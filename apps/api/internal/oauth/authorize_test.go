@@ -293,6 +293,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "state_not_utf8", set: map[string]string{"state": "xyz\xff"}, wantError: "invalid_request"},
 		{name: "state_too_long", set: map[string]string{"state": strings.Repeat("s", 2049)}, wantError: "invalid_request"},
 		{name: "no_authorization_code_grant", set: map[string]string{"client_id": "no-codes"}, wantError: "unauthorized_client"},
+		{name: "prompt_consent", set: map[string]string{"prompt": "login consent"}, wantError: "unauthorized_client"},
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
 		{name: "store_unavailable", storeErr: domain.ErrUnavailable().WithParent(errors.New("contention")), wantError: "temporarily_unavailable"},

@@ -111,6 +111,10 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	if !slices.Contains(c.grantTypes, oidc.GrantTypeCode) {
 		return nil, oidc.ErrUnauthorizedClient().WithDescription("the client's grant_types do not include authorization_code")
 	}
+	// Until consent ships, a request may not ask for it (ADR 082, step 2).
+	if slices.Contains(req.Prompt, oidc.PromptConsent) {
+		return nil, oidc.ErrUnauthorizedClient().WithDescription("consent is not supported yet")
+	}
 	if req.CodeChallenge != "" {
 		// The library reads a missing method as plain; this server accepts S256 only.
 		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
