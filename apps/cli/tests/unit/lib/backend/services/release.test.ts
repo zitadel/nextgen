@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConflictError } from "@/lib/backend/errors";
 import { ReleaseInUseError, ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
+import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const INPUT = {
@@ -66,10 +67,10 @@ describe("ReleaseService.revoke", () => {
 
   describe("when an origin still serves the release", () => {
     /** A primary origin that serves the release, as the server names it. */
-    const PRIMARY = { origin: "https://app.acme.com", deployment_id: "dep_1", kind: "primary" };
+    const PRIMARY = { origin: PRIMARY_ORIGIN, deployment_id: "dep_1", kind: "primary" };
 
     /** A preview that serves the release, as the server names it. */
-    const PREVIEW = { origin: "https://x.vercel.app", deployment_id: "dep_2", kind: "preview" };
+    const PREVIEW = { origin: PREVIEW_URL, deployment_id: "dep_2", kind: "preview" };
 
     /**
      * The answer the server refuses a revoke with when origins serve the release.
@@ -113,7 +114,9 @@ describe("ReleaseService.revoke", () => {
     it("fails with every origin that serves it", async () => {
       const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
 
-      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+      const refusal = await rejectionOf(() => {
+        return releaseService.revoke("rel_1");
+      });
 
       expect(refusal).toBeInstanceOf(ReleaseInUseError);
       expect(refusal).toMatchObject({ origins: [PRIMARY, PREVIEW] });
@@ -122,7 +125,9 @@ describe("ReleaseService.revoke", () => {
     it("lists the origins that serve it as primary origins", async () => {
       const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
 
-      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+      const refusal = await rejectionOf(() => {
+        return releaseService.revoke("rel_1");
+      });
 
       expect(refusal).toMatchObject({ primaries: [PRIMARY] });
     });
@@ -130,7 +135,9 @@ describe("ReleaseService.revoke", () => {
     it("lists the origins that serve it as previews", async () => {
       const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
 
-      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+      const refusal = await rejectionOf(() => {
+        return releaseService.revoke("rel_1");
+      });
 
       expect(refusal).toMatchObject({ previews: [PREVIEW] });
     });
@@ -138,7 +145,9 @@ describe("ReleaseService.revoke", () => {
     it("fails as a conflict that keeps the server's answer", async () => {
       const releaseService = refusedWith(anInUseAnswer([PRIMARY]));
 
-      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+      const refusal = await rejectionOf(() => {
+        return releaseService.revoke("rel_1");
+      });
 
       expect(refusal).toBeInstanceOf(ConflictError);
       expect(refusal).toMatchObject({
@@ -156,7 +165,9 @@ describe("ReleaseService.revoke", () => {
       async (kind) => {
         const releaseService = refusedWith(anInUseAnswer([{ ...PRIMARY, kind }]));
 
-        const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+        const refusal = await rejectionOf(() => {
+          return releaseService.revoke("rel_1");
+        });
 
         expect(refusal).toBeInstanceOf(ReleaseInUseError);
       },
@@ -172,7 +183,9 @@ describe("ReleaseService.revoke", () => {
     ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
       const releaseService = refusedWith(body);
 
-      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+      const refusal = await rejectionOf(() => {
+        return releaseService.revoke("rel_1");
+      });
 
       expect(refusal).toBeInstanceOf(ConflictError);
       expect(refusal).not.toBeInstanceOf(ReleaseInUseError);

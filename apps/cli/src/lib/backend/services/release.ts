@@ -46,7 +46,8 @@ export class ReleaseInUseError extends ConflictError {
   /**
    * @param message - The server's message.
    * @param origins - Every origin that serves the release.
-   * @param options - What the server's answer carried: status, URL, body and request id.
+   * @param options - What the server's answer carried (status, URL, body and
+   * request id) and the conflict it came from, as the cause.
    */
   constructor(
     message: string,

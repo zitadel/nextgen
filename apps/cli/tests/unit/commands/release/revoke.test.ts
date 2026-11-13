@@ -76,7 +76,7 @@ describe("release revoke refused for a release an origin serves", () => {
    * Arranges a project whose release the given origin kinds serve.
    *
    * @param served - Which origin kinds serve the release.
-   * @returns The project's directory, its release and the deployments serving it.
+   * @returns The project's directory, its release and which deployment serves it where.
    */
   async function aServedRelease(served: { primary: boolean; preview: boolean }) {
     const project = await aReleaseServedOn("zitadel-release-revoke-served-", served);
@@ -106,14 +106,6 @@ describe("release revoke refused for a release an origin serves", () => {
     ];
   }
 
-  it("fails as a conflict", async () => {
-    const project = await aServedRelease({ primary: true, preview: false });
-
-    const result = await runCliForTest(revokeArgumentsOf(project));
-
-    expect(result).toFailWith("E_CONFLICT");
-  });
-
   it.each([
     ["a primary origin", { primary: true, preview: false }, PRIMARY_ORIGIN, "primary"],
     ["a preview", { primary: false, preview: true }, PREVIEW_URL, "preview"],
@@ -134,8 +126,7 @@ describe("release revoke refused for a release an origin serves", () => {
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 
-    expect(project[kind]).toBeDefined();
-    expect(result).toHintAt(`${origin} (${kind}, ${project[kind]})`);
+    expect(result).toHintAt(`${origin} (${kind}, ${project.deploymentOn(kind)})`);
   });
 
   it.each([

@@ -153,6 +153,9 @@ export async function aProjectWithTwoDeploys(
   return { cwd: await aProjectDirectory(prefix, project), undone };
 }
 
+/** The kinds of origin a release can be served on. */
+type OriginKind = "primary" | "preview";
+
 /**
  * A project on the mock with one release live on a primary origin, on a
  * preview URL, or on both, its directory, and the deployments that serve it.
@@ -160,39 +163,51 @@ export async function aProjectWithTwoDeploys(
  *
  * @param prefix - The project's name, and the prefix of its directory.
  * @param served - Where the release is live.
- * @returns The directory, the release, and the deployment serving it on each
- * origin kind, undefined for a kind it was not put live on. The caller removes
- * the directory.
+ * @returns The directory, the release, and `deploymentOn`, which names the
+ * deployment serving the release on an origin kind and throws for a kind it
+ * was not put live on. The caller removes the directory.
  */
 export async function aReleaseServedOn(
   prefix: string,
   served: { primary: boolean; preview: boolean },
-): Promise<{
-  cwd: string;
-  releaseId: string;
-  primary: string | undefined;
-  preview: string | undefined;
-}> {
+): Promise<{ cwd: string; releaseId: string; deploymentOn(kind: OriginKind): string }> {
   const project = await aProjectWithPrimaryOrigin(prefix);
   await callPlatform(`/projects/${project.id}/origins`, project.secret, {
     pattern: PREVIEW_PATTERN,
     kind: "preview",
   });
   const releaseId = await createdRelease(project, "sch_a");
-  let primary: string | undefined;
+  const deployments: Partial<Record<OriginKind, string>> = {};
   if (served.primary) {
-    primary = await createdDeployment(project, releaseId, { targets: "primary" });
+    deployments.primary = await createdDeployment(project, releaseId, { targets: "primary" });
   }
-  let preview: string | undefined;
   if (served.preview) {
-    preview = await createdDeployment(project, releaseId, {
+    deployments.preview = await createdDeployment(project, releaseId, {
       targets: [PREVIEW_URL],
       ttl: "PT168H",
     });
   }
   const cwd = await aProjectDirectory(prefix, project);
 
-  return { cwd, releaseId, primary, preview };
+  return {
+    cwd,
+    releaseId,
+    /**
+     * The deployment serving the release on an origin kind.
+     *
+     * @param kind - The origin kind.
+     * @returns The deployment's ID.
+     * @throws Error when the release was not put live on that kind.
+     */
+    deploymentOn(kind: OriginKind): string {
+      const deployment = deployments[kind];
+      if (deployment === undefined) {
+        throw new Error(`The release is not served on a ${kind} origin`);
+      }
+
+      return deployment;
+    },
+  };
 }
 
 /**
