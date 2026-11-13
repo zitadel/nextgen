@@ -18,6 +18,7 @@ import { statusColor } from "@/lib/style";
 import {
   type Again,
   declaredOf,
+  type FlagNameOf,
   type LooseNext,
   helpOf,
   commandOf,
@@ -26,6 +27,7 @@ import {
   type Suggest,
   type Suggested,
   type SuggestedCommand,
+  spelled,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
@@ -49,7 +51,7 @@ import {
 import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
-import { type Rerun, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
+import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
@@ -451,7 +453,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @throws {Error} When the target is no command this CLI loaded.
    */
   protected readonly suggest: Suggest = (next: Suggested | LooseNext) => {
-    return this.suggestions.aimedAt(this.scope())(next as Suggested);
+    return this.suggestions.render(next, this.scope());
   };
 
   /**
@@ -494,19 +496,66 @@ export abstract class BaseCommand extends Interruptible(Command) {
       throw new Error(`${this.id} cannot suggest itself as ${id}`);
     }
 
-    return this.rerun({ without: change.without, with: change.with }, id);
+    return this.rebuilt({ without: change.without, with: change.with }, id);
   };
 
   /**
    * {@link again} for code that does not know which command it runs in, such
-   * as a mixin: the changes are checked when the command is rendered, not when
-   * it is compiled ({@link RunSuggestions.rerun}).
+   * as a mixin. It names the flags it relies on as `Defs`, which is never
+   * inferred, so the change is checked against them when it is compiled; the
+   * run then refuses one the command does not declare
+   * ({@link RunSuggestions.rerun}).
    *
+   * @typeParam Defs - The flags the rerun relies on the command declaring, as
+   *   a command declares them. Nothing infers it, so a caller names it.
    * @param change - What the rerun changes, by the names code reads them.
-   * @param id - The running command, where the class has no id of its own.
    * @returns The command.
+   * @throws {Error} When the change names a flag the running command does not
+   *   declare.
+   * @example
+   * await this.rerun<{ force: Interfaces.BooleanFlag<boolean> }>({ with: { force: true } });
    */
-  protected async rerun(change: Rerun = {}, id: string = this.id ?? ""): Promise<SuggestedCommand> {
+  protected async rerun<Defs extends object = Record<never, never>>(
+    change: RerunOf<NoInfer<Defs>> = {},
+  ): Promise<SuggestedCommand> {
+    return this.rebuilt(change);
+  }
+
+  /**
+   * Refuses this run unless its command declares each of `names`: the flags
+   * that code shared by many commands, such as a mixin, sets or leaves out
+   * when it reruns one, and cannot see declared. That code calls this where
+   * it starts, so a command without one fails on every run of it, not only on
+   * the rare one that builds the rerun.
+   *
+   * @typeParam Defs - The flags relied on, as a command declares them.
+   * @param names - The flags, by the names code reads them.
+   * @throws {Error} When the command does not declare one of them.
+   */
+  protected relyOn<Defs extends object>(...names: readonly FlagNameOf<{ flags: Defs }>[]): void {
+    const declared = { ...this.command.baseFlags, ...this.command.flags };
+    const lacking = names.filter((name) => {
+      return !(spelled(name) in declared);
+    });
+    if (lacking.length > 0) {
+      throw new Error(
+        `${this.id ?? ""} declares no --${lacking.map(spelled).join(", --")}, which it reruns with`,
+      );
+    }
+  }
+
+  /**
+   * This run again with `change`, its flags only names by now: the one
+   * implementation {@link again}, {@link rerun} and {@link realRun} share.
+   *
+   * @param change - What the rerun changes.
+   * @param id - The running command; this run's own id unless {@link again}
+   *   names it.
+   * @returns The command.
+   * @throws {Error} When the change names a flag the running command does not
+   *   declare.
+   */
+  private async rebuilt(change: Rerun, id: string = this.id ?? ""): Promise<SuggestedCommand> {
     const { raw } = await this.parseOnce();
     // Read off the running class itself rather than looked up by id: this run
     // is the command, whatever table it was loaded from.
@@ -529,7 +578,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @returns The command.
    */
   protected async realRun(): Promise<SuggestedCommand> {
-    return this.rerun({ without: ["dryRun"] });
+    return this.rebuilt({ without: ["dryRun"] });
   }
 
   /**
