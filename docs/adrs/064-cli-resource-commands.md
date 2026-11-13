@@ -6,10 +6,11 @@
 > **Relates to:** [ADR 004](004-agent-contract-and-agents-md.md), [ADR 027](027-cursor-based-pagination.md), [ADR 030](030-error-model-mapping-and-reporting.md), [ADR 031](031-openapi-querying.md), [ADR 035](035-configuration-environments.md), [ADR 036](036-api-credential-planes.md)
 >
 > **Amendment (2026-10-07):** §2's *plural* is superseded. Resources are
-> spelled singular (`zitadel user create`), and `deploy`, `preview` and
-> `rollback` stay top-level as the release loop. §3's `environments` question
-> is settled as `env`, which is singular under the same rule. Rationale and the
-> noun list: [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
+> spelled singular (`zitadel user create`), and `deploy` and `preview` stay
+> top-level as the release loop; a rollback sits under its resource, as
+> `deployment rollback`. §3's `environments` question is settled as `env`,
+> which is singular under the same rule. Rationale and the noun list:
+> [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
 > The shipped commands are renamed without a deprecation window (alpha).
 >
 > **Amendment (2026-10-15):** §6 and §13 are extended by

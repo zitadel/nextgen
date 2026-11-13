@@ -216,7 +216,7 @@ Examples include:
 ```text
 deploy
 promote
-rollback
+deployment rollback
 reset
 eject
 <resource> delete
