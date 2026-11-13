@@ -4,7 +4,7 @@ import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 /** A span that records nothing, which is all `event.tracing` needs while tracing is off. */
 const span: RequestEvent["tracing"]["root"] = {
@@ -39,7 +39,7 @@ async function serve(request: Request, options: NextgenMiddlewareOptions): Promi
     platform: undefined,
     route: { id: null },
     fetch,
-    getClientAddress: () => "203.0.113.7",
+    getClientAddress: () => CLIENT_ADDRESS,
     setHeaders: () => {},
     isDataRequest: false,
     isSubRequest: false,

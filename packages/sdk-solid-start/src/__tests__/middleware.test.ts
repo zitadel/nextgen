@@ -43,7 +43,6 @@ async function serve(
     status: response?.status ?? 200,
     headers,
     auth: event.locals.nextgenAuth,
-    inbound: event.request.headers,
     body: (await response?.text()) ?? "",
   };
 }

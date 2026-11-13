@@ -6,7 +6,7 @@
 import type { EventHandler, H3Event, H3EventContext } from "h3";
 
 import { createApp, toWebHandler } from "h3";
-import { expectTypeOf, vi } from "vitest";
+import { beforeEach, expectTypeOf, vi } from "vitest";
 
 import type { AuthResult } from "@zitadel/sdk-core/middleware";
 import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
@@ -16,9 +16,10 @@ import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middlewar
 import { createNextgenMiddleware, getAuth } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
-function resetSdk(): void {
+// Each case starts from an app that sets no runtime config.
+beforeEach(() => {
   setRuntimeConfig({ nextgen: {} });
-}
+});
 
 async function serve(
   url: string,
@@ -36,11 +37,9 @@ async function serve(
   app.use(createNextgenMiddleware(options));
   let continued = false;
   let auth: AuthResult | undefined;
-  let inbound = new Headers();
   app.use((event) => {
     continued = true;
     auth = event.context.nextgenAuth;
-    inbound = new Headers(event.node.req.headers as Record<string, string>);
     return { ok: true };
   });
   const response = await toWebHandler(app)(
@@ -54,13 +53,13 @@ async function serve(
     status: response.status,
     headers: response.headers,
     auth,
-    inbound,
     body: await response.text(),
   };
 }
 
 function configureSecret(configured?: string, environment?: string): ServeOptions {
-  setRuntimeConfig({ nextgen: { projectSecret: configured ?? environment } });
+  setRuntimeConfig({ nextgen: { projectSecret: configured } });
+  vi.stubEnv("ZITADEL_PROJECT_SECRET", environment);
   return {};
 }
 
@@ -85,6 +84,5 @@ describeServerMiddleware({
   configureProject,
   readAuth,
   expectHandlerType,
-  resetSdk,
   checksSessionsOnPublicRoutes: true,
 });

@@ -53,7 +53,8 @@ change needs a changeset, and the whole train versions together.
   the same. Only the glue above a block, which hands a render to the
   framework, is the framework's own.
 - **Server SDKs run one test contract**: write a middleware or edge case once in
-  `@zitadel/server-sdk-contract`; each server SDK's spec is only its adapter.
+  `@zitadel/server-sdk-contract`; a server SDK's spec is its adapter, plus
+  cases only that framework has.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

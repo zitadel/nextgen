@@ -71,7 +71,6 @@ async function serve(
     status: response.status,
     headers,
     auth: event.locals.nextgenAuth as AuthResult | undefined,
-    inbound: event.request.headers,
     body: await response.text(),
   };
 }

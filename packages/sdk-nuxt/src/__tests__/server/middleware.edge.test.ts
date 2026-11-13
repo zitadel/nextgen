@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
@@ -12,7 +12,7 @@ import { setRuntimeConfig } from "../stubs/nuxt-imports";
 async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
   const app = createApp();
   app.use((event) => {
-    Object.defineProperty(event.node.req, "socket", { value: { remoteAddress: "203.0.113.7" } });
+    Object.defineProperty(event.node.req, "socket", { value: { remoteAddress: CLIENT_ADDRESS } });
   });
   app.use(createNextgenMiddleware(options));
   app.use(() => "ok");

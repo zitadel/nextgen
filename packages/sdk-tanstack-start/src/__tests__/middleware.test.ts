@@ -38,7 +38,6 @@ async function serve(
     status: response.status,
     headers: response.headers,
     auth,
-    inbound: request.headers,
     body: await response.text(),
   };
 }

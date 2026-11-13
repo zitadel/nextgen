@@ -2,7 +2,7 @@ import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 /** Sends a request through the built handler, the way Qwik Router would, and returns the answer. */
 async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {
@@ -12,7 +12,7 @@ async function serve(request: Request, options: NextgenMiddlewareOptions): Promi
       request,
       url: new URL(request.url),
       sharedMap: new Map(),
-      clientConn: { ip: "203.0.113.7" },
+      clientConn: { ip: CLIENT_ADDRESS },
       cookie: { get: () => null, getAll: () => ({}), set: () => {}, delete: () => {} },
       send: (response) => {
         sent = response;

@@ -112,17 +112,6 @@ function captureFetch(response: () => Response = () => new Response("{}", { stat
   return calls;
 }
 
-/**
- * Answers the opaque-session lookup (`GET /sessions/me`) with `response`, a
- * copy each time: a middleware and a page's own session read may both ask.
- */
-function sessionsMe(response: Response): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => response.clone()),
-  );
-}
-
 /** Fails the opaque-session lookup on the network, as a backend that is down does. */
 function sessionsMeUnreachable(): void {
   vi.stubGlobal(
@@ -146,11 +135,6 @@ function sessionsMeSilent(): void {
   );
 }
 
-/**
- * Asserts that an answer moved this project's session `token` out of the shared
- * cookie: it sets the app's own cookie, HttpOnly, for the session's lifetime,
- * and clears the shared one.
- */
 /**
  * Expects `token` copied into this project's cookie, with the server's
  * attributes, and the shared cookie left as it was: the Console may share the
@@ -208,8 +192,6 @@ export interface Served {
   readonly headers: Headers;
   /** What a downstream handler reads as the session; undefined when none was set. */
   readonly auth: AuthResult | undefined;
-  /** The request headers a downstream handler sees. */
-  readonly inbound: Headers;
   /** The answer's body. */
   readonly body: string;
 }
@@ -230,8 +212,6 @@ export interface ServerSdkAdapter {
   readAuth(context: unknown): Promise<AuthResult>;
   /** Asserts, at type level, that the handler is assignable to the framework's handler type. */
   expectHandlerType(): void;
-  /** Resets the SDK's own state between cases, such as a runtime config stub. */
-  resetSdk?(): void;
   /**
    * Whether the handler asks the backend about an opaque session cookie on a
    * public route too. Next's middleware leaves that to the page's `auth()` and
@@ -252,9 +232,22 @@ const PROXY: ServeOptions = { url: "http://localhost:4000" };
 /** Runs the server middleware contract against one SDK's adapter. */
 export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
   const { serve, configureSecret, configureProject, readAuth, expectHandlerType } = adapter;
-  const resetSdk = (): void => adapter.resetSdk?.();
   /** Where the handler asks about an opaque session (see `checksSessionsOnPublicRoutes`). */
   const SESSION_ROUTE = adapter.checksSessionsOnPublicRoutes ? "/" : "/admin";
+
+  /**
+   * Answers the opaque-session lookup (`GET /sessions/me`) with `response`. A
+   * handler that leaves the session to the page (`checksSessionsOnPublicRoutes`
+   * false, Next's `auth()`) may see the page ask too, so each lookup gets a
+   * copy; every other handler reads the answer once, and a second lookup in one
+   * request fails.
+   */
+  function sessionsMe(response: Response): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => (adapter.checksSessionsOnPublicRoutes ? response : response.clone())),
+    );
+  }
 
   // The JWKS cache is module-level and per issuer: start every case from a cold
   // cache, so each one fetches the keys its own mock publishes. So is the memo of
@@ -270,7 +263,6 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
 
     beforeEach(() => {
       vi.restoreAllMocks();
-      resetSdk();
     });
 
     afterEach(() => {

@@ -82,7 +82,6 @@ async function serve(
     status: sent?.status ?? redirected?.status ?? 200,
     headers,
     auth: ev.sharedMap.get("nextgenAuth") as AuthResult | undefined,
-    inbound: ev.request.headers,
     body: (await sent?.text()) ?? "",
   };
 }

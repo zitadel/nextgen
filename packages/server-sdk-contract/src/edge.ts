@@ -2,10 +2,13 @@ import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** The address the runtime reports for the client of every edge case. */
+export const CLIENT_ADDRESS = "203.0.113.7";
+
 /**
  * Sends `request` through a server SDK's built handler, the way its framework
- * would, from the client address `203.0.113.7`, and returns the answer: the
- * handler's own, or a 200 `ok` when it lets the request continue.
+ * would, from {@link CLIENT_ADDRESS}, and returns the answer: the handler's
+ * own, or a 200 `ok` when it lets the request continue.
  */
 export type EdgeServe = (request: Request, options: NextgenMiddlewareOptions) => Promise<Response>;
 
@@ -70,7 +73,7 @@ export function describeEdgeServer(serve: EdgeServe): void {
       expect(forwarded[0]?.headers.get("authorization")).toBe("Bearer abc");
       expect(forwarded[0]?.headers.get("cookie")).toBe("theme=dark");
       expect(forwarded[0]?.headers.get("content-type")).toBe("text/plain");
-      expect(forwarded[0]?.headers.get("x-forwarded-for")).toBe("198.51.100.1, 203.0.113.7");
+      expect(forwarded[0]?.headers.get("x-forwarded-for")).toBe(`198.51.100.1, ${CLIENT_ADDRESS}`);
       expect(forwarded[0]?.headers.has("connection")).toBe(false);
     });
 
@@ -79,7 +82,7 @@ export function describeEdgeServer(serve: EdgeServe): void {
       expect(forwarded).toHaveLength(1);
       expect(forwarded[0]?.url).toBe(`${BACKEND}/ping`);
       expect(forwarded[0]?.method).toBe("GET");
-      expect(forwarded[0]?.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+      expect(forwarded[0]?.headers.get("x-forwarded-for")).toBe(CLIENT_ADDRESS);
     });
 
     it("refuses a request that carries the auth header before forwarding it", async () => {

@@ -50,11 +50,13 @@ async function serve(
     status: response.status,
     headers: response.headers,
     auth,
-    inbound,
     body: await response.text(),
   };
 }
 
+// Next reads the project secret from one source, `ZITADEL_PROJECT_SECRET`, and
+// takes no option for it, so the contract's "configuration" row repeats its
+// "environment" row here.
 function configureSecret(configured?: string, environment?: string): ServeOptions {
   vi.stubEnv("ZITADEL_PROJECT_SECRET", configured ?? environment);
   return {};
