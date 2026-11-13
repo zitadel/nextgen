@@ -103,6 +103,6 @@ default flow's switch between sign-in and sign-up (its JSDoc has the rules).
   that file's `fetch` count: test a new handler and its refusals there.
 - The check proves an error code is one the operation declares, not that it is
   the right one, and `default` lets any error status through.
-- When the mock and the spec disagree, the spec wins. A route the spec lacks,
-  or an answer the spec gets wrong about the server, goes in
+- When the mock and the spec disagree, the spec wins; where the spec is wrong
+  about the server, fix the spec first. A route the spec lacks goes in
   `src/__tests__/spec-exceptions.ts` with its reason.

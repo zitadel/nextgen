@@ -21,8 +21,6 @@ import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import type { ZodType } from "zod";
 
-import { SPEC_GAPS } from "./spec-exceptions.js";
-
 type Schema = Record<string, unknown>;
 type ResponseObject = { $ref?: string; content?: Record<string, { schema?: Schema }> };
 type OperationObject = { operationId: string; responses: Record<string, ResponseObject> };
@@ -192,9 +190,6 @@ export function declaredCodes(op: SpecOperation, status: number): Set<string> {
   return codes;
 }
 
-/** The `SPEC_GAPS` entries an answer needed, so a gap the spec has closed shows as unused. */
-export const usedGaps = new Set<string>();
-
 export type Exchange = { status: number; contentType: string | null; text: string };
 
 /**
@@ -241,14 +236,7 @@ export function violations(op: SpecOperation, exchange: Exchange): string[] {
     return schemaErrors(schema, body).map((e) => `${where}: ${e}`);
   }
 
-  let problems = schemaErrors(schema, body).map((e) => `${where}: ${e}`);
-  const fallback = op.responses.default;
-  const fallbackSchema = fallback ? jsonSchema(resolve(fallback)) : undefined;
-  const gap = `${op.id} ${status}`;
-  if (problems.length > 0 && gap in SPEC_GAPS && fallbackSchema) {
-    problems = schemaErrors(fallbackSchema, body).map((e) => `${where}: ${e}`);
-    if (problems.length === 0) usedGaps.add(gap);
-  }
+  const problems = schemaErrors(schema, body).map((e) => `${where}: ${e}`);
   const code = (body as { code?: unknown }).code;
   const codes = declaredCodes(op, status);
   if (typeof code === "string" && codes.size > 0 && !codes.has(code)) {

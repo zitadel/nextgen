@@ -29,8 +29,8 @@ import {
   observations,
   routeKey,
 } from "./__tests__/mock-routes.js";
-import { OUT_OF_SPEC_ROUTES, SPEC_GAPS } from "./__tests__/spec-exceptions.js";
-import { specOperations, usedGaps } from "./__tests__/spec-contract.js";
+import { OUT_OF_SPEC_ROUTES } from "./__tests__/spec-exceptions.js";
+import { specOperations } from "./__tests__/spec-contract.js";
 import { signHandoffToken } from "./crypto.js";
 import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
@@ -3783,6 +3783,26 @@ describe("api-mock error paths — each refusal a handler names", () => {
       );
     });
 
+    // submitFlowStep's 400 is either shape: this is the step with its error,
+    // the server-transport tests above send the error envelope.
+    test("refuses a submit as the same step with an error when told to", async () => {
+      const start = await call("POST", "/flow", {
+        purpose: "login",
+        project_id: "proj_in_process",
+      });
+      const flow = (await start.json()) as { id: string; session_token: string };
+      mock.rejectNextSubmit("error.invalid_credentials");
+      const res = await call("POST", `/flow/${flow.id}/submit`, {
+        session_token: flow.session_token,
+        action: "submit",
+        fields: { email: "in-process@example.com" },
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { step: { error: string } }).step.error).toBe(
+        "error.invalid_credentials",
+      );
+    });
+
     test("answers the session reads and sign-out of a signed-out browser with 401", async () => {
       await expectRefusal(await call("GET", "/sessions/me"), 401, "auth.unauthorized");
       await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");
@@ -3805,10 +3825,6 @@ describe("api-mock route coverage — every handler answers by the contract", ()
     const served = new Set(routes.map((r) => routeKey(r.method, r.path)));
     const stale = [...listed].filter((key) => inSpec.has(key) || !served.has(key));
     expect(stale, "OUT_OF_SPEC_ROUTES entries the spec now has or no route serves").toEqual([]);
-  });
-
-  test("every spec gap is still one an answer needs", () => {
-    expect(Object.keys(SPEC_GAPS).filter((gap) => !usedGaps.has(gap))).toEqual([]);
   });
 
   test("every server route answered its success path, and every in-process one answered", () => {
