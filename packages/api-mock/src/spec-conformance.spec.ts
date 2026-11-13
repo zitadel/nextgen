@@ -35,6 +35,7 @@ import { signHandoffToken } from "./crypto.js";
 import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
 import {
+  acceptInvitation,
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
@@ -3808,6 +3809,154 @@ describe("api-mock error paths — each refusal a handler names", () => {
       await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");
       await expectRefusal(await call("DELETE", "/sessions/me"), 401, "auth.unauthorized");
     });
+  });
+});
+
+describe("api-mock invitations", () => {
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${API}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  type Created = { id: string; journey_id: string; link?: string; metadata?: unknown };
+
+  const invite = (projectId: string, body: Record<string, unknown> = {}) =>
+    fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "project_member",
+        project_member: { relation: "viewer" },
+        ...body,
+      }),
+    });
+
+  async function invited(projectId: string, body: Record<string, unknown> = {}): Promise<Created> {
+    const res = await invite(projectId, body);
+    expect(res.status).toBe(201);
+    return (await res.json()) as Created;
+  }
+
+  async function code(res: Response): Promise<{ status: number; code: string }> {
+    return { status: res.status, code: ((await res.json()) as { code: string }).code };
+  }
+
+  test("creates a pending invitation with its one-shot link", async () => {
+    const projectId = await newProject("invitations-create");
+
+    const created = await invited(projectId, { metadata: { name: "Ada" } });
+
+    expect(created).toMatchObject({
+      id: expect.stringMatching(/^inv_/),
+      status: "pending",
+      link: expect.stringMatching(/\/invitations\/accept#token=\S+$/),
+      metadata: { name: "Ada" },
+    });
+  });
+
+  test("never returns the link on a read", async () => {
+    const projectId = await newProject("invitations-read");
+    const created = await invited(projectId);
+
+    const one = (await (
+      await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const listed = (await (await fetch(`${API}/invitations?project_id=${projectId}`)).json()) as {
+      invitations: Record<string, unknown>[];
+    };
+
+    expect([one, ...listed.invitations].some((invitation) => "link" in invitation)).toBe(false);
+  });
+
+  test("lists newest first, filtered and paged", async () => {
+    const projectId = await newProject("invitations-list");
+    const first = await invited(projectId);
+    const second = await invited(projectId);
+    acceptInvitation(first.id);
+
+    const page = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&limit=1`)
+    ).json()) as { invitations: { id: string }[]; next_page_token?: string | null };
+    const pending = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&status=pending`)
+    ).json()) as { invitations: { id: string }[] };
+    const teams = (await (
+      await fetch(`${API}/invitations?project_id=${projectId}&type=team_member`)
+    ).json()) as { invitations: unknown[] };
+
+    expect({
+      page: page.invitations.map((invitation) => invitation.id),
+      next: page.next_page_token,
+      pending: pending.invitations.map((invitation) => invitation.id),
+      teams: teams.invitations,
+    }).toEqual({ page: [second.id], next: "1", pending: [second.id], teams: [] });
+  });
+
+  test("a replace keeps the journey and name and deletes the original", async () => {
+    const projectId = await newProject("invitations-replace");
+    const original = await invited(projectId, { metadata: { name: "Ada" } });
+
+    const replacement = await invited(projectId, { replaces_invitation_id: original.id });
+
+    expect({
+      journey: replacement.journey_id,
+      metadata: replacement.metadata,
+      original: (await fetch(`${API}/invitations/${original.id}?project_id=${projectId}`)).status,
+    }).toEqual({ journey: original.journey_id, metadata: { name: "Ada" }, original: 404 });
+  });
+
+  test("cancels a pending invitation", async () => {
+    const projectId = await newProject("invitations-cancel");
+    const created = await invited(projectId);
+
+    const res = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+  });
+
+  test("refuses a team invitation as not implemented", async () => {
+    const projectId = await newProject("invitations-team");
+
+    const res = await fetch(`${API}/invitations?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "team_member",
+        team_member: { team_id: "team_1", role: "member" },
+      }),
+    });
+
+    expect(await code(res)).toEqual({ status: 501, code: "not_implemented" });
+  });
+
+  test("answers inv.not_found for an invitation the project does not hold", async () => {
+    const projectId = await newProject("invitations-missing");
+
+    const res = await fetch(`${API}/invitations/inv_missing?project_id=${projectId}`);
+
+    expect(await code(res)).toEqual({ status: 404, code: "inv.not_found" });
+  });
+
+  test("refuses to replace or cancel an accepted invitation", async () => {
+    const projectId = await newProject("invitations-accepted");
+    const created = await invited(projectId);
+    acceptInvitation(created.id);
+
+    const replaced = await invite(projectId, { replaces_invitation_id: created.id });
+    const cancelled = await fetch(`${API}/invitations/${created.id}?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+
+    expect([await code(replaced), await code(cancelled)]).toEqual([
+      { status: 404, code: "inv.not_found" },
+      { status: 404, code: "inv.not_found" },
+    ]);
   });
 });
 

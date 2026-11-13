@@ -1,8 +1,6 @@
 import { Args, Flags } from "@oclif/core";
-import { z } from "zod";
 
 import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
-import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -10,10 +8,12 @@ import { deletedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { invitationIdSchema } from "./id";
 
 /** The invitation `invitation cancel` cancels, as the API spells an invitation id. */
+// Annotated: its `next` names this topic's list, which would make the type circular.
 const INVITATION_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetInvitationParams.shape.id),
+  schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list --status pending`.",
@@ -31,25 +31,25 @@ const INVITATION_CANCELLED = "invitation_cancelled";
  * How a bare cancel is refused when it cannot pick: a dry run must not read the
  * server, and a run with nobody to ask would read it only to refuse.
  */
-const NO_ID_REFUSAL: Refusal = {
+const NO_ID_REFUSAL = {
   message: "Name the invitation to cancel",
   hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
   next: [{ id: "invitation:list", flags: { status: "pending" } }],
-};
+} as const satisfies Refusal;
 
 /** How a cancel of an invitation that has already finished is refused. */
-const NOT_PENDING_REFUSAL: Refusal = {
+const NOT_PENDING_REFUSAL = {
   message: "{id} is {status}, so there is nothing to cancel",
   hint: "Only a pending invitation can be cancelled.",
   next: [{ id: "invitation:list", flags: { status: "pending" } }],
-};
+} as const satisfies Refusal;
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
-const NOTHING_PENDING_REFUSAL: Refusal = {
+const NOTHING_PENDING_REFUSAL = {
   message: "The project has no pending invitations",
   hint: "Only a pending invitation can be cancelled.",
   next: [{ id: "invitation:list" }],
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
@@ -150,11 +150,13 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
       retry: this.suggest({ id: "invitation:list", flags: { status: "pending" } }),
-      options: pending.map((invitation) => ({
-        value: invitation,
-        label: invitation.id,
-        hint: pendingHint(invitation),
-      })),
+      options: pending.map((invitation) => {
+        return {
+          value: invitation,
+          label: invitation.id,
+          hint: pendingHint(invitation),
+        };
+      }),
     });
   }
 
