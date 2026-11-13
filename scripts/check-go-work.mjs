@@ -123,9 +123,19 @@ async function completedWorkSum(sum, env) {
 /** Checks the staged go.work.sum, or with `fix` completes the working tree's; the exit code. */
 async function checkWorkSum(fix, env) {
   const path = join(root, "go.work.sum");
-  const sum = fix
-    ? await readFile(path, "utf8").catch(() => "")
-    : (await exec("git", ["show", ":go.work.sum"], { cwd: root })).stdout;
+  let sum;
+  if (fix) {
+    sum = await readFile(path, "utf8").catch(() => "");
+  } else {
+    try {
+      sum = (await exec("git", ["show", ":go.work.sum"], { cwd: root })).stdout;
+    } catch (error) {
+      // No fallback to the working tree: turbo has completed that copy.
+      console.error(`error: git show :go.work.sum\n${error.stderr || error.message}`);
+      console.error("hint: the check reads the go.work.sum git has staged; stage it");
+      return 1;
+    }
+  }
   const completed = await completedWorkSum(sum, env);
   if (completed === sum) return 0;
   if (fix) {
