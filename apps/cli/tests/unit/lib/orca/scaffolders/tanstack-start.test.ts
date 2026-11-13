@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("TanStackStartScaffolder", () => {
-  it("runs @tanstack/cli create (full Start mode) then removes the starter routes/index.tsx", async () => {
+  it("runs @tanstack/cli create (full Start mode) without an install, then removes the starter routes/index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new TanStackStartScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "tanstack-start");
@@ -45,6 +45,7 @@ describe("TanStackStartScaffolder", () => {
       "--no-intent",
       "--no-git",
       "-y",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/index.tsx"), {

@@ -24,7 +24,8 @@ const TANSTACK_CLI = frameworkCli("@tanstack/cli");
  * Nitro target, and `--no-examples`/`--no-toolchain`/`--no-intent` keep the
  * output minimal. `vite.config.*` is left in place — auth is wired through
  * `src/start.ts` (the framework's server entry, which the patcher writes), so
- * no config edit is needed.
+ * no config edit is needed. It installs nothing: setup's own install step
+ * does, once, and not under `--skip-install`.
  */
 export class TanStackStartScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "TanStack Start";
@@ -55,6 +56,9 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
         "--no-intent",
         "--no-git",
         "-y",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--no-install",
       ],
       cwd,
     );
