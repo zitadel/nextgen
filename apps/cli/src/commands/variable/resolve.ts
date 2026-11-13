@@ -151,9 +151,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       }
     }
 
-    // The live list narrows each deployment to the origins it still serves, so
-    // this names exactly what the resolved map runs on — the chosen origin,
-    // stated in the output.
+    // The live list names every origin a deployment still serves, so this names
+    // exactly what the resolved map runs on: all of the deployment's origins,
+    // the one asked for among them.
     const live = found.deployment;
     const items = await deploymentService.variables(live.id);
     const origins = [...live.origins].sort();

@@ -358,6 +358,7 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 		ProjectID:  link.ProjectID,
 		EntityType: "idp_identity_link",
 		EntityID:   link.ID,
+		UserID:     link.UserID,
 		Payload:    domain.IDPIdentityLinkCreatedPayload{ConnectionID: link.ConnectionID, UserID: link.UserID},
 	}); err != nil {
 		return fmt.Errorf("create sso user: emit identity link created: %w", err)

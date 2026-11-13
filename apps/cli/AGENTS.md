@@ -20,6 +20,9 @@
   (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:
   [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)
   (`src/lib/scaffold-manifest.ts`).
+- Run a framework CLI only at its pin in
+  `src/lib/orca/scaffolders/framework-clis/package.json`, never a dist-tag;
+  Dependabot bumps it there, and a bump needs a changeset.
 - Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
 - The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 - Never write a suggested command (`next.commands`, `nextCommands`, a `retry`) as a

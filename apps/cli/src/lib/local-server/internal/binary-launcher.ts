@@ -431,7 +431,7 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   }
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-  // such as pnpm and moon export), and the server's long path is cut before its name.
+  // such as pnpm export), and the server's long path is cut before its name.
   const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
     return undefined;
   });

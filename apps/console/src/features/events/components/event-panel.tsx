@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
-import { createContext, type ReactNode, useContext, useEffect } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
 
 import { DocumentViewer } from "@/components/document-viewer";
 import { FormSheetHeader } from "@/components/form-sheet";
@@ -16,11 +16,16 @@ import {
   around,
   eventFields,
   eventFilterValues,
+  type FlowSummary,
+  flowSummary,
+  formatSpan,
   isFailure,
   type ProjectEvent,
   type EventsSearch,
   sharing,
 } from "../model";
+import { useNamesOf } from "../use-user-names";
+import { OutcomeBadge, UserName } from "./event-people";
 import { EventSubject } from "./event-subject";
 
 /**
@@ -151,6 +156,12 @@ export function EventPanel({
 
   const fields = eventFields(event);
   const related = eventFilterValues(event);
+  // The flow told as one sign-in, as Vercel heads a trace with its outcome
+  // and duration. Its events say all of it only when the drawer holds them all.
+  const summary = useMemo(
+    () => (flow ? flowSummary(flow.items, { complete: !flow.more, now: new Date() }) : undefined),
+    [flow],
+  );
 
   return (
     <>
@@ -205,7 +216,8 @@ export function EventPanel({
 
         {flow && flow.items.length > 0 && event.flow_id ? (
           <Timeline
-            title="This login flow"
+            title={summary?.title ?? "This login flow"}
+            summary={summary}
             timeline={flow}
             current={event.id}
             all={{
@@ -301,27 +313,77 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
 
 /**
  * The events the open one belongs with, oldest first, and a way to the rest
- * when the drawer does not hold them all.
+ * when the drawer does not hold them all. A login flow is headed by what it
+ * came to: whose account, when it started and how long it took.
+ *
+ * In a login flow each step says how long after the first it happened, and a
+ * dot on a track places it in the whole, as a trace's waterfall does: a
+ * sign-up through an identity provider spends most of its time at the
+ * provider, and the gap shows it. A request's events fall within one second
+ * as the API returns them, so they keep their clock time.
  */
 function Timeline({
   title,
+  summary,
   timeline,
   current,
   all,
 }: {
   title: string;
+  summary?: FlowSummary;
   timeline: EventTimeline;
   /** The open event's id. */
   current: string;
   /** The list under the filter that holds them all. */
   all?: { search: EventsSearch; label: string };
 }) {
+  const names = useNamesOf(summary?.userId ? [summary.userId] : []);
+  const start = Date.parse(timeline.items[0]?.occurred_at ?? "");
+  const end = Date.parse(timeline.items.at(-1)?.occurred_at ?? "");
+  const span = Math.max(end - start, 0);
   return (
     <PanelSection title={title}>
+      {summary && (
+        <dl className={FIELD_GRID}>
+          {summary.outcome && (
+            <>
+              <dt className={FIELD_LABEL}>Outcome</dt>
+              <dd className={FIELD_VALUE}>
+                <OutcomeBadge outcome={summary.outcome} />
+              </dd>
+            </>
+          )}
+          {summary.userId && (
+            <>
+              <dt className={FIELD_LABEL}>User</dt>
+              <dd className={FIELD_VALUE}>
+                <UserName id={summary.userId} names={names} />
+              </dd>
+            </>
+          )}
+          <dt className={FIELD_LABEL}>Started</dt>
+          <dd className={FIELD_VALUE}>
+            <time dateTime={summary.startedAt}>{formatEventTime(summary.startedAt)}</time>
+          </dd>
+          <dt className={FIELD_LABEL}>Took</dt>
+          <dd className={FIELD_VALUE}>
+            {formatSpan(summary.durationMs)}
+            {timeline.more && <span className="text-muted-foreground">so far</span>}
+          </dd>
+        </dl>
+      )}
       <ol className="flex flex-col">
-        {timeline.items.map((step) => (
-          <TimelineStep key={step.id} event={step} current={step.id === current} />
-        ))}
+        {timeline.items.map((step) => {
+          const at = Date.parse(step.occurred_at) - start;
+          return (
+            <TimelineStep
+              key={step.id}
+              event={step}
+              current={step.id === current}
+              place={summary ? { offset: at, share: span > 0 ? at / span : 0 } : undefined}
+            />
+          );
+        })}
       </ol>
       {timeline.more && all && (
         <Link to="/events" search={all.search} className="text-sm underline underline-offset-4">
@@ -337,18 +399,56 @@ function Timeline({
  * and what it was about. The open event is marked and not a link; the others
  * open in the drawer.
  */
-function TimelineStep({ event, current }: { event: ProjectEvent; current: boolean }) {
+function TimelineStep({
+  event,
+  current,
+  place,
+}: {
+  event: ProjectEvent;
+  current: boolean;
+  /**
+   * In a login flow: milliseconds after its first event, and where it falls
+   * between the first and the last, from 0 to 1. Without it the step shows
+   * its clock time and no track.
+   */
+  place?: { offset: number; share: number };
+}) {
   const { search } = useContext(EventRowsContext);
   const line = (
     <>
-      <time dateTime={event.occurred_at} className="text-muted-foreground shrink-0 tabular-nums">
-        {formatClockTime(event.occurred_at)}
-      </time>
-      <span className={cn("shrink-0", isFailure(event) && "text-destructive")}>
-        {event.event_type}
-      </span>
-      <span className="flex min-w-0 flex-1">
-        <EventSubject event={event} />
+      {place ? (
+        <time
+          dateTime={event.occurred_at}
+          title={formatClockTime(event.occurred_at)}
+          className="text-muted-foreground w-14 shrink-0 text-right tabular-nums"
+        >
+          +{formatSpan(place.offset)}
+        </time>
+      ) : (
+        <time dateTime={event.occurred_at} className="text-muted-foreground shrink-0 tabular-nums">
+          {formatClockTime(event.occurred_at)}
+        </time>
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className={cn("shrink-0", isFailure(event) && "text-destructive")}>
+            {event.event_type}
+          </span>
+          <span className="flex min-w-0 flex-1">
+            <EventSubject event={event} />
+          </span>
+        </span>
+        {place && (
+          <span aria-hidden className="bg-muted relative h-1 rounded-full">
+            <span
+              className={cn(
+                "absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                isFailure(event) ? "bg-destructive" : "bg-muted-foreground",
+              )}
+              style={{ left: `${(place.share * 100).toFixed(1)}%` }}
+            />
+          </span>
+        )}
       </span>
     </>
   );

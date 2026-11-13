@@ -90,7 +90,7 @@ The use-case surface the HTTP handler depends on. Four methods:
 
 | Method | Responsibility |
 |---|---|
-| `Resolve` | Pick the active `FlowDefinition` to run. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
+| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
 | `Start` | Mint a fresh `FlowState`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
 | `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
 | `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |
@@ -240,7 +240,7 @@ ceremony rides the same attempt + checks machinery (ADR 056).
 
 Postgres, Spanner, and SQLite implementations live under
 `internal/storage/dialect/{postgres,spanner,sqlite}/flow_definition.go` and back
-`FlowService.Resolve` (list active definitions) and `FlowService.Submit` /
+`FlowService.Resolve` (list pinned definitions) and `FlowService.Submit` /
 `GetStep` (re-fetch by id) via `FlowDefinitionService`. Migrations ship
 `flow_definitions` SQL per dialect.
 

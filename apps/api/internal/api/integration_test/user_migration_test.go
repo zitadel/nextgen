@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -402,8 +401,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	})
 	setAttemptPassword(t, f.project, userID, password)
 
-	rpOrigin, err := url.Parse(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
+	rpOrigin := passkeyOrigin(t, harness.EnsureTestServer(t).URL)
 	rp := virtualwebauthn.RelyingParty{ID: rpOrigin.Hostname(), Name: "Test", Origin: rpOrigin.String()}
 	authenticator := virtualwebauthn.NewAuthenticatorWithOptions(virtualwebauthn.AuthenticatorOptions{
 		UserHandle: []byte(userID),

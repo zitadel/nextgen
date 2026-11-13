@@ -15,6 +15,7 @@ import {
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { offTerminal } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],
@@ -231,7 +232,7 @@ describe("deploy", () => {
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deploy();
 
@@ -246,7 +247,7 @@ describe("deploy", () => {
             content_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
             deployment_id: expect.stringMatching(/^dep_/),
             resources: 4,
-            origins: [SETUP_ORIGIN.pattern, "https://app.acme.com"],
+            origins: [SETUP_ORIGIN.pattern, PRIMARY_ORIGIN],
             diff: NO_BASELINE,
             next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list"))],
           },
@@ -1954,7 +1955,7 @@ describe("deploy", () => {
     describe("rendered for a terminal", () => {
       it("says what it deployed", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deployRendered();
 
@@ -1963,16 +1964,16 @@ describe("deploy", () => {
 
       it("names the release and every origin it went to, under the closing line", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await app.deployRendered();
 
-        expect(result).toPrint("is now live on http://localhost:3000 and https://app.acme.com.");
+        expect(result).toPrint(`is now live on http://localhost:3000 and ${PRIMARY_ORIGIN}.`);
       });
 
       it("sets the release line apart from the title when piped, as the terminal does", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
         const result = await offTerminal(() => app.deployRendered());
 
@@ -1997,7 +1998,7 @@ describe("deploy", () => {
         const result = await app.deployRendered();
 
         expect(result).toPrint(
-          "Release sha256\\x1b[2Jwiped:aaaaaaaaaaaa is now live on https://app.acme.com\\x1b[2Jwiped.",
+          `Release sha256\\x1b[2Jwiped:aaaaaaaaaaaa is now live on ${PRIMARY_ORIGIN}\\x1b[2Jwiped.`,
         );
       });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import EnvAdd, { readAppUrl } from "@/commands/env/add/index";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 describe("the environment name argument", () => {
   it.each(["production", "staging-2", "a.b", "team_a"])("accepts %j", async (name) => {
@@ -30,9 +31,9 @@ describe("readAppUrl, which the prompt reuses", () => {
   });
 
   it("takes an http(s) URL as typed", () => {
-    expect(readAppUrl(" https://app.acme.com ")).toEqual({
+    expect(readAppUrl(` ${PRIMARY_ORIGIN} `)).toEqual({
       ok: true,
-      value: "https://app.acme.com",
+      value: PRIMARY_ORIGIN,
     });
   });
 
@@ -46,22 +47,22 @@ describe("readAppUrl, which the prompt reuses", () => {
 
 describe("--app-url", () => {
   it("is the URL the flag holds", async () => {
-    await expect(
-      parseFlag(EnvAdd.flags["app-url"], "https://app.acme.com", "app-url"),
-    ).resolves.toBe("https://app.acme.com");
+    await expect(parseFlag(EnvAdd.flags["app-url"], PRIMARY_ORIGIN, "app-url")).resolves.toBe(
+      PRIMARY_ORIGIN,
+    );
   });
 
   it("accepts one a shell padded with spaces, as the prompt does", async () => {
     await expect(
-      parseFlag(EnvAdd.flags["app-url"], " https://app.acme.com ", "app-url"),
-    ).resolves.toBe("https://app.acme.com");
+      parseFlag(EnvAdd.flags["app-url"], ` ${PRIMARY_ORIGIN} `, "app-url"),
+    ).resolves.toBe(PRIMARY_ORIGIN);
   });
 
   it.each(["ftp://app.acme.com", "not a url", "  "])("refuses %j, quoting it", async (input) => {
     await expect(parseFlag(EnvAdd.flags["app-url"], input, "app-url")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: `Invalid app URL "${input}"`,
-      hint: "Use a URL like https://app.acme.com.",
+      hint: `Use a URL like ${PRIMARY_ORIGIN}.`,
     });
   });
 });

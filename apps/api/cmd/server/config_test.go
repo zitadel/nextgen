@@ -163,6 +163,8 @@ func TestServerConfigValidate(t *testing.T) {
 		{name: "a console path of /idp itself errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp"}, wantKey: "server.console_path"},
 		{name: "a console path under /__nextgen/idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/__nextgen/idp/admin"}, wantKey: "server.console_path"},
 		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idps"}},
+		{name: "a console path of /oauth errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/oauth"}, wantKey: "server.console_path"},
+		{name: "a console path under /.well-known errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/.well-known/console"}, wantKey: "server.console_path"},
 		{name: "a disabled console is not checked", cfg: ServerConfig{ConsoleEnabled: false, ConsolePath: "/idp/console"}},
 		{name: "a console origin validates", cfg: ServerConfig{ConsoleOrigins: []string{"https://console.example.com"}}},
 		// The hosted cloud serves the console apart from the server, so its

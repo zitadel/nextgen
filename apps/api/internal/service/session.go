@@ -362,7 +362,17 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) (
 	defer end(&err)
 
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
+		// Read before the delete: the events name the user whose session ends.
+		var userID string
+		session, err := tx.Statements().GetSessionByID(ctx, input.ProjectID, input.SessionID)
+		switch {
+		case err == nil:
+			userID = stringValue(session.UserID)
+		case !errors.Is(err, domain.ErrSessionNotFound()):
+			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
+		}
+
+		err = tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
 		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {
 			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
@@ -383,6 +393,7 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) (
 			Category:   domain.EventCategoryAuth,
 			ProjectID:  input.ProjectID,
 			EntityType: "token",
+			UserID:     userID,
 			SessionID:  &sid,
 			Payload:    domain.AuthTokenRevokedPayload{},
 		}); err != nil {
@@ -394,6 +405,7 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) (
 			ProjectID:  input.ProjectID,
 			EntityType: "session",
 			EntityID:   input.SessionID,
+			UserID:     userID,
 			SessionID:  &sid,
 			Payload:    domain.SessionDeletedPayload{Reason: "revoked"},
 		})
@@ -412,6 +424,7 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 		ProjectID:  session.ProjectID,
 		EntityType: "session",
 		EntityID:   session.ID,
+		UserID:     payload.UserID,
 		SessionID:  &sid,
 		FlowID:     &session.FlowID,
 		Payload:    payload,
@@ -419,7 +432,8 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 }
 
 // flowID names the login flow whose handoff minted the token; nil or empty
-// leaves the request's own flow, if any.
+// leaves the request's own flow, if any. The minted token is the event's
+// entity; token_id stays the credential the request presented, if any.
 func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, flowID, userID *string, scopes []string) error {
 	spec := audit.EmitSpec{
 		Type:       domain.EventTypeAuthTokenIssued,
@@ -427,7 +441,7 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, 
 		ProjectID:  projectID,
 		EntityType: "token",
 		EntityID:   tokenID,
-		TokenID:    tokenID,
+		UserID:     stringValue(userID),
 		SessionID:  sessionID,
 		FlowID:     flowID,
 		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes},
@@ -438,6 +452,14 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, 
 		spec.ActorType = &actorType
 	}
 	return audit.Emit(ctx, stmts, spec)
+}
+
+// stringValue is what p points to; empty for nil.
+func stringValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func NewSessionService(v2Pool StatementPool, refs UserRefResolver, cfg SessionConfig) SessionService {
