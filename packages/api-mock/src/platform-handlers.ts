@@ -1583,13 +1583,22 @@ function newestDeploymentForOrigin(
  * An origin a deployment serves now.
  */
 type ServedOrigin = {
-  /** The origin's URL. */
+  /**
+   * The origin's URL.
+   */
   origin: string;
-  /** The deployment that serves it. */
+  /**
+   * The deployment that serves it.
+   */
   deployment: DeploymentRecord;
-  /** Whether the deployment serves it as a primary origin or as a preview. */
+  /**
+   * Whether the deployment serves it as a primary origin or as a preview.
+   */
   kind: "primary" | "preview";
-  /** The expiry of the preview the deployment serves it as, null for a primary origin. */
+  /**
+   * The expiry of the preview the deployment serves it as, null for a primary
+   * origin.
+   */
   expiresAt: string | null;
 };
 
@@ -1742,6 +1751,20 @@ function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefine
 }
 
 /**
+ * A live deployment with every origin it serves.
+ */
+type LiveGroup = {
+  /**
+   * The deployment that serves the origins.
+   */
+  deployment: DeploymentRecord;
+  /**
+   * The origins it serves, with the expiry of each preview.
+   */
+  targets: DeploymentTargetRow[];
+};
+
+/**
  * The deployments that serve what a live list asked about, each with every
  * origin it serves, as the server attaches them.
  *
@@ -1750,19 +1773,13 @@ function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefine
  * ones for one origin.
  * @returns One group per matching deployment, newest first, as `served` is.
  */
-function liveGroups(
-  served: readonly ServedOrigin[],
-  asked: readonly ServedOrigin[],
-): { deployment: DeploymentRecord; targets: DeploymentTargetRow[] }[] {
+function liveGroups(served: readonly ServedOrigin[], asked: readonly ServedOrigin[]): LiveGroup[] {
   const matched = new Set(
     asked.map((entry) => {
       return entry.deployment.id;
     }),
   );
-  const groups = new Map<
-    string,
-    { deployment: DeploymentRecord; targets: DeploymentTargetRow[] }
-  >();
+  const groups = new Map<string, LiveGroup>();
   for (const entry of served) {
     if (!matched.has(entry.deployment.id)) {
       continue;
@@ -1789,38 +1806,6 @@ function servingIds(served: readonly ServedOrigin[]): ReadonlySet<string> {
   );
 }
 
-/**
- * The ids of the deployments that serve an origin of a project right now. It
- * reads every deployment of the project, so a handler that describes many
- * deployments reads it once and passes it on.
- *
- * @param projectId - The project.
- * @returns The ids of the project's deployments that serve an origin.
- */
-function servingNow(projectId: string): ReadonlySet<string> {
-  return servingIds(servedOrigins(projectId, projectDeployments(projectId)));
-}
-
-/**
- * Whether the deployment still serves its release: while some origin of its
- * project is served by it. A later deployment, or its previews expiring or
- * being removed, makes it `inactive`.
- *
- * @param deployment - The deployment.
- * @param serving - The ids of the deployments that serve an origin now.
- * @returns `live` while the deployment serves an origin, else `inactive`.
- */
-function deploymentStatus(
-  deployment: DeploymentRecord,
-  serving: ReadonlySet<string>,
-): "live" | "inactive" {
-  if (serving.has(deployment.id)) {
-    return "live";
-  }
-
-  return "inactive";
-}
-
 /** Whether a deployment has this release and exactly these origins. */
 function repeats(deployment: DeploymentRecord, releaseId: string, origins: string[]): boolean {
   const named = deployment.targets.map((target) => target.origin).sort();
@@ -1836,8 +1821,10 @@ function repeats(deployment: DeploymentRecord, releaseId: string, origins: strin
  * The wire shape of a deployment, optionally over a restricted target set.
  *
  * @param deployment - The deployment.
- * @param serving - The ids of the deployments serving in its project now, as
- * {@link servingNow} reads them after the write the answer describes.
+ * @param serving - The ids of the deployments that serve an origin of its
+ * project now. It is `live` while it is among them, and `inactive` once a later
+ * deployment, or its previews expiring or being removed, leaves it serving
+ * nothing.
  * @param targets - The targets to report, all of them when not given.
  * @param expand - Whether to expand its release.
  * @returns The deployment as the API answers it.
@@ -1848,6 +1835,7 @@ function deploymentResponse(
   targets: DeploymentTargetRow[] = deployment.targets,
   expand?: { release: boolean },
 ): Record<string, unknown> {
+  const status = serving.has(deployment.id) ? "live" : "inactive";
   const body: Record<string, unknown> = {
     id: deployment.id,
     project_id: deployment.projectId,
@@ -1858,7 +1846,7 @@ function deploymentResponse(
         : { origin: target.origin, expires_at: target.expiresAt },
     ),
     kind: deploymentKind(deployment),
-    status: deploymentStatus(deployment, serving),
+    status,
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,
@@ -1878,10 +1866,22 @@ function deploymentResponse(
 }
 
 /**
+ * The wire shape of a deployment a write answers with. The server reports the
+ * deployment it wrote, or the one a refused write would have replaced, as live
+ * without asking what serves (`toAPIDeployment(..., api.DeploymentStatusLive)`
+ * in apps/api/internal/api/deployment.go), so this does too.
+ *
+ * @param deployment - The deployment the write answers with.
+ * @returns The deployment as the API answers it, `live`.
+ */
+function answeredLive(deployment: DeploymentRecord): Record<string, unknown> {
+  return deploymentResponse(deployment, new Set([deployment.id]));
+}
+
+/**
  * The refusal of a write whose `expected_deployment_id` is not the deployment
- * it replaces. It names that deployment as live, as the server does, because it
- * is the newest to the targets whether or not a removed or expired preview
- * still serves them.
+ * it replaces. It names that deployment, the newest to the targets whether or
+ * not a removed or expired preview still serves them, as live.
  *
  * @param newest - The deployment the write replaces, if there is one.
  * @returns The `409 dep.conflict` answer, naming no deployment when there is none.
@@ -1889,7 +1889,7 @@ function deploymentResponse(
 function guardConflict(newest: DeploymentRecord | undefined) {
   let named: Record<string, unknown> | null = null;
   if (newest !== undefined) {
-    named = deploymentResponse(newest, new Set([newest.id]));
+    named = answeredLive(newest);
   }
 
   return HttpResponse.json(
@@ -2438,9 +2438,7 @@ export function setupPlatformHandlers() {
       // deployment (201), which is how its expiry is renewed.
       const newestPrimary = newestPrimaryDeployment(project.id);
       if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary, servingNow(project.id)), {
-          status: 200,
-        });
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2458,9 +2456,7 @@ export function setupPlatformHandlers() {
         variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record, servingNow(project.id)), {
-        status: 201,
-      });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2544,7 +2540,10 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
-      return HttpResponse.json(deploymentResponse(deployment, servingNow(deployment.projectId)));
+      const deployments = projectDeployments(deployment.projectId);
+      const serving = servingIds(servedOrigins(deployment.projectId, deployments));
+
+      return HttpResponse.json(deploymentResponse(deployment, serving));
     }),
 
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
@@ -2603,9 +2602,7 @@ export function setupPlatformHandlers() {
         return guardConflict(newestPrimary);
       }
       if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary, servingNow(project.id)), {
-          status: 200,
-        });
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2625,9 +2622,7 @@ export function setupPlatformHandlers() {
         variables: target.variables,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record, servingNow(project.id)), {
-        status: 201,
-      });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     // --- previews --------------------------------------------------------
