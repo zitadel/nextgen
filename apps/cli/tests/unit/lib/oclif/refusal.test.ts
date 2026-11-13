@@ -9,6 +9,9 @@ import { interpolate, type Refusal, refusalError, unmetBy } from "@/lib/oclif/re
  */
 const WIDE_NEXT: Refusal = { message: "No server", next: ["{next}"] };
 
+/** A `next` string with two placeholders in it, which is no whole placeholder. */
+const TWO_PLACEHOLDERS = "{a} then {b}";
+
 /** A hint known only as text, beside a message written as a literal. */
 const WIDE_HINT: string = "Try another one.";
 
@@ -201,8 +204,15 @@ describe("refusalError's values", () => {
     expect(refusalError(braces, {}).message).toBe("Pass {} or {a.b} or {json|yaml}");
   });
 
-  it("takes an entry with two placeholders as no whole placeholder", () => {
-    const error = refusalError({ message: "No", next: ["{a} then {b}"] }, {});
+  it("does not compile with a next string that is not one placeholder", () => {
+    const error = refusalError(
+      {
+        message: "No",
+        // @ts-expect-error the run fills only a next string that is one {name}
+        next: [TWO_PLACEHOLDERS],
+      },
+      {},
+    );
 
     expect(error.nextCommands).toEqual([]);
   });
@@ -276,6 +286,18 @@ describe("refusalError's details", () => {
 });
 
 describe("unmetBy", () => {
+  it("names a placeholder in the details that nothing fills", () => {
+    const refusal: Refusal = { message: "No schema", details: { known: ["{known}"] } };
+
+    expect(unmetBy(refusal, {})).toEqual(["known"]);
+  });
+
+  it("names a next string that is not one placeholder, which nothing can fill", () => {
+    const refusal: Refusal = { message: "No", next: [TWO_PLACEHOLDERS] };
+
+    expect(unmetBy(refusal, {}, {})).toEqual([TWO_PLACEHOLDERS]);
+  });
+
   it("names what a refusal's wording would leave unfilled", () => {
     const refusal = {
       message: "{value} is not a valid page size",

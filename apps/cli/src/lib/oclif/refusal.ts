@@ -49,7 +49,9 @@ export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Sugg
  * @param refusal - The refusal.
  * @param values - What its message and hint are filled from.
  * @param next - What its whole-placeholder `next` entries are filled from.
- * @returns Each name nothing fills, once.
+ * @returns Each name nothing fills, once, in its message, hint, details or
+ *   `next`; a `next` entry that is not one placeholder is named as it is
+ *   written, since nothing can fill it.
  */
 export function unmetBy(
   refusal: Refusal,
@@ -58,23 +60,54 @@ export function unmetBy(
 ): string[] {
   const namesIn = (templates: readonly string[]) => {
     return templates.flatMap((template) => {
-      return [...template.matchAll(PLACEHOLDER)].map((match) => {
-        return match[1] as string;
+      return [...template.matchAll(PLACEHOLDER)].flatMap((match) => {
+        return match[1] === undefined ? [] : [match[1]];
       });
     });
   };
-  const placeholders = (refusal.next ?? []).filter((entry) => {
+  const entries = (refusal.next ?? []).filter((entry) => {
     return typeof entry === "string";
   });
   const unfilled = [
-    ...namesIn([refusal.message, refusal.hint ?? ""]).filter((name) => {
-      return values[name] === undefined;
-    }),
-    ...namesIn(placeholders).filter((name) => {
-      return next[name] === undefined;
+    ...namesIn([refusal.message, refusal.hint ?? "", ...textsIn(refusal.details)]).filter(
+      (name) => {
+        return values[name] === undefined;
+      },
+    ),
+    // An entry that is not one placeholder is never filled, whatever is given.
+    ...entries.flatMap((entry) => {
+      const name = WHOLE_PLACEHOLDER.exec(entry)?.[1];
+      if (name === undefined) {
+        return [entry];
+      }
+      return next[name] === undefined ? [name] : [];
     }),
   ];
   return [...new Set(unfilled)];
+}
+
+/**
+ * Each string `details` holds, in a list or a plain object as deep as it goes,
+ * which {@link fill} fills as it fills the message.
+ *
+ * @param details - A refusal's details.
+ * @returns The strings, in order.
+ */
+function textsIn(details: unknown): string[] {
+  if (typeof details === "string") {
+    return [details];
+  }
+  if (Array.isArray(details)) {
+    return details.flatMap((one) => {
+      return textsIn(one);
+    });
+  }
+  if (typeof details === "object" && details !== null && isPlain(details)) {
+    return Object.values(details).flatMap((one) => {
+      return textsIn(one);
+    });
+  }
+  return [];
 }
 
 /**
@@ -170,6 +203,14 @@ type WholeName<Entry> = Entry extends `{${infer Name}}`
     : never
   : never;
 
+/**
+ * Whether `value` is a plain object, made by a literal or `Object.create(null)`,
+ * rather than a `Date`, a `Map` or a class, which would come apart into its
+ * entries if it were rebuilt.
+ *
+ * @param value - An object.
+ * @returns Whether it is plain.
+ */
 function isPlain(value: object): boolean {
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
@@ -254,6 +295,36 @@ export type NextNames<R> = R extends { readonly next?: readonly (infer Entry)[] 
   : never;
 
 /**
+ * `Entry` when it is braces around something that is not one placeholder's
+ * name, such as `{a} then {b}` or `{}`, which the run never fills; `never`
+ * otherwise, for a follow-up object, a whole placeholder, or an entry known
+ * only as `{${string}}`.
+ *
+ * @typeParam Entry - One of a refusal's `next` entries.
+ */
+type LooseEntry<Entry> = Entry extends `{${infer Name}}`
+  ? string extends Name
+    ? never
+    : IsName<Name> extends true
+      ? never
+      : Entry
+  : never;
+
+/**
+ * Nothing more than `R`, unless one of its `next` strings is not one
+ * placeholder ({@link LooseEntry}): then a `next` no list matches, so the
+ * refusal does not compile and the error says why.
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ */
+type WholeEntries<R> =
+  IsNever<
+    R extends { readonly next?: readonly (infer Entry)[] } ? LooseEntry<Entry> : never
+  > extends true
+    ? unknown
+    : { readonly next: "each next string is one {name} and nothing else" };
+
+/**
  * What a refusal's `values` must hold: a value for every name its wording asks
  * for ({@link ValueNames}), and anything else besides. A refusal whose wording
  * is only known as `string` asks for nothing, so its values go unchecked and
@@ -294,7 +365,7 @@ export type NextFor<R> = NextPlaceholders & {
  * @returns The error, for the caller to throw.
  */
 export function refusalError<const R extends Refusal>(
-  refusal: R,
+  refusal: R & WholeEntries<R>,
   values: ValuesFor<R>,
   ...given: IsNever<NextNames<R>> extends true ? [next?: NextPlaceholders] : [next: NextFor<R>]
 ): ZitadelError {
