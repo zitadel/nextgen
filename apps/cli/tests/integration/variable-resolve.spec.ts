@@ -196,7 +196,7 @@ describe("variable resolve", () => {
             count: 1,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
-            origins: ["https://app.example.com"],
+            origins: LIVE_ORIGINS,
           },
           warnings: [],
         });
