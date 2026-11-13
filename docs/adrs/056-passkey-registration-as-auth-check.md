@@ -102,5 +102,5 @@ sign-up parity with `POST /users` + `PUT /users/{id}/password`.
   prefix).
 - Abandoned ceremonies now age out with abandoned attempts — one cleanup debt
   instead of two (no GC exists yet for either).
-- The wire contract of `POST /flow/{flow_id}/submit` is unchanged except
+- The wire contract of `POST /flows/{flow_id}/submit` is unchanged except
   `pkreg.not_found`, which is replaced by the existing `att.*` codes.

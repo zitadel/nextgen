@@ -49,13 +49,13 @@ A single web component — call it `<zitadel-flow>` — takes enough input to ta
 
 Under the hood the component:
 
-1. `POST /flow` with `{ purpose, auth_request_id?, hint? }` to start a flow.
+1. `POST /flows` with `{ purpose, auth_request_id?, hint? }` to start a flow.
 2. Receives a step response with **ordered capability arrays** for `fields` and `actions` (entries carry a `name`; [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)), a keyed `gates` map, optional `sso_providers`, step-level `texts.{title_key, description_key}`, and a **`branding.liquid_template` string**.
 3. Renders the step by **executing the Liquid template** against those capabilities as context. The template iterates the arrays or looks entries up by name (`where: "name"`); it controls element ordering, grouping, and layout — the component never decides "email first, then password."
 4. Resolves every `text_key` through the `| t` LiquidJS filter against the active locale dictionary loaded at boot.
 5. Sanitizes the rendered HTML (DOMPurify) and injects it into the Shadow DOM.
 6. Mounts `<zl-*>` web components emitted by the template: `<zl-field>`, `<zl-action>`, `<zl-captcha>`, `<zl-passkey>`, `<zl-sso>`.
-7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/flow/{flow_id}/submit` — note `fields` (object), not `data`.
+7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/flows/{flow_id}/submit` — note `fields` (object), not `data`.
 8. Applies the response: next step, or redirect on completion.
 
 Step rendering is the whole job, but rendering is now **Liquid execution**, not array iteration. The capability contract is defined by [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md); the renderer implements that contract and nothing else.
