@@ -1,3 +1,4 @@
+// Imports only Node built-ins: the artifacts workflow runs its importers without an install.
 import { spawn } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";

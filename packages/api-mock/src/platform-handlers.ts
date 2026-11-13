@@ -202,19 +202,40 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-const INVALID_JSON = errorBody("invalid_json", "request body must be valid JSON");
+const INVALID_JSON = errorBody("req.invalid", "request body must be valid JSON");
 
 /**
  * Run `safeParse` against the generated Zod and return either the
- * parsed (and defaulted) value or a 400 `HttpResponse` carrying the
- * Zod issue list. The discriminant key (`ok`) lets the caller short-
- * circuit cleanly. One pattern, used uniformly for path params, query
- * params, request bodies, and responses-on-the-way-out.
+ * parsed (and defaulted) value or a 400 `req.invalid` `HttpResponse`
+ * carrying the Zod issue list, as the server answers a request that fails
+ * base validation. The discriminant key (`ok`) lets the caller short-
+ * circuit cleanly. Used uniformly for path params, query params and
+ * request bodies.
  */
 function parse<S extends z.ZodTypeAny>(
   schema: S,
   value: unknown,
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
+  return check(schema, value, 400, "req.invalid", "request does not conform to spec");
+}
+
+/**
+ * `parse` for a response on its way out: a body the mock builds that breaks
+ * the spec is the mock's own fault, so it answers `500 internal`.
+ */
+function parseOut<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
+  return check(schema, value, 500, "internal", "mock response does not conform to spec");
+}
+
+function check<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+  status: number,
   code: string,
+  message: string,
 ): { ok: true; data: z.output<S> } | { ok: false; response: HttpResponse<ErrorBody> } {
   const result = schema.safeParse(value);
   if (result.success) {
@@ -222,12 +243,9 @@ function parse<S extends z.ZodTypeAny>(
   }
   return {
     ok: false,
-    response: HttpResponse.json(
-      errorBody(code, "request does not conform to spec", {
-        issues: result.error.issues,
-      }),
-      { status: 400 },
-    ),
+    response: HttpResponse.json(errorBody(code, message, { issues: result.error.issues }), {
+      status,
+    }),
   };
 }
 
@@ -1094,7 +1112,7 @@ export function completeClaimChallenge(
   if (!out.success) {
     return {
       status: 500,
-      body: errorBody("mock_response_invalid", "mock response does not conform to spec", {
+      body: errorBody("internal", "mock response does not conform to spec", {
         issues: out.error.issues,
       }),
     };
@@ -1123,15 +1141,11 @@ function invalidFlowDefinitionResponse(
   if (!firstError) {
     return null;
   }
-  // `details` is a bare string here — mirroring what the Go server actually
-  // emits for ErrFlowDefinitionInvalid (its Details field is `any`), which
-  // the CLI's pickDetailString handles alongside the spec's object shape.
+  // The server wraps a producer's details in the envelope's `details` object
+  // (`internal/api/error_handler.go`), so the reason arrives at
+  // `details.details`, as the spec's object-typed `details` allows.
   return HttpResponse.json(
-    {
-      code: "flowdef.invalid",
-      message: "flow definition: invalid",
-      details: firstError.message,
-    },
+    errorBody("flowdef.invalid", "flow definition: invalid", { details: firstError.message }),
     { status: 400 },
   );
 }
@@ -1944,7 +1958,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateProjectBody, raw, "invalid_request");
+      const body = parse(CreateProjectBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -1976,14 +1990,16 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/projects/:project_id", ({ params }) => {
-      const path = parse(GetProjectParams, params, "invalid_request");
+      const path = parse(GetProjectParams, params);
       if (!path.ok) {
         return path.response;
       }
 
       const project = store.projects.get(path.data.project_id);
       if (!project) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
+          status: 404,
+        });
       }
       const responseBody: GetProject200 = {
         id: project.id,
@@ -1995,7 +2011,7 @@ export function setupPlatformHandlers() {
         // assignment does; null until the project is claimed.
         owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
-      const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetProjectResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2005,7 +2021,7 @@ export function setupPlatformHandlers() {
     // POST /projects/:project_id/origins/remove — drop one pattern. Missing
     // project is 404; removing an already-absent pattern is idempotent 204.
     http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
-      const path = parse(RemoveOriginParams, params, "invalid_request");
+      const path = parse(RemoveOriginParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2013,7 +2029,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      const body = parse(RemoveOriginBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2037,7 +2053,7 @@ export function setupPlatformHandlers() {
     // pattern+kind is idempotent 201; same pattern with a different kind is
     // origin.kind_conflict. No check/warning field on the response.
     http.post("*/projects/:project_id/origins", async ({ params, request }) => {
-      const path = parse(AddOriginParams, params, "invalid_request");
+      const path = parse(AddOriginParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2045,7 +2061,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(AddOriginBody, raw, "invalid_request");
+      const body = parse(AddOriginBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2078,7 +2094,7 @@ export function setupPlatformHandlers() {
       }
 
       const responseBody: AddOrigin201 = existing ?? origin;
-      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(AddOriginResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2093,7 +2109,7 @@ export function setupPlatformHandlers() {
     // `POST /releases/build` — the CLI's path: build a release from the
     // `.zitadel/` bundle, reusing matching revisions and allocating the rest.
     http.post("*/releases/build", async ({ request }) => {
-      const query = parse(BuildReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(BuildReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2101,7 +2117,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(buildReleaseRequestSchema, raw, "invalid_request");
+      const body = parse(buildReleaseRequestSchema, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2160,7 +2176,7 @@ export function setupPlatformHandlers() {
     // `POST /releases` — pin pre-existing revision ids. Not a CLI flow, kept for
     // contract completeness.
     http.post("*/releases", async ({ request }) => {
-      const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2168,7 +2184,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateReleaseBody, raw, "invalid_request");
+      const body = parse(CreateReleaseBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2178,13 +2194,10 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
+      // The body's zod requires `pointers`, so a create without them is
+      // refused above as malformed.
       const data = body.data as Record<string, unknown>;
-      if (!Array.isArray(data.pointers)) {
-        return HttpResponse.json(errorBody("rel.invalid", "release: a create pins pointers"), {
-          status: 400,
-        });
-      }
-      const pointers = data.pointers.map((item) => {
+      const pointers = body.data.pointers.map((item) => {
         const pointer = item as { kind: string; revision_id: string };
         return {
           kind: pointer.kind,
@@ -2203,7 +2216,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/releases", ({ request }) => {
-      const query = parse(ListReleasesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListReleasesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2227,11 +2240,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/releases/:release_id", ({ params, request }) => {
-      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      const path = parse(GetReleaseByIdParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetReleaseByIdQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2243,11 +2256,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/releases/:release_id/revoke", ({ params, request }) => {
-      const path = parse(RevokeReleaseParams, params, "invalid_request");
+      const path = parse(RevokeReleaseParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(RevokeReleaseQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(RevokeReleaseQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2291,7 +2304,7 @@ export function setupPlatformHandlers() {
     // freezes the variables of its kind; a rollback reuses the restored set.
 
     http.post("*/deployments", async ({ request }) => {
-      const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateDeploymentQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2299,7 +2312,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateDeploymentBody, raw, "invalid_request");
+      const body = parse(CreateDeploymentBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2466,16 +2479,12 @@ export function setupPlatformHandlers() {
       const record = queryRecord(request);
       const expandRelease = (request.url.match(/[?&]expand=release\b/) ?? []).length > 0;
       const { live: liveRaw, limit, expand: _expand, ...rest } = record;
-      const query = parse(
-        ListDeploymentsQueryParams,
-        {
-          ...rest,
-          ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
-          ...(limit === undefined ? {} : { limit: Number(limit) }),
-          ...(expandRelease ? { expand: ["release"] } : {}),
-        },
-        "invalid_query",
-      );
+      const query = parse(ListDeploymentsQueryParams, {
+        ...rest,
+        ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+        ...(expandRelease ? { expand: ["release"] } : {}),
+      });
       if (!query.ok) {
         return query.response;
       }
@@ -2526,11 +2535,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/deployments/:deployment_id", ({ params, request }) => {
-      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      const path = parse(GetDeploymentByIdParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2547,28 +2556,30 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
-      const path = parse(RollbackDeploymentParams, params, "invalid_request");
+      const path = parse(RollbackDeploymentParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(RollbackDeploymentQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(RollbackDeploymentQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
       const raw = (await readJson(request)) ?? {};
-      const body = parse(RollbackDeploymentBody, raw, "invalid_request");
+      const body = parse(RollbackDeploymentBody, raw);
       if (!body.ok) {
         return body.response;
       }
-      const target = store.deployments.get(path.data.deployment_id);
-      if (!target || target.projectId !== query.data.project_id) {
-        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
-          status: 404,
-        });
-      }
+      // As on the server, project access is checked first: a write to a
+      // project it does not hold is env.project_not_found.
       const project = store.projects.get(query.data.project_id);
       if (!project) {
         return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+      const target = store.deployments.get(path.data.deployment_id);
+      if (!target || target.projectId !== project.id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
           status: 404,
         });
       }
@@ -2633,7 +2644,7 @@ export function setupPlatformHandlers() {
     // works — the Go handlers are unimplemented stubs regardless.
 
     http.get("*/projects/:project_id/previews", ({ params, request }) => {
-      const path = parse(ListPreviewsParams, params, "invalid_request");
+      const path = parse(ListPreviewsParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2641,11 +2652,10 @@ export function setupPlatformHandlers() {
       // coerce, so build it before validating, as the deployments list does.
       const record = queryRecord(request);
       const { limit, ...rest } = record;
-      const query = parse(
-        ListPreviewsQueryParams,
-        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
-        "invalid_query",
-      );
+      const query = parse(ListPreviewsQueryParams, {
+        ...rest,
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+      });
       if (!query.ok) {
         return query.response;
       }
@@ -2670,11 +2680,7 @@ export function setupPlatformHandlers() {
       const previews = live.slice(start, start + query.data.limit);
       const nextPageToken =
         start + query.data.limit < live.length ? String(start + query.data.limit) : null;
-      const out = parse(
-        ListPreviewsResponse,
-        { previews, next_page_token: nextPageToken },
-        "mock_response_invalid",
-      );
+      const out = parseOut(ListPreviewsResponse, { previews, next_page_token: nextPageToken });
       if (!out.ok) {
         return out.response;
       }
@@ -2682,7 +2688,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
-      const path = parse(RemovePreviewParams, params, "invalid_request");
+      const path = parse(RemovePreviewParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2690,7 +2696,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      const body = parse(RemovePreviewBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -2709,7 +2715,7 @@ export function setupPlatformHandlers() {
     // mirrors the real server: the project secret is the bearer (as in GET
     // /users). First-claim-wins is a 409 derived from the existing claim.
     http.post("*/projects/:project_id/claim/init", ({ params, request }) => {
-      const path = parse(InitClaimParams, params, "invalid_request");
+      const path = parse(InitClaimParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -2767,11 +2773,11 @@ export function setupPlatformHandlers() {
     // that initiated the challenge (403 otherwise). Outbound-validated like
     // GET /projects/:id so the mock cannot lie about its own output.
     http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
-      const path = parse(GetClaimStatusParams, params, "invalid_request");
+      const path = parse(GetClaimStatusParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimStatusQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetClaimStatusQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2819,7 +2825,7 @@ export function setupPlatformHandlers() {
           claimed_at: claim.claimedAt,
           dashboard_url: claim.dashboardUrl,
         };
-        const completedOut = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+        const completedOut = parseOut(GetClaimStatusResponse, responseBody);
         if (!completedOut.ok) {
           return completedOut.response;
         }
@@ -2843,7 +2849,7 @@ export function setupPlatformHandlers() {
       }
 
       responseBody = { status: "pending" };
-      const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetClaimStatusResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2856,11 +2862,11 @@ export function setupPlatformHandlers() {
     // capability. An unknown challenge is the only refusal, so a caller
     // learns nothing about which project ids exist.
     http.get("*/projects/:project_id/claim/window", ({ params, request }) => {
-      const path = parse(GetClaimWindowParams, params, "invalid_request");
+      const path = parse(GetClaimWindowParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetClaimWindowQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetClaimWindowQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2892,7 +2898,7 @@ export function setupPlatformHandlers() {
         expires_at: expiresAt.toISOString(),
         expired: expiresAt.getTime() < Date.now(),
       };
-      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetClaimWindowResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -2907,14 +2913,14 @@ export function setupPlatformHandlers() {
     http.post("*/users/query", async ({ request }) => {
       // The query body is JSON, so `limit` arrives already numeric — unlike the
       // query string this endpoint replaced, which needed it coerced by hand.
-      const body = parse(QueryUsersBody, await request.json(), "invalid_request");
+      const body = parse(QueryUsersBody, await request.json());
       if (!body.ok) {
         return body.response;
       }
       const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       const project = [...store.projects.values()].find((p) => p.projectSecret === token);
       if (!project) {
-        return HttpResponse.json(errorBody("unauthenticated", "missing or invalid credentials"), {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
           status: 401,
         });
       }
@@ -2922,7 +2928,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/schemas", async ({ request }) => {
-      const query = parse(CreateSchemaQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateSchemaQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -2934,7 +2940,7 @@ export function setupPlatformHandlers() {
       const issues = schemaFileIssues(raw);
       if (issues.length > 0) {
         return HttpResponse.json(
-          errorBody("invalid_schema", "request does not conform to spec", { issues }),
+          errorBody("sch.invalid_request", "request does not conform to spec", { issues }),
           { status: 400 },
         );
       }
@@ -2961,7 +2967,7 @@ export function setupPlatformHandlers() {
         ...listQueryRecord(request),
         ...(expand.length === 0 ? {} : { expand }),
       };
-      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      const query = parse(ListSchemasQueryParams, raw);
       if (!query.ok) {
         return query.response;
       }
@@ -2998,20 +3004,20 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
+      const path = parse(GetSchemaByIdParams, params);
       if (!path.ok) {
         return path.response;
       }
       // Flat-by-id: OpenAPI dropped required project_id; optional team_id may
       // still appear. Authz on the real server resolves ownership via RSI.
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetSchemaByIdQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
 
       const record = store.schemas.get(schemaID(path.data.id));
       if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("sch.not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetSchemaById200 = {
         id: record.id,
@@ -3021,31 +3027,12 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(responseBody);
     }),
 
-    http.delete("*/schemas/:id", ({ params, request }) => {
-      const path = parse(GetSchemaByIdParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-      const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
-      if (!query.ok) {
-        return query.response;
-      }
-
-      const key = schemaID(path.data.id);
-      const record = store.schemas.get(key);
-      if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      store.schemas.delete(key);
-      return new HttpResponse(null, { status: 204 });
-    }),
-
     http.post("*/flow_definitions", async ({ request }) => {
       const raw = await readJson(request);
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(createFlowDefinitionRequestSchema, raw, "invalid_request");
+      const body = parse(createFlowDefinitionRequestSchema, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3075,7 +3062,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3100,7 +3087,7 @@ export function setupPlatformHandlers() {
         flow_definitions: records.map(flowResponse),
         next_page_token: null,
       };
-      const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListFlowDefinitionsResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -3108,7 +3095,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions/:id", ({ params }) => {
-      const path = parse(GetFlowDefinitionParams, params, "invalid_request");
+      const path = parse(GetFlowDefinitionParams, params);
       if (!path.ok) {
         return path.response;
       }
@@ -3117,10 +3104,12 @@ export function setupPlatformHandlers() {
       // on the real server.
       const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("flowdef.not_found", "resource not found"), {
+          status: 404,
+        });
       }
       const responseBody: GetFlowDefinition200 = flowResponse(record);
-      const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(GetFlowDefinitionResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -3134,7 +3123,7 @@ export function setupPlatformHandlers() {
     // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
-      const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(CreateIdpQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3142,7 +3131,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateIdpBody, raw, "invalid_request");
+      const body = parse(CreateIdpBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3200,7 +3189,7 @@ export function setupPlatformHandlers() {
       store.idps.set(record.id, record);
 
       const responseBody = idpResponse(record);
-      const out = parse(CreateIdpResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(CreateIdpResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -3208,7 +3197,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.post("*/idps/query", async ({ request }) => {
-      const query = parse(QueryIdpsQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(QueryIdpsQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3216,7 +3205,7 @@ export function setupPlatformHandlers() {
       // would let a CLI slug filter appear to work while returning every
       // connection in the project.
       const raw = (await readJson(request)) ?? {};
-      const body = parse(QueryIdpsBody, raw, "invalid_request");
+      const body = parse(QueryIdpsBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3233,7 +3222,7 @@ export function setupPlatformHandlers() {
         })
         .slice(0, body.data.limit ?? undefined);
       const responseBody = { idps: records.map(idpResponse), next_page_token: null };
-      const out = parse(QueryIdpsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(QueryIdpsResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -3241,11 +3230,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/idps/:id", ({ params, request }) => {
-      const path = parse(GetIdpByIdParams, params, "invalid_request");
+      const path = parse(GetIdpByIdParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetIdpByIdQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetIdpByIdQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3256,7 +3245,7 @@ export function setupPlatformHandlers() {
           { status: 404 },
         );
       }
-      const out = parse(GetIdpByIdResponse, idpResponse(record), "mock_response_invalid");
+      const out = parseOut(GetIdpByIdResponse, idpResponse(record));
       if (!out.ok) {
         return out.response;
       }
@@ -3271,7 +3260,7 @@ export function setupPlatformHandlers() {
     // the maximum fails the template's config rule (`pol.invalid`).
 
     http.post("*/policies", async ({ request }) => {
-      const query = parse(PublishPolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(PublishPolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3281,7 +3270,7 @@ export function setupPlatformHandlers() {
       }
       // Like the server's decoder: unknown settings are refused, while an
       // extra top-level key (the file's `$schema`) is ignored.
-      const body = parse(PublishPolicyLooseBody, raw, "req.invalid");
+      const body = parse(PublishPolicyLooseBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3296,11 +3285,7 @@ export function setupPlatformHandlers() {
       }
       const { record, revision } = publishPolicyRevision(query.data.project_id, operation, config);
 
-      const out = parse(
-        PublishPolicyResponse,
-        policyResponse(record, revision),
-        "mock_response_invalid",
-      );
+      const out = parseOut(PublishPolicyResponse, policyResponse(record, revision));
       if (!out.ok) {
         return out.response;
       }
@@ -3310,7 +3295,7 @@ export function setupPlatformHandlers() {
     // A dry run: nothing is read or stored. The config is checked as a
     // publish checks it, then evaluated as the server's password set would.
     http.post("*/policies/evaluate", async ({ request }) => {
-      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3318,7 +3303,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
+      const body = parse(EvaluatePolicyStrictBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3337,7 +3322,7 @@ export function setupPlatformHandlers() {
               self_service: body.data.facts?.self_service ?? true,
               history_matches: body.data.facts?.history_matches ?? [],
             });
-      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      const out = parseOut(EvaluatePolicyResponse, decision);
       if (!out.ok) {
         return out.response;
       }
@@ -3345,7 +3330,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/policies", ({ request }) => {
-      const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
+      const query = parse(ListPoliciesQueryParams, listQueryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3362,7 +3347,7 @@ export function setupPlatformHandlers() {
         policies: paged.page.map((record) => policyResponse(record, newestRevision(record))),
         next_page_token: paged.next ?? null,
       };
-      const out = parse(ListPoliciesResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListPoliciesResponse, responseBody);
       if (!out.ok) {
         return out.response;
       }
@@ -3372,11 +3357,11 @@ export function setupPlatformHandlers() {
     // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
     // as a policy id.
     http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
-      const path = parse(GetPolicyRevisionParams, params, "invalid_request");
+      const path = parse(GetPolicyRevisionParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3384,11 +3369,7 @@ export function setupPlatformHandlers() {
         if (record.projectId !== query.data.project_id) continue;
         const revision = record.revisions.find((r) => r.revisionId === path.data.revision_id);
         if (revision) {
-          const out = parse(
-            GetPolicyRevisionResponse,
-            policyResponse(record, revision),
-            "mock_response_invalid",
-          );
+          const out = parseOut(GetPolicyRevisionResponse, policyResponse(record, revision));
           return out.ok ? HttpResponse.json(out.data) : out.response;
         }
       }
@@ -3396,11 +3377,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/policies/:policy_id", ({ params, request }) => {
-      const path = parse(GetPolicyParams, params, "invalid_request");
+      const path = parse(GetPolicyParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetPolicyQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetPolicyQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3408,24 +3389,16 @@ export function setupPlatformHandlers() {
       if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
       }
-      const out = parse(
-        GetPolicyResponse,
-        policyResponse(record, newestRevision(record)),
-        "mock_response_invalid",
-      );
+      const out = parseOut(GetPolicyResponse, policyResponse(record, newestRevision(record)));
       return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     http.get("*/policies/:policy_id/revisions", ({ params, request }) => {
-      const path = parse(ListPolicyRevisionsParams, params, "invalid_request");
+      const path = parse(ListPolicyRevisionsParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(
-        ListPolicyRevisionsQueryParams,
-        listQueryRecord(request),
-        "invalid_query",
-      );
+      const query = parse(ListPolicyRevisionsQueryParams, listQueryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3445,7 +3418,7 @@ export function setupPlatformHandlers() {
         revisions: paged.page.map((revision) => policyResponse(record, revision)),
         next_page_token: paged.next ?? null,
       };
-      const out = parse(ListPolicyRevisionsResponse, responseBody, "mock_response_invalid");
+      const out = parseOut(ListPolicyRevisionsResponse, responseBody);
       return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
@@ -3456,11 +3429,11 @@ export function setupPlatformHandlers() {
 
     // Registered ahead of `*/variables`, which would otherwise match it.
     http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
-      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      const path = parse(GetDeploymentVariablesParams, params);
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3474,7 +3447,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/variables", ({ request }) => {
-      const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3483,7 +3456,7 @@ export function setupPlatformHandlers() {
         query.data.project_id,
         variableKinds(query.data.kind),
       );
-      const out = parse(GetVariablesResponse, body, "mock_response_invalid");
+      const out = parseOut(GetVariablesResponse, body);
       if (!out.ok) {
         return out.response;
       }
@@ -3493,15 +3466,11 @@ export function setupPlatformHandlers() {
     // One variable by name, which `variables get` and `variables delete`
     // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
-      const path = parse(
-        GetVariableParams,
-        { variable_name: String(params.variableName) },
-        "invalid_request",
-      );
+      const path = parse(GetVariableParams, { variable_name: String(params.variableName) });
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(GetVariableQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(GetVariableQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3513,7 +3482,7 @@ export function setupPlatformHandlers() {
       if (body === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      const out = parse(GetVariableResponse, body, "mock_response_invalid");
+      const out = parseOut(GetVariableResponse, body);
       if (!out.ok) {
         return out.response;
       }
@@ -3521,15 +3490,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.delete("*/variables/:variableName", ({ request, params }) => {
-      const path = parse(
-        DeleteVariableParams,
-        { variable_name: String(params.variableName) },
-        "invalid_request",
-      );
+      const path = parse(DeleteVariableParams, { variable_name: String(params.variableName) });
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(DeleteVariableQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(DeleteVariableQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3546,7 +3511,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.patch("*/variables", async ({ request }) => {
-      const query = parse(UpdateVariablesQueryParams, queryRecord(request), "invalid_query");
+      const query = parse(UpdateVariablesQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
       }
@@ -3554,7 +3519,7 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(UpdateVariablesBody, raw, "invalid_request");
+      const body = parse(UpdateVariablesBody, raw);
       if (!body.ok) {
         return body.response;
       }
@@ -3592,7 +3557,7 @@ export function setupPlatformHandlers() {
       }
       // 200 with the variables read back, including what the write did not touch.
       const response = variablesResponse(store.variables, projectId, kinds);
-      const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
+      const out = parseOut(UpdateVariablesResponse, response);
       if (!out.ok) {
         return out.response;
       }

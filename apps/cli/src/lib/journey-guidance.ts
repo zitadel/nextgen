@@ -65,6 +65,15 @@ export function customizeAndPublishActions(suggest: Suggest): string[] {
 }
 
 /**
+ * The opt-in first end-to-end test, offered once a sign-in has worked. It is
+ * prose and never a `next_commands` entry: `tests add` installs Playwright,
+ * which an agent following `next_commands` would do unasked.
+ */
+export function testsAction(suggest: Suggest): string {
+  return `Keep the sign-in working with an end-to-end test whenever you want one: ${suggest({ id: "tests:add" })} adds Playwright tests on @zitadel/testing and installs them as dev dependencies.`;
+}
+
+/**
  * How to change the login's look after setup. Setup never ejects a template
  * or publishes a branding revision: the app embeds the maintained
  * `<zitadel-login>`, so its look is the app's own CSS (`--zl-*` tokens) and

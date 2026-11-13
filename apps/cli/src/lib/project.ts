@@ -49,6 +49,17 @@ export type ZitadelSecret = {
 };
 
 /**
+ * The framework setup recorded in `zitadel.json`.
+ *
+ * @param config - `zitadel.json`, as {@link readZitadelConfig} reads it.
+ * @returns The framework's id, or undefined when the file names none.
+ */
+export function readFrameworkId(config: Record<string, unknown>): string | undefined {
+  const id = isObject(config.framework) ? config.framework.id : undefined;
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
  * Reads and parses `zitadel.json` into a plain object. Translates a missing
  * file into an actionable `E_VALIDATION` error pointing at `zitadel setup`;
  * other errors (e.g. malformed JSON) propagate unchanged.
