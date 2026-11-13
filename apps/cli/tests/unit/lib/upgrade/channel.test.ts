@@ -73,6 +73,22 @@ describe("ReleaseChannel.latest", () => {
     expect([stable?.version, alpha?.version]).toEqual(["2.0.0", "3.0.0-alpha.1"]);
   });
 
+  it("writes every slash of the package name as %2f", async ({ dir, server }) => {
+    server.use(
+      http.get(`${REGISTRY}/-/package/@acme%2fcli%2fextra/dist-tags`, () => {
+        return HttpResponse.json({ latest: "2.0.0" });
+      }),
+    );
+    const nested = new ReleaseChannel({
+      packageName: "@acme/cli/extra",
+      distTag: "latest",
+      registry: REGISTRY,
+      cache: new Cache(join(dir, "nested.json")),
+    });
+
+    expect((await nested.latest())?.version).toBe("2.0.0");
+  });
+
   it("asks the registry it is given", async ({ channel, publishes }) => {
     publishes({ latest: "2.0.0" }, MIRROR);
 

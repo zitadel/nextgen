@@ -104,7 +104,7 @@ export class ReleaseChannel {
       }
     }
 
-    const path = `/-/package/${packageName.replace("/", "%2f")}/dist-tags`;
+    const path = `/-/package/${packageName.replaceAll("/", "%2f")}/dist-tags`;
     const answered = await fetch(`${registry}${path}`, {
       signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
     })
