@@ -3,9 +3,23 @@ import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors"
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
-/** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
-export type CheckOutcome = {
-  details?: unknown;
+/**
+ * Pass/fail/advisory outcome of a single {@link SanityCheck}. One that carries
+ * a {@link CheckOutcome.remedy} gives its details as an object, so the
+ * envelope can write the remedy into them beside what the check found.
+ */
+export type CheckOutcome = Readonly<
+  | { details?: unknown; remedy?: never }
+  | {
+      details?: Readonly<Record<string, unknown>>;
+      /**
+       * The command that repairs a warning, as the check rendered it, and the
+       * one place a check gives it: the report quotes it, and the envelope
+       * writes it into the check's `details.remedy_command` (`withCategories`).
+       */
+      remedy: SuggestedCommand;
+    }
+> & {
   name: string;
   status: "pass" | "warn" | "fail";
   message: string;
@@ -18,12 +32,6 @@ export type CheckOutcome = {
    */
   code?: ZitadelErrorCode;
   hint?: string;
-  /**
-   * The command that repairs a warning, as the check rendered it, and the one
-   * place a check gives it: the report quotes it, and the envelope writes it
-   * into the check's `details.remedy_command` ({@link withCategories}).
-   */
-  remedy?: SuggestedCommand;
 };
 
 /** Everything a check needs to inspect or repair a project. */

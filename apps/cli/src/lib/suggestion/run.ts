@@ -85,7 +85,11 @@ export type RerunOf<Defs> = RerunShape<
   Partial<FlagsOf<{ flags: Defs }>>
 >;
 
-/** How a rerun changes the command line it rebuilds, once its flags are only names. */
+/**
+ * How a rerun changes the command line it rebuilds, once its flags are only
+ * names: what {@link RerunOf} becomes after the compiler has checked it, and
+ * what the run checks again against the command it rebuilds.
+ */
 export type Rerun = RerunShape<string, Readonly<Record<string, unknown>>>;
 
 /**
@@ -175,6 +179,8 @@ export class RunSuggestions {
    * @param raw - Its command line, as oclif parsed it.
    * @param change - What the rerun changes.
    * @returns The command.
+   * @throws {Error} When the change leaves out, or sets, a flag the command
+   *   does not declare.
    */
   rerun(
     id: string,

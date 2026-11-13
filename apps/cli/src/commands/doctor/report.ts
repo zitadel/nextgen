@@ -1,6 +1,5 @@
 import wrapAnsi from "wrap-ansi";
 
-import { isObject } from "@/lib/json";
 import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
 import type { Suggest } from "@/lib/suggestion";
 import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
@@ -91,16 +90,14 @@ export function categoryOf(checkName: string): CheckCategory {
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
-  return checks.map(({ remedy, ...check }) => {
-    return {
-      ...check,
-      ...(remedy === undefined
-        ? {}
-        : {
-            details: { ...(isObject(check.details) ? check.details : {}), remedy_command: remedy },
-          }),
-      category: categoryOf(check.name),
-    };
+  return checks.map((check) => {
+    const category = categoryOf(check.name);
+    if (check.remedy === undefined) {
+      const { remedy: _none, ...found } = check;
+      return { ...found, category };
+    }
+    const { remedy, ...found } = check;
+    return { ...found, details: { ...found.details, remedy_command: remedy }, category };
   });
 }
 

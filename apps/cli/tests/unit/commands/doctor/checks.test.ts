@@ -2640,7 +2640,7 @@ describe("DependencyVersionCheck", () => {
       });
     });
 
-    it("gives the exact npm remedy for every trailing pin", async ({ dir }) => {
+    it("names every trailing pin", async ({ dir }) => {
       await aTrailingProject(dir);
 
       const outcome = await new DependencyVersionCheck().run(
@@ -2653,6 +2653,18 @@ describe("DependencyVersionCheck", () => {
           { name: "@zitadel/testing", declared: TRAILING, expected: RELEASE },
         ],
       });
+    });
+
+    it("gives the exact npm remedy for every trailing pin", async ({ dir }) => {
+      await aTrailingProject(dir);
+
+      const outcome = await new DependencyVersionCheck().run(
+        aCheckContext(dir, { cliVersion: RELEASE }),
+      );
+
+      expect(outcome.remedy).toBe(
+        `npm install --save-exact @zitadel/sdk-next@${RELEASE} @zitadel/testing@${RELEASE}`,
+      );
     });
 
     it("writes the remedy with the project's own package manager", async ({ dir }) => {

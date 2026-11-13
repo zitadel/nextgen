@@ -142,6 +142,13 @@ describe("withCategories", () => {
     ]);
   });
 
+  it("does not compile for a remedy beside details that are no object", () => {
+    // @ts-expect-error the envelope writes the remedy into the details
+    const listed: CheckOutcome = { ...BEHIND, details: ["2.0.0"] };
+
+    expect(withCategories([listed])[0]?.details).toMatchObject({ remedy_command: UPGRADE });
+  });
+
   it("writes a warning's remedy into its details, after what the check found", () => {
     const [check] = withCategories([BEHIND]);
 
