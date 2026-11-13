@@ -15,7 +15,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { bootLocalServer } from "@zitadel/testing";
-import semver from "semver";
 
 const require = createRequire(import.meta.url);
 const workspaceRoot = join(import.meta.dirname, "..", "..", "..");
@@ -43,11 +42,10 @@ const DROPPED_FILES = new Set([
 
 /**
  * Tooling that only the generated scripts a fixture drops (`lint`, `build`,
- * `preview`) would load: linters, static servers and test runners, with
- * their config files. Kept, they install packages nothing in the lane runs,
- * which pnpm also hands other workspace packages as their optional peers.
- * Add a name here when a generator writes another; a fixture has no list of
- * its own.
+ * `preview`) would load, and its config files. Kept, it installs packages
+ * nothing in the lane runs, which pnpm also hands other workspace packages as
+ * their optional peers. Add a name here when a generator writes another; a
+ * fixture has no list of its own.
  */
 const UNLOADED_DEPENDENCIES = new Set(["eslint", "eslint-config-next", "oxlint", "serve"]);
 const UNLOADED_FILES = new Set(["eslint.config.mjs", ".oxlintrc.json"]);
@@ -188,12 +186,11 @@ async function normalizeManifest(text, settings, name) {
     devDependencies,
     ...rest
   } = generated;
-  const behind = [];
   const mapped = (deps = {}) =>
     Object.fromEntries(
       Object.entries(deps)
         .filter(([dep]) => !UNLOADED_DEPENDENCIES.has(dep))
-        .map(([dep, range]) => [dep, workspaceRange(dep, range, catalog, behind)])
+        .map(([dep, range]) => [dep, workspaceRange(dep, range, catalog)])
         .sort(([a], [b]) => a.localeCompare(b)),
     );
   const manifest = {
@@ -219,32 +216,17 @@ async function normalizeManifest(text, settings, name) {
     ),
     conformance: settings,
   };
-  if (behind.length > 0) {
-    // The lane runs the workspace's versions; the journeys run the
-    // generator's. Bump the catalog when a lane fails, not to follow a
-    // generator.
-    console.warn(
-      `${name}: the pnpm catalog is behind what setup writes; the fixture runs the catalog's version:\n${behind.join("\n")}`,
-    );
-  }
   return `${JSON.stringify(manifest, null, indent)}\n`;
 }
 
 /**
- * `workspace:*` for a Zitadel package, `catalog:` for one the catalog holds,
- * and the generated range for one it does not hold. A catalog entry whose
- * floor is below every version the generated range allows is recorded in
- * `behind`, which `generate` reports.
+ * `workspace:*` for a Zitadel package, `catalog:` for one the catalog holds
+ * (the lane runs the workspace's versions, conformance/README.md), and the
+ * generated range for one it does not hold.
  */
-function workspaceRange(dep, range, catalog, behind) {
+function workspaceRange(dep, range, catalog) {
   if (dep.startsWith("@zitadel/")) return "workspace:*";
-  const pinned = catalog.get(dep);
-  if (pinned === undefined) return range;
-  const floor = semver.minVersion(pinned);
-  if (!floor || semver.ltr(floor, range)) {
-    behind.push(`  ${dep}: the catalog has ${pinned}, setup writes ${range}`);
-  }
-  return "catalog:";
+  return catalog.has(dep) ? "catalog:" : range;
 }
 
 /** The default catalog of pnpm-workspace.yaml: `name: range` lines under `catalog:`. */

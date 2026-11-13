@@ -5,7 +5,7 @@
   // `"extends": ["//", "@zitadel/conformance"]` (conformance/README.md). The
   // suite itself has only the typecheck, lint and install-browsers scripts, so
   // only those run here. It installs the lane's Chromium once for every
-  // fixture: one `playwright install` per fixture cost minutes of CI task time.
+  // fixture.
   //
   // `^build` follows a package's dependencies, devDependencies included, which
   // the rest of the graph avoids (docs/design/build/turborepo.md). A fixture
