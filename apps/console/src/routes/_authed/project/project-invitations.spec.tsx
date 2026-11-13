@@ -20,7 +20,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.mock("@/addon/analytics", () => ({ trackEvent: vi.fn() }));
 
 /**
- * Project Settings → Invitations (root ADR 086, #2855): the table of
+ * Project Settings → Members → Invitations (root ADR 086, #2855): the table of
  * a project's invitations, and creating, replacing and cancelling one. Every
  * request names the route's project.
  */
@@ -57,7 +57,10 @@ interface ListRead {
   pageToken: string | null;
 }
 
-/** The Settings layout's project read, with `list` answering the invitations one. */
+/**
+ * The Settings layout's project read and the Members tab's two, with `list`
+ * answering the invitations one.
+ */
 function stubPage(
   list: (read: ListRead) => Response = () =>
     HttpResponse.json({ invitations: [], next_page_token: null }),
@@ -73,6 +76,8 @@ function stubPage(
         updated_at: "2026-07-08T09:00:00Z",
       }),
     ),
+    http.get(`${API}/projects/:id/admins`, () => HttpResponse.json({ admins: [] })),
+    http.post(`${API}/grants/query`, () => HttpResponse.json({ grants: [] })),
     http.get(INVITATIONS_URL, ({ request }) => {
       const params = new URL(request.url).searchParams;
       const read = { projectId: params.get("project_id"), pageToken: params.get("page_token") };
@@ -103,13 +108,16 @@ function stubCreate() {
   return created;
 }
 
-async function openInvitations() {
+function openMembers(path = "/project/members") {
   const router = createAppRouter({
-    history: createMemoryHistory({
-      initialEntries: [scopedPath("/project/invitations", PROJECT_ID)],
-    }),
+    history: createMemoryHistory({ initialEntries: [scopedPath(path, PROJECT_ID)] }),
   });
   render(<RouterProvider router={router} />);
+  return router;
+}
+
+async function openInvitations() {
+  openMembers("/project/members?tab=invitations");
   return within(await screen.findByRole("region", { name: "Invitations" }));
 }
 
@@ -130,6 +138,50 @@ async function openMenu(name: string) {
 
 beforeEach(() => {
   vi.mocked(trackEvent).mockClear();
+});
+
+describe("project members tabs", () => {
+  it("opens on Members and keeps the chosen tab in the URL", async () => {
+    stubPage(listing(invitation()));
+    const router = openMembers();
+
+    // A bare URL is the people; the invitations are read but not drawn.
+    expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("region", { name: "Invitations" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
+    expect(await screen.findByRole("region", { name: "Invitations" })).toBeInTheDocument();
+    expect(router.state.location.search).toMatchObject({ tab: "invitations", project: PROJECT_ID });
+    expect(screen.queryByRole("region", { name: "Admins" })).not.toBeInTheDocument();
+    // Add admin is the Members tab's; Invite member is on both.
+    expect(screen.queryByRole("button", { name: "Add admin" })).not.toBeInTheDocument();
+    expect(inviteButton()).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Members" }));
+    await screen.findByRole("region", { name: "Admins" });
+    expect(router.state.location.search).toEqual({ project: PROJECT_ID });
+  });
+
+  it("shows the Invitations tab after inviting from Members", async () => {
+    stubPage();
+    stubCreate();
+    const router = openMembers();
+    await screen.findByRole("region", { name: "Admins" });
+
+    await userEvent.click(inviteButton());
+    const dialog = within(await screen.findByRole("dialog", { name: "Invite member" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Create invitation" }));
+
+    // The link is read first; closing lands on the table its row is in.
+    const done = within(await screen.findByRole("dialog", { name: "Invitation created" }));
+    expect(router.state.location.search).toEqual({ project: PROJECT_ID });
+    await userEvent.click(done.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ tab: "invitations" }));
+    expect(await screen.findByRole("region", { name: "Invitations" })).toBeInTheDocument();
+  });
 });
 
 describe("project invitations", () => {

@@ -206,7 +206,7 @@ function InvitationsTable({
   );
 }
 
-/** The page's one action, drawn on its heading's row. */
+/** Invite member, drawn on the tabs' row of the Members page. */
 export function InviteMemberButton({
   projectId,
   projectName,

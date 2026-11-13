@@ -17,7 +17,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
-// The project's Settings also read its admins and grants on their Admins page
+// The project's Settings also read its admins and grants on their Members page
 // (#1238, #1462), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
 // switcher names it from their list rather than by its id while its own read is

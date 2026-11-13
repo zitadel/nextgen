@@ -12,7 +12,7 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * The selected project's Settings: a list of its own in the sidebar, as the
  * root Settings above every project is (D29) and as Vercel's project Settings
  * is (D40). The project's row opens it, and its pages are the routes beneath
- * this one: General (name, origins, variables, policies) and Admins (who has
+ * this one: General (name, origins, variables, policies) and Members (who has
  * access and how, #1238, #1462). For the reserved platform project they are
  * the root's (D42): its pages head the root's Settings list, before what the
  * hosted cloud adds.

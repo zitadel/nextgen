@@ -25,9 +25,8 @@ import { Route as AuthedEventsEventIdRouteImport } from './routes/_authed/events
 import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
 import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
 import { Route as AuthedProjectIndexRouteImport } from './routes/_authed/project/index'
-import { Route as AuthedProjectAdminsRouteImport } from './routes/_authed/project/admins'
 import { Route as AuthedProjectGeneralRouteImport } from './routes/_authed/project/general'
-import { Route as AuthedProjectInvitationsRouteImport } from './routes/_authed/project/invitations'
+import { Route as AuthedProjectMembersRouteImport } from './routes/_authed/project/members'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
 import { Route as AuthedProjectsProjectIdRouteImport } from './routes/_authed/projects/$projectId'
 import { Route as AuthedReleasesReleaseIdRouteImport } from './routes/_authed/releases/$releaseId'
@@ -123,22 +122,16 @@ const AuthedProjectIndexRoute = AuthedProjectIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedProjectRouteRoute,
 } as any)
-const AuthedProjectAdminsRoute = AuthedProjectAdminsRouteImport.update({
-  id: '/admins',
-  path: '/admins',
-  getParentRoute: () => AuthedProjectRouteRoute,
-} as any)
 const AuthedProjectGeneralRoute = AuthedProjectGeneralRouteImport.update({
   id: '/general',
   path: '/general',
   getParentRoute: () => AuthedProjectRouteRoute,
 } as any)
-const AuthedProjectInvitationsRoute =
-  AuthedProjectInvitationsRouteImport.update({
-    id: '/invitations',
-    path: '/invitations',
-    getParentRoute: () => AuthedProjectRouteRoute,
-  } as any)
+const AuthedProjectMembersRoute = AuthedProjectMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AuthedProjectRouteRoute,
+} as any)
 const AuthedProjectsIndexRoute = AuthedProjectsIndexRouteImport.update({
   id: '/projects/',
   path: '/projects/',
@@ -210,9 +203,8 @@ export interface FileRoutesByFullPath {
   '/claim/': typeof ClaimIndexRoute
   '/events/$eventId': typeof AuthedEventsEventIdRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
-  '/project/admins': typeof AuthedProjectAdminsRoute
   '/project/general': typeof AuthedProjectGeneralRoute
-  '/project/invitations': typeof AuthedProjectInvitationsRoute
+  '/project/members': typeof AuthedProjectMembersRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/releases/$releaseId': typeof AuthedReleasesReleaseIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
@@ -240,9 +232,8 @@ export interface FileRoutesByTo {
   '/claim': typeof ClaimIndexRoute
   '/events/$eventId': typeof AuthedEventsEventIdRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
-  '/project/admins': typeof AuthedProjectAdminsRoute
   '/project/general': typeof AuthedProjectGeneralRoute
-  '/project/invitations': typeof AuthedProjectInvitationsRoute
+  '/project/members': typeof AuthedProjectMembersRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/releases/$releaseId': typeof AuthedReleasesReleaseIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
@@ -274,9 +265,8 @@ export interface FileRoutesById {
   '/claim/': typeof ClaimIndexRoute
   '/_authed/events/$eventId': typeof AuthedEventsEventIdRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
-  '/_authed/project/admins': typeof AuthedProjectAdminsRoute
   '/_authed/project/general': typeof AuthedProjectGeneralRoute
-  '/_authed/project/invitations': typeof AuthedProjectInvitationsRoute
+  '/_authed/project/members': typeof AuthedProjectMembersRoute
   '/_authed/projects/$projectId': typeof AuthedProjectsProjectIdRoute
   '/_authed/releases/$releaseId': typeof AuthedReleasesReleaseIdRoute
   '/_authed/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
@@ -308,9 +298,8 @@ export interface FileRouteTypes {
     | '/claim/'
     | '/events/$eventId'
     | '/flow-definitions/$definitionId'
-    | '/project/admins'
     | '/project/general'
-    | '/project/invitations'
+    | '/project/members'
     | '/projects/$projectId'
     | '/releases/$releaseId'
     | '/schemas/$schemaId'
@@ -338,9 +327,8 @@ export interface FileRouteTypes {
     | '/claim'
     | '/events/$eventId'
     | '/flow-definitions/$definitionId'
-    | '/project/admins'
     | '/project/general'
-    | '/project/invitations'
+    | '/project/members'
     | '/projects/$projectId'
     | '/releases/$releaseId'
     | '/schemas/$schemaId'
@@ -371,9 +359,8 @@ export interface FileRouteTypes {
     | '/claim/'
     | '/_authed/events/$eventId'
     | '/_authed/flow-definitions/$definitionId'
-    | '/_authed/project/admins'
     | '/_authed/project/general'
-    | '/_authed/project/invitations'
+    | '/_authed/project/members'
     | '/_authed/projects/$projectId'
     | '/_authed/releases/$releaseId'
     | '/_authed/schemas/$schemaId'
@@ -516,13 +503,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectIndexRouteImport
       parentRoute: typeof AuthedProjectRouteRoute
     }
-    '/_authed/project/admins': {
-      id: '/_authed/project/admins'
-      path: '/admins'
-      fullPath: '/project/admins'
-      preLoaderRoute: typeof AuthedProjectAdminsRouteImport
-      parentRoute: typeof AuthedProjectRouteRoute
-    }
     '/_authed/project/general': {
       id: '/_authed/project/general'
       path: '/general'
@@ -530,11 +510,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectGeneralRouteImport
       parentRoute: typeof AuthedProjectRouteRoute
     }
-    '/_authed/project/invitations': {
-      id: '/_authed/project/invitations'
-      path: '/invitations'
-      fullPath: '/project/invitations'
-      preLoaderRoute: typeof AuthedProjectInvitationsRouteImport
+    '/_authed/project/members': {
+      id: '/_authed/project/members'
+      path: '/members'
+      fullPath: '/project/members'
+      preLoaderRoute: typeof AuthedProjectMembersRouteImport
       parentRoute: typeof AuthedProjectRouteRoute
     }
     '/_authed/projects/': {
@@ -638,16 +618,14 @@ const AuthedEventsRouteRouteWithChildren =
   AuthedEventsRouteRoute._addFileChildren(AuthedEventsRouteRouteChildren)
 
 interface AuthedProjectRouteRouteChildren {
-  AuthedProjectAdminsRoute: typeof AuthedProjectAdminsRoute
   AuthedProjectGeneralRoute: typeof AuthedProjectGeneralRoute
-  AuthedProjectInvitationsRoute: typeof AuthedProjectInvitationsRoute
+  AuthedProjectMembersRoute: typeof AuthedProjectMembersRoute
   AuthedProjectIndexRoute: typeof AuthedProjectIndexRoute
 }
 
 const AuthedProjectRouteRouteChildren: AuthedProjectRouteRouteChildren = {
-  AuthedProjectAdminsRoute: AuthedProjectAdminsRoute,
   AuthedProjectGeneralRoute: AuthedProjectGeneralRoute,
-  AuthedProjectInvitationsRoute: AuthedProjectInvitationsRoute,
+  AuthedProjectMembersRoute: AuthedProjectMembersRoute,
   AuthedProjectIndexRoute: AuthedProjectIndexRoute,
 }
 

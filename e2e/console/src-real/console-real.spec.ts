@@ -198,7 +198,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await page.goto(`/projects/${zitadel.handle.projectId}`);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
@@ -281,7 +281,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     await page.goto(`/projects/${projectId}`);
     await page
       .getByRole("navigation", { name: "Project settings" })
-      .getByRole("link", { name: "Admins" })
+      .getByRole("link", { name: "Members" })
       .click();
     const row = page.getByRole("row").filter({ hasText: team.name });
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
@@ -330,7 +330,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await page
     .getByRole("navigation", { name: "Project settings" })
-    .getByRole("link", { name: "Admins" })
+    .getByRole("link", { name: "Members" })
     .click();
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
