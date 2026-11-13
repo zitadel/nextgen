@@ -2154,7 +2154,7 @@ describe("setup", () => {
             },
             // This pins a misleading warning. The server refuses the minted id
             // in the probe's query as req.invalid, and the probe
-            // (serverTakesSignupPolicy in src/commands/setup/index.ts) reads any
+            // (serverTakesSignupPolicy in src/cli/commands/setup/index.ts) reads any
             // req.invalid as a server without the sign-up policy, so setup
             // drops user.create.json for a server that takes it.
             warnings: [
