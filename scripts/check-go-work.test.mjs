@@ -1,12 +1,12 @@
 /**
- * Tests for the comparison `//#check-go-work` runs before the check
+ * Tests for the comparisons `//#check-go-work` runs before the check
  * itself (Vitest, no Go): which modules a module's own build and the
- * workspace's load at different versions.
+ * workspace's load at different versions, and the go.work.sum check's helpers.
  */
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { TAG_SETS, versionDifferences } from "./check-go-work.mjs";
+import { relocatedGoWork, sumChanges, TAG_SETS, versionDifferences } from "./check-go-work.mjs";
 
 const versions = (entries) => new Map(Object.entries(entries));
 
@@ -55,4 +55,40 @@ test("each integration lane loads on its own", () => {
   for (const tags of TAG_SETS) {
     assert.ok(tags.filter((tag) => tag.endsWith("_integration")).length <= 1, tags.join(","));
   }
+});
+
+test("a relocated go.work resolves its local paths from the workspace root", () => {
+  const work = {
+    Go: "1.26.0",
+    Toolchain: "go1.26.9",
+    Godebug: [{ Key: "http2client", Value: "0" }],
+    Use: [{ DiskPath: "./apps/api" }, { DiskPath: "/abs/tools/bench" }],
+    Replace: [
+      { Old: { Path: "example.com/a" }, New: { Path: "../a" } },
+      {
+        Old: { Path: "example.com/b", Version: "v1.0.0" },
+        New: { Path: "example.com/c", Version: "v1.1.0" },
+      },
+    ],
+  };
+  assert.equal(
+    relocatedGoWork(work, "/repo"),
+    [
+      "go 1.26.0",
+      "toolchain go1.26.9",
+      "godebug http2client=0",
+      'use "/repo/apps/api"',
+      'use "/abs/tools/bench"',
+      'replace example.com/a => "/a"',
+      "replace example.com/b v1.0.0 => example.com/c v1.1.0",
+      "",
+    ].join("\n"),
+  );
+});
+
+test("sum changes list the lines Go adds and drops", () => {
+  assert.deepEqual(sumChanges("a h1:1\nb h1:2\n", "b h1:2\nc h1:3\n"), {
+    added: ["c h1:3"],
+    removed: ["a h1:1"],
+  });
 });

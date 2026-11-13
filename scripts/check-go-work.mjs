@@ -16,10 +16,22 @@
  * outside the workspace) until nothing differs. `go work sync` is not
  * enough: it left the server module below versions bench requires.
  *
+ * It also fails when go.work.sum lacks checksums the workspace's module graph
+ * needs. Every turbo run lists that graph (`go list -m -json all`, even with
+ * `--dry`), and Go writes what is missing into go.work.sum: a stale file
+ * changes a committed file under every run and rehashes every Go task between
+ * two runs. A go.mod edited outside the workspace (Dependabot bumps each
+ * directory on its own) leaves it stale. Since turbo has completed the
+ * working tree's copy before this task starts, the check lists the graph
+ * against a copy of what git has staged, in a temporary workspace, and
+ * compares; `--fix` writes the result to the working tree.
+ *
  * Usage: node scripts/check-go-work.mjs [--fix]
  */
 import { execFile } from "node:child_process";
-import { join } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -83,6 +95,97 @@ export function versionDifferences(own, workspace, skip) {
   return differences.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+/**
+ * The text of a go.work equal to `work` (`go work edit -json`) whose relative
+ * paths resolve from `base`, so that it works from another directory.
+ */
+export function relocatedGoWork(work, base) {
+  const local = (path) => (isAbsolute(path) ? path : join(base, path));
+  const module = ({ Path, Version }) => (Version ? `${Path} ${Version}` : Path);
+  const lines = [`go ${work.Go}`];
+  if (work.Toolchain) lines.push(`toolchain ${work.Toolchain}`);
+  for (const { Key, Value } of work.Godebug ?? []) lines.push(`godebug ${Key}=${Value}`);
+  for (const { DiskPath } of work.Use ?? []) lines.push(`use ${JSON.stringify(local(DiskPath))}`);
+  for (const { Old, New } of work.Replace ?? []) {
+    const target = New.Version ? module(New) : JSON.stringify(local(New.Path));
+    lines.push(`replace ${module(Old)} => ${target}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/** The lines `after` adds to `before`, and the lines it drops. */
+export function sumChanges(before, after) {
+  const lines = (text) => new Set(text.split("\n").filter(Boolean));
+  const [old, next] = [lines(before), lines(after)];
+  return {
+    added: [...next].filter((line) => !old.has(line)),
+    removed: [...old].filter((line) => !next.has(line)),
+  };
+}
+
+/**
+ * go.work.sum as Go leaves it after listing the workspace's module graph,
+ * starting from `sum`. Runs in a temporary copy of the workspace, so the
+ * committed file is never written.
+ */
+async function completedWorkSum(sum, env) {
+  const work = JSON.parse(await go(".", ["work", "edit", "-json"], env));
+  const dir = await mkdtemp(join(tmpdir(), "check-go-work-"));
+  try {
+    await writeFile(join(dir, "go.work"), relocatedGoWork(work, root));
+    await writeFile(join(dir, "go.work.sum"), sum);
+    await go(".", ["list", "-mod=readonly", "-m", "-json", "all"], {
+      ...env,
+      GOWORK: join(dir, "go.work"),
+    });
+    return await readFile(join(dir, "go.work.sum"), "utf8").catch(() => "");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** The go.work.sum git has staged, or the working tree's when git has none. */
+async function stagedWorkSum() {
+  try {
+    const { stdout } = await exec("git", ["show", ":go.work.sum"], {
+      cwd: root,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return stdout;
+  } catch {
+    return workingWorkSum();
+  }
+}
+
+function workingWorkSum() {
+  return readFile(join(root, "go.work.sum"), "utf8").catch(() => "");
+}
+
+/** Checks go.work.sum, or with `fix` completes the working tree's; the exit code. */
+async function checkWorkSum(fix, env) {
+  if (fix) {
+    const working = await workingWorkSum();
+    const completed = await completedWorkSum(working, env);
+    if (completed !== working) await writeFile(join(root, "go.work.sum"), completed);
+    return 0;
+  }
+  const staged = await stagedWorkSum();
+  const completed = await completedWorkSum(staged, env);
+  if (completed === staged) return 0;
+  const { added, removed } = sumChanges(staged, completed);
+  console.error(
+    `error: go.work.sum lacks what the workspace's module graph needs: Go adds ${added.length} lines and drops ${removed.length}`,
+  );
+  for (const line of added.slice(0, 5)) console.error(`  + ${line}`);
+  if (added.length > 5) console.error(`  … and ${added.length - 5} more`);
+  console.error(
+    (await workingWorkSum()) === completed
+      ? "hint: the working tree's go.work.sum is already complete (turbo writes it); stage and commit it"
+      : "hint: run `node scripts/check-go-work.mjs --fix`, then stage and commit go.work.sum",
+  );
+  return 1;
+}
+
 async function compare(dirs, skip, envs) {
   return Promise.all(
     dirs.map(async (dir) => {
@@ -125,7 +228,7 @@ export async function main(argv = process.argv.slice(2)) {
       const drifted = (await compare(dirs, skip, envs)).filter(
         ({ differences }) => differences.length > 0,
       );
-      if (drifted.length === 0) return 0;
+      if (drifted.length === 0) return checkWorkSum(fix, envs.workspace);
       if (!fix || round === FIX_ROUNDS) {
         console.error(
           "error: these Go modules compile with other versions inside go.work than alone:",
