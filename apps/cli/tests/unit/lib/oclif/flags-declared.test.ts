@@ -1,22 +1,16 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
+import { declaredAs, sourcesUnder } from "@tests/helpers/declarations";
+
 import { WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
-
-/**
- * What one flag or argument is refused for, either way a command declares it:
- * `const NAME = { … } as const satisfies Refused<T>`, whose body closes no line
- * at the margin before its own end, or `const NAME: Refused<T> = { … }`.
- */
-const REFUSED =
-  /const (\w+)(?:: Refused<[^>]*> = \{| = \{(?:[^\n]|\n(?!\}))*\n\} as const satisfies Refused<)/g;
 
 /**
  * The ways a flag's refusal is raised by the flag itself: the `parse` it gives
@@ -33,16 +27,12 @@ const CLASS = /^export default class /m;
  * use the same word.
  */
 function code(source: string): string {
+  // Strings go first: a `//` in a URL is not a comment, and taking it out as
+  // one would cut the string in two.
   return source
+    .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""')
     .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\/\/[^\n]*/g, " ")
-    .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""');
-}
-
-/** Every `.ts` file under `src/commands`, as a path relative to it. */
-async function files(): Promise<string[]> {
-  const found = await readdir(commands, { recursive: true });
-  return found.filter((file) => file.endsWith(".ts")).map((file) => file.split(sep).join("/"));
+    .replace(/\/\/[^\n]*/g, " ");
 }
 
 /**
@@ -55,9 +45,11 @@ type Command = Readonly<{ file: string; refused: string[]; body: string }>;
 
 async function declared(): Promise<Command[]> {
   const found: Command[] = [];
-  for (const file of await files()) {
+  for (const file of await sourcesUnder(commands)) {
     const source = await readFile(join(commands, file), "utf8");
-    const refused = [...source.matchAll(REFUSED)].map((match) => match[1] as string);
+    const refused = declaredAs(source, "Refused").map((declaration) => {
+      return declaration.name;
+    });
     const at = CLASS.exec(source)?.index;
     if (refused.length === 0 || at === undefined) {
       continue;

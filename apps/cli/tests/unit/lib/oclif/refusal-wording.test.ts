@@ -1,8 +1,10 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+
+import { declaredAs, objectAt, sourcesUnder } from "@tests/helpers/declarations";
 
 const root = fileURLToPath(new URL("../../../../src", import.meta.url));
 
@@ -15,24 +17,8 @@ const ALWAYS = ["value", "input", "problem"];
  */
 const PLACEHOLDER = /(?<!\$)\{([\w-]+)\}/g;
 
-/**
- * What a flag or argument is refused for, filled only by `read`: an object a
- * const holds, typed `: Refused<T>` or followed by `as const satisfies
- * Refused<T>` ({@link SATISFIES_REFUSED}).
- */
-const REFUSED = /const (\w+)(: Refused<[^>]*>)? = \{/g;
-
-/** What follows a `Refused` declared without a type, once its object closes. */
-const SATISFIES_REFUSED = " as const satisfies Refused<";
-
-/**
- * A refusal thrown by hand, filled by whoever throws it: typed `: Refusal`, or
- * followed by `as const satisfies Refusal` ({@link SATISFIES_REFUSAL}).
- */
-const REFUSAL = /const (\w+)(: Refusal)? = \{/g;
-
-/** What follows a `Refusal` declared without a type, once its object closes. */
-const SATISFIES_REFUSAL = " as const satisfies Refusal";
+/** Where a `Refused` declaration's own `values` open. */
+const VALUES = /\bvalues:\s*\{/;
 
 /**
  * Where a refusal is thrown: everything from the call to the values it hands
@@ -41,133 +27,133 @@ const SATISFIES_REFUSAL = " as const satisfies Refusal";
  */
 const THROWN = /refusalError\(([^{]*)\{/g;
 
-type Declared = Readonly<{ file: string; text: string }>;
+/** Wording joined with `+`, which the compiler can read only as `string`. */
+const JOINED = /["'`]\s*\+|\+\s*["'`]/;
 
-/** Every `.ts` file under `src`, as a path relative to it. */
-async function sources(): Promise<string[]> {
-  const files = await readdir(root, { recursive: true });
-  return files.filter((file) => file.endsWith(".ts")).map((file) => file.split(sep).join("/"));
-}
-
-/**
- * The object literal that starts at `opened`, read to its matching brace, so a
- * refusal's wording and its `values` are weighed together.
- */
-function literalAt(source: string, opened: number): string {
-  let depth = 0;
-  for (let at = opened; at < source.length; at++) {
-    if (source[at] === "{") {
-      depth++;
-    }
-    if (source[at] === "}") {
-      depth--;
-      if (depth === 0) {
-        return source.slice(opened, at + 1);
-      }
-    }
-  }
-  return source.slice(opened);
-}
+/** One refusal, with its wording and the names something fills it with. */
+type Weighed = Readonly<{
+  /** The file it is declared in, relative to `src`. */
+  file: string;
+  /** The const that holds it. */
+  name: string;
+  /** Its declaration, wording and all. */
+  wording: string;
+  /** Each name a value is given for wherever it is raised. */
+  filled: readonly string[];
+}>;
 
 /**
- * Every refusal declared in `src`, each with its wording and everything that
- * fills it.
+ * The keys an object literal gives a value for. A key is written every way a
+ * property can be — `reason: reason`, the shorthand `reason`, a spread — and a
+ * literal is as often one line as several, so a key is read from what opens it
+ * rather than from the indentation it sits at. Strings are taken out first, so
+ * a placeholder in one, which reads exactly like a shorthand property, does not
+ * count as filling itself; then comments, so one does not hide the key after it.
  *
- * A `Refused` is filled by `read` alone, so its own declaration is all there
- * is. A `Refusal` is filled wherever it is thrown, so each `refusalError` of
- * it in the same file counts too — a name no throw of it ever passes reaches
- * the person as braces.
+ * @param literal - The object, braces included.
+ * @returns Its keys.
  */
+function keysOf(literal: string): string[] {
+  const code = literal
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '""')
+    .replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, " ");
+  // The delimiter that ends a key is looked ahead to, not consumed: it opens
+  // the key after it, and a match that ate it would skip every second one.
+  return [...code.matchAll(/[{,]\s*\.{0,3}([\w-]+)\s*(?=[:,}])/g)].flatMap((match) => {
+    return match[1] === undefined ? [] : [match[1]];
+  });
+}
+
 /**
- * The values a throw hands over, opening at `opened`: the wording's values and,
- * after them, the values its whole-placeholder `next` entries are filled from.
+ * The values each throw of `name` in `source` hands over: the wording's values
+ * and, after them, the values its whole-placeholder `next` entries are filled
+ * from. A throw counts when its first argument names `name` as a whole word,
+ * so `LIMIT` is not credited with what a throw of `MAX_LIMIT` passes.
  *
  * @param source - The module's source.
- * @param opened - Where the first values literal opens.
- * @returns Both literals, one after the other.
+ * @param name - The refusal's const.
+ * @returns The keys the throws give values for.
  */
-function valuesAt(source: string, opened: number): string {
-  const values = literalAt(source, opened);
-  const after = source.slice(opened + values.length);
-  const next = /^\s*,\s*\{/.exec(after);
+function thrownWith(source: string, name: string): string[] {
+  const named = new RegExp(`\\b${name}\\b`);
+  return [...source.matchAll(THROWN)]
+    .filter((throwing) => {
+      return named.test(throwing[1] ?? "");
+    })
+    .flatMap((throwing) => {
+      const opened = throwing.index + throwing[0].length - 1;
+      const values = objectAt(source, opened);
+      const after = source.slice(opened + values.length);
+      const next = /^\s*,\s*\{/.exec(after);
+      const nextValues =
+        next === null ? "" : objectAt(source, opened + values.length + next[0].length - 1);
 
-  return next === null
-    ? values
-    : `${values}\n${literalAt(source, opened + values.length + next[0].length - 1)}`;
+      return [...keysOf(values), ...keysOf(nextValues)];
+    });
 }
 
-async function declared(): Promise<Declared[]> {
-  const found: Declared[] = [];
-  for (const file of await sources()) {
+/**
+ * Every refusal declared in `src`, each with its wording and what fills it.
+ * A `Refused` is filled by `read` and its own `values`, nothing else. A
+ * `Refusal` is filled wherever it is thrown, so each `refusalError` of it in
+ * the same file counts — a name no throw of it passes reaches the person as
+ * braces — and by `read` too where a flag's declaration names it as its
+ * `refusal`, or a `ParseRefusal` takes it as its default.
+ *
+ * @returns The refusals.
+ */
+async function weighed(): Promise<Weighed[]> {
+  const found: Weighed[] = [];
+  for (const file of await sourcesUnder(root)) {
     const source = await readFile(join(root, file), "utf8");
-    for (const match of source.matchAll(REFUSED)) {
-      const opened = match.index + match[0].length - 1;
-      const literal = literalAt(source, opened);
-      if (
-        match[2] === undefined &&
-        !source.startsWith(SATISFIES_REFUSED, opened + literal.length)
-      ) {
-        continue;
-      }
-      found.push({ file, text: literal });
+    for (const { name, literal } of declaredAs(source, "Refused")) {
+      const values = VALUES.exec(literal);
+      const own =
+        values === null ? [] : keysOf(objectAt(literal, values.index + values[0].length - 1));
+      found.push({ file, name, wording: literal, filled: [...ALWAYS, ...own] });
     }
-    for (const match of source.matchAll(REFUSAL)) {
-      const opened = match.index + match[0].length - 1;
-      const literal = literalAt(source, opened);
-      if (
-        match[2] === undefined &&
-        !source.startsWith(SATISFIES_REFUSAL, opened + literal.length)
-      ) {
-        continue;
-      }
-      const thrown = [...source.matchAll(THROWN)]
-        .filter((throwing) => (throwing[1] ?? "").includes(match[1] as string))
-        .map((throwing) => valuesAt(source, throwing.index + throwing[0].length - 1));
-      // A refusal nothing throws is dead, which another test would catch; it
-      // is weighed on its wording alone.
-      found.push({ file, text: [literal, ...thrown].join("\n") });
+    for (const { name, literal } of declaredAs(source, "Refusal")) {
+      const parsed = new RegExp(`(?:refusal:|ParseRefusal =)\\s*${name}\\b`).test(source);
+      found.push({
+        file,
+        name,
+        wording: literal,
+        filled: [...(parsed ? ALWAYS : []), ...thrownWith(source, name)],
+      });
     }
   }
   return found;
-}
-
-/** What a refusal's wording asks for that nothing in its declaration fills. */
-function unfilled(text: string): string[] {
-  const asked = [...text.matchAll(PLACEHOLDER)].map((match) => match[1] as string);
-  // A key is written every way a property can be — `reason: reason`, the
-  // shorthand `reason`, a spread — and a literal handed to a throw is as
-  // often one line as several, so a key is read from what opens it rather
-  // than from the indentation it happens to sit at. The wording is taken out
-  // first: a placeholder reads exactly like a shorthand property, so a
-  // refusal's own `{reason}` would otherwise count as filling itself.
-  const code = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '""');
-  // The delimiter that ends a key is looked ahead to, not consumed: it opens
-  // the key after it, and a match that ate it would skip every second one.
-  const keys = [...code.matchAll(/[{,]\s*\.{0,3}([\w-]+)\s*(?=[:,}])/g)].map(
-    (match) => match[1] as string,
-  );
-  return [...new Set(asked.filter((name) => ![...ALWAYS, ...keys].includes(name)))];
 }
 
 /**
  * A refusal's wording reaches the person, so a placeholder nothing fills shows
  * them `{min}` where a number belonged. The compiler refuses one where it can
  * read the wording; this weighs every refusal, so one it cannot read is caught
- * too: wording joined with `+`, a refusal chosen by a condition, a refusal
- * typed with an annotation because its `next` would make its type circular.
+ * too: a refusal chosen by a condition, or one typed with an annotation
+ * because its `next` would make its type circular.
  */
 describe("what a flag or argument is refused for", () => {
   it("asks only for what something fills", async () => {
-    const defective = (await declared())
-      .map((refusal) => {
-        return {
-          file: refusal.file,
-          unfilled: unfilled(refusal.text),
-        };
-      })
-      .filter((refusal) => refusal.unfilled.length > 0)
-      .map((refusal) => `${refusal.file}: ${refusal.unfilled.map((n) => `{${n}}`).join(", ")}`);
+    const defective = (await weighed()).flatMap((refusal) => {
+      const asked = [...refusal.wording.matchAll(PLACEHOLDER)].flatMap((match) => {
+        return match[1] === undefined ? [] : [match[1]];
+      });
+      const unfilled = [...new Set(asked)].filter((name) => {
+        return !refusal.filled.includes(name);
+      });
+      return unfilled.length === 0
+        ? []
+        : [`${refusal.file}: ${refusal.name} ${unfilled.map((n) => `{${n}}`).join(", ")}`];
+    });
 
     expect(defective).toEqual([]);
+  });
+
+  it("is worded in literals the compiler can read, never joined with +", async () => {
+    const joined = (await weighed()).flatMap((refusal) => {
+      return JOINED.test(refusal.wording) ? [`${refusal.file}: ${refusal.name}`] : [];
+    });
+
+    expect(joined).toEqual([]);
   });
 });
