@@ -48,7 +48,7 @@ the document whose `$id` is that URL, while the API keeps
 
 The services install and build from `vercel.json` itself. The install
 leaves out the other platforms' native packages, so Vercel's build cache
-stays under its 1.5 GB limit, and pnpm skips it once a service built earlier
+stays under its size limit, and pnpm skips it once a service built earlier
 in the deployment has installed (`--optimistic-repeat-install`). Every
 service builds through turbo, so CI and the deployments share one task graph
 and the team's remote cache, which each build reads and writes as Vercel

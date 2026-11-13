@@ -815,11 +815,21 @@ project and imports the root admin.
   [`install:cloud` script](../../package.json). A redeploy without the build
   cache also clears dependencies retained from an older, broader install.
 
-  The compressed archive must stay below the Standard build machine's
-  1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
+  Only production saves an archive. The Preview environment sets
+  `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD=1`, so a preview restores production's
+  archive and skips creating and uploading its own. That step runs after
+  `Deployment completed` and took longer than the build itself, and Vercel
+  bills it as build time. A preview's log ends with
+  `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD is set so skipping build cache upload step`.
+  Never set `VERCEL_FORCE_NO_BUILD_CACHE`: it skips the restore, not the
+  upload. A CLI `vercel redeploy` also builds without the build cache and
+  Turbo's remote cache.
+
+  The archive must stay below Vercel's 5 GB limit, the same on every build
+  machine type. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
   the Go caches and removes duplicate data while preserving the preset's
   toolchain. A successful deployment alone does not prove its cache was
-  saved: check the final log for `Uploading build cache [...]`, not
+  saved: check production's final log for `Uploading build cache [...]`, not
   `Build cache size ... exceeds limit`, and note the creation time. On the
   next build, check `Restored build cache` and the launcher's build duration.
 
