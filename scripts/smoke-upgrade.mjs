@@ -1,20 +1,26 @@
 #!/usr/bin/env node
-// Upgrades a data dir that the latest published release wrote:
+// Upgrades a data dir that an older published release wrote:
 //
-// 1. installs @zitadel/server@<from> (default: npm's `latest`) from npm and
-//    starts its binary on an empty data dir (SQLite, the default);
+// 1. installs @zitadel/server@<from> from npm and starts its binary on an
+//    empty data dir (SQLite, the default);
 // 2. creates a project and a user in it over the API, then stops it;
-// 3. runs `migrate` with the current build on that data dir and checks that
-//    it applied the migrations the release does not have;
-// 4. starts the current build and reads the user back with the project
-//    secret the release issued.
+// 3. runs `migrate` with the target on that data dir and checks that the
+//    schema version did not go back;
+// 4. starts the target and reads the user back with the project secret the
+//    older release issued.
 //
 //   node scripts/smoke-upgrade.mjs [--from <version>] [--binary <path>]
+//   node scripts/smoke-upgrade.mjs --to <version> [--from <version>]
 //
-// The current build is dist/server/nextgen, which `@zitadel/server#build`
-// writes; `turbo run //#smoke-upgrade` builds it first. The nightly
-// artifacts workflow (.github/workflows/artifacts.yml) runs that task.
-import { mkdtempSync, rmSync } from "node:fs";
+// The target is the current build, dist/server/nextgen, which
+// `@zitadel/server#build` writes (`turbo run //#smoke-upgrade` builds it
+// first), and --from defaults to npm's `latest`. With --to the target is
+// that published release, installed from npm, and --from defaults to the
+// stable release published before it (by npm's publish time: version order
+// is not release order, an old 1.0.0-alpha line sits above 0.x). An empty
+// --to is the same as none. The artifacts workflow
+// (.github/workflows/artifacts.yml) runs both forms.
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -22,35 +28,32 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-import { isDirectRun, run, runCapture } from "./dev-process.mjs";
-import { runServerCommand, startServer } from "./smoke-server.mjs";
+import { isDirectRun, runCapture } from "./dev-process.mjs";
+import { installPublishedServer, runServerCommand, startServer } from "./smoke-server.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const MIGRATIONS_APPLIED_LOG = "database migrations applied";
 
-/** The published release's binary for this host, installed from npm into dir. */
-async function installRelease(version, dir) {
-  await run(
-    "npm",
-    [
-      "install",
-      "--prefix",
-      dir,
-      "--ignore-scripts",
-      "--no-audit",
-      "--no-fund",
-      `@zitadel/server@${version}`,
-    ],
-    { cwd: dir },
+/**
+ * The stable release published last before `version` (any release, if
+ * `version` is a prerelease), by npm's publish times.
+ */
+export function previousRelease(version, times) {
+  const published = times[version];
+  if (!published) throw new Error(`@zitadel/server@${version} is not published`);
+  const candidates = Object.entries(times).filter(
+    ([candidate, time]) =>
+      !["created", "modified"].includes(candidate) &&
+      time < published &&
+      (version.includes("-") || !candidate.includes("-")),
   );
-  return join(
-    dir,
-    "node_modules",
-    "@zitadel",
-    `server-${process.platform}-${process.arch}`,
-    "bin",
-    "nextgen",
-  );
+  if (candidates.length === 0) throw new Error(`no release of @zitadel/server before ${version}`);
+  return candidates.reduce((latest, entry) => (entry[1] > latest[1] ? entry : latest))[0];
+}
+
+async function npmView(field, cwd) {
+  const { stdout } = await runCapture("npm", ["view", "@zitadel/server", field, "--json"], { cwd });
+  return JSON.parse(stdout);
 }
 
 /** The newest goose version recorded in the data dir's SQLite database. */
@@ -86,16 +89,23 @@ async function api(baseUrl, method, path, { body, token } = {}) {
   }
 }
 
-export async function smokeUpgrade({ from, binary = join(repoRoot, "dist/server/nextgen") } = {}) {
+export async function smokeUpgrade({
+  from,
+  to,
+  binary = join(repoRoot, "dist/server/nextgen"),
+} = {}) {
   const work = mkdtempSync(join(tmpdir(), "nextgen-upgrade-"));
   const dataDir = join(work, "data");
   try {
-    const version =
-      from ??
-      (
-        await runCapture("npm", ["view", "@zitadel/server", "version"], { cwd: work })
-      ).stdout.trim();
-    const releaseBinary = await installRelease(version, work);
+    let version = from;
+    if (to) {
+      version ??= previousRelease(to, await npmView("time", work));
+      mkdirSync(join(work, "to"));
+      binary = await installPublishedServer(to, join(work, "to"));
+    }
+    version ??= await npmView("version", work);
+    mkdirSync(join(work, "from"));
+    const releaseBinary = await installPublishedServer(version, join(work, "from"));
 
     // The release writes the data dir.
     const email = `upgrade-${Date.now()}@example.com`;
@@ -141,7 +151,7 @@ export async function smokeUpgrade({ from, binary = join(repoRoot, "dist/server/
     } finally {
       await current.stop();
     }
-    return { version, releaseSchema, currentSchema, projectId: project.id, userId: user.id };
+    return { version, to, releaseSchema, currentSchema, projectId: project.id, userId: user.id };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -150,15 +160,17 @@ export async function smokeUpgrade({ from, binary = join(repoRoot, "dist/server/
 if (isDirectRun(import.meta.url)) {
   try {
     const { values } = parseArgs({
-      options: { from: { type: "string" }, binary: { type: "string" } },
+      options: { from: { type: "string" }, to: { type: "string" }, binary: { type: "string" } },
     });
     const result = await smokeUpgrade({
-      from: values.from,
+      from: values.from || undefined,
+      to: values.to || undefined,
       ...(values.binary ? { binary: resolve(values.binary) } : {}),
     });
+    const target = result.to ? `@zitadel/server@${result.to}` : "the current build";
     process.stderr.write(
       `[smoke-upgrade] @zitadel/server@${result.version} wrote schema ${result.releaseSchema}; ` +
-        `the current build migrated it to ${result.currentSchema} and read back user ${result.userId}\n`,
+        `${target} migrated it to ${result.currentSchema} and read back user ${result.userId}\n`,
     );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

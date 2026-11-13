@@ -4,21 +4,26 @@
 // 200 and stops it again.
 //
 //   node scripts/smoke-server.mjs [binary]
+//   node scripts/smoke-server.mjs --version <published version>
 //
 // Without an argument it runs this host's release binary: the bin/ of its
 // platform package (apps/server-<platform>), which that package's
-// build-binary task writes. The nightly artifacts workflow
-// (.github/workflows/artifacts.yml) runs it on macOS and Linux with the
-// binaries one Linux job cross-compiled. It does not run on Windows.
+// build-binary task writes. With --version it installs that release of
+// @zitadel/server from npm, as a customer does, and starts the binary the
+// package resolves for this host (`@zitadel/server/binary`, what the CLI
+// uses); the server must report that version. An empty --version is the
+// same as none. The artifacts workflow (.github/workflows/artifacts.yml) runs
+// it on macOS and Linux. It does not run on Windows.
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
-import { isDirectRun } from "./dev-process.mjs";
+import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -32,6 +37,31 @@ export function hostReleaseBinary(platform = process.platform, arch = process.ar
     throw new Error(`no server release binary to smoke for ${platform}/${arch}`);
   }
   return join(repoRoot, entry.packageDir, "bin", "nextgen");
+}
+
+/**
+ * Installs @zitadel/server@<version> from npm into `dir` the way a customer
+ * does, and returns the binary that release resolves for this host: its
+ * `@zitadel/server/binary` export finds the platform package npm installed
+ * as an optional dependency, as the CLI does.
+ */
+export async function installPublishedServer(version, dir) {
+  await run(
+    "npm",
+    ["install", "--prefix", dir, "--no-audit", "--no-fund", `@zitadel/server@${version}`],
+    { cwd: dir },
+  );
+  // runCapture throws with the output when the resolution fails.
+  const resolved = await runCapture(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      'console.log((await import("@zitadel/server/binary")).resolveServerBinary())',
+    ],
+    { cwd: dir },
+  );
+  return resolved.stdout.trim();
 }
 
 async function freePort() {
@@ -124,10 +154,20 @@ export async function startServer({ binary, dataDir, env = {}, timeoutMs = 120_0
   throw new Error(`${binary} ${reason}:\n${output}`);
 }
 
-/** Start, health check, stop: the whole smoke of one binary. */
-export async function smokeServer({ binary = hostReleaseBinary() } = {}) {
-  const dataDir = mkdtempSync(join(tmpdir(), "nextgen-smoke-"));
+/**
+ * Start, health check, stop: the whole smoke of one binary, or of the
+ * published release `version`.
+ */
+export async function smokeServer({ binary, version } = {}) {
+  const work = mkdtempSync(join(tmpdir(), "nextgen-smoke-"));
+  const dataDir = join(work, "data");
   try {
+    if (version) {
+      const install = join(work, "install");
+      mkdirSync(install);
+      binary = await installPublishedServer(version, install);
+    }
+    binary ??= hostReleaseBinary();
     const started = Date.now();
     const server = await startServer({ binary, dataDir });
     const readyMs = Date.now() - started;
@@ -138,16 +178,30 @@ export async function smokeServer({ binary = hostReleaseBinary() } = {}) {
         `${binary} did not stop cleanly (code ${result.code}, signal ${result.signal}):\n${result.output}`,
       );
     }
+    // The server logs its version with every record (text or JSON format).
+    if (
+      version &&
+      !result.output.includes(`version=${version} `) &&
+      !result.output.includes(`"version":"${version}"`)
+    ) {
+      throw new Error(`${binary} did not report version ${version}:\n${result.output}`);
+    }
     return { binary, readyMs, exit: result };
   } finally {
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
   }
 }
 
 if (isDirectRun(import.meta.url)) {
   try {
-    const arg = process.argv[2];
-    const { binary, readyMs, exit } = await smokeServer(arg ? { binary: resolve(arg) } : {});
+    const { values, positionals } = parseArgs({
+      allowPositionals: true,
+      options: { version: { type: "string" } },
+    });
+    const { binary, readyMs, exit } = await smokeServer({
+      binary: positionals[0] ? resolve(positionals[0]) : undefined,
+      version: values.version || undefined,
+    });
     process.stderr.write(
       `[smoke-server] ${binary}: /readyz 200 after ${readyMs} ms; stopped (code ${exit.code}, signal ${exit.signal})\n`,
     );

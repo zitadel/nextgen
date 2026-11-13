@@ -1,3 +1,6 @@
+// The registry repository each release pushes its server image to.
+export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
+
 export const SERVER_PLATFORM_PACKAGES = [
   {
     goos: "linux",

@@ -2,25 +2,48 @@ name: artifacts
 
 # What a release ships, run the way users run it. `full-pr` builds and packs
 # every artifact on Linux arm64 but never starts the macOS server,
-# the container or a data dir an older release wrote; this workflow does,
-# nightly on main (04:41 UTC), on demand against any branch
-# (`gh workflow run artifacts.yml --ref <branch>`), and on PRs that change this
-# file. It is not a required check.
+# the container or a data dir an older release wrote; this workflow does.
+# It is not a required check. It tests one of two things
+# (scripts/artifacts-target.mjs decides, in `target`):
 #
-# - binaries: the five platform packages' build-binary, the release's own
-#   cross-compile, once on Linux.
-# - start: the macOS and Linux binaries, each on its own platform: start on
-#   an empty data dir, /readyz, stop (scripts/smoke-server.mjs). The Windows
+# - what this ref builds: nightly on main (04:41 UTC), on PRs that change
+#   this file, and on a dispatch without a version
+#   (`gh workflow run artifacts.yml --ref <branch>`);
+# - a published release: on a dispatch with one
+#   (`gh workflow run artifacts.yml -f version=0.6.0`), and after every
+#   release-publish run that published one. That trigger is workflow_run,
+#   not a job in release-publish.yml: the release neither waits for these
+#   checks nor turns red when one fails, and its workflow file stays as it
+#   is. A release-publish run that published nothing (a version PR update, a
+#   dry run) leaves every job here skipped.
+#
+# Jobs:
+# - binaries (built only): the five platform packages' build-binary, the
+#   release's own cross-compile, once on Linux.
+# - start: the macOS and Linux server, each on its own platform: start on an
+#   empty data dir, /readyz, stop (scripts/smoke-server.mjs). A published
+#   release is installed from npm as a customer installs it. The Windows
 #   binary is built and published but not started here.
-# - linux: the container smoke (//#smoke-container) and the upgrade from the
-#   latest published release (//#smoke-upgrade), in one turbo run.
+# - linux (built only): the container smoke (//#smoke-container) and the
+#   upgrade from the latest published release (//#smoke-upgrade).
+# - published (published only): the release's container image, and the
+#   upgrade from the release before it.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "A published @zitadel/server version to test instead of building this ref, for example 0.6.0. Leave empty to build."
+        required: false
+        default: ""
+        type: string
   schedule:
     - cron: "41 4 * * *"
   pull_request:
     paths:
       - .github/workflows/artifacts.yml
+  workflow_run:
+    workflows: [release-publish]
+    types: [completed]
 
 permissions:
   contents: read
@@ -34,7 +57,32 @@ env:
   TURBO_CACHE: local:rw
 
 jobs:
+  target:
+    # Only a release-publish run that succeeded can have published.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.target.outputs.mode }}
+      version: ${{ steps.target.outputs.version }}
+      image: ${{ steps.target.outputs.image }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - id: target
+        run: node scripts/artifacts-target.mjs
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_RUN_STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
+          RELEASE_RUN_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+
   binaries:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'build' }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -70,7 +118,9 @@ jobs:
           retention-days: 7
 
   start:
-    needs: binaries
+    needs: [target, binaries]
+    # binaries is skipped for a published release.
+    if: ${{ !cancelled() && needs.target.result == 'success' && needs.target.outputs.mode != 'none' && needs.binaries.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -85,15 +135,21 @@ jobs:
           node-version-file: .nvmrc
 
       - uses: actions/download-artifact@v8
+        if: ${{ needs.target.outputs.mode == 'build' }}
         with:
           name: server-binaries
           path: apps
 
-      # The script needs no dependencies; it picks this runner's binary.
+      # The script needs no dependencies. It picks this runner's binary, or
+      # installs the published version (empty when built).
       - name: Start, check and stop the server
-        run: node scripts/smoke-server.mjs
+        run: node scripts/smoke-server.mjs --version "$VERSION"
+        env:
+          VERSION: ${{ needs.target.outputs.version }}
 
   linux:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'build' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -119,3 +175,26 @@ jobs:
 
       - name: Smoke the container and the upgrade
         run: corepack pnpm exec turbo run //#smoke-container //#smoke-upgrade --continue --output-logs=errors-only
+
+  published:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'published' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.target.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # target's summary says when the release pushed no image.
+      - name: Smoke the published container image
+        if: ${{ needs.target.outputs.image == 'true' }}
+        run: node scripts/smoke-container.mjs --version "$VERSION"
+
+      - name: Upgrade from the release before it
+        if: ${{ !cancelled() }}
+        run: node scripts/smoke-upgrade.mjs --to "$VERSION"

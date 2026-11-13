@@ -297,15 +297,26 @@ against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
 the task locally, where it still starts the Spanner emulator.
 
 The released artifacts run in the separate `artifacts` workflow
-([`artifacts.yml`](.github/workflows/artifacts.yml)), nightly on `main`, on
-demand (`gh workflow run artifacts.yml --ref <branch>`) and on PRs that
-change it; it is not a required check. It starts the macOS and Linux
-release binaries, each on its own OS
-([`smoke-server.mjs`](scripts/smoke-server.mjs)), runs
-the container smoke (`turbo run //#smoke-container`, Docker), and upgrades a
-data dir the latest published `@zitadel/server` wrote
-(`turbo run //#smoke-upgrade`, no Docker). The Windows binary is built and
-published but not started there.
+([`artifacts.yml`](.github/workflows/artifacts.yml)), which is not a
+required check. Nightly on `main`, on PRs that change it, and on a dispatch
+(`gh workflow run artifacts.yml --ref <branch>`), it tests what the ref
+builds:
+
+- it starts the macOS and Linux release binaries, each on its own OS
+  ([`smoke-server.mjs`](scripts/smoke-server.mjs));
+- it runs the container smoke (`turbo run //#smoke-container`, Docker);
+- it upgrades a data dir the latest published `@zitadel/server` wrote
+  (`turbo run //#smoke-upgrade`, no Docker).
+
+After every `release-publish` run that published a version, and on a
+dispatch with `-f version=<version>`, it tests that published release
+instead:
+
+- it installs it from npm on each runner as a customer does;
+- it starts the release's container image;
+- it upgrades from the release before it.
+
+The Windows binary is built and published but not started there.
 
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
