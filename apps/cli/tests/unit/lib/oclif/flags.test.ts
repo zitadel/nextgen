@@ -223,6 +223,13 @@ describe("a refusal a flag or argument is built with", () => {
     expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
+  it("does not compile with a value the parse would replace", () => {
+    // @ts-expect-error the parse fills {value} with what was typed
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: { value: 3 } });
+
+    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
+  });
+
   it("does not compile with a key a declaration does not have", () => {
     // @ts-expect-error a refusal has no hnt, so the hint would be lost
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hnt: HINT } });

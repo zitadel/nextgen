@@ -67,7 +67,7 @@ type Unfilled<R, Declared> = Exclude<
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
  */
-type Filled<R, Declared> =
+export type Filled<R, Declared> =
   IsNever<Unfilled<R, Declared>> extends true
     ? unknown
     : {
@@ -79,7 +79,9 @@ type Filled<R, Declared> =
 /**
  * Nothing but the keys a declaration and its refusal may have: any other key,
  * such as a misspelt `hint` or `values`, must be `never`, so it does not
- * compile rather than being dropped without a word.
+ * compile rather than being dropped without a word. Its `values` may not give
+ * one of the names {@link read} fills ({@link Parsed}) either, since the
+ * parse would replace it.
  *
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
@@ -88,6 +90,7 @@ type Known<R, Declared> = {
   readonly [Key in Exclude<keyof Declared, keyof Refused<unknown>>]: never;
 } & {
   readonly refusal: { readonly [Key in Exclude<keyof R, keyof ParseRefusal>]: never };
+  readonly values?: { readonly [Name in Parsed]?: never };
 };
 
 /**

@@ -76,7 +76,7 @@ function thrownWith(source: string, name: string): string[] {
  * `Refusal` is filled wherever it is thrown, so each `refusalError` of it in
  * the same file counts — a name no throw of it passes reaches the person as
  * braces — and by `read` too where a flag's declaration names it as its
- * `refusal`, or a `ParseRefusal` takes it as its default.
+ * `refusal`, or a `ParseRefusal` is given it, as `readsFilled`'s empty value is.
  *
  * @returns The refusals.
  */
@@ -92,7 +92,9 @@ async function weighed(): Promise<Weighed[]> {
       found.push({ file, name, wording: literal, filled: [...ALWAYS, ...own] });
     }
     for (const { name, literal } of declaredAs(source, "Refusal")) {
-      const parsed = new RegExp(`(?:refusal:|ParseRefusal =)\\s*${name}\\b`).test(code);
+      const parsed = new RegExp(`(?:refusal:\\s*|: ParseRefusal = [^;\\n]*)\\b${name}\\b`).test(
+        code,
+      );
       found.push({
         file,
         name,

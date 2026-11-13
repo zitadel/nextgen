@@ -210,6 +210,19 @@ describe("refusalError's values", () => {
     expect(refusalError(braces, {}).message).toBe("Pass {} or {a.b} or {json|yaml}");
   });
 
+  it("does not compile with a next string that holds text around a placeholder", () => {
+    const error = refusalError(
+      {
+        message: "No",
+        // @ts-expect-error a next string is a whole placeholder or nothing
+        next: ["run {help}"],
+      },
+      {},
+    );
+
+    expect(error.nextCommands).toEqual([]);
+  });
+
   it("does not compile with a next string that is not one placeholder", () => {
     const error = refusalError(
       {

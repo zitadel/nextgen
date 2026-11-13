@@ -91,6 +91,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import {
   type Declaration,
+  type Filled,
   filled,
   type ParseRefusal,
   type Refused,
@@ -895,17 +896,23 @@ function made<T>(parse: (value: string) => Parsed<T>) {
  * @typeParam T - What the value parses to.
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
+ * @typeParam Empty - The refusal for an empty value, as it is written. It
+ *   has no `values`, so it may ask only for what the parse fills.
  * @param refused - What a value that is not empty is refused for.
- * @param empty - What an empty value is refused with.
+ * @param empty - What an empty value is refused with; {@link EMPTY_SETTING}
+ *   when it is left out.
  * @returns The `parse`.
  */
-function readsFilled<T, const R extends ParseRefusal, const Declared extends Refused<T>>(
-  refused: Declaration<T, R, Declared>,
-  empty: ParseRefusal = EMPTY_SETTING,
-) {
+function readsFilled<
+  T,
+  const R extends ParseRefusal,
+  const Declared extends Refused<T>,
+  const Empty extends ParseRefusal = typeof EMPTY_SETTING,
+>(refused: Declaration<T, R, Declared>, empty?: Empty & Filled<Empty, Record<never, never>>) {
+  const emptied: ParseRefusal = empty ?? EMPTY_SETTING;
   const blank = reads({
     schema: filled,
-    refusal: empty,
+    refusal: emptied,
   });
   const declared: Refused<T> = refused;
   const value = reads(declared);
