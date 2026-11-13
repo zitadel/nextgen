@@ -11,115 +11,139 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// answer serves one canned response through the validator.
-func answer(v *SpecValidator, method, target string, status int, contentType, body string) {
-	handler := v.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
-		}
-		w.WriteHeader(status)
-		_, _ = w.Write([]byte(body))
-	}))
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(method, target, nil))
+// fixtureSpec has the shapes the real spec uses: a schema with a $ref and no
+// keyword of JSON Schema 2020-12 alone (which kin checks with its OpenAPI 3.0
+// validator), an error envelope, a default error set of const codes (which
+// kin checks with its 2020-12 validator), a status without a body but with a
+// required header, and a text answer.
+const fixtureSpec = `{
+  "openapi": "3.1.0",
+  "info": {"title": "fixture", "version": "1"},
+  "paths": {
+    "/things/{id}": {
+      "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+      "get": {"operationId": "getThing", "responses": {
+        "200": {"description": "The thing.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/thing"}}}},
+        "404": {"description": "No thing.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/error"}}}},
+        "default": {"description": "The error set.", "content": {"application/json": {"schema": {"oneOf": [
+          {"$ref": "#/components/schemas/thing-not-found"}, {"$ref": "#/components/schemas/internal"}]}}}}
+      }},
+      "delete": {"operationId": "deleteThing", "responses": {
+        "204": {"description": "Gone.", "headers": {"X-Thing-Version": {"required": true, "schema": {"type": "integer"}}}}
+      }}
+    },
+    "/live": {"get": {"operationId": "getLive", "responses": {
+      "200": {"description": "Up.", "content": {"text/plain": {"schema": {"type": "string"}}}}
+    }}}
+  },
+  "components": {"schemas": {
+    "thing": {"type": "object", "required": ["id", "created_at", "link"], "properties": {
+      "id": {"type": "string"},
+      "created_at": {"type": "string", "format": "date-time"},
+      "link": {"$ref": "#/components/schemas/link"}}},
+    "link": {"type": "string", "format": "uri"},
+    "error": {"type": "object", "required": ["code", "message"], "properties": {
+      "code": {"type": "string"}, "message": {"type": "string"}}},
+    "thing-not-found": {"type": "object", "required": ["code", "message"], "properties": {
+      "code": {"const": "thing.not_found"}, "message": {"type": "string"}}},
+    "internal": {"type": "object", "required": ["code", "message"], "properties": {
+      "code": {"const": "internal"}, "message": {"type": "string"}}}
+  }}
+}`
+
+const (
+	goodThing       = `{"id":"t1","created_at":"2026-11-12T10:00:00Z","link":"https://example.test/t1"}`
+	thingNotFound   = `{"code":"thing.not_found","message":"No thing."}`
+	jsonContentType = "application/json"
+)
+
+type exchange struct {
+	method, target string
+	status         int
+	header         http.Header
+	body           string
 }
 
-const teamNotFound = `{"code":"team.team_not_found","message":"Team not found."}`
+func jsonAnswer(method, target string, status int, body string) exchange {
+	return exchange{method, target, status, http.Header{"Content-Type": {jsonContentType}}, body}
+}
+
+// serve answers e through the validator.
+func serve(v *SpecValidator, e exchange) {
+	handler := v.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		for name, values := range e.header {
+			w.Header()[name] = values
+		}
+		w.WriteHeader(e.status)
+		_, _ = w.Write([]byte(e.body))
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(e.method, e.target, nil))
+}
+
+func fixtureValidator(t *testing.T) *SpecValidator {
+	t.Helper()
+	v, err := NewSpecValidator([]byte(fixtureSpec))
+	require.NoError(t, err)
+	return v
+}
 
 func TestSpecValidatorPassesWhatTheSpecDeclares(t *testing.T) {
-	v, err := NewSpecValidator(nil)
-	require.NoError(t, err)
-
-	answer(v, http.MethodGet, "/api/v1/livez", http.StatusOK, "text/plain; charset=utf-8", "ok")
-	answer(v, http.MethodGet, "/livez", http.StatusOK, "text/plain; charset=utf-8", "ok")
-	answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusNotFound, "application/json", teamNotFound)
-	// A path the spec lacks, answered as one.
-	answer(v, http.MethodGet, "/api/v1/no-such-path", http.StatusNotFound, "application/json", `{"code":"req.not_found","message":"x"}`)
-	// Mounts that are no operation.
-	answer(v, http.MethodGet, "/api/v1/openapi.json", http.StatusOK, "application/json", `{}`)
-	answer(v, http.MethodGet, "/idp/google/callback", http.StatusFound, "", "")
-
+	v := fixtureValidator(t)
+	for _, e := range []exchange{
+		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusOK, goodThing),
+		jsonAnswer(http.MethodGet, "/things/t1", http.StatusOK, goodThing), // the root alias
+		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusNotFound, thingNotFound),
+		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusForbidden, thingNotFound),
+		{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{"X-Thing-Version": {"3"}}, ""},
+		{http.MethodGet, "/api/v1/live", http.StatusOK, http.Header{"Content-Type": {"text/plain; charset=utf-8"}}, "ok"},
+		jsonAnswer(http.MethodGet, "/api/v1/nothing", http.StatusNotFound, `{}`),
+		jsonAnswer(http.MethodPut, "/api/v1/live", http.StatusMethodNotAllowed, `{}`),
+	} {
+		serve(v, e)
+	}
 	assert.NoError(t, v.CheckSpecConformance())
 }
 
 func TestSpecValidatorCatchesWhatTheSpecDoesNotDeclare(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		method      string
-		target      string
-		status      int
-		contentType string
-		body        string
-		reason      string
+		name   string
+		answer exchange
+		reason string
 	}{
-		{"body against the schema", http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", `{"bogus":true}`, "doesn't match schema"},
-		{"error code outside the operation's error set", http.MethodGet, "/api/v1/teams/team_1", http.StatusForbidden, "application/json", `{"code":"user.user_not_found","message":"x"}`, "doesn't match schema"},
-		{"undeclared status", http.MethodGet, "/api/v1/teams/team_1", http.StatusCreated, "application/json", `{}`, "status 201 is not declared"},
-		{"undeclared content type", http.MethodGet, "/api/v1/teams/team_1", http.StatusNotFound, "text/html", "<p>no</p>", `content type "text/html" is not declared`},
-		{"a path the spec lacks, answered", http.MethodGet, "/api/v1/no-such-path", http.StatusOK, "application/json", `{}`, "names no operation"},
-		{"a method the path lacks, answered", http.MethodPut, "/api/v1/livez", http.StatusOK, "text/plain", "ok", "names no operation"},
+		{"a body against its schema",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusOK, `{"id":"t1"}`), "created_at"},
+		{"a date-time",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusOK, `{"id":"t1","created_at":"yesterday","link":"https://example.test"}`), "at '/created_at'"},
+		{"a uri",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusOK, `{"id":"t1","created_at":"2026-11-12T10:00:00Z","link":"/t1"}`), "not an absolute URI"},
+		{"an error code outside the error set",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusForbidden, `{"code":"user.not_found","message":"x"}`), "value must be 'thing.not_found'"},
+		{"an undeclared status",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusCreated, goodThing), "status 201 is not declared"},
+		{"a success the error set does not cover",
+			jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusAccepted, thingNotFound), "status 202 is not declared"},
+		{"an undeclared content type",
+			exchange{http.MethodGet, "/api/v1/things/t1", http.StatusOK, http.Header{"Content-Type": {"text/html"}}, "<p>t1</p>"}, `"text/html"`},
+		{"a body on a status without one",
+			exchange{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{"X-Thing-Version": {"3"}, "Content-Type": {jsonContentType}}, `{}`}, "declares no body"},
+		{"a missing required header",
+			exchange{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{}, ""}, "X-Thing-Version"},
+		{"a path the spec lacks, answered",
+			jsonAnswer(http.MethodGet, "/api/v1/nothing", http.StatusOK, `{}`), "names no operation"},
+		{"a method the path lacks, answered",
+			exchange{http.MethodPut, "/api/v1/live", http.StatusOK, http.Header{"Content-Type": {"text/plain"}}, "ok"}, "names no operation"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			v, err := NewSpecValidator(nil)
-			require.NoError(t, err)
-			answer(v, tc.method, tc.target, tc.status, tc.contentType, tc.body)
-			err = v.CheckSpecConformance()
+			v := fixtureValidator(t)
+			serve(v, tc.answer)
+			err := v.CheckSpecConformance()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.reason)
 		})
 	}
 }
 
-func TestSpecValidatorKnownMismatchesOnlyShrink(t *testing.T) {
-	known := []KnownSpecMismatch{{Operation: "getTeam", Status: http.StatusOK, Reason: "test"}}
-
-	t.Run("a mismatch it lists is tolerated", func(t *testing.T) {
-		v, err := NewSpecValidator(known)
-		require.NoError(t, err)
-		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", `{"bogus":true}`)
-		assert.NoError(t, v.CheckSpecConformance())
-	})
-
-	t.Run("an entry fails once the answer matches", func(t *testing.T) {
-		v, err := NewSpecValidator([]KnownSpecMismatch{{Operation: "getTeam", Status: http.StatusNotFound, Reason: "test"}})
-		require.NoError(t, err)
-		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusNotFound, "application/json", teamNotFound)
-		err = v.CheckSpecConformance()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "remove it from the known spec mismatches")
-	})
-
-	t.Run("an entry narrowed to codes still checks the operation's other answers", func(t *testing.T) {
-		v, err := NewSpecValidator([]KnownSpecMismatch{{Operation: "getTeam", Status: http.StatusOK, Codes: []string{"team.team_not_found"}, Reason: "test"}})
-		require.NoError(t, err)
-		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", teamNotFound)
-		require.NoError(t, v.CheckSpecConformance())
-		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", `{"bogus":true}`)
-		assert.ErrorContains(t, v.CheckSpecConformance(), "getTeam 200")
-	})
-
-	t.Run("an entry no exchange reaches is left alone", func(t *testing.T) {
-		v, err := NewSpecValidator(known)
-		require.NoError(t, err)
-		assert.NoError(t, v.CheckSpecConformance())
-	})
-
-	t.Run("an entry listed twice", func(t *testing.T) {
-		_, err := NewSpecValidator(append(known, known...))
-		assert.ErrorContains(t, err, "listed twice")
-	})
-}
-
-func TestSpecValidatorKnownMismatchesNameRealOperations(t *testing.T) {
-	v, err := NewSpecValidator(nil)
-	require.NoError(t, err)
-	operations := map[string]bool{}
-	for _, path := range v.doc.Paths.Map() {
-		for _, op := range path.Operations() {
-			operations[op.OperationID] = true
-		}
-	}
-	for _, entry := range knownSpecMismatches {
-		assert.True(t, operations[entry.Operation], "known spec mismatch names no operation: %s", entry.Operation)
-		assert.NotEmpty(t, entry.Reason, "known spec mismatch %s %d gives no reason", entry.Operation, entry.Status)
-	}
+func TestSpecValidatorLoadsTheBundle(t *testing.T) {
+	var h Harness
+	require.NotNil(t, h.EnsureSpecValidator(t))
 }

@@ -21,12 +21,10 @@ predicate's cost grows with the rows in its tables.
 
 ## Integration tests check the wire against the spec
 
-- The harness validates every answer of its test server against the bundled
-  OpenAPI document; `TestMain` fails the run on a mismatch, after the tests.
-- A test that mounts the API on a server of its own wraps the handler in
-  `Harness.SpecChecked`.
-- Fix the server or the spec for a new mismatch; never add it to
-  `knownSpecMismatches` (`helpers/spec_mismatches.go`), which only shrinks.
+- Every answer of the harness's test server is checked against the OpenAPI
+  spec; fix the server or the spec for a mismatch, never the check.
+- A test that mounts the API on a server of its own puts
+  `Harness.SpecChecked` in the chain it passes to `MountAPI`.
 
 ## Errors
 

@@ -5,11 +5,10 @@ package helpers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -20,59 +19,20 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
 	"github.com/zitadel/nextgen/api/client"
-	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
-	"github.com/zitadel/nextgen/internal/api"
 )
 
-// SpecValidator checks what the server under test answers against the bundled
-// OpenAPI document, the contract of record: the status is declared for the
-// operation, the content type is one it declares, and the body validates
-// against its schema. A request that names no operation must be answered
-// with 404 or 405. Each mismatch is recorded, not failed on the spot, since
-// it happens on a server goroutine: CheckSpecConformance reports them all.
+// SpecValidator checks what the server under test answers against an OpenAPI
+// document: the status is declared for the operation, the content type is
+// one it declares, the declared headers and the body validate. A request that
+// names no operation must be answered 404 or 405. A mismatch happens on a
+// server goroutine, so it is recorded and CheckSpecConformance reports them.
 type SpecValidator struct {
-	doc    *openapi3.T
 	router routers.Router
-	// outside matches the mounts that are not API operations by design.
-	outside *http.ServeMux
-	known   map[knownKey]KnownSpecMismatch
 
-	mutex    sync.Mutex
-	findings map[findingKey]*specFinding
-	// seen counts the exchanges of each known mismatch's operation and
-	// status, and mismatched those that still mismatched.
-	seen       map[knownKey]int
-	mismatched map[knownKey]int
-	unmatched  map[string]int
-	checked    int
-}
-
-// KnownSpecMismatch is an operation whose answer with Status does not match
-// the spec, and why. Codes, when set, narrows it to the answers whose body
-// carries one of these error codes, so the operation's other answers with
-// Status are still checked. The validator skips it; CheckSpecConformance
-// fails once the run sees it answer to the spec, so the list only shrinks.
-type KnownSpecMismatch struct {
-	Operation string
-	Status    int
-	Codes     []string
-	Reason    string
-}
-
-// covers reports whether the entry applies to an answer with body.
-func (k KnownSpecMismatch) covers(body []byte) bool {
-	if len(k.Codes) == 0 {
-		return true
-	}
-	var envelope struct {
-		Code string `json:"code"`
-	}
-	return json.Unmarshal(body, &envelope) == nil && slices.Contains(k.Codes, envelope.Code)
-}
-
-type knownKey struct {
-	operation string
-	status    int
+	mutex     sync.Mutex
+	findings  map[findingKey]*specFinding
+	unmatched map[string]int
+	checked   int
 }
 
 type findingKey struct {
@@ -86,17 +46,11 @@ type specFinding struct {
 	count   int
 }
 
-// NewSpecValidator loads the bundled OpenAPI document. known lists the
-// mismatches the run tolerates.
-func NewSpecValidator(known []KnownSpecMismatch) (*SpecValidator, error) {
-	loader := openapi3.NewLoader()
-	data, err := io.ReadAll(openapibundled.Reader())
+// NewSpecValidator loads an OpenAPI document, the bundle for the harness.
+func NewSpecValidator(document []byte) (*SpecValidator, error) {
+	doc, err := openapi3.NewLoader().LoadFromData(document)
 	if err != nil {
-		return nil, err
-	}
-	doc, err := loader.LoadFromData(data)
-	if err != nil {
-		return nil, fmt.Errorf("load the bundled OpenAPI document: %w", err)
+		return nil, fmt.Errorf("load the OpenAPI document: %w", err)
 	}
 	// Match the paths as written: the server answers each operation under
 	// client.PathPrefix and, until 1.0.0, at the root (ADR 077); Check strips
@@ -104,34 +58,9 @@ func NewSpecValidator(known []KnownSpecMismatch) (*SpecValidator, error) {
 	doc.Servers = nil
 	router, err := gorillamux.NewRouter(doc)
 	if err != nil {
-		return nil, fmt.Errorf("route the bundled OpenAPI document: %w", err)
+		return nil, fmt.Errorf("route the OpenAPI document: %w", err)
 	}
-	outside := http.NewServeMux()
-	for _, pattern := range []string{
-		openapibundled.Path,            // the document itself
-		api.IDPCallbackPattern,         // a browser lands on it from the IdP
-		api.IDPCallbackUpstreamPattern, // the same, behind the proxy
-	} {
-		outside.Handle(pattern, http.NotFoundHandler())
-	}
-	v := &SpecValidator{
-		doc:        doc,
-		router:     router,
-		outside:    outside,
-		known:      map[knownKey]KnownSpecMismatch{},
-		findings:   map[findingKey]*specFinding{},
-		seen:       map[knownKey]int{},
-		mismatched: map[knownKey]int{},
-		unmatched:  map[string]int{},
-	}
-	for _, entry := range known {
-		key := knownKey{entry.Operation, entry.Status}
-		if _, dup := v.known[key]; dup {
-			return nil, fmt.Errorf("known spec mismatch %s %d is listed twice", entry.Operation, entry.Status)
-		}
-		v.known[key] = entry
-	}
-	return v, nil
+	return &SpecValidator{router: router, findings: map[findingKey]*specFinding{}, unmatched: map[string]int{}}, nil
 }
 
 // Wrap records every exchange next goes through and checks it.
@@ -139,57 +68,36 @@ func (v *SpecValidator) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recorder := &specRecorder{ResponseWriter: w}
 		next.ServeHTTP(recorder, r)
-		v.Record(r, recorder.statusCode(), recorder.Header(), recorder.body.Bytes())
+		v.record(r, recorder.statusCode(), recorder.Header(), recorder.body.Bytes())
 	})
 }
 
-// Record checks one exchange and keeps what does not match the spec.
-func (v *SpecValidator) Record(r *http.Request, status int, header http.Header, body []byte) {
-	operation, err := v.Check(r, status, header, body)
+func (v *SpecValidator) record(r *http.Request, status int, header http.Header, body []byte) {
+	operation, err := v.check(r, status, header, body)
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 	v.checked++
-	if errors.Is(err, errOutsideSpec) {
-		return
-	}
-	if errors.Is(err, errNoOperation) {
+	switch {
+	case err == nil:
+	case errors.Is(err, errNoOperation):
 		v.unmatched[r.Method+" "+r.URL.Path]++
-		return
-	}
-	key := knownKey{operation, status}
-	if entry, ok := v.known[key]; ok && entry.covers(body) {
-		v.seen[key]++
-		if err != nil {
-			v.mismatched[key]++
+	default:
+		key := findingKey{operation, status, err.Error()}
+		finding := v.findings[key]
+		if finding == nil {
+			finding = &specFinding{example: fmt.Sprintf("%s %s: %s", r.Method, r.URL.RequestURI(), snippet(body))}
+			v.findings[key] = finding
 		}
-		return
+		finding.count++
 	}
-	if err == nil {
-		return
-	}
-	reason := err.Error()
-	fkey := findingKey{operation, status, reason}
-	finding := v.findings[fkey]
-	if finding == nil {
-		finding = &specFinding{example: fmt.Sprintf("%s %s: %s", r.Method, r.URL.RequestURI(), snippet(body))}
-		v.findings[fkey] = finding
-	}
-	finding.count++
 }
 
-var (
-	// errOutsideSpec: the request is for a mount that is no API operation.
-	errOutsideSpec = errors.New("not an API operation")
-	// errNoOperation: no operation matches, and the server said so.
-	errNoOperation = errors.New("no operation matches")
-)
+// errNoOperation: no operation matches, and the server said so.
+var errNoOperation = errors.New("no operation matches")
 
-// Check validates one exchange and names its operation ("" when none
-// matches). It returns errOutsideSpec, errNoOperation, or the mismatch.
-func (v *SpecValidator) Check(r *http.Request, status int, header http.Header, body []byte) (string, error) {
-	if _, pattern := v.outside.Handler(r); pattern != "" {
-		return "", errOutsideSpec
-	}
+// check validates one exchange and names its operation ("" when none
+// matches).
+func (v *SpecValidator) check(r *http.Request, status int, header http.Header, body []byte) (string, error) {
 	match := r.Clone(context.Background())
 	match.URL.Path = stripPathPrefix(r.URL.Path)
 	// The router matches the escaped path: an ID with an escaped slash, such
@@ -203,90 +111,80 @@ func (v *SpecValidator) Check(r *http.Request, status int, header http.Header, b
 		return "", fmt.Errorf("%s %s names no operation in the spec, yet the server answered %d", r.Method, r.URL.Path, status)
 	}
 	operation := route.Operation.OperationID
-	if r.Method == http.MethodHead {
-		return operation, nil
-	}
 	responses := route.Operation.Responses
-	responseRef := responses.Status(status)
-	if responseRef == nil && status >= http.StatusBadRequest {
+	response := responses.Status(status)
+	if response == nil && status >= http.StatusBadRequest {
 		// Every operation's default is its generated error set: it covers
 		// an error status, never a success or a redirect.
-		responseRef = responses.Default()
+		response = responses.Default()
 	}
-	if responseRef == nil {
+	if response == nil {
 		return operation, fmt.Errorf("status %d is not declared", status)
 	}
-	if len(responseRef.Value.Content) == 0 {
-		if len(body) > 0 {
-			return operation, fmt.Errorf("status %d declares no body, yet one came (%s)", status, header.Get("Content-Type"))
+	// kin lets a body through on a status that declares none.
+	if len(response.Value.Content) == 0 && len(body) > 0 {
+		return operation, fmt.Errorf("status %d declares no body, yet one came (%s)", status, header.Get("Content-Type"))
+	}
+	options := &openapi3filter.Options{
+		IncludeResponseStatus:   true,
+		MultiError:              true,
+		SchemaValidationOptions: []openapi3.SchemaValidationOption{openapi3.WithStringFormatValidator("uri", uriFormat)},
+	}
+	// The reason and where, without kin's dumps of the schema and value.
+	options.WithCustomSchemaErrorFunc(func(err *openapi3.SchemaError) string {
+		reason := strings.Join(strings.Fields(err.Reason), " ")
+		if _, rest, ok := strings.Cut(reason, "' - "); ok && strings.HasPrefix(reason, "jsonschema validation failed") {
+			reason = rest // the JSON Schema 2020-12 validator's, which names the path
 		}
-		return operation, validateHeaders(match, route, params, status, header, body)
-	}
-	if responseRef.Value.Content.Get(header.Get("Content-Type")) == nil {
-		return operation, fmt.Errorf("content type %q is not declared for status %d", header.Get("Content-Type"), status)
-	}
+		if pointer := err.JSONPointer(); len(pointer) > 0 && !strings.HasPrefix(reason, "at '") {
+			return "at '/" + strings.Join(pointer, "/") + "': " + reason
+		}
+		return reason
+	})
 	input := &openapi3filter.ResponseValidationInput{
-		RequestValidationInput: &openapi3filter.RequestValidationInput{
-			Request:    match,
-			PathParams: params,
-			Route:      route,
-		},
-		Status: status,
-		Header: header,
-		Options: &openapi3filter.Options{
-			IncludeResponseStatus: true,
-			MultiError:            true,
-		},
+		RequestValidationInput: &openapi3filter.RequestValidationInput{Request: match, PathParams: params, Route: route},
+		Status:                 status,
+		Header:                 header,
+		Options:                options,
 	}
 	input.SetBodyBytes(body)
 	if err := openapi3filter.ValidateResponse(context.Background(), input); err != nil {
-		return operation, flatten(err)
+		return operation, errors.New(strings.Join(strings.Fields(err.Error()), " "))
 	}
 	return operation, nil
 }
 
-// validateHeaders runs kin's response validation for a status without a
-// body, which checks only the declared headers.
-func validateHeaders(r *http.Request, route *routers.Route, params map[string]string, status int, header http.Header, body []byte) error {
-	input := &openapi3filter.ResponseValidationInput{
-		RequestValidationInput: &openapi3filter.RequestValidationInput{Request: r, PathParams: params, Route: route},
-		Status:                 status,
-		Header:                 header,
-		Options:                &openapi3filter.Options{IncludeResponseStatus: true, MultiError: true},
+// uriFormat holds `format: uri` to RFC 3986's absolute URI: kin checks only
+// the formats it is given, and knows no uri.
+var uriFormat = openapi3.NewCallbackValidator(func(value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return err
 	}
-	input.SetBodyBytes(body)
-	if err := openapi3filter.ValidateResponse(context.Background(), input); err != nil {
-		return flatten(err)
+	if !parsed.IsAbs() {
+		return fmt.Errorf("%q is not an absolute URI", value)
 	}
 	return nil
-}
+})
 
-// CheckSpecConformance reports every mismatch the run recorded, and every
-// known mismatch the run saw answer to the spec. nil means the run conformed.
+// CheckSpecConformance reports every mismatch the run recorded; nil means
+// the run conformed.
 func (v *SpecValidator) CheckSpecConformance() error {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
-	var problems []string
-	keys := make([]findingKey, 0, len(v.findings))
-	for key := range v.findings {
-		keys = append(keys, key)
-	}
-	slices.SortFunc(keys, func(a, b findingKey) int {
-		return strings.Compare(fmt.Sprint(a.operation, a.status, a.reason), fmt.Sprint(b.operation, b.status, b.reason))
-	})
-	for _, key := range keys {
-		finding := v.findings[key]
-		problems = append(problems, fmt.Sprintf("%s %d (%d×): %s\n    e.g. %s", orUnmatched(key.operation), key.status, finding.count, key.reason, finding.example))
-	}
-	for key, entry := range v.known {
-		if v.seen[key] > 0 && v.mismatched[key] == 0 {
-			problems = append(problems, fmt.Sprintf("%s %d now matches the spec in all %d exchanges: remove it from the known spec mismatches (%s)", key.operation, key.status, v.seen[key], entry.Reason))
-		}
-	}
-	if len(problems) == 0 {
+	if len(v.findings) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%d of the server's answers do not match the OpenAPI spec (helpers/spec_mismatches.go lists the known ones):\n  %s",
+	problems := make([]string, 0, len(v.findings))
+	for key, finding := range v.findings {
+		operation := key.operation
+		if operation == "" {
+			operation = "(no operation)"
+		}
+		problems = append(problems, fmt.Sprintf("%s %d (%d×): %s\n    e.g. %s", operation, key.status, finding.count, key.reason, finding.example))
+	}
+	slices.Sort(problems)
+	return fmt.Errorf("%d of the server's answers do not match the OpenAPI spec. Fix the handler, or the spec under api/openapi and regenerate (turbo run generate --filter=@zitadel/server):\n  %s",
 		len(problems), strings.Join(problems, "\n  "))
 }
 
@@ -294,19 +192,12 @@ func (v *SpecValidator) CheckSpecConformance() error {
 func (v *SpecValidator) Summary() string {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
-	unmatched := 0
 	requests := make([]string, 0, len(v.unmatched))
-	for request, n := range v.unmatched {
-		unmatched += n
+	for request := range v.unmatched {
 		requests = append(requests, request)
 	}
 	slices.Sort(requests)
-	tolerated := 0
-	for _, n := range v.mismatched {
-		tolerated += n
-	}
-	return fmt.Sprintf("spec conformance: %d exchanges checked, %d known mismatches tolerated, %d requests for no operation answered 404/405 %v",
-		v.checked, tolerated, unmatched, requests)
+	return fmt.Sprintf("spec conformance: %d exchanges checked; requests for no operation, answered 404/405: %v", v.checked, requests)
 }
 
 func stripPathPrefix(path string) string {
@@ -317,58 +208,6 @@ func stripPathPrefix(path string) string {
 		return "/" + rest
 	}
 	return path
-}
-
-// flatten turns kin's errors into one line: the reason of each cause and
-// where in the body it is, without the schema and value dumps.
-func flatten(err error) error {
-	return errors.New(describe(err))
-}
-
-func describe(err error) string {
-	var multi openapi3.MultiError
-	var response *openapi3filter.ResponseError
-	var schema *openapi3.SchemaError
-	switch {
-	case errors.As(err, &response):
-		if response.Err == nil {
-			return response.Reason
-		}
-		return response.Reason + ": " + describe(response.Err)
-	case errors.As(err, &multi):
-		parts := make([]string, 0, len(multi))
-		for _, e := range multi {
-			parts = append(parts, describe(e))
-		}
-		slices.Sort(parts)
-		return strings.Join(slices.Compact(parts), "; ")
-	case errors.As(err, &schema):
-		if schema.Origin != nil {
-			return describe(schema.Origin)
-		}
-		reason := schema.Reason
-		if reason == "" {
-			reason = "does not match " + schema.SchemaField
-		}
-		if pointer := schema.JSONPointer(); len(pointer) > 0 && !strings.Contains(reason, "at '/") {
-			reason = "at '/" + strings.Join(pointer, "/") + "': " + reason
-		}
-		return reason
-	}
-	message, _, _ := strings.Cut(err.Error(), " Schema:")
-	message = strings.Join(strings.Fields(message), " ")
-	// A oneOf branch's error names its path twice.
-	if _, rest, ok := strings.Cut(message, `": at '/`); ok && strings.HasPrefix(message, `error at "`) {
-		message = "at '/" + rest
-	}
-	return message
-}
-
-func orUnmatched(operation string) string {
-	if operation == "" {
-		return "(no operation)"
-	}
-	return operation
 }
 
 func snippet(body []byte) string {
