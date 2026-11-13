@@ -53,7 +53,7 @@ func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		).Scan(&deployedAt); err != nil {
 			return wrapError(err)
 		}
-		entity.StampExpiry(deployedAt)
+		entity.StampExpiry(deployedAt, previewTTL)
 		if _, err := tx.Exec(ctx, createDeploymentOriginsStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), deployedAt,
 			entity.Origins(), deployment.NextSeqs(entity.Origins(), read), entity.Expiries(),
@@ -211,7 +211,7 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			return scanned, err
 		}
 		scanned.DeployedAt = scanned.DeployedAt.UTC()
-		scanned.ExpiresAt = deployment.UTC(scanned.ExpiresAt)
+		scanned.ExpiresAt = database.UTCOrNil(scanned.ExpiresAt)
 		return deployment.WithKind(scanned, kind)
 	})
 	if err != nil {

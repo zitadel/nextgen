@@ -86,8 +86,7 @@ func TestDeploymentStampExpiry(t *testing.T) {
 
 	preview, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPreview, []string{"https://b.vercel.app", "https://a.vercel.app"}, DeploymentMetadata{})
 	require.NoError(t, err)
-	preview.PreviewTTL = 3 * time.Minute
-	preview.StampExpiry(deployedAt)
+	preview.StampExpiry(deployedAt, 3*time.Minute)
 	want := deployedAt.Add(3 * time.Minute)
 	for _, expiry := range preview.Expiries() {
 		require.NotNil(t, expiry)
@@ -96,8 +95,7 @@ func TestDeploymentStampExpiry(t *testing.T) {
 
 	primary, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{"https://app.acme.com"}, DeploymentMetadata{})
 	require.NoError(t, err)
-	primary.PreviewTTL = 3 * time.Minute
-	primary.StampExpiry(deployedAt)
+	primary.StampExpiry(deployedAt, 3*time.Minute)
 	assert.Equal(t, []*time.Time{nil}, primary.Expiries(), "a primary deployment sets no expiry")
 }
 

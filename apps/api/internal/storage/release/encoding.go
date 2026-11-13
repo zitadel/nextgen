@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // pointer is one entry of the structure stored inside the pointers column.
@@ -125,13 +126,6 @@ func ToDomain(row Row) (*domain.Release, error) {
 		},
 		// Spanner returns UTC while pgx defaults to local; normalize.
 		CreatedAt: row.CreatedAt.UTC(),
-		RevokedAt: utcOrNil(row.RevokedAt),
+		RevokedAt: database.UTCOrNil(row.RevokedAt),
 	}, nil
-}
-
-func utcOrNil(t *time.Time) *time.Time {
-	if t == nil {
-		return nil
-	}
-	return new(t.UTC())
 }

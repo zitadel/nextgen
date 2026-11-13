@@ -11,5 +11,6 @@ properties:
     format: date-time
     description: |
       Preview URLs only: the expiry this deployment set. A later deployment
-      to the URL records its own.
+      to the URL records its own. Absent on a preview deployment that a later
+      one to the same URL replaced before expiries were recorded.
     example: '2026-10-09T14:10:00Z'

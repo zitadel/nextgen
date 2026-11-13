@@ -169,16 +169,15 @@ export class Deployment {
   }
 
   /**
-   * Whether this deployment serves a primary origin. A preview deployment's
-   * targets carry an expiry; it is never the baseline, the guard or the thing a
-   * bare rollback undoes.
+   * Whether this deployment went to the primary origins. A preview deployment
+   * is never the baseline, the guard or the thing a bare rollback undoes, and
+   * it says so by its kind, not by carrying an expiry: one made before the
+   * server recorded expiries has none.
    *
-   * @returns True when at least one target never expires.
+   * @returns True when its kind is primary.
    */
   get servesPrimary(): boolean {
-    return this.targets.some((target) => {
-      return target.expires_at == null;
-    });
+    return this.kind === "primary";
   }
 
   /**
@@ -196,19 +195,16 @@ export class Deployment {
    * set on its targets, which a later deployment to the same URL does not
    * change.
    *
-   * @returns The earliest expiry of its targets, or null for a deployment
-   *   that never expires, a primary one.
+   * @returns The expiry its targets carry, all of them the same, or null for
+   *   a deployment that has none: a primary one, or a preview one the server
+   *   made before it recorded expiries.
    */
   get expiresAt(): string | null {
-    const expiries = this.targets.flatMap((target) => {
-      return target.expires_at == null ? [] : [target.expires_at];
-    });
-    if (expiries.length === 0) {
-      return null;
-    }
-    return expiries.reduce((earliest, expiry) => {
-      return Date.parse(expiry) < Date.parse(earliest) ? expiry : earliest;
-    });
+    return (
+      this.targets.find((target) => {
+        return target.expires_at != null;
+      })?.expires_at ?? null
+    );
   }
 
   /**

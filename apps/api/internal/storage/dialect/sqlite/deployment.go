@@ -55,7 +55,7 @@ func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -66,19 +66,16 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 	type target struct {
 		Origin    string `json:"origin"`
 		Seq       int64  `json:"seq"`
-		ExpiresAt *int64 `json:"expires_at"`
+		ExpiresAt any    `json:"expires_at"`
 	}
 	origins, seqs := entity.Origins(), deployment.NextSeqs(entity.Origins(), read)
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
 		deployedAt = deployment.Stamp(time.Now())
-		entity.StampExpiry(deployedAt)
+		entity.StampExpiry(deployedAt, previewTTL)
 		rows := make([]target, len(origins))
 		for i, origin := range origins {
-			rows[i] = target{Origin: origin, Seq: seqs[i]}
-			if expiresAt := entity.Targets[i].ExpiresAt; expiresAt != nil {
-				rows[i].ExpiresAt = new(expiresAt.UnixNano())
-			}
+			rows[i] = target{Origin: origin, Seq: seqs[i], ExpiresAt: nullUnixNano(entity.Targets[i].ExpiresAt)}
 		}
 		targets, err := encodeJSON(rows)
 		if err != nil {

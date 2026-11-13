@@ -124,11 +124,11 @@ func expectServedPrimary(statements *servicemocks.MockAllStatements, serving *do
 var unrestricted = gomock.Cond(func(ctx context.Context) bool { return service.AuthzListUnrestricted(ctx) })
 
 func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment, set *domain.VariableSet) {
-	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
-		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read, gomock.Any()).
+		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment, ttl time.Duration) error {
 			entity.ID = "dep_new"
 			entity.DeployedAt = deployedAt
-			entity.StampExpiry(deployedAt)
+			entity.StampExpiry(deployedAt, ttl)
 			return nil
 		})
 	statements.EXPECT().EnsureVariableSet(gomock.Any(), set).Return(nil)
@@ -191,7 +191,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil).Times(2)
 		expectServing(statements, nil)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		read := expectServing(statements, servingDeployment("rel_0"))
 		expectInsert(statements, read, emptyVariableSet())
 
@@ -206,7 +206,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		before := servingDeployment("rel_0")
 		before.ID = "dep_before"
 		expectServing(statements, before)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		winner := servingDeployment("rel_0")
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
@@ -226,7 +226,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil).Times(3)
 		for range 3 {
 			expectServing(statements, nil)
-			statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+			statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		}
 		winner := servingDeployment("rel_0")
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
@@ -531,8 +531,8 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		serving := servingDeployment("rel_0")
 		previousSet := emptyVariableSet()
 		read := expectRollbackServing(statements, serving, "dep_previous", previousSet)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
-			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read, gomock.Any()).
+			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment, _ time.Duration) error {
 				entity.ID = "dep_new"
 				entity.DeployedAt = deployedAt
 				return nil
@@ -575,8 +575,8 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		current := variableSet(t, "GOOGLE_CLIENT_ID", "new")
 		read := expectRollbackServing(statements, serving, "dep_previous", previous)
 		expectDeploymentSet(statements, serving.ID, current)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
-			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read, gomock.Any()).
+			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment, _ time.Duration) error {
 				entity.ID = "dep_new"
 				entity.DeployedAt = deployedAt
 				return nil
@@ -643,8 +643,8 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		}, nil)
 		expectDeploymentSet(statements, "dep_previous", previousSet)
 		read := expectServedPrimary(statements, serving)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
-			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read, gomock.Any()).
+			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment, _ time.Duration) error {
 				entity.ID = "dep_new"
 				entity.DeployedAt = deployedAt
 				return nil
@@ -693,7 +693,7 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectPrimaryLock(statements)
 		expectServing(statements, nil)
-		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
 		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)

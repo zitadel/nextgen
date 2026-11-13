@@ -312,8 +312,7 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 
 		// A copy per attempt: each one mints its own id and stamp.
 		written := *entity
-		written.PreviewTTL = input.PreviewTTL
-		if err := stmts.CreateDeployment(ctx, &written, read); err != nil {
+		if err := stmts.CreateDeployment(ctx, &written, read, input.PreviewTTL); err != nil {
 			// The release was read above, so the only reference left to
 			// trip is the project.
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {

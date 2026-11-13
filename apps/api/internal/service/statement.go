@@ -376,7 +376,10 @@ type DeploymentStatements interface {
 	// optimistic lock: read is what GetNewestPerOrigin returned for its origins,
 	// and when another deploy wrote to one of them since, nothing is written
 	// and it fails with a UniqueError. The caller re-reads and retries.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error
+	// previewTTL is how long a preview deployment's previews stay live, counted
+	// from the deployed_at the write takes; it sets each target's expires_at,
+	// and a primary deployment ignores it.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
 	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)

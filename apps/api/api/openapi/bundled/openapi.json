@@ -25681,7 +25681,7 @@
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "Preview URLs only: the expiry this deployment set. A later deployment\nto the URL records its own.\n",
+            "description": "Preview URLs only: the expiry this deployment set. A later deployment\nto the URL records its own. Absent on a preview deployment that a later\none to the same URL replaced before expiries were recorded.\n",
             "example": "2026-10-09T14:10:00Z"
           }
         }

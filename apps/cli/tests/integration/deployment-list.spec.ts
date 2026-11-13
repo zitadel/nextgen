@@ -456,10 +456,7 @@ describe("deployment list", () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
         await app.previewData(PREVIEW_URL);
-        const previews = app.envelopeOf<{ items: { expires_at: string }[] }>(
-          await app.run(["preview", "list", "--json"]),
-        );
-        const expires = previews.data.items[0]?.expires_at ?? "";
+        const expires = await app.previewExpiry(PREVIEW_URL);
 
         const result = await offTerminal(() =>
           app.run(["deployment", "list", "--live", "--plain"]),

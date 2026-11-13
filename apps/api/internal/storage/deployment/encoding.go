@@ -125,15 +125,6 @@ func DeploymentIDs(items []*domain.Deployment) []string {
 	return ids
 }
 
-// UTC normalizes a scanned expiry the way DeployedAt is: Spanner returns UTC
-// while pgx defaults to local. A NULL stays nil.
-func UTC(t *time.Time) *time.Time {
-	if t == nil {
-		return nil
-	}
-	return new(t.UTC())
-}
-
 // Stamp truncates now to the microsecond every dialect keeps.
 func Stamp(now time.Time) time.Time {
 	return now.UTC().Truncate(time.Microsecond)

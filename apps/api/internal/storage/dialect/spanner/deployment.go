@@ -54,7 +54,7 @@ func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -83,15 +83,12 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		// so one mutation applies them at commit.
 		origins := entity.Origins()
 		seqs := deployment.NextSeqs(origins, read)
-		entity.StampExpiry(stamped)
+		entity.StampExpiry(stamped, previewTTL)
 		mutations := make([]*spanner.Mutation, 0, len(origins))
 		for i, origin := range origins {
-			expiresAt := spanner.NullTime{}
-			if target := entity.Targets[i].ExpiresAt; target != nil {
-				expiresAt = spanner.NullTime{Time: *target, Valid: true}
-			}
 			mutations = append(mutations, spanner.Insert(originsTable, originColumns, []any{
-				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i], expiresAt,
+				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
+				spannerNullTime(entity.Targets[i].ExpiresAt),
 			}))
 		}
 		if _, err := tx.BufferWrite(ctx, mutations); err != nil {
@@ -231,7 +228,7 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			}
 			scanned.DeployedAt = scanned.DeployedAt.UTC()
 			if expires.Valid {
-				scanned.ExpiresAt = deployment.UTC(&expires.Time)
+				scanned.ExpiresAt = database.UTCOrNil(&expires.Time)
 			}
 			return deployment.WithKind(scanned, kind)
 		})

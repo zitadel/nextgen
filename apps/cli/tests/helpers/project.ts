@@ -1322,6 +1322,20 @@ export class ScaffoldedApp {
     return this.envelopeOf<DeployResult>(result).data;
   }
 
+  /** The expiry `preview list` reports for the preview at `url`, failing the arrange if it lists none. */
+  async previewExpiry(url: string): Promise<string> {
+    const result = await this.run(["preview", "list", "--json"]);
+    expect(result, "preview list should have succeeded").toSucceed();
+    const { items } = this.envelopeOf<{ items: { origin: string; expires_at: string }[] }>(
+      result,
+    ).data;
+    const listed = items.find((item) => {
+      return item.origin === url;
+    });
+    expect(listed, `preview list should show ${url}`).toBeDefined();
+    return listed?.expires_at ?? "";
+  }
+
   /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
   async previewData(url: string): Promise<Record<string, unknown>> {
     const result = await this.run(["preview", "--origin", url, "--json"]);

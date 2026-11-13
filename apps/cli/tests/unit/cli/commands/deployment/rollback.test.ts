@@ -37,6 +37,7 @@ describe("deployment rollback", () => {
                 {
                   id: "dep_landed_since",
                   release_id: "rel_x",
+                  kind: "primary",
                   targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
                   reason: "deploy",
                   deployed_at: "2026-01-02T00:00:00.000Z",
@@ -79,6 +80,7 @@ describe("deployment rollback", () => {
     const primary = (id: string, deployedAt: string) => ({
       id,
       release_id: `rel_${id}`,
+      kind: "primary",
       targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
       metadata: { reason: "deploy" },
       deployed_at: deployedAt,

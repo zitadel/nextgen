@@ -47,10 +47,9 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 	t.Helper()
 	entity, err := domain.NewDeployment(projectID, releaseID, args.kind, origins, args.metadata)
 	require.NoError(t, err)
-	entity.PreviewTTL = args.ttl
 	serving, err := stmts.GetNewestPerOrigin(t.Context(), projectID, entity.Origins())
 	require.NoError(t, err)
-	if err := stmts.CreateDeployment(t.Context(), entity, serving); err != nil {
+	if err := stmts.CreateDeployment(t.Context(), entity, serving, args.ttl); err != nil {
 		return entity, err
 	}
 	if args.kind == domain.DeploymentOriginKindPreview {
@@ -292,7 +291,7 @@ func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
 				// a loser must not leave its www row behind.
 				entity, err := domain.NewDeployment(projectID, releases[i].ID, domain.DeploymentOriginKindPrimary, []string{appOrigin, wwwOrigin}, domain.DeploymentMetadata{})
 				if err == nil {
-					err = d.stmts.CreateDeployment(context.Background(), entity, read)
+					err = d.stmts.CreateDeployment(context.Background(), entity, read, 0)
 				}
 				errs[i] = err
 			})

@@ -101,10 +101,22 @@ describe("deployment list at a terminal", () => {
   const deployment = (id: string) => ({
     id,
     release_id: "rel_1",
+    kind: "primary",
     targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
     metadata: { reason: "deploy" },
     deployed_at: "2026-01-01T00:00:00.000Z",
   });
+
+  const previewDeployment = (id: string) => ({
+    ...deployment(id),
+    kind: "preview",
+    targets: [{ origin: "https://pr-7.preview.acme.com", expires_at: "2030-01-01T00:00:00Z" }],
+  });
+
+  const listing = (...deployments: object[]) =>
+    http.get(`${SERVER}/api/v1/deployments`, () =>
+      HttpResponse.json({ deployments, next_page_token: null }),
+    );
 
   async function aProject(): Promise<string> {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-list-"));
@@ -138,6 +150,37 @@ describe("deployment list at a terminal", () => {
     );
 
   describe("deployment list", () => {
+    it("ends each row with its kind and expiry, after deployed_at, piped", async () => {
+      const cwd = await aProject();
+      server.use(listing(deployment("dep_1"), previewDeployment("dep_2")));
+
+      const { stdout } = await runCliForTest([
+        "deployment",
+        "list",
+        "--plain",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+        "--no-telemetry",
+      ]);
+
+      expect(stdout.split("\n").filter(Boolean)).toEqual([
+        `dep_1\trel_1\tdeploy\t${PRIMARY_ORIGIN}\t2026-01-01T00:00:00.000Z\tprimary\t`,
+        "dep_2\trel_1\tdeploy\thttps://pr-7.preview.acme.com\t2026-01-01T00:00:00.000Z\tpreview\t2030-01-01T00:00:00Z",
+      ]);
+    });
+
+    it("heads the columns with kind and expires last, at a terminal", async () => {
+      const cwd = await aProject();
+      server.use(listing(previewDeployment("dep_2")));
+
+      const res = await listed(cwd);
+
+      expect(res.stdout).toMatch(/id.*release_id.*reason.*origins.*deployed_at.*kind.*expires/);
+    });
+
     it("says so, as the closing clause beside the place it ran, when it finds nothing", async () => {
       const cwd = await aProject();
       server.use(

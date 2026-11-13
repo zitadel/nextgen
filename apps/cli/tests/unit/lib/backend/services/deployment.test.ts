@@ -81,6 +81,15 @@ describe("Deployment.servesPrimary", () => {
   it("is false for a preview deployment", () => {
     expect(Deployment.of(preview("dep_1")).servesPrimary).toBe(false);
   });
+
+  it("is false for a preview deployment made before expiries were recorded", () => {
+    expect(
+      Deployment.of({
+        ...record("dep_1", [{ origin: "https://pr-7.preview.acme.com" }]),
+        kind: "preview",
+      }).servesPrimary,
+    ).toBe(false);
+  });
 });
 
 describe("Deployment.kind", () => {
@@ -102,15 +111,13 @@ describe("Deployment.expiresAt", () => {
     expect(Deployment.of(preview("dep_1")).expiresAt).toBe("2030-01-01T00:00:00Z");
   });
 
-  it("is the earliest when the targets differ", () => {
+  it("is null for a preview deployment made before expiries were recorded", () => {
     expect(
-      Deployment.of(
-        record("dep_1", [
-          { origin: "https://a.acme.com", expires_at: "2030-01-02T00:00:00Z" },
-          { origin: "https://b.acme.com", expires_at: "2030-01-01T00:00:00Z" },
-        ]),
-      ).expiresAt,
-    ).toBe("2030-01-01T00:00:00Z");
+      Deployment.of({
+        ...record("dep_1", [{ origin: "https://pr-7.preview.acme.com" }]),
+        kind: "preview",
+      }).expiresAt,
+    ).toBeNull();
   });
 });
 

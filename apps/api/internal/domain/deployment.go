@@ -131,19 +131,16 @@ type Deployment struct {
 	Targets    []DeploymentTarget   `json:"targets"`
 	Metadata   DeploymentMetadata   `json:"metadata"`
 	DeployedAt time.Time            `json:"deployed_at"`
-	// PreviewTTL is how long a preview deployment keeps its previews live,
-	// counted from DeployedAt. It is only read when the deployment is written.
-	PreviewTTL time.Duration `json:"-"`
 }
 
 // StampExpiry sets the expiry of every target of a preview deployment to
-// deployedAt plus its PreviewTTL, and leaves a primary deployment's targets
-// without one. A storage statement calls it once deployedAt is known.
-func (d *Deployment) StampExpiry(deployedAt time.Time) {
+// deployedAt plus ttl, and leaves a primary deployment's targets without one.
+// A storage statement calls it once deployedAt is known.
+func (d *Deployment) StampExpiry(deployedAt time.Time, ttl time.Duration) {
 	for i := range d.Targets {
 		d.Targets[i].ExpiresAt = nil
 		if d.OriginKind == DeploymentOriginKindPreview {
-			expiresAt := deployedAt.Add(d.PreviewTTL).UTC()
+			expiresAt := deployedAt.Add(ttl).UTC()
 			d.Targets[i].ExpiresAt = &expiresAt
 		}
 	}

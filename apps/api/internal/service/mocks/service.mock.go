@@ -866,17 +866,17 @@ func (c *MockAllStatementsCreateChallengeCall) DoAndReturn(f func(context.Contex
 }
 
 // CreateDeployment mocks base method.
-func (m *MockAllStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
+func (m *MockAllStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDeployment", ctx, entity, read)
+	ret := m.ctrl.Call(m, "CreateDeployment", ctx, entity, read, previewTTL)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateDeployment indicates an expected call of CreateDeployment.
-func (mr *MockAllStatementsMockRecorder) CreateDeployment(ctx, entity, read any) *MockAllStatementsCreateDeploymentCall {
+func (mr *MockAllStatementsMockRecorder) CreateDeployment(ctx, entity, read, previewTTL any) *MockAllStatementsCreateDeploymentCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDeployment", reflect.TypeOf((*MockAllStatements)(nil).CreateDeployment), ctx, entity, read)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDeployment", reflect.TypeOf((*MockAllStatements)(nil).CreateDeployment), ctx, entity, read, previewTTL)
 	return &MockAllStatementsCreateDeploymentCall{Call: call}
 }
 
@@ -892,13 +892,13 @@ func (c *MockAllStatementsCreateDeploymentCall) Return(arg0 error) *MockAllState
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCreateDeploymentCall) Do(f func(context.Context, *domain.Deployment, []domain.OriginDeployment) error) *MockAllStatementsCreateDeploymentCall {
+func (c *MockAllStatementsCreateDeploymentCall) Do(f func(context.Context, *domain.Deployment, []domain.OriginDeployment, time.Duration) error) *MockAllStatementsCreateDeploymentCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCreateDeploymentCall) DoAndReturn(f func(context.Context, *domain.Deployment, []domain.OriginDeployment) error) *MockAllStatementsCreateDeploymentCall {
+func (c *MockAllStatementsCreateDeploymentCall) DoAndReturn(f func(context.Context, *domain.Deployment, []domain.OriginDeployment, time.Duration) error) *MockAllStatementsCreateDeploymentCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

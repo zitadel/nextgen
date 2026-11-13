@@ -374,7 +374,7 @@ func TestVariableSetStatements_LinkSeesTheDeploymentItFollows(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if err := stmts.CreateDeployment(ctx, entity, serving); err != nil {
+			if err := stmts.CreateDeployment(ctx, entity, serving, 0); err != nil {
 				return err
 			}
 			variables, err := stmts.GetVariables(ctx, f.owner(), domain.DeploymentOriginKindPrimary)
