@@ -1281,14 +1281,16 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 //
 // A deployment makes a release live on origins. By default the list is the history, newest first:
 // every deployment of the project, with every target it made the release live on. With `origin`, it is
-// the history of that origin alone.
+// the history of that origin alone. With `release_id`, it is every deployment of that release,
+// superseded ones included.
 //
 // With `live=true`, the list is what is served now, newest first. It holds the project's newest
 // primary deployment with every origin it names, an origin the project no longer lists included: that
 // deployment also serves requests with no `Origin`, so it stays live. It also holds the newest
 // deployment to each live preview URL, narrowed to the URLs it still serves. Combined with `origin`,
 // it is the one deployment that origin serves, or empty, as it is for an origin the project no longer
-// lists.
+// lists. Combined with `release_id`, it is the deployments of the live view that serve that release:
+// the primary deployment only when it is of that release, and the previews serving it.
 //
 // The `id` of an entry is the deployment ID that `getDeploymentById`
 // (`GET /deployments/{deployment_id}`), `getDeploymentVariables`

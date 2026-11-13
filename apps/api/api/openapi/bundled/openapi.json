@@ -10391,7 +10391,7 @@
         "operationId": "listDeployments",
         "x-zitadel-cli": "deployment list",
         "summary": "List deployments",
-        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
+        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone. With `release_id`, it is every deployment of that release,\nsuperseded ones included.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\nCombined with `release_id`, it is the deployments of the live view that\nserve that release: the primary deployment only when it is of that\nrelease, and the previews serving it.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
         "tags": [
           "Deployments"
         ],
@@ -10401,6 +10401,9 @@
           },
           {
             "$ref": "#/components/parameters/origin-filter"
+          },
+          {
+            "$ref": "#/components/parameters/release-id-filter"
           },
           {
             "name": "live",
@@ -37275,6 +37278,15 @@
         "description": "Narrows the list to the deployments that targeted this origin, given\nexactly as the deployment records it. An origin no deployment targeted\nanswers an empty list, not an error.\n",
         "schema": {
           "$ref": "#/components/schemas/origin"
+        }
+      },
+      "release-id-filter": {
+        "name": "release_id",
+        "in": "query",
+        "required": false,
+        "description": "Narrows the list to the deployments of this release: the `id` that\n`createRelease` (`POST /releases`) returns or `listReleases`\n(`GET /releases`) lists. A release with nothing to list, one never\ndeployed, one no longer served with `live=true`, or one of another\nproject, answers an empty list, not an error.\n",
+        "schema": {
+          "$ref": "#/components/schemas/release-id"
         }
       },
       "deployment-id": {

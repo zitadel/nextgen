@@ -382,7 +382,7 @@ type DeploymentStatements interface {
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
 	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// ListLiveDeployments lists, with deployment.ListOptions, the
 	// deployments some origin serves at now, each narrowed to those origins.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
