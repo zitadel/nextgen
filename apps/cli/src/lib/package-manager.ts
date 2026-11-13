@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execa } from "execa";
 
 import { Cmd } from "./cmd";
@@ -29,17 +29,79 @@ export type PackageCommand = {
   display: string;
 };
 
+/** Each lockfile, and the package manager that writes it, in the order they are looked for. */
+const LOCKFILES = [
+  ["pnpm-lock.yaml", "pnpm"],
+  ["yarn.lock", "yarn"],
+  ["bun.lock", "bun"],
+  ["bun.lockb", "bun"],
+  ["package-lock.json", "npm"],
+] as const satisfies ReadonlyArray<readonly [string, PackageManager]>;
+
+/**
+ * The package manager the project in `cwd` uses. A workspace keeps its
+ * lockfile and its `packageManager` field at the repository's root, not in
+ * each app, so every directory from `cwd` up to the one holding `.git` is
+ * read, nearest first ({@link projectDirectories}).
+ *
+ * @param cwd - The project's directory.
+ * @returns What the nearest `packageManager` field or lockfile names, or npm
+ *   when none does.
+ */
 export async function detectPackageManager(cwd: string): Promise<PackageManager> {
-  const declared = await packageManagerFromManifest(cwd);
-  if (declared) {
+  for (const dir of await projectDirectories(cwd)) {
+    const named = await packageManagerIn(dir);
+    if (named !== undefined) {
+      return named;
+    }
+  }
+  return "npm";
+}
+
+/**
+ * The directories whose files say which package manager `cwd` uses: `cwd`
+ * and each one above it, up to and including the repository's root (the one
+ * holding `.git`). Outside a repository only `cwd`, so nothing above a
+ * project, such as a home directory's stray lockfile, can choose for it.
+ *
+ * @param cwd - The project's directory.
+ * @returns The directories, nearest first.
+ */
+async function projectDirectories(cwd: string): Promise<string[]> {
+  const start = resolve(cwd);
+  const dirs: string[] = [];
+  let dir = start;
+  for (;;) {
+    dirs.push(dir);
+    if (await pathExists(join(dir, ".git"))) {
+      return dirs;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return [start];
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * The package manager `dir` itself names: its `package.json`'s
+ * `packageManager` field first, then the first lockfile it holds.
+ *
+ * @param dir - A directory.
+ * @returns The package manager, or `undefined` when `dir` names none.
+ */
+async function packageManagerIn(dir: string): Promise<PackageManager | undefined> {
+  const declared = await packageManagerFromManifest(dir);
+  if (declared !== undefined) {
     return declared;
   }
-  if (await pathExists(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (await pathExists(join(cwd, "yarn.lock"))) return "yarn";
-  if (await pathExists(join(cwd, "bun.lock"))) return "bun";
-  if (await pathExists(join(cwd, "bun.lockb"))) return "bun";
-  if (await pathExists(join(cwd, "package-lock.json"))) return "npm";
-  return "npm";
+  for (const [lockfile, packageManager] of LOCKFILES) {
+    if (await pathExists(join(dir, lockfile))) {
+      return packageManager;
+    }
+  }
+  return undefined;
 }
 
 export function installCommandFor(packageManager: PackageManager): PackageCommand {

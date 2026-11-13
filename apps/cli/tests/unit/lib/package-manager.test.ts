@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -28,6 +28,31 @@ async function tempProject(): Promise<string> {
   return dir;
 }
 
+/**
+ * A repository's root in a new temporary directory: a directory holding `.git`.
+ *
+ * @returns The root.
+ */
+async function tempRepository(): Promise<string> {
+  const root = await tempProject();
+  await mkdir(join(root, ".git"));
+  return root;
+}
+
+/**
+ * An app of a workspace, at `apps/web` under `root`, with a `package.json`
+ * that names no package manager.
+ *
+ * @param root - The workspace's root.
+ * @returns The app's directory.
+ */
+async function memberApp(root: string): Promise<string> {
+  const app = join(root, "apps", "web");
+  await mkdir(app, { recursive: true });
+  await writeFile(join(app, "package.json"), JSON.stringify({ name: "web" }));
+  return app;
+}
+
 describe("package manager detection", () => {
   it("prefers package.json#packageManager over lockfiles", async () => {
     const cwd = await tempProject();
@@ -55,6 +80,45 @@ describe("package manager detection", () => {
 
   it("falls back to npm", async () => {
     expect(await detectPackageManager(await tempProject())).toBe("npm");
+  });
+
+  it("reads a workspace's lockfile at the repository's root", async () => {
+    const root = await tempRepository();
+    await writeFile(join(root, "pnpm-lock.yaml"), "");
+
+    expect(await detectPackageManager(await memberApp(root))).toBe("pnpm");
+  });
+
+  it("reads a workspace's packageManager field at the repository's root", async () => {
+    const root = await tempRepository();
+    await writeFile(join(root, "package.json"), JSON.stringify({ packageManager: "yarn@4.0.0" }));
+
+    expect(await detectPackageManager(await memberApp(root))).toBe("yarn");
+  });
+
+  it("prefers what the app itself names over the repository's root", async () => {
+    const root = await tempRepository();
+    await writeFile(join(root, "pnpm-lock.yaml"), "");
+    const app = await memberApp(root);
+    await writeFile(join(app, "bun.lock"), "");
+
+    expect(await detectPackageManager(app)).toBe("bun");
+  });
+
+  it("reads nothing above the repository's root", async () => {
+    const outside = await tempProject();
+    await writeFile(join(outside, "pnpm-lock.yaml"), "");
+    const root = join(outside, "repo");
+    await mkdir(join(root, ".git"), { recursive: true });
+
+    expect(await detectPackageManager(await memberApp(root))).toBe("npm");
+  });
+
+  it("reads nothing above a project outside any repository", async () => {
+    const outside = await tempProject();
+    await writeFile(join(outside, "pnpm-lock.yaml"), "");
+
+    expect(await detectPackageManager(await memberApp(outside))).toBe("npm");
   });
 });
 
