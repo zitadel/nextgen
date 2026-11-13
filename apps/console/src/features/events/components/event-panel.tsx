@@ -17,6 +17,7 @@ import {
   eventFields,
   eventFilterValues,
   type FlowSummary,
+  flowPlaces,
   flowSummary,
   formatSpan,
   isFailure,
@@ -319,8 +320,8 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
  * In a login flow each step says how long after the first it happened, and a
  * dot on a track places it in the whole, as a trace's waterfall does: a
  * sign-up through an identity provider spends most of its time at the
- * provider, and the gap shows it. A request's events fall within one second
- * as the API returns them, so they keep their clock time.
+ * provider, and the gap shows it. The events of one request share its offset
+ * (`flowPlaces`). A request's own events keep their clock time.
  */
 function Timeline({
   title,
@@ -338,9 +339,7 @@ function Timeline({
   all?: { search: EventsSearch; label: string };
 }) {
   const names = useNamesOf(summary?.userId ? [summary.userId] : []);
-  const start = Date.parse(timeline.items[0]?.occurred_at ?? "");
-  const end = Date.parse(timeline.items.at(-1)?.occurred_at ?? "");
-  const span = Math.max(end - start, 0);
+  const { offsets, spanMs } = useMemo(() => flowPlaces(timeline.items), [timeline.items]);
   return (
     <PanelSection title={title}>
       {summary && (
@@ -374,13 +373,13 @@ function Timeline({
       )}
       <ol className="flex flex-col">
         {timeline.items.map((step) => {
-          const at = Date.parse(step.occurred_at) - start;
+          const at = offsets.get(step.id) ?? 0;
           return (
             <TimelineStep
               key={step.id}
               event={step}
               current={step.id === current}
-              place={summary ? { offset: at, share: span > 0 ? at / span : 0 } : undefined}
+              place={summary ? { offset: at, share: spanMs > 0 ? at / spanMs : 0 } : undefined}
             />
           );
         })}
@@ -437,6 +436,11 @@ function TimelineStep({
           <span className="flex min-w-0 flex-1">
             <EventSubject event={event} />
           </span>
+          {event.event_type === "request.api" && (
+            <span className="text-muted-foreground shrink-0 tabular-nums">
+              {formatSpan(event.payload.duration_ms)}
+            </span>
+          )}
         </span>
         {place && (
           <span aria-hidden className="bg-muted relative h-1 rounded-full">

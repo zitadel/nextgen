@@ -1568,9 +1568,9 @@ type ApplicationCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ApplicationCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -2165,9 +2165,9 @@ type ApplicationUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ApplicationUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -3051,9 +3051,9 @@ type AuthAttemptCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthAttemptCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -3511,9 +3511,9 @@ type AuthAttemptHandedOffEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthAttemptHandedOffEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -4185,9 +4185,9 @@ type AuthCheckFailedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthCheckFailedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -4685,9 +4685,9 @@ type AuthCheckSucceededEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthCheckSucceededEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -5198,9 +5198,9 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthFactorPasskeyEnrolledEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -5658,9 +5658,9 @@ type AuthFactorPasswordSetEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthFactorPasswordSetEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -6222,9 +6222,9 @@ type AuthSSOAuthorizationFailedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthSSOAuthorizationFailedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -6682,9 +6682,9 @@ type AuthSSOExchangeFailedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthSSOExchangeFailedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -7142,9 +7142,9 @@ type AuthSSOExchangeSucceededEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthSSOExchangeSucceededEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -7602,9 +7602,9 @@ type AuthTokenIssuedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthTokenIssuedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -8078,9 +8078,9 @@ type AuthTokenRevokedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthTokenRevokedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -8629,9 +8629,9 @@ type AuthzGrantedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthzGrantedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -9127,9 +9127,9 @@ type AuthzRevokedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthzRevokedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -10232,9 +10232,9 @@ type BrandingCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category BrandingCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -25530,9 +25530,9 @@ type DeploymentCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category DeploymentCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -32651,9 +32651,9 @@ type FlowSignupChallengeConsumedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category FlowSignupChallengeConsumedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -33111,9 +33111,9 @@ type FlowSignupChallengeIssuedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category FlowSignupChallengeIssuedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -34452,9 +34452,9 @@ type FlowdefCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category FlowdefCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -34912,9 +34912,9 @@ type FlowdefDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category FlowdefDeletedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -35882,9 +35882,9 @@ type FlowdefUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category FlowdefUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -46761,9 +46761,9 @@ type IdpCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category IdpCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -47427,9 +47427,9 @@ type IdpIdentityLinkCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category IdpIdentityLinkCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -48370,9 +48370,9 @@ type IdpUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category IdpUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -49690,9 +49690,9 @@ type InvitationAcceptedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category InvitationAcceptedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -50528,9 +50528,9 @@ type InvitationCancelledEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category InvitationCancelledEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -51061,9 +51061,9 @@ type InvitationCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category InvitationCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -52564,9 +52564,9 @@ type InvitationRejectedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category InvitationRejectedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -80425,9 +80425,9 @@ type OriginAddedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category OriginAddedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -81218,9 +81218,9 @@ type OriginRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category OriginRemovedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -84368,9 +84368,9 @@ type PolicyCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category PolicyCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -84930,9 +84930,9 @@ type PolicyUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category PolicyUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -85524,9 +85524,9 @@ type PreviewRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category PreviewRemovedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -86874,9 +86874,9 @@ type ProjectCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ProjectCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -87334,9 +87334,9 @@ type ProjectDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ProjectDeletedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -88093,9 +88093,9 @@ type ProjectUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ProjectUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -92559,9 +92559,9 @@ type ReleaseCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ReleaseCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -93423,9 +93423,9 @@ type ReleaseRevokedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category ReleaseRevokedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -94709,9 +94709,9 @@ type RequestAPIEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category RequestAPIEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -97648,9 +97648,9 @@ type SchemaCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category SchemaCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -99536,9 +99536,9 @@ type SessionDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category SessionDeletedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -100012,9 +100012,9 @@ type SessionEstablishedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category SessionEstablishedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -103194,9 +103194,9 @@ type TeamCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category TeamCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -103654,9 +103654,9 @@ type TeamDeactivatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category TeamDeactivatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -104629,9 +104629,9 @@ type TeamUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category TeamUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -106724,9 +106724,9 @@ type UserCreateFailedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category UserCreateFailedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -107386,9 +107386,9 @@ type UserCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category UserCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -107896,9 +107896,9 @@ type UserDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category UserDeletedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -109720,9 +109720,9 @@ type UserUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category UserUpdatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -110847,9 +110847,9 @@ type VariableRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category VariableRemovedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -111462,9 +111462,9 @@ type VariableSetEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category VariableSetEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`

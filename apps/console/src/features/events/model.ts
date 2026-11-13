@@ -394,7 +394,7 @@ export function flowSummary(
     .filter((step): step is Signin => step !== undefined && step.outcome !== "opened");
   const signedIn = signin.find((step) => step.outcome === "signed_in");
   const startedAt = first.occurred_at;
-  const durationMs = Date.parse(last.occurred_at) - Date.parse(startedAt);
+  const durationMs = flowPlaces(events).spanMs;
   const userId =
     signedIn?.userId ??
     [...events].reverse().find((event) => event.user_id)?.user_id ??
@@ -420,6 +420,40 @@ export function flowSummary(
             ? "Sign-in in progress"
             : "This login flow";
   return { title, outcome, userId, startedAt, durationMs };
+}
+
+/**
+ * Where each step of a login flow falls, in milliseconds after its first
+ * event, and how long the flow ran. The events one request wrote share the
+ * request's first moment: the server stamps its `request.api` event at the
+ * request's start and the others as it stores them, so a gap between them is
+ * the request's own work, which its `duration_ms` tells, not a wait between
+ * steps. The span runs from the first event to where the last request ended.
+ */
+export interface FlowPlaces {
+  offsets: ReadonlyMap<string, number>;
+  spanMs: number;
+}
+
+export function flowPlaces(events: readonly ProjectEvent[]): FlowPlaces {
+  const offsets = new Map<string, number>();
+  const at = (event: ProjectEvent) => Date.parse(event.occurred_at);
+  if (events.length === 0) return { offsets, spanMs: 0 };
+  const start = Math.min(...events.map(at));
+  const requestStart = new Map<string, number>();
+  for (const event of events) {
+    if (!event.request_id) continue;
+    const seen = requestStart.get(event.request_id);
+    if (seen === undefined || at(event) < seen) requestStart.set(event.request_id, at(event));
+  }
+  let end = start;
+  for (const event of events) {
+    const moment = (event.request_id ? requestStart.get(event.request_id) : undefined) ?? at(event);
+    offsets.set(event.id, moment - start);
+    const took = event.event_type === "request.api" ? event.payload.duration_ms : 0;
+    end = Math.max(end, at(event) + took);
+  }
+  return { offsets, spanMs: end - start };
 }
 
 /**
@@ -520,9 +554,13 @@ export function inOccurrenceOrder(events: readonly ProjectEvent[]): ProjectEvent
     .map(({ event }) => event);
 }
 
-/** A span of time as the drawer's timeline writes it: `0 s`, `1.5 s`, `19 s`, `2 min 5 s`. */
+/**
+ * A span of time as the drawer's timeline writes it: `0 ms`, `29 ms`,
+ * `1.5 s`, `19 s`, `2 min 5 s`.
+ */
 export function formatSpan(ms: number): string {
   const safe = Math.max(0, ms);
+  if (safe < 999.5) return `${Math.round(safe)} ms`;
   // Tenths below ten seconds, unless they round up to ten.
   const tenths = Math.round(safe / 100);
   if (safe % 1000 !== 0 && tenths < 100) return `${(tenths / 10).toFixed(1)} s`;
