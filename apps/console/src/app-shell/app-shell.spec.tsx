@@ -568,6 +568,8 @@ describe("platform root", () => {
       }),
     );
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    // The platform is the selection then, not the project left behind.
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" });
     await waitFor(() => expect(pill).toHaveTextContent("Platform"));
   });
 

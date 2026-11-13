@@ -403,7 +403,7 @@ const TEAM_PAGE = 25;
  *
  * The platform is the root's (D42): a list of the root's stays too, but the
  * root has no Overview, so from anywhere else it opens Projects, the root's
- * home.
+ * home, with the platform selected.
  */
 function useScopeTarget(): (projectId: string, toRoot: boolean) => SwitcherOption["link"] {
   const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
@@ -417,7 +417,14 @@ function useScopeTarget(): (projectId: string, toRoot: boolean) => SwitcherOptio
         search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
       };
     }
-    return toRoot ? { to: "/projects" } : selectTarget(projectId);
+    // `_authed` retains `?project=`, so the platform is named here or the
+    // previous project would stay the selection.
+    return toRoot
+      ? {
+          to: "/projects",
+          search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
+        }
+      : selectTarget(projectId);
   };
 }
 
