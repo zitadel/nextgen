@@ -209,8 +209,7 @@ if (existsSync(".env.local")) {
 }
 const projectId = process.env.ZITADEL_PROJECT_ID;
 if (!projectId) {
-  console.error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it) or to the environment.");
-  process.exit(1);
+  throw new Error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it) or to the environment.");
 }
 process.argv.push("--define", \`${PROJECT_ID_DEFINE}=\${JSON.stringify(projectId)}\`);
 require("@angular/cli/bin/ng.js");
