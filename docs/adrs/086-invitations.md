@@ -467,3 +467,14 @@ matching sentence in the 2026-11-11 amendment.
 - **The list expands the inviter** with `expand=inviter`: `inviter` is the
   creator as a user reference, as lookup returns it, and null when a project
   secret created the invitation.
+
+## Amendment (2026-11-13): the redeem calls' rate limit lives at the edge
+
+This refines §10's rule that `lookup`, `accept` and `reject` are rate-limited.
+
+- Their volume is limited at the edge, the first layer of
+  [ADR 078](078-abuse-prevention-in-layers.md). No guard in the server
+  answers them, so, per ADR 078 §7, they declare no `429`.
+- A server guard waits for [ADR 088](088-abuse-protection-per-operation.md).
+  The 128-bit token and the same `404` for every unknown or finished one
+  already make guessing a link impractical.

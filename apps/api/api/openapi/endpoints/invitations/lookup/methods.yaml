@@ -9,7 +9,7 @@ post:
     or finished token answers the same opaque `404`. Authenticate with a
     platform-project user session cookie (`sessionCookie`). Lookup is a read:
     same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
-    reject still do). The call is rate-limited.
+    reject still do).
   tags:
     - Invitations
   security:
@@ -41,14 +41,6 @@ post:
             $ref: ../../../components/error-details.yaml
     '404':
       description: Unknown or finished invitation token.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '429':
-      description: |
-        Too many requests. Lookup is rate-limited so a guessed token cannot be
-        brute-forced. Wait and retry.
       content:
         application/json:
           schema:

@@ -18,7 +18,7 @@ type Handler interface {
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-	// that scheme's CSRF rules. The call is rate-limited.
+	// that scheme's CSRF rules.
 	//
 	// POST /invitations/accept
 	AcceptInvitation(ctx context.Context, req *InvitationTokenRequest) (AcceptInvitationRes, error)
@@ -1332,7 +1332,7 @@ type Handler interface {
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-	// still do). The call is rate-limited.
+	// still do).
 	//
 	// POST /invitations/lookup
 	LookupInvitation(ctx context.Context, req *InvitationTokenRequest) (LookupInvitationRes, error)
@@ -1479,7 +1479,7 @@ type Handler interface {
 	// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
 	// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
 	// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
-	// requests follow that scheme's CSRF rules. The call is rate-limited.
+	// requests follow that scheme's CSRF rules.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (RejectInvitationRes, error)

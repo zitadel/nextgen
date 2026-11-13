@@ -39,7 +39,7 @@ type Invoker interface {
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-	// that scheme's CSRF rules. The call is rate-limited.
+	// that scheme's CSRF rules.
 	//
 	// POST /invitations/accept
 	AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error)
@@ -1353,7 +1353,7 @@ type Invoker interface {
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-	// still do). The call is rate-limited.
+	// still do).
 	//
 	// POST /invitations/lookup
 	LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error)
@@ -1500,7 +1500,7 @@ type Invoker interface {
 	// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
 	// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
 	// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
-	// requests follow that scheme's CSRF rules. The call is rate-limited.
+	// requests follow that scheme's CSRF rules.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error)
@@ -1856,7 +1856,7 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-// that scheme's CSRF rules. The call is rate-limited.
+// that scheme's CSRF rules.
 //
 // POST /invitations/accept
 func (c *Client) AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error) {
@@ -16336,7 +16336,7 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 // Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-// still do). The call is rate-limited.
+// still do).
 //
 // POST /invitations/lookup
 func (c *Client) LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error) {
@@ -18062,7 +18062,7 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // administrators, but this response returns `metadata` as null. The inviter cannot decline their own
 // invitation; an administrator cancels it instead. Every unknown or finished token answers the same
 // opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
-// requests follow that scheme's CSRF rules. The call is rate-limited.
+// requests follow that scheme's CSRF rules.
 //
 // POST /invitations/reject
 func (c *Client) RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error) {
