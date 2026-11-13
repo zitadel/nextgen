@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -14,9 +13,7 @@ const (
 	authRequestColumns    = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at`
 	createAuthRequestStmt = `INSERT INTO auth_requests (` + authRequestColumns + `)` +
 		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	getAuthRequestStmt           = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
-	deleteExpiredAuthRequestStmt = `DELETE FROM auth_requests WHERE project_id = ?1 AND expires_at <= ?2` +
-		` AND id IN (SELECT id FROM auth_requests WHERE project_id = ?1 AND expires_at <= ?2 LIMIT ?3)`
+	getAuthRequestStmt = `SELECT ` + authRequestColumns + ` FROM auth_requests WHERE project_id = ? AND id = ?`
 )
 
 type authRequestStatements struct{ statement }
@@ -68,12 +65,6 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 		return nil, wrapError(err)
 	}
 	return request, nil
-}
-
-// DeleteExpiredAuthRequests implements [service.AuthRequestStatements].
-func (s authRequestStatements) DeleteExpiredAuthRequests(ctx context.Context, projectID string, now time.Time, limit int) error {
-	_, err := s.client.Exec(ctx, deleteExpiredAuthRequestStmt, projectID, now.UnixNano(), limit)
-	return wrapError(err)
 }
 
 func scanAuthRequest(rows *sql.Rows) (*domain.AuthRequest, error) {

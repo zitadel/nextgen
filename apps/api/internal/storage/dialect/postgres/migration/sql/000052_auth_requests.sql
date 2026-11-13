@@ -1,7 +1,7 @@
 -- +goose Up
 -- An authorization request the endpoint validated, waiting for the login to
--- complete it (ADR 081 §8). Rows are never updated. state and code_challenge
--- are empty when the client sent none. client_id has no FK: a declared client
+-- complete it (ADR 081 §8). Rows are never updated. code_challenge is empty
+-- when the client sent none. client_id has no FK: a declared client
 -- (#2790) lives in a release and has no row in application_clients.
 -- deployment_id and release_id have no FK: they record what the request
 -- resolved, and a revoked release is read, not cascaded.
@@ -24,10 +24,5 @@ CREATE TABLE zitadel_nextgen.auth_requests (
     , PRIMARY KEY (project_id, id)
 );
 
--- Serves the bounded purge of expired requests.
-CREATE INDEX idx_auth_requests_project_expires_at
-    ON zitadel_nextgen.auth_requests (project_id, expires_at);
-
 -- +goose Down
-DROP INDEX IF EXISTS zitadel_nextgen.idx_auth_requests_project_expires_at;
 DROP TABLE IF EXISTS zitadel_nextgen.auth_requests;

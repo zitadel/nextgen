@@ -813,9 +813,6 @@ type AuthRequestStatements interface {
 	// GetAuthRequest returns the request, expired or not, or a
 	// [database.NoRowFoundError].
 	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
-	// DeleteExpiredAuthRequests deletes at most limit of the project's
-	// requests that expired at or before now.
-	DeleteExpiredAuthRequests(ctx context.Context, projectID string, now time.Time, limit int) error
 }
 
 // InvitationStatements persists invitations (ADR 086). A pending invitation

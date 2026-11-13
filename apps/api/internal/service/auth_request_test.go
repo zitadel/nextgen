@@ -22,14 +22,9 @@ func TestAuthRequestService_Create(t *testing.T) {
 		name      string
 		createErr error
 		emitErr   error
-		sweep     bool
-		sweepErr  error
 		wantErr   error
 	}{
-		{name: "no_sweep"},
-		{name: "sweep", sweep: true},
-		// A failed sweep leaves rows for a later one; the request stands.
-		{name: "failed_sweep", sweep: true, sweepErr: errors.New("aborted")},
+		{name: "stored"},
 		{name: "storage_unavailable", createErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
 		{name: "storage_fails", createErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
 		{name: "emit_fails", emitErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
@@ -41,7 +36,6 @@ func TestAuthRequestService_Create(t *testing.T) {
 			pool := servicemocks.NewMockPool(ctrl)
 			stmts := servicemocks.NewMockAllStatements(ctrl)
 			statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
-			pool.EXPECT().Statements().Return(stmts).AnyTimes()
 			pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 					return fn(ctx, statementer)
@@ -59,12 +53,9 @@ func TestAuthRequestService_Create(t *testing.T) {
 					return tt.emitErr
 				})
 			}
-			if tt.sweep {
-				stmts.EXPECT().DeleteExpiredAuthRequests(gomock.Any(), "proj_1", gomock.Any(), 1000).Return(tt.sweepErr)
-			}
 
 			request := &domain.AuthRequest{ProjectID: "proj_1", ClientID: "shop", State: "xyz"}
-			nonce, err := service.NewAuthRequestServiceForTest(service.NewPool(pool), tt.sweep).Create(t.Context(), request)
+			nonce, err := service.NewAuthRequestService(service.NewPool(pool)).Create(t.Context(), request)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, nonce)

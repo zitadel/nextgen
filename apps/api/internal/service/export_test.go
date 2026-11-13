@@ -48,10 +48,3 @@ func NewSignupProtectionForTest(db StatementPool, keys KeyService, policy *UserC
 	p.sweep = func() bool { return sweep }
 	return p
 }
-
-// NewAuthRequestServiceForTest fixes whether each request sweeps expired rows.
-func NewAuthRequestServiceForTest(db StatementPool, sweep bool) AuthRequestService {
-	s := NewAuthRequestService(db).(*authRequestService)
-	s.sweep = func() bool { return sweep }
-	return s
-}

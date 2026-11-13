@@ -23,16 +23,9 @@ CREATE TABLE auth_requests (
         ON DELETE CASCADE,
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
--- +goose StatementBegin
-CREATE INDEX idx_auth_requests_project_expires_at
-    ON auth_requests (project_id, expires_at)
--- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_auth_requests_project_expires_at
--- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS auth_requests
 -- +goose StatementEnd

@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -15,8 +14,6 @@ const (
 	createAuthRequestStmt = `INSERT INTO auth_requests` +
 		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12) THEN RETURN created_at`
-	expiredAuthRequestsQuery     = `SELECT id FROM auth_requests@{FORCE_INDEX=idx_auth_requests_project_expires_at} WHERE project_id = @p1 AND expires_at <= @p2 LIMIT @p3`
-	deleteExpiredAuthRequestStmt = `DELETE FROM auth_requests WHERE project_id = @p1 AND expires_at <= @p2 AND id IN UNNEST(@p3)`
 )
 
 var authRequestColumns = []string{
@@ -79,25 +76,6 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 	request.CreatedAt = request.CreatedAt.UTC()
 	request.ExpiresAt = request.ExpiresAt.UTC()
 	return &request, nil
-}
-
-// DeleteExpiredAuthRequests implements [service.AuthRequestStatements]. The
-// delete checks expiry again, so the read and the write need no transaction.
-func (s authRequestStatements) DeleteExpiredAuthRequests(ctx context.Context, projectID string, now time.Time, limit int) error {
-	var ids []string
-	err := s.db.Query(ctx, buildStatement(expiredAuthRequestsQuery, projectID, now, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		ids, err = collectRows(iter, func(row *spanner.Row) (string, error) {
-			var id string
-			return id, row.Columns(&id)
-		})
-		return err
-	})
-	if err != nil || len(ids) == 0 {
-		return err
-	}
-	_, err = s.db.Update(ctx, buildStatement(deleteExpiredAuthRequestStmt, projectID, now, ids).statement())
-	return wrapError(err)
 }
 
 var _ service.AuthRequestStatements = (*authRequestStatements)(nil)

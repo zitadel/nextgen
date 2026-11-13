@@ -3,7 +3,6 @@
 package stmttest
 
 import (
-	"crypto/rand"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -75,35 +73,23 @@ func TestAuthRequestStatements_GetUnknownIsNoRowFound(t *testing.T) {
 	})
 }
 
-// The purge takes at most limit expired rows of one project, and never a
-// live row or another project's.
-func TestAuthRequestStatements_DeleteExpired(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		now := authRequestNow()
-		projectID := ensureProject(t, d.stmts)
-		otherProjectID := ensureProject(t, d.stmts)
-		expired := []*domain.AuthRequest{
-			createAuthRequest(t, d.stmts, projectID, now.Add(-time.Minute)),
-			createAuthRequest(t, d.stmts, projectID, now),
-		}
-		live := createAuthRequest(t, d.stmts, projectID, now.Add(time.Minute))
-		other := createAuthRequest(t, d.stmts, otherProjectID, now.Add(-time.Minute))
-
-		require.NoError(t, d.stmts.DeleteExpiredAuthRequests(t.Context(), projectID, now, 1))
-		assert.Equal(t, 1, countAuthRequests(t, d.stmts, expired...), "a purge with limit 1 leaves one expired row")
-
-		require.NoError(t, d.stmts.DeleteExpiredAuthRequests(t.Context(), projectID, now, 10))
-		assert.Zero(t, countAuthRequests(t, d.stmts, expired...))
-		assert.Equal(t, 1, countAuthRequests(t, d.stmts, live), "the live row is kept")
-		assert.Equal(t, 1, countAuthRequests(t, d.stmts, other), "another project's row is kept")
-	})
-}
-
 // The project FK cascades, so deleting a project takes its requests with it.
 func TestAuthRequestStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
-		request := createAuthRequest(t, d.stmts, projectID, authRequestNow().Add(time.Hour))
+		request := &domain.AuthRequest{
+			ProjectID:    projectID,
+			ClientID:     "client_1",
+			RedirectURI:  "https://app.example.com/callback",
+			State:        "xyz",
+			Scopes:       []string{},
+			Issuer:       "https://app.example.com/oauth/" + projectID,
+			DeploymentID: "dep_1",
+			ReleaseID:    "rel_1",
+			BindingHash:  domain.HashSecret("nonce"),
+			ExpiresAt:    authRequestNow().Add(time.Hour),
+		}
+		require.NoError(t, d.stmts.CreateAuthRequest(t.Context(), request))
 
 		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
 		require.NoError(t, err)
@@ -117,35 +103,4 @@ func TestAuthRequestStatements_ProjectDeleteCascades(t *testing.T) {
 // round-trip equal on every dialect.
 func authRequestNow() time.Time {
 	return time.Now().UTC().Truncate(time.Microsecond)
-}
-
-func createAuthRequest(t *testing.T, stmts service.AllStatements, projectID string, expiresAt time.Time) *domain.AuthRequest {
-	t.Helper()
-	request := &domain.AuthRequest{
-		ProjectID:    projectID,
-		ClientID:     "client_1",
-		RedirectURI:  "https://app.example.com/callback",
-		Issuer:       "https://app.example.com/oauth/" + projectID,
-		DeploymentID: "dep_1",
-		ReleaseID:    "rel_1",
-		BindingHash:  domain.HashSecret(rand.Text()),
-		ExpiresAt:    expiresAt,
-	}
-	require.NoError(t, stmts.CreateAuthRequest(t.Context(), request))
-	return request
-}
-
-// countAuthRequests counts how many of requests are still stored.
-func countAuthRequests(t *testing.T, stmts service.AllStatements, requests ...*domain.AuthRequest) int {
-	t.Helper()
-	n := 0
-	for _, request := range requests {
-		_, err := stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
-		if err == nil {
-			n++
-			continue
-		}
-		require.ErrorIs(t, err, new(database.NoRowFoundError))
-	}
-	return n
 }

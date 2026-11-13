@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,9 +14,7 @@ const (
 	createAuthRequestStmt = `INSERT INTO zitadel_nextgen.auth_requests` +
 		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
 		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING created_at`
-	getAuthRequestStmt           = `SELECT ` + authRequestColumns + ` FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND id = $2`
-	deleteExpiredAuthRequestStmt = `DELETE FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND expires_at <= $2` +
-		` AND id IN (SELECT id FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND expires_at <= $2 LIMIT $3)`
+	getAuthRequestStmt = `SELECT ` + authRequestColumns + ` FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND id = $2`
 )
 
 type authRequestStatements struct{ statement }
@@ -62,12 +59,6 @@ func (s authRequestStatements) GetAuthRequest(ctx context.Context, projectID, id
 		return nil, wrapError(err)
 	}
 	return request, nil
-}
-
-// DeleteExpiredAuthRequests implements [service.AuthRequestStatements].
-func (s authRequestStatements) DeleteExpiredAuthRequests(ctx context.Context, projectID string, now time.Time, limit int) error {
-	_, err := s.client.Exec(ctx, deleteExpiredAuthRequestStmt, projectID, now, limit)
-	return wrapError(err)
 }
 
 func scanAuthRequest(row pgx.CollectableRow) (*domain.AuthRequest, error) {

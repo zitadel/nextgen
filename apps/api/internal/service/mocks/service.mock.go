@@ -1893,44 +1893,6 @@ func (c *MockAllStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.
 	return c
 }
 
-// DeleteExpiredAuthRequests mocks base method.
-func (m *MockAllStatements) DeleteExpiredAuthRequests(ctx context.Context, projectID string, now time.Time, limit int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteExpiredAuthRequests", ctx, projectID, now, limit)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteExpiredAuthRequests indicates an expected call of DeleteExpiredAuthRequests.
-func (mr *MockAllStatementsMockRecorder) DeleteExpiredAuthRequests(ctx, projectID, now, limit any) *MockAllStatementsDeleteExpiredAuthRequestsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredAuthRequests", reflect.TypeOf((*MockAllStatements)(nil).DeleteExpiredAuthRequests), ctx, projectID, now, limit)
-	return &MockAllStatementsDeleteExpiredAuthRequestsCall{Call: call}
-}
-
-// MockAllStatementsDeleteExpiredAuthRequestsCall wrap *gomock.Call
-type MockAllStatementsDeleteExpiredAuthRequestsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteExpiredAuthRequestsCall) Return(arg0 error) *MockAllStatementsDeleteExpiredAuthRequestsCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteExpiredAuthRequestsCall) Do(f func(context.Context, string, time.Time, int) error) *MockAllStatementsDeleteExpiredAuthRequestsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteExpiredAuthRequestsCall) DoAndReturn(f func(context.Context, string, time.Time, int) error) *MockAllStatementsDeleteExpiredAuthRequestsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // DeleteExpiredPreview mocks base method.
 func (m *MockAllStatements) DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
 	m.ctrl.T.Helper()
