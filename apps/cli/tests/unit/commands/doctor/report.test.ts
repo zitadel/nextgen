@@ -284,7 +284,7 @@ describe("renderDoctorReport", () => {
           status: "warn",
           message: "pins differ",
           details: { remedy_command: "npm install --save-exact @zitadel/sdk-next@1.0.0" },
-          remedy: shellCommand("npm install --save-exact @zitadel/sdk-next@1.0.0"),
+          remedy: shellCommand("npm", "install", "--save-exact", "@zitadel/sdk-next@1.0.0"),
         },
       ]);
 

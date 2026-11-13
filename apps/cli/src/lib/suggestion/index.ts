@@ -2,13 +2,8 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import {
-  type CLI_BINARY,
-  type CLI_PACKAGE_NAME,
-  newestCliCommand,
-  optionArgs,
-  publicCliCommand,
-} from "@/lib/public-cli";
+import type { PackageManager } from "@/lib/package-manager";
+import { CLI_BINARY, newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
 import type { RELATIONS } from "./relations";
 
@@ -451,69 +446,169 @@ function canonical(value: unknown): string {
   });
 }
 
-/** A package runner as a command line starts with one: `npx`, or a manager's `pnpm dlx`. */
-type Runner =
-  | "bunx"
-  | "npx"
-  | "pnpx"
-  | `${"bun" | "npm" | "pnpm" | "yarn"} ${"dlx" | "exec" | "x"}`;
-
-/** This CLI as a runner is given it: its package, at a version or not, or its binary. */
-type Launched =
-  | typeof CLI_BINARY
-  | typeof CLI_PACKAGE_NAME
-  | `${typeof CLI_PACKAGE_NAME}@${string}`;
-
 /**
- * A command line that starts by running this CLI: the binary itself, a package
- * manager running the binary, or a package runner given the CLI, with or
- * without `-y`. A template counts as well as a literal, so
- * `` `zitadel deploy --env ${env}` `` matches whatever `env` holds.
+ * Programs a shell suggestion never names: they run another program rather
+ * than being one (`npx`, `sudo`, `sh`), so naming one would let this CLI in
+ * through its arguments, where nothing checks it.
  */
-type StartsWithTheCli =
-  | typeof CLI_BINARY
-  | `${typeof CLI_BINARY} ${string}`
-  | `${"bun" | "npm" | "pnpm" | "yarn"} ${typeof CLI_BINARY}${"" | ` ${string}`}`
-  | `${Runner} ${"" | "-y " | "--yes "}${Launched}${"" | ` ${string}`}`;
+const WRAPPERS = [
+  "bash",
+  "builtin",
+  "bunx",
+  "command",
+  "env",
+  "eval",
+  "exec",
+  "nice",
+  "nohup",
+  "npx",
+  "pnpx",
+  "sh",
+  "sudo",
+  "time",
+  "xargs",
+  "zsh",
+] as const;
 
 /**
- * Nothing more than `Command`, unless any one spelling it may have starts by
- * running this CLI ({@link StartsWithTheCli}): then a property no string has,
- * so the call does not compile and the error says what to write instead. A
- * union counts when one of its members runs the CLI, so `cond ? "zitadel
- * deploy" : "ls"` is refused too.
- *
- * @typeParam Command - The command line, as the call spells it.
+ * Each package manager, which runs a package or a binary through one of
+ * {@link RUNNING} but otherwise installs and runs a project's own scripts. A
+ * record of every {@link PackageManager}, so a new one does not compile until
+ * it is listed.
  */
-type NotTheCli<Command extends string> = true extends (
-  Command extends StartsWithTheCli
-    ? true
-    : never
-)
-  ? { readonly "suggest the CLI as { id, args, flags }": never }
-  : unknown;
+const MANAGERS: Readonly<Record<PackageManager, true>> = {
+  bun: true,
+  npm: true,
+  pnpm: true,
+  yarn: true,
+};
 
 /**
- * A command that is not the CLI (`npm install …`, `rm …`), suggested as
- * written. One that starts by running the CLI does not compile, since only the
- * renderer checks a CLI command against the command it names: suggest it as
- * `{ id, args, flags }` instead.
+ * What a package manager is given to run a package or a binary rather than its
+ * own command: `pnpm dlx`, `npm exec`, `bun x`, or this CLI's binary straight
+ * after it (`pnpm zitadel`).
+ */
+const RUNNING = ["dlx", "exec", "x", CLI_BINARY] as const;
+
+/**
+ * A program a shell suggestion may not be: this CLI's binary, a path to it,
+ * or one of the {@link WRAPPERS} that would run it.
+ */
+type Refused = typeof CLI_BINARY | `${string}/${typeof CLI_BINARY}` | (typeof WRAPPERS)[number];
+
+/**
+ * Nothing more than the program, unless it runs this CLI: a {@link Refused}
+ * program, or a package manager whose first word is one of {@link RUNNING}
+ * ({@link FirstOf}). Then a property
+ * no string has, so the call does not compile and the error says what to
+ * write instead. A program or word known only as `string` is left to the run
+ * time check in {@link shellCommand}.
  *
- * The check is the compiler's alone. A line built from text known only as
- * `string`, such as a path or a commit message the person typed, is taken as
- * it is: reading shell syntax at run time would mistake quoted text for a
- * command and fail a run over its own advice.
+ * @typeParam Program - The program, as the call names it.
+ * @typeParam Words - Its words, as the call gives them.
+ */
+type NotTheCli<Program extends string, Words extends readonly string[]> =
+  true extends AnyOf<Program, Refused>
+    ? { readonly "suggest the CLI as { id, args, flags }": never }
+    : true extends AnyOf<Program, PackageManager>
+      ? true extends AnyOf<FirstOf<Words>, (typeof RUNNING)[number]>
+        ? { readonly "suggest the CLI as { id, args, flags }": never }
+        : unknown
+      : unknown;
+
+/**
+ * The first of `Words`, which for a package manager given literal words says
+ * what it does: `pnpm dlx …` runs a package, `npm uninstall …` does not.
  *
- * @typeParam Command - The command line, as the call spells it.
- * @param command - The command line, as a shell runs it.
+ * @typeParam Words - A command's words.
+ */
+type FirstOf<Words extends readonly string[]> = Words extends readonly [
+  infer First,
+  ...(readonly string[]),
+]
+  ? First
+  : never;
+
+/**
+ * `true` when some member of `Union` is one of `Members`, and `never`
+ * otherwise, so `true extends AnyOf<…>` asks whether any one of them is.
+ *
+ * @typeParam Union - What may be one of them: a literal, or a union of them.
+ * @typeParam Members - What it is checked against.
+ */
+type AnyOf<Union, Members> = Union extends Members ? true : never;
+
+/**
+ * Whether `program`, given `words`, runs this CLI. It reads words, never shell
+ * text: the program is one word the call names, and for a package manager the
+ * word that says what it does is the first that is neither an option nor the
+ * value of one (`npm --prefix app exec zitadel` runs `exec`). A word that came
+ * from a person, such as a path or a commit message, is never that word.
+ *
+ * @param program - The program.
+ * @param words - Its words, each one as the shell will read it.
+ * @returns Whether it runs the CLI.
+ */
+function runsTheCli(program: string, words: readonly string[]): boolean {
+  if (
+    program === CLI_BINARY ||
+    program.endsWith(`/${CLI_BINARY}`) ||
+    (WRAPPERS as readonly string[]).includes(program)
+  ) {
+    return true;
+  }
+  if (!Object.hasOwn(MANAGERS, program)) {
+    return false;
+  }
+  const subcommand = words.find((word, at) => {
+    const before = words[at - 1];
+    return !word.startsWith("-") && !(before?.startsWith("-") === true && !before.includes("="));
+  });
+
+  return subcommand !== undefined && (RUNNING as readonly string[]).includes(subcommand);
+}
+
+/**
+ * A command that is not the CLI (`npm install …`, `docker pull …`), suggested
+ * as its program and its words, joined with spaces. Each word is written as
+ * the shell should read it: quote a value that came from a person with
+ * `Cmd.quote`, and leave a glob bare. One that runs the CLI is refused, since
+ * only the renderer checks a CLI command against the command it names: by the
+ * compiler where the program and words are literals ({@link NotTheCli}), and
+ * when it is made otherwise. Run several one after another with
+ * {@link shellSteps}.
+ *
+ * @typeParam Program - The program, as the call names it.
+ * @typeParam Words - Its words, as the call gives them.
+ * @param program - The program: `docker`, `rm`, a package manager.
+ * @param words - What follows it.
  * @returns The command.
+ * @throws {Error} When it runs this CLI.
  */
-export function shellCommand<const Command extends string>(
-  command: Command & NotTheCli<Command>,
+export function shellCommand<const Program extends string, const Words extends readonly string[]>(
+  program: Program & NotTheCli<Program, Words>,
+  ...words: Words
 ): SuggestedCommand {
-  const line: string = command;
+  const named: string = program;
+  if (runsTheCli(named, words)) {
+    throw new Error(`${named} runs the CLI: suggest it as { id, args, flags } instead`);
+  }
+  const line = [named, ...words].join(" ");
 
   return line as SuggestedCommand;
+}
+
+/**
+ * Commands run one after another, each only if the one before it worked:
+ * `cd app && npm uninstall x`.
+ *
+ * @param steps - The commands, each made by {@link shellCommand}.
+ * @returns The line that runs them in turn.
+ */
+export function shellSteps(
+  ...steps: readonly [SuggestedCommand, SuggestedCommand, ...SuggestedCommand[]]
+): SuggestedCommand {
+  return steps.join(" && ") as SuggestedCommand;
 }
 
 /**

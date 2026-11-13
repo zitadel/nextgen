@@ -19,7 +19,7 @@ import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/g
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, shellCommand, shellSteps } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -70,8 +70,8 @@ function assembleNextCommands(
   // so a command run from the shell's would miss them or touch another project.
   dir: string | undefined,
 ): ReadonlyArray<SuggestedCommand> {
-  const inDir = (command: string) => {
-    return shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
+  const inDir = (command: SuggestedCommand) => {
+    return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
   };
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
@@ -81,10 +81,10 @@ function assembleNextCommands(
     const patterns = backedUp.map((entry) => {
       return `${entry.split(" -> ")[0]}.ejected-*`;
     });
-    commands.push(inDir(`rm -f ${patterns.join(" ")}`));
+    commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
   }
   for (const dep of dependencies) {
-    commands.push(inDir(`npm uninstall ${dep}`));
+    commands.push(inDir(shellCommand("npm", "uninstall", dep)));
   }
   return commands;
 }

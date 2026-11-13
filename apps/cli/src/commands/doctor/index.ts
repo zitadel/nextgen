@@ -596,7 +596,7 @@ export function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), again.rerun],
+      nextCommands: [shellCommand("docker", "pull", Cmd.quote(image)), again.rerun],
     };
   }
 

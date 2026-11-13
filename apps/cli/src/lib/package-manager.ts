@@ -5,6 +5,7 @@ import { Cmd } from "./cmd";
 import { pathExists } from "./fs";
 import { readPackageJson } from "./npm";
 import { optionArgs } from "./public-cli";
+import { type SuggestedCommand, shellCommand } from "./suggestion";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
@@ -25,6 +26,23 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
   if (await pathExists(join(cwd, "bun.lockb"))) return "bun";
   if (await pathExists(join(cwd, "package-lock.json"))) return "npm";
   return "npm";
+}
+
+/**
+ * `packageCommand` as a suggestion, each of its words written as the shell
+ * reads it back, so a directory with a space in it stays one word.
+ *
+ * @param packageCommand - The package manager's command.
+ * @returns The command.
+ * @throws {Error} When it would run this CLI, as `pnpm dlx` would.
+ */
+export function suggestedCommandOf(packageCommand: PackageCommand): SuggestedCommand {
+  return shellCommand(
+    packageCommand.command,
+    ...packageCommand.args.map((word) => {
+      return Cmd.quote(word);
+    }),
+  );
 }
 
 export function installCommandFor(packageManager: PackageManager): PackageCommand {

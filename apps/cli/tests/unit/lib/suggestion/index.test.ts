@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { aSuggest } from "@tests/helpers/suggestions";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
   commandOf,
@@ -19,6 +20,7 @@ import {
   type SuggestionId,
   type Suggestion,
   shellCommand,
+  shellSteps,
   spelled,
   suggestionWords,
   WHAT_CHANGED,
@@ -27,8 +29,11 @@ import { relatedFlags } from "@/lib/suggestion/relations";
 
 const VERSION = "1.0.0-alpha.25";
 
-/** An environment a command line built at run time names, so its type is only `string`. */
-const ENVIRONMENT: string = "prod";
+/** A program known only when the code runs, which may be the CLI. */
+const CHOSEN_PROGRAM: "zitadel" | "ls" = VERSION.length > 0 ? "zitadel" : "ls";
+
+/** A commit message quoted as one shell word, which names the CLI and a `;`. */
+const QUOTED_MESSAGE = "'don'\\''t; zitadel deploy again'";
 
 /**
  * Holds `next` to the type every suggestion is written as, so a
@@ -190,9 +195,9 @@ describe("distinct", () => {
   });
 
   it("keeps a rendered command once", () => {
-    expect(distinct([shellCommand("docker version"), shellCommand("docker version")])).toEqual([
-      "docker version",
-    ]);
+    expect(
+      distinct([shellCommand("docker", "version"), shellCommand("docker", "version")]),
+    ).toEqual(["docker version"]);
   });
 });
 
@@ -248,35 +253,79 @@ describe("a suggested help", () => {
 });
 
 describe("shellCommand", () => {
-  it("is suggested exactly as written", () => {
-    expect(shellCommand("npm install @zitadel/cli@alpha")).toBe("npm install @zitadel/cli@alpha");
+  it("is its program and its words, as written", () => {
+    expect(shellCommand("npm", "install", "@zitadel/cli@alpha")).toBe(
+      "npm install @zitadel/cli@alpha",
+    );
   });
 
-  it("does not compile for a line that starts by running the CLI", () => {
-    const written = [
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("zitadel deploy --dry-run"),
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("npx @zitadel/cli@1.0.0 deploy"),
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("npx --yes @zitadel/cli deploy"),
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("bunx @zitadel/cli"),
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("pnpm exec zitadel start"),
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand(`zitadel deploy --env ${ENVIRONMENT}`),
-      // @ts-expect-error one of the lines it may be runs the CLI
-      shellCommand(ENVIRONMENT === "prod" ? "zitadel deploy" : "ls"),
+  it("does not compile for a program or words that run the CLI, which it refuses too", () => {
+    const refused = [
+      thrownBy(() => {
+        // @ts-expect-error the CLI is suggested as an object the renderer checks
+        return shellCommand("zitadel", "deploy");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error a path to the binary is the CLI too
+        return shellCommand("./node_modules/.bin/zitadel", "doctor");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error a runner runs whatever it is given, the CLI included
+        return shellCommand("npx", "@zitadel/cli");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error a wrapper runs whatever it is given, the CLI included
+        return shellCommand("env", "FOO=1", "zitadel");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error a package manager's dlx runs a package
+        return shellCommand("pnpm", "dlx", "@zitadel/cli");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error a package manager given the binary runs it
+        return shellCommand("pnpm", "zitadel", "deploy");
+      }),
+      thrownBy(() => {
+        // @ts-expect-error one of the programs it may be is the CLI
+        return shellCommand(CHOSEN_PROGRAM, "deploy");
+      }),
     ];
 
-    expect(written).toHaveLength(7);
+    expect(refused).toEqual(Array(refused.length).fill(expect.any(Error)));
   });
 
-  it("takes a line built at run time whose quoted text mentions the CLI as it is", () => {
-    const line: string = "git commit -m 'don'\\''t; zitadel deploy again' -- .zitadel";
+  it.each<[string, string, readonly string[]]>([
+    ["the binary", "zitadel", ["deploy"]],
+    ["npm exec after a directory", "npm", ["--prefix", "app", "exec", "zitadel"]],
+    ["yarn dlx", "yarn", ["dlx", "@zitadel/cli", "deploy"]],
+    ["sudo", "sudo", ["zitadel", "start"]],
+  ])("refuses a command built at run time that runs the CLI through %s", (_how, program, words) => {
+    const error = thrownBy(() => {
+      return shellCommand(program, ...words);
+    });
 
-    expect(shellCommand(line)).toBe(line);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: `${program} runs the CLI: suggest it as { id, args, flags } instead`,
+    });
+  });
+
+  it.each<[string, string, readonly string[]]>([
+    ["commits a message that names the CLI", "git", ["commit", "-m", QUOTED_MESSAGE]],
+    ["runs a script in a directory named exec", "npm", ["--prefix", "exec", "run", "dev"]],
+    ["uninstalls a package named like it", "npm", ["uninstall", "zitadel"]],
+    ["pulls the server's image", "docker", ["pull", "ghcr.io/zitadel/zitadel"]],
+    ["changes to a directory named like it", "cd", ["/home/me/zitadel"]],
+  ])("takes a command that only %s", (_what, program, words) => {
+    expect(shellCommand(program, ...words)).toBe([program, ...words].join(" "));
+  });
+});
+
+describe("shellSteps", () => {
+  it("runs each command after the one before it worked", () => {
+    expect(shellSteps(shellCommand("cd", "app"), shellCommand("npm", "uninstall", "x"))).toBe(
+      "cd app && npm uninstall x",
+    );
   });
 });
 

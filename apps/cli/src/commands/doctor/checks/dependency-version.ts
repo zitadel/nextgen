@@ -1,7 +1,10 @@
 import semver from "semver";
 
-import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
-import { shellCommand } from "@/lib/suggestion";
+import {
+  addExactCommandFor,
+  detectPackageManager,
+  suggestedCommandOf,
+} from "@/lib/package-manager";
 import { exactZitadelPins } from "@/lib/zitadel-pins";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
@@ -60,13 +63,13 @@ export class DependencyVersionCheck implements SanityCheck {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project
       // and write a caret range — exactly the float this check ignores.
-      const remedy = shellCommand(
+      const remedy = suggestedCommandOf(
         addExactCommandFor(
           await detectPackageManager(ctx.cwd),
           mismatched.map(([name]) => {
             return `${name}@${ctx.cliVersion}`;
           }),
-        ).display,
+        ),
       );
       return {
         ...base,
