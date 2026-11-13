@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { copyFile, cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
@@ -59,15 +60,21 @@ export async function prepareLocalRegistry(input) {
     await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
   } else if (input.packageDirs) {
     // A CI journey's own set (journey-packages.mjs), packed from the builds
-    // its turbo task depends on.
+    // its turbo task depends on. The ones every journey installs come packed
+    // once from the `journey-packages` task (`shared`), the rest are packed
+    // here.
+    const shared = input.shared ?? { dirs: [], tarballsDir: "" };
     await packPackageDirs(
       input.repoRoot,
       paths.tarballsDir,
-      input.packageDirs,
+      input.packageDirs.filter((dir) => !shared.dirs.includes(dir)),
       env,
       log,
       input.runCapture,
     );
+    if (shared.dirs.length > 0) {
+      await copySharedTarballs(input.repoRoot, shared, paths.tarballsDir, log);
+    }
     await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, [
       `--packages=${input.packageDirs.join(",")}`,
     ]);
@@ -181,6 +188,27 @@ export async function packPackageDirs(
     tarballsDir,
     run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
   });
+}
+
+// The tarballs of `shared.dirs`, named as `pnpm pack` names them; the
+// verification that follows checks that with the journey's own packs they make
+// up exactly its set.
+async function copySharedTarballs(repoRoot, shared, tarballsDir, log) {
+  log(`copying the shared npm tarballs from ${shared.tarballsDir}`);
+  for (const dir of shared.dirs) {
+    const name = await packageName(repoRoot, dir);
+    const file = `${name.replace(/^@/, "").replaceAll("/", "-")}-${await packageVersion(repoRoot, dir)}.tgz`;
+    await copyFile(
+      join(shared.tarballsDir, file),
+      join(tarballsDir, file),
+      constants.COPYFILE_FICLONE,
+    ).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+      throw new Error(
+        `no ${file} in ${shared.tarballsDir}; run turbo run journey-packages --filter=@zitadel/e2e`,
+      );
+    });
+  }
 }
 
 export async function verifyTarballs(repoRoot, tarballsDir, run, env, flags = []) {

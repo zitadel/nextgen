@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 
 import { ciJourneyVariants, frameworkForId } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
-import { journeyPackageDirs } from "./journey-packages.mjs";
+import { journeyPackageDirs, sharedPackageDirs, sharedPackagesDir } from "./journey-packages.mjs";
 import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
@@ -107,10 +107,22 @@ const journeyContexts = [];
 const sharedPhases = [];
 // --tarballs-dir: npm tarballs to install as they are. --packed: pack only
 // what these journeys install, from the builds turbo's journey tasks depend
-// on (journey-packages.mjs).
+// on (journey-packages.mjs). As turbo's `journey:<id>` task (turbo sets
+// TURBO_HASH), which runs right after journey-packages, copy what every
+// journey installs from that task's folder instead; any other run packs it,
+// so it never installs tarballs an earlier run left there.
 const prebuiltTarballsDir = options.tarballsDir;
 const packedPackageDirs =
   options.packed && !options.tarballsDir ? journeyPackageDirs(repoRoot, plannedRuns) : undefined;
+const asJourneyTask =
+  Boolean(process.env.TURBO_HASH) && (process.env.npm_lifecycle_event ?? "").startsWith("journey:");
+const sharedPackages =
+  packedPackageDirs && asJourneyTask
+    ? {
+        dirs: sharedPackageDirs(repoRoot).filter((dir) => packedPackageDirs.includes(dir)),
+        tarballsDir: sharedPackagesDir(repoRoot),
+      }
+    : undefined;
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -154,6 +166,7 @@ try {
       repoRoot,
       prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
       packageDirs: packedPackageDirs,
+      shared: sharedPackages,
       run,
       workDir,
     }),
@@ -240,7 +253,8 @@ Options:
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
   --packed                 Pack only what these journeys install, from builds
-                           turbo ran before (journey:<id> tasks)
+                           turbo ran before; as a journey:<id> task, copy what
+                           every journey installs from journey-packages
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 

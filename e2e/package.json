@@ -19,6 +19,7 @@
     "demo-next-real": "NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} node ../scripts/task-guard.mjs --mutex demo-next-app -- playwright test --config demo-next/playwright.real.config.mts",
     "demo-nuxt-mock": "playwright test --config demo-nuxt/playwright.config.mts",
     "journey": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
+    "journey-packages": "node journey/scripts/pack-shared-packages.mjs",
     "journey:next": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs --ci --runtime binary --packed --only fresh-app/next",
     "journey:nuxt": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs --ci --runtime binary --packed --only fresh-app/nuxt",
     "journey:react": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs --ci --runtime binary --packed --only fresh-app/react",

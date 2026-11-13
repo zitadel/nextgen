@@ -46,10 +46,14 @@ the repo root.
   packs every public package with the server binaries the graph built.
   `--tarballs-dir` hands prebuilt ones to the runner, which skips building
   but still verifies and publishes them.
-- The CI journeys (`journey:<id>`, `--packed`) pack only what they install
+- The CI journeys (`journey:<id>`, `--packed`) install only what they need
   (`journeyPackageDirs`, `e2e/journey/scripts/journey-packages.mjs`) from the
-  builds their task depends on; by hand,
+  builds their task depends on: the `journey-packages` task packs what every
+  CI journey installs once per run, and a `journey:<id>` task copies those
+  and packs the rest (run any other way, `--packed` packs it all); by hand,
   `turbo run journey --filter=@zitadel/e2e -- --ci` packs the release set.
+- Publish to the journey registry with `publish-tarballs.mjs`'s own request,
+  not `npm publish`: an npm process per package costs seconds each.
 - Give a journey task an edge to the build of every package it installs, in
   `e2e/turbo.json`; `frameworks.test.mjs` checks them against the manifests.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
