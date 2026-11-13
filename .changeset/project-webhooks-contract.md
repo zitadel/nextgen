@@ -2,4 +2,6 @@
 "@zitadel/server": minor
 ---
 
-You can now manage webhooks for a project's events: create, list, read, update and delete a webhook and rotate its signing secret, under `/webhooks`. The server stores them and records each change as a `webhook.*` event, but does not deliver events to them yet. See the [Webhooks reference](https://preview.zitadel.com/docs/reference/api/webhooks).
+A project can now send its events to webhooks: manage them under `/webhooks`, and the server POSTs each event a webhook names to its URL, signed, with retries. See the [Webhooks reference](https://preview.zitadel.com/docs/reference/api/webhooks) and [Verify a webhook's signature](https://preview.zitadel.com/docs/guides/verify-webhook-signatures).
+
+**Upgrading a self-hosted server:** delivery is on by default (`events.webhooks.enabled`). A server that runs only while it serves a request sets `events.webhooks.trigger_secret` and has a scheduler call `/cron/events-webhooks`, as for `/cron/events-retention`.

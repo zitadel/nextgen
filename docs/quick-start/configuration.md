@@ -160,6 +160,42 @@ curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com
 The hosted cloud calls it from a Vercel Cron Job
 ([runbook](../runbooks/cloud.md#operating)).
 
+## Webhook delivery
+
+| YAML key                         | Environment                              | Default | Description                                                   |
+| -------------------------------- | ---------------------------------------- | ------- | ------------------------------------------------------------- |
+| `events.webhooks.enabled`        | `NEXTGEN_EVENTS_WEBHOOKS_ENABLED`        | `true`  | Send each project's events to its webhooks                    |
+| `events.webhooks.interval`       | `NEXTGEN_EVENTS_WEBHOOKS_INTERVAL`       | `5s`    | How often the server looks for events to send                 |
+| `events.webhooks.trigger_secret` | `NEXTGEN_EVENTS_WEBHOOKS_TRIGGER_SECRET` | (empty) | Leaves the schedule to a scheduler outside the server (below) |
+
+The server sends a project's events to the webhooks the project created with
+`POST /webhooks`, signed, and retries a webhook that fails. It reaches them
+through the client the `httpclient` settings configure, so `deny_list` and
+`allow_list` decide which addresses a webhook may name: a webhook to
+`localhost` is refused unless `allow_list` holds it. With several servers on
+one database, one of them sends each webhook's events at a time; keep their
+clocks in step.
+
+The server sends on its own timer. As for the purge above, set
+`trigger_secret` to at least 16 printable ASCII characters on a server that
+runs only while it serves a request. The server then stops its timer and
+sends once per `GET` or `POST` to `/cron/events-webhooks` that carries the
+secret as a bearer token:
+
+```sh
+curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-webhooks
+# {"webhooks":3}
+```
+
+- The answer counts the webhooks the call looked at, not the events it sent.
+- A request without the secret gets `401`. A webhook whose endpoint fails is
+  not a failed call: the call fails with `500` only when the server can't read
+  its webhooks.
+- A call runs for at most 4½ minutes and works on one webhook for at most 30
+  seconds. What is left waits for the next call.
+- An event waits for the next call, so call as often as the scheduler allows.
+  Two calls at once are safe: each webhook is sent to by one of them.
+
 ## Logging
 
 | YAML key                                     | Environment                                          | Default                                       | Description                                                 |
@@ -334,6 +370,7 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
 | `zitadel.audit.insert.duration` | histogram | `s` | `source`: `request`, `event` | Duration of one audit insert: a single event in its transaction, or one attempt to write a batch of buffered request events (a retried batch is timed per attempt). |
 | `zitadel.audit.events.written` | counter | `{event}` | `type`: fixed in code | Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted. |
+| `zitadel.webhook.deliveries` | counter | `{delivery}` | `result`: `delivered`, `failed` | Attempts to deliver an event to a project's webhook, by how they ended. A retry is an attempt of its own. Events sent to the sinks of `events.export` are not counted. |
 | `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
 | `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
 | `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |

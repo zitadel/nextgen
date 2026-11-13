@@ -281,31 +281,40 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 	assert.Equal(t, "root", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
 }
 
-// The event retention trigger is a mount only when a scheduler outside the
-// process runs the purge; otherwise its path is the API's like any other. It
-// takes the request ID the proxy sent, so the scheduler's log and the
-// server's lines name the same run.
-func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
+// A trigger, the event retention purge's or webhook delivery's, is a mount
+// only when a scheduler outside the process runs its job; otherwise its path
+// is the API's like any other. It takes the request ID the proxy sent, so
+// the scheduler's log and the server's lines name the same run.
+func TestBuildHTTPMuxMountsATriggerOnlyWhenGiven(t *testing.T) {
 	cfg := ServerConfig{RequestIDHeader: "x-vercel-id"}
-	trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("X-Test-Handler", "retention-trigger")
-	})
-	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
-		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
-		nil, trigger, nil)
-	require.NoError(t, err)
+	for _, path := range []string{audit.RetentionTriggerPath, audit.WebhookTriggerPath} {
+		t.Run(path, func(t *testing.T) {
+			trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("X-Test-Handler", "trigger")
+			})
+			mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
+				staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
+				nil, map[string]http.Handler{path: trigger}, nil)
+			require.NoError(t, err)
 
-	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
-	r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, r)
-	assert.Equal(t, "retention-trigger", rec.Header().Get("X-Test-Handler"))
-	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
-	// A longer path is not the trigger and stays with the API's root alias.
-	assert.Equal(t, "root", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
+			r := httptest.NewRequest(http.MethodGet, path, nil)
+			r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, r)
+			assert.Equal(t, "trigger", rec.Header().Get("X-Test-Handler"))
+			assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
+			// A longer path is not the trigger and stays with the API's root alias.
+			assert.Equal(t, "root", get(t, mux, path+"/x").Header().Get("X-Test-Handler"))
 
-	assert.Equal(t, "root", get(t, newTestMux(t, cfg), audit.RetentionTriggerPath).Header().Get("X-Test-Handler"),
-		"without a trigger the path falls through to the API's root alias")
+			// A job that runs on the server's own timer hands in no handler.
+			mux, err = buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
+				staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
+				nil, map[string]http.Handler{path: nil}, nil)
+			require.NoError(t, err)
+			assert.Equal(t, "root", get(t, mux, path).Header().Get("X-Test-Handler"),
+				"without a trigger the path falls through to the API's root alias")
+		})
+	}
 }
 
 // checkSessionCSRF refuses every cookie-authenticated request that did not pass

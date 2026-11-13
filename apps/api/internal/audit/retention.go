@@ -66,6 +66,33 @@ func CheckTriggerSecret(secret string) error {
 	return nil
 }
 
+// hashTriggerSecret hashes a trigger secret for authorizeTrigger, so the
+// comparison takes as long whatever the length of the token a request sends.
+func hashTriggerSecret(secret string) [sha256.Size]byte {
+	return sha256.Sum256([]byte(secret))
+}
+
+// authorizeTrigger lets through a GET or POST that carries the trigger
+// secret as a bearer token. It answers any other request itself, 405 or 401,
+// and reports false.
+func authorizeTrigger(w http.ResponseWriter, r *http.Request, secret [sha256.Size]byte) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		w.Header().Set("Allow", "GET, POST")
+		errlog.Log(r.Context(), domain.ErrRequestMethodNotAllowed())
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return false
+	}
+	scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+	sent := sha256.Sum256([]byte(token))
+	if !strings.EqualFold(scheme, "Bearer") || subtle.ConstantTimeCompare(sent[:], secret[:]) != 1 {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		errlog.Log(r.Context(), domain.ErrAuthUnauthorized(nil))
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 func DefaultRetentionConfig() RetentionConfig {
 	return RetentionConfig{
 		Retention: 30 * 24 * time.Hour,
@@ -186,22 +213,9 @@ func (j *RetentionJob) Trigger() http.Handler {
 	if !j.cfg.Enabled || j.cfg.TriggerSecret == "" {
 		return nil
 	}
-	// Hashes, so the comparison takes as long whatever the length of the
-	// token a request sends.
-	secret := sha256.Sum256([]byte(j.cfg.TriggerSecret))
+	secret := hashTriggerSecret(j.cfg.TriggerSecret)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
-			w.Header().Set("Allow", "GET, POST")
-			errlog.Log(r.Context(), domain.ErrRequestMethodNotAllowed())
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
-		}
-		scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
-		sent := sha256.Sum256([]byte(token))
-		if !strings.EqualFold(scheme, "Bearer") || subtle.ConstantTimeCompare(sent[:], secret[:]) != 1 {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			errlog.Log(r.Context(), domain.ErrAuthUnauthorized(nil))
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		if !authorizeTrigger(w, r, secret) {
 			return
 		}
 

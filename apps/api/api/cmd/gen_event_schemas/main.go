@@ -104,6 +104,7 @@ var payloadByEventType = map[string]string{
 	"webhook.updated":        "webhook-payload.yaml",
 	"webhook.deleted":        "empty-event-payload.yaml",
 	"webhook.secret_rotated": "empty-event-payload.yaml",
+	"webhook.disabled":       "webhook-disabled-payload.yaml",
 }
 
 // eventStatus says whether anything emits an event type, as the Path A/B,
@@ -244,6 +245,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"webhook.deleted": {description: "A webhook was deleted."},
 	"webhook.secret_rotated": {description: "A webhook's signing secret was rotated. The previous secret stays " +
 		"valid for 24 hours. The event carries neither secret."},
+	"webhook.disabled": {description: "The server disabled a webhook and stopped delivering to it. " +
+		"Its deliveries failed for 3 days without one success, or its endpoint answered `410`; " +
+		"`data`'s `reason` says which. Enabling it with `updateWebhook` (`PATCH /webhooks/{id}`) " +
+		"starts delivery again from that moment."},
 }
 
 func main() {

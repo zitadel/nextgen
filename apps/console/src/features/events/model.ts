@@ -229,6 +229,7 @@ export const EVENT_TYPES = [
   "variable.set",
   "webhook.created",
   "webhook.deleted",
+  "webhook.disabled",
   "webhook.secret_rotated",
   "webhook.updated",
 ] as const satisfies readonly ProjectEvent["event_type"][];

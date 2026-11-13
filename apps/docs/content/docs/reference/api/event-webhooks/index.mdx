@@ -8,10 +8,6 @@ project's [webhooks](/docs/reference/api/webhooks): the URLs the project
 registered, each with the event types it receives. Every delivery is the same
 request, whatever the event type.
 
-Registering a webhook is not available yet: the Webhooks operations answer
-`501` with the code `not_implemented`, so no project receives these requests
-for now. The contract is published ahead of the server code.
-
 ## The body
 
 One `POST` per event, with `Content-Type: application/json`. The body has
@@ -59,11 +55,13 @@ these seven fields, always all of them:
 - Events arrive in the order they were stored.
 - Delivery is at least once, so an event can arrive twice. Drop duplicates by
   `id`.
-- Every request is signed with the webhook's secret. Verify the signature
-  over the raw body before parsing it, as
-  [Webhooks](/docs/reference/api/webhooks#verify-the-signature) describes.
-- A webhook that keeps failing is disabled:
-  [Webhooks](/docs/reference/api/webhooks#what-a-webhook-receives) says when.
+- Every request is signed with the webhook's secret.
+  [Verify the signature](/docs/guides/verify-webhook-signatures) over the raw
+  body before you parse it.
+- A webhook gets the events stored after it was created, and nothing before
+  the project is [claimed](/docs/concepts/project-team-user#claim).
+- After a failure the server waits 5 seconds, then twice as long each time,
+  up to 1 hour. It disables a webhook that fails for 3 days or answers `410`.
 
 ## The operator's export sink
 
@@ -85,6 +83,8 @@ events:
 - It gets the events of every project, including projects nobody has claimed
   yet: the sink is the deployment's, like its platform operators, who read
   every project's events.
+- The server retries a failed delivery on its next pass, every 5 seconds by
+  default, and never disables a sink.
 - A new sink URL starts with the oldest event still retained.
 - Retention deletes events by age, 30 days by default, whether they were
   delivered or not. An event the sink hasn't taken by then is lost.

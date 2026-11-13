@@ -42,7 +42,11 @@ UPDATE webhooks SET
     cursor_created_at = CASE WHEN ?6 AND enabled = 0
         THEN coalesce((SELECT max(created_at) FROM events WHERE project_id = ?1), 0) + 1
         ELSE cursor_created_at END,
-    cursor_event_id = CASE WHEN ?6 AND enabled = 0 THEN '' ELSE cursor_event_id END
+    cursor_event_id = CASE WHEN ?6 AND enabled = 0 THEN '' ELSE cursor_event_id END,
+    next_attempt_at = CASE WHEN ?6 AND enabled = 0 THEN NULL ELSE next_attempt_at END,
+    failing_since = CASE WHEN ?6 AND enabled = 0 THEN NULL ELSE failing_since END,
+    lease_holder = CASE WHEN ?6 AND enabled = 0 THEN NULL ELSE lease_holder END,
+    lease_expires_at = CASE WHEN ?6 AND enabled = 0 THEN NULL ELSE lease_expires_at END
 WHERE project_id = ?1 AND id = ?2
 RETURNING ` + webhook.Columns
 
@@ -57,6 +61,56 @@ UPDATE webhooks SET
     previous_secret_expires_at = ?4
 WHERE project_id = ?1 AND id = ?2
 RETURNING ` + webhook.Columns
+
+	// One statement under SQLite's one writer: no other server leases between
+	// the choice and the write. NULL sorts first, so a webhook that was never
+	// attempted comes before the longest due.
+	leaseDueWebhooksStmt = `
+UPDATE webhooks SET lease_holder = ?1, lease_expires_at = ?4
+WHERE (project_id, id) IN (
+    SELECT project_id, id FROM webhooks
+    WHERE enabled = 1
+      AND (next_attempt_at IS NULL OR next_attempt_at <= ?2)
+      AND (lease_expires_at IS NULL OR lease_expires_at <= ?3)
+    ORDER BY next_attempt_at, project_id, id
+    LIMIT ?5
+)
+RETURNING ` + webhook.Columns
+
+	recordWebhookProgressStmt = `
+UPDATE webhooks SET
+    cursor_created_at = ?4,
+    cursor_event_id = ?5,
+    last_delivered_at = coalesce(?6, last_delivered_at),
+    failing_since = CASE WHEN ?6 IS NULL THEN failing_since END
+WHERE project_id = ?1 AND id = ?2 AND lease_holder = ?3`
+
+	recordWebhookFailureStmt = `
+UPDATE webhooks SET
+    last_error_at = ?4,
+    last_error_status = ?5,
+    next_attempt_at = ?6,
+    failing_since = coalesce(failing_since, ?4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = ?1 AND id = ?2 AND lease_holder = ?3`
+
+	disableFailedWebhookStmt = `
+UPDATE webhooks SET
+    enabled = 0,
+    last_error_at = ?4,
+    last_error_status = ?5,
+    failing_since = coalesce(failing_since, ?4),
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = ?1 AND id = ?2 AND lease_holder = ?3 AND enabled = 1`
+
+	releaseWebhookLeaseStmt = `
+UPDATE webhooks SET
+    next_attempt_at = ?4,
+    lease_holder = NULL,
+    lease_expires_at = NULL
+WHERE project_id = ?1 AND id = ?2 AND lease_holder = ?3`
 )
 
 type webhookStatements struct{ statement }
@@ -166,6 +220,57 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 	return s.queryOne(ctx, s.client, rotateWebhookSecretStmt, projectID, id, secret, previousExpiresAt.UTC().UnixNano())
 }
 
+// LeaseDueWebhooks implements [service.WebhookStatements].
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+	rows, err := s.client.Query(ctx, leaseDueWebhooksStmt,
+		holder, dueBy.UTC().UnixNano(), now.UTC().UnixNano(), leaseUntil.UTC().UnixNano(), limit)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := collectRows(rows, scanWebhook)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
+// RecordWebhookProgress implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookProgress(ctx context.Context, projectID, id, holder string, cursorCreatedAt time.Time, cursorEventID string, deliveredAt *time.Time) error {
+	var delivered any
+	if deliveredAt != nil {
+		delivered = deliveredAt.UTC().UnixNano()
+	}
+	return s.execLeased(ctx, recordWebhookProgressStmt, projectID, id, holder, cursorCreatedAt.UTC().UnixNano(), cursorEventID, delivered)
+}
+
+// RecordWebhookFailure implements [service.WebhookStatements].
+func (s webhookStatements) RecordWebhookFailure(ctx context.Context, projectID, id, holder string, at time.Time, status *int32, nextAttemptAt time.Time) error {
+	return s.execLeased(ctx, recordWebhookFailureStmt, projectID, id, holder, at.UTC().UnixNano(), status, nextAttemptAt.UTC().UnixNano())
+}
+
+// DisableFailedWebhook implements [service.WebhookStatements].
+func (s webhookStatements) DisableFailedWebhook(ctx context.Context, projectID, id, holder string, at time.Time, status *int32) error {
+	return s.execLeased(ctx, disableFailedWebhookStmt, projectID, id, holder, at.UTC().UnixNano(), status)
+}
+
+// ReleaseWebhookLease implements [service.WebhookStatements].
+func (s webhookStatements) ReleaseWebhookLease(ctx context.Context, projectID, id, holder string, nextAttemptAt time.Time) error {
+	return s.execLeased(ctx, releaseWebhookLeaseStmt, projectID, id, holder, nextAttemptAt.UTC().UnixNano())
+}
+
+// execLeased runs a write on a webhook its holder has leased, or none when
+// the holder no longer holds it: a *database.NoRowFoundError.
+func (s webhookStatements) execLeased(ctx context.Context, stmt string, args ...any) error {
+	n, err := execAffected(ctx, s.client, stmt, args...)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
 // queryOne runs a statement that returns one webhook, or none when the
 // project has no webhook of that id: a *database.NoRowFoundError.
 func (s webhookStatements) queryOne(ctx context.Context, client queryExecutor, stmt string, args ...any) (*domain.Webhook, error) {
@@ -192,6 +297,10 @@ func scanWebhook(rows *sql.Rows) (*domain.Webhook, error) {
 		lastErrorStatus         sql.NullInt32
 		cursorCreatedAt         int64
 		createdAt               int64
+		nextAttemptAt           sql.NullInt64
+		failingSince            sql.NullInt64
+		leaseHolder             sql.NullString
+		leaseExpiresAt          sql.NullInt64
 	)
 	if err := rows.Scan(
 		&entity.ID,
@@ -209,6 +318,10 @@ func scanWebhook(rows *sql.Rows) (*domain.Webhook, error) {
 		&cursorCreatedAt,
 		&entity.CursorEventID,
 		&createdAt,
+		&nextAttemptAt,
+		&failingSince,
+		&leaseHolder,
+		&leaseExpiresAt,
 	); err != nil {
 		return nil, err
 	}
@@ -226,6 +339,10 @@ func scanWebhook(rows *sql.Rows) (*domain.Webhook, error) {
 	}
 	entity.CursorCreatedAt = timeFromUnixNano(cursorCreatedAt)
 	entity.CreatedAt = timeFromUnixNano(createdAt)
+	entity.NextAttemptAt = nullUnixNanoPtr(nextAttemptAt)
+	entity.FailingSince = nullUnixNanoPtr(failingSince)
+	entity.LeaseHolder = nullStringPtr(leaseHolder)
+	entity.LeaseExpiresAt = nullUnixNanoPtr(leaseExpiresAt)
 	return &entity, nil
 }
 

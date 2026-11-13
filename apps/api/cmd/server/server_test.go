@@ -191,6 +191,30 @@ func TestLoadConfigEventRetention(t *testing.T) {
 	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
 }
 
+// TestLoadConfigEventWebhooks pins delivery to the projects' webhooks as a
+// server runs it with no settings, on its own 5 second loop, and the trigger
+// secret that hands the schedule to something outside the process.
+func TestLoadConfigEventWebhooks(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_EVENTS_WEBHOOKS_TRIGGER_SECRET", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.WebhookConfig{Enabled: true, Interval: 5 * time.Second}, cfg.Events.Webhooks)
+	assert.Equal(t, audit.DefaultWebhookConfig(), cfg.Events.Webhooks)
+
+	require.NoError(t, os.WriteFile(configPath, []byte("events:\n  webhooks:\n    interval: 1m\n    trigger_secret: '0123456789abcdef-file'\n"), 0o600))
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.WebhookConfig{Enabled: true, Interval: time.Minute, TriggerSecret: "0123456789abcdef-file"}, cfg.Events.Webhooks)
+
+	t.Setenv("NEXTGEN_EVENTS_WEBHOOKS_TRIGGER_SECRET", "too short")
+	_, err = loadConfig(configPath)
+	assert.ErrorContains(t, err, "events.webhooks.trigger_secret must be at least 16 printable ASCII characters")
+}
+
 // The two settings the cloud's launcher makes for a server that runs only
 // while it serves a request, read as it writes them into the environment.
 func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {

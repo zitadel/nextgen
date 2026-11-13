@@ -868,6 +868,25 @@ oneOf:
             const: webhook.deleted
           data:
             $ref: payloads/empty-event-payload.yaml
+  - title: webhook.disabled
+    description: |
+      The server disabled a webhook and stopped delivering to it. Its
+      deliveries failed for 3 days without one success, or its endpoint
+      answered `410`; `data`'s `reason` says which. Enabling it with
+      `updateWebhook` (`PATCH /webhooks/{id}`) starts delivery again from
+      that moment.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: webhook.disabled
+          data:
+            $ref: payloads/webhook-disabled-payload.yaml
   - title: webhook.secret_rotated
     description: |
       A webhook's signing secret was rotated. The previous secret stays

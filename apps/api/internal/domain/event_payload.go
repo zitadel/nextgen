@@ -513,6 +513,14 @@ func WebhookPayloadDelta(update WebhookUpdate, stored *Webhook) WebhookPayload {
 	return payload
 }
 
+// WebhookDisabledPayload is the payload of webhook.disabled: why the server
+// stopped delivering to the webhook (ADR 090 §4). A state flip with a reason
+// enum, so it holds nothing else: the failed delivery is on the webhook's
+// last_error_at and last_error_status.
+type WebhookDisabledPayload struct {
+	Reason WebhookDisabledReason `json:"reason"`
+}
+
 // ApplicationPayload is shared by application.created (snapshot) and
 // application.updated (delta). ClientIDs are the clients the write created,
 // each of which got a secret. The document body and the secrets stay out.

@@ -1,0 +1,168 @@
+---
+title: Verify a webhook's signature
+description: Check that a request to your webhook endpoint came from Zitadel, refuse replayed requests, and handle each event once.
+---
+
+A webhook is a URL the server sends a project's events to, one `POST` per event. Anyone who learns the URL can post to it. Every request from Zitadel is therefore signed with a secret only you and the server hold. Verify the signature before you act on a request.
+
+The headers and the signature follow [Standard Webhooks](https://www.standardwebhooks.com/), so a library for your language does the check. This guide shows it with a library and by hand.
+
+## Before you start
+
+- **A webhook.** Create one with `createWebhook` (`POST /webhooks`). The [webhooks reference](/docs/reference/api/webhooks) describes what it receives.
+- **Its signing secret.** The response to `createWebhook` holds it in `secret`, as `whsec_` followed by base64. No later response shows it again. Store it where your endpoint reads its secrets, here the `ZITADEL_WEBHOOK_SECRET` environment variable. If you lose it, issue a new one with `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+
+## What a request carries
+
+```http
+POST /hooks/zitadel HTTP/1.1
+Content-Type: application/json
+webhook-id: evt_01KWH3B7K2M9P4R6T8V0X2Z4C6
+webhook-timestamp: 1794391200
+webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
+
+{"id":"evt_01KWH3B7K2M9P4R6T8V0X2Z4C6","type":"user.created","created_at":"2026-11-11T10:00:00Z","project_id":"proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A","actor":{"type":"human","id":"user_01JD2Q7C4T9N6M8P0R2V5X7Z9B"},"entity":{"type":"user","id":"user_01KWH3B7JZ5N7Q9S1U3W5Y7A9C"},"data":{"schema_id":"sch_01JD2Q6W8K3M5P7R9T1V3X5Z7B","attribute_keys":["email","name"]}}
+```
+
+The body always has these seven fields. `actor` and `entity` are `null` when the event has none. `data` is the event's payload, not the resource. To get more, read the resource by `entity.id`, or the whole event with `getEvent` (`GET /events/{id}`).
+
+| Header | Value |
+| --- | --- |
+| `webhook-id` | The event's `id`. It is the same on every retry of the event. |
+| `webhook-timestamp` | When this attempt was sent, in seconds since the Unix epoch. A retry carries a new one. |
+| `webhook-signature` | `v1,` followed by the signature in base64. During a rotation it holds two, separated by a space. |
+
+The signature is the HMAC-SHA256 of the signed content, in base64:
+
+- **The signed content** is `{webhook-id}.{webhook-timestamp}.{body}`: the two header values and the request body, joined by dots. The body is the bytes that arrived, not a parsed and re-serialized copy.
+- **The key** is the secret without its `whsec_` prefix, decoded from base64.
+
+## Verify with a library
+
+Install the Standard Webhooks library for your language. For Node.js:
+
+```sh
+npm install standardwebhooks
+```
+
+Hand it the secret, the raw body and the headers. This server verifies each request and prints the event:
+
+```js title="server.mjs"
+import { createServer } from "node:http";
+import { Webhook } from "standardwebhooks";
+
+const webhook = new Webhook(process.env.ZITADEL_WEBHOOK_SECRET);
+
+createServer(async (req, res) => {
+  // Read the body as it arrived. Don't parse it first.
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const rawBody = Buffer.concat(chunks).toString("utf8");
+
+  let event;
+  try {
+    // Throws when no signature matches or the timestamp is too old.
+    event = webhook.verify(rawBody, req.headers);
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
+
+  console.log(event.type, event.id);
+  res.writeHead(204).end();
+}).listen(3000);
+```
+
+`verify` checks the signature and refuses a timestamp more than five minutes from your clock. It returns the parsed event.
+
+## Verify by hand
+
+Without a library, do the same four steps:
+
+1. Read the body as raw bytes, before parsing it.
+2. Refuse the request when `webhook-timestamp` is more than five minutes from your clock.
+3. Compute the HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}` with the decoded secret as the key.
+4. Compare the result with each signature in `webhook-signature`, in constant time. Accept the request when one matches.
+
+```js title="verify-webhook.mjs"
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const TOLERANCE_SECONDS = 5 * 60;
+
+// rawBody is the request body as a Buffer, exactly as it arrived.
+export function verifyWebhook(rawBody, headers, secret, now = Date.now()) {
+  const id = headers["webhook-id"];
+  const timestamp = headers["webhook-timestamp"];
+  const signatures = headers["webhook-signature"];
+  if (!id || !timestamp || !signatures) return false;
+
+  // Refuse an old or a future timestamp: a captured request can't be replayed later.
+  const age = Math.abs(now / 1000 - Number(timestamp));
+  if (!(age <= TOLERANCE_SECONDS)) return false;
+
+  const key = Buffer.from(secret.slice("whsec_".length), "base64");
+  const expected = createHmac("sha256", key)
+    .update(`${id}.${timestamp}.`)
+    .update(rawBody)
+    .digest();
+
+  // During a rotation the header holds two signatures. One match is enough.
+  return signatures.split(" ").some((signature) => {
+    const [version, value = ""] = signature.split(",");
+    const given = Buffer.from(value, "base64");
+    return version === "v1" && given.length === expected.length && timingSafeEqual(given, expected);
+  });
+}
+```
+
+Check your own implementation against the test vector Standard Webhooks publishes. These inputs give this signature:
+
+| Input | Value |
+| --- | --- |
+| Secret | `whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw` |
+| `webhook-id` | `msg_p5jXN8AQM9LWM0D4loKWxJek` |
+| `webhook-timestamp` | `1614265330` |
+| Body | `{"test": 2432232314}` |
+| `webhook-signature` | `v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=` |
+
+The timestamp is from 2021, so pass it as the current time when you test the tolerance check.
+
+## Refuse old timestamps
+
+A signature stays valid for as long as the secret does. Someone who captures one request could send it again a week later. The timestamp is part of the signed content, so it can't be changed without breaking the signature. Refuse a request whose `webhook-timestamp` is more than five minutes from your clock, in either direction.
+
+- The timestamp is the time of the attempt, not of the event. A retry that arrives hours after the event still passes.
+- Keep your server's clock synchronized. A clock that is off by more than five minutes refuses every request.
+
+## Handle each event once
+
+Delivery is at least once. The same event arrives again when your endpoint answered too late, or answered with an error after doing the work. A request inside the five-minute tolerance can also be replayed.
+
+- `webhook-id` is the event's `id` and the same on every attempt. Record it when you handle an event, and skip an event whose `webhook-id` you have recorded.
+- Record the ID in the same transaction as the work, under a unique key, so two attempts at once can't both pass.
+- Answer a duplicate with a `2xx` status. Any other status makes the server send it again.
+- Keep the IDs for at least 3 days. The server retries a failed event for that long before it disables the webhook.
+
+## Rotate the secret
+
+`rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`) returns a new secret. The previous one stays valid for 24 hours.
+
+- During those 24 hours every request carries two signatures, one per secret. Verification with either secret passes, so your endpoint keeps working while it still holds the previous one.
+- Deploy the new secret to your endpoint within the 24 hours. After that, requests carry only the new secret's signature.
+- A second rotation inside the 24 hours drops the older secret at once. Finish deploying one secret before you rotate again.
+
+## Answer the request
+
+- Answer with any `2xx` status once you have stored or handled the event. The server ignores the response body.
+- Answer within 10 seconds. For slow work, store the event, answer, and process it afterwards.
+- Answer a request that fails verification with `400` or `401`. The server treats it like any failure and sends the event again, so a wrong secret on your side shows up as a failing webhook: its `last_error_status` holds your status.
+- Don't answer `410` unless the endpoint is gone for good. The server disables a webhook that answers `410`.
+
+## Check that it works
+
+1. Start your endpoint and create a webhook for its URL with `event_types` set to `["*"]`.
+2. Change something in the project, for example update the webhook's `description` with `updateWebhook` (`PATCH /webhooks/{id}`). The server sends a `webhook.updated` event within a few seconds.
+3. Read the webhook with `getWebhook` (`GET /webhooks/{id}`). `last_delivered_at` holds the time of the delivery. If `last_error_at` is later instead, `last_error_status` holds the status your endpoint answered, or `null` when it gave no answer.
+4. Send your endpoint the same request with one character of the body changed. It must refuse it.
+
+The server only sends to `https` URLs on public addresses. To receive events on your machine during development, expose the endpoint through an `https` tunnel.

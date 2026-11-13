@@ -49,6 +49,8 @@ const (
 
 	AuditInsertDuration = "zitadel.audit.insert.duration"
 	AuditEventsWritten  = "zitadel.audit.events.written"
+
+	WebhookDeliveries = "zitadel.webhook.deliveries"
 )
 
 // Attribute keys. The database keys are the semantic convention's; CacheNameKey
@@ -270,6 +272,18 @@ const (
 	AuditEvent AuditSource = "event"
 )
 
+// WebhookDeliveryResult is how one attempt to deliver an event to a
+// project's webhook ended.
+type WebhookDeliveryResult string
+
+const (
+	// WebhookDelivered is an attempt the endpoint answered with a 2xx.
+	WebhookDelivered WebhookDeliveryResult = "delivered"
+	// WebhookFailed is every other attempt, one that never reached the
+	// endpoint included.
+	WebhookFailed WebhookDeliveryResult = "failed"
+)
+
 func values[T ~string](vs ...T) []string {
 	out := make([]string, len(vs))
 	for i, v := range vs {
@@ -369,6 +383,13 @@ func Catalogue() []Instrument {
 			Description: "Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted.",
 			Attributes: []Attribute{
 				{Key: EventTypeKey, Description: "Event type, such as `auth.token.revoked`. Fixed in code."},
+			},
+		},
+		{
+			Name: WebhookDeliveries, Kind: KindCounter, Unit: "{delivery}",
+			Description: "Attempts to deliver an event to a project's webhook, by how they ended. A retry is an attempt of its own. Events sent to the sinks of `events.export` are not counted.",
+			Attributes: []Attribute{
+				{Key: ResultKey, Description: "How the attempt ended: `delivered` on a 2xx answer, `failed` on any other answer or none.", Values: values(WebhookDelivered, WebhookFailed)},
 			},
 		},
 		{

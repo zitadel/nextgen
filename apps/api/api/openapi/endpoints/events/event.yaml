@@ -58,6 +58,7 @@ oneOf:
   - $ref: types/variable-set-event.yaml
   - $ref: types/webhook-created-event.yaml
   - $ref: types/webhook-deleted-event.yaml
+  - $ref: types/webhook-disabled-event.yaml
   - $ref: types/webhook-secret_rotated-event.yaml
   - $ref: types/webhook-updated-event.yaml
 discriminator:
@@ -117,5 +118,6 @@ discriminator:
     variable.set: types/variable-set-event.yaml
     webhook.created: types/webhook-created-event.yaml
     webhook.deleted: types/webhook-deleted-event.yaml
+    webhook.disabled: types/webhook-disabled-event.yaml
     webhook.secret_rotated: types/webhook-secret_rotated-event.yaml
     webhook.updated: types/webhook-updated-event.yaml
