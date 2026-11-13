@@ -4,8 +4,8 @@
 // 1. installs @zitadel/server@<from> from npm and starts its binary on an
 //    empty data dir (SQLite, the default);
 // 2. creates a project and a user in it over the API, then stops it;
-// 3. runs `migrate` with the target on that data dir and checks that the
-//    schema version did not go back;
+// 3. runs `migrate` with the target on that data dir and checks that it
+//    reached the schema version the target migrates an empty data dir to;
 // 4. starts the target and reads the user back with the project secret the
 //    older release issued.
 //
@@ -19,8 +19,9 @@
 // stable release published before it (by npm's publish time: version order
 // is not release order, an old 1.0.0-alpha line sits above 0.x). An empty
 // --to is the same as none. The artifacts workflow
-// (.github/workflows/artifacts.yml) runs both forms.
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+// (.github/workflows/artifacts.yml) runs both forms, the published one
+// without an install: this file imports only Node built-ins.
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -32,7 +33,6 @@ import { isDirectRun, runCapture } from "./dev-process.mjs";
 import { installPublishedServer, runServerCommand, startServer } from "./smoke-server.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const MIGRATIONS_APPLIED_LOG = "database migrations applied";
 
 /**
  * The stable release published last before `version` (any release, if
@@ -56,9 +56,18 @@ async function npmView(field, cwd) {
   return JSON.parse(stdout);
 }
 
-/** The newest goose version recorded in the data dir's SQLite database. */
+async function migrate(binary, dataDir) {
+  const result = await runServerCommand({ binary, dataDir, args: ["migrate"] });
+  if (result.code !== 0) {
+    throw new Error(`${binary} migrate failed (code ${result.code}):\n${result.output}`);
+  }
+}
+
+/** The newest goose version recorded in the data dir's SQLite database (0: none). */
 function schemaVersion(dataDir) {
-  const db = new DatabaseSync(join(dataDir, "zitadel.db"), { readOnly: true });
+  const path = join(dataDir, "zitadel.db");
+  if (!existsSync(path)) return 0;
+  const db = new DatabaseSync(path, { readOnly: true });
   try {
     return db
       .prepare("SELECT MAX(version_id) AS version FROM goose_db_version WHERE is_applied")
@@ -129,14 +138,16 @@ export async function smokeUpgrade({
     }
     const releaseSchema = schemaVersion(dataDir);
 
-    // The current build migrates it...
-    const migrate = await runServerCommand({ binary, dataDir, args: ["migrate"] });
-    if (migrate.code !== 0 || !migrate.output.includes(MIGRATIONS_APPLIED_LOG)) {
-      throw new Error(`${binary} migrate failed (code ${migrate.code}):\n${migrate.output}`);
-    }
+    // The target migrates it to the schema it gives an empty data dir...
+    await migrate(binary, dataDir);
     const currentSchema = schemaVersion(dataDir);
-    if (currentSchema < releaseSchema) {
-      throw new Error(`schema went back from ${releaseSchema} to ${currentSchema}`);
+    const freshDir = join(work, "fresh");
+    await migrate(binary, freshDir);
+    const freshSchema = schemaVersion(freshDir);
+    if (currentSchema !== freshSchema) {
+      throw new Error(
+        `${binary} migrated the upgraded data dir to schema ${currentSchema}, an empty one to ${freshSchema}`,
+      );
     }
 
     // ...and serves what the release wrote, to the secret the release issued.

@@ -15,6 +15,7 @@
 // The default image is the local runtime image (//#build-local-image). With
 // --version it pulls the image that release pushed to the registry; an empty
 // --version is the same as none.
+// Imports only Node built-ins: the artifacts workflow runs it without an install.
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs } from "node:util";
 

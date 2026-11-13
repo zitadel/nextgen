@@ -13,7 +13,8 @@
 // package resolves for this host (`@zitadel/server/binary`, what the CLI
 // uses); the server must report that version. An empty --version is the
 // same as none. The artifacts workflow (.github/workflows/artifacts.yml) runs
-// it on macOS and Linux. It does not run on Windows.
+// it on macOS and Linux, without an install: it imports only Node built-ins.
+// It does not run on Windows.
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
@@ -40,12 +41,33 @@ export function hostReleaseBinary(platform = process.platform, arch = process.ar
 }
 
 /**
+ * Waits until npm serves `name@version`: a release's platform packages reach
+ * the registry minutes after @zitadel/server, and npm installs a missing
+ * optional dependency as nothing at all.
+ */
+async function waitForPublished(name, version, cwd, timeoutMs = 15 * 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const found = await runCapture("npm", ["view", `${name}@${version}`, "version"], { cwd })
+      .then(({ stdout }) => stdout.trim() === version)
+      .catch(() => false);
+    if (found) return;
+    if (Date.now() > deadline) {
+      throw new Error(`${name}@${version} is not on npm after ${timeoutMs / 60_000} minutes`);
+    }
+    await delay(20_000);
+  }
+}
+
+/**
  * Installs @zitadel/server@<version> from npm into `dir` the way a customer
  * does, and returns the binary that release resolves for this host: its
  * `@zitadel/server/binary` export finds the platform package npm installed
  * as an optional dependency, as the CLI does.
  */
 export async function installPublishedServer(version, dir) {
+  await waitForPublished("@zitadel/server", version, dir);
+  await waitForPublished(`@zitadel/server-${process.platform}-${process.arch}`, version, dir);
   await run(
     "npm",
     ["install", "--prefix", dir, "--no-audit", "--no-fund", `@zitadel/server@${version}`],
@@ -74,9 +96,10 @@ async function freePort() {
 
 /**
  * Runs `binary` with `args` on `dataDir` and resolves once it has exited,
- * with its exit code and output. For one-shot commands such as `migrate`.
+ * with its exit code and output; kills it after `timeoutMs`. For one-shot
+ * commands such as `migrate`.
  */
-export async function runServerCommand({ binary, dataDir, args, env = {} }) {
+export async function runServerCommand({ binary, dataDir, args, env = {}, timeoutMs = 120_000 }) {
   const child = spawn(binary, args, {
     env: { ...process.env, NEXTGEN_SERVER_DATA_DIR: dataDir, ...env },
     stdio: ["ignore", "pipe", "pipe"],
@@ -84,9 +107,17 @@ export async function runServerCommand({ binary, dataDir, args, env = {} }) {
   let output = "";
   child.stdout.on("data", (chunk) => (output += chunk));
   child.stderr.on("data", (chunk) => (output += chunk));
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill("SIGKILL");
+  }, timeoutMs);
   const [code, signal] = await new Promise((done, fail) =>
     child.once("error", fail).once("exit", (...exit) => done(exit)),
-  );
+  ).finally(() => clearTimeout(timer));
+  if (timedOut) {
+    throw new Error(`${binary} ${args.join(" ")} ran longer than ${timeoutMs / 1000}s:\n${output}`);
+  }
   return { code, signal, output };
 }
 
@@ -172,8 +203,8 @@ export async function smokeServer({ binary, version } = {}) {
     const server = await startServer({ binary, dataDir });
     const readyMs = Date.now() - started;
     const result = await server.stop();
-    // The server exits 0 on SIGTERM; a SIGTERM exit is clean too.
-    if (result.code !== 0 && result.signal !== "SIGTERM") {
+    // A clean shutdown on SIGTERM exits 0.
+    if (result.code !== 0) {
       throw new Error(
         `${binary} did not stop cleanly (code ${result.code}, signal ${result.signal}):\n${result.output}`,
       );

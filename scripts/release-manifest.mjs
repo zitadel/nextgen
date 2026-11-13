@@ -1,3 +1,4 @@
+// Imports only Node built-ins: the artifacts workflow runs its importers without an install.
 // The registry repository each release pushes its server image to.
 export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 

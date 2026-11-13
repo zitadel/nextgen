@@ -7,15 +7,19 @@ name: artifacts
 # (scripts/artifacts-target.mjs decides, in `target`):
 #
 # - what this ref builds: nightly on main (04:41 UTC), on PRs that change
-#   this file, and on a dispatch without a version
+#   this file or the scripts it runs, and on a dispatch without a version
 #   (`gh workflow run artifacts.yml --ref <branch>`);
 # - a published release: on a dispatch with one
-#   (`gh workflow run artifacts.yml -f version=0.6.0`), and after every
-#   release-publish run that published one. That trigger is workflow_run,
-#   not a job in release-publish.yml: the release neither waits for these
-#   checks nor turns red when one fails, and its workflow file stays as it
-#   is. A release-publish run that published nothing (a version PR update, a
-#   dry run) leaves every job here skipped.
+#   (`gh workflow run artifacts.yml -f version=0.6.0`), and when a person
+#   publishes the GitHub Release that release-publish drafted
+#   (docs/runbooks/manual-release.md). Its tag `v<version>` is the version.
+#   The release neither waits for these checks nor turns red when one fails,
+#   and release-publish.yml is not involved. A release published right
+#   after the npm publish waits, in each install, for its platform packages
+#   to reach the registry.
+#
+# The start, published and target jobs run the scripts without an install:
+# they and the modules they import take only Node built-ins.
 #
 # Jobs:
 # - binaries (built only): the five platform packages' build-binary, the
@@ -41,9 +45,14 @@ on:
   pull_request:
     paths:
       - .github/workflows/artifacts.yml
-  workflow_run:
-    workflows: [release-publish]
-    types: [completed]
+      - scripts/artifacts-target.mjs
+      - scripts/smoke-server.mjs
+      - scripts/smoke-upgrade.mjs
+      - scripts/smoke-container.mjs
+      - scripts/dev-process.mjs
+      - scripts/release-manifest.mjs
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -53,19 +62,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # No remote cache token here: every task this runs is uncached anyway.
+  # Local cache only: these runs get no remote-cache token.
   TURBO_CACHE: local:rw
+  TURBO_TELEMETRY_DISABLED: "1"
 
 jobs:
   target:
-    # Only a release-publish run that succeeded can have published.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       mode: ${{ steps.target.outputs.mode }}
       version: ${{ steps.target.outputs.version }}
-      image: ${{ steps.target.outputs.image }}
     steps:
       - uses: actions/checkout@v6
 
@@ -76,9 +83,7 @@ jobs:
       - id: target
         run: node scripts/artifacts-target.mjs
         env:
-          VERSION: ${{ inputs.version }}
-          RELEASE_RUN_STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
-          RELEASE_RUN_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+          VERSION: ${{ inputs.version || github.event.release.tag_name }}
 
   binaries:
     needs: target
@@ -109,7 +114,7 @@ jobs:
       - name: Build the release binaries
         run: corepack pnpm exec turbo run build-binary --filter='@zitadel/server-*' --output-logs=errors-only
 
-      # Stored relative to apps/: server-<platform>/bin/nextgen[.exe].
+      # Stored relative to apps/: server-<platform>/bin/.
       - uses: actions/upload-artifact@v7
         with:
           name: server-binaries
@@ -120,13 +125,14 @@ jobs:
   start:
     needs: [target, binaries]
     # binaries is skipped for a published release.
-    if: ${{ !cancelled() && needs.target.result == 'success' && needs.target.outputs.mode != 'none' && needs.binaries.result != 'failure' }}
+    if: ${{ !cancelled() && needs.target.result == 'success' && needs.binaries.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
         runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    # A published release's install may wait up to 15 minutes for npm.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -174,13 +180,13 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Smoke the container and the upgrade
-        run: corepack pnpm exec turbo run //#smoke-container //#smoke-upgrade --continue --output-logs=errors-only
+        run: corepack pnpm exec turbo run //#smoke-container //#smoke-upgrade --continue
 
   published:
     needs: target
     if: ${{ needs.target.outputs.mode == 'published' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       VERSION: ${{ needs.target.outputs.version }}
     steps:
@@ -190,9 +196,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # target's summary says when the release pushed no image.
+      # Every release pushes this image; a missing one fails `docker run`.
       - name: Smoke the published container image
-        if: ${{ needs.target.outputs.image == 'true' }}
         run: node scripts/smoke-container.mjs --version "$VERSION"
 
       - name: Upgrade from the release before it
