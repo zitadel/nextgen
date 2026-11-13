@@ -198,20 +198,18 @@ export function textsIn(node: ts.Node): string[] {
 }
 
 /**
- * Whether anything under `node` joins a string with `+`, which the compiler
- * then reads only as `string`.
+ * Whether anything under `node` joins with `+`: a string, or two names that
+ * may each hold one, which the compiler then reads only as `string`. Only a
+ * sum of two numbers written out is no join.
  *
  * @param node - Where to look.
- * @returns Whether a string is joined.
+ * @returns Whether anything is joined.
  */
 export function joinsStrings(node: ts.Node): boolean {
-  const stringish = (side: ts.Expression): boolean => {
-    return isText(side) || ts.isTemplateExpression(side);
-  };
   return nodesOf(node, ts.isBinaryExpression).some((binary) => {
     return (
       binary.operatorToken.kind === ts.SyntaxKind.PlusToken &&
-      (stringish(binary.left) || stringish(binary.right))
+      !(ts.isNumericLiteral(binary.left) && ts.isNumericLiteral(binary.right))
     );
   });
 }

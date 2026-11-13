@@ -22,6 +22,7 @@ const MODULE = parsedSource(
     "const PLAIN = { refusal: { message: 'p' } } satisfies Refused<string>;",
     "const OTHER = { message: 'c', hint: `see ${link} {x}` } as const satisfies Refusal;",
     "const JOINED = { message: 'a ' + 'b' } as const satisfies Refusal;",
+    "const NAMES_JOINED = { message: PREFIX + SUFFIX } as const satisfies Refusal;",
     "throw refusalError(cond ? OTHER : JOINED, { x: 1, ...rest }, { fix });",
   ].join("\n"),
 );
@@ -40,7 +41,7 @@ describe("declaredAs", () => {
       return declaration.name;
     });
 
-    expect(names).toEqual(["OTHER", "JOINED"]);
+    expect(names).toEqual(["OTHER", "JOINED", "NAMES_JOINED"]);
   });
 });
 
@@ -70,7 +71,13 @@ describe("joinsStrings", () => {
       return joinsStrings(declaration.literal);
     });
 
-    expect(joined).toEqual([false, true]);
+    expect(joined).toEqual([false, true, true]);
+  });
+
+  it("counts no sum of two numbers written out as a join", () => {
+    const sum = parsedSource("sum.ts", "const LIMIT = { max: 1 + 2 };");
+
+    expect(joinsStrings(sum)).toBe(false);
   });
 });
 
