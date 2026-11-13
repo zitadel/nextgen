@@ -123,7 +123,9 @@ another factor — fails with the step name; log in through the UI for those.
 `seed.identity()` complements registration specs: an unused email+password
 that creates nothing, so the flow under test must create the user. It needs
 no instance, so a spec without `withZitadel()` — against an app you started
-yourself — imports it as `identity()`.
+yourself — imports it as `identity()`. For backend suites that need no browser
+at all, the [Vitest entry](#quick-start-vitest-backend-tests) wires up the
+instance lifecycle instead.
 
 ### Drive the login flow
 
@@ -195,9 +197,65 @@ and `e2e/console/playwright.real.config.mts` — run them with
 that calls `startLocalZitadel()` + `writeHandshake()`, and an app-runner entry
 that `waitForHandshake()`s and spawns the dev server with
 `applyAppEnvTemplate(...)` applied. Suites with unusual topologies (or
-non-Playwright runners) compose those functions directly —
+runners other than Playwright and Vitest) compose those functions directly —
 `apps/console/scripts/dev-real.mts` does, seeding a dev environment rather
 than a test suite.
+
+## Quick start (Vitest, backend tests)
+
+For tests that call your own API with a real session and no browser:
+
+```sh
+npm i -D @zitadel/testing@latest vitest
+```
+
+A global setup boots one instance for the run and stops it when the run
+ends. It takes the same options as `startLocalZitadel()`:
+
+```ts
+// zitadel.global-setup.ts
+import { zitadelGlobalSetup } from "@zitadel/testing/vitest";
+
+export default zitadelGlobalSetup({
+  appOrigins: ["http://localhost:3000"], // the origin your API sees on flow calls
+});
+```
+
+```ts
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    globalSetup: ["./zitadel.global-setup.ts"],
+    testTimeout: 30_000, // the first boot of a fresh data dir takes a few seconds
+  },
+});
+```
+
+`injectZitadel()` connects a test to that instance, with the same surface
+`connectZitadel()` returns:
+
+```ts
+// me.test.ts
+import { expect, it } from "vitest";
+import { injectZitadel, SESSION_COOKIE_NAME } from "@zitadel/testing/vitest";
+
+it("returns the signed-in user", async () => {
+  const zitadel = injectZitadel();
+  const { user, sessionToken } = await zitadel.seedSession(); // fresh user, real login flow
+  const response = await fetch("http://localhost:3000/api/me", {
+    headers: { cookie: `${SESSION_COOKIE_NAME}=${sessionToken}` },
+  });
+  expect(await response.json()).toMatchObject({ id: user.id });
+});
+```
+
+The global setup hands the serializable `handle` to the test workers through
+Vitest's own `provide`/`inject`, so every pool works. Your API needs the
+instance's coordinates too: start it from the global setup, or read them in
+the test from `zitadel.handle` and `zitadel.appEnv`. The entry is ESM only, as
+Vitest is.
 
 ## API
 
@@ -236,6 +294,12 @@ await z.stop(); // stop server and remove owned temp dir
 what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
 
+From `@zitadel/testing/vitest`: `zitadelGlobalSetup(options)`, the
+`globalSetup` default export that boots the run's instance (`options` are
+`startLocalZitadel`'s), and `injectZitadel()`, which returns the
+`ConnectedZitadel` for it inside a test. It needs `vitest` (4 or newer) and
+never loads Playwright.
+
 From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
 per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 (`loginWithPassword`, `loginWithPasskey`, `registerWithPassword`,
@@ -245,8 +309,8 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 `enableVirtualPasskey(page)` for non-fixture pages, and
 `nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
 above. `identity()`, `SESSION_COOKIE_NAME`, `browserSessionCookieName` and
-`sessionCookieName` are on both entry points, so a Playwright spec imports
-everything from this one. Without a URL, the two functions name the cookies of
+`sessionCookieName` are on every entry point, so a Playwright or Vitest spec
+imports everything from its own one. Without a URL, the two functions name the cookies of
 a loopback http dev server.
 
 ## How it works
@@ -308,7 +372,8 @@ or export.
 **One instance per suite, one fresh user per test.** Emails are unique per
 project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
-(demonstrated by the `demo-next-real` lane, 2 workers).
+(demonstrated by the `demo-next-real` lane, 2 workers). The Vitest entry
+follows the same model: one instance per run, shared by every test file.
 
 Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
@@ -369,12 +434,11 @@ on top, in intended order:
 2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
    verification flows. Blocked on a server-side story (dev SMTP sink or
    API-exposed codes); password-only flows don't hit this.
-3. **Vitest surface.** Landed from this item: `withZitadel(config)`
-   orchestration, `AppEnvTemplate`/`nextAppEnv`, and the session-mint seed-op
-   (`seed.session()` driving the real flow headlessly, `authenticatedPage` on
-   top). Remaining: a dedicated `@zitadel/testing/vitest` entry once a second
-   backend consumer exists — `sessionToken` already serves backend tests
-   directly.
+3. **Vitest surface.** Landed: `withZitadel(config)` orchestration,
+   `AppEnvTemplate`/`nextAppEnv`, the session-mint seed-op (`seed.session()`
+   driving the real flow headlessly, `authenticatedPage` on top), and the
+   `@zitadel/testing/vitest` entry (`zitadelGlobalSetup()` + `injectZitadel()`)
+   for backend tests.
 4. **Remote mode: ephemeral project on a persistent instance.** For app
    deployments that cannot reach a local process (preview environments).
    `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose
