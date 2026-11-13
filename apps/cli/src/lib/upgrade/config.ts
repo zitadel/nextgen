@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
 import { isCI } from "@/lib/ci";
-import { npmDistTagForCliVersion } from "@/lib/public-cli";
+import { CLI_PACKAGE_NAME, npmDistTagForCliVersion } from "@/lib/public-cli";
 import { telemetryConfigDir } from "@/lib/telemetry/identity";
 
 import { Cache } from "./cache";
 import { ReleaseChannel } from "./channel";
-import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI } from "./defaults";
+import { UPDATE_CHECK_VARIABLE } from "./defaults";
 
 /**
  * The registry asked when npm was not pointed at another.
@@ -52,7 +52,7 @@ export function releaseChannel(cliVersion: string, env: NodeJS.ProcessEnv): Rele
   }
 
   return new ReleaseChannel({
-    packageName: ZITADEL_CLI,
+    packageName: CLI_PACKAGE_NAME,
     distTag: npmDistTagForCliVersion(cliVersion),
     registry,
     cache: new Cache(file),

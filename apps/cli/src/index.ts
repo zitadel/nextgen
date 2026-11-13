@@ -52,7 +52,7 @@ import VariableSet from "./cli/commands/variable/set";
  * (`oclif.commands.strategy: "explicit"` in `package.json`). Keys are command
  * ids with `:` as the topic separator; oclif renders them with the configured
  * space separator (`users list`). The resource commands (`users`, `teams`,
- * `sessions`, …) come from the registry in `commands/resources.ts`, so a new
+ * `sessions`, …) come from the registry in `cli/commands/resources.ts`, so a new
  * backend resource is one registry entry.
  */
 export const WORKFLOW_COMMANDS = {

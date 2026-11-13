@@ -7,14 +7,14 @@ import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { hasZitadelConfig } from "@/lib/project";
-import { newestCliCommand } from "@/lib/public-cli";
+import { CLI_PACKAGE_NAME, newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { releaseChannel } from "@/lib/upgrade/config";
-import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import {
   InstallError,
   PackageInstaller,
@@ -102,7 +102,7 @@ export default class Upgrade extends BaseCommand {
         throw error;
       }
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-        hint: "Check the connection to the npm registry, then rerun.",
+        hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
         nextCommands: [await this.again("upgrade", {})],
       });
     });
@@ -186,7 +186,7 @@ export default class Upgrade extends BaseCommand {
     const actions: string[] = [];
     if (plan.cliBehind) {
       const newest = newestCliCommand("<command>", this.cliVersion);
-      const global = `npm install --global ${ZITADEL_CLI}@${plan.target}`;
+      const global = `npm install --global ${CLI_PACKAGE_NAME}@${plan.target}`;
       actions.push(
         `This CLI is still ${this.cliVersion}. Run the newest with ${newest}, or if you installed it globally, update it with ${global}.`,
       );
@@ -269,7 +269,7 @@ export default class Upgrade extends BaseCommand {
 
     const args = [
       "--yes",
-      `${ZITADEL_CLI}@${version}`,
+      `${CLI_PACKAGE_NAME}@${version}`,
       "doctor",
       "--fix",
       "--non-interactive",

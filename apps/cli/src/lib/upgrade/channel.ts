@@ -47,7 +47,7 @@ export type ChannelOptions = Readonly<{
 
 /**
  * The newest published release on one dist-tag, asked of the registry at most
- * once a day.
+ * once a day, and at most once an hour after a lookup that failed.
  */
 export class ReleaseChannel {
   /**
@@ -71,8 +71,10 @@ export class ReleaseChannel {
    *
    * It never throws: a lookup is advice, so an offline machine, a registry that
    * does not answer or an unwritable cache costs the answer and never the
-   * caller. A failed lookup is remembered as well, keeping the version known
-   * before it, so an offline machine does not wait out the timeout on every run.
+   * caller. A failed lookup is remembered as well, for an hour and not a day,
+   * keeping the version known before it, so an offline machine does not wait out
+   * the timeout on every run and one failed request does not hide a release for
+   * a day.
    *
    * A cached timestamp ahead of now (the clock moved back, or the file was
    * edited) would otherwise keep its answer fresh for however long it says, so
@@ -96,7 +98,7 @@ export class ReleaseChannel {
 
     if (!fresh && cached !== undefined) {
       const age = Date.now() - cached.checked_at;
-      const window = cached.version === undefined ? FAILURE_MAX_AGE_MS : CACHE_MAX_AGE_MS;
+      const window = cached.failed === true ? FAILURE_MAX_AGE_MS : CACHE_MAX_AGE_MS;
       if (age >= 0 && age < window) {
         return Release.from(cached.version);
       }
@@ -127,6 +129,7 @@ export class ReleaseChannel {
     const entry: CacheEntry = {
       checked_at: Date.now(),
       version: known?.version,
+      failed: answered === undefined,
     };
     await cache.set(key, entry);
 

@@ -49,7 +49,7 @@ runs the new release's `doctor --fix`. It reports `data.packages`,
 `data.refresh` (`done`, `issues`, `failed`, `planned` on a dry run, or `skipped`). A range or dist-tag is
 listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
 did not say what the latest release is. `doctor` warns (`cli-version`) when a
-newer CLI exists, asking the npm registry at most once a day and never on CI;
+newer CLI exists, asking the npm registry at most once a day (once an hour after a lookup that failed) and never on CI;
 `ZITADEL_UPDATE_CHECK=0` turns that off, and a registry that does not answer
 passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
 `local_server`, `project`, `credentials`, `app_integration` or `environment`.

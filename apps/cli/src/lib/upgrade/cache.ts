@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 /**
@@ -13,11 +14,23 @@ export type CacheEntry = Readonly<{
   checked_at: number;
 
   /**
-   * What the answer was. Absent when the asking failed: a failure is remembered
-   * as well, so an offline machine does not ask again on every run.
+   * What the answer was. Absent when nothing has ever been known.
    */
   version?: string | undefined;
+
+  /**
+   * Whether the asking failed, so `version` is only what was known before it.
+   * A failure is remembered as well, so an offline machine does not ask again on
+   * every run, and a caller can give it a shorter life than an answer.
+   */
+  failed?: boolean | undefined;
 }>;
+
+/**
+ * How long an entry is kept, so keys for registries and dist-tags no longer in
+ * use do not pile up in the file.
+ */
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Whether a value read from the file is an entry. The file is as much an answer
@@ -60,7 +73,8 @@ export class Cache {
   private writing: Promise<void> = Promise.resolve();
 
   /**
-   * @param file - Where entries are kept. Without one the cache remembers nothing.
+   * @param file - Where entries are kept. Without one the cache remembers only
+   * for the life of this instance.
    */
   constructor(file: string | undefined) {
     this.file = file;
@@ -81,9 +95,11 @@ export class Cache {
   /**
    * Keeps an answer next to the others in the file. The cache is only an
    * optimisation, so a home that cannot be written costs one more question next
-   * time and is never an error.
+   * time and is never an error. Entries older than {@link RETENTION_MS} are left
+   * out of the rewrite.
    *
-   * The file is written to a temporary name and renamed over the real one, so a
+   * The file is written to a temporary name of its own, removed again if the
+   * write fails, and renamed over the real one, so a
    * run that reads while another writes sees the old file or the new one and
    * never half of either. Writes from one cache happen one after another, each
    * of the whole remembered state, so none of them loses another's key or lands
@@ -96,13 +112,19 @@ export class Cache {
    * @param entry - The answer.
    */
   async set(key: string, entry: CacheEntry): Promise<void> {
+    this.entries = this.load().then((entries) => {
+      const kept: Record<string, CacheEntry> = {};
+      for (const [name, held] of Object.entries(entries)) {
+        if (Date.now() - held.checked_at < RETENTION_MS) {
+          kept[name] = held;
+        }
+      }
+      return { ...kept, [key]: entry };
+    });
     const { file } = this;
     if (file === undefined) {
       return;
     }
-    this.entries = this.load().then((entries) => {
-      return { ...entries, [key]: entry };
-    });
     this.writing = this.writing.then(() => {
       return this.persist(file);
     });
@@ -115,14 +137,14 @@ export class Cache {
    * @param file - Where entries are kept.
    */
   private async persist(file: string): Promise<void> {
+    const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
     try {
       const entries = await this.load();
-      const temporary = `${file}.${process.pid}.tmp`;
       await mkdir(dirname(file), { recursive: true });
       await writeFile(temporary, `${JSON.stringify(entries)}\n`);
       await rename(temporary, file);
     } catch {
-      return;
+      await rm(temporary, { force: true }).catch(() => undefined);
     }
   }
 

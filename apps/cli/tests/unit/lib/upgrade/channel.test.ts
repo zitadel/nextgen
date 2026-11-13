@@ -129,7 +129,44 @@ describe("ReleaseChannel.latest", () => {
   });
 
   it("asks again once a remembered failure is an hour old", async () => {
-    await cacheHolds({ [KEY]: { checked_at: Date.now() - 2 * 60 * 60 * 1000 } });
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - 2 * 60 * 60 * 1000, failed: true } });
+    publishes({ latest: "2.0.0" });
+
+    expect((await channel().latest())?.version).toBe("2.0.0");
+  });
+
+  it("does not make an old answer look current when the lookup that followed it failed", async () => {
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - DAY, version: "1.5.0" } });
+    down();
+
+    await channel().latest();
+
+    expect(JSON.parse(await readFile(join(home, "cache.json"), "utf8"))[KEY]).toMatchObject({
+      version: "1.5.0",
+      failed: true,
+    });
+  });
+
+  it("asks again within a day when what it knows came from a failed lookup", async () => {
+    await cacheHolds({
+      [KEY]: { checked_at: Date.now() - 2 * 60 * 60 * 1000, version: "1.5.0", failed: true },
+    });
+    publishes({ latest: "2.0.0" });
+
+    expect((await channel().latest())?.version).toBe("2.0.0");
+  });
+
+  it("does not carry another registry's answer past a failed lookup", async () => {
+    await cacheHolds({
+      [`${MIRROR}/@acme/cli#latest`]: { checked_at: Date.now() - DAY, version: "9.0.0" },
+    });
+    down();
+
+    await expect(channel().latest()).resolves.toBeUndefined();
+  });
+
+  it("does not take another registry's failure", async () => {
+    await cacheHolds({ [`${MIRROR}/@acme/cli#latest`]: { checked_at: Date.now(), failed: true } });
     publishes({ latest: "2.0.0" });
 
     expect((await channel().latest())?.version).toBe("2.0.0");

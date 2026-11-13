@@ -22,7 +22,7 @@ function importsIn(source: string): string[] {
 }
 
 describe("lib/upgrade", () => {
-  it("knows nothing of Zitadel, the CLI, oclif or how it is drawn", () => {
+  it("imports only itself, node, its two libraries and the utilities it is allowed", () => {
     const offending = readdirSync(LIBRARY).flatMap((file) => {
       return importsIn(readFileSync(join(LIBRARY, file), "utf8"))
         .filter((source) => !ALLOWED.test(source))
