@@ -1,3 +1,5 @@
+import type { IsNever } from "type-fest";
+
 import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Suggested, Suggestion } from "@/lib/suggestion";
 
@@ -34,74 +36,20 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  */
 export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
-/** The name of each `{name}` in `Text`, as {@link interpolate} reads one. */
-type NamesIn<Text extends string> = Text extends `${string}{${infer Name}}${infer Rest}`
-  ?
-      | (Name extends `${string}${" " | '"' | "'" | ":" | "{" | "$"}${string}` ? never : Name)
-      | NamesIn<Rest>
-  : never;
-
-/** The placeholder names anywhere in `Value`: a string, or each string a list or object holds. */
-type NamesInValue<Value> = Value extends string
-  ? NamesIn<Value>
-  : Value extends readonly (infer Each)[]
-    ? NamesInValue<Each>
-    : Value extends object
-      ? { [Key in keyof Value]: NamesInValue<Value[Key]> }[keyof Value]
-      : never;
-
-/** Whether `R`'s wording is known only as `string`, as a refusal held in a variable of type {@link Refusal} is. */
-type Wide<R> = R extends { readonly message: infer Message }
-  ? string extends Message
-    ? true
-    : R extends { readonly hint: infer Hint }
-      ? string extends Hint
-        ? true
-        : false
-      : false
-  : true;
-
-/** The names `R`'s message, hint and details ask `values` for. */
-export type ValueNames<R> =
-  Wide<R> extends true
-    ? never
-    :
-        | NamesInValue<R extends { readonly message: infer Message } ? Message : never>
-        | NamesInValue<R extends { readonly hint: infer Hint } ? Hint : never>
-        | NamesInValue<R extends { readonly details: infer Details } ? Details : never>;
-
-/** The names `R`'s whole-placeholder `next` entries ask the `next` values for. */
-export type NextNames<R> =
-  Wide<R> extends true
-    ? never
-    : R extends { readonly next: readonly (infer Entry)[] }
-      ? Entry extends `{${infer Name}}`
-        ? Name
-        : never
-      : never;
-
-/**
- * What a refusal's `values` must hold: every name its wording asks for, with a
- * value. A refusal whose wording is only known as `string` takes any values,
- * and only a test can tell what it asks for.
- */
-export type ValuesFor<R> = Placeholders & {
-  readonly [Name in ValueNames<R>]: NonNullable<unknown> | null;
-};
-
-/** What a refusal's `next` values must hold: a follow-up for each whole placeholder it names. */
-export type NextFor<R> = NextPlaceholders & {
-  readonly [Name in NextNames<R>]: Suggested | readonly Suggested[];
-};
-
 /**
  * The names a refusal's wording would leave unfilled, given the values it
  * would be raised with.
  *
  * A refusal with one is a defect in its own wording, not in the run, so the
- * person still gets refused and reads `{min}` where a number belonged. That
- * makes it a defect only a test can catch: a refusal's own test asserts this
- * is empty.
+ * person still gets refused and reads `{min}` where a number belonged. The
+ * compiler catches it where the wording is written as a literal
+ * ({@link ValuesFor}); a refusal whose wording is only known as `string` is
+ * held to this by its own test.
+ *
+ * @param refusal - The refusal.
+ * @param values - What its message and hint are filled from.
+ * @param next - What its whole-placeholder `next` entries are filled from.
+ * @returns Each name nothing fills, once.
  */
 export function unmetBy(
   refusal: Refusal,
@@ -129,7 +77,77 @@ export function unmetBy(
   return [...new Set(unfilled)];
 }
 
+/**
+ * Each placeholder in a refusal's wording, and the name it is filled from: one
+ * or more letters, digits, `_` or `-` between braces. {@link NamesIn} reads a
+ * literal's names the same way, so the compiler asks for exactly the values
+ * {@link interpolate} would fill.
+ */
 const PLACEHOLDER = /\{([\w-]+)\}/g;
+
+/**
+ * Each character of `Text`, as a union of one-character strings.
+ *
+ * @typeParam Text - The characters, written as one string.
+ * @typeParam Found - The characters read so far. Carrying them keeps each step
+ *   in tail position, which a string of 64 characters needs.
+ */
+type CharacterOf<
+  Text extends string,
+  Found extends string = never,
+> = Text extends `${infer Character}${infer Rest}` ? CharacterOf<Rest, Found | Character> : Found;
+
+/** A character a placeholder's name may have, as `[\w-]` in {@link PLACEHOLDER} matches one. */
+type NameCharacter =
+  CharacterOf<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-">;
+
+/**
+ * Whether `Text` is a placeholder's name: one or more {@link NameCharacter}s.
+ * Only literal text can be; text known only as `string` is not.
+ *
+ * @typeParam Text - What a pair of braces holds.
+ */
+type IsName<Text extends string> = Text extends `${NameCharacter}${infer Rest}`
+  ? Rest extends ""
+    ? true
+    : IsName<Rest>
+  : false;
+
+/**
+ * The name of each placeholder in `Text`, read as {@link PLACEHOLDER} reads
+ * them: from each `{` on, the text up to the next `}` is a name when it is
+ * made only of {@link NameCharacter}s, and the reading goes on either way. So
+ * `{{limit}}` asks for `limit`, while `{}`, `{a.b}` and `{json|yaml}` ask for
+ * nothing. Text known only as `string` asks for nothing either.
+ *
+ * @typeParam Text - The wording.
+ * @typeParam Found - The names read so far. Carrying them keeps each step in
+ *   tail position, so a long message does not run out of recursion depth.
+ */
+type NamesIn<
+  Text extends string,
+  Found extends string = never,
+> = Text extends `${string}{${infer Rest}`
+  ? Rest extends `${infer Name}}${infer After}`
+    ? IsName<Name> extends true
+      ? NamesIn<After, Found | Name>
+      : NamesIn<Rest, Found>
+    : Found
+  : Found;
+
+/**
+ * The placeholder names anywhere in `Value`: in a string, or in each string a
+ * list or an object holds, as {@link fill} fills a refusal's details.
+ *
+ * @typeParam Value - A refusal's message, hint or details.
+ */
+type NamesInValue<Value> = Value extends string
+  ? NamesIn<Value>
+  : Value extends readonly (infer Each)[]
+    ? NamesInValue<Each>
+    : Value extends object
+      ? { [Key in keyof Value]: NamesInValue<Value[Key]> }[keyof Value]
+      : never;
 
 /**
  * `template` with each `{name}` replaced by the value `values` holds for it.
@@ -146,7 +164,24 @@ export function interpolate(template: string, values: Placeholders): string {
   });
 }
 
+/**
+ * A string that is one placeholder and nothing else, which takes its value as
+ * it is rather than as text. {@link WholeName} reads a literal the same way.
+ */
 const WHOLE_PLACEHOLDER = /^\{([\w-]+)\}$/;
+
+/**
+ * The name `Entry` is filled from when it is one placeholder and nothing else,
+ * as {@link WHOLE_PLACEHOLDER} reads one: `{fix}` is filled from `fix`, while
+ * `{a} then {b}` is no whole placeholder at all.
+ *
+ * @typeParam Entry - One of a refusal's `next` entries.
+ */
+type WholeName<Entry> = Entry extends `{${infer Name}}`
+  ? IsName<Name> extends true
+    ? Name
+    : never
+  : never;
 
 function isPlain(value: object): boolean {
   const prototype = Object.getPrototypeOf(value);
@@ -206,17 +241,74 @@ function isSuggestedList(value: Suggested | readonly Suggested[]): value is read
   return Array.isArray(value);
 }
 
+/** The parts of a refusal whose wording its `values` fill. */
+type Worded = "message" | "hint" | "details";
+
+/**
+ * The names `R`'s message, hint and details ask `values` for. Each part is
+ * read on its own: one known only as `string`, as every part of a refusal
+ * typed {@link Refusal} is, asks for nothing, and the others are still read.
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ */
+export type ValueNames<R> = {
+  [Part in Worded & keyof R]: NamesInValue<R[Part]>;
+}[Worded & keyof R];
+
+/**
+ * The names `R`'s whole-placeholder `next` entries ask the `next` values for
+ * ({@link WholeName}).
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ */
+export type NextNames<R> = R extends { readonly next?: readonly (infer Entry)[] }
+  ? WholeName<Entry>
+  : never;
+
+/**
+ * What a refusal's `values` must hold: a value for every name its wording asks
+ * for ({@link ValueNames}), and anything else besides. A refusal whose wording
+ * is only known as `string` asks for nothing, so its values go unchecked and
+ * its own test holds it to {@link unmetBy}.
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ */
+export type ValuesFor<R> = Placeholders & {
+  readonly [Name in ValueNames<R>]: NonNullable<unknown> | null;
+};
+
+/**
+ * What a refusal's `next` values must hold: a follow-up, or a list of them, for
+ * each whole placeholder its `next` entries name ({@link NextNames}).
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ */
+export type NextFor<R> = NextPlaceholders & {
+  readonly [Name in NextNames<R>]: Suggested | readonly Suggested[];
+};
+
 /**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
  * `values` fill its wording and `next` its whole-placeholder `next` entries.
  * Its `next` commands stay suggestions for the run that reports it to render,
  * so a refusal raised while a flag parses, before any run has settled, names
  * the same follow-ups as one raised by the command.
+ *
+ * A refusal written as a literal is checked where it is raised: leaving out a
+ * value its wording asks for, or the `next` values its whole placeholders ask
+ * for, does not compile.
+ *
+ * @typeParam R - The refusal, as its declaration or the call spells it.
+ * @param refusal - The refusal.
+ * @param values - What its message, hint and details are filled from.
+ * @param given - What its whole-placeholder `next` entries are filled from:
+ *   required when it has one, and optional otherwise.
+ * @returns The error, for the caller to throw.
  */
 export function refusalError<const R extends Refusal>(
   refusal: R,
   values: ValuesFor<R>,
-  ...given: [NextNames<R>] extends [never] ? [next?: NextPlaceholders] : [next: NextFor<R>]
+  ...given: IsNever<NextNames<R>> extends true ? [next?: NextPlaceholders] : [next: NextFor<R>]
 ): ZitadelError {
   const next: NextPlaceholders = given[0] ?? {};
   const suggested = refusal.next?.flatMap((entry) => {

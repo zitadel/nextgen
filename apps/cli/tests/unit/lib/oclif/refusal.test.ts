@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { interpolate, type Refusal, refusalError, unmetBy } from "@/lib/oclif/refusal";
 
+/**
+ * A refusal with a whole `next` placeholder, typed {@link Refusal}: its
+ * wording is only known as text, so the compiler asks for nothing and only the
+ * run decides what fills it.
+ */
+const WIDE_NEXT: Refusal = { message: "No server", next: ["{next}"] };
+
+/** A hint known only as text, beside a message written as a literal. */
+const WIDE_HINT: string = "Try another one.";
+
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {
     expect(interpolate("{flag} cannot be {value}", { flag: "--port", value: 0 })).toBe(
@@ -81,10 +91,20 @@ describe("refusalError", () => {
   });
 
   it("fills a next placeholder only from the next values, never from a string among the others", () => {
-    // @ts-expect-error a whole `next` placeholder is filled from the typed `next` values alone
-    const error = refusalError({ message: "No server", next: ["{next}"] }, { next: "deploy -m x" });
+    const error = refusalError(WIDE_NEXT, { next: "deploy -m x" });
 
     expect(error.nextCommands).toEqual([]);
+  });
+
+  it("does not compile with a string for a next placeholder", () => {
+    const error = refusalError(
+      { message: "No server", next: ["{next}"] },
+      {},
+      // @ts-expect-error a whole `next` placeholder is filled with a follow-up, never a string
+      { next: "deploy -m x" },
+    );
+
+    expect(error.nextCommands).toEqual(["deploy -m x"]);
   });
 
   it("names nothing for a placeholder no value fills", () => {
@@ -131,6 +151,45 @@ describe("refusalError's values", () => {
     const wide: Refusal = { message: "No {thing}" };
 
     expect(refusalError(wide, {}).message).toBe("No {thing}");
+  });
+
+  it("still asks for what a literal message names when the hint is only known as text", () => {
+    const named = { message: "No {thing}", hint: WIDE_HINT } as const;
+
+    // @ts-expect-error the message asks for {thing}
+    refusalError(named, {});
+
+    expect(refusalError(named, { thing: "schema" }).message).toBe("No schema");
+  });
+
+  it("asks for a name inside doubled braces, as the run fills it", () => {
+    const doubled = { message: "{{limit}} reached" } as const;
+
+    // @ts-expect-error the message asks for {limit}
+    refusalError(doubled, {});
+
+    expect(refusalError(doubled, { limit: 3 }).message).toBe("{3} reached");
+  });
+
+  it("asks for the name after a brace that never closes, as the run fills it", () => {
+    const unclosed = { message: "Use {one {other}" } as const;
+
+    // @ts-expect-error the message asks for {other}
+    refusalError(unclosed, {});
+
+    expect(refusalError(unclosed, { other: "x" }).message).toBe("Use {one x");
+  });
+
+  it("asks for nothing a pair of braces holds that is not a name", () => {
+    const braces = { message: "Pass {} or {a.b} or {json|yaml}" } as const;
+
+    expect(refusalError(braces, {}).message).toBe("Pass {} or {a.b} or {json|yaml}");
+  });
+
+  it("takes an entry with two placeholders as no whole placeholder", () => {
+    const error = refusalError({ message: "No", next: ["{a} then {b}"] }, {});
+
+    expect(error.nextCommands).toEqual([]);
   });
 });
 
