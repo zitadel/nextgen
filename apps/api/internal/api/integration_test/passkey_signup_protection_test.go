@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
@@ -53,9 +52,8 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, def, helpers.MustMarshal(t, def))
 	deployPrimary(t, project.ID)
 
-	origin, err := url.Parse(testServer.URL)
-	require.NoError(t, err)
-	rp := virtualwebauthn.RelyingParty{ID: origin.Hostname(), Name: origin.Hostname(), Origin: testServer.URL}
+	origin := passkeyOrigin(t, testServer.URL)
+	rp := virtualwebauthn.RelyingParty{ID: origin.Hostname(), Name: origin.Hostname(), Origin: origin.String()}
 
 	started, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeRegister}, api.CreateFlowParams{})
 	require.NoError(t, err)
@@ -147,8 +145,7 @@ func TestPasskeySignupFallsBackToAPasswordWithTheSignupProof(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, def, helpers.MustMarshal(t, def))
 	deployPrimary(t, project.ID)
 
-	origin, err := url.Parse(testServer.URL)
-	require.NoError(t, err)
+	origin := passkeyOrigin(t, testServer.URL)
 	started, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeRegister}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, started, helpers.MustMarshal(t, started))

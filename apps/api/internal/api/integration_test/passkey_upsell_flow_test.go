@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
@@ -32,11 +31,10 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
-	rpOriginURL, err := url.Parse(testServer.URL)
-	require.NoError(t, err)
+	rpOriginURL := passkeyOrigin(t, testServer.URL)
 	rpIDStr := rpOriginURL.Hostname()
 
-	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: testServer.URL}
+	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: rpOriginURL.String()}
 	// UserHandle is ignored for passkey_register: the engine derives it from
 	// the session's pinned _user_id, not the authenticator.
 	auth := virtualwebauthn.NewAuthenticator()
