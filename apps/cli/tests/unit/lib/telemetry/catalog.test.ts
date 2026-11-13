@@ -30,7 +30,7 @@ const catalogPath = join(
   "../../../../../../docs/product-analytics-events.yaml",
 );
 const srcDir = join(import.meta.dirname, "../../../../src");
-const commandsDir = join(srcDir, "commands");
+const commandsDir = join(srcDir, "cli", "commands");
 const baseCommand = join(srcDir, "lib/oclif/base.ts");
 
 type PropertyDef = {
@@ -122,7 +122,7 @@ function calls(name: string): (call: ts.CallExpression) => boolean {
     ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === name;
 }
 
-/** The command id oclif gives a file under `src/commands`, such as `variables:set`. */
+/** The command id oclif gives a file under `src/cli/commands`, such as `variables:set`. */
 function commandId(file: string): string {
   const segments = file.replace(/\.ts$/, "").split(sep);
   if (segments.at(-1) === "index") {

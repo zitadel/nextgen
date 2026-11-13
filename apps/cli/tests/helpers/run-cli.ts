@@ -155,7 +155,7 @@ async function commandSeeing(
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
   if (name === "doctor") {
-    const { default: Doctor } = await import("@/commands/doctor");
+    const { default: Doctor } = await import("@/cli/commands/doctor");
     return class extends Doctor {
       static override id = "doctor";
 
@@ -165,7 +165,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("@/commands/stop");
+    const { default: Stop } = await import("@/cli/commands/stop");
     return class extends Stop {
       static override id = "stop";
 

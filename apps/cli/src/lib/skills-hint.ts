@@ -1,3 +1,4 @@
+import { isCI } from "./ci";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -137,10 +138,6 @@ export async function showSkillsHint(input: SkillsHintShown): Promise<void> {
   } catch {
     // A hint must never break `setup` or the root help.
   }
-}
-
-export function isCI(env: NodeJS.ProcessEnv): boolean {
-  return Boolean(env.CI) && env.CI !== "0" && env.CI !== "false";
 }
 
 function isOptedOut(env: NodeJS.ProcessEnv): boolean {
