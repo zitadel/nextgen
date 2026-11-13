@@ -275,7 +275,7 @@ describe("release detail", () => {
     servePointers();
     const preview = deployment("dep_2", {
       kind: "preview",
-      targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
+      targets: [{ origin: "https://acme-k3x9v2.vercel.app" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
     // The history also holds another release's deployment, which the card

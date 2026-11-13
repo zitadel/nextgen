@@ -1854,11 +1854,7 @@ function deploymentResponse(
     id: deployment.id,
     project_id: deployment.projectId,
     release_id: deployment.releaseId,
-    targets: targets.map((target) =>
-      target.expiresAt === null
-        ? { origin: target.origin }
-        : { origin: target.origin, expires_at: target.expiresAt },
-    ),
+    targets: targets.map((target) => ({ origin: target.origin })),
     kind: deploymentKind(deployment),
     status,
     deployed_at: deployment.deployedAt,

@@ -145,7 +145,8 @@ post:
                   deployed_by_type: human
             previewed:
               summary: A release deployed to two preview URLs
-              description: Each target carries the expiry of its preview.
+              description: |
+                Each preview's expiry is on `GET /projects/{project_id}/previews`.
               value:
                 id: dep_01KX5M2A0C4D7F0N9WD3P2E4YM8
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -153,9 +154,7 @@ post:
                 kind: preview
                 targets:
                   - origin: https://acme-git-sso-acmeinc.vercel.app
-                    expires_at: '2026-10-09T14:10:00Z'
                   - origin: https://acme-k3x9v2-acmeinc.vercel.app
-                    expires_at: '2026-10-09T14:10:00Z'
                 status: live
                 deployed_at: '2026-10-02T14:10:00Z'
                 metadata:
@@ -360,7 +359,6 @@ get:
                     kind: preview
                     targets:
                       - origin: https://acme-git-sso-acmeinc.vercel.app
-                        expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
                     metadata:
@@ -425,7 +423,6 @@ get:
                     kind: preview
                     targets:
                       - origin: https://acme-git-sso-acmeinc.vercel.app
-                        expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
                     metadata:

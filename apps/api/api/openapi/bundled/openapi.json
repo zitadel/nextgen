@@ -10209,7 +10209,7 @@
                   },
                   "previewed": {
                     "summary": "A release deployed to two preview URLs",
-                    "description": "Each target carries the expiry of its preview.",
+                    "description": "Each preview's expiry is on `GET /projects/{project_id}/previews`.\n",
                     "value": {
                       "id": "dep_01KX5M2A0C4D7F0N9WD3P2E4YM8",
                       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
@@ -10217,12 +10217,10 @@
                       "kind": "preview",
                       "targets": [
                         {
-                          "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                          "expires_at": "2026-10-09T14:10:00Z"
+                          "origin": "https://acme-git-sso-acmeinc.vercel.app"
                         },
                         {
-                          "origin": "https://acme-k3x9v2-acmeinc.vercel.app",
-                          "expires_at": "2026-10-09T14:10:00Z"
+                          "origin": "https://acme-k3x9v2-acmeinc.vercel.app"
                         }
                       ],
                       "status": "live",
@@ -10488,8 +10486,7 @@
                           "kind": "preview",
                           "targets": [
                             {
-                              "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                              "expires_at": "2026-10-09T14:58:00Z"
+                              "origin": "https://acme-git-sso-acmeinc.vercel.app"
                             }
                           ],
                           "status": "live",
@@ -10586,8 +10583,7 @@
                           "kind": "preview",
                           "targets": [
                             {
-                              "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                              "expires_at": "2026-10-09T14:58:00Z"
+                              "origin": "https://acme-git-sso-acmeinc.vercel.app"
                             }
                           ],
                           "status": "live",
@@ -25602,12 +25598,6 @@
         "properties": {
           "origin": {
             "$ref": "#/components/schemas/origin"
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Preview URLs only: the expiry this deployment set. A later deployment\nto the URL records its own.\n",
-            "example": "2026-10-09T14:10:00Z"
           }
         }
       },

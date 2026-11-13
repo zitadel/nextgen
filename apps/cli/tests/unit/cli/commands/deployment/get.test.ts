@@ -29,7 +29,7 @@ const DEPLOYMENT = {
   id: "dep_1",
   project_id: "proj_test",
   release_id: "rel_1",
-  targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
+  targets: [{ origin: PRIMARY_ORIGIN }],
   kind: "primary",
   status: "live",
   metadata: { reason: "deploy" },

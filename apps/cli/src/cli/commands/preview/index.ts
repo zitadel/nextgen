@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { ForbiddenError, OriginService, PreviewService, type ZitadelClient } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -338,10 +338,17 @@ export default class Preview extends PreviewCommand {
           }),
     });
 
+    // The deployment records no expiry; the live preview carries the one it set.
+    const live = await new PreviewService(client, projectId).list();
+    const expiries = new Map(
+      live.map((preview) => {
+        return [preview.origin, preview.expires_at] as const;
+      }),
+    );
     const previews = deployment.targets.map((target) => {
       return {
         url: target.origin,
-        expires_at: target.expires_at ?? null,
+        expires_at: expiries.get(target.origin) ?? null,
       };
     });
 
