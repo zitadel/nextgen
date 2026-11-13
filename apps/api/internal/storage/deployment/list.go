@@ -58,13 +58,6 @@ func NewestOfKindOptions(projectID string, kind domain.DeploymentOriginKind) *da
 	return opts
 }
 
-// LiveListOptions lists the deployments some origin still serves, newest
-// first; a non-nil releaseID narrows it to that release. ListLiveDeployments
-// applies the time with LiveAt.
-func LiveListOptions(projectID string, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
-	return ListOptions(projectID, nil, releaseID, limit)
-}
-
 // ServesOrigin matches the deployment origin serves at now.
 func ServesOrigin(origin string, now time.Time) database.Filter[domain.DeploymentField] {
 	return database.CorrelatedEqual(database.Col(domain.DeploymentFieldServesOrigin), origin, now)

@@ -431,7 +431,7 @@ func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymen
 // an origin, it is the one deployment serving it.
 func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
 	now := time.Now()
-	opts := deployment.LiveListOptions(input.ProjectID, input.ReleaseID, uint32(normalizeLimit(input.Limit)))
+	opts := deployment.ListOptions(input.ProjectID, nil, input.ReleaseID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 	if input.Origin != nil {
 		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(*input.Origin, now))

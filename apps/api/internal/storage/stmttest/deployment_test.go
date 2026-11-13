@@ -67,7 +67,7 @@ func history(t *testing.T, stmts service.AllStatements, projectID, origin string
 
 func live(t *testing.T, stmts service.AllStatements, projectID string, now time.Time, releaseID *string) []*domain.Deployment {
 	t.Helper()
-	result, err := stmts.ListLiveDeployments(unfilteredListCtx(t), now, deployment.LiveListOptions(projectID, releaseID, 50))
+	result, err := stmts.ListLiveDeployments(unfilteredListCtx(t), now, deployment.ListOptions(projectID, nil, releaseID, 50))
 	require.NoError(t, err)
 	return result.Items
 }
@@ -425,7 +425,7 @@ func TestDeploymentStatements_ListServingOneOrigin(t *testing.T) {
 		addPrimaryOrigins(t, d.stmts, projectID, wwwOrigin)
 		now := time.Now()
 
-		opts := deployment.LiveListOptions(projectID, nil, 1)
+		opts := deployment.ListOptions(projectID, nil, nil, 1)
 		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(wwwOrigin, now))
 		result, err := d.stmts.ListLiveDeployments(unfilteredListCtx(t), now, opts)
 		require.NoError(t, err)
