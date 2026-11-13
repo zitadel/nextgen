@@ -321,7 +321,7 @@ SQLite integration tests use a local file database and need no Docker:
 
 ```sh
 turbo run test:sqlite --filter=@zitadel/server
-# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
+# or, with every untagged test too: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
 Postgres and Spanner integration tests use
@@ -335,7 +335,7 @@ Docker.
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 turbo run test:postgres --filter=@zitadel/server
-# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
+# or, with every untagged test too: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the turbo task — see emulator-testcontainer note below)
 turbo run test:spanner --filter=@zitadel/server

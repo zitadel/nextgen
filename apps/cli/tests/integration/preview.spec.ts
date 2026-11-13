@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
 const platform = usePlatformMock();
 
-const PREVIEW_PATTERN = "https://*-acme.vercel.app";
-const PREVIEW_URL = "https://x-acme.vercel.app";
 const OTHER_URL = "https://y-acme.vercel.app";
 
 const UNNAMED_CI_WARNING =
@@ -684,9 +683,9 @@ describe("preview", () => {
 
       it("refuses a primary origin's own URL as a target", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
 
-        const result = await app.run(["preview", "--origin", "https://app.acme.com", "--json"]);
+        const result = await app.run(["preview", "--origin", PRIMARY_ORIGIN, "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
         expect(app.envelopeOf(result)).toEqual({
@@ -695,7 +694,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
-          message: "https://app.acme.com is a primary origin",
+          message: `${PRIMARY_ORIGIN} is a primary origin`,
           hint: "Pass the preview URLs with --origin; production is deployed after merge.",
         });
       });

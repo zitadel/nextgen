@@ -409,6 +409,15 @@ Each invocation prints one JSON object:
   trimmed) before they ask or call the server, saying what one looks like and
   suggesting the list command. `claim --challenge-id` refuses a malformed
   challenge id the same way.
+- `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
+  When the server names the origins that serve it, the `hint` names each with
+  its kind (`primary` or `preview`) and the deployment that pins the release
+  there, and `next_commands` lists what frees them: `deploy` and
+  `deployment rollback` for primary origins (each only helps if the release it
+  puts live is a different one), `preview rm <url>` for each preview, which
+  cannot be rolled back and also stops serving when it expires. Without them
+  the conflict has no `hint` and no `next_commands`. Revoke again once none
+  serves it.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.

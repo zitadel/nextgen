@@ -146,6 +146,35 @@ func TestEventStatements_Insert_OccurredAtWait(t *testing.T) {
 	})
 }
 
+// Event times keep their sub-second part through storage on every dialect:
+// the console's Events timeline measures a login flow's steps by them, and
+// the API writes them to the millisecond.
+func TestEventStatements_TimesKeepMilliseconds(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, eventID := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		const wait = 1234 * time.Millisecond
+		entity := sampleEvent(projectID, eventID)
+		entity.OccurredAtWait = wait
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), entity))
+
+		got, err := d.stmts.GetEventByID(t.Context(), projectID, eventID)
+		require.NoError(t, err)
+		// Postgres keeps microseconds, Spanner and SQLite nanoseconds.
+		assert.True(t, entity.OccurredAt.Truncate(time.Microsecond).Equal(got.OccurredAt.Truncate(time.Microsecond)),
+			"occurred_at %s read back as %s", entity.OccurredAt, got.OccurredAt)
+		assert.True(t, entity.CreatedAt.Truncate(time.Microsecond).Equal(got.CreatedAt.Truncate(time.Microsecond)),
+			"created_at %s read back as %s", entity.CreatedAt, got.CreatedAt)
+
+		// The stored gap is the wait to the millisecond, not whole seconds.
+		gap := got.CreatedAt.Sub(got.OccurredAt)
+		assert.GreaterOrEqual(t, gap, wait)
+		assert.Less(t, gap, wait+time.Second)
+		assert.NotZero(t, gap%time.Second, "the gap %s lost its fraction", gap)
+	})
+}
+
 func TestEventStatements_ListKeyset(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)

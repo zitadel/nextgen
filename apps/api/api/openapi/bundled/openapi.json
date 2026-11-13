@@ -22843,12 +22843,14 @@
           "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the action happened, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the action happened, on the server's clock, to the millisecond.\n"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the event was stored, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the event was stored, on the server's clock, to the millisecond.\n"
           },
           "actor_id": {
             "description": "The ID of the actor that triggered the event.",
