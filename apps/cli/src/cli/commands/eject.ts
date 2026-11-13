@@ -26,6 +26,7 @@ import {
   shellSteps,
   suggestedCommandOf,
 } from "@/lib/suggestion";
+import { ejectedBackup } from "@/lib/secret-paths";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -161,11 +162,11 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
       continue;
     }
     if (dryRun) {
-      backedUp.push(`${rel} -> ${rel}.ejected-<timestamp>`);
+      backedUp.push(`${rel} -> ${ejectedBackup(rel, "<timestamp>")}`);
       continue;
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backup = `${abs}.ejected-${stamp}`;
+    const backup = ejectedBackup(abs, stamp);
     await rename(abs, backup);
     backedUp.push(`${rel} -> ${backup.slice(cwd.length + 1)}`);
   }

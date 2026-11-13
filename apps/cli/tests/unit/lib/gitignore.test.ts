@@ -4,9 +4,14 @@ import { join } from "node:path";
 import { beforeEach, describe, expect } from "vitest";
 
 import { brokenRules, entriesToAppend, ZITADEL_GITIGNORE } from "@/lib/gitignore";
+import { createOrca } from "@/lib/orca";
+import { detectors } from "@/lib/orca/detectors";
+import type { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { ejectedBackup, environmentFileName, isSecretPath } from "@/lib/secret-paths";
 import { it } from "@tests/helpers/fixtures";
 import { git, ignoredByGit, isolateGit } from "@tests/helpers/git-repo";
 import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
+import { aPatchContext } from "@tests/helpers/patch-context";
 
 /** What `sv create`'s minimal template writes. */
 const SVELTEKIT = SVELTEKIT_GITIGNORE;
@@ -89,6 +94,47 @@ const OTHER_PATHS = [
   "src/app.ts",
 ];
 
+/** A hand-written list of the env files a developer has seen the CLI write, with a pattern for eject's backups. */
+const A_LIST_OF_NAMES =
+  ".zitadel/secret\n.env\n.env.local\n.env.development.local\n*.ejected-*\n!.env.example\n";
+
+/** One pattern for each kind of name the CLI gives a secret file, and nothing broader. */
+const A_PATTERN_PER_KIND = ".zitadel/secret\n.env\n*.local\n*.ejected-*\n";
+
+/** When the files `eject` backs up were ejected, in the form it names them with. */
+const EJECTED_AT = "2026-11-13T10-00-00-000Z";
+
+/** Environments `env add` could bind, none of them a sample the rules name. */
+const ENVIRONMENTS = ["staging", "qa", "production", "development"];
+
+/**
+ * Every file the CLI writes that {@link isSecretPath} says holds a secret,
+ * read from the code that names them: each framework's setup plan, the files
+ * `eject` backs up and the names it gives the backups, and the file each
+ * environment `env add` binds. A file a patcher starts to write shows up here
+ * without anyone listing it.
+ */
+function secretFilesTheCliWrites(): string[] {
+  const written = new Set<string>();
+  for (const { framework } of detectors) {
+    const patcher = createOrca().patcherFor(framework) as AbstractRulePatcher;
+    const context = aPatchContext(framework, { scaffoldedFramework: true });
+    for (const op of patcher.plan(context).ops) {
+      if ("path" in op && typeof op.path === "string" && isSecretPath(op.path)) {
+        written.add(op.path);
+      }
+    }
+    for (const file of patcher.artifacts(context).envBackups) {
+      written.add(file);
+      written.add(ejectedBackup(file, EJECTED_AT));
+    }
+  }
+  for (const name of ENVIRONMENTS) {
+    written.add(environmentFileName(name));
+  }
+  return [...written].sort();
+}
+
 /** The paths of `paths` git ignores once the repository at `dir` has `text` as its `.gitignore`. */
 async function ignoredWith(dir: string, text: string, paths: readonly string[]): Promise<string[]> {
   await writeFile(join(dir, ".gitignore"), text);
@@ -162,6 +208,31 @@ describe("entriesToAppend", () => {
     const entries = entriesToAppend(AN_OLDER_SETUP);
 
     expect(appended(AN_OLDER_SETUP, entries).startsWith(AN_OLDER_SETUP)).toBe(true);
+  });
+});
+
+describe("ZITADEL_GITIGNORE", () => {
+  it("finds the secret files setup writes in its own plans", () => {
+    const files = secretFilesTheCliWrites();
+
+    expect(files).toEqual(
+      expect.arrayContaining([".zitadel/secret", ".env.local", ".env.development.local"]),
+    );
+  });
+
+  describe.for([
+    ...SHAPES,
+    ["a list of the names the CLI writes", A_LIST_OF_NAMES],
+    ["a pattern for each kind of name", A_PATTERN_PER_KIND],
+  ] as const)("with %s", ([, text]) => {
+    it("makes git ignore every file the CLI writes a secret into", async ({ dir }) => {
+      await git(dir, "init", "--quiet");
+      const files = secretFilesTheCliWrites();
+
+      const entries = entriesToAppend(text);
+
+      expect(await ignoredWith(dir, appended(text, entries), files)).toEqual(files);
+    });
   });
 });
 

@@ -23,6 +23,7 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "@/lib/project";
+import { environmentFileName } from "@/lib/secret-paths";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -45,7 +46,7 @@ async function environmentFile(
   name: string,
   force: boolean,
 ): Promise<{ file: string; path: string }> {
-  const file = `.env.${name}.local`;
+  const file = environmentFileName(name);
   const path = join(cwd, file);
   const exists = await stat(path).then(
     () => {

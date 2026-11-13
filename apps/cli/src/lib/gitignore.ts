@@ -1,6 +1,6 @@
 import ignore from "ignore";
 
-import { isSecretPath } from "@/lib/secret-paths";
+import { ejectedBackup, environmentFileName, isSecretPath } from "@/lib/secret-paths";
 
 /**
  * A path the root `.gitignore` must ignore or must keep, and the line that
@@ -13,7 +13,15 @@ export interface GitignoreRule {
 }
 
 /**
- * What the files setup writes need from the root `.gitignore`: each file
+ * An environment and an eject time no `.gitignore` names on its own, so only a
+ * line that ignores every environment's file, or every backup, meets the rules
+ * that stand for them.
+ */
+const ANY_ENVIRONMENT = "any-environment";
+const ANY_STAMP = "any-time";
+
+/**
+ * What the files the CLI writes need from the root `.gitignore`: each one
  * {@link isSecretPath} says must never be committed ignored, and
  * `.env.example`, which names the variables without their values and is meant
  * to be committed, kept.
@@ -21,18 +29,20 @@ export interface GitignoreRule {
  * @remarks
  * Each rule names a path, not a line, because a generator's own lines may
  * already cover it (`.env.*`, `*.local`) or undo it (`.env*` after
- * `!.env.example`), and git lets the last matching line win. The rules that
- * ignore come first: an entry appended for one of them can re-ignore a kept
- * path, which the kept path's own entry, appended after it, then undoes.
- * `eject` renames each env file to `<name>.ejected-<timestamp>`, which holds
- * the same secrets.
+ * `!.env.example`), and git lets the last matching line win. A file whose name
+ * varies (an environment's, an eject backup's) is named by a sample no list
+ * holds, taken from the function that names the file. The rules that ignore
+ * come first: an entry appended for one of them can re-ignore a kept path,
+ * which the kept path's own entry, appended after it, then undoes.
  */
 export const ZITADEL_GITIGNORE: ReadonlyArray<GitignoreRule> = [
   rule(".zitadel/secret", ".zitadel/secret"),
   rule(".env", ".env*"),
   rule(".env.local", ".env*"),
-  rule(".env.development.local", ".env*"),
-  rule(".env.local.ejected-2026-01-01T00-00-00-000Z", ".env*"),
+  rule(environmentFileName("development"), ".env*"),
+  rule(environmentFileName(ANY_ENVIRONMENT), ".env*"),
+  rule(ejectedBackup(".env.local", ANY_STAMP), ".env*"),
+  rule(ejectedBackup(environmentFileName("development"), ANY_STAMP), ".env*"),
   rule(".env.example", "!.env.example"),
 ];
 
