@@ -6,11 +6,13 @@ import { describe, expect, it } from "vitest";
 const LIBRARY = join(import.meta.dirname, "../../../../src/lib/upgrade");
 
 /**
- * The only things `lib/upgrade` may import: itself, node, semver and the two npm
- * libs. This checks direct imports only: `lib/package-manager` itself reaches
- * `public-cli` and `cmd` for how a command is spelled.
+ * The only things `lib/upgrade` may import: itself, node, `semver`, `execa` and
+ * the small utilities it builds on. It carries Zitadel's defaults, so it may
+ * name Zitadel, but it must not reach into commands, oclif or the rest of the
+ * CLI. This checks direct imports only.
  */
-const ALLOWED = /^(\.\/|node:|semver$|@\/lib\/npm$|@\/lib\/package-manager$)/;
+const ALLOWED =
+  /^(\.\/|node:|semver$|execa$|@\/lib\/(ci|fs|json|npm|package-manager|public-cli|telemetry\/identity)$)/;
 
 /** Every module a source imports: `from "x"`, `import "x"` and `import("x")`. */
 function importsIn(source: string): string[] {

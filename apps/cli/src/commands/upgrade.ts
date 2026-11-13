@@ -13,6 +13,8 @@ import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
 import { type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { releaseChannel } from "@/lib/upgrade/config";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import {
   InstallError,
   PackageInstaller,
@@ -20,8 +22,6 @@ import {
   type UpgradeResult,
   Upgrader,
 } from "@/lib/upgrade";
-import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE } from "@/cli/constants";
-import { zitadelChannel } from "@/cli/release";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
@@ -89,7 +89,7 @@ export default class Upgrade extends BaseCommand {
       cwd: this.cwd,
       scope: ZITADEL_SCOPE,
       dryRun: this.dryRun,
-      channel: zitadelChannel(this.cliVersion, this.env),
+      channel: releaseChannel(this.cliVersion, this.env),
       installer: new PackageInstaller({
         cwd: this.cwd,
         typedCwd: flags.cwd,

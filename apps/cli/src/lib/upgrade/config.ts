@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
+import { isCI } from "@/lib/ci";
 import { npmDistTagForCliVersion } from "@/lib/public-cli";
-import { isCI } from "@/lib/skills-hint";
 import { telemetryConfigDir } from "@/lib/telemetry/identity";
-import { Cache } from "@/lib/upgrade/cache";
-import { ReleaseChannel } from "@/lib/upgrade/channel";
 
-import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI } from "./constants";
+import { Cache } from "./cache";
+import { ReleaseChannel } from "./channel";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI } from "./defaults";
 
 /**
  * The registry asked when npm was not pointed at another.
@@ -38,7 +38,7 @@ export function updateCheckDisabled(env: NodeJS.ProcessEnv): boolean {
  * @param env - The run's environment.
  * @returns The channel.
  */
-export function zitadelChannel(cliVersion: string, env: NodeJS.ProcessEnv): ReleaseChannel {
+export function releaseChannel(cliVersion: string, env: NodeJS.ProcessEnv): ReleaseChannel {
   let registry = DEFAULT_REGISTRY;
   const configured = env.npm_config_registry?.trim();
   if (configured !== undefined && configured !== "") {

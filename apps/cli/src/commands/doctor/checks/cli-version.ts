@@ -1,5 +1,5 @@
 import type { Suggest } from "@/lib/suggestion";
-import { updateCheckDisabled, zitadelChannel } from "@/cli/release";
+import { releaseChannel, updateCheckDisabled } from "@/lib/upgrade/config";
 
 import type { CheckOutcome } from "./types";
 
@@ -24,7 +24,7 @@ export async function checkCliVersion(input: {
       message: `CLI ${cliVersion}; update check is off`,
     };
   }
-  const latest = await zitadelChannel(cliVersion, env).latest();
+  const latest = await releaseChannel(cliVersion, env).latest();
   if (latest === undefined) {
     return {
       ...base,

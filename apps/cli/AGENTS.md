@@ -129,9 +129,12 @@
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never
   imports `lib/oclif`. The exception is `src/lib/upgrade` (classes, one word per
-  file): it is generic, knows nothing of Zitadel, the CLI or `doctor`, and takes
-  what it needs as options. `src/cli/release.ts` supplies Zitadel's, and
-  the `upgrade` command does the CLI's part, `doctor --fix` included.
+  file): it carries Zitadel's defaults in `defaults.ts` and `config.ts`, takes
+  every one of them as an option so a test or another product can swap it, and
+  builds only on small utilities (`lib/ci`, `fs`, `json`, `npm`,
+  `package-manager`, `public-cli`, `telemetry/identity`). It never imports
+  commands or `lib/oclif`; the `upgrade` command does the CLI's part,
+  `doctor --fix` included.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
   sink decides the look, and `--json` installs one that draws nothing; with no

@@ -2,7 +2,7 @@ import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
 import { Dependencies } from "@/lib/upgrade/dependencies";
-import { ZITADEL_SCOPE } from "@/cli/constants";
+import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 

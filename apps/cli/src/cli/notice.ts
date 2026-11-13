@@ -5,8 +5,8 @@ import { command, notice } from "@/lib/style";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { drawBox } from "@/lib/ui/layout";
-import { ZITADEL_SCOPE } from "./constants";
-import { updateCheckDisabled, zitadelChannel } from "./release";
+import { releaseChannel, updateCheckDisabled } from "@/lib/upgrade/config";
+import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 
 /**
  * The box `zitadel --version` ends with when something is behind the latest
@@ -39,7 +39,7 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  const release = await zitadelChannel(cliVersion, env).latest();
+  const release = await releaseChannel(cliVersion, env).latest();
   if (release === undefined) {
     return undefined;
   }
