@@ -20,7 +20,6 @@ import {
   getCreateFlowMockHandler,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
-import { exchangeHandoffQueryProjectIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   CreateFlow201,
   CreateFlow201StepPurpose,
@@ -175,6 +174,14 @@ function returnTargetRefusal(
 }
 
 /**
+ * The spec's project-id pattern, written out. This file runs in the browser
+ * (Storybook, the docs' live examples), and importing it from orval's zod
+ * module would build every schema there, whose `new Function` probe a strict
+ * CSP reports as an eval. Keep validators out of the handlers' import graph.
+ */
+const PROJECT_ID = /^[a-zA-Z0-9_-]+$/;
+
+/**
  * The session an in-process exchange answers with: active, with the verified
  * factor a completed sign-in leaves, and ids in the spec's patterns. The
  * project is the one the request names, when it is a valid project id.
@@ -185,8 +192,7 @@ function exchangedSession(projectId: string | undefined): ExchangeHandoff200 {
   return {
     session: {
       session_id: "sess_mock",
-      project_id:
-        projectId && exchangeHandoffQueryProjectIdRegExp.test(projectId) ? projectId : "proj_mock",
+      project_id: projectId && PROJECT_ID.test(projectId) ? projectId : "proj_mock",
       state: "active",
       user_id: "user_mock",
       factors: [{ method: "password", verified_at: created.toISOString() }],
