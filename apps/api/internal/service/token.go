@@ -51,7 +51,7 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (_ s
 		if err := tx.Statements().CreateToken(ctx, data); err != nil {
 			return err
 		}
-		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, tokenUserID(data), data.Scope)
+		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, nil, tokenUserID(data), data.Scope)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -114,6 +114,14 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 		return nil
 	}
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// Read before the delete: the event names the user whose token it was.
+		var userID string
+		token, err := tx.Statements().GetTokenByID(ctx, projectID, tokenID)
+		if err == nil {
+			userID = token.UserID
+		} else if _, missing := errors.AsType[*database.NoRowFoundError](err); !missing {
+			return err
+		}
 		if err := tx.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
 			return err
 		}
@@ -123,7 +131,7 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 			ProjectID:  projectID,
 			EntityType: "token",
 			EntityID:   tokenID,
-			TokenID:    tokenID,
+			UserID:     userID,
 			Payload:    domain.AuthTokenRevokedPayload{},
 		})
 	})

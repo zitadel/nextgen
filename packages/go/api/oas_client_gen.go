@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -30,529 +31,529 @@ func trimTrailingSlashes(u *url.URL) {
 type Invoker interface {
 	// AcceptInvitation invokes acceptInvitation operation.
 	//
-	// Accepts a pending invitation for the signed-in user and returns the updated
-	// invitation.
-	// Send the plaintext token from the invitation link fragment. Acceptance
-	// grants the invitation's role (a project grant for `project_member`) when
-	// the invitation is pending and unexpired, the project is active and claimed,
-	// and the creator still holds `admin` unless `created_by` is null. The
-	// inviter cannot accept their own invitation. Every unknown or finished token
-	// answers the same opaque `404`.
-	// Authenticate with a platform-project user session cookie (`sessionCookie`).
-	// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	// Accepts a pending invitation for the signed-in user and returns the updated invitation.
+	//
+	// Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
+	// (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
+	// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
+	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+	//
+	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
+	// that scheme's CSRF rules. The call is rate-limited.
 	//
 	// POST /invitations/accept
 	AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error)
 	// AddProjectOrigin invokes addProjectOrigin operation.
 	//
 	// Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
-	// An origin pattern says which web origins the project accepts. A `primary`
-	// pattern must be an exact URL with no wildcard. A `preview` pattern may
-	// include a single DNS-label wildcard.
-	// While the project has no patterns, it admits no origin except a loopback
-	// origin, so the first pattern you add opens it to the origins that
-	// pattern matches. Admitting an origin is not serving it: a new `primary`
-	// origin answers `rel.not_deployed` until the next deploy to primary
+	//
+	// An origin pattern says which web origins the project accepts. A `primary` pattern must be an exact
+	// URL with no wildcard. A `preview` pattern may include a single DNS-label wildcard.
+	//
+	// While the project has no patterns, it admits no origin except a loopback origin, so the first
+	// pattern you add opens it to the origins that pattern matches. Admitting an origin is not serving it:
+	// a new `primary` origin answers `rel.not_deployed` until the next deploy to primary
 	// (`zitadel deploy`).
-	// Adding a pattern that already exists with the same kind is idempotent and
-	// answers `201` with the stored origin. If the pattern exists with the other
-	// kind, the request is refused with `origin.kind_conflict`: remove it with
-	// `removeProjectOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
+	//
+	// Adding a pattern that already exists with the same kind is idempotent and answers `201` with the
+	// stored origin. If the pattern exists with the other kind, the request is refused with
+	// `origin.kind_conflict`: remove it with `removeProjectOrigin`
+	// (`POST /projects/{project_id}/origins/remove`), then add it again.
 	//
 	// POST /projects/{project_id}/origins
 	AddProjectOrigin(ctx context.Context, request *ProjectOrigin, params AddProjectOriginParams) (AddProjectOriginRes, error)
 	// BuildRelease invokes buildRelease operation.
 	//
-	// Builds a release from the resources in `.zitadel/` as authored on disk,
-	// grouped by kind, in one transaction.
-	// A release is a snapshot of the project's configuration. A failure anywhere
-	// leaves no revision and no release. The caller records nothing. The CLI's
-	// `deploy` command builds its release with this operation.
-	// If the project already holds a release with the same content, the same
-	// `content_hash`, the request answers `200` with that release and allocates
-	// nothing, however long ago it was built. Metadata is excluded from the
-	// comparison, so the same content under a different `message` is the same
-	// release.
-	// Otherwise every resource is compared with the project's newest revision of
-	// the same handle. Unchanged content reuses that revision, and changed
-	// content allocates a new one. The request answers `201` with the new
-	// release. A policy whose config matches only an older revision allocates a
-	// new one too, so the policy reads back as the config the build carried.
-	// A structurally malformed request is refused while decoding with
-	// `req.invalid`, naming the offending fields. A well-formed bundle is then
-	// checked resource by resource, as each kind's create endpoint checks it,
-	// and every failure is reported at once. The request answers `400` with
-	// `rel.invalid`, and `details.resources` lists each resource that failed.
-	// Fix each listed resource and build again. A handle that resolves neither
-	// in the bundle nor in the project answers `rel.unresolved_reference`,
+	// Builds a release from the resources in `.zitadel/` as authored on disk, grouped by kind, in one
+	// transaction.
+	//
+	// A release is a snapshot of the project's configuration. A failure anywhere leaves no revision and no
+	// release. The caller records nothing. The CLI's `deploy` command builds its release with this
+	// operation.
+	//
+	// If the project already holds a release with the same content, the same `content_hash`, the request
+	// answers `200` with that release and allocates nothing, however long ago it was built. Metadata is
+	// excluded from the comparison, so the same content under a different `message` is the same release.
+	//
+	// Otherwise every resource is compared with the project's newest revision of the same handle.
+	// Unchanged content reuses that revision, and changed content allocates a new one. The request answers
+	// `201` with the new release. A policy whose config matches only an older revision allocates a new one
+	// too, so the policy reads back as the config the build carried.
+	//
+	// A structurally malformed request is refused while decoding with `req.invalid`, naming the offending
+	// fields. A well-formed bundle is then checked resource by resource, as each kind's create endpoint
+	// checks it, and every failure is reported at once. The request answers `400` with `rel.invalid`, and
+	// `details.resources` lists each resource that failed. Fix each listed resource and build again. A
+	// handle that resolves neither in the bundle nor in the project answers `rel.unresolved_reference`,
 	// naming the pointer and the handle. Add the missing resource to the bundle.
-	// Building writes revisions, so besides `release.write` it needs the write
-	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-	// as the per-kind create endpoints do. A missing scope answers `403` with
-	// `rel.permission_denied`, naming the kind. Request a token with that scope.
-	// An empty kind needs no scope.
-	// Building a release does not deploy it. A release is not tied to an origin,
-	// and the same release can later be deployed to any number of origins
-	// unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
+	//
+	// Building writes revisions, so besides `release.write` it needs the write scope of every kind the
+	// bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
+	// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
+	// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
+	// scope. An empty kind needs no scope.
+	//
+	// Building a release does not deploy it. A release is not tied to an origin, and the same release can
+	// later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
+	// (`POST /deployments`).
 	//
 	// POST /releases/build
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CancelInvitation invokes cancelInvitation operation.
 	//
-	// Deletes a pending invitation. Its link can no longer be redeemed. Only a
-	// `pending` invitation can be cancelled; a finished invitation answers the
-	// same opaque `404` as a miss. Expired invitations keep their row until a
-	// later cleanup job removes them.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Cancelling needs the same project `admin` check as
-	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
-	// rules.
+	// Deletes a pending invitation. Its link can no longer be redeemed. Only a `pending` invitation can be
+	// cancelled; a finished invitation answers the same opaque `404` as a miss. Expired invitations keep
+	// their row until a later cleanup job removes them.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
+	// Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
+	// follow that scheme's CSRF rules.
 	//
 	// DELETE /invitations/{invitation_id}
 	CancelInvitation(ctx context.Context, params CancelInvitationParams) (CancelInvitationRes, error)
 	// CompleteProjectClaim invokes completeProjectClaim operation.
 	//
-	// Completes a claim by attaching the project to the signed-in developer's
-	// personal team.
-	// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim),
-	// so that the team's members administer it. The claim page in the browser
-	// calls this operation after the developer signs in, with the session cookie.
-	// The `challenge_id` from the claim URL that `createProjectClaim` (`POST
-	// /projects/{project_id}/claim/init`) returns is the
-	// request's single-use, browser-safe authorization.
-	// Claims are first-claim-wins and spend the challenge. If a team already
-	// claimed the project, the request answers `409`. If the challenge lapsed
-	// (`410` with `proj.claim_expired`), call `createProjectClaim` again for a fresh one.
+	// Completes a claim by attaching the project to the signed-in developer's personal team.
+	//
+	// A [claim attaches a project to a team], so that the team's members administer it. The claim page in
+	// the browser calls this operation after the developer signs in, with the session cookie. The
+	// `challenge_id` from the claim URL that `createProjectClaim`
+	// (`POST /projects/{project_id}/claim/init`) returns is the request's single-use, browser-safe
+	// authorization.
+	//
+	// Claims are first-claim-wins and spend the challenge. If a team already claimed the project, the
+	// request answers `409`. If the challenge lapsed (`410` with `proj.claim_expired`), call
+	// `createProjectClaim` again for a fresh one.
+	//
+	// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
 	//
 	// POST /projects/{project_id}/claim/complete
 	CompleteProjectClaim(ctx context.Context, request *CompleteClaimRequest, params CompleteProjectClaimParams) (CompleteProjectClaimRes, error)
 	// CompleteUserPasskeyRegistration invokes completeUserPasskeyRegistration operation.
 	//
-	// Verifies the attestation against the registration ceremony and stores
-	// the new passkey for the user. `registration_id` is the one that
-	// `createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
-	// returned when it started the ceremony. The attestation is
-	// the browser's answer from `navigator.credentials.create()`.
+	// Verifies the attestation against the registration ceremony and stores the new passkey for the user.
+	// `registration_id` is the one that `createUserPasskeyRegistration`
+	// (`POST /users/{user_id}/passkeys/registrations`) returned when it started the ceremony. The
+	// attestation is the browser's answer from `navigator.credentials.create()`.
+	//
 	// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
-	// `att.stale_challenge`: begin a new registration. An unknown or
-	// already-consumed registration ID answers `att.not_found`.
+	// `att.stale_challenge`: begin a new registration. An unknown or already-consumed registration ID
+	// answers `att.not_found`.
 	//
 	// POST /users/{user_id}/passkeys/registrations/{registration_id}
 	CompleteUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params CompleteUserPasskeyRegistrationParams) (CompleteUserPasskeyRegistrationRes, error)
 	// CreateAuthAttempt invokes createAuthAttempt operation.
 	//
 	// Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.
-	// An authentication attempt collects the proofs for one sign-in and ends in a
-	// handoff token. A handoff token is the short-lived, single-use credential that
-	// a completed attempt hands to the session exchange. A client makes these calls
-	// in order:
+	//
+	// An authentication attempt collects the proofs for one sign-in and ends in a handoff token. A handoff
+	// token is the short-lived, single-use credential that a completed attempt hands to the session
+	// exchange. A client makes these calls in order:
+	//
 	// 1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
 	// 2. `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge,
-	//  a request to prove one factor such as
-	// `identifier`, `password` or `passkey`.
-	// 3. `verifyAuthAttemptChallenge` (`POST
-	// /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that
-	// challenge: the
-	// credential, code or assertion. Repeat steps 2 and 3 until
-	// `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every
-	// factor in
-	// `required_factors` is verified.
-	// 4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt
-	// and returns the `handoff_token`.
-	// 5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
-	// for the session and its `session_token`.
-	// The body takes a `project_id` and a `challenge_nonce` (from
-	// `POST /bootstrap/challenge`). For step-up authentication, which adds factors
-	// to an existing session, also send that session's `session_id` and its
-	// `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
-	// The attempt's `attempt_id` in the response is the ID every later call takes.
-	// The project comes from the project secret. A body `project_id` that names
-	// another project answers `403` with `proj.mismatch`: send the credential's own
-	// project. The attempt seals the project's newest primary deployment, whatever
-	// the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
-	// revoked release answers `409` with `rel.revoked`.
+	//    a request to prove one factor such as `identifier`, `password` or `passkey`.
+	// 3. `verifyAuthAttemptChallenge`
+	//    (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that
+	//    challenge: the credential, code or assertion. Repeat steps 2 and 3 until `getAuthAttempt`
+	//    (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
+	//    `required_factors` is verified.
+	// 4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and
+	//    returns the `handoff_token`.
+	// 5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token for the session and its
+	//    `session_token`.
+	//
+	// The body takes a `project_id` and a `challenge_nonce` (from `POST /bootstrap/challenge`). For
+	// step-up authentication, which adds factors to an existing session, also send that session's
+	// `session_id` and its `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff`
+	// returned them. The attempt's `attempt_id` in the response is the ID every later call takes.
+	//
+	// The project comes from the project secret. A body `project_id` that names another project answers
+	// `403` with `proj.mismatch`: send the credential's own project. The attempt seals the project's
+	// newest primary deployment, whatever the caller's `Origin`. With none it answers `409` with
+	// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
 	// CreateAuthAttemptChallenge invokes createAuthAttemptChallenge operation.
 	//
 	// Issues a challenge, a request to prove one factor, within an authentication attempt.
-	// A challenge names one factor method, such as password, passkey, TOTP or OTP
-	// via SMS. The response carries the challenge's `challenge_id`, method,
-	// metadata and any UI hints. The client then submits the proof with
-	// `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`),
-	//  using that `challenge_id`.
+	//
+	// A challenge names one factor method, such as password, passkey, TOTP or OTP via SMS. The response
+	// carries the challenge's `challenge_id`, method, metadata and any UI hints. The client then submits
+	// the proof with `verifyAuthAttemptChallenge`
+	// (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	CreateAuthAttemptChallenge(ctx context.Context, request *IssueChallengeRequest, params CreateAuthAttemptChallengeParams) (CreateAuthAttemptChallengeRes, error)
 	// CreateAuthAttemptHandoff invokes createAuthAttemptHandoff operation.
 	//
 	// Completes an authentication attempt and mints a `handoff_token`.
-	// A handoff token is the short-lived credential that a completed attempt hands
-	// to the session exchange. Call this after every required factor is verified and
-	// the attempt is in `completed` state. Otherwise it answers `409` with
-	// `att.not_completed`: verify the remaining factors, then call again.
+	//
+	// A handoff token is the short-lived credential that a completed attempt hands to the session
+	// exchange. Call this after every required factor is verified and the attempt is in `completed` state.
+	// Otherwise it answers `409` with `att.not_completed`: verify the remaining factors, then call again.
+	//
 	// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
-	// within 60
-	// seconds to receive the session and its `session_token`. The handoff token is:
-	// - Single-use: exchange it once, with no retry.
-	// - Bound to the project: the exchange needs the same project's credential.
-	// - Created once: a second call answers `409 att.already_handed_off`, even
-	// with the same idempotency key.
-	// A revoked release is refused when the handoff is exchanged, not here. A
-	// release is the configuration that `zitadel deploy` publishes.
+	// within 60 seconds to receive the session and its `session_token`. The handoff token is:
+	//
+	//  - Single-use: exchange it once, with no retry.
+	//  - Bound to the project: the exchange needs the same project's credential.
+	//  - Created once: a second call answers `409 att.already_handed_off`, even with the same idempotency
+	//    key.
+	//
+	// A revoked release is refused when the handoff is exchanged, not here. A release is the configuration
+	// that `zitadel deploy` publishes.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateAuthAttemptHandoff(ctx context.Context, params CreateAuthAttemptHandoffParams) (CreateAuthAttemptHandoffRes, error)
 	// CreateDeployment invokes createDeployment operation.
 	//
-	// Creates a deployment: it makes a release live on the project's primary
-	// origins or on preview URLs.
-	// A release is a snapshot of the project's configuration. A deployment makes
-	// a release live on origins and freezes the project's variable values for
-	// its kind, with no fallback between primary and preview values. The call is
-	// atomic: on success every target serves the release and the deployment is
-	// recorded, and it records a `deployment.created` event. On failure nothing
-	// changes and nothing is recorded.
-	// Name the release by exactly one of `release_id` or `content_hash`. Take the
-	// release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
-	// /releases/build`) or
-	// `listReleases` (`GET /releases`) returns. The release must already exist in the project.
-	// `targets` is `primary`, which means every primary origin, or a list of
-	// preview URLs. `["primary"]`, which clients released before this shape
-	// send, still deploys to every primary origin until 1.0.0; its answer
-	// carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
-	// The project's newest primary deployment also serves every request with no
-	// `Origin`, such as a backend, a native app or the CLI, and the console's
-	// login preview of a project that does not list the console's origin. A
-	// preview URL serves only itself.
-	// `primary` records the project's current primary origins. One added later
-	// serves nothing until the next deployment to `primary`; one removed stops
-	// being served at once.
-	// A deployment to `primary` changes nothing when the project's newest
-	// primary deployment has the same release and frozen values and covers
-	// exactly the current primary origins. The call then answers `200` with that
-	// deployment. Any other request writes a new deployment and answers `201`.
-	// For preview URLs, that deployment renews their previews.
+	// Creates a deployment: it makes a release live on the project's primary origins or on preview URLs.
+	//
+	// A release is a snapshot of the project's configuration. A deployment makes a release live on origins
+	// and freezes the project's variable values for its kind, with no fallback between primary and preview
+	// values. The call is atomic: on success every target serves the release and the deployment is
+	// recorded, and it records a `deployment.created` event. On failure nothing changes and nothing is
+	// recorded.
+	//
+	// Name the release by exactly one of `release_id` or `content_hash`. Take the release ID from the `id`
+	// that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases`
+	// (`GET /releases`) returns. The release must already exist in the project. `targets` is `primary`,
+	// which means every primary origin, or a list of preview URLs. `["primary"]`, which clients released
+	// before this shape send, still deploys to every primary origin until 1.0.0; its answer carries a
+	// `Deprecation` header (RFC 9745) and a `Link` to these docs.
+	//
+	// The project's newest primary deployment also serves every request with no `Origin`, such as a
+	// backend, a native app or the CLI, and the console's login preview of a project that does not list
+	// the console's origin. A preview URL serves only itself.
+	//
+	// `primary` records the project's current primary origins. One added later serves nothing until the
+	// next deployment to `primary`; one removed stops being served at once.
+	//
+	// A deployment to `primary` changes nothing when the project's newest primary deployment has the same
+	// release and frozen values and covers exactly the current primary origins. The call then answers
+	// `200` with that deployment. Any other request writes a new deployment and answers `201`. For preview
+	// URLs, that deployment renews their previews.
+	//
 	// If the request is refused, fix the cause and send it again:
-	// - `400 dep.invalid`: the request names both or neither of `release_id` and
-	// `content_hash`, names a primary origin among the preview URLs, sends
-	// `primary` for a project with no primary origin, sends
-	// `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
-	// the request.
-	// - `400 dep.variables_missing`: a variable the release references has no
-	// value for the kind. `details` names the kind and every missing variable.
-	// Set each one for that kind with `setVariables` (`PATCH /variables`), then deploy again.
-	// - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
-	// of the project, or is a loopback URL. Use a URL that matches a pattern.
-	// - `404 rel.not_found`: the release ID or digest names no release in this
-	// project. List the project's releases with `listReleases`.
-	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment this
-	// write replaces, and `details.deployment` is that deployment. Inspect it,
-	// then retry with its ID as `expected_deployment_id`, or stop.
-	// - `409 rel.revoked`: the release is revoked and cannot be deployed. Change
-	// the configuration and build a new release, or deploy a release that is
-	// not revoked. Rebuilding unchanged content returns the same revoked release.
+	//
+	//  - `400 dep.invalid`: the request names both or neither of `release_id` and `content_hash`, names a
+	//    primary origin among the preview URLs, sends `primary` for a project with no primary origin,
+	//    sends `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct the request.
+	//  - `400 dep.variables_missing`: a variable the release references has no value for the kind.
+	//    `details` names the kind and every missing variable. Set each one for that kind with
+	//    `setVariables` (`PATCH /variables`), then deploy again.
+	//  - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern of the project, or is a
+	//    loopback URL. Use a URL that matches a pattern.
+	//  - `404 rel.not_found`: the release ID or digest names no release in this project. List the
+	//    project's releases with `listReleases`.
+	//  - `409 dep.conflict`: `expected_deployment_id` is not the deployment this write replaces, and
+	//    `details.deployment` is that deployment. Inspect it, then retry with its ID as
+	//    `expected_deployment_id`, or stop.
+	//  - `409 rel.revoked`: the release is revoked and cannot be deployed. Change the configuration and
+	//    build a new release, or deploy a release that is not revoked. Rebuilding unchanged content
+	//    returns the same revoked release.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
 	// CreateFlow invokes createFlow operation.
 	//
-	// Starts a flow: resolves a flow definition from the request's purpose and
-	// audience, and returns the first step.
-	// The flow endpoints are the runtime calls the login component
-	// (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
-	// step it gets back, and submits the user's input with `submitFlowStep` (`POST
-	// /flow/{flow_id}/submit`) to
-	// get the next step. This call creates a new session implicitly, unless
-	// `session_id` is provided together with that session's `session_token`
+	// Starts a flow: resolves a flow definition from the request's purpose and audience, and returns the
+	// first step.
+	//
+	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
+	// step. It starts a flow here, renders the step it gets back, and submits the user's input with
+	// `submitFlowStep` (`POST /flow/{flow_id}/submit`) to get the next step. This call creates a new
+	// session implicitly, unless `session_id` is provided together with that session's `session_token`
 	// (for step-up or reauthentication on an existing session).
-	// The browser `Origin` header selects which deployment serves this attempt.
-	// The server checks the origin against the project's origin patterns and live
-	// previews, and the deployment that origin serves is the target: the
-	// project's newest primary deployment when it names a primary origin, or the
-	// newest live deployment to a preview URL. A
-	// deployment is a release, the immutable bundle of the project's
-	// configuration, made live at an origin. The deployment's release supplies
-	// flow definitions, user schemas and branding. The resolved deployment is
-	// sealed into the `_zflow` cookie so later steps keep the same
-	// configuration.
-	// - An origin that matches no pattern answers `403` with
-	// `proj.origin_not_allowed`, including when the project lists no origins.
-	// Add the origin with `zitadel origin add`.
-	// - An origin that matches a preview pattern with no live preview answers
-	// `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-	// - Nothing deployed to a listed origin or a live preview answers `409`
-	// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
-	// since the last deploy serves nothing until the next one.
-	// - A loopback origin the project does not list answers `409` with
-	// `rel.not_deployed` too, as no deployment can name it. Add it with
-	// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
-	// - A revoked release answers `409` with `rel.revoked`.
-	// A request with no `Origin` passes the check, and so does the server's own
-	// origin, from which its console previews a project's login. Both are served
-	// the project's newest primary deployment unless the project lists that
-	// origin; with no primary deployment they answer `409` with
-	// `rel.no_default`. A loopback origin passes the check and is its own
-	// target. A step submitted from the server's own origin is still refused
-	// unless the project lists it.
-	// The response contains an `id` field, the flow handle. Use it as the path
-	// parameter for all subsequent `/flow/{flow_id}/submit` calls.
-	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
-	// the flow's orchestration state (current step, collected data, history).
-	// The server is stateless between requests: all flow state lives in this
-	// cookie. The browser sends it automatically on subsequent requests.
+	//
+	// The browser `Origin` header selects which deployment serves this attempt. The server checks the
+	// origin against the project's origin patterns and live previews, and the deployment that origin
+	// serves is the target: the project's newest primary deployment when it names a primary origin, or the
+	// newest live deployment to a preview URL. A deployment is a release, the immutable bundle of the
+	// project's configuration, made live at an origin. The deployment's release supplies flow definitions,
+	// user schemas and branding. The resolved deployment is sealed into the `_zflow` cookie so later steps
+	// keep the same configuration.
+	//
+	//  - An origin that matches no pattern answers `403` with `proj.origin_not_allowed`, including when
+	//    the project lists no origins. Add the origin with `zitadel origin add`.
+	//  - An origin that matches a preview pattern with no live preview answers `403` with
+	//    `proj.preview_not_live`. Run `zitadel preview` on the branch.
+	//  - Nothing deployed to a listed origin or a live preview answers `409` with `rel.not_deployed`. Run
+	//    `zitadel deploy`: a primary origin added since the last deploy serves nothing until the next one.
+	//  - A loopback origin the project does not list answers `409` with `rel.not_deployed` too, as no
+	//    deployment can name it. Add it with `zitadel origin add <origin> --kind primary`, then run
+	//    `zitadel deploy`.
+	//  - A revoked release answers `409` with `rel.revoked`.
+	//
+	// A request with no `Origin` passes the check, and so does the server's own origin, from which its
+	// console previews a project's login. Both are served the project's newest primary deployment unless
+	// the project lists that origin; with no primary deployment they answer `409` with `rel.no_default`. A
+	// loopback origin passes the check and is its own target. A step submitted from the server's own
+	// origin is still refused unless the project lists it.
+	//
+	// The response contains an `id` field, the flow handle. Use it as the path parameter for all
+	// subsequent `/flow/{flow_id}/submit` calls.
+	//
+	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
+	// state (current step, collected data, history). The server is stateless between requests: all flow
+	// state lives in this cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
 	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateGrant invokes createGrant operation.
 	//
-	// Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.
-	// admin` role on a project.
-	// The project is the one named by the `project_id` query parameter. Name the
-	// principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
-	// `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-	// `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant` (`DELETE /grants/{grant_id}`) take.
-	// Owning-team (`project.team`) grants are not
-	// created here: a claim, which attaches a project to a team, creates them.
-	// An unrevoked grant with the same principal and relation holds that binding
-	// even after `expires_at`. Revoke it with `deleteGrant` before you create it
-	// again.
-	// Create does not accept `expand`. The `user_id` and team locators return `201`,
-	// whose `user` and `team` carry only `user_id` and `team_id`. They still answer
-	// `404` or `409` when the principal is missing or the grant already exists.
-	// Creating by `user.identifier` answers `202` with no body on every outcome.
-	// Granting the session caller's own user is `grant.invalid` on either user
-	// locator. A `201` grant names its user or team by ID only: read it back
-	// with `getGrant` for the identifier and display name. A `202` returns no
-	// grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). A session caller is authorized as the signed-in person
-	// against the target project, even when the session belongs to another project.
-	// Cookie requests follow that scheme's CSRF rules.
+	// Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or
+	// `project.admin` role on a project.
+	//
+	// The project is the one named by the `project_id` query parameter. Name the principal with `user`
+	// (`user_id` or `identifier`) or `team` (`team_id` or `name`). The `id` in the response
+	// (`asgn_<opaque>`) is the grant ID that `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant`
+	// (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not created here: a
+	// claim, which attaches a project to a team, creates them.
+	//
+	// An unrevoked grant with the same principal and relation holds that binding even after `expires_at`.
+	// Revoke it with `deleteGrant` before you create it again.
+	//
+	// Create does not accept `expand`. The `user_id` and team locators return `201`, whose `user` and
+	// `team` carry only `user_id` and `team_id`. They still answer `404` or `409` when the principal is
+	// missing or the grant already exists. Creating by `user.identifier` answers `202` with no body on
+	// every outcome. Granting the session caller's own user is `grant.invalid` on either user locator. A
+	// `201` grant names its user or team by ID only: read it back with `getGrant` for the identifier and
+	// display name. A `202` returns no grant ID: find the grant with `queryGrants` (`POST /grants/query`),
+	// filtered by `user_id`.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). A
+	// session caller is authorized as the signed-in person against the target project, even when the
+	// session belongs to another project. Cookie requests follow that scheme's CSRF rules.
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
 	// CreateInvitation invokes createInvitation operation.
 	//
-	// Creates an invitation for a project, or replaces an existing one, and
-	// returns the invitation and its one-shot link.
-	// Send `type` and the object named after it. `project_member` takes
-	// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
-	// and `role`, and answers `501` `not_implemented` until team invitations
-	// ship. Optional `metadata.name` labels who the link is for. Optional
-	// `replaces_invitation_id` replaces that invitation: the new row keeps the
-	// original's `journey_id`, and a pending original is deleted in the same
-	// transaction.
-	// The `link` appears only in this response. Share it out of band; whoever
-	// opens it and is signed in can redeem the role. It expires in 72 hours.
-	// Refused for an unclaimed project, on a server without a platform project,
-	// and when the project's pending-invitation cap is reached.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Creation needs the same project `admin` check as
-	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
-	// rules.
+	// Creates an invitation for a project, or replaces an existing one, and returns the invitation and its
+	// one-shot link.
+	//
+	// Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
+	// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
+	// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+	// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
+	// and the original is deleted in the same transaction unless it was accepted.
+	//
+	// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
+	// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
+	// platform project, and when the project's pending-invitation cap is reached.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
+	// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
+	// follow that scheme's CSRF rules.
 	//
 	// POST /invitations
 	CreateInvitation(ctx context.Context, request CreateInvitationRequest, params CreateInvitationParams) (CreateInvitationRes, error)
 	// CreateProject invokes createProject operation.
 	//
-	// Creates a project and returns its project secret and preview secret, which no
-	// other endpoint returns.
-	// A project is the top-level boundary that holds users, sessions and
-	// configuration. It has no owning team until someone claims it; see `createProjectClaim` (`POST
-	// /projects/{project_id}/claim/init`).
-	// The request needs no credential and is rate-limited. On `429`, wait and retry.
-	// Unless `seed_defaults` is `false`, the project starts with a default user schema
-	// and flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.
+	// Creates a project and returns its project secret and preview secret, which no other endpoint
+	// returns.
+	//
+	// A project is the top-level boundary that holds users, sessions and configuration. It has no owning
+	// team until someone claims it; see `createProjectClaim` (`POST /projects/{project_id}/claim/init`).
+	//
+	// The request needs no credential and is rate-limited. On `429`, wait and retry. Unless
+	// `seed_defaults` is `false`, the project starts with a default user schema and flow. The CLI sets it
+	// to `false` and uploads its own from `.zitadel/`.
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateProjectClaim invokes createProjectClaim operation.
 	//
-	// Starts a claim, which attaches a project created before sign-in to a
-	// team, and returns the `claim_url` to open in a browser.
-	// A claim [attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim)
-	// so that the team's members administer it. This operation mints a
-	// single-use, short-lived challenge for an unclaimed project. The developer
-	// opens `claim_url`, signs in and completes the claim in the browser; see
-	// `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`). Poll
-	// `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned
-	// `challenge_id`,
-	// as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
+	// Starts a claim, which attaches a project created before sign-in to a team, and returns the
+	// `claim_url` to open in a browser.
+	//
+	// A claim [attaches a project to a team] so that the team's members administer it. This operation
+	// mints a single-use, short-lived challenge for an unclaimed project. The developer opens `claim_url`,
+	// signs in and completes the claim in the browser; see `completeProjectClaim`
+	// (`POST /projects/{project_id}/claim/complete`). Poll `getProjectClaimStatus`
+	// (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`, as `zitadel claim`
+	// does. The response's `expires_at` carries the exact expiry.
+	//
 	// Authenticate with the project secret that `createProject` (`POST /projects`) returns as
 	// `project_secret`.
-	// A `409` means a team already claimed the project, and its details name
-	// that team. A `410` means the project's 14-day claim window has closed,
-	// which is final.
+	//
+	// A `409` means a team already claimed the project, and its details name that team. A `410` means the
+	// project's 14-day claim window has closed, which is final.
+	//
+	// [attaches a project to a team]: /docs/concepts/project-team-user#claim
 	//
 	// POST /projects/{project_id}/claim/init
 	CreateProjectClaim(ctx context.Context, params CreateProjectClaimParams) (CreateProjectClaimRes, error)
 	// CreateRelease invokes createRelease operation.
 	//
-	// Creates a release from existing revisions, given as `(kind, revision_id)`
-	// pairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)
-	// (`POST /releases/build`).
-	// A release is a snapshot of the project's configuration: it pins one
-	// revision of each resource it includes, and it is not tied to an origin.
-	// Take each `revision_id` from the operation that created the revision, for
-	// example the `id` that `publishBranding` (`POST /branding`) or `publishFlowDefinition` (`POST
-	// /flow_definitions`) returns.
-	// Each revision must exist in the project and is recorded under the handle
-	// it declares. The release must be complete and consistent:
-	// - Every handle its revisions name must be in the release: a flow's
-	// `user_schema`, and the identity provider (IdP) connections named by a
-	// flow step's `sso_providers` or a schema's `x-auth-methods.sso.providers`.
-	// A missing one answers `rel.unresolved_reference`, naming the resource and
-	// the handle, for example `flow_definition default-login: user_schema
-	// human-user not found`. Add the missing revision to the request.
-	// - Every flow is validated as on save, against the user schema revision in
-	// the release. A flow that fails answers `rel.invalid`, with the reason in
-	// `details`. Fix the flow and send the request again.
-	// The call is idempotent on the set of revisions: the same revisions with a
-	// different `message` answer `200` with the existing release. A new release
-	// answers `201`.
-	// Creating a release does not deploy it. Pass the returned `id` to
-	// `createDeployment` (`POST /deployments`) to make the release live.
+	// Creates a release from existing revisions, given as `(kind, revision_id)` pairs. To build one from
+	// files on disk, use `buildRelease` (`POST /releases/build`) (`POST /releases/build`).
+	//
+	// A release is a snapshot of the project's configuration: it pins one revision of each resource it
+	// includes, and it is not tied to an origin. Take each `revision_id` from the operation that created
+	// the revision, for example the `id` that `publishBranding` (`POST /branding`) or
+	// `publishFlowDefinition` (`POST /flow_definitions`) returns.
+	//
+	// Each revision must exist in the project and is recorded under the handle it declares. The release
+	// must be complete and consistent:
+	//
+	//  - Every handle its revisions name must be in the release: a flow's `user_schema`, and the identity
+	//    provider (IdP) connections named by a flow step's `sso_providers` or a schema's
+	//    `x-auth-methods.sso.providers`. A missing one answers `rel.unresolved_reference`, naming the
+	//    resource and the handle, for example `flow_definition default-login: user_schema
+	//    human-user not found`. Add the missing revision to the request.
+	//  - Every flow is validated as on save, against the user schema revision in the release. A flow that
+	//    fails answers `rel.invalid`, with the reason in `details`. Fix the flow and send the request
+	//    again.
+	//
+	// The call is idempotent on the set of revisions: the same revisions with a different `message` answer
+	// `200` with the existing release. A new release answers `201`.
+	//
+	// Creating a release does not deploy it. Pass the returned `id` to `createDeployment`
+	// (`POST /deployments`) to make the release live.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSession invokes createSession operation.
 	//
 	// Creates an anonymous session with no user and no factors (`state: building`).
-	// A session is the durable record of a signed-in user. This call is optional: an
-	// authentication attempt creates a session implicitly if none is provided.
-	// Create one explicitly when you want to:
-	// - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
-	// can be correlated with the eventual authenticated session from the start.
-	// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-	// The session belongs to the project of the project secret. A `project_id` that
-	// names another project answers `403` with `proj.mismatch` and creates nothing:
-	// send the credential's own project.
-	// Creating a session runs on the project credential (`session.write`). The returned
-	// `session_token` is a session credential for the end-user client, not a
-	// management scope. It is delivered as the `__Host-zitadel_session` cookie
-	// (`zitadel_session` over plain http to a loopback host) and authorises the
-	// self-service operations `GET /sessions/me` and `DELETE /sessions/me`
-	// (`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`
-	// and `DELETE /sessions/{session_id}` are operator endpoints and require
-	// `session.read` / `session.delete` instead.
-	// The `session_token` is superseded when a handoff exchange completes. Clients
-	// must replace it at that point.
-	// Anonymous sessions expire after 10 minutes. The lifetime resets to the
-	// configured full session lifetime when a completing authentication attempt
-	// writes the first authentication factor.
+	//
+	// A session is the durable record of a signed-in user. This call is optional: an authentication
+	// attempt creates a session implicitly if none is provided. Create one explicitly when you want to:
+	//
+	//  - Pre-allocate a `session_id` before the user is known, so device and telemetry signals can be
+	//    correlated with the eventual authenticated session from the start.
+	//  - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+	//
+	// The session belongs to the project of the project secret. A `project_id` that names another project
+	// answers `403` with `proj.mismatch` and creates nothing: send the credential's own project.
+	//
+	// Creating a session runs on the project credential (`session.write`). The returned `session_token` is
+	// a session credential for the end-user client, not a management scope. It is delivered as the
+	// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a loopback host) and
+	// authorises the self-service operations `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie`
+	// scheme). The by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}` are
+	// operator endpoints and require `session.read` / `session.delete` instead.
+	//
+	// The `session_token` is superseded when a handoff exchange completes. Clients must replace it at that
+	// point.
+	//
+	// Anonymous sessions expire after 10 minutes. The lifetime resets to the configured full session
+	// lifetime when a completing authentication attempt writes the first authentication factor.
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, request *CreateSessionRequest) (CreateSessionRes, error)
 	// CreateTeam invokes createTeam operation.
 	//
 	// Creates a team in the project, with a name no other team in the project has.
-	// A team groups users inside a project and can represent a customer. A taken
-	// name is refused with `409 team.already_exists`: choose another name. The
-	// new team has no members yet.
+	//
+	// A team groups users inside a project and can represent a customer. A taken name is refused with
+	// `409 team.already_exists`: choose another name. The new team has no members yet.
 	//
 	// POST /teams
 	CreateTeam(ctx context.Context, request *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
 	// CreateUser invokes createUser operation.
 	//
 	// Creates a user whose attributes satisfy the user schema named in the request.
-	// The server assigns the user's ID and returns it. `schema` is the `id` of a
-	// schema, as `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
-	//  With
-	// `team_id`, the user also becomes an active member of that team. A value the
-	// schema marks unique that another user already holds is refused with `409`;
-	// send a different value.
+	//
+	// The server assigns the user's ID and returns it. `schema` is the `id` of a schema, as
+	// `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With
+	// `team_id`, the user also becomes an active member of that team. A value the schema marks unique that
+	// another user already holds is refused with `409`; send a different value.
 	//
 	// POST /users
 	CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
 	// CreateUserPasskeyRegistration invokes createUserPasskeyRegistration operation.
 	//
-	// Starts a WebAuthn registration ceremony for the user and returns the
-	// creation options for `navigator.credentials.create()`. A passkey is
-	// registered in two steps: this one returns options for the browser, and
-	// `completeUserPasskeyRegistration` (`POST
-	// /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
-	// Complete the ceremony with
-	// `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five
-	// minutes, using the `registration_id` this response returns. Credentials
-	// already registered for the user are excluded automatically.
+	// Starts a WebAuthn registration ceremony for the user and returns the creation options for
+	// `navigator.credentials.create()`. A passkey is registered in two steps: this one returns options for
+	// the browser, and `completeUserPasskeyRegistration`
+	// (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
+	//
+	// Complete the ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+	// five minutes, using the `registration_id` this response returns. Credentials already registered for
+	// the user are excluded automatically.
 	//
 	// POST /users/{user_id}/passkeys/registrations
 	CreateUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params CreateUserPasskeyRegistrationParams) (CreateUserPasskeyRegistrationRes, error)
 	// DeactivateTeam invokes deactivateTeam operation.
 	//
 	// Deactivates a team and removes its memberships.
-	// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with
-	// status `deactivated`. The users whose lifecycle the team owns are
-	// deactivated with it.
-	// The request is idempotent. Deleting a team that is already deactivated
-	// or does not exist succeeds without changing anything.
-	// A team that still owns a project is refused with `409 team.owns_project`.
-	// Deactivating it would leave the project owned by a deactivated team and so
-	// unmanageable. No endpoint ends a team's ownership of a project yet, so for
-	// now such a team cannot be deactivated through the API.
+	//
+	// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with status
+	// `deactivated`. The users whose lifecycle the team owns are deactivated with it.
+	//
+	// The request is idempotent. Deleting a team that is already deactivated or does not exist succeeds
+	// without changing anything.
+	//
+	// A team that still owns a project is refused with `409 team.owns_project`. Deactivating it would
+	// leave the project owned by a deactivated team and so unmanageable. No endpoint ends a team's
+	// ownership of a project yet, so for now such a team cannot be deactivated through the API.
 	//
 	// DELETE /teams/{team_id}
 	DeactivateTeam(ctx context.Context, params DeactivateTeamParams) (DeactivateTeamRes, error)
 	// DeleteGrant invokes deleteGrant operation.
 	//
 	// Revokes a grant this API manages and emits `authz.revoked`.
-	// A revoked grant cannot be restored: create a new one. Already-revoked, missing,
-	// project-secret setup and owning-team grants return `404`. Expired grants can
-	// still be revoked, so the binding can be reused.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+	//
+	// A revoked grant cannot be restored: create a new one. Already-revoked, missing, project-secret setup
+	// and owning-team grants return `404`. Expired grants can still be revoked, so the binding can be
+	// reused.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+	// requests follow that scheme's CSRF rules.
 	//
 	// DELETE /grants/{grant_id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
 	// DeleteUser invokes deleteUser operation.
 	//
-	// Deletes a user, removes them from every team they belong to, and revokes
-	// every grant they hold, on any project.
-	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
-	// plus `authz.revoked` for each grant on that grant's project.
-	// With a project secret the request is idempotent: deleting a user that exists
-	// in no project succeeds without changing anything. Deleting the last active
-	// member of a project's owning team returns 409 `proj.last_owner` and changes
-	// nothing.
+	// Deletes a user, removes them from every team they belong to, and revokes every grant they hold, on
+	// any project.
+	//
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`, plus `authz.revoked`
+	// for each grant on that grant's project. With a project secret the request is idempotent: deleting a
+	// user that exists in no project succeeds without changing anything. Deleting the last active member
+	// of a project's owning team returns 409 `proj.last_owner` and changes nothing.
 	//
 	// DELETE /users/{user_id}
 	DeleteUser(ctx context.Context, params DeleteUserParams) (DeleteUserRes, error)
 	// DeleteVariable invokes deleteVariable operation.
 	//
-	// Deletes a variable for the requested kind, or for both kinds without
-	// `kind`. Existing deployments keep the values they froze. Each kind removed
-	// records a `variable.removed` event.
-	// A name with no value for that kind answers `var.not_found`: there is
-	// nothing to delete. `listVariables` (`GET /variables`) lists the names the project holds. To
-	// remove several names in one request, or to remove a name that may already
-	// be absent, send `null` for each name to `setVariables` (`PATCH /variables`).
+	// Deletes a variable for the requested kind, or for both kinds without `kind`. Existing deployments
+	// keep the values they froze. Each kind removed records a `variable.removed` event.
+	//
+	// A name with no value for that kind answers `var.not_found`: there is nothing to delete.
+	// `listVariables` (`GET /variables`) lists the names the project holds. To remove several names in one
+	// request, or to remove a name that may already be absent, send `null` for each name to `setVariables`
+	// (`PATCH /variables`).
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
 	// EvaluatePolicy invokes evaluatePolicy operation.
 	//
-	// Evaluates a policy config against one request, without side effects, and
-	// answers the decision the operation would reach. A policy holds a
-	// project's rules for one operation, such as setting a password.
-	// Nothing is read from or written to the project. The config is the one in
-	// the body, checked exactly as a publish checks it, so an invalid config
-	// answers `pol.invalid` with the same violations. Fix the settings the
-	// violations list and send the request again.
-	// `input` is what the operation's request carries, in the operation's own
-	// terms (a password, not its length). The server derives what the policy
-	// checks with the code the live operation runs, guards included. `facts`
-	// states what the operation would look up at runtime, such as whether the
-	// candidate matches one of the user's kept passwords.
-	// The decision and the names of the failed rules hold wherever the
-	// operation runs. `code` and `violations` are what an API call answers. A
-	// login flow shows the same rules as field errors on the password field
-	// (`error.x-auth-methods#password_<rule>` in `step.error`).
-	// This operation does not choose which policy a project or release applies.
-	// Read that policy, for example with `getPolicy` (`GET /policies/{policy_id}`), and pass its
-	// `config`.
+	// Evaluates a policy config against one request, without side effects, and answers the decision the
+	// operation would reach. A policy holds a project's rules for one operation, such as setting a
+	// password.
+	//
+	// Nothing is read from or written to the project. The config is the one in the body, checked exactly
+	// as a publish checks it, so an invalid config answers `pol.invalid` with the same violations. Fix the
+	// settings the violations list and send the request again.
+	//
+	// `input` is what the operation's request carries, in the operation's own terms (a password, not its
+	// length). The server derives what the policy checks with the code the live operation runs, guards
+	// included. `facts` states what the operation would look up at runtime, such as whether the candidate
+	// matches one of the user's kept passwords.
+	//
+	// The decision and the names of the failed rules hold wherever the operation runs. `code` and
+	// `violations` are what an API call answers. A login flow shows the same rules as field errors on the
+	// password field (`error.x-auth-methods#password_<rule>` in `step.error`).
+	//
+	// This operation does not choose which policy a project or release applies. Read that policy, for
+	// example with `getPolicy` (`GET /policies/{policy_id}`), and pass its `config`.
+	//
 	// The caller needs read access to the project in `project_id`.
 	//
 	// POST /policies/evaluate
@@ -560,41 +561,41 @@ type Invoker interface {
 	// ExchangeHandoff invokes exchangeHandoff operation.
 	//
 	// Exchanges a handoff token for a session and a `session_token`.
-	// A handoff token is the short-lived, single-use credential that
-	// `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token`
-	// once an authentication attempt is
-	// complete. This call consumes it. It is the last step of the sign-in sequence:
-	// create the attempt, issue a challenge, verify the proof, create the handoff,
-	// exchange it.
+	//
+	// A handoff token is the short-lived, single-use credential that `createAuthAttemptHandoff`
+	// (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication
+	// attempt is complete. This call consumes it. It is the last step of the sign-in sequence: create the
+	// attempt, issue a challenge, verify the proof, create the handoff, exchange it.
+	//
 	// The server resolves the originating authentication attempt from the token and then:
-	// | Originating authentication attempt | Outcome |
-	// |---|---|
-	// | No `session_id` | A new authenticated session is **created**. |
-	// | `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors
-	// written in, lifetime reset to the full session lifetime. |
-	// | `session_id` points to an active session (step-up) | Existing session is **upgraded**: new
-	// factors merged, `assurance_levels[]` expanded. |
+	//
+	// 	Originating authentication attempt                 | Outcome
+	// 	---------------------------------------------------+--------------------------------------------------------------------------------------------------------
+	// 	No `session_id`                                    | A new authenticated session is created.
+	// 	`session_id` points to an anonymous session        | Existing session is upgraded: user and factors written in, lifetime reset to the full session lifetime.
+	// 	`session_id` points to an active session (step-up) | Existing session is upgraded: new factors merged, `assurance_levels[]` expanded.
+	//
 	// The response shape is identical in all three cases.
-	// The `session_token` supersedes any previously issued `session_token` for the
-	// same session. Clients must replace their stored token at this point.
-	// Requires a project service key (OAuth2 client credentials). The project comes
-	// from the project secret. A query `project_id` that disagrees answers `403`
-	// with `proj.mismatch`.
-	// The exchange resolves a deployment the same way as other runtime operations.
-	// A deployment makes a release live, and a release is the configuration that
-	// `zitadel deploy` publishes. With no browser `Origin` and
-	// nothing deployed to the resolved target, the response is `409` with
-	// `rel.not_deployed`: run `zitadel deploy`, then retry. A revoked release
-	// answers `409` with `rel.revoked`.
+	//
+	// The `session_token` supersedes any previously issued `session_token` for the same session. Clients
+	// must replace their stored token at this point.
+	//
+	// Requires a project service key (OAuth2 client credentials). The project comes from the project
+	// secret. A query `project_id` that disagrees answers `403` with `proj.mismatch`.
+	//
+	// The exchange resolves a deployment the same way as other runtime operations. A deployment makes a
+	// release live, and a release is the configuration that `zitadel deploy` publishes. With no browser
+	// `Origin` and nothing deployed to the resolved target, the response is `409` with `rel.not_deployed`:
+	// run `zitadel deploy`, then retry. A revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
 	// GetApplication invokes getApplication operation.
 	//
-	// Returns an application that authenticates its users via Zitadel, by ID
-	// at its newest revision, with each client's `client_id` in `definition`. It
-	// never returns a client secret: `publishApplication` (`POST /applications`)
-	// shows one once, when it creates the client.
+	// Returns an application that authenticates its users via Zitadel, by ID at its newest revision, with
+	// each client's `client_id` in `definition`. It never returns a client secret: `publishApplication`
+	// (`POST /applications`) shows one once, when it creates the client.
+	//
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /applications/{application_id}
@@ -602,107 +603,109 @@ type Invoker interface {
 	// GetAuthAttempt invokes getAuthAttempt operation.
 	//
 	// Returns the current state of an authentication attempt, one sign-in round.
-	// The response holds the attempt's state, available factors for the next
-	// challenge, challenges issued so far, and any errors preventing progress.
-	// Use it to poll during long-running factor verifications, for example waiting
-	// for a federated identity provider (IdP) callback or a device flow.
+	//
+	// The response holds the attempt's state, available factors for the next challenge, challenges issued
+	// so far, and any errors preventing progress.
+	//
+	// Use it to poll during long-running factor verifications, for example waiting for a federated
+	// identity provider (IdP) callback or a device flow.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
 	// GetBranding invokes getBranding operation.
 	//
-	// Returns one branding revision, including its stored configuration. Pass the
-	// `id` that `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
+	// Returns one branding revision, including its stored configuration. Pass the `id` that
+	// `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
 	//
 	// GET /branding/{branding_id}
 	GetBranding(ctx context.Context, params GetBrandingParams) (GetBrandingRes, error)
 	// GetDeployment invokes getDeployment operation.
 	//
-	// Returns one deployment: the release it made live, the origins it made it
-	// live on, and whether they still serve it.
-	// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST
-	// /deployments/{deployment_id}/rollback`) or
-	// `listDeployments` (`GET /deployments`) returns.
-	// The lookup is scoped to the project in `project_id`. A deployment ID
-	// belonging to another project answers not found exactly as an unknown ID
-	// does, so the endpoint cannot be used to probe for deployments in projects
-	// the caller cannot read.
+	// Returns one deployment: the release it made live, the origins it made it live on, and whether they
+	// still serve it.
+	//
+	// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment`
+	// (`POST /deployments/{deployment_id}/rollback`) or `listDeployments` (`GET /deployments`) returns.
+	//
+	// The lookup is scoped to the project in `project_id`. A deployment ID belonging to another project
+	// answers not found exactly as an unknown ID does, so the endpoint cannot be used to probe for
+	// deployments in projects the caller cannot read.
 	//
 	// GET /deployments/{deployment_id}
 	GetDeployment(ctx context.Context, params GetDeploymentParams) (GetDeploymentRes, error)
 	// GetEvent invokes getEvent operation.
 	//
 	// Returns one event of a project by its ID. Requires `events.read`.
-	// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
-	// `project_id`. An unknown ID and the ID of another project's event both
-	// answer `404`.
-	// A project that is not claimed yet also answers `404`: its events are
-	// stored but stay invisible until the
-	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
-	// platform operators read them from the start.
+	//
+	// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its `project_id`. An
+	// unknown ID and the ID of another project's event both answer `404`.
+	//
+	// A project that is not claimed yet also answers `404`: its events are stored but stay invisible until
+	// the [claim] succeeds. The deployment's platform operators read them from the start.
+	//
+	// [claim]: /docs/concepts/project-team-user#claim
 	//
 	// GET /events/{event_id}
 	GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error)
 	// GetFlowDefinition invokes getFlowDefinition operation.
 	//
-	// Returns one flow definition revision. Pass the `id` that
-	// `publishFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET
-	// /flow_definitions`) returns.
+	// Returns one flow definition revision. Pass the `id` that `publishFlowDefinition`
+	// (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
 	//
 	// GET /flow_definitions/{flow_definition_id}
 	GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error)
 	// GetFlowStep invokes getFlowStep operation.
 	//
-	// Returns the current step of a flow without advancing it. Use it to render
-	// the step again after a page reload or a network error.
-	// The flow endpoints are the runtime calls the login component
-	// (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
-	// `submitFlowStep` (`POST /flow/{flow_id}/submit`) advances it.
-	// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
-	// creates its user on submit, or one carrying a passkey registration that
-	// creates its user.
-	// Reuses challenges with more than a minute remaining; otherwise issues a
-	// new one. If this render resolves parked SSO state, it first returns the
-	// updated cookie; fetch the step again to obtain its puzzle.
-	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
-	// re-resolve from `Origin`. If that release was revoked since the attempt
-	// started, the response is `409` with `rel.revoked`.
+	// Returns the current step of a flow without advancing it. Use it to render the step again after a
+	// page reload or a network error.
+	//
+	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
+	// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep`
+	// (`POST /flow/{flow_id}/submit`) advances it.
+	//
+	// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
+	// or one carrying a passkey registration that creates its user. Reuses challenges with more than a
+	// minute remaining; otherwise issues a new one. If this render resolves parked SSO state, it first
+	// returns the updated cookie; fetch the step again to obtain its puzzle.
+	//
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
+	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
 	// GET /flow/{flow_id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetGrant invokes getGrant operation.
 	//
 	// Returns a grant by ID, when this API manages it and it has not been revoked.
-	// This API manages grants that bind a user or team to the viewer, editor or
-	// admin role. An expired grant is still returned, so you can revoke it with
-	// `deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization
-	// still
-	// ignores expired grants. Send `project_id` as well as the grant ID.
-	// Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
-	// (`relation=team`) rows and grants of another project all return `404`.
-	// `expand=principal` adds envelope fields on `user` or `team`. For project
-	// secrets it requires `user.read` and `team.read` in addition to `project.read`.
-	// A user-bound console session that already passed the project check may expand
-	// without those scopes.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+	//
+	// This API manages grants that bind a user or team to the viewer, editor or admin role. An expired
+	// grant is still returned, so you can revoke it with `deleteGrant` (`DELETE /grants/{grant_id}`)
+	// before you grant the same binding again. Authorization still ignores expired grants. Send
+	// `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
+	// owning-team (`relation=team`) rows and grants of another project all return `404`.
+	//
+	// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
+	// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
+	// passed the project check may expand without those scopes.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+	// requests follow that scheme's CSRF rules.
 	//
 	// GET /grants/{grant_id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetIdp invokes getIdp operation.
 	//
-	// Returns an identity provider, an external sign-in such as Google, by ID at
-	// its newest revision. `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists
-	// every revision of it.
+	// Returns an identity provider, an external sign-in such as Google, by ID at its newest revision.
+	// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists every revision of it.
+	//
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/{idp_id}
 	GetIdp(ctx context.Context, params GetIdpParams) (GetIdpRes, error)
 	// GetIdpRevision invokes getIdpRevision operation.
 	//
-	// Returns one revision of an identity provider, an external sign-in such as
-	// Google, by its `revision_id`, the value an authentication attempt or a
-	// release pins.
+	// Returns one revision of an identity provider, an external sign-in such as Google, by its
+	// `revision_id`, the value an authentication attempt or a release pins.
+	//
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/revisions/{revision_id}
@@ -710,200 +713,214 @@ type Invoker interface {
 	// GetInvitation invokes getInvitation operation.
 	//
 	// Returns one invitation by ID for the project named by `project_id`.
-	// The response never includes the redeem token or the create-time `link`.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Reading needs the same project `admin` check as
-	// `createGrant` (`POST /grants`).
+	//
+	// The response never includes the redeem token or the create-time `link`. Authenticate with a project
+	// secret (`oauth2`) or a console session cookie (`sessionCookie`). Reading needs the same project
+	// `admin` check as `createGrant` (`POST /grants`).
 	//
 	// GET /invitations/{invitation_id}
 	GetInvitation(ctx context.Context, params GetInvitationParams) (GetInvitationRes, error)
 	// GetLive invokes getLive operation.
 	//
-	// Answers `ok` while the server process serves HTTP, and checks nothing
-	// behind it.
-	// A liveness probe tells an orchestrator such as Kubernetes whether to
-	// restart the process. Point it at `/livez` at the root, where the probes
-	// stay, not under `/api/v1`. It never checks the database, so an outage of
-	// the database does not restart every instance. `GET /readyz` takes an
-	// instance out of rotation instead.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	//
+	// A liveness probe tells an orchestrator such as Kubernetes whether to restart the process. Point it
+	// at `/livez` at the root, where the probes stay, not under `/api/v1`. It never checks the database,
+	// so an outage of the database does not restart every instance. `GET /readyz` takes an instance out of
+	// rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
 	// GetMyPasswordState invokes getMyPasswordState operation.
 	//
-	// Returns when the signed-in user's current password was set, and leaves
-	// `set_at` out when they have none. The password and its hash are never
-	// returned.
-	// With `project_id`, the state is read only when the session belongs to that
-	// project.
+	// Returns when the signed-in user's current password was set, and leaves `set_at` out when they have
+	// none. The password and its hash are never returned.
+	//
+	// With `project_id`, the state is read only when the session belongs to that project.
 	//
 	// GET /users/me/password
 	GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error)
 	// GetMySession invokes getMySession operation.
 	//
-	// Returns the current state of the caller's session, including its factors and all currently
-	// satisfied assurance levels.
+	// Returns the current state of the caller's session, including its factors and all currently satisfied
+	// assurance levels.
+	//
 	// With `project_id`, the session is returned only when it belongs to that project.
-	// An assurance level is a profile, such as `urn:nist:aal:2`, that the
-	// session's verified factors satisfy. `assurance_levels[]` may shrink over time
-	// as factor freshness windows expire, without the session itself expiring.
-	// To restore a dropped level, use step-up authentication: create an
+	//
+	// An assurance level is a profile, such as `urn:nist:aal:2`, that the session's verified factors
+	// satisfy. `assurance_levels[]` may shrink over time as factor freshness windows expire, without the
+	// session itself expiring. To restore a dropped level, use step-up authentication: create an
 	// authentication attempt with the same `session_id`.
 	//
 	// GET /sessions/me
 	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
 	// GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
 	//
-	// Returns the session-bound token that protects against cross-site request
-	// forgery (CSRF). Browser code sends it in the `X-Zitadel-CSRF` header on the
-	// state-changing requests that the session cookie authenticates and that
-	// require it; see the `sessionCookie` scheme. It authorizes nothing on its
-	// own: the HttpOnly cookie is still the credential, and a cross-site page
-	// cannot read this response. It stays the same for the life of the session,
-	// so a client fetches it once per session.
-	// With `project_id`, the token is returned only when the session belongs to
-	// that project.
+	// Returns the session-bound token that protects against cross-site request forgery (CSRF). Browser
+	// code sends it in the `X-Zitadel-CSRF` header on the state-changing requests that the session cookie
+	// authenticates and that require it; see the `sessionCookie` scheme. It authorizes nothing on its own:
+	// the HttpOnly cookie is still the credential, and a cross-site page cannot read this response. It
+	// stays the same for the life of the session, so a client fetches it once per session.
+	//
+	// With `project_id`, the token is returned only when the session belongs to that project.
 	//
 	// GET /sessions/me/csrf
 	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
 	// Returns the user signed in to the session that authenticates the request.
-	// The project and the user both come from the session cookie, so a caller only
-	// ever reads their own user.
-	// With `project_id`, the user is returned only when the session belongs to
-	// that project.
+	//
+	// The project and the user both come from the session cookie, so a caller only ever reads their own
+	// user.
+	//
+	// With `project_id`, the user is returned only when the session belongs to that project.
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetMyUserSchema invokes getMyUserSchema operation.
 	//
 	// Returns the schema that validates the signed-in user's own record.
-	// With `project_id`, the schema is returned only when the session belongs to
-	// that project.
+	//
+	// With `project_id`, the schema is returned only when the session belongs to that project.
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetOAuthSettings invokes getOAuthSettings operation.
+	//
+	// Returns one OAuth settings revision, including its stored settings. Pass the `revision_id` of the
+	// `kind: oauth` pointer on a release, which `buildRelease` (`POST /releases/build`) and `getRelease`
+	// (`GET /releases/{release_id}`) return.
+	//
+	// A release is the only writer of OAuth settings, so there is no operation that publishes a revision
+	// on its own: put `oauth` in the bundle that `buildRelease` takes.
+	//
+	// GET /oauth_settings/{oauth_settings_id}
+	GetOAuthSettings(ctx context.Context, params GetOAuthSettingsParams) (GetOAuthSettingsRes, error)
 	// GetPolicy invokes getPolicy operation.
 	//
-	// Returns a policy as its newest revision. A revision applies once a deployed
-	// release pins it.
-	// A policy holds a project's rules for one operation, such as setting a
-	// password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
-	// /policies`) returns.
-	// The lookup is scoped to the project in `project_id`: a policy of another
-	// project answers not found exactly as an unknown ID does.
+	// Returns a policy as its newest revision. A revision applies once a deployed release pins it.
+	//
+	// A policy holds a project's rules for one operation, such as setting a password. Pass the `id` that
+	// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
+	//
+	// The lookup is scoped to the project in `project_id`: a policy of another project answers not found
+	// exactly as an unknown ID does.
 	//
 	// GET /policies/{policy_id}
 	GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error)
 	// GetPolicyRevision invokes getPolicyRevision operation.
 	//
 	// Returns one revision of a policy, the newest or an older one.
-	// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions` (`GET
-	// /policies/{policy_id}/revisions`)
-	// returns.
-	// The lookup is scoped to the project in `project_id`: a revision of another
-	// project answers not found exactly as an unknown ID does.
+	//
+	// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions`
+	// (`GET /policies/{policy_id}/revisions`) returns.
+	//
+	// The lookup is scoped to the project in `project_id`: a revision of another project answers not found
+	// exactly as an unknown ID does.
 	//
 	// GET /policies/revisions/{revision_id}
 	GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error)
 	// GetProject invokes getProject operation.
 	//
-	// Returns a project's current state: its name, origins, password hashing
-	// method and owning team.
-	// Authenticate with the project secret, or with the session of a signed-in
-	// person who holds a grant on the project.
+	// Returns a project's current state: its name, origins, password hashing method and owning team.
+	//
+	// Authenticate with the project secret, or with the session of a signed-in person who holds a grant on
+	// the project.
 	//
 	// GET /projects/{project_id}
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetProjectClaimStatus invokes getProjectClaimStatus operation.
 	//
-	// Returns the status of a claim challenge, `pending` or `completed`, while a
-	// browser completes the claim.
-	// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim).
-	// `zitadel claim` polls this operation after `createProjectClaim` (`POST
-	// /projects/{project_id}/claim/init`) starts the claim.
-	// Once the project is claimed, the response is `completed` with the owning
-	// team, the claim timestamp and the dashboard URL.
-	// The claim itself, not the polled challenge, decides the status. A project
-	// claimed through another concurrent challenge also reports `completed`. A
-	// completed claim keeps reporting `completed` past this challenge's expiry
-	// and past the project's claim window.
-	// Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the
-	// project secret that started the challenge. On `410` with `proj.claim_expired`, call
-	// `createProjectClaim` again for a fresh challenge.
+	// Returns the status of a claim challenge, `pending` or `completed`, while a browser completes the
+	// claim.
+	//
+	// A [claim attaches a project to a team]. `zitadel claim` polls this operation after
+	// `createProjectClaim` (`POST /projects/{project_id}/claim/init`) starts the claim. Once the project
+	// is claimed, the response is `completed` with the owning team, the claim timestamp and the dashboard
+	// URL.
+	//
+	// The claim itself, not the polled challenge, decides the status. A project claimed through another
+	// concurrent challenge also reports `completed`. A completed claim keeps reporting `completed` past
+	// this challenge's expiry and past the project's claim window.
+	//
+	// Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the project secret that
+	// started the challenge. On `410` with `proj.claim_expired`, call `createProjectClaim` again for a
+	// fresh challenge.
+	//
+	// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
 	//
 	// GET /projects/{project_id}/claim/status
 	GetProjectClaimStatus(ctx context.Context, params GetProjectClaimStatusParams) (GetProjectClaimStatusRes, error)
 	// GetProjectClaimWindow invokes getProjectClaimWindow operation.
 	//
-	// Returns when a project's claim window closes and whether it has already
-	// closed.
-	// The claim window is the 14 days after a project is created during which a
-	// team can [claim it](https://preview.zitadel.com/docs/concepts/project-team-user#claim). The claim page
-	// in the browser calls this operation to show how long is left.
-	// The request needs no credential, because the claim page calls it before the
-	// developer has signed in. Holding the `challenge_id` from the claim URL that
-	// `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the
-	// same one `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`)
-	// accepts. The response reveals only the window, never the project itself.
-	// Unlike `completeProjectClaim` it spends nothing, so reloading the page is safe.
+	// Returns when a project's claim window closes and whether it has already closed.
+	//
+	// The claim window is the 14 days after a project is created during which a team can [claim it]. The
+	// claim page in the browser calls this operation to show how long is left.
+	//
+	// The request needs no credential, because the claim page calls it before the developer has signed in.
+	// Holding the `challenge_id` from the claim URL that `createProjectClaim`
+	// (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
+	// `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`) accepts. The response reveals
+	// only the window, never the project itself. Unlike `completeProjectClaim` it spends nothing, so
+	// reloading the page is safe.
+	//
+	// [claim it]: /docs/concepts/project-team-user#claim
 	//
 	// GET /projects/{project_id}/claim/window
 	GetProjectClaimWindow(ctx context.Context, params GetProjectClaimWindowParams) (GetProjectClaimWindowRes, error)
 	// GetReady invokes getReady operation.
 	//
-	// Answers `ok` when the server can serve requests, which takes its database
-	// answering within a second, and `fail` with `503` otherwise.
-	// A readiness probe tells an orchestrator such as Kubernetes whether to send
-	// the instance requests. Point it at `/readyz` at the root, where the probes
-	// stay, not under `/api/v1`, so that a server whose database does not answer
-	// gets no requests until it does. The check is one round trip to the
+	// Answers `ok` when the server can serve requests, which takes its database answering within a second,
+	// and `fail` with `503` otherwise.
+	//
+	// A readiness probe tells an orchestrator such as Kubernetes whether to send the instance requests.
+	// Point it at `/readyz` at the root, where the probes stay, not under `/api/v1`, so that a server
+	// whose database does not answer gets no requests until it does. The check is one round trip to the
 	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetRelease invokes getRelease operation.
 	//
-	// Returns one release: its digest, its metadata, whether it was revoked, and
-	// the `(kind, handle, revision_id)` tuples it pins. A release is a snapshot
-	// of the project's configuration.
-	// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),
-	// `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a
-	// release from its
-	// digest, list with the `content_hash` filter and read the matched entry's
-	// `id`.
-	// The response does not embed resource content. Resolve each `revision_id`
-	// through the per-kind read endpoints when the bytes are needed.
-	// The lookup is scoped to the project in `project_id`. A release ID
-	// belonging to another project answers not found exactly as an unknown ID
-	// does, so the endpoint cannot be used to probe for releases in projects the
-	// caller cannot read.
+	// Returns one release: its digest, its metadata, whether it was revoked, and the
+	// `(kind, handle, revision_id)` tuples it pins. A release is a snapshot of the project's
+	// configuration.
+	//
+	// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`), `buildRelease`
+	// (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a release from its
+	// digest, list with the `content_hash` filter and read the matched entry's `id`.
+	//
+	// The response does not embed resource content. Resolve each `revision_id` through the per-kind read
+	// endpoints when the bytes are needed.
+	//
+	// The lookup is scoped to the project in `project_id`. A release ID belonging to another project
+	// answers not found exactly as an unknown ID does, so the endpoint cannot be used to probe for
+	// releases in projects the caller cannot read.
 	//
 	// GET /releases/{release_id}
 	GetRelease(ctx context.Context, params GetReleaseParams) (GetReleaseRes, error)
 	// GetSchema invokes getSchema operation.
 	//
-	// Returns a schema by ID. A schema ID identifies one immutable revision, so
-	// this returns exactly that revision. To find the current revision of an
-	// object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
-	// Schema IDs are unique within a project, not across projects (the seeded
-	// default schema carries the same `$id` in every project). A console
-	// session that manages more than one project names the project with
-	// `project_id`; without it, the ID is resolved in the credential's own
-	// project when it is ambiguous. A project secret always resolves in its
-	// own project and ignores `project_id`.
+	// Returns a schema by ID. A schema ID identifies one immutable revision, so this returns exactly that
+	// revision. To find the current revision of an object type, call `listSchemas` (`GET /schemas`) with
+	// `revisions=latest`.
+	//
+	// Schema IDs are unique within a project, not across projects (the seeded default schema carries the
+	// same `$id` in every project). A console session that manages more than one project names the project
+	// with `project_id`; without it, the ID is resolved in the credential's own project when it is
+	// ambiguous. A project secret always resolves in its own project and ignores `project_id`.
 	//
 	// GET /schemas/{schema_id}
 	GetSchema(ctx context.Context, params GetSchemaParams) (GetSchemaRes, error)
 	// GetSession invokes getSession operation.
 	//
-	// Returns the current state of a session, including its factors and all currently satisfied
-	// assurance levels.
-	// An assurance level is a profile, such as `urn:nist:aal:2`, that the
-	// session's verified factors satisfy. `assurance_levels[]` may shrink over time
-	// as factor freshness windows expire, without the session itself expiring.
-	// To restore a dropped level, use step-up authentication: create an
+	// Returns the current state of a session, including its factors and all currently satisfied assurance
+	// levels.
+	//
+	// An assurance level is a profile, such as `urn:nist:aal:2`, that the session's verified factors
+	// satisfy. `assurance_levels[]` may shrink over time as factor freshness windows expire, without the
+	// session itself expiring. To restore a dropped level, use step-up authentication: create an
 	// authentication attempt with the same `session_id`.
 	//
 	// GET /sessions/{session_id}
@@ -911,6 +928,7 @@ type Invoker interface {
 	// GetTeam invokes getTeam operation.
 	//
 	// Returns a team, a group of users inside a project, by ID.
+	//
 	// A deactivated team is still returned, with status `deactivated`.
 	//
 	// GET /teams/{team_id}
@@ -918,648 +936,646 @@ type Invoker interface {
 	// GetUser invokes getUser operation.
 	//
 	// Returns a user by ID, with the attributes its schema defines.
-	// With `team_id`, the user is returned only while they are an active member
-	// of that team.
+	//
+	// With `team_id`, the user is returned only while they are an active member of that team.
 	//
 	// GET /users/{user_id}
 	GetUser(ctx context.Context, params GetUserParams) (GetUserRes, error)
 	// GetUserPasswordState invokes getUserPasswordState operation.
 	//
-	// Returns when the user's current password was set, and leaves `set_at` out
-	// when the user has none. The password and its hash are never returned;
-	// `setUserPassword` (`PUT` on the same path) sets one.
+	// Returns when the user's current password was set, and leaves `set_at` out when the user has none.
+	// The password and its hash are never returned; `setUserPassword` (`PUT` on the same path) sets one.
 	//
 	// GET /users/{user_id}/password
 	GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error)
 	// GetVariable invokes getVariable operation.
 	//
-	// Returns one variable by name, with its value for each kind. A variable
-	// holds a value per kind: `primary` for primary origins and `preview` for
-	// preview URLs.
-	// Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists
-	// it. A name with no value for the requested kind answers `var.not_found`;
-	// set it with `setVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
+	// Returns one variable by name, with its value for each kind. A variable holds a value per kind:
+	// `primary` for primary origins and `preview` for preview URLs.
+	//
+	// Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists it. A
+	// name with no value for the requested kind answers `var.not_found`; set it with `setVariables`
+	// (`PATCH /variables`). A secret reads back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// ListBranding invokes listBranding operation.
 	//
-	// Lists a project's branding revisions, newest first, capped at the 100 most
-	// recent and not paginated. The first entry is the newest revision.
-	// The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes
-	// and
+	// Lists a project's branding revisions, newest first, capped at the 100 most recent and not paginated.
+	// The first entry is the newest revision.
+	//
+	// The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
 	// that a release pins for `kind: branding`.
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListDeploymentVariables invokes listDeploymentVariables operation.
 	//
-	// Returns the variable values the deployment froze when it was made. Later
-	// changes to the project's variables do not affect them. A secret reads
-	// back as `{"secret": true}`.
-	// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET
-	// /deployments`) returns.
+	// Returns the variable values the deployment froze when it was made. Later changes to the project's
+	// variables do not affect them. A secret reads back as `{"secret": true}`.
+	//
+	// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments`
+	// (`GET /deployments`) returns.
 	//
 	// GET /deployments/{deployment_id}/variables
 	ListDeploymentVariables(ctx context.Context, params ListDeploymentVariablesParams) (ListDeploymentVariablesRes, error)
 	// ListDeployments invokes listDeployments operation.
 	//
-	// Lists the project's deployments: the history of what ran where and when,
-	// or with `live=true` what is served now.
-	// A deployment makes a release live on origins. By default the list is the
-	// history, newest first: every deployment of the project, with every target
-	// it made the release live on. With `origin`, it is the history of that
-	// origin alone.
-	// With `live=true`, the list is what is served now, newest first. It holds
-	// the project's newest primary deployment with every origin it names, an
-	// origin the project no longer lists included: that deployment also serves
-	// requests with no `Origin`, so it stays live. It also holds the newest
-	// deployment to each live preview URL, narrowed to the URLs it still
-	// serves. Combined with `origin`, it is the one deployment that origin
-	// serves, or empty, as it is for an origin the project no longer lists.
-	// The `id` of an entry is the deployment ID that `getDeployment` (`GET
-	// /deployments/{deployment_id}`),
+	// Lists the project's deployments: the history of what ran where and when, or with `live=true` what is
+	// served now.
+	//
+	// A deployment makes a release live on origins. By default the list is the history, newest first:
+	// every deployment of the project, with every target it made the release live on. With `origin`, it is
+	// the history of that origin alone.
+	//
+	// With `live=true`, the list is what is served now, newest first. It holds the project's newest
+	// primary deployment with every origin it names, an origin the project no longer lists included: that
+	// deployment also serves requests with no `Origin`, so it stays live. It also holds the newest
+	// deployment to each live preview URL, narrowed to the URLs it still serves. Combined with `origin`,
+	// it is the one deployment that origin serves, or empty, as it is for an origin the project no longer
+	// lists.
+	//
+	// The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
 	// `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
 	// (`POST /deployments/{deployment_id}/rollback`) take.
-	// `expand: ["release"]` embeds the release each deployment made live. It
-	// requires `release.read` and does not change the ordering or the page
-	// tokens.
+	//
+	// `expand: ["release"]` embeds the release each deployment made live. It requires `release.read` and
+	// does not change the ordering or the page tokens.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
 	// ListEvents invokes listEvents operation.
 	//
-	// Lists a project's audit events, newest first. Pass `order=asc` for oldest
-	// first. Requires `events.read`.
-	// A project that is not claimed yet returns an empty list: its events are
-	// stored but stay invisible until the
-	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
-	// platform operators read them from the start.
-	// Team-scoped credentials see only the events whose `team_id` matches the
-	// credential's team. Team-scoped credentials are not issued today.
-	// Each item carries an `event_type` that says which type of event it is, and
-	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
-	// Filters combine. These are answered from an index and fill their pages: no
-	// filter, `category`, `event_type`, `status_class`, `operation_id` with or
-	// without `status_class`, `request_id`, `flow_id`, and `session_id`,
-	// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
-	// with or without the time bounds. Any other filter or combination is
-	// matched event by event, over at most a few thousand events per request.
-	// Such a page can hold fewer events than `limit`, or none, and still carry
-	// `next_page_token`: keep passing the token until a response has none.
+	// Lists a project's audit events, newest first. Pass `order=asc` for oldest first. Requires
+	// `events.read`.
+	//
+	// A project that is not claimed yet returns an empty list: its events are stored but stay invisible
+	// until the [claim] succeeds. The deployment's platform operators read them from the start.
+	//
+	// Team-scoped credentials see only the events whose `team_id` matches the credential's team.
+	// Team-scoped credentials are not issued today.
+	//
+	// Each item carries an `event_type` that says which type of event it is, and the matching `payload`.
+	// To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
+	//
+	// Filters combine. These are answered from an index and fill their pages: no filter, `category`,
+	// `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
+	// `flow_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
+	// `category`, each with or without the time bounds. Any other filter or combination is matched event
+	// by event, over at most a few thousand events per request. Such a page can hold fewer events than
+	// `limit`, or none, and still carry `next_page_token`: keep passing the token until a response has
+	// none.
+	//
+	// [claim]: /docs/concepts/project-team-user#claim
 	//
 	// GET /events
 	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
 	// ListFlowDefinitions invokes listFlowDefinitions operation.
 	//
-	// Lists the project's flow definitions with their configurations, newest by
-	// creation time first. A flow definition sets which step of a sign-in
-	// renders when, and which fields each step collects.
-	// The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET
-	// /flow_definitions/{flow_definition_id}`)
-	// takes. Filter by `name` to list the revisions of one flow.
+	// Lists the project's flow definitions with their configurations, newest by creation time first. A
+	// flow definition sets which step of a sign-in renders when, and which fields each step collects.
+	//
+	// The `id` of an entry is the flow definition ID that `getFlowDefinition`
+	// (`GET /flow_definitions/{flow_definition_id}`) takes. Filter by `name` to list the revisions of one
+	// flow.
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
 	// ListIdpRevisions invokes listIdpRevisions operation.
 	//
-	// Lists every revision of one identity provider, an external sign-in such as
-	// Google, newest first, paginated with a cursor. The order is fixed, so there
-	// is no `sorting`.
+	// Lists every revision of one identity provider, an external sign-in such as Google, newest first,
+	// paginated with a cursor. The order is fixed, so there is no `sorting`.
+	//
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /idps/{idp_id}/revisions
 	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
 	// ListInvitations invokes listInvitations operation.
 	//
-	// Lists a project's invitations, newest first, in any status, paginated with
-	// `limit` and `page_token`.
-	// Optional `status` and `type` filters narrow the page. `expired` is derived
-	// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
-	// a console session cookie (`sessionCookie`). Listing needs the same project
-	// `admin` check as `createGrant` (`POST /grants`).
+	// Lists a project's invitations, newest first, in any status, paginated with `limit` and `page_token`.
+	//
+	// Optional `status` and `type` filters narrow the page. `expired` is derived on read from
+	// `expires_at`. Authenticate with a project secret (`oauth2`) or a console session cookie
+	// (`sessionCookie`). Listing needs the same project `admin` check as `createGrant` (`POST /grants`).
 	//
 	// GET /invitations
 	ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error)
 	// ListMyIdentityLinks invokes listMyIdentityLinks operation.
 	//
-	// Lists the identity provider accounts a sign-in linked to the signed-in user,
-	// oldest first. The provider's subject and claims, the data it asserts about
-	// the account, are never returned.
-	// With `project_id`, the links are listed only when the session belongs to
-	// that project.
+	// Lists the identity provider accounts a sign-in linked to the signed-in user, oldest first. The
+	// provider's subject and claims, the data it asserts about the account, are never returned.
+	//
+	// With `project_id`, the links are listed only when the session belongs to that project.
 	//
 	// GET /users/me/identity_links
 	ListMyIdentityLinks(ctx context.Context, params ListMyIdentityLinksParams) (ListMyIdentityLinksRes, error)
 	// ListMyPasskeys invokes listMyPasskeys operation.
 	//
-	// Lists the signed-in user's own passkeys, newest first, paginated with a
-	// cursor. A passkey is a WebAuthn credential that signs a user in without a
-	// password. Each passkey carries its ID, its name and when it was registered,
-	// never the credential itself.
-	// With `project_id`, the passkeys are listed only when the session belongs to
-	// that project.
+	// Lists the signed-in user's own passkeys, newest first, paginated with a cursor. A passkey is a
+	// WebAuthn credential that signs a user in without a password. Each passkey carries its ID, its name
+	// and when it was registered, never the credential itself.
+	//
+	// With `project_id`, the passkeys are listed only when the session belongs to that project.
 	//
 	// GET /users/me/passkeys
 	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects invokes listMyProjects operation.
 	//
-	// Lists the projects the signed-in user can act on: those they hold an active
-	// grant on, either directly or through a team they are a member of. For a
-	// platform operator, someone who runs the deployment, that is every project of
-	// the deployment. Ordered by project ID unless `order` asks for creation
-	// time, and paged with an opaque cursor.
+	// Lists the projects the signed-in user can act on: those they hold an active grant on, either
+	// directly or through a team they are a member of. For a platform operator, someone who runs the
+	// deployment, that is every project of the deployment. Ordered by project ID unless `order` asks for
+	// creation time, and paged with an opaque cursor.
+	//
 	// This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
-	// one
-	// project the calling credential is bound to. Here the session is the caller
-	// and the grants are the answer, so the list spans projects.
-	// With `name_contains`, only the projects whose name contains that text are
-	// listed. The search runs on the server together with the grants, so it
-	// reaches every project the user can act on, however many there are, and
-	// pages like the full list.
-	// With `project_id`, the projects are listed only when the session belongs to
-	// that project. It names the project the session was signed in to, not one to
-	// list.
+	// one project the calling credential is bound to. Here the session is the caller and the grants are
+	// the answer, so the list spans projects.
+	//
+	// With `name_contains`, only the projects whose name contains that text are listed. The search runs on
+	// the server together with the grants, so it reaches every project the user can act on, however many
+	// there are, and pages like the full list.
+	//
+	// With `project_id`, the projects are listed only when the session belongs to that project. It names
+	// the project the session was signed in to, not one to list.
+	//
+	// With `exclude_platform`, the deployment's reserved platform project is left out: the project the
+	// console signs in to, which holds the console's accounts rather than an application's users. A
+	// deployment without one lists the same projects either way.
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
 	// ListMyTeams invokes listMyTeams operation.
 	//
 	// Lists the teams the signed-in user belongs to, ordered by team name.
-	// With `project_id`, the teams are listed only when the session belongs to
-	// that project.
+	//
+	// With `project_id`, the teams are listed only when the session belongs to that project.
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
 	// ListPolicies invokes listPolicies operation.
 	//
-	// Lists the project's policies, one per operation, each as its newest
-	// revision.
-	// A policy holds a project's rules for one operation, such as setting a
-	// password. The list is ordered by `created_at` (first publish) and then
-	// `id`. Filter by `operation` to read the policy of one operation; a project
-	// that never published one gets an empty list.
+	// Lists the project's policies, one per operation, each as its newest revision.
+	//
+	// A policy holds a project's rules for one operation, such as setting a password. The list is ordered
+	// by `created_at` (first publish) and then `id`. Filter by `operation` to read the policy of one
+	// operation; a project that never published one gets an empty list.
+	//
 	// The lookup is scoped to the project in `project_id`.
 	//
 	// GET /policies
 	ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error)
 	// ListPolicyRevisions invokes listPolicyRevisions operation.
 	//
-	// Lists every revision of one policy, newest first, one page at a time. The
-	// order is fixed, so there is no `sorting`.
-	// Each publish of a policy adds a revision. Pass the policy `id` that
-	// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
-	// The lookup is scoped to the project in `project_id`: a policy of another
-	// project answers not found exactly as an unknown ID does.
+	// Lists every revision of one policy, newest first, one page at a time. The order is fixed, so there
+	// is no `sorting`.
+	//
+	// Each publish of a policy adds a revision. Pass the policy `id` that `listPolicies` (`GET /policies`)
+	// or `publishPolicy` (`POST /policies`) returns.
+	//
+	// The lookup is scoped to the project in `project_id`: a policy of another project answers not found
+	// exactly as an unknown ID does.
 	//
 	// GET /policies/{policy_id}/revisions
 	ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error)
 	// ListProjectAdmins invokes listProjectAdmins operation.
 	//
-	// Lists the people who can administer a project, and how each of them
-	// holds that access.
+	// Lists the people who can administer a project, and how each of them holds that access.
+	//
 	// A person appears once, with one entry in `sources` per way they hold it:
-	// - `owning_team`: an active member of the team that owns the project, the
-	// team a claim attaches the project to. Removing a grant does not remove
-	// this access. It ends only when the person leaves the team or the
-	// project changes owner.
-	// - `grant`: an unexpired `admin` grant on the project, which is a role
-	// given to the person (`grant_id` only) or to a team they are an active
-	// member of (`grant_id` and `team`). Revoking that grant removes this
-	// source.
-	// The list follows the authorization check. A person who left a team, or
-	// whose team or user was deactivated, is not listed through it. Grants that
-	// expired or carry a lower role are left out. A person whose only access is a
-	// `viewer` or `editor` grant is not an admin and is not listed. Like the
-	// check, the list does not look at a person's user status beyond that, so a
-	// direct grant to a suspended person is listed.
-	// A person whose access comes only through teams the caller is not a
-	// member of is left out. A team the caller is not in is named by `team_id`
-	// only. The grant to such a team still shows in the project's grants.
-	// The list is ordered by `user_id` and paginated with `page_token`.
-	// Authenticate with a project secret (`oauth2`), or with the session cookie
-	// (`sessionCookie`) of a signed-in person who can read the project.
+	//
+	//  - `owning_team`: an active member of the team that owns the project, the team a claim attaches the
+	//    project to. Removing a grant does not remove this access. It ends only when the person leaves the
+	//    team or the project changes owner.
+	//  - `grant`: an unexpired `admin` grant on the project, which is a role given to the person
+	//    (`grant_id` only) or to a team they are an active member of (`grant_id` and `team`). Revoking
+	//    that grant removes this source.
+	//
+	// The list follows the authorization check. A person who left a team, or whose team or user was
+	// deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
+	// person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
+	// check, the list does not look at a person's user status beyond that, so a direct grant to a
+	// suspended person is listed.
+	//
+	// A person whose access comes only through teams the caller is not a member of is left out. A team the
+	// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
+	// grants.
+	//
+	// The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
+	// (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
+	// project.
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
 	// ListProjectPreviews invokes listProjectPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`.
-	// A preview is a URL with a deployment on it, served until it expires.
-	// An expired or removed preview is not listed. What was deployed to it stays
-	// in `GET /deployments`.
+	//
+	// A preview is a URL with a deployment on it, served until it expires. An expired or removed preview
+	// is not listed. What was deployed to it stays in `GET /deployments`.
 	//
 	// GET /projects/{project_id}/previews
 	ListProjectPreviews(ctx context.Context, params ListProjectPreviewsParams) (ListProjectPreviewsRes, error)
 	// ListReleases invokes listReleases operation.
 	//
-	// Lists the project's releases, newest first. A release is a snapshot of the
-	// project's configuration.
-	// Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-	// omitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
-	// The `id` of an entry is the release ID that `getRelease`,
-	// `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST
-	// /deployments`) take.
-	// `content_hash` looks a release up by its content, as the CLI does when a
-	// person types the digest a transcript printed. The project holds at most
-	// one release per digest, so the filtered list has one entry or none. An
-	// unknown digest is an empty list rather than an error. Paths take the
-	// `rel_` ID only, so use the matched entry's `id` there.
+	// Lists the project's releases, newest first. A release is a snapshot of the project's configuration.
+	//
+	// Entries carry the digest, the metadata and `revoked_at`. The pinned set is omitted: read one release
+	// with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
+	//
+	// The `id` of an entry is the release ID that `getRelease`, `revokeRelease`
+	// (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
+	//
+	// `content_hash` looks a release up by its content, as the CLI does when a person types the digest a
+	// transcript printed. The project holds at most one release per digest, so the filtered list has one
+	// entry or none. An unknown digest is an empty list rather than an error. Paths take the `rel_` ID
+	// only, so use the matched entry's `id` there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
 	// ListSchemas invokes listSchemas operation.
 	//
-	// Lists the schemas of a project, newest first, paginated with a cursor.
-	// Filter by `object_type` or `kind`, and choose which revisions to return
-	// with `revisions`.
+	// Lists the schemas of a project, newest first, paginated with a cursor. Filter by `object_type` or
+	// `kind`, and choose which revisions to return with `revisions`.
+	//
 	// A schema's `id` is what `createUser` (`POST /users`) takes as `schema`.
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
 	// ListUserIdentityLinks invokes listUserIdentityLinks operation.
 	//
-	// Lists the identity provider accounts a sign-in linked to the user, oldest
-	// first. The provider's subject and claims, the data it asserts about the
-	// account, are never returned.
+	// Lists the identity provider accounts a sign-in linked to the user, oldest first. The provider's
+	// subject and claims, the data it asserts about the account, are never returned.
 	//
 	// GET /users/{user_id}/identity_links
 	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys invokes listUserPasskeys operation.
 	//
-	// Lists the passkeys registered for a user, newest first, paginated with a
-	// cursor. A passkey is a WebAuthn credential that signs a user in without a
-	// password.
-	// Each passkey carries its ID, its name and when it was registered, never the
-	// credential itself.
+	// Lists the passkeys registered for a user, newest first, paginated with a cursor. A passkey is a
+	// WebAuthn credential that signs a user in without a password.
+	//
+	// Each passkey carries its ID, its name and when it was registered, never the credential itself.
 	//
 	// GET /users/{user_id}/passkeys
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
 	// ListUserTeams invokes listUserTeams operation.
 	//
-	// Lists the teams a user belongs to, ordered by team name. Each entry carries
-	// the team's name, so a client renders a page without resolving IDs one by
-	// one.
-	// This is the user's team memberships, not lifecycle ownership: the single
-	// team that owns the user's lifecycle is reported as
-	// `metadata.lifecycle_owner_team_id` on the user read endpoints. Memberships
+	// Lists the teams a user belongs to, ordered by team name. Each entry carries the team's name, so a
+	// client renders a page without resolving IDs one by one.
+	//
+	// This is the user's team memberships, not lifecycle ownership: the single team that owns the user's
+	// lifecycle is reported as `metadata.lifecycle_owner_team_id` on the user read endpoints. Memberships
 	// the user was removed from are not returned.
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
 	// ListVariables invokes listVariables operation.
 	//
-	// Returns the project's variables, keyed by name, each with its value for
-	// each kind: `primary` for primary origins and `preview` for preview URLs.
-	// With `kind`, only that kind's values are returned.
-	// Secret values are not returned. A secret appears as `{"secret": true}`,
-	// which says a value is held without disclosing it.
+	// Returns the project's variables, keyed by name, each with its value for each kind: `primary` for
+	// primary origins and `preview` for preview URLs. With `kind`, only that kind's values are returned.
+	//
+	// Secret values are not returned. A secret appears as `{"secret": true}`, which says a value is held
+	// without disclosing it.
 	//
 	// GET /variables
 	ListVariables(ctx context.Context, params ListVariablesParams) (ListVariablesRes, error)
 	// LookupInvitation invokes lookupInvitation operation.
 	//
-	// Returns a lean view of the invitation for the signed-in accept page:
-	// project, role, inviter and expiry.
-	// Send the plaintext token from the invitation link fragment. Every unknown
-	// or finished token answers the same opaque `404`. Authenticate with a
-	// platform-project user session cookie (`sessionCookie`). Lookup is a read:
-	// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
-	// reject still do). The call is rate-limited.
+	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
+	// expiry.
+	//
+	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
+	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
+	// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
+	// still do). The call is rate-limited.
 	//
 	// POST /invitations/lookup
 	LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error)
 	// PublishApplication invokes publishApplication operation.
 	//
-	// Creates or revises a registered application that authenticates its users
-	// via Zitadel. If the slug does not already exist in the project, a new
-	// application is created. If one with that slug already exists, a revision
-	// is created.
-	// A revision gets a new `revision_id` and does not modify the application's
-	// `id`. Sending an unchanged document also creates a revision. Each client
-	// is matched to the stored one by its slug and keeps its `client_id`: a
-	// revision that changes a client's `client_id` is rejected with
-	// `application.field_immutable`. A revision keeps every client of the
-	// stored document: one that omits a client is also rejected with
-	// `application.field_immutable`, since removing a client is not available
-	// yet. A client with a new slug is a new client. It takes the `client_id`
-	// the document supplies, or the server generates one, and every response
-	// carries it in `definition`. A `client_id` another client of the project
-	// holds, or ever held, is rejected with `application.client_id_taken`.
-	// Every new client gets a secret, generated by the server and returned once
-	// in `client_secrets`. The server stores only its hash, so no later read
-	// returns it.
-	// The document is validated against the `application.json` schema before
-	// anything is stored, and then against the rules the authorization server
-	// applies: `refresh_token` comes with `authorization_code`, a client with
-	// `authorization_code` has at least one redirect URI, and each redirect
-	// URI meets the rules `redirect_uris` states. A document that breaks one
-	// is refused with `application.invalid`, whose details identify the
-	// setting.
-	// If the document is refused, no change is stored and an existing
-	// application keeps its current revision.
+	// Creates or revises a registered application that authenticates its users via Zitadel. If the slug
+	// does not already exist in the project, a new application is created. If one with that slug already
+	// exists, a revision is created.
+	//
+	// A revision gets a new `revision_id` and does not modify the application's `id`. Sending an unchanged
+	// document also creates a revision. Each client is matched to the stored one by its slug and keeps its
+	// `client_id`: a revision that changes a client's `client_id` is rejected with `app.field_immutable`.
+	// A revision keeps every client of the stored document: one that omits a client is also rejected with
+	// `app.field_immutable`, since removing a client is not available yet. A client with a new slug is a
+	// new client. It takes the `client_id` the document supplies, or the server generates one, and every
+	// response carries it in `definition`. A `client_id` another client of the project holds, or ever
+	// held, is rejected with `app.client_id_taken`.
+	//
+	// Every new client gets a secret, generated by the server and returned once in `client_secrets`. The
+	// server stores only its hash, so no later read returns it.
+	//
+	// The document is validated against the `application.json` schema before anything is stored, and then
+	// against the rules the authorization server applies: `refresh_token` comes with `authorization_code`,
+	// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
+	// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
+	// details identify the setting.
+	//
+	// If the document is refused, no change is stored and an existing application keeps its current
+	// revision.
 	//
 	// POST /applications
 	PublishApplication(ctx context.Context, request *CreateApplicationRequest, params PublishApplicationParams) (PublishApplicationRes, error)
 	// PublishBranding invokes publishBranding operation.
 	//
-	// Publishes a new immutable branding revision for the project, and records a
-	// `branding.created` event. Branding revisions cannot be updated or deleted.
-	// Every edit publishes a new revision. Flow responses carry the branding
-	// revision the request's release pins.
-	// The `id` of the new revision is the revision ID a release pins for
-	// `kind: branding`.
-	// The `liquid_template` is validated lexically on save (size, encoding,
-	// banned patterns such as `<script>` tags, inline event handlers, and the
-	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
-	// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
+	// Publishes a new immutable branding revision for the project, and records a `branding.created` event.
+	// Branding revisions cannot be updated or deleted. Every edit publishes a new revision. Flow responses
+	// carry the branding revision the request's release pins.
+	//
+	// The `id` of the new revision is the revision ID a release pins for `kind: branding`.
+	//
+	// The `liquid_template` is validated lexically on save (size, encoding, banned patterns such as
+	// `<script>` tags, inline event handlers, and the `| raw` filter). Authoritative LiquidJS validation
+	// runs at authoring time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 	//
 	// POST /branding
 	PublishBranding(ctx context.Context, request *Branding, params PublishBrandingParams) (PublishBrandingRes, error)
 	// PublishFlowDefinition invokes publishFlowDefinition operation.
 	//
-	// Publishes a new revision of a flow definition, creating the flow definition
-	// on its first publish. It records a `flowdef.created` event.
-	// A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
-	// defines the sequence of steps (capabilities) for one user journey, such as
-	// registration, login or password reset. The body follows the flow
-	// definition schema, which includes the flow's purpose, audience and steps.
-	// Every call allocates a new opaque ID. That `id` is the `revision_id` a
-	// release pins for `kind: flow_definition`.
-	// Revisions of one flow share its `name`. Posting a definition under an
-	// existing `name` publishes a new revision of that flow, which is not a
-	// conflict. List with `name` to see a flow's revisions, newest by creation
-	// time first.
+	// Publishes a new revision of a flow definition, creating the flow definition on its first publish. It
+	// records a `flowdef.created` event.
+	//
+	// A [flow definition] is a template that defines the sequence of steps (capabilities) for one user
+	// journey, such as registration, login or password reset. The body follows the flow definition schema,
+	// which includes the flow's purpose, audience and steps.
+	//
+	// Every call allocates a new opaque ID. That `id` is the `revision_id` a release pins for
+	// `kind: flow_definition`.
+	//
+	// Revisions of one flow share its `name`. Posting a definition under an existing `name` publishes a
+	// new revision of that flow, which is not a conflict. List with `name` to see a flow's revisions,
+	// newest by creation time first.
+	//
+	// [flow definition]: /docs/concepts/flows-and-schemas
 	//
 	// POST /flow_definitions
 	PublishFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (PublishFlowDefinitionRes, error)
 	// PublishIdp invokes publishIdp operation.
 	//
-	// Creates or revises an identity provider, an external sign-in such as
-	// Google, from its connection document. If the slug does not already exist,
-	// a new identity provider is created. If one with that slug already exists,
-	// a revision is created.
-	// A revision gets a new `revision_id` and does not modify the identity
-	// provider's `id`. Identity links, which tie a user to an account at the
-	// provider, keep resolving. Releases and authentication attempts stay pinned
-	// to the revision they captured.
-	// Identity fields are fixed for the life of the identity provider and a
-	// revision that changes one is rejected: `protocol`, `subject_claim`, and
-	// `issuer`, the field that names the authority. Their values decide which provider
-	// account a stored subject belongs to, so changing one would silently
+	// Creates or revises an identity provider, an external sign-in such as Google, from its connection
+	// document. If the slug does not already exist, a new identity provider is created. If one with that
+	// slug already exists, a revision is created.
+	//
+	// A revision gets a new `revision_id` and does not modify the identity provider's `id`. Identity
+	// links, which tie a user to an account at the provider, keep resolving. Releases and authentication
+	// attempts stay pinned to the revision they captured.
+	//
+	// Identity fields are fixed for the life of the identity provider and a revision that changes one is
+	// rejected: `protocol`, `subject_claim`, and `issuer`, the field that names the authority. Their
+	// values decide which provider account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
-	// `subject_claim` is optional, and `sub` is used as the default value. If a
-	// revision updates `subject_claim` to a different value than the one set
-	// during creation, the request is rejected.
+	//
+	// `subject_claim` is optional, and `sub` is used as the default value. If a revision updates
+	// `subject_claim` to a different value than the one set during creation, the request is rejected.
+	//
 	// OIDC is the only protocol.
-	// The document is validated against the `idp-connection.json` schema before
-	// anything is stored. The rules the server applies when it starts a sign-in
-	// then run on the document, so a document that could never start one is
-	// refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
-	// without the others. Set no endpoint, and discovery fills them, or set
-	// `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and
-	// `userinfo_endpoint`. `userinfo_endpoint` may be left out when
-	// `id_token_mapping` is on, but setting it alone still counts as setting an
-	// endpoint. The details list the missing endpoints.
-	// A refused document stores nothing, and on a revise the current revision
-	// stays unchanged.
+	//
+	// The document is validated against the `idp-connection.json` schema before anything is stored. The
+	// rules the server applies when it starts a sign-in then run on the document, so a document that could
+	// never start one is refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
+	// without the others. Set no endpoint, and discovery fills them, or set `authorization_endpoint`,
+	// `token_endpoint`, `jwks_uri`, and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+	// `id_token_mapping` is on, but setting it alone still counts as setting an endpoint. The details list
+	// the missing endpoints.
+	//
+	// A refused document stores nothing, and on a revise the current revision stays unchanged.
 	//
 	// POST /idps
 	PublishIdp(ctx context.Context, request *CreateIdpRequest, params PublishIdpParams) (PublishIdpRes, error)
 	// PublishPolicy invokes publishPolicy operation.
 	//
-	// Publishes the project's policy for an operation as a new immutable
-	// revision, creating the policy on its first publish. A revision applies
-	// once a deployed release pins it. Nothing already stored is
-	// re-evaluated, so a stricter password policy applies the next time a
-	// password is set.
-	// A policy holds a project's rules for one operation, such as setting a
-	// password. The first publish records a `policy.created` event and every
-	// later one a `policy.updated` event.
-	// The request is typed by `operation`. An unknown operation or setting, or
-	// a value of the wrong type or outside its bounds, answers `req.invalid`
-	// like any malformed request.
-	// The operation's template then checks the config again, together with the
-	// rules that relate settings to each other (a `min_length` above
-	// `max_length`), and answers `pol.invalid`. Its `details.details.violations`
-	// lists everything that failed, settings first, then rules.
+	// Publishes the project's policy for an operation as a new immutable revision, creating the policy on
+	// its first publish. A revision applies once a deployed release pins it. Nothing already stored is
+	// re-evaluated, so a stricter password policy applies the next time a password is set.
+	//
+	// A policy holds a project's rules for one operation, such as setting a password. The first publish
+	// records a `policy.created` event and every later one a `policy.updated` event.
+	//
+	// The request is typed by `operation`. An unknown operation or setting, or a value of the wrong type
+	// or outside its bounds, answers `req.invalid` like any malformed request.
+	//
+	// The operation's template then checks the config again, together with the rules that relate settings
+	// to each other (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+	// `details.details.violations` lists everything that failed, settings first, then rules.
 	// `{"setting": "min_length"}` names one setting. `{"config_rule":
-	// "min_length_not_above_max_length", "settings": ["min_length",
-	// "max_length"]}` names a rule across settings, with the settings it reads.
-	// Fix what the violations list and publish again. To check a config without
-	// publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
-	// A setting left out is off, and `{}` switches every rule off; there are no
-	// defaults.
+	// "min_length_not_above_max_length", "settings": ["min_length", "max_length"]}` names a rule across
+	// settings, with the settings it reads. Fix what the violations list and publish again. To check a
+	// config without publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
+	//
+	// A setting left out is off, and `{}` switches every rule off; there are no defaults.
 	//
 	// POST /policies
 	PublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// PublishSchema invokes publishSchema operation.
 	//
-	// Publishes a user schema, the JSON Schema that says which attributes a user
-	// has and which attribute identifies the user.
-	// The request is either a user schema (`kind: user-schema`) or a schema URL
-	// (`kind: schema-url`) that the server resolves. The response's `id` is what
-	// `createUser` (`POST /users`) takes as `schema`.
-	// The optional `$id` is the JSON Schema document URI that identifies the
-	// schema in later requests. It is a stable identity for GitOps, not a
-	// free-form resource key. When `$id` is omitted, the server generates a
-	// `sch_*` URL. When provided, `$id` must be unique within the project and
-	// should ideally be a valid URI pointing at where the schema can be accessed.
-	// A `$id` that already exists in the project is refused; pick another or
-	// omit it.
+	// Publishes a user schema, the JSON Schema that says which attributes a user has and which attribute
+	// identifies the user.
+	//
+	// The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
+	// the server resolves. The response's `id` is what `createUser` (`POST /users`) takes as `schema`.
+	//
+	// The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
+	// is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server
+	// generates a `sch_*` URL. When provided, `$id` must be unique within the project and should ideally
+	// be a valid URI pointing at where the schema can be accessed. A `$id` that already exists in the
+	// project is refused; pick another or omit it.
 	//
 	// POST /schemas
 	PublishSchema(ctx context.Context, request PublishSchemaReq, params PublishSchemaParams) (PublishSchemaRes, error)
 	// QueryGrants invokes queryGrants operation.
 	//
 	// Returns a page of a project's grants.
-	// Only unrevoked grants this API manages are listed, which bind a user or team
-	// to the viewer, editor or admin role. Expired grants are included, so a client
-	// can revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding
-	// again.
-	// Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
-	// not returned. Requires `project.read`.
-	// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project
-	// secrets it additionally requires `user.read` and `team.read`. A user-bound
-	// console session that already passed the project check may expand without those scopes.
-	// Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+	//
+	// Only unrevoked grants this API manages are listed, which bind a user or team to the viewer, editor
+	// or admin role. Expired grants are included, so a client can revoke them with `deleteGrant`
+	// (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
+	// (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
+	//
+	// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
+	// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
+	// the project check may expand without those scopes.
+	//
+	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+	// requests follow that scheme's CSRF rules.
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
 	// QueryIdps invokes queryIdps operation.
 	//
-	// Returns the identity providers of a project, external sign-ins such as
-	// Google, paginated with a cursor. Each identity provider appears once, with
-	// its newest revision.
+	// Returns the identity providers of a project, external sign-ins such as Google, paginated with a
+	// cursor. Each identity provider appears once, with its newest revision.
 	//
 	// POST /idps/query
 	QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects invokes queryProjects operation.
 	//
-	// Returns the project the project secret belongs to, as a page of at most one
-	// project.
-	// A credential is scoped to one project today, so the filters and sorting
-	// apply to that project alone. A signed-in person lists the projects they can
-	// act on with `GET /users/me/projects`.
+	// Returns the project the project secret belongs to, as a page of at most one project.
+	//
+	// A credential is scoped to one project today, so the filters and sorting apply to that project alone.
+	// A signed-in person lists the projects they can act on with `GET /users/me/projects`.
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error)
 	// QuerySessions invokes querySessions operation.
 	//
 	// Returns a page of a project's sessions.
-	// Sessions of every lifecycle state are returned; each carries its `state`.
-	// Requires the `session.read` scope.
+	//
+	// Sessions of every lifecycle state are returned; each carries its `state`. Requires the
+	// `session.read` scope.
 	//
 	// POST /sessions/query
 	QuerySessions(ctx context.Context, request *QuerySessionsRequest, params QuerySessionsParams) (QuerySessionsRes, error)
 	// QueryTeams invokes queryTeams operation.
 	//
 	// Returns a page of a project's teams.
-	// Pass the response's `next_page_token` as `page_token` to fetch the next
-	// page. `project_id` names the project to list; without it, the credential's
-	// own project is listed.
+	//
+	// Pass the response's `next_page_token` as `page_token` to fetch the next page. `project_id` names the
+	// project to list; without it, the credential's own project is listed.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
 	// QueryUsers invokes queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// `project_id` names the project to list; without it, the credential's own
-	// project is listed.
-	// Accepts either a project secret (`oauth2`) or a user-bound console
-	// session cookie (`sessionCookie`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`sessionCookie`).
-	// With a project secret, embedding `teams` with `expand`, or filtering by
-	// `team_id`, also needs `team_membership.read`. Embedding
-	// `lifecycle_owner_team` needs `team.read`. A console session carries no
-	// scopes: it may do both when it may read the whole project, and gets
+	//
+	// `project_id` names the project to list; without it, the credential's own project is listed.
+	//
+	// Accepts either a project secret (`oauth2`) or a user-bound console session cookie (`sessionCookie`).
+	// Cookie-authenticated requests follow the scheme's CSRF rules (`sessionCookie`).
+	//
+	// With a project secret, embedding `teams` with `expand`, or filtering by `team_id`, also needs
+	// `team_membership.read`. Embedding `lifecycle_owner_team` needs `team.read`. A console session
+	// carries no scopes: it may do both when it may read the whole project, and gets
 	// `403 user.permission_denied` otherwise.
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
 	// RejectInvitation invokes rejectInvitation operation.
 	//
-	// Declines a pending invitation for the signed-in user and returns the
-	// updated invitation with status `rejected`.
-	// Send the plaintext token from the invitation link fragment. Metadata is
-	// cleared. Every unknown or finished token answers the same opaque `404`.
-	// Authenticate with a platform-project user session cookie (`sessionCookie`).
-	// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	// Declines a pending invitation for the signed-in user and returns the updated invitation with status
+	// `rejected`.
+	//
+	// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
+	// finished token answers the same opaque `404`. Authenticate with a platform-project user session
+	// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error)
 	// RemoveProjectOrigin invokes removeProjectOrigin operation.
 	//
 	// Removes one origin pattern from the project's origins.
-	// Requests from URLs only that pattern admitted are refused from then on.
-	// Live previews and deployment history are untouched. Removing the last
-	// pattern leaves an empty list, which admits no origin except a loopback
-	// origin.
-	// Removing a pattern that is already absent is idempotent and answers `204`.
-	// The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`)
-	// stored.
+	//
+	// Requests from URLs only that pattern admitted are refused from then on. Live previews and deployment
+	// history are untouched. Removing the last pattern leaves an empty list, which admits no origin except
+	// a loopback origin. Removing a pattern that is already absent is idempotent and answers `204`.
+	//
+	// The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`) stored.
 	//
 	// POST /projects/{project_id}/origins/remove
 	RemoveProjectOrigin(ctx context.Context, request *RemoveProjectOriginReq, params RemoveProjectOriginParams) (RemoveProjectOriginRes, error)
 	// RemoveProjectPreview invokes removeProjectPreview operation.
 	//
 	// Ends a preview before it expires: the URL stops being served at once.
-	// The deployments to it stay in the history. The call is idempotent.
-	// A URL with no live preview answers `204` too. That includes one that
-	// expired or was removed before, so a cleanup that races the expiry still
-	// succeeds.
-	// The URL travels in the body rather than the path because an origin
-	// contains `/`. Take it from `listProjectPreviews` (`GET /projects/{project_id}/previews`).
+	//
+	// The deployments to it stay in the history. The call is idempotent. A URL with no live preview
+	// answers `204` too. That includes one that expired or was removed before, so a cleanup that races the
+	// expiry still succeeds.
+	//
+	// The URL travels in the body rather than the path because an origin contains `/`. Take it from
+	// `listProjectPreviews` (`GET /projects/{project_id}/previews`).
 	//
 	// POST /projects/{project_id}/previews/remove
 	RemoveProjectPreview(ctx context.Context, request *RemovePreviewRequest, params RemoveProjectPreviewParams) (RemoveProjectPreviewRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Revokes the caller's own session by deleting it, which signs the user out.
-	// The request needs the session cookie issued at creation (or superseded by a
-	// handoff exchange). It also needs the session's CSRF token from
-	// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone,
-	// this still returns `204`. Any tokens derived from the session are
-	// invalidated, and the response clears the cookie.
-	// With `project_id`, only a session of that project is revoked. A session of
-	// another project is left alone, and so is its cookie.
+	//
+	// The request needs the session cookie issued at creation (or superseded by a handoff exchange). It
+	// also needs the session's CSRF token from `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header.
+	// Idempotent: if the session is already gone, this still returns `204`. Any tokens derived from the
+	// session are invalidated, and the response clears the cookie.
+	//
+	// With `project_id`, only a session of that project is revoked. A session of another project is left
+	// alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeRelease invokes revokeRelease operation.
 	//
-	// Revokes a release, so that its content is never served again. Pass the
-	// `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
-	// `listReleases` (`GET /releases`) returns. It
-	// records a `release.revoked` event.
-	// From then on the release cannot be deployed. Every path that would serve
-	// it refuses it with `rel.revoked`, including a build that pins its digest.
-	// A release that any origin still serves cannot be revoked. An origin serves
-	// the release of the newest deployment to it, so the call answers `409` with
-	// `rel.in_use`, naming each such origin, that deployment and whether the
-	// origin is primary or a preview. Deploy another release to a primary origin
-	// or roll it back, and remove a preview, then revoke. Revoking therefore
-	// never takes an origin down. Deployments that named the release earlier stay in
-	// the history.
-	// The call is idempotent: revoking a release that is already revoked answers
-	// `200` with the release unchanged, and `revoked_at` still names the first
-	// revocation. There is no un-revoke. To serve that configuration again,
-	// change it and build a new release: rebuilding unchanged content returns
-	// the same revoked release.
-	// The call takes no body. The lookup is scoped to the project in
-	// `project_id`, so a release ID of another project answers not found exactly
-	// as an unknown ID does.
+	// Revokes a release, so that its content is never served again. Pass the `id` that `createRelease`
+	// (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`)
+	// returns. It records a `release.revoked` event.
+	//
+	// From then on the release cannot be deployed. Every path that would serve it refuses it with
+	// `rel.revoked`, including a build that pins its digest.
+	//
+	// A release that any origin still serves cannot be revoked. An origin serves the release of the newest
+	// deployment to it, so the call answers `409` with `rel.in_use`, naming each such origin, that
+	// deployment and whether the origin is primary or a preview. Deploy another release to a primary
+	// origin or roll it back, and remove a preview, then revoke. Revoking therefore never takes an origin
+	// down. Deployments that named the release earlier stay in the history.
+	//
+	// The call is idempotent: revoking a release that is already revoked answers `200` with the release
+	// unchanged, and `revoked_at` still names the first revocation. There is no un-revoke. To serve that
+	// configuration again, change it and build a new release: rebuilding unchanged content returns the
+	// same revoked release.
+	//
+	// The call takes no body. The lookup is scoped to the project in `project_id`, so a release ID of
+	// another project answers not found exactly as an unknown ID does.
 	//
 	// POST /releases/{release_id}/revoke
 	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
-	// Revokes a session by deleting it, immediately and for good. A later
-	// `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
-	// This is the operator revoke path. It requires the `session.delete` scope on a
-	// project-bound credential. End-user sign-out with the session cookie is
-	// `DELETE /sessions/me` (`sessionCookie` scheme).
-	// Idempotent: revoking a session that does not exist, or was already revoked,
-	// still returns `204`. After revocation, any tokens derived from the session are
-	// invalidated.
+	// Revokes a session by deleting it, immediately and for good. A later `getSession`
+	// (`GET /sessions/{session_id}`) for it answers `404`.
+	//
+	// This is the operator revoke path. It requires the `session.delete` scope on a project-bound
+	// credential. End-user sign-out with the session cookie is `DELETE /sessions/me` (`sessionCookie`
+	// scheme).
+	//
+	// Idempotent: revoking a session that does not exist, or was already revoked, still returns `204`.
+	// After revocation, any tokens derived from the session are invalidated.
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
 	// RollbackDeployment invokes rollbackDeployment operation.
 	//
-	// Rolls back to an earlier deployment by deploying its release again to the
-	// same origins, with the same variable values. A listed primary origin that
-	// deployment left out serves nothing until the next deployment to `primary`,
-	// and one it named serves its release again, even when the live deployment
+	// Rolls back to an earlier deployment by deploying its release again to the same origins, with the
+	// same variable values. A listed primary origin that deployment left out serves nothing until the next
+	// deployment to `primary`, and one it named serves its release again, even when the live deployment
 	// left it out.
-	// A release is a snapshot of the project's configuration. A deployment makes
-	// a release live on origins and freezes the project's variable values with
-	// it.
-	// The deployment ID in the path is the deployment to return to, not the one
-	// to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
-	// the newest deployment first.
-	// A rollback is a new deployment, not an undo. It has `reason: rollback`,
-	// and its `rollback_to` names the deployment you returned to. It uses the
-	// variable values that deployment froze, not the project's current ones, and
-	// creates no release.
-	// To guard against a deployment that landed since you looked, set
-	// `expected_deployment_id` in the request body to the newest primary
-	// deployment, the one live now. The call then fails with `409 dep.conflict`
-	// if another deployment has replaced it.
-	// A rollback is idempotent like a deployment to `primary`. When nothing
-	// would change, it answers `200` with the newest primary deployment.
+	//
+	// A release is a snapshot of the project's configuration. A deployment makes a release live on origins
+	// and freezes the project's variable values with it.
+	//
+	// The deployment ID in the path is the deployment to return to, not the one to undo. Take it from the
+	// `id` that `listDeployments` (`GET /deployments`) returns, which lists the newest deployment first.
+	//
+	// A rollback is a new deployment, not an undo. It has `reason: rollback`, and its `rollback_to` names
+	// the deployment you returned to. It uses the variable values that deployment froze, not the project's
+	// current ones, and creates no release.
+	//
+	// To guard against a deployment that landed since you looked, set `expected_deployment_id` in the
+	// request body to the newest primary deployment, the one live now. The call then fails with
+	// `409 dep.conflict` if another deployment has replaced it.
+	//
+	// A rollback is idempotent like a deployment to `primary`. When nothing would change, it answers `200`
+	// with the newest primary deployment.
+	//
 	// If the request is refused:
-	// - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
-	// - `404 dep.not_found`: no deployment of the project has that ID, or that
-	// deployment recorded no variables to restore, so it cannot be a rollback
-	// target. List them with `listDeployments` and pick another.
-	// - `409 dep.conflict`: `expected_deployment_id` is not the project's
-	// newest primary deployment, and `details.deployment` is that deployment.
-	// Inspect it, then retry with its ID, or stop.
-	// - `409 rel.revoked`: the release of that deployment is revoked and cannot
-	// be deployed. Roll back to a deployment of a release that is not revoked.
+	//
+	//  - `400 dep.invalid`: the deployment went to preview URLs, which cannot be rolled back. Deploy to
+	//    the preview again with `createDeployment` (`POST /deployments`).
+	//  - `404 dep.not_found`: no deployment of the project has that ID, or that deployment recorded no
+	//    variables to restore, so it cannot be a rollback target. List them with `listDeployments` and
+	//    pick another.
+	//  - `409 dep.conflict`: `expected_deployment_id` is not the project's newest primary deployment, and
+	//    `details.deployment` is that deployment. Inspect it, then retry with its ID, or stop.
+	//  - `409 rel.revoked`: the release of that deployment is revoked and cannot be deployed. Roll back to
+	//    a deployment of a release that is not revoked.
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
@@ -1567,217 +1583,223 @@ type Invoker interface {
 	//
 	// Finds the resources of one project, or of the projects a person can act on, that match a text,
 	// across resource types.
-	// `query` is what the person typed and `types` names the kinds of result to
-	// look for; only those are searched. Each result is a reference: its `type`,
-	// its `id`, its `project_id`, a `title` and sometimes a `subtitle`. Read the
-	// resource itself with the type's own operation, for example `getUser`
-	// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the
-	// result's project.
+	//
+	// `query` is what the person typed and `types` names the kinds of result to look for; only those are
+	// searched. Each result is a reference: its `type`, its `id`, its `project_id`, a `title` and
+	// sometimes a `subtitle`. Read the resource itself with the type's own operation, for example
+	// `getUser` (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the result's project.
+	//
 	// What a type matches on:
-	// - `user`: the start of the value they carry as `identifier` or of a part
-	// of their `display` name, from three characters on
-	// - `team`: its name
-	// - `schema`: the `title` and the `objectType` of a user schema
-	// - `flow_definition`: its name
-	// - `idp`: the `slug` and the `display_name` of an identity provider
-	// connection
-	// A user matches from the start of a value. Every other type matches from
-	// the start of a name or of a word in it, so `staff` finds "Partner Staff"
-	// and `sso` finds `partner-sso`. Matching ignores case. A `query` that is the
-	// `id` of a resource of a requested type finds that one. A schema and a flow
+	//
+	//  - `user`: the start of the value they carry as `identifier` or of a part of their `display` name,
+	//    from three characters on
+	//  - `team`: its name
+	//  - `schema`: the `title` and the `objectType` of a user schema
+	//  - `flow_definition`: its name
+	//  - `idp`: the `slug` and the `display_name` of an identity provider connection
+	//
+	// A user matches from the start of a value. Every other type matches from the start of a name or of a
+	// word in it, so `staff` finds "Partner Staff" and `sso` finds `partner-sso`. Matching ignores case. A
+	// `query` that is the `id` of a resource of a requested type finds that one. A schema and a flow
 	// definition are found at their newest revision.
-	// `project_id` names the project to search. Without it, a project secret
-	// searches its own project, and a console session searches the projects the
-	// person can act on: the ones `listMyProjects` (`GET /users/me/projects`)
-	// lists, at most the newest 10 by when each was created (`order=desc`).
-	// `more_projects` says the person can act on more than that; search one of
-	// the others by naming it. A caller with access to part of a project finds
-	// only what that access covers.
-	// Authenticate with the project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). A preview secret is refused, as on every management
-	// operation.
-	// Results come best match first, at most `limit_per_type` of each type
-	// across every searched project, and types can be mixed in the order.
-	// `incomplete_types` lists the types that have more to show: page those with
-	// the type's own list, such as `queryUsers` (`POST /users/query`) or
-	// `queryTeams` (`POST /teams/query`).
-	// How text is matched and ranked can change, and later versions can match
-	// more of a resource. Treat the results as suggestions; to filter by an exact
-	// rule, use the type's own list.
+	//
+	// `project_id` names the project to search. Without it, a project secret searches its own project, and
+	// a console session searches the projects the person can act on: the ones `listMyProjects`
+	// (`GET /users/me/projects`) lists, at most the newest 10 by when each was created (`order=desc`).
+	// `more_projects` says the person can act on more than that; search one of the others by naming it. A
+	// caller with access to part of a project finds only what that access covers.
+	//
+	// Authenticate with the project secret (`oauth2`) or a console session cookie (`sessionCookie`). A
+	// preview secret is refused, as on every management operation.
+	//
+	// Results come best match first, at most `limit_per_type` of each type across every searched project,
+	// and types can be mixed in the order. `incomplete_types` lists the types that have more to show: page
+	// those with the type's own list, such as `queryUsers` (`POST /users/query`) or `queryTeams`
+	// (`POST /teams/query`).
+	//
+	// How text is matched and ranked can change, and later versions can match more of a resource. Treat
+	// the results as suggestions; to filter by an exact rule, use the type's own list.
 	//
 	// POST /search
 	Search(ctx context.Context, request *SearchRequest, params SearchParams) (SearchRes, error)
 	// SetUserPassword invokes setUserPassword operation.
 	//
-	// Sets a user's password, hashed with the project's current password hashing
-	// policy.
-	// The new password replaces the current one, and setting it emits
-	// `auth.factor.password.set`. A password the project's password policy
-	// refuses answers `user.password_policy_violation`; send one that meets the
-	// policy.
-	// The password policy is the one in the release that serves the caller's
-	// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
-	// preview URL gets that preview's policy, and one on a primary origin the
-	// newest primary deployment's. A request with no `Origin`, or from the
-	// console when the project does not list the console's origin, gets the
-	// project's newest primary deployment.
+	// Sets a user's password, hashed with the project's current password hashing policy.
+	//
+	// The new password replaces the current one, and setting it emits `auth.factor.password.set`. A
+	// password the project's password policy refuses answers `user.password_policy_violation`; send one
+	// that meets the policy.
+	//
+	// The password policy is the one in the release that serves the caller's `Origin`, chosen as
+	// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+	// one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
+	// console when the project does not list the console's origin, gets the project's newest primary
+	// deployment.
+	//
 	// If the request is refused:
-	// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
-	// with `zitadel origin add`.
-	// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
-	// no live preview. Run `zitadel preview` on the branch.
-	// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
-	// `zitadel deploy`.
-	// - `409 rel.no_default`: the request names no origin and the project has no
-	// primary deployment. Run `zitadel deploy`.
-	// - `409 rel.revoked`: the release that serves the origin is revoked.
+	//
+	//  - `403 proj.origin_not_allowed`: the project admits no such origin. Add it with
+	//    `zitadel origin add`.
+	//  - `403 proj.preview_not_live`: the origin matches a preview pattern but has no live preview. Run
+	//    `zitadel preview` on the branch.
+	//  - `409 rel.not_deployed`: nothing is deployed to the origin. Run `zitadel deploy`.
+	//  - `409 rel.no_default`: the request names no origin and the project has no primary deployment. Run
+	//    `zitadel deploy`.
+	//  - `409 rel.revoked`: the release that serves the origin is revoked.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
 	// SetVariables invokes setVariables operation.
 	//
-	// Sets, replaces and removes the project's variables for the requested
-	// kind, in one request. Names not in the body are untouched. Existing
-	// deployments keep the values they froze.
-	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
-	// stores the value encrypted under the project's active `secret` key, after
-	// which it can be referenced but not read back. `null` removes the name
-	// (RFC 7386), which is how several variables are removed in one request.
-	// Removing a name the project does not hold is a no-op rather than an error.
-	// Without `kind`, a plain value is written for both kinds. A secret is
-	// written for `primary` only and removes the name's `preview` value, so a
-	// preview never keeps a plaintext copy. Set a preview secret with
-	// `kind=preview`. `null` removes the name from both kinds.
-	// The body is applied whole or not at all, so a rejected request leaves the
-	// project's variables exactly as they were. Fix what the error reports and
-	// send the request again. Writing the same name twice replaces the value
-	// rather than duplicating it, which makes a retry safe.
-	// Each kind written records a `variable.set` event, and each kind removed a
-	// `variable.removed` event. The value never appears in either.
+	// Sets, replaces and removes the project's variables for the requested kind, in one request. Names not
+	// in the body are untouched. Existing deployments keep the values they froze.
+	//
+	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}` stores the value encrypted
+	// under the project's active `secret` key, after which it can be referenced but not read back. `null`
+	// removes the name (RFC 7386), which is how several variables are removed in one request. Removing a
+	// name the project does not hold is a no-op rather than an error.
+	//
+	// Without `kind`, a plain value is written for both kinds. A secret is written for `primary` only and
+	// removes the name's `preview` value, so a preview never keeps a plaintext copy. Set a preview secret
+	// with `kind=preview`. `null` removes the name from both kinds.
+	//
+	// The body is applied whole or not at all, so a rejected request leaves the project's variables
+	// exactly as they were. Fix what the error reports and send the request again. Writing the same name
+	// twice replaces the value rather than duplicating it, which makes a retry safe.
+	//
+	// Each kind written records a `variable.set` event, and each kind removed a `variable.removed` event.
+	// The value never appears in either.
 	//
 	// PATCH /variables
 	SetVariables(ctx context.Context, request UpdateVariablesRequest, params SetVariablesParams) (SetVariablesRes, error)
 	// SubmitFlowStep invokes submitFlowStep operation.
 	//
-	// Submits the user's input for the current step of a flow. The server
-	// validates it, processes it (for example, verifies a credential), advances
-	// the flow through any invisible steps, and returns the next visible step.
-	// The flow endpoints are the runtime calls the login component
-	// (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
-	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
-	// with the new flow state. The server is stateless: all orchestration
-	// state is carried in this cookie between requests.
-	// Sign-up additionally requires a single-use `gate_proofs.signup_pow`
-	// solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
-	// sends it with the submit, and a passkey registration that creates its user
-	// sends it with the attestation in `challenge_response`. Pending
-	// challenges and rate counters are stored on the server. Invalid or spent
-	// proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
-	// `429 flow.rate_limited`. GET the current step to obtain or refresh its
-	// challenge before solving. Start and Submit announce the gate without a puzzle.
-	// **Important:** The `id` in the response may differ from the `id` used in
-	// the request. This happens when a flow pivots (pushes a new flow onto the
-	// stack) or when a stacked flow completes (auto-pops to the parent flow).
-	// Always use the `id` from the latest response for the next request.
-	// ## Flow completion
-	// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
-	// field tells the frontend what to do:
-	// | `behavior`   | Action                                                     |
-	// |------------- |------------------------------------------------------------|
-	// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
-	// | `show`       | Render the step as a success screen, such as registration. |
-	// A `complete` step is only returned when the **entire flow stack** is done.
-	// If a stacked flow (for example, recovery pivoted from login) finishes, the
-	// server auto-pops to the parent flow and returns the parent's next step.
-	// The frontend never sees a `complete` for intermediate flows.
-	// ## External sign-in
-	// `{action: "sso", sso_provider_id, return_target}` on a step that offers
-	// `sso_providers` returns the server-emitted `sso-redirect` step, whose
-	// `redirect_url` the frontend navigates to.
-	// - The flow state does not change, but `_zflow` is re-sealed like on
-	// every response, so its ten-minute window restarts at this submission;
-	// the external sign-in and the return must complete within it.
-	// - A second `Set-Cookie` line carries the browser-binding cookie the
-	// callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
-	// - On every host except http loopback it is `__Host-_zsso` with `Secure`.
-	// - When the request host is http loopback (local development, where
-	// Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
-	// `__Host-` prefix is dropped because it requires `Secure`.
-	// An identity provider (an external sign-in such as Google) whose
-	// `client_id` is a `${{ NAME }}` reference has it filled from the project's
-	// variables. A provider the server cannot start a sign-in with, including a
-	// reference with no variable behind it, re-renders the step with
+	// Submits the user's input for the current step of a flow. The server validates it, processes it (for
+	// example, verifies a credential), advances the flow through any invisible steps, and returns the next
+	// visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
+	// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+	//
+	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
+	// server is stateless: all orchestration state is carried in this cookie between requests.
+	//
+	// Sign-up additionally requires a single-use `gate_proofs.signup_pow` solution for
+	// `step.gates.signup_pow`: a password sign-up (`create_user`) sends it with the submit, and a passkey
+	// registration that creates its user sends it with the attestation in `challenge_response`. Pending
+	// challenges and rate counters are stored on the server. Invalid or spent proofs return
+	// `403 flow.proof_invalid`; exhausted per-flow budgets return `429 flow.rate_limited`. GET the current
+	// step to obtain or refresh its challenge before solving. Start and Submit announce the gate without a
+	// puzzle.
+	//
+	// Important: The `id` in the response may differ from the `id` used in the request. This happens when
+	// a flow pivots (pushes a new flow onto the stack) or when a stacked flow completes (auto-pops to the
+	// parent flow). Always use the `id` from the latest response for the next request.
+	//
+	// # Flow completion
+	//
+	// When `step.type` is `complete`, the flow is terminal. The `step.behavior` field tells the frontend
+	// what to do:
+	//
+	// 	`behavior` | Action
+	// 	-----------+-----------------------------------------------------------
+	// 	`redirect` | Navigate to `redirect_uri` (OIDC/SAML auth request done).
+	// 	`show`     | Render the step as a success screen, such as registration.
+	//
+	// A `complete` step is only returned when the entire flow stack is done. If a stacked flow (for
+	// example, recovery pivoted from login) finishes, the server auto-pops to the parent flow and returns
+	// the parent's next step. The frontend never sees a `complete` for intermediate flows.
+	//
+	// # External sign-in
+	//
+	// `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` returns the
+	// server-emitted `sso-redirect` step, whose `redirect_url` the frontend navigates to.
+	//
+	//  - The flow state does not change, but `_zflow` is re-sealed like on every response, so its
+	//    ten-minute window restarts at this submission; the external sign-in and the return must complete
+	//    within it.
+	//  - A second `Set-Cookie` line carries the browser-binding cookie the callback checks: `HttpOnly`,
+	//    `Path=/`, `SameSite=Lax`.
+	//  - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+	//  - When the request host is http loopback (local development, where Safari rejects `Secure`), it is
+	//    `_zsso` with no `Secure`; the `__Host-` prefix is dropped because it requires `Secure`.
+	//
+	// An identity provider (an external sign-in such as Google) whose `client_id` is a `${{ NAME }}`
+	// reference has it filled from the project's variables. A provider the server cannot start a sign-in
+	// with, including a reference with no variable behind it, re-renders the step with
 	// `error.sso_unavailable`.
-	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
-	// re-resolve from `Origin`. If that release was revoked since the attempt
-	// started, the response is `409` with `rel.revoked`.
+	//
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
+	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
 	// POST /flow/{flow_id}/submit
 	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 	// UpdateMyUser invokes updateMyUser operation.
 	//
-	// Partially updates the caller's own schema-defined attributes. The merged
-	// result is validated against the user's schema before commit. Concurrent
-	// writes are last-write-wins.
-	// With `project_id`, the user is updated only when the session belongs to
-	// that project.
+	// Partially updates the caller's own schema-defined attributes. The merged result is validated against
+	// the user's schema before commit. Concurrent writes are last-write-wins.
+	//
+	// With `project_id`, the user is updated only when the session belongs to that project.
 	//
 	// PATCH /users/me
 	UpdateMyUser(ctx context.Context, request *PatchMyUserRequest, params UpdateMyUserParams) (UpdateMyUserRes, error)
 	// UpdateProject invokes updateProject operation.
 	//
 	// Updates a project's name or password hashing method.
-	// Fields you leave out keep their value. Sending `password_hash: null` drops
-	// the project's own method and returns to the server default. A change of
-	// method rewrites no stored password: each moves to the new method when its
-	// owner next signs in or sets a new password.
-	// Authenticate with the project secret, or with the session of a signed-in
-	// person who can act on the project.
+	//
+	// Fields you leave out keep their value. Sending `password_hash: null` drops the project's own method
+	// and returns to the server default. A change of method rewrites no stored password: each moves to the
+	// new method when its owner next signs in or sets a new password.
+	//
+	// Authenticate with the project secret, or with the session of a signed-in person who can act on the
+	// project.
 	//
 	// PATCH /projects/{project_id}
 	UpdateProject(ctx context.Context, request *PatchProjectRequest, params UpdateProjectParams) (UpdateProjectRes, error)
 	// UpdateTeam invokes updateTeam operation.
 	//
 	// Renames an active team.
-	// Only active teams can be updated. A deactivated team answers `404`. The new
-	// name must be unique within the project, and a taken name answers `409`:
-	// choose another name.
+	//
+	// Only active teams can be updated. A deactivated team answers `404`. The new name must be unique
+	// within the project, and a taken name answers `409`: choose another name.
 	//
 	// PATCH /teams/{team_id}
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateUser invokes updateUser operation.
 	//
-	// Partially updates a user's schema-defined attributes, and optionally
-	// moves the user to another registered schema. The merged result is
-	// validated against the schema before commit. Concurrent writes are
-	// last-write-wins.
-	// To move the user, send `schema` with the `id` of a registered schema, as
-	// `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
-	// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
-	// the same permission and answers the same status and `details` as the real
-	// request, and it changes nothing and emits no `user.updated`. The request
-	// itself is still recorded as `request.api`, like any other API call. A `200`
-	// holds for the moment of the check: a unique value that is free then can be
-	// taken before the real request, which then answers `409`.
-	// `dry_run` is a body field so that a server from before it refuses the
-	// request as malformed (`400 req.invalid`) instead of applying the patch.
+	// Partially updates a user's schema-defined attributes, and optionally moves the user to another
+	// registered schema. The merged result is validated against the schema before commit. Concurrent
+	// writes are last-write-wins.
+	//
+	// To move the user, send `schema` with the `id` of a registered schema, as `publishSchema`
+	// (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+	//
+	// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes the same permission
+	// and answers the same status and `details` as the real request, and it changes nothing and emits no
+	// `user.updated`. The request itself is still recorded as `request.api`, like any other API call. A
+	// `200` holds for the moment of the check: a unique value that is free then can be taken before the
+	// real request, which then answers `409`.
+	//
+	// `dry_run` is a body field so that a server from before it refuses the request as malformed
+	// (`400 req.invalid`) instead of applying the patch.
 	//
 	// PATCH /users/{user_id}
 	UpdateUser(ctx context.Context, request *PatchUserRequest, params UpdateUserParams) (UpdateUserRes, error)
 	// VerifyAuthAttemptChallenge invokes verifyAuthAttemptChallenge operation.
 	//
 	// Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
+	//
 	// The proof format depends on the challenge method. For example:
-	// - `password` method: { password: "…" }
-	// - `totp` method: { totp: { code: "123456" } }
-	// - `passkey` method: { passkey: { assertion: "…" } }
-	// - `recovery_code` method: { recovery_code: "…" }
-	// On success, the factor is recorded on the authentication attempt. The
-	// attempt moves to the next pending challenge, or completes when every required
-	// factor is verified. Then call `createAuthAttemptHandoff` (`POST
-	// /auth_attempts/{attempt_id}/handoff`).
-	// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
-	// again. There is no retry limit: you can retry until the attempt expires.
+	//
+	//  - `password` method: { password: "…" }
+	//  - `totp` method: { totp: { code: "123456" } }
+	//  - `passkey` method: { passkey: { assertion: "…" } }
+	//  - `recovery_code` method: { recovery_code: "…" }
+	//
+	// On success, the factor is recorded on the authentication attempt. The attempt moves to the next
+	// pending challenge, or completes when every required factor is verified. Then call
+	// `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
+	//
+	// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try again. There is no
+	// retry limit: you can retry until the attempt expires.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyAuthAttemptChallenge(ctx context.Context, request *VerifyChallengeRequest, params VerifyAuthAttemptChallengeParams) (VerifyAuthAttemptChallengeRes, error)
@@ -1826,16 +1848,15 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 
 // AcceptInvitation invokes acceptInvitation operation.
 //
-// Accepts a pending invitation for the signed-in user and returns the updated
-// invitation.
-// Send the plaintext token from the invitation link fragment. Acceptance
-// grants the invitation's role (a project grant for `project_member`) when
-// the invitation is pending and unexpired, the project is active and claimed,
-// and the creator still holds `admin` unless `created_by` is null. The
-// inviter cannot accept their own invitation. Every unknown or finished token
-// answers the same opaque `404`.
-// Authenticate with a platform-project user session cookie (`sessionCookie`).
-// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+// Accepts a pending invitation for the signed-in user and returns the updated invitation.
+//
+// Send the plaintext token from the invitation link fragment. Acceptance grants the invitation's role
+// (a project grant for `project_member`) when the invitation is pending and unexpired, the project is
+// active and claimed, and the creator still holds `admin` unless `created_by` is null. The inviter
+// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
+//
+// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
+// that scheme's CSRF rules. The call is rate-limited.
 //
 // POST /invitations/accept
 func (c *Client) AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error) {
@@ -1941,7 +1962,13 @@ func (c *Client) sendAcceptInvitation(ctx context.Context, request *InvitationTo
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeAcceptInvitationResponse(resp)
@@ -1955,18 +1982,19 @@ func (c *Client) sendAcceptInvitation(ctx context.Context, request *InvitationTo
 // AddProjectOrigin invokes addProjectOrigin operation.
 //
 // Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
-// An origin pattern says which web origins the project accepts. A `primary`
-// pattern must be an exact URL with no wildcard. A `preview` pattern may
-// include a single DNS-label wildcard.
-// While the project has no patterns, it admits no origin except a loopback
-// origin, so the first pattern you add opens it to the origins that
-// pattern matches. Admitting an origin is not serving it: a new `primary`
-// origin answers `rel.not_deployed` until the next deploy to primary
+//
+// An origin pattern says which web origins the project accepts. A `primary` pattern must be an exact
+// URL with no wildcard. A `preview` pattern may include a single DNS-label wildcard.
+//
+// While the project has no patterns, it admits no origin except a loopback origin, so the first
+// pattern you add opens it to the origins that pattern matches. Admitting an origin is not serving it:
+// a new `primary` origin answers `rel.not_deployed` until the next deploy to primary
 // (`zitadel deploy`).
-// Adding a pattern that already exists with the same kind is idempotent and
-// answers `201` with the stored origin. If the pattern exists with the other
-// kind, the request is refused with `origin.kind_conflict`: remove it with
-// `removeProjectOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
+//
+// Adding a pattern that already exists with the same kind is idempotent and answers `201` with the
+// stored origin. If the pattern exists with the other kind, the request is refused with
+// `origin.kind_conflict`: remove it with `removeProjectOrigin`
+// (`POST /projects/{project_id}/origins/remove`), then add it again.
 //
 // POST /projects/{project_id}/origins
 func (c *Client) AddProjectOrigin(ctx context.Context, request *ProjectOrigin, params AddProjectOriginParams) (AddProjectOriginRes, error) {
@@ -2106,7 +2134,13 @@ func (c *Client) sendAddProjectOrigin(ctx context.Context, request *ProjectOrigi
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeAddProjectOriginResponse(resp)
@@ -2119,38 +2153,38 @@ func (c *Client) sendAddProjectOrigin(ctx context.Context, request *ProjectOrigi
 
 // BuildRelease invokes buildRelease operation.
 //
-// Builds a release from the resources in `.zitadel/` as authored on disk,
-// grouped by kind, in one transaction.
-// A release is a snapshot of the project's configuration. A failure anywhere
-// leaves no revision and no release. The caller records nothing. The CLI's
-// `deploy` command builds its release with this operation.
-// If the project already holds a release with the same content, the same
-// `content_hash`, the request answers `200` with that release and allocates
-// nothing, however long ago it was built. Metadata is excluded from the
-// comparison, so the same content under a different `message` is the same
-// release.
-// Otherwise every resource is compared with the project's newest revision of
-// the same handle. Unchanged content reuses that revision, and changed
-// content allocates a new one. The request answers `201` with the new
-// release. A policy whose config matches only an older revision allocates a
-// new one too, so the policy reads back as the config the build carried.
-// A structurally malformed request is refused while decoding with
-// `req.invalid`, naming the offending fields. A well-formed bundle is then
-// checked resource by resource, as each kind's create endpoint checks it,
-// and every failure is reported at once. The request answers `400` with
-// `rel.invalid`, and `details.resources` lists each resource that failed.
-// Fix each listed resource and build again. A handle that resolves neither
-// in the bundle nor in the project answers `rel.unresolved_reference`,
+// Builds a release from the resources in `.zitadel/` as authored on disk, grouped by kind, in one
+// transaction.
+//
+// A release is a snapshot of the project's configuration. A failure anywhere leaves no revision and no
+// release. The caller records nothing. The CLI's `deploy` command builds its release with this
+// operation.
+//
+// If the project already holds a release with the same content, the same `content_hash`, the request
+// answers `200` with that release and allocates nothing, however long ago it was built. Metadata is
+// excluded from the comparison, so the same content under a different `message` is the same release.
+//
+// Otherwise every resource is compared with the project's newest revision of the same handle.
+// Unchanged content reuses that revision, and changed content allocates a new one. The request answers
+// `201` with the new release. A policy whose config matches only an older revision allocates a new one
+// too, so the policy reads back as the config the build carried.
+//
+// A structurally malformed request is refused while decoding with `req.invalid`, naming the offending
+// fields. A well-formed bundle is then checked resource by resource, as each kind's create endpoint
+// checks it, and every failure is reported at once. The request answers `400` with `rel.invalid`, and
+// `details.resources` lists each resource that failed. Fix each listed resource and build again. A
+// handle that resolves neither in the bundle nor in the project answers `rel.unresolved_reference`,
 // naming the pointer and the handle. Add the missing resource to the bundle.
-// Building writes revisions, so besides `release.write` it needs the write
-// scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-// as the per-kind create endpoints do. A missing scope answers `403` with
-// `rel.permission_denied`, naming the kind. Request a token with that scope.
-// An empty kind needs no scope.
-// Building a release does not deploy it. A release is not tied to an origin,
-// and the same release can later be deployed to any number of origins
-// unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
+//
+// Building writes revisions, so besides `release.write` it needs the write scope of every kind the
+// bundle carries a resource of: `schema.write`, `flow_definition.write`, `branding.write`,
+// `idp.write`, `policy.write` and `oauth_settings.write`, as the per-kind create endpoints do. A
+// missing scope answers `403` with `rel.permission_denied`, naming the kind. Request a token with that
+// scope. An empty kind needs no scope.
+//
+// Building a release does not deploy it. A release is not tied to an origin, and the same release can
+// later be deployed to any number of origins unchanged. Pass the returned `id` to `createDeployment`
+// (`POST /deployments`).
 //
 // POST /releases/build
 func (c *Client) BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error) {
@@ -2277,7 +2311,13 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeBuildReleaseResponse(resp)
@@ -2290,14 +2330,13 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 
 // CancelInvitation invokes cancelInvitation operation.
 //
-// Deletes a pending invitation. Its link can no longer be redeemed. Only a
-// `pending` invitation can be cancelled; a finished invitation answers the
-// same opaque `404` as a miss. Expired invitations keep their row until a
-// later cleanup job removes them.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Cancelling needs the same project `admin` check as
-// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
-// rules.
+// Deletes a pending invitation. Its link can no longer be redeemed. Only a `pending` invitation can be
+// cancelled; a finished invitation answers the same opaque `404` as a miss. Expired invitations keep
+// their row until a later cleanup job removes them.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
+// Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
+// follow that scheme's CSRF rules.
 //
 // DELETE /invitations/{invitation_id}
 func (c *Client) CancelInvitation(ctx context.Context, params CancelInvitationParams) (CancelInvitationRes, error) {
@@ -2445,7 +2484,13 @@ func (c *Client) sendCancelInvitation(ctx context.Context, params CancelInvitati
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCancelInvitationResponse(resp)
@@ -2458,17 +2503,19 @@ func (c *Client) sendCancelInvitation(ctx context.Context, params CancelInvitati
 
 // CompleteProjectClaim invokes completeProjectClaim operation.
 //
-// Completes a claim by attaching the project to the signed-in developer's
-// personal team.
-// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim),
-// so that the team's members administer it. The claim page in the browser
-// calls this operation after the developer signs in, with the session cookie.
-// The `challenge_id` from the claim URL that `createProjectClaim` (`POST
-// /projects/{project_id}/claim/init`) returns is the
-// request's single-use, browser-safe authorization.
-// Claims are first-claim-wins and spend the challenge. If a team already
-// claimed the project, the request answers `409`. If the challenge lapsed
-// (`410` with `proj.claim_expired`), call `createProjectClaim` again for a fresh one.
+// Completes a claim by attaching the project to the signed-in developer's personal team.
+//
+// A [claim attaches a project to a team], so that the team's members administer it. The claim page in
+// the browser calls this operation after the developer signs in, with the session cookie. The
+// `challenge_id` from the claim URL that `createProjectClaim`
+// (`POST /projects/{project_id}/claim/init`) returns is the request's single-use, browser-safe
+// authorization.
+//
+// Claims are first-claim-wins and spend the challenge. If a team already claimed the project, the
+// request answers `409`. If the challenge lapsed (`410` with `proj.claim_expired`), call
+// `createProjectClaim` again for a fresh one.
+//
+// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
 //
 // POST /projects/{project_id}/claim/complete
 func (c *Client) CompleteProjectClaim(ctx context.Context, request *CompleteClaimRequest, params CompleteProjectClaimParams) (CompleteProjectClaimRes, error) {
@@ -2596,7 +2643,13 @@ func (c *Client) sendCompleteProjectClaim(ctx context.Context, request *Complete
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCompleteProjectClaimResponse(resp)
@@ -2609,14 +2662,14 @@ func (c *Client) sendCompleteProjectClaim(ctx context.Context, request *Complete
 
 // CompleteUserPasskeyRegistration invokes completeUserPasskeyRegistration operation.
 //
-// Verifies the attestation against the registration ceremony and stores
-// the new passkey for the user. `registration_id` is the one that
-// `createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
-// returned when it started the ceremony. The attestation is
-// the browser's answer from `navigator.credentials.create()`.
+// Verifies the attestation against the registration ceremony and stores the new passkey for the user.
+// `registration_id` is the one that `createUserPasskeyRegistration`
+// (`POST /users/{user_id}/passkeys/registrations`) returned when it started the ceremony. The
+// attestation is the browser's answer from `navigator.credentials.create()`.
+//
 // A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
-// `att.stale_challenge`: begin a new registration. An unknown or
-// already-consumed registration ID answers `att.not_found`.
+// `att.stale_challenge`: begin a new registration. An unknown or already-consumed registration ID
+// answers `att.not_found`.
 //
 // POST /users/{user_id}/passkeys/registrations/{registration_id}
 func (c *Client) CompleteUserPasskeyRegistration(ctx context.Context, request *FinishUserPasskeyRegistrationRequest, params CompleteUserPasskeyRegistrationParams) (CompleteUserPasskeyRegistrationRes, error) {
@@ -2753,7 +2806,13 @@ func (c *Client) sendCompleteUserPasskeyRegistration(ctx context.Context, reques
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCompleteUserPasskeyRegistrationResponse(resp)
@@ -2767,36 +2826,33 @@ func (c *Client) sendCompleteUserPasskeyRegistration(ctx context.Context, reques
 // CreateAuthAttempt invokes createAuthAttempt operation.
 //
 // Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.
-// An authentication attempt collects the proofs for one sign-in and ends in a
-// handoff token. A handoff token is the short-lived, single-use credential that
-// a completed attempt hands to the session exchange. A client makes these calls
-// in order:
+//
+// An authentication attempt collects the proofs for one sign-in and ends in a handoff token. A handoff
+// token is the short-lived, single-use credential that a completed attempt hands to the session
+// exchange. A client makes these calls in order:
+//
 //  1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
 //  2. `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge,
-//     a request to prove one factor such as
+//     a request to prove one factor such as `identifier`, `password` or `passkey`.
+//  3. `verifyAuthAttemptChallenge`
+//     (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that
+//     challenge: the credential, code or assertion. Repeat steps 2 and 3 until `getAuthAttempt`
+//     (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
+//     `required_factors` is verified.
+//  4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and
+//     returns the `handoff_token`.
+//  5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token for the session and its
+//     `session_token`.
 //
-// `identifier`, `password` or `passkey`.
-// 3. `verifyAuthAttemptChallenge` (`POST
-// /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that
-// challenge: the
-// credential, code or assertion. Repeat steps 2 and 3 until
-// `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every
-// factor in
-// `required_factors` is verified.
-// 4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt
-// and returns the `handoff_token`.
-// 5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
-// for the session and its `session_token`.
-// The body takes a `project_id` and a `challenge_nonce` (from
-// `POST /bootstrap/challenge`). For step-up authentication, which adds factors
-// to an existing session, also send that session's `session_id` and its
-// `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
-// The attempt's `attempt_id` in the response is the ID every later call takes.
-// The project comes from the project secret. A body `project_id` that names
-// another project answers `403` with `proj.mismatch`: send the credential's own
-// project. The attempt seals the project's newest primary deployment, whatever
-// the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
-// revoked release answers `409` with `rel.revoked`.
+// The body takes a `project_id` and a `challenge_nonce` (from `POST /bootstrap/challenge`). For
+// step-up authentication, which adds factors to an existing session, also send that session's
+// `session_id` and its `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff`
+// returned them. The attempt's `attempt_id` in the response is the ID every later call takes.
+//
+// The project comes from the project secret. A body `project_id` that names another project answers
+// `403` with `proj.mismatch`: send the credential's own project. The attempt seals the project's
+// newest primary deployment, whatever the caller's `Origin`. With none it answers `409` with
+// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
 //
 // POST /auth_attempts
 func (c *Client) CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error) {
@@ -2902,7 +2958,13 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateAuthAttemptResponse(resp)
@@ -2916,12 +2978,11 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 // CreateAuthAttemptChallenge invokes createAuthAttemptChallenge operation.
 //
 // Issues a challenge, a request to prove one factor, within an authentication attempt.
-// A challenge names one factor method, such as password, passkey, TOTP or OTP
-// via SMS. The response carries the challenge's `challenge_id`, method,
-// metadata and any UI hints. The client then submits the proof with
-// `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`),
 //
-//	using that `challenge_id`.
+// A challenge names one factor method, such as password, passkey, TOTP or OTP via SMS. The response
+// carries the challenge's `challenge_id`, method, metadata and any UI hints. The client then submits
+// the proof with `verifyAuthAttemptChallenge`
+// (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (c *Client) CreateAuthAttemptChallenge(ctx context.Context, request *IssueChallengeRequest, params CreateAuthAttemptChallengeParams) (CreateAuthAttemptChallengeRes, error) {
@@ -3049,7 +3110,13 @@ func (c *Client) sendCreateAuthAttemptChallenge(ctx context.Context, request *Is
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateAuthAttemptChallengeResponse(resp)
@@ -3063,19 +3130,21 @@ func (c *Client) sendCreateAuthAttemptChallenge(ctx context.Context, request *Is
 // CreateAuthAttemptHandoff invokes createAuthAttemptHandoff operation.
 //
 // Completes an authentication attempt and mints a `handoff_token`.
-// A handoff token is the short-lived credential that a completed attempt hands
-// to the session exchange. Call this after every required factor is verified and
-// the attempt is in `completed` state. Otherwise it answers `409` with
-// `att.not_completed`: verify the remaining factors, then call again.
+//
+// A handoff token is the short-lived credential that a completed attempt hands to the session
+// exchange. Call this after every required factor is verified and the attempt is in `completed` state.
+// Otherwise it answers `409` with `att.not_completed`: verify the remaining factors, then call again.
+//
 // Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
-// within 60
-// seconds to receive the session and its `session_token`. The handoff token is:
-// - Single-use: exchange it once, with no retry.
-// - Bound to the project: the exchange needs the same project's credential.
-// - Created once: a second call answers `409 att.already_handed_off`, even
-// with the same idempotency key.
-// A revoked release is refused when the handoff is exchanged, not here. A
-// release is the configuration that `zitadel deploy` publishes.
+// within 60 seconds to receive the session and its `session_token`. The handoff token is:
+//
+//   - Single-use: exchange it once, with no retry.
+//   - Bound to the project: the exchange needs the same project's credential.
+//   - Created once: a second call answers `409 att.already_handed_off`, even with the same idempotency
+//     key.
+//
+// A revoked release is refused when the handoff is exchanged, not here. A release is the configuration
+// that `zitadel deploy` publishes.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (c *Client) CreateAuthAttemptHandoff(ctx context.Context, params CreateAuthAttemptHandoffParams) (CreateAuthAttemptHandoffRes, error) {
@@ -3208,7 +3277,13 @@ func (c *Client) sendCreateAuthAttemptHandoff(ctx context.Context, params Create
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateAuthAttemptHandoffResponse(resp)
@@ -3221,53 +3296,51 @@ func (c *Client) sendCreateAuthAttemptHandoff(ctx context.Context, params Create
 
 // CreateDeployment invokes createDeployment operation.
 //
-// Creates a deployment: it makes a release live on the project's primary
-// origins or on preview URLs.
-// A release is a snapshot of the project's configuration. A deployment makes
-// a release live on origins and freezes the project's variable values for
-// its kind, with no fallback between primary and preview values. The call is
-// atomic: on success every target serves the release and the deployment is
-// recorded, and it records a `deployment.created` event. On failure nothing
-// changes and nothing is recorded.
-// Name the release by exactly one of `release_id` or `content_hash`. Take the
-// release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
-// /releases/build`) or
-// `listReleases` (`GET /releases`) returns. The release must already exist in the project.
-// `targets` is `primary`, which means every primary origin, or a list of
-// preview URLs. `["primary"]`, which clients released before this shape
-// send, still deploys to every primary origin until 1.0.0; its answer
-// carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
-// The project's newest primary deployment also serves every request with no
-// `Origin`, such as a backend, a native app or the CLI, and the console's
-// login preview of a project that does not list the console's origin. A
-// preview URL serves only itself.
-// `primary` records the project's current primary origins. One added later
-// serves nothing until the next deployment to `primary`; one removed stops
-// being served at once.
-// A deployment to `primary` changes nothing when the project's newest
-// primary deployment has the same release and frozen values and covers
-// exactly the current primary origins. The call then answers `200` with that
-// deployment. Any other request writes a new deployment and answers `201`.
-// For preview URLs, that deployment renews their previews.
+// Creates a deployment: it makes a release live on the project's primary origins or on preview URLs.
+//
+// A release is a snapshot of the project's configuration. A deployment makes a release live on origins
+// and freezes the project's variable values for its kind, with no fallback between primary and preview
+// values. The call is atomic: on success every target serves the release and the deployment is
+// recorded, and it records a `deployment.created` event. On failure nothing changes and nothing is
+// recorded.
+//
+// Name the release by exactly one of `release_id` or `content_hash`. Take the release ID from the `id`
+// that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases`
+// (`GET /releases`) returns. The release must already exist in the project. `targets` is `primary`,
+// which means every primary origin, or a list of preview URLs. `["primary"]`, which clients released
+// before this shape send, still deploys to every primary origin until 1.0.0; its answer carries a
+// `Deprecation` header (RFC 9745) and a `Link` to these docs.
+//
+// The project's newest primary deployment also serves every request with no `Origin`, such as a
+// backend, a native app or the CLI, and the console's login preview of a project that does not list
+// the console's origin. A preview URL serves only itself.
+//
+// `primary` records the project's current primary origins. One added later serves nothing until the
+// next deployment to `primary`; one removed stops being served at once.
+//
+// A deployment to `primary` changes nothing when the project's newest primary deployment has the same
+// release and frozen values and covers exactly the current primary origins. The call then answers
+// `200` with that deployment. Any other request writes a new deployment and answers `201`. For preview
+// URLs, that deployment renews their previews.
+//
 // If the request is refused, fix the cause and send it again:
-// - `400 dep.invalid`: the request names both or neither of `release_id` and
-// `content_hash`, names a primary origin among the preview URLs, sends
-// `primary` for a project with no primary origin, sends
-// `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
-// the request.
-// - `400 dep.variables_missing`: a variable the release references has no
-// value for the kind. `details` names the kind and every missing variable.
-// Set each one for that kind with `setVariables` (`PATCH /variables`), then deploy again.
-// - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
-// of the project, or is a loopback URL. Use a URL that matches a pattern.
-// - `404 rel.not_found`: the release ID or digest names no release in this
-// project. List the project's releases with `listReleases`.
-// - `409 dep.conflict`: `expected_deployment_id` is not the deployment this
-// write replaces, and `details.deployment` is that deployment. Inspect it,
-// then retry with its ID as `expected_deployment_id`, or stop.
-// - `409 rel.revoked`: the release is revoked and cannot be deployed. Change
-// the configuration and build a new release, or deploy a release that is
-// not revoked. Rebuilding unchanged content returns the same revoked release.
+//
+//   - `400 dep.invalid`: the request names both or neither of `release_id` and `content_hash`, names a
+//     primary origin among the preview URLs, sends `primary` for a project with no primary origin,
+//     sends `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct the request.
+//   - `400 dep.variables_missing`: a variable the release references has no value for the kind.
+//     `details` names the kind and every missing variable. Set each one for that kind with
+//     `setVariables` (`PATCH /variables`), then deploy again.
+//   - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern of the project, or is a
+//     loopback URL. Use a URL that matches a pattern.
+//   - `404 rel.not_found`: the release ID or digest names no release in this project. List the
+//     project's releases with `listReleases`.
+//   - `409 dep.conflict`: `expected_deployment_id` is not the deployment this write replaces, and
+//     `details.deployment` is that deployment. Inspect it, then retry with its ID as
+//     `expected_deployment_id`, or stop.
+//   - `409 rel.revoked`: the release is revoked and cannot be deployed. Change the configuration and
+//     build a new release, or deploy a release that is not revoked. Rebuilding unchanged content
+//     returns the same revoked release.
 //
 // POST /deployments
 func (c *Client) CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error) {
@@ -3406,7 +3479,13 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateDeploymentResponse(resp)
@@ -3419,50 +3498,46 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 
 // CreateFlow invokes createFlow operation.
 //
-// Starts a flow: resolves a flow definition from the request's purpose and
-// audience, and returns the first step.
-// The flow endpoints are the runtime calls the login component
-// (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
-// step it gets back, and submits the user's input with `submitFlowStep` (`POST
-// /flow/{flow_id}/submit`) to
-// get the next step. This call creates a new session implicitly, unless
-// `session_id` is provided together with that session's `session_token`
+// Starts a flow: resolves a flow definition from the request's purpose and audience, and returns the
+// first step.
+//
+// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
+// step. It starts a flow here, renders the step it gets back, and submits the user's input with
+// `submitFlowStep` (`POST /flow/{flow_id}/submit`) to get the next step. This call creates a new
+// session implicitly, unless `session_id` is provided together with that session's `session_token`
 // (for step-up or reauthentication on an existing session).
-// The browser `Origin` header selects which deployment serves this attempt.
-// The server checks the origin against the project's origin patterns and live
-// previews, and the deployment that origin serves is the target: the
-// project's newest primary deployment when it names a primary origin, or the
-// newest live deployment to a preview URL. A
-// deployment is a release, the immutable bundle of the project's
-// configuration, made live at an origin. The deployment's release supplies
-// flow definitions, user schemas and branding. The resolved deployment is
-// sealed into the `_zflow` cookie so later steps keep the same
-// configuration.
-// - An origin that matches no pattern answers `403` with
-// `proj.origin_not_allowed`, including when the project lists no origins.
-// Add the origin with `zitadel origin add`.
-// - An origin that matches a preview pattern with no live preview answers
-// `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-// - Nothing deployed to a listed origin or a live preview answers `409`
-// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
-// since the last deploy serves nothing until the next one.
-// - A loopback origin the project does not list answers `409` with
-// `rel.not_deployed` too, as no deployment can name it. Add it with
-// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
-// - A revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin` passes the check, and so does the server's own
-// origin, from which its console previews a project's login. Both are served
-// the project's newest primary deployment unless the project lists that
-// origin; with no primary deployment they answer `409` with
-// `rel.no_default`. A loopback origin passes the check and is its own
-// target. A step submitted from the server's own origin is still refused
-// unless the project lists it.
-// The response contains an `id` field, the flow handle. Use it as the path
-// parameter for all subsequent `/flow/{flow_id}/submit` calls.
-// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
-// the flow's orchestration state (current step, collected data, history).
-// The server is stateless between requests: all flow state lives in this
-// cookie. The browser sends it automatically on subsequent requests.
+//
+// The browser `Origin` header selects which deployment serves this attempt. The server checks the
+// origin against the project's origin patterns and live previews, and the deployment that origin
+// serves is the target: the project's newest primary deployment when it names a primary origin, or the
+// newest live deployment to a preview URL. A deployment is a release, the immutable bundle of the
+// project's configuration, made live at an origin. The deployment's release supplies flow definitions,
+// user schemas and branding. The resolved deployment is sealed into the `_zflow` cookie so later steps
+// keep the same configuration.
+//
+//   - An origin that matches no pattern answers `403` with `proj.origin_not_allowed`, including when
+//     the project lists no origins. Add the origin with `zitadel origin add`.
+//   - An origin that matches a preview pattern with no live preview answers `403` with
+//     `proj.preview_not_live`. Run `zitadel preview` on the branch.
+//   - Nothing deployed to a listed origin or a live preview answers `409` with `rel.not_deployed`. Run
+//     `zitadel deploy`: a primary origin added since the last deploy serves nothing until the next one.
+//   - A loopback origin the project does not list answers `409` with `rel.not_deployed` too, as no
+//     deployment can name it. Add it with `zitadel origin add <origin> --kind primary`, then run
+//     `zitadel deploy`.
+//   - A revoked release answers `409` with `rel.revoked`.
+//
+// A request with no `Origin` passes the check, and so does the server's own origin, from which its
+// console previews a project's login. Both are served the project's newest primary deployment unless
+// the project lists that origin; with no primary deployment they answer `409` with `rel.no_default`. A
+// loopback origin passes the check and is its own target. A step submitted from the server's own
+// origin is still refused unless the project lists it.
+//
+// The response contains an `id` field, the flow handle. Use it as the path parameter for all
+// subsequent `/flow/{flow_id}/submit` calls.
+//
+// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
+// state (current step, collected data, history). The server is stateless between requests: all flow
+// state lives in this cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
 func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
@@ -3552,7 +3627,13 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateFlowResponse(resp)
@@ -3565,29 +3646,29 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 
 // CreateGrant invokes createGrant operation.
 //
-// Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.
-// admin` role on a project.
-// The project is the one named by the `project_id` query parameter. Name the
-// principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
-// `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-// `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant` (`DELETE /grants/{grant_id}`) take.
-// Owning-team (`project.team`) grants are not
-// created here: a claim, which attaches a project to a team, creates them.
-// An unrevoked grant with the same principal and relation holds that binding
-// even after `expires_at`. Revoke it with `deleteGrant` before you create it
-// again.
-// Create does not accept `expand`. The `user_id` and team locators return `201`,
-// whose `user` and `team` carry only `user_id` and `team_id`. They still answer
-// `404` or `409` when the principal is missing or the grant already exists.
-// Creating by `user.identifier` answers `202` with no body on every outcome.
-// Granting the session caller's own user is `grant.invalid` on either user
-// locator. A `201` grant names its user or team by ID only: read it back
-// with `getGrant` for the identifier and display name. A `202` returns no
-// grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). A session caller is authorized as the signed-in person
-// against the target project, even when the session belongs to another project.
-// Cookie requests follow that scheme's CSRF rules.
+// Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or
+// `project.admin` role on a project.
+//
+// The project is the one named by the `project_id` query parameter. Name the principal with `user`
+// (`user_id` or `identifier`) or `team` (`team_id` or `name`). The `id` in the response
+// (`asgn_<opaque>`) is the grant ID that `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant`
+// (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not created here: a
+// claim, which attaches a project to a team, creates them.
+//
+// An unrevoked grant with the same principal and relation holds that binding even after `expires_at`.
+// Revoke it with `deleteGrant` before you create it again.
+//
+// Create does not accept `expand`. The `user_id` and team locators return `201`, whose `user` and
+// `team` carry only `user_id` and `team_id`. They still answer `404` or `409` when the principal is
+// missing or the grant already exists. Creating by `user.identifier` answers `202` with no body on
+// every outcome. Granting the session caller's own user is `grant.invalid` on either user locator. A
+// `201` grant names its user or team by ID only: read it back with `getGrant` for the identifier and
+// display name. A `202` returns no grant ID: find the grant with `queryGrants` (`POST /grants/query`),
+// filtered by `user_id`.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). A
+// session caller is authorized as the signed-in person against the target project, even when the
+// session belongs to another project. Cookie requests follow that scheme's CSRF rules.
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -3726,7 +3807,13 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateGrantResponse(resp)
@@ -3739,23 +3826,22 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 
 // CreateInvitation invokes createInvitation operation.
 //
-// Creates an invitation for a project, or replaces an existing one, and
-// returns the invitation and its one-shot link.
-// Send `type` and the object named after it. `project_member` takes
-// `relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`
-// and `role`, and answers `501` `not_implemented` until team invitations
-// ship. Optional `metadata.name` labels who the link is for. Optional
-// `replaces_invitation_id` replaces that invitation: the new row keeps the
-// original's `journey_id`, and a pending original is deleted in the same
-// transaction.
-// The `link` appears only in this response. Share it out of band; whoever
-// opens it and is signed in can redeem the role. It expires in 72 hours.
-// Refused for an unclaimed project, on a server without a platform project,
-// and when the project's pending-invitation cap is reached.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Creation needs the same project `admin` check as
-// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
-// rules.
+// Creates an invitation for a project, or replaces an existing one, and returns the invitation and its
+// one-shot link.
+//
+// Send `type` and the object named after it. `project_member` takes `relation` (`viewer`, `editor` or
+// `admin`). `team_member` takes `team_id` and `role`, and answers `501` `not_implemented` until team
+// invitations ship. Optional `metadata.name` labels who the link is for. Optional
+// `replaces_invitation_id` replaces that invitation: the new row keeps the original's `journey_id`,
+// and the original is deleted in the same transaction unless it was accepted.
+//
+// The `link` appears only in this response. Share it out of band; whoever opens it and is signed in
+// can redeem the role. It expires in 72 hours. Refused for an unclaimed project, on a server without a
+// platform project, and when the project's pending-invitation cap is reached.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
+// Creation needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
+// follow that scheme's CSRF rules.
 //
 // POST /invitations
 func (c *Client) CreateInvitation(ctx context.Context, request CreateInvitationRequest, params CreateInvitationParams) (CreateInvitationRes, error) {
@@ -3894,7 +3980,13 @@ func (c *Client) sendCreateInvitation(ctx context.Context, request CreateInvitat
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateInvitationResponse(resp)
@@ -3907,14 +3999,15 @@ func (c *Client) sendCreateInvitation(ctx context.Context, request CreateInvitat
 
 // CreateProject invokes createProject operation.
 //
-// Creates a project and returns its project secret and preview secret, which no
-// other endpoint returns.
-// A project is the top-level boundary that holds users, sessions and
-// configuration. It has no owning team until someone claims it; see `createProjectClaim` (`POST
-// /projects/{project_id}/claim/init`).
-// The request needs no credential and is rate-limited. On `429`, wait and retry.
-// Unless `seed_defaults` is `false`, the project starts with a default user schema
-// and flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.
+// Creates a project and returns its project secret and preview secret, which no other endpoint
+// returns.
+//
+// A project is the top-level boundary that holds users, sessions and configuration. It has no owning
+// team until someone claims it; see `createProjectClaim` (`POST /projects/{project_id}/claim/init`).
+//
+// The request needs no credential and is rate-limited. On `429`, wait and retry. Unless
+// `seed_defaults` is `false`, the project starts with a default user schema and flow. The CLI sets it
+// to `false` and uploads its own from `.zitadel/`.
 //
 // POST /projects
 func (c *Client) CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error) {
@@ -3987,7 +4080,13 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateProjectResponse(resp)
@@ -4000,21 +4099,23 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 // CreateProjectClaim invokes createProjectClaim operation.
 //
-// Starts a claim, which attaches a project created before sign-in to a
-// team, and returns the `claim_url` to open in a browser.
-// A claim [attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim)
-// so that the team's members administer it. This operation mints a
-// single-use, short-lived challenge for an unclaimed project. The developer
-// opens `claim_url`, signs in and completes the claim in the browser; see
-// `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`). Poll
-// `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned
-// `challenge_id`,
-// as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
+// Starts a claim, which attaches a project created before sign-in to a team, and returns the
+// `claim_url` to open in a browser.
+//
+// A claim [attaches a project to a team] so that the team's members administer it. This operation
+// mints a single-use, short-lived challenge for an unclaimed project. The developer opens `claim_url`,
+// signs in and completes the claim in the browser; see `completeProjectClaim`
+// (`POST /projects/{project_id}/claim/complete`). Poll `getProjectClaimStatus`
+// (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`, as `zitadel claim`
+// does. The response's `expires_at` carries the exact expiry.
+//
 // Authenticate with the project secret that `createProject` (`POST /projects`) returns as
 // `project_secret`.
-// A `409` means a team already claimed the project, and its details name
-// that team. A `410` means the project's 14-day claim window has closed,
-// which is final.
+//
+// A `409` means a team already claimed the project, and its details name that team. A `410` means the
+// project's 14-day claim window has closed, which is final.
+//
+// [attaches a project to a team]: /docs/concepts/project-team-user#claim
 //
 // POST /projects/{project_id}/claim/init
 func (c *Client) CreateProjectClaim(ctx context.Context, params CreateProjectClaimParams) (CreateProjectClaimRes, error) {
@@ -4130,7 +4231,13 @@ func (c *Client) sendCreateProjectClaim(ctx context.Context, params CreateProjec
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateProjectClaimResponse(resp)
@@ -4143,30 +4250,31 @@ func (c *Client) sendCreateProjectClaim(ctx context.Context, params CreateProjec
 
 // CreateRelease invokes createRelease operation.
 //
-// Creates a release from existing revisions, given as `(kind, revision_id)`
-// pairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)
-// (`POST /releases/build`).
-// A release is a snapshot of the project's configuration: it pins one
-// revision of each resource it includes, and it is not tied to an origin.
-// Take each `revision_id` from the operation that created the revision, for
-// example the `id` that `publishBranding` (`POST /branding`) or `publishFlowDefinition` (`POST
-// /flow_definitions`) returns.
-// Each revision must exist in the project and is recorded under the handle
-// it declares. The release must be complete and consistent:
-// - Every handle its revisions name must be in the release: a flow's
-// `user_schema`, and the identity provider (IdP) connections named by a
-// flow step's `sso_providers` or a schema's `x-auth-methods.sso.providers`.
-// A missing one answers `rel.unresolved_reference`, naming the resource and
-// the handle, for example `flow_definition default-login: user_schema
-// human-user not found`. Add the missing revision to the request.
-// - Every flow is validated as on save, against the user schema revision in
-// the release. A flow that fails answers `rel.invalid`, with the reason in
-// `details`. Fix the flow and send the request again.
-// The call is idempotent on the set of revisions: the same revisions with a
-// different `message` answer `200` with the existing release. A new release
-// answers `201`.
-// Creating a release does not deploy it. Pass the returned `id` to
-// `createDeployment` (`POST /deployments`) to make the release live.
+// Creates a release from existing revisions, given as `(kind, revision_id)` pairs. To build one from
+// files on disk, use `buildRelease` (`POST /releases/build`) (`POST /releases/build`).
+//
+// A release is a snapshot of the project's configuration: it pins one revision of each resource it
+// includes, and it is not tied to an origin. Take each `revision_id` from the operation that created
+// the revision, for example the `id` that `publishBranding` (`POST /branding`) or
+// `publishFlowDefinition` (`POST /flow_definitions`) returns.
+//
+// Each revision must exist in the project and is recorded under the handle it declares. The release
+// must be complete and consistent:
+//
+//   - Every handle its revisions name must be in the release: a flow's `user_schema`, and the identity
+//     provider (IdP) connections named by a flow step's `sso_providers` or a schema's
+//     `x-auth-methods.sso.providers`. A missing one answers `rel.unresolved_reference`, naming the
+//     resource and the handle, for example `flow_definition default-login: user_schema
+//     human-user not found`. Add the missing revision to the request.
+//   - Every flow is validated as on save, against the user schema revision in the release. A flow that
+//     fails answers `rel.invalid`, with the reason in `details`. Fix the flow and send the request
+//     again.
+//
+// The call is idempotent on the set of revisions: the same revisions with a different `message` answer
+// `200` with the existing release. A new release answers `201`.
+//
+// Creating a release does not deploy it. Pass the returned `id` to `createDeployment`
+// (`POST /deployments`) to make the release live.
 //
 // POST /releases
 func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
@@ -4293,7 +4401,13 @@ func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateReleaseResponse(resp)
@@ -4307,28 +4421,29 @@ func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRe
 // CreateSession invokes createSession operation.
 //
 // Creates an anonymous session with no user and no factors (`state: building`).
-// A session is the durable record of a signed-in user. This call is optional: an
-// authentication attempt creates a session implicitly if none is provided.
-// Create one explicitly when you want to:
-// - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
-// can be correlated with the eventual authenticated session from the start.
-// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-// The session belongs to the project of the project secret. A `project_id` that
-// names another project answers `403` with `proj.mismatch` and creates nothing:
-// send the credential's own project.
-// Creating a session runs on the project credential (`session.write`). The returned
-// `session_token` is a session credential for the end-user client, not a
-// management scope. It is delivered as the `__Host-zitadel_session` cookie
-// (`zitadel_session` over plain http to a loopback host) and authorises the
-// self-service operations `GET /sessions/me` and `DELETE /sessions/me`
-// (`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`
-// and `DELETE /sessions/{session_id}` are operator endpoints and require
-// `session.read` / `session.delete` instead.
-// The `session_token` is superseded when a handoff exchange completes. Clients
-// must replace it at that point.
-// Anonymous sessions expire after 10 minutes. The lifetime resets to the
-// configured full session lifetime when a completing authentication attempt
-// writes the first authentication factor.
+//
+// A session is the durable record of a signed-in user. This call is optional: an authentication
+// attempt creates a session implicitly if none is provided. Create one explicitly when you want to:
+//
+//   - Pre-allocate a `session_id` before the user is known, so device and telemetry signals can be
+//     correlated with the eventual authenticated session from the start.
+//   - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+//
+// The session belongs to the project of the project secret. A `project_id` that names another project
+// answers `403` with `proj.mismatch` and creates nothing: send the credential's own project.
+//
+// Creating a session runs on the project credential (`session.write`). The returned `session_token` is
+// a session credential for the end-user client, not a management scope. It is delivered as the
+// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a loopback host) and
+// authorises the self-service operations `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie`
+// scheme). The by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}` are
+// operator endpoints and require `session.read` / `session.delete` instead.
+//
+// The `session_token` is superseded when a handoff exchange completes. Clients must replace it at that
+// point.
+//
+// Anonymous sessions expire after 10 minutes. The lifetime resets to the configured full session
+// lifetime when a completing authentication attempt writes the first authentication factor.
 //
 // POST /sessions
 func (c *Client) CreateSession(ctx context.Context, request *CreateSessionRequest) (CreateSessionRes, error) {
@@ -4434,7 +4549,13 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateSessionResponse(resp)
@@ -4448,9 +4569,9 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 // CreateTeam invokes createTeam operation.
 //
 // Creates a team in the project, with a name no other team in the project has.
-// A team groups users inside a project and can represent a customer. A taken
-// name is refused with `409 team.already_exists`: choose another name. The
-// new team has no members yet.
+//
+// A team groups users inside a project and can represent a customer. A taken name is refused with
+// `409 team.already_exists`: choose another name. The new team has no members yet.
 //
 // POST /teams
 func (c *Client) CreateTeam(ctx context.Context, request *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error) {
@@ -4589,7 +4710,13 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateTeamResponse(resp)
@@ -4603,14 +4730,11 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 // CreateUser invokes createUser operation.
 //
 // Creates a user whose attributes satisfy the user schema named in the request.
-// The server assigns the user's ID and returns it. `schema` is the `id` of a
-// schema, as `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
 //
-//	With
-//
-// `team_id`, the user also becomes an active member of that team. A value the
-// schema marks unique that another user already holds is refused with `409`;
-// send a different value.
+// The server assigns the user's ID and returns it. `schema` is the `id` of a schema, as
+// `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With
+// `team_id`, the user also becomes an active member of that team. A value the schema marks unique that
+// another user already holds is refused with `409`; send a different value.
 //
 // POST /users
 func (c *Client) CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error) {
@@ -4769,7 +4893,13 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateUserResponse(resp)
@@ -4782,15 +4912,14 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 
 // CreateUserPasskeyRegistration invokes createUserPasskeyRegistration operation.
 //
-// Starts a WebAuthn registration ceremony for the user and returns the
-// creation options for `navigator.credentials.create()`. A passkey is
-// registered in two steps: this one returns options for the browser, and
-// `completeUserPasskeyRegistration` (`POST
-// /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
-// Complete the ceremony with
-// `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five
-// minutes, using the `registration_id` this response returns. Credentials
-// already registered for the user are excluded automatically.
+// Starts a WebAuthn registration ceremony for the user and returns the creation options for
+// `navigator.credentials.create()`. A passkey is registered in two steps: this one returns options for
+// the browser, and `completeUserPasskeyRegistration`
+// (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
+//
+// Complete the ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+// five minutes, using the `registration_id` this response returns. Credentials already registered for
+// the user are excluded automatically.
 //
 // POST /users/{user_id}/passkeys/registrations
 func (c *Client) CreateUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params CreateUserPasskeyRegistrationParams) (CreateUserPasskeyRegistrationRes, error) {
@@ -4918,7 +5047,13 @@ func (c *Client) sendCreateUserPasskeyRegistration(ctx context.Context, request 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeCreateUserPasskeyRegistrationResponse(resp)
@@ -4932,15 +5067,16 @@ func (c *Client) sendCreateUserPasskeyRegistration(ctx context.Context, request 
 // DeactivateTeam invokes deactivateTeam operation.
 //
 // Deactivates a team and removes its memberships.
-// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with
-// status `deactivated`. The users whose lifecycle the team owns are
-// deactivated with it.
-// The request is idempotent. Deleting a team that is already deactivated
-// or does not exist succeeds without changing anything.
-// A team that still owns a project is refused with `409 team.owns_project`.
-// Deactivating it would leave the project owned by a deactivated team and so
-// unmanageable. No endpoint ends a team's ownership of a project yet, so for
-// now such a team cannot be deactivated through the API.
+//
+// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with status
+// `deactivated`. The users whose lifecycle the team owns are deactivated with it.
+//
+// The request is idempotent. Deleting a team that is already deactivated or does not exist succeeds
+// without changing anything.
+//
+// A team that still owns a project is refused with `409 team.owns_project`. Deactivating it would
+// leave the project owned by a deactivated team and so unmanageable. No endpoint ends a team's
+// ownership of a project yet, so for now such a team cannot be deactivated through the API.
 //
 // DELETE /teams/{team_id}
 func (c *Client) DeactivateTeam(ctx context.Context, params DeactivateTeamParams) (DeactivateTeamRes, error) {
@@ -5055,7 +5191,13 @@ func (c *Client) sendDeactivateTeam(ctx context.Context, params DeactivateTeamPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeDeactivateTeamResponse(resp)
@@ -5069,11 +5211,13 @@ func (c *Client) sendDeactivateTeam(ctx context.Context, params DeactivateTeamPa
 // DeleteGrant invokes deleteGrant operation.
 //
 // Revokes a grant this API manages and emits `authz.revoked`.
-// A revoked grant cannot be restored: create a new one. Already-revoked, missing,
-// project-secret setup and owning-team grants return `404`. Expired grants can
-// still be revoked, so the binding can be reused.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+//
+// A revoked grant cannot be restored: create a new one. Already-revoked, missing, project-secret setup
+// and owning-team grants return `404`. Expired grants can still be revoked, so the binding can be
+// reused.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules.
 //
 // DELETE /grants/{grant_id}
 func (c *Client) DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error) {
@@ -5218,7 +5362,13 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteGrantResponse(resp)
@@ -5231,14 +5381,13 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 
 // DeleteUser invokes deleteUser operation.
 //
-// Deletes a user, removes them from every team they belong to, and revokes
-// every grant they hold, on any project.
-// The user is removed, not deactivated, and the deletion emits `user.deleted`,
-// plus `authz.revoked` for each grant on that grant's project.
-// With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything. Deleting the last active
-// member of a project's owning team returns 409 `proj.last_owner` and changes
-// nothing.
+// Deletes a user, removes them from every team they belong to, and revokes every grant they hold, on
+// any project.
+//
+// The user is removed, not deactivated, and the deletion emits `user.deleted`, plus `authz.revoked`
+// for each grant on that grant's project. With a project secret the request is idempotent: deleting a
+// user that exists in no project succeeds without changing anything. Deleting the last active member
+// of a project's owning team returns 409 `proj.last_owner` and changes nothing.
 //
 // DELETE /users/{user_id}
 func (c *Client) DeleteUser(ctx context.Context, params DeleteUserParams) (DeleteUserRes, error) {
@@ -5365,7 +5514,13 @@ func (c *Client) sendDeleteUser(ctx context.Context, params DeleteUserParams) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteUserResponse(resp)
@@ -5378,13 +5533,13 @@ func (c *Client) sendDeleteUser(ctx context.Context, params DeleteUserParams) (r
 
 // DeleteVariable invokes deleteVariable operation.
 //
-// Deletes a variable for the requested kind, or for both kinds without
-// `kind`. Existing deployments keep the values they froze. Each kind removed
-// records a `variable.removed` event.
-// A name with no value for that kind answers `var.not_found`: there is
-// nothing to delete. `listVariables` (`GET /variables`) lists the names the project holds. To
-// remove several names in one request, or to remove a name that may already
-// be absent, send `null` for each name to `setVariables` (`PATCH /variables`).
+// Deletes a variable for the requested kind, or for both kinds without `kind`. Existing deployments
+// keep the values they froze. Each kind removed records a `variable.removed` event.
+//
+// A name with no value for that kind answers `var.not_found`: there is nothing to delete.
+// `listVariables` (`GET /variables`) lists the names the project holds. To remove several names in one
+// request, or to remove a name that may already be absent, send `null` for each name to `setVariables`
+// (`PATCH /variables`).
 //
 // DELETE /variables/{variable_name}
 func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
@@ -5537,7 +5692,13 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteVariableResponse(resp)
@@ -5550,25 +5711,26 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 
 // EvaluatePolicy invokes evaluatePolicy operation.
 //
-// Evaluates a policy config against one request, without side effects, and
-// answers the decision the operation would reach. A policy holds a
-// project's rules for one operation, such as setting a password.
-// Nothing is read from or written to the project. The config is the one in
-// the body, checked exactly as a publish checks it, so an invalid config
-// answers `pol.invalid` with the same violations. Fix the settings the
-// violations list and send the request again.
-// `input` is what the operation's request carries, in the operation's own
-// terms (a password, not its length). The server derives what the policy
-// checks with the code the live operation runs, guards included. `facts`
-// states what the operation would look up at runtime, such as whether the
-// candidate matches one of the user's kept passwords.
-// The decision and the names of the failed rules hold wherever the
-// operation runs. `code` and `violations` are what an API call answers. A
-// login flow shows the same rules as field errors on the password field
-// (`error.x-auth-methods#password_<rule>` in `step.error`).
-// This operation does not choose which policy a project or release applies.
-// Read that policy, for example with `getPolicy` (`GET /policies/{policy_id}`), and pass its
-// `config`.
+// Evaluates a policy config against one request, without side effects, and answers the decision the
+// operation would reach. A policy holds a project's rules for one operation, such as setting a
+// password.
+//
+// Nothing is read from or written to the project. The config is the one in the body, checked exactly
+// as a publish checks it, so an invalid config answers `pol.invalid` with the same violations. Fix the
+// settings the violations list and send the request again.
+//
+// `input` is what the operation's request carries, in the operation's own terms (a password, not its
+// length). The server derives what the policy checks with the code the live operation runs, guards
+// included. `facts` states what the operation would look up at runtime, such as whether the candidate
+// matches one of the user's kept passwords.
+//
+// The decision and the names of the failed rules hold wherever the operation runs. `code` and
+// `violations` are what an API call answers. A login flow shows the same rules as field errors on the
+// password field (`error.x-auth-methods#password_<rule>` in `step.error`).
+//
+// This operation does not choose which policy a project or release applies. Read that policy, for
+// example with `getPolicy` (`GET /policies/{policy_id}`), and pass its `config`.
+//
 // The caller needs read access to the project in `project_id`.
 //
 // POST /policies/evaluate
@@ -5708,7 +5870,13 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeEvaluatePolicyResponse(resp)
@@ -5722,32 +5890,32 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 // ExchangeHandoff invokes exchangeHandoff operation.
 //
 // Exchanges a handoff token for a session and a `session_token`.
-// A handoff token is the short-lived, single-use credential that
-// `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token`
-// once an authentication attempt is
-// complete. This call consumes it. It is the last step of the sign-in sequence:
-// create the attempt, issue a challenge, verify the proof, create the handoff,
-// exchange it.
+//
+// A handoff token is the short-lived, single-use credential that `createAuthAttemptHandoff`
+// (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication
+// attempt is complete. This call consumes it. It is the last step of the sign-in sequence: create the
+// attempt, issue a challenge, verify the proof, create the handoff, exchange it.
+//
 // The server resolves the originating authentication attempt from the token and then:
-// | Originating authentication attempt | Outcome |
-// |---|---|
-// | No `session_id` | A new authenticated session is **created**. |
-// | `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors
-// written in, lifetime reset to the full session lifetime. |
-// | `session_id` points to an active session (step-up) | Existing session is **upgraded**: new
-// factors merged, `assurance_levels[]` expanded. |
+//
+//	Originating authentication attempt                 | Outcome
+//	---------------------------------------------------+--------------------------------------------------------------------------------------------------------
+//	No `session_id`                                    | A new authenticated session is created.
+//	`session_id` points to an anonymous session        | Existing session is upgraded: user and factors written in, lifetime reset to the full session lifetime.
+//	`session_id` points to an active session (step-up) | Existing session is upgraded: new factors merged, `assurance_levels[]` expanded.
+//
 // The response shape is identical in all three cases.
-// The `session_token` supersedes any previously issued `session_token` for the
-// same session. Clients must replace their stored token at this point.
-// Requires a project service key (OAuth2 client credentials). The project comes
-// from the project secret. A query `project_id` that disagrees answers `403`
-// with `proj.mismatch`.
-// The exchange resolves a deployment the same way as other runtime operations.
-// A deployment makes a release live, and a release is the configuration that
-// `zitadel deploy` publishes. With no browser `Origin` and
-// nothing deployed to the resolved target, the response is `409` with
-// `rel.not_deployed`: run `zitadel deploy`, then retry. A revoked release
-// answers `409` with `rel.revoked`.
+//
+// The `session_token` supersedes any previously issued `session_token` for the same session. Clients
+// must replace their stored token at this point.
+//
+// Requires a project service key (OAuth2 client credentials). The project comes from the project
+// secret. A query `project_id` that disagrees answers `403` with `proj.mismatch`.
+//
+// The exchange resolves a deployment the same way as other runtime operations. A deployment makes a
+// release live, and a release is the configuration that `zitadel deploy` publishes. With no browser
+// `Origin` and nothing deployed to the resolved target, the response is `409` with `rel.not_deployed`:
+// run `zitadel deploy`, then retry. A revoked release answers `409` with `rel.revoked`.
 //
 // POST /sessions/exchange
 func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error) {
@@ -5882,7 +6050,13 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeExchangeHandoffResponse(resp)
@@ -5895,10 +6069,10 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 
 // GetApplication invokes getApplication operation.
 //
-// Returns an application that authenticates its users via Zitadel, by ID
-// at its newest revision, with each client's `client_id` in `definition`. It
-// never returns a client secret: `publishApplication` (`POST /applications`)
-// shows one once, when it creates the client.
+// Returns an application that authenticates its users via Zitadel, by ID at its newest revision, with
+// each client's `client_id` in `definition`. It never returns a client secret: `publishApplication`
+// (`POST /applications`) shows one once, when it creates the client.
+//
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /applications/{application_id}
@@ -6032,7 +6206,13 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetApplicationResponse(resp)
@@ -6046,10 +6226,12 @@ func (c *Client) sendGetApplication(ctx context.Context, params GetApplicationPa
 // GetAuthAttempt invokes getAuthAttempt operation.
 //
 // Returns the current state of an authentication attempt, one sign-in round.
-// The response holds the attempt's state, available factors for the next
-// challenge, challenges issued so far, and any errors preventing progress.
-// Use it to poll during long-running factor verifications, for example waiting
-// for a federated identity provider (IdP) callback or a device flow.
+//
+// The response holds the attempt's state, available factors for the next challenge, challenges issued
+// so far, and any errors preventing progress.
+//
+// Use it to poll during long-running factor verifications, for example waiting for a federated
+// identity provider (IdP) callback or a device flow.
 //
 // GET /auth_attempts/{attempt_id}
 func (c *Client) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error) {
@@ -6164,7 +6346,13 @@ func (c *Client) sendGetAuthAttempt(ctx context.Context, params GetAuthAttemptPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetAuthAttemptResponse(resp)
@@ -6177,8 +6365,8 @@ func (c *Client) sendGetAuthAttempt(ctx context.Context, params GetAuthAttemptPa
 
 // GetBranding invokes getBranding operation.
 //
-// Returns one branding revision, including its stored configuration. Pass the
-// `id` that `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
+// Returns one branding revision, including its stored configuration. Pass the `id` that
+// `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
 //
 // GET /branding/{branding_id}
 func (c *Client) GetBranding(ctx context.Context, params GetBrandingParams) (GetBrandingRes, error) {
@@ -6302,7 +6490,13 @@ func (c *Client) sendGetBranding(ctx context.Context, params GetBrandingParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetBrandingResponse(resp)
@@ -6315,15 +6509,15 @@ func (c *Client) sendGetBranding(ctx context.Context, params GetBrandingParams) 
 
 // GetDeployment invokes getDeployment operation.
 //
-// Returns one deployment: the release it made live, the origins it made it
-// live on, and whether they still serve it.
-// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST
-// /deployments/{deployment_id}/rollback`) or
-// `listDeployments` (`GET /deployments`) returns.
-// The lookup is scoped to the project in `project_id`. A deployment ID
-// belonging to another project answers not found exactly as an unknown ID
-// does, so the endpoint cannot be used to probe for deployments in projects
-// the caller cannot read.
+// Returns one deployment: the release it made live, the origins it made it live on, and whether they
+// still serve it.
+//
+// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment`
+// (`POST /deployments/{deployment_id}/rollback`) or `listDeployments` (`GET /deployments`) returns.
+//
+// The lookup is scoped to the project in `project_id`. A deployment ID belonging to another project
+// answers not found exactly as an unknown ID does, so the endpoint cannot be used to probe for
+// deployments in projects the caller cannot read.
 //
 // GET /deployments/{deployment_id}
 func (c *Client) GetDeployment(ctx context.Context, params GetDeploymentParams) (GetDeploymentRes, error) {
@@ -6471,7 +6665,13 @@ func (c *Client) sendGetDeployment(ctx context.Context, params GetDeploymentPara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetDeploymentResponse(resp)
@@ -6485,13 +6685,14 @@ func (c *Client) sendGetDeployment(ctx context.Context, params GetDeploymentPara
 // GetEvent invokes getEvent operation.
 //
 // Returns one event of a project by its ID. Requires `events.read`.
-// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
-// `project_id`. An unknown ID and the ID of another project's event both
-// answer `404`.
-// A project that is not claimed yet also answers `404`: its events are
-// stored but stay invisible until the
-// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
-// platform operators read them from the start.
+//
+// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its `project_id`. An
+// unknown ID and the ID of another project's event both answer `404`.
+//
+// A project that is not claimed yet also answers `404`: its events are stored but stay invisible until
+// the [claim] succeeds. The deployment's platform operators read them from the start.
+//
+// [claim]: /docs/concepts/project-team-user#claim
 //
 // GET /events/{event_id}
 func (c *Client) GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error) {
@@ -6636,7 +6837,13 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetEventResponse(resp)
@@ -6649,9 +6856,8 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 
 // GetFlowDefinition invokes getFlowDefinition operation.
 //
-// Returns one flow definition revision. Pass the `id` that
-// `publishFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET
-// /flow_definitions`) returns.
+// Returns one flow definition revision. Pass the `id` that `publishFlowDefinition`
+// (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
 //
 // GET /flow_definitions/{flow_definition_id}
 func (c *Client) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error) {
@@ -6775,7 +6981,13 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetFlowDefinitionResponse(resp)
@@ -6788,20 +7000,20 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 
 // GetFlowStep invokes getFlowStep operation.
 //
-// Returns the current step of a flow without advancing it. Use it to render
-// the step again after a page reload or a network error.
-// The flow endpoints are the runtime calls the login component
-// (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
-// `submitFlowStep` (`POST /flow/{flow_id}/submit`) advances it.
-// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
-// creates its user on submit, or one carrying a passkey registration that
-// creates its user.
-// Reuses challenges with more than a minute remaining; otherwise issues a
-// new one. If this render resolves parked SSO state, it first returns the
-// updated cookie; fetch the step again to obtain its puzzle.
-// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
-// re-resolve from `Origin`. If that release was revoked since the attempt
-// started, the response is `409` with `rel.revoked`.
+// Returns the current step of a flow without advancing it. Use it to render the step again after a
+// page reload or a network error.
+//
+// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
+// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep`
+// (`POST /flow/{flow_id}/submit`) advances it.
+//
+// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
+// or one carrying a passkey registration that creates its user. Reuses challenges with more than a
+// minute remaining; otherwise issues a new one. If this render resolves parked SSO state, it first
+// returns the updated cookie; fetch the step again to obtain its puzzle.
+//
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
+// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
 // GET /flow/{flow_id}
 func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
@@ -6896,7 +7108,13 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetFlowStepResponse(resp)
@@ -6910,19 +7128,19 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // GetGrant invokes getGrant operation.
 //
 // Returns a grant by ID, when this API manages it and it has not been revoked.
-// This API manages grants that bind a user or team to the viewer, editor or
-// admin role. An expired grant is still returned, so you can revoke it with
-// `deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization
-// still
-// ignores expired grants. Send `project_id` as well as the grant ID.
-// Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
-// (`relation=team`) rows and grants of another project all return `404`.
-// `expand=principal` adds envelope fields on `user` or `team`. For project
-// secrets it requires `user.read` and `team.read` in addition to `project.read`.
-// A user-bound console session that already passed the project check may expand
-// without those scopes.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+//
+// This API manages grants that bind a user or team to the viewer, editor or admin role. An expired
+// grant is still returned, so you can revoke it with `deleteGrant` (`DELETE /grants/{grant_id}`)
+// before you grant the same binding again. Authorization still ignores expired grants. Send
+// `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
+// owning-team (`relation=team`) rows and grants of another project all return `404`.
+//
+// `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
+// `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
+// passed the project check may expand without those scopes.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules.
 //
 // GET /grants/{grant_id}
 func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
@@ -7093,7 +7311,13 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetGrantResponse(resp)
@@ -7106,9 +7330,9 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 
 // GetIdp invokes getIdp operation.
 //
-// Returns an identity provider, an external sign-in such as Google, by ID at
-// its newest revision. `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists
-// every revision of it.
+// Returns an identity provider, an external sign-in such as Google, by ID at its newest revision.
+// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists every revision of it.
+//
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/{idp_id}
@@ -7254,7 +7478,13 @@ func (c *Client) sendGetIdp(ctx context.Context, params GetIdpParams) (res GetId
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetIdpResponse(resp)
@@ -7267,9 +7497,9 @@ func (c *Client) sendGetIdp(ctx context.Context, params GetIdpParams) (res GetId
 
 // GetIdpRevision invokes getIdpRevision operation.
 //
-// Returns one revision of an identity provider, an external sign-in such as
-// Google, by its `revision_id`, the value an authentication attempt or a
-// release pins.
+// Returns one revision of an identity provider, an external sign-in such as Google, by its
+// `revision_id`, the value an authentication attempt or a release pins.
+//
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/revisions/{revision_id}
@@ -7415,7 +7645,13 @@ func (c *Client) sendGetIdpRevision(ctx context.Context, params GetIdpRevisionPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetIdpRevisionResponse(resp)
@@ -7429,10 +7665,10 @@ func (c *Client) sendGetIdpRevision(ctx context.Context, params GetIdpRevisionPa
 // GetInvitation invokes getInvitation operation.
 //
 // Returns one invitation by ID for the project named by `project_id`.
-// The response never includes the redeem token or the create-time `link`.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Reading needs the same project `admin` check as
-// `createGrant` (`POST /grants`).
+//
+// The response never includes the redeem token or the create-time `link`. Authenticate with a project
+// secret (`oauth2`) or a console session cookie (`sessionCookie`). Reading needs the same project
+// `admin` check as `createGrant` (`POST /grants`).
 //
 // GET /invitations/{invitation_id}
 func (c *Client) GetInvitation(ctx context.Context, params GetInvitationParams) (GetInvitationRes, error) {
@@ -7580,7 +7816,13 @@ func (c *Client) sendGetInvitation(ctx context.Context, params GetInvitationPara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetInvitationResponse(resp)
@@ -7593,13 +7835,12 @@ func (c *Client) sendGetInvitation(ctx context.Context, params GetInvitationPara
 
 // GetLive invokes getLive operation.
 //
-// Answers `ok` while the server process serves HTTP, and checks nothing
-// behind it.
-// A liveness probe tells an orchestrator such as Kubernetes whether to
-// restart the process. Point it at `/livez` at the root, where the probes
-// stay, not under `/api/v1`. It never checks the database, so an outage of
-// the database does not restart every instance. `GET /readyz` takes an
-// instance out of rotation instead.
+// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+//
+// A liveness probe tells an orchestrator such as Kubernetes whether to restart the process. Point it
+// at `/livez` at the root, where the probes stay, not under `/api/v1`. It never checks the database,
+// so an outage of the database does not restart every instance. `GET /readyz` takes an instance out of
+// rotation instead.
 //
 // GET /livez
 func (c *Client) GetLive(ctx context.Context) (GetLiveRes, error) {
@@ -7660,7 +7901,13 @@ func (c *Client) sendGetLive(ctx context.Context) (res GetLiveRes, err error) {
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetLiveResponse(resp)
@@ -7673,11 +7920,10 @@ func (c *Client) sendGetLive(ctx context.Context) (res GetLiveRes, err error) {
 
 // GetMyPasswordState invokes getMyPasswordState operation.
 //
-// Returns when the signed-in user's current password was set, and leaves
-// `set_at` out when they have none. The password and its hash are never
-// returned.
-// With `project_id`, the state is read only when the session belongs to that
-// project.
+// Returns when the signed-in user's current password was set, and leaves `set_at` out when they have
+// none. The password and its hash are never returned.
+//
+// With `project_id`, the state is read only when the session belongs to that project.
 //
 // GET /users/me/password
 func (c *Client) GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error) {
@@ -7795,7 +8041,13 @@ func (c *Client) sendGetMyPasswordState(ctx context.Context, params GetMyPasswor
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyPasswordStateResponse(resp)
@@ -7808,13 +8060,14 @@ func (c *Client) sendGetMyPasswordState(ctx context.Context, params GetMyPasswor
 
 // GetMySession invokes getMySession operation.
 //
-// Returns the current state of the caller's session, including its factors and all currently
-// satisfied assurance levels.
+// Returns the current state of the caller's session, including its factors and all currently satisfied
+// assurance levels.
+//
 // With `project_id`, the session is returned only when it belongs to that project.
-// An assurance level is a profile, such as `urn:nist:aal:2`, that the
-// session's verified factors satisfy. `assurance_levels[]` may shrink over time
-// as factor freshness windows expire, without the session itself expiring.
-// To restore a dropped level, use step-up authentication: create an
+//
+// An assurance level is a profile, such as `urn:nist:aal:2`, that the session's verified factors
+// satisfy. `assurance_levels[]` may shrink over time as factor freshness windows expire, without the
+// session itself expiring. To restore a dropped level, use step-up authentication: create an
 // authentication attempt with the same `session_id`.
 //
 // GET /sessions/me
@@ -7933,7 +8186,13 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMySessionResponse(resp)
@@ -7946,15 +8205,13 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 
 // GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
 //
-// Returns the session-bound token that protects against cross-site request
-// forgery (CSRF). Browser code sends it in the `X-Zitadel-CSRF` header on the
-// state-changing requests that the session cookie authenticates and that
-// require it; see the `sessionCookie` scheme. It authorizes nothing on its
-// own: the HttpOnly cookie is still the credential, and a cross-site page
-// cannot read this response. It stays the same for the life of the session,
-// so a client fetches it once per session.
-// With `project_id`, the token is returned only when the session belongs to
-// that project.
+// Returns the session-bound token that protects against cross-site request forgery (CSRF). Browser
+// code sends it in the `X-Zitadel-CSRF` header on the state-changing requests that the session cookie
+// authenticates and that require it; see the `sessionCookie` scheme. It authorizes nothing on its own:
+// the HttpOnly cookie is still the credential, and a cross-site page cannot read this response. It
+// stays the same for the life of the session, so a client fetches it once per session.
+//
+// With `project_id`, the token is returned only when the session belongs to that project.
 //
 // GET /sessions/me/csrf
 func (c *Client) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error) {
@@ -8072,7 +8329,13 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySess
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMySessionCsrfTokenResponse(resp)
@@ -8086,10 +8349,11 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySess
 // GetMyUser invokes getMyUser operation.
 //
 // Returns the user signed in to the session that authenticates the request.
-// The project and the user both come from the session cookie, so a caller only
-// ever reads their own user.
-// With `project_id`, the user is returned only when the session belongs to
-// that project.
+//
+// The project and the user both come from the session cookie, so a caller only ever reads their own
+// user.
+//
+// With `project_id`, the user is returned only when the session belongs to that project.
 //
 // GET /users/me
 func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
@@ -8207,7 +8471,13 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyUserResponse(resp)
@@ -8221,8 +8491,8 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 // GetMyUserSchema invokes getMyUserSchema operation.
 //
 // Returns the schema that validates the signed-in user's own record.
-// With `project_id`, the schema is returned only when the session belongs to
-// that project.
+//
+// With `project_id`, the schema is returned only when the session belongs to that project.
 //
 // GET /users/me/schema
 func (c *Client) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error) {
@@ -8340,7 +8610,13 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyUserSchemaResponse(resp)
@@ -8351,15 +8627,163 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 	return result, nil
 }
 
+// GetOAuthSettings invokes getOAuthSettings operation.
+//
+// Returns one OAuth settings revision, including its stored settings. Pass the `revision_id` of the
+// `kind: oauth` pointer on a release, which `buildRelease` (`POST /releases/build`) and `getRelease`
+// (`GET /releases/{release_id}`) return.
+//
+// A release is the only writer of OAuth settings, so there is no operation that publishes a revision
+// on its own: put `oauth` in the bundle that `buildRelease` takes.
+//
+// GET /oauth_settings/{oauth_settings_id}
+func (c *Client) GetOAuthSettings(ctx context.Context, params GetOAuthSettingsParams) (GetOAuthSettingsRes, error) {
+	res, err := c.sendGetOAuthSettings(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetOAuthSettings(ctx context.Context, params GetOAuthSettingsParams) (res GetOAuthSettingsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getOAuthSettings"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/oauth_settings/{oauth_settings_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetOAuthSettingsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/oauth_settings/"
+	{
+		// Encode "oauth_settings_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "oauth_settings_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.OAuthSettingsID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetOAuthSettingsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetOAuthSettingsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetOAuthSettingsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetPolicy invokes getPolicy operation.
 //
-// Returns a policy as its newest revision. A revision applies once a deployed
-// release pins it.
-// A policy holds a project's rules for one operation, such as setting a
-// password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
-// /policies`) returns.
-// The lookup is scoped to the project in `project_id`: a policy of another
-// project answers not found exactly as an unknown ID does.
+// Returns a policy as its newest revision. A revision applies once a deployed release pins it.
+//
+// A policy holds a project's rules for one operation, such as setting a password. Pass the `id` that
+// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
+//
+// The lookup is scoped to the project in `project_id`: a policy of another project answers not found
+// exactly as an unknown ID does.
 //
 // GET /policies/{policy_id}
 func (c *Client) GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error) {
@@ -8507,7 +8931,13 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetPolicyResponse(resp)
@@ -8521,11 +8951,12 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 // GetPolicyRevision invokes getPolicyRevision operation.
 //
 // Returns one revision of a policy, the newest or an older one.
-// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions` (`GET
-// /policies/{policy_id}/revisions`)
-// returns.
-// The lookup is scoped to the project in `project_id`: a revision of another
-// project answers not found exactly as an unknown ID does.
+//
+// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions`
+// (`GET /policies/{policy_id}/revisions`) returns.
+//
+// The lookup is scoped to the project in `project_id`: a revision of another project answers not found
+// exactly as an unknown ID does.
 //
 // GET /policies/revisions/{revision_id}
 func (c *Client) GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error) {
@@ -8673,7 +9104,13 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetPolicyRevisionResponse(resp)
@@ -8686,10 +9123,10 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 
 // GetProject invokes getProject operation.
 //
-// Returns a project's current state: its name, origins, password hashing
-// method and owning team.
-// Authenticate with the project secret, or with the session of a signed-in
-// person who holds a grant on the project.
+// Returns a project's current state: its name, origins, password hashing method and owning team.
+//
+// Authenticate with the project secret, or with the session of a signed-in person who holds a grant on
+// the project.
 //
 // GET /projects/{project_id}
 func (c *Client) GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error) {
@@ -8816,7 +9253,13 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetProjectResponse(resp)
@@ -8829,20 +9272,23 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 
 // GetProjectClaimStatus invokes getProjectClaimStatus operation.
 //
-// Returns the status of a claim challenge, `pending` or `completed`, while a
-// browser completes the claim.
-// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim).
-// `zitadel claim` polls this operation after `createProjectClaim` (`POST
-// /projects/{project_id}/claim/init`) starts the claim.
-// Once the project is claimed, the response is `completed` with the owning
-// team, the claim timestamp and the dashboard URL.
-// The claim itself, not the polled challenge, decides the status. A project
-// claimed through another concurrent challenge also reports `completed`. A
-// completed claim keeps reporting `completed` past this challenge's expiry
-// and past the project's claim window.
-// Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the
-// project secret that started the challenge. On `410` with `proj.claim_expired`, call
-// `createProjectClaim` again for a fresh challenge.
+// Returns the status of a claim challenge, `pending` or `completed`, while a browser completes the
+// claim.
+//
+// A [claim attaches a project to a team]. `zitadel claim` polls this operation after
+// `createProjectClaim` (`POST /projects/{project_id}/claim/init`) starts the claim. Once the project
+// is claimed, the response is `completed` with the owning team, the claim timestamp and the dashboard
+// URL.
+//
+// The claim itself, not the polled challenge, decides the status. A project claimed through another
+// concurrent challenge also reports `completed`. A completed claim keeps reporting `completed` past
+// this challenge's expiry and past the project's claim window.
+//
+// Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the project secret that
+// started the challenge. On `410` with `proj.claim_expired`, call `createProjectClaim` again for a
+// fresh challenge.
+//
+// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
 //
 // GET /projects/{project_id}/claim/status
 func (c *Client) GetProjectClaimStatus(ctx context.Context, params GetProjectClaimStatusParams) (GetProjectClaimStatusRes, error) {
@@ -8979,7 +9425,13 @@ func (c *Client) sendGetProjectClaimStatus(ctx context.Context, params GetProjec
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetProjectClaimStatusResponse(resp)
@@ -8992,17 +9444,19 @@ func (c *Client) sendGetProjectClaimStatus(ctx context.Context, params GetProjec
 
 // GetProjectClaimWindow invokes getProjectClaimWindow operation.
 //
-// Returns when a project's claim window closes and whether it has already
-// closed.
-// The claim window is the 14 days after a project is created during which a
-// team can [claim it](https://preview.zitadel.com/docs/concepts/project-team-user#claim). The claim page
-// in the browser calls this operation to show how long is left.
-// The request needs no credential, because the claim page calls it before the
-// developer has signed in. Holding the `challenge_id` from the claim URL that
-// `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the
-// same one `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`)
-// accepts. The response reveals only the window, never the project itself.
-// Unlike `completeProjectClaim` it spends nothing, so reloading the page is safe.
+// Returns when a project's claim window closes and whether it has already closed.
+//
+// The claim window is the 14 days after a project is created during which a team can [claim it]. The
+// claim page in the browser calls this operation to show how long is left.
+//
+// The request needs no credential, because the claim page calls it before the developer has signed in.
+// Holding the `challenge_id` from the claim URL that `createProjectClaim`
+// (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
+// `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`) accepts. The response reveals
+// only the window, never the project itself. Unlike `completeProjectClaim` it spends nothing, so
+// reloading the page is safe.
+//
+// [claim it]: /docs/concepts/project-team-user#claim
 //
 // GET /projects/{project_id}/claim/window
 func (c *Client) GetProjectClaimWindow(ctx context.Context, params GetProjectClaimWindowParams) (GetProjectClaimWindowRes, error) {
@@ -9106,7 +9560,13 @@ func (c *Client) sendGetProjectClaimWindow(ctx context.Context, params GetProjec
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetProjectClaimWindowResponse(resp)
@@ -9119,12 +9579,12 @@ func (c *Client) sendGetProjectClaimWindow(ctx context.Context, params GetProjec
 
 // GetReady invokes getReady operation.
 //
-// Answers `ok` when the server can serve requests, which takes its database
-// answering within a second, and `fail` with `503` otherwise.
-// A readiness probe tells an orchestrator such as Kubernetes whether to send
-// the instance requests. Point it at `/readyz` at the root, where the probes
-// stay, not under `/api/v1`, so that a server whose database does not answer
-// gets no requests until it does. The check is one round trip to the
+// Answers `ok` when the server can serve requests, which takes its database answering within a second,
+// and `fail` with `503` otherwise.
+//
+// A readiness probe tells an orchestrator such as Kubernetes whether to send the instance requests.
+// Point it at `/readyz` at the root, where the probes stay, not under `/api/v1`, so that a server
+// whose database does not answer gets no requests until it does. The check is one round trip to the
 // database.
 //
 // GET /readyz
@@ -9186,7 +9646,13 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetReadyResponse(resp)
@@ -9199,20 +9665,20 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetRelease invokes getRelease operation.
 //
-// Returns one release: its digest, its metadata, whether it was revoked, and
-// the `(kind, handle, revision_id)` tuples it pins. A release is a snapshot
-// of the project's configuration.
-// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),
-// `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a
-// release from its
-// digest, list with the `content_hash` filter and read the matched entry's
-// `id`.
-// The response does not embed resource content. Resolve each `revision_id`
-// through the per-kind read endpoints when the bytes are needed.
-// The lookup is scoped to the project in `project_id`. A release ID
-// belonging to another project answers not found exactly as an unknown ID
-// does, so the endpoint cannot be used to probe for releases in projects the
-// caller cannot read.
+// Returns one release: its digest, its metadata, whether it was revoked, and the
+// `(kind, handle, revision_id)` tuples it pins. A release is a snapshot of the project's
+// configuration.
+//
+// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`), `buildRelease`
+// (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a release from its
+// digest, list with the `content_hash` filter and read the matched entry's `id`.
+//
+// The response does not embed resource content. Resolve each `revision_id` through the per-kind read
+// endpoints when the bytes are needed.
+//
+// The lookup is scoped to the project in `project_id`. A release ID belonging to another project
+// answers not found exactly as an unknown ID does, so the endpoint cannot be used to probe for
+// releases in projects the caller cannot read.
 //
 // GET /releases/{release_id}
 func (c *Client) GetRelease(ctx context.Context, params GetReleaseParams) (GetReleaseRes, error) {
@@ -9360,7 +9826,13 @@ func (c *Client) sendGetRelease(ctx context.Context, params GetReleaseParams) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetReleaseResponse(resp)
@@ -9373,15 +9845,14 @@ func (c *Client) sendGetRelease(ctx context.Context, params GetReleaseParams) (r
 
 // GetSchema invokes getSchema operation.
 //
-// Returns a schema by ID. A schema ID identifies one immutable revision, so
-// this returns exactly that revision. To find the current revision of an
-// object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
-// Schema IDs are unique within a project, not across projects (the seeded
-// default schema carries the same `$id` in every project). A console
-// session that manages more than one project names the project with
-// `project_id`; without it, the ID is resolved in the credential's own
-// project when it is ambiguous. A project secret always resolves in its
-// own project and ignores `project_id`.
+// Returns a schema by ID. A schema ID identifies one immutable revision, so this returns exactly that
+// revision. To find the current revision of an object type, call `listSchemas` (`GET /schemas`) with
+// `revisions=latest`.
+//
+// Schema IDs are unique within a project, not across projects (the seeded default schema carries the
+// same `$id` in every project). A console session that manages more than one project names the project
+// with `project_id`; without it, the ID is resolved in the credential's own project when it is
+// ambiguous. A project secret always resolves in its own project and ignores `project_id`.
 //
 // GET /schemas/{schema_id}
 func (c *Client) GetSchema(ctx context.Context, params GetSchemaParams) (GetSchemaRes, error) {
@@ -9549,7 +10020,13 @@ func (c *Client) sendGetSchema(ctx context.Context, params GetSchemaParams) (res
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetSchemaResponse(resp)
@@ -9562,12 +10039,12 @@ func (c *Client) sendGetSchema(ctx context.Context, params GetSchemaParams) (res
 
 // GetSession invokes getSession operation.
 //
-// Returns the current state of a session, including its factors and all currently satisfied
-// assurance levels.
-// An assurance level is a profile, such as `urn:nist:aal:2`, that the
-// session's verified factors satisfy. `assurance_levels[]` may shrink over time
-// as factor freshness windows expire, without the session itself expiring.
-// To restore a dropped level, use step-up authentication: create an
+// Returns the current state of a session, including its factors and all currently satisfied assurance
+// levels.
+//
+// An assurance level is a profile, such as `urn:nist:aal:2`, that the session's verified factors
+// satisfy. `assurance_levels[]` may shrink over time as factor freshness windows expire, without the
+// session itself expiring. To restore a dropped level, use step-up authentication: create an
 // authentication attempt with the same `session_id`.
 //
 // GET /sessions/{session_id}
@@ -9683,7 +10160,13 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetSessionResponse(resp)
@@ -9697,6 +10180,7 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 // GetTeam invokes getTeam operation.
 //
 // Returns a team, a group of users inside a project, by ID.
+//
 // A deactivated team is still returned, with status `deactivated`.
 //
 // GET /teams/{team_id}
@@ -9824,7 +10308,13 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetTeamResponse(resp)
@@ -9838,8 +10328,8 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 // GetUser invokes getUser operation.
 //
 // Returns a user by ID, with the attributes its schema defines.
-// With `team_id`, the user is returned only while they are an active member
-// of that team.
+//
+// With `team_id`, the user is returned only while they are an active member of that team.
 //
 // GET /users/{user_id}
 func (c *Client) GetUser(ctx context.Context, params GetUserParams) (GetUserRes, error) {
@@ -9990,7 +10480,13 @@ func (c *Client) sendGetUser(ctx context.Context, params GetUserParams) (res Get
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetUserResponse(resp)
@@ -10003,9 +10499,8 @@ func (c *Client) sendGetUser(ctx context.Context, params GetUserParams) (res Get
 
 // GetUserPasswordState invokes getUserPasswordState operation.
 //
-// Returns when the user's current password was set, and leaves `set_at` out
-// when the user has none. The password and its hash are never returned;
-// `setUserPassword` (`PUT` on the same path) sets one.
+// Returns when the user's current password was set, and leaves `set_at` out when the user has none.
+// The password and its hash are never returned; `setUserPassword` (`PUT` on the same path) sets one.
 //
 // GET /users/{user_id}/password
 func (c *Client) GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error) {
@@ -10133,7 +10628,13 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetUserPasswordStateResponse(resp)
@@ -10146,12 +10647,12 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 
 // GetVariable invokes getVariable operation.
 //
-// Returns one variable by name, with its value for each kind. A variable
-// holds a value per kind: `primary` for primary origins and `preview` for
-// preview URLs.
-// Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists
-// it. A name with no value for the requested kind answers `var.not_found`;
-// set it with `setVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
+// Returns one variable by name, with its value for each kind. A variable holds a value per kind:
+// `primary` for primary origins and `preview` for preview URLs.
+//
+// Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists it. A
+// name with no value for the requested kind answers `var.not_found`; set it with `setVariables`
+// (`PATCH /variables`). A secret reads back as `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -10316,7 +10817,13 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetVariableResponse(resp)
@@ -10329,10 +10836,10 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 
 // ListBranding invokes listBranding operation.
 //
-// Lists a project's branding revisions, newest first, capped at the 100 most
-// recent and not paginated. The first entry is the newest revision.
-// The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes
-// and
+// Lists a project's branding revisions, newest first, capped at the 100 most recent and not paginated.
+// The first entry is the newest revision.
+//
+// The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
 // that a release pins for `kind: branding`.
 //
 // GET /branding
@@ -10460,7 +10967,13 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListBrandingResponse(resp)
@@ -10473,11 +10986,11 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 // ListDeploymentVariables invokes listDeploymentVariables operation.
 //
-// Returns the variable values the deployment froze when it was made. Later
-// changes to the project's variables do not affect them. A secret reads
-// back as `{"secret": true}`.
-// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET
-// /deployments`) returns.
+// Returns the variable values the deployment froze when it was made. Later changes to the project's
+// variables do not affect them. A secret reads back as `{"secret": true}`.
+//
+// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments`
+// (`GET /deployments`) returns.
 //
 // GET /deployments/{deployment_id}/variables
 func (c *Client) ListDeploymentVariables(ctx context.Context, params ListDeploymentVariablesParams) (ListDeploymentVariablesRes, error) {
@@ -10614,7 +11127,13 @@ func (c *Client) sendListDeploymentVariables(ctx context.Context, params ListDep
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListDeploymentVariablesResponse(resp)
@@ -10627,26 +11146,26 @@ func (c *Client) sendListDeploymentVariables(ctx context.Context, params ListDep
 
 // ListDeployments invokes listDeployments operation.
 //
-// Lists the project's deployments: the history of what ran where and when,
-// or with `live=true` what is served now.
-// A deployment makes a release live on origins. By default the list is the
-// history, newest first: every deployment of the project, with every target
-// it made the release live on. With `origin`, it is the history of that
-// origin alone.
-// With `live=true`, the list is what is served now, newest first. It holds
-// the project's newest primary deployment with every origin it names, an
-// origin the project no longer lists included: that deployment also serves
-// requests with no `Origin`, so it stays live. It also holds the newest
-// deployment to each live preview URL, narrowed to the URLs it still
-// serves. Combined with `origin`, it is the one deployment that origin
-// serves, or empty, as it is for an origin the project no longer lists.
-// The `id` of an entry is the deployment ID that `getDeployment` (`GET
-// /deployments/{deployment_id}`),
+// Lists the project's deployments: the history of what ran where and when, or with `live=true` what is
+// served now.
+//
+// A deployment makes a release live on origins. By default the list is the history, newest first:
+// every deployment of the project, with every target it made the release live on. With `origin`, it is
+// the history of that origin alone.
+//
+// With `live=true`, the list is what is served now, newest first. It holds the project's newest
+// primary deployment with every origin it names, an origin the project no longer lists included: that
+// deployment also serves requests with no `Origin`, so it stays live. It also holds the newest
+// deployment to each live preview URL, narrowed to the URLs it still serves. Combined with `origin`,
+// it is the one deployment that origin serves, or empty, as it is for an origin the project no longer
+// lists.
+//
+// The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
 // `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
 // (`POST /deployments/{deployment_id}/rollback`) take.
-// `expand: ["release"]` embeds the release each deployment made live. It
-// requires `release.read` and does not change the ordering or the page
-// tokens.
+//
+// `expand: ["release"]` embeds the release each deployment made live. It requires `release.read` and
+// does not change the ordering or the page tokens.
 //
 // GET /deployments
 func (c *Client) ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error) {
@@ -10876,7 +11395,13 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListDeploymentsResponse(resp)
@@ -10889,24 +11414,27 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 // ListEvents invokes listEvents operation.
 //
-// Lists a project's audit events, newest first. Pass `order=asc` for oldest
-// first. Requires `events.read`.
-// A project that is not claimed yet returns an empty list: its events are
-// stored but stay invisible until the
-// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
-// platform operators read them from the start.
-// Team-scoped credentials see only the events whose `team_id` matches the
-// credential's team. Team-scoped credentials are not issued today.
-// Each item carries an `event_type` that says which type of event it is, and
-// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
-// Filters combine. These are answered from an index and fill their pages: no
-// filter, `category`, `event_type`, `status_class`, `operation_id` with or
-// without `status_class`, `request_id`, `flow_id`, and `session_id`,
-// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
-// with or without the time bounds. Any other filter or combination is
-// matched event by event, over at most a few thousand events per request.
-// Such a page can hold fewer events than `limit`, or none, and still carry
-// `next_page_token`: keep passing the token until a response has none.
+// Lists a project's audit events, newest first. Pass `order=asc` for oldest first. Requires
+// `events.read`.
+//
+// A project that is not claimed yet returns an empty list: its events are stored but stay invisible
+// until the [claim] succeeds. The deployment's platform operators read them from the start.
+//
+// Team-scoped credentials see only the events whose `team_id` matches the credential's team.
+// Team-scoped credentials are not issued today.
+//
+// Each item carries an `event_type` that says which type of event it is, and the matching `payload`.
+// To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
+//
+// Filters combine. These are answered from an index and fill their pages: no filter, `category`,
+// `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
+// `flow_id`, and `session_id`, `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
+// `category`, each with or without the time bounds. Any other filter or combination is matched event
+// by event, over at most a few thousand events per request. Such a page can hold fewer events than
+// `limit`, or none, and still carry `next_page_token`: keep passing the token until a response has
+// none.
+//
+// [claim]: /docs/concepts/project-team-user#claim
 //
 // GET /events
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error) {
@@ -11036,6 +11564,23 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.ActorID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "user_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "user_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.UserID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
@@ -11381,7 +11926,13 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListEventsResponse(resp)
@@ -11394,12 +11945,12 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 
 // ListFlowDefinitions invokes listFlowDefinitions operation.
 //
-// Lists the project's flow definitions with their configurations, newest by
-// creation time first. A flow definition sets which step of a sign-in
-// renders when, and which fields each step collects.
-// The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET
-// /flow_definitions/{flow_definition_id}`)
-// takes. Filter by `name` to list the revisions of one flow.
+// Lists the project's flow definitions with their configurations, newest by creation time first. A
+// flow definition sets which step of a sign-in renders when, and which fields each step collects.
+//
+// The `id` of an entry is the flow definition ID that `getFlowDefinition`
+// (`GET /flow_definitions/{flow_definition_id}`) takes. Filter by `name` to list the revisions of one
+// flow.
 //
 // GET /flow_definitions
 func (c *Client) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error) {
@@ -11643,7 +12194,13 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListFlowDefinitionsResponse(resp)
@@ -11656,9 +12213,9 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 
 // ListIdpRevisions invokes listIdpRevisions operation.
 //
-// Lists every revision of one identity provider, an external sign-in such as
-// Google, newest first, paginated with a cursor. The order is fixed, so there
-// is no `sorting`.
+// Lists every revision of one identity provider, an external sign-in such as Google, newest first,
+// paginated with a cursor. The order is fixed, so there is no `sorting`.
+//
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/{idp_id}/revisions
@@ -11833,7 +12390,13 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListIdpRevisionsResponse(resp)
@@ -11846,12 +12409,11 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 
 // ListInvitations invokes listInvitations operation.
 //
-// Lists a project's invitations, newest first, in any status, paginated with
-// `limit` and `page_token`.
-// Optional `status` and `type` filters narrow the page. `expired` is derived
-// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
-// a console session cookie (`sessionCookie`). Listing needs the same project
-// `admin` check as `createGrant` (`POST /grants`).
+// Lists a project's invitations, newest first, in any status, paginated with `limit` and `page_token`.
+//
+// Optional `status` and `type` filters narrow the page. `expired` is derived on read from
+// `expires_at`. Authenticate with a project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). Listing needs the same project `admin` check as `createGrant` (`POST /grants`).
 //
 // GET /invitations
 func (c *Client) ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error) {
@@ -12052,7 +12614,13 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListInvitationsResponse(resp)
@@ -12065,11 +12633,10 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 
 // ListMyIdentityLinks invokes listMyIdentityLinks operation.
 //
-// Lists the identity provider accounts a sign-in linked to the signed-in user,
-// oldest first. The provider's subject and claims, the data it asserts about
-// the account, are never returned.
-// With `project_id`, the links are listed only when the session belongs to
-// that project.
+// Lists the identity provider accounts a sign-in linked to the signed-in user, oldest first. The
+// provider's subject and claims, the data it asserts about the account, are never returned.
+//
+// With `project_id`, the links are listed only when the session belongs to that project.
 //
 // GET /users/me/identity_links
 func (c *Client) ListMyIdentityLinks(ctx context.Context, params ListMyIdentityLinksParams) (ListMyIdentityLinksRes, error) {
@@ -12227,7 +12794,13 @@ func (c *Client) sendListMyIdentityLinks(ctx context.Context, params ListMyIdent
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyIdentityLinksResponse(resp)
@@ -12240,12 +12813,11 @@ func (c *Client) sendListMyIdentityLinks(ctx context.Context, params ListMyIdent
 
 // ListMyPasskeys invokes listMyPasskeys operation.
 //
-// Lists the signed-in user's own passkeys, newest first, paginated with a
-// cursor. A passkey is a WebAuthn credential that signs a user in without a
-// password. Each passkey carries its ID, its name and when it was registered,
-// never the credential itself.
-// With `project_id`, the passkeys are listed only when the session belongs to
-// that project.
+// Lists the signed-in user's own passkeys, newest first, paginated with a cursor. A passkey is a
+// WebAuthn credential that signs a user in without a password. Each passkey carries its ID, its name
+// and when it was registered, never the credential itself.
+//
+// With `project_id`, the passkeys are listed only when the session belongs to that project.
 //
 // GET /users/me/passkeys
 func (c *Client) ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error) {
@@ -12403,7 +12975,13 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyPasskeysResponse(resp)
@@ -12416,22 +12994,25 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 
 // ListMyProjects invokes listMyProjects operation.
 //
-// Lists the projects the signed-in user can act on: those they hold an active
-// grant on, either directly or through a team they are a member of. For a
-// platform operator, someone who runs the deployment, that is every project of
-// the deployment. Ordered by project ID unless `order` asks for creation
-// time, and paged with an opaque cursor.
+// Lists the projects the signed-in user can act on: those they hold an active grant on, either
+// directly or through a team they are a member of. For a platform operator, someone who runs the
+// deployment, that is every project of the deployment. Ordered by project ID unless `order` asks for
+// creation time, and paged with an opaque cursor.
+//
 // This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
-// one
-// project the calling credential is bound to. Here the session is the caller
-// and the grants are the answer, so the list spans projects.
-// With `name_contains`, only the projects whose name contains that text are
-// listed. The search runs on the server together with the grants, so it
-// reaches every project the user can act on, however many there are, and
-// pages like the full list.
-// With `project_id`, the projects are listed only when the session belongs to
-// that project. It names the project the session was signed in to, not one to
-// list.
+// one project the calling credential is bound to. Here the session is the caller and the grants are
+// the answer, so the list spans projects.
+//
+// With `name_contains`, only the projects whose name contains that text are listed. The search runs on
+// the server together with the grants, so it reaches every project the user can act on, however many
+// there are, and pages like the full list.
+//
+// With `project_id`, the projects are listed only when the session belongs to that project. It names
+// the project the session was signed in to, not one to list.
+//
+// With `exclude_platform`, the deployment's reserved platform project is left out: the project the
+// console signs in to, which holds the console's accounts rather than an application's users. A
+// deployment without one lists the same projects either way.
 //
 // GET /users/me/projects
 func (c *Client) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error) {
@@ -12557,6 +13138,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 		}
 	}
 	{
+		// Encode "exclude_platform" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "exclude_platform",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ExcludePlatform.Get(); ok {
+				return e.EncodeValue(conv.BoolToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
 		// Encode "project_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "project_id",
@@ -12623,7 +13221,13 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyProjectsResponse(resp)
@@ -12637,8 +13241,8 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListMyTeams invokes listMyTeams operation.
 //
 // Lists the teams the signed-in user belongs to, ordered by team name.
-// With `project_id`, the teams are listed only when the session belongs to
-// that project.
+//
+// With `project_id`, the teams are listed only when the session belongs to that project.
 //
 // GET /users/me/teams
 func (c *Client) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error) {
@@ -12796,7 +13400,13 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyTeamsResponse(resp)
@@ -12809,12 +13419,12 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 
 // ListPolicies invokes listPolicies operation.
 //
-// Lists the project's policies, one per operation, each as its newest
-// revision.
-// A policy holds a project's rules for one operation, such as setting a
-// password. The list is ordered by `created_at` (first publish) and then
-// `id`. Filter by `operation` to read the policy of one operation; a project
-// that never published one gets an empty list.
+// Lists the project's policies, one per operation, each as its newest revision.
+//
+// A policy holds a project's rules for one operation, such as setting a password. The list is ordered
+// by `created_at` (first publish) and then `id`. Filter by `operation` to read the policy of one
+// operation; a project that never published one gets an empty list.
+//
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /policies
@@ -12999,7 +13609,13 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListPoliciesResponse(resp)
@@ -13012,12 +13628,14 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 
 // ListPolicyRevisions invokes listPolicyRevisions operation.
 //
-// Lists every revision of one policy, newest first, one page at a time. The
-// order is fixed, so there is no `sorting`.
-// Each publish of a policy adds a revision. Pass the policy `id` that
-// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
-// The lookup is scoped to the project in `project_id`: a policy of another
-// project answers not found exactly as an unknown ID does.
+// Lists every revision of one policy, newest first, one page at a time. The order is fixed, so there
+// is no `sorting`.
+//
+// Each publish of a policy adds a revision. Pass the policy `id` that `listPolicies` (`GET /policies`)
+// or `publishPolicy` (`POST /policies`) returns.
+//
+// The lookup is scoped to the project in `project_id`: a policy of another project answers not found
+// exactly as an unknown ID does.
 //
 // GET /policies/{policy_id}/revisions
 func (c *Client) ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error) {
@@ -13206,7 +13824,13 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListPolicyRevisionsResponse(resp)
@@ -13219,29 +13843,30 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 
 // ListProjectAdmins invokes listProjectAdmins operation.
 //
-// Lists the people who can administer a project, and how each of them
-// holds that access.
+// Lists the people who can administer a project, and how each of them holds that access.
+//
 // A person appears once, with one entry in `sources` per way they hold it:
-// - `owning_team`: an active member of the team that owns the project, the
-// team a claim attaches the project to. Removing a grant does not remove
-// this access. It ends only when the person leaves the team or the
-// project changes owner.
-// - `grant`: an unexpired `admin` grant on the project, which is a role
-// given to the person (`grant_id` only) or to a team they are an active
-// member of (`grant_id` and `team`). Revoking that grant removes this
-// source.
-// The list follows the authorization check. A person who left a team, or
-// whose team or user was deactivated, is not listed through it. Grants that
-// expired or carry a lower role are left out. A person whose only access is a
-// `viewer` or `editor` grant is not an admin and is not listed. Like the
-// check, the list does not look at a person's user status beyond that, so a
-// direct grant to a suspended person is listed.
-// A person whose access comes only through teams the caller is not a
-// member of is left out. A team the caller is not in is named by `team_id`
-// only. The grant to such a team still shows in the project's grants.
-// The list is ordered by `user_id` and paginated with `page_token`.
-// Authenticate with a project secret (`oauth2`), or with the session cookie
-// (`sessionCookie`) of a signed-in person who can read the project.
+//
+//   - `owning_team`: an active member of the team that owns the project, the team a claim attaches the
+//     project to. Removing a grant does not remove this access. It ends only when the person leaves the
+//     team or the project changes owner.
+//   - `grant`: an unexpired `admin` grant on the project, which is a role given to the person
+//     (`grant_id` only) or to a team they are an active member of (`grant_id` and `team`). Revoking
+//     that grant removes this source.
+//
+// The list follows the authorization check. A person who left a team, or whose team or user was
+// deactivated, is not listed through it. Grants that expired or carry a lower role are left out. A
+// person whose only access is a `viewer` or `editor` grant is not an admin and is not listed. Like the
+// check, the list does not look at a person's user status beyond that, so a direct grant to a
+// suspended person is listed.
+//
+// A person whose access comes only through teams the caller is not a member of is left out. A team the
+// caller is not in is named by `team_id` only. The grant to such a team still shows in the project's
+// grants.
+//
+// The list is ordered by `user_id` and paginated with `page_token`. Authenticate with a project secret
+// (`oauth2`), or with the session cookie (`sessionCookie`) of a signed-in person who can read the
+// project.
 //
 // GET /projects/{project_id}/admins
 func (c *Client) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error) {
@@ -13413,7 +14038,13 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListProjectAdminsResponse(resp)
@@ -13427,9 +14058,9 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 // ListProjectPreviews invokes listProjectPreviews operation.
 //
 // Lists the project's live previews, newest first by `created_at`.
-// A preview is a URL with a deployment on it, served until it expires.
-// An expired or removed preview is not listed. What was deployed to it stays
-// in `GET /deployments`.
+//
+// A preview is a URL with a deployment on it, served until it expires. An expired or removed preview
+// is not listed. What was deployed to it stays in `GET /deployments`.
 //
 // GET /projects/{project_id}/previews
 func (c *Client) ListProjectPreviews(ctx context.Context, params ListProjectPreviewsParams) (ListProjectPreviewsRes, error) {
@@ -13589,7 +14220,13 @@ func (c *Client) sendListProjectPreviews(ctx context.Context, params ListProject
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListProjectPreviewsResponse(resp)
@@ -13602,18 +14239,18 @@ func (c *Client) sendListProjectPreviews(ctx context.Context, params ListProject
 
 // ListReleases invokes listReleases operation.
 //
-// Lists the project's releases, newest first. A release is a snapshot of the
-// project's configuration.
-// Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-// omitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
-// The `id` of an entry is the release ID that `getRelease`,
-// `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST
-// /deployments`) take.
-// `content_hash` looks a release up by its content, as the CLI does when a
-// person types the digest a transcript printed. The project holds at most
-// one release per digest, so the filtered list has one entry or none. An
-// unknown digest is an empty list rather than an error. Paths take the
-// `rel_` ID only, so use the matched entry's `id` there.
+// Lists the project's releases, newest first. A release is a snapshot of the project's configuration.
+//
+// Entries carry the digest, the metadata and `revoked_at`. The pinned set is omitted: read one release
+// with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
+//
+// The `id` of an entry is the release ID that `getRelease`, `revokeRelease`
+// (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
+//
+// `content_hash` looks a release up by its content, as the CLI does when a person types the digest a
+// transcript printed. The project holds at most one release per digest, so the filtered list has one
+// entry or none. An unknown digest is an empty list rather than an error. Paths take the `rel_` ID
+// only, so use the matched entry's `id` there.
 //
 // GET /releases
 func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
@@ -13800,7 +14437,13 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListReleasesResponse(resp)
@@ -13813,9 +14456,9 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 
 // ListSchemas invokes listSchemas operation.
 //
-// Lists the schemas of a project, newest first, paginated with a cursor.
-// Filter by `object_type` or `kind`, and choose which revisions to return
-// with `revisions`.
+// Lists the schemas of a project, newest first, paginated with a cursor. Filter by `object_type` or
+// `kind`, and choose which revisions to return with `revisions`.
+//
 // A schema's `id` is what `createUser` (`POST /users`) takes as `schema`.
 //
 // GET /schemas
@@ -14060,7 +14703,13 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListSchemasResponse(resp)
@@ -14073,9 +14722,8 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 
 // ListUserIdentityLinks invokes listUserIdentityLinks operation.
 //
-// Lists the identity provider accounts a sign-in linked to the user, oldest
-// first. The provider's subject and claims, the data it asserts about the
-// account, are never returned.
+// Lists the identity provider accounts a sign-in linked to the user, oldest first. The provider's
+// subject and claims, the data it asserts about the account, are never returned.
 //
 // GET /users/{user_id}/identity_links
 func (c *Client) ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error) {
@@ -14247,7 +14895,13 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListUserIdentityLinksResponse(resp)
@@ -14260,11 +14914,10 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 
 // ListUserPasskeys invokes listUserPasskeys operation.
 //
-// Lists the passkeys registered for a user, newest first, paginated with a
-// cursor. A passkey is a WebAuthn credential that signs a user in without a
-// password.
-// Each passkey carries its ID, its name and when it was registered, never the
-// credential itself.
+// Lists the passkeys registered for a user, newest first, paginated with a cursor. A passkey is a
+// WebAuthn credential that signs a user in without a password.
+//
+// Each passkey carries its ID, its name and when it was registered, never the credential itself.
 //
 // GET /users/{user_id}/passkeys
 func (c *Client) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error) {
@@ -14436,7 +15089,13 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListUserPasskeysResponse(resp)
@@ -14449,12 +15108,11 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 
 // ListUserTeams invokes listUserTeams operation.
 //
-// Lists the teams a user belongs to, ordered by team name. Each entry carries
-// the team's name, so a client renders a page without resolving IDs one by
-// one.
-// This is the user's team memberships, not lifecycle ownership: the single
-// team that owns the user's lifecycle is reported as
-// `metadata.lifecycle_owner_team_id` on the user read endpoints. Memberships
+// Lists the teams a user belongs to, ordered by team name. Each entry carries the team's name, so a
+// client renders a page without resolving IDs one by one.
+//
+// This is the user's team memberships, not lifecycle ownership: the single team that owns the user's
+// lifecycle is reported as `metadata.lifecycle_owner_team_id` on the user read endpoints. Memberships
 // the user was removed from are not returned.
 //
 // GET /users/{user_id}/teams
@@ -14627,7 +15285,13 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListUserTeamsResponse(resp)
@@ -14640,11 +15304,11 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 
 // ListVariables invokes listVariables operation.
 //
-// Returns the project's variables, keyed by name, each with its value for
-// each kind: `primary` for primary origins and `preview` for preview URLs.
-// With `kind`, only that kind's values are returned.
-// Secret values are not returned. A secret appears as `{"secret": true}`,
-// which says a value is held without disclosing it.
+// Returns the project's variables, keyed by name, each with its value for each kind: `primary` for
+// primary origins and `preview` for preview URLs. With `kind`, only that kind's values are returned.
+//
+// Secret values are not returned. A secret appears as `{"secret": true}`, which says a value is held
+// without disclosing it.
 //
 // GET /variables
 func (c *Client) ListVariables(ctx context.Context, params ListVariablesParams) (ListVariablesRes, error) {
@@ -14788,7 +15452,13 @@ func (c *Client) sendListVariables(ctx context.Context, params ListVariablesPara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeListVariablesResponse(resp)
@@ -14801,13 +15471,13 @@ func (c *Client) sendListVariables(ctx context.Context, params ListVariablesPara
 
 // LookupInvitation invokes lookupInvitation operation.
 //
-// Returns a lean view of the invitation for the signed-in accept page:
-// project, role, inviter and expiry.
-// Send the plaintext token from the invitation link fragment. Every unknown
-// or finished token answers the same opaque `404`. Authenticate with a
-// platform-project user session cookie (`sessionCookie`). Lookup is a read:
-// same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and
-// reject still do). The call is rate-limited.
+// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
+// expiry.
+//
+// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
+// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
+// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
+// still do). The call is rate-limited.
 //
 // POST /invitations/lookup
 func (c *Client) LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error) {
@@ -14913,7 +15583,13 @@ func (c *Client) sendLookupInvitation(ctx context.Context, request *InvitationTo
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeLookupInvitationResponse(resp)
@@ -14926,33 +15602,30 @@ func (c *Client) sendLookupInvitation(ctx context.Context, request *InvitationTo
 
 // PublishApplication invokes publishApplication operation.
 //
-// Creates or revises a registered application that authenticates its users
-// via Zitadel. If the slug does not already exist in the project, a new
-// application is created. If one with that slug already exists, a revision
-// is created.
-// A revision gets a new `revision_id` and does not modify the application's
-// `id`. Sending an unchanged document also creates a revision. Each client
-// is matched to the stored one by its slug and keeps its `client_id`: a
-// revision that changes a client's `client_id` is rejected with
-// `application.field_immutable`. A revision keeps every client of the
-// stored document: one that omits a client is also rejected with
-// `application.field_immutable`, since removing a client is not available
-// yet. A client with a new slug is a new client. It takes the `client_id`
-// the document supplies, or the server generates one, and every response
-// carries it in `definition`. A `client_id` another client of the project
-// holds, or ever held, is rejected with `application.client_id_taken`.
-// Every new client gets a secret, generated by the server and returned once
-// in `client_secrets`. The server stores only its hash, so no later read
-// returns it.
-// The document is validated against the `application.json` schema before
-// anything is stored, and then against the rules the authorization server
-// applies: `refresh_token` comes with `authorization_code`, a client with
-// `authorization_code` has at least one redirect URI, and each redirect
-// URI meets the rules `redirect_uris` states. A document that breaks one
-// is refused with `application.invalid`, whose details identify the
-// setting.
-// If the document is refused, no change is stored and an existing
-// application keeps its current revision.
+// Creates or revises a registered application that authenticates its users via Zitadel. If the slug
+// does not already exist in the project, a new application is created. If one with that slug already
+// exists, a revision is created.
+//
+// A revision gets a new `revision_id` and does not modify the application's `id`. Sending an unchanged
+// document also creates a revision. Each client is matched to the stored one by its slug and keeps its
+// `client_id`: a revision that changes a client's `client_id` is rejected with `app.field_immutable`.
+// A revision keeps every client of the stored document: one that omits a client is also rejected with
+// `app.field_immutable`, since removing a client is not available yet. A client with a new slug is a
+// new client. It takes the `client_id` the document supplies, or the server generates one, and every
+// response carries it in `definition`. A `client_id` another client of the project holds, or ever
+// held, is rejected with `app.client_id_taken`.
+//
+// Every new client gets a secret, generated by the server and returned once in `client_secrets`. The
+// server stores only its hash, so no later read returns it.
+//
+// The document is validated against the `application.json` schema before anything is stored, and then
+// against the rules the authorization server applies: `refresh_token` comes with `authorization_code`,
+// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
+// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
+// details identify the setting.
+//
+// If the document is refused, no change is stored and an existing application keeps its current
+// revision.
 //
 // POST /applications
 func (c *Client) PublishApplication(ctx context.Context, request *CreateApplicationRequest, params PublishApplicationParams) (PublishApplicationRes, error) {
@@ -15096,7 +15769,13 @@ func (c *Client) sendPublishApplication(ctx context.Context, request *CreateAppl
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishApplicationResponse(resp)
@@ -15109,16 +15788,15 @@ func (c *Client) sendPublishApplication(ctx context.Context, request *CreateAppl
 
 // PublishBranding invokes publishBranding operation.
 //
-// Publishes a new immutable branding revision for the project, and records a
-// `branding.created` event. Branding revisions cannot be updated or deleted.
-// Every edit publishes a new revision. Flow responses carry the branding
-// revision the request's release pins.
-// The `id` of the new revision is the revision ID a release pins for
-// `kind: branding`.
-// The `liquid_template` is validated lexically on save (size, encoding,
-// banned patterns such as `<script>` tags, inline event handlers, and the
-// `| raw` filter). Authoritative LiquidJS validation runs at authoring
-// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
+// Publishes a new immutable branding revision for the project, and records a `branding.created` event.
+// Branding revisions cannot be updated or deleted. Every edit publishes a new revision. Flow responses
+// carry the branding revision the request's release pins.
+//
+// The `id` of the new revision is the revision ID a release pins for `kind: branding`.
+//
+// The `liquid_template` is validated lexically on save (size, encoding, banned patterns such as
+// `<script>` tags, inline event handlers, and the `| raw` filter). Authoritative LiquidJS validation
+// runs at authoring time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 //
 // POST /branding
 func (c *Client) PublishBranding(ctx context.Context, request *Branding, params PublishBrandingParams) (PublishBrandingRes, error) {
@@ -15245,7 +15923,13 @@ func (c *Client) sendPublishBranding(ctx context.Context, request *Branding, par
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishBrandingResponse(resp)
@@ -15258,18 +15942,21 @@ func (c *Client) sendPublishBranding(ctx context.Context, request *Branding, par
 
 // PublishFlowDefinition invokes publishFlowDefinition operation.
 //
-// Publishes a new revision of a flow definition, creating the flow definition
-// on its first publish. It records a `flowdef.created` event.
-// A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
-// defines the sequence of steps (capabilities) for one user journey, such as
-// registration, login or password reset. The body follows the flow
-// definition schema, which includes the flow's purpose, audience and steps.
-// Every call allocates a new opaque ID. That `id` is the `revision_id` a
-// release pins for `kind: flow_definition`.
-// Revisions of one flow share its `name`. Posting a definition under an
-// existing `name` publishes a new revision of that flow, which is not a
-// conflict. List with `name` to see a flow's revisions, newest by creation
-// time first.
+// Publishes a new revision of a flow definition, creating the flow definition on its first publish. It
+// records a `flowdef.created` event.
+//
+// A [flow definition] is a template that defines the sequence of steps (capabilities) for one user
+// journey, such as registration, login or password reset. The body follows the flow definition schema,
+// which includes the flow's purpose, audience and steps.
+//
+// Every call allocates a new opaque ID. That `id` is the `revision_id` a release pins for
+// `kind: flow_definition`.
+//
+// Revisions of one flow share its `name`. Posting a definition under an existing `name` publishes a
+// new revision of that flow, which is not a conflict. List with `name` to see a flow's revisions,
+// newest by creation time first.
+//
+// [flow definition]: /docs/concepts/flows-and-schemas
 //
 // POST /flow_definitions
 func (c *Client) PublishFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (PublishFlowDefinitionRes, error) {
@@ -15375,7 +16062,13 @@ func (c *Client) sendPublishFlowDefinition(ctx context.Context, request *CreateF
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishFlowDefinitionResponse(resp)
@@ -15388,34 +16081,33 @@ func (c *Client) sendPublishFlowDefinition(ctx context.Context, request *CreateF
 
 // PublishIdp invokes publishIdp operation.
 //
-// Creates or revises an identity provider, an external sign-in such as
-// Google, from its connection document. If the slug does not already exist,
-// a new identity provider is created. If one with that slug already exists,
-// a revision is created.
-// A revision gets a new `revision_id` and does not modify the identity
-// provider's `id`. Identity links, which tie a user to an account at the
-// provider, keep resolving. Releases and authentication attempts stay pinned
-// to the revision they captured.
-// Identity fields are fixed for the life of the identity provider and a
-// revision that changes one is rejected: `protocol`, `subject_claim`, and
-// `issuer`, the field that names the authority. Their values decide which provider
-// account a stored subject belongs to, so changing one would silently
+// Creates or revises an identity provider, an external sign-in such as Google, from its connection
+// document. If the slug does not already exist, a new identity provider is created. If one with that
+// slug already exists, a revision is created.
+//
+// A revision gets a new `revision_id` and does not modify the identity provider's `id`. Identity
+// links, which tie a user to an account at the provider, keep resolving. Releases and authentication
+// attempts stay pinned to the revision they captured.
+//
+// Identity fields are fixed for the life of the identity provider and a revision that changes one is
+// rejected: `protocol`, `subject_claim`, and `issuer`, the field that names the authority. Their
+// values decide which provider account a stored subject belongs to, so changing one would silently
 // repoint existing identities at a different provider.
-// `subject_claim` is optional, and `sub` is used as the default value. If a
-// revision updates `subject_claim` to a different value than the one set
-// during creation, the request is rejected.
+//
+// `subject_claim` is optional, and `sub` is used as the default value. If a revision updates
+// `subject_claim` to a different value than the one set during creation, the request is rejected.
+//
 // OIDC is the only protocol.
-// The document is validated against the `idp-connection.json` schema before
-// anything is stored. The rules the server applies when it starts a sign-in
-// then run on the document, so a document that could never start one is
-// refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
-// without the others. Set no endpoint, and discovery fills them, or set
-// `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and
-// `userinfo_endpoint`. `userinfo_endpoint` may be left out when
-// `id_token_mapping` is on, but setting it alone still counts as setting an
-// endpoint. The details list the missing endpoints.
-// A refused document stores nothing, and on a revise the current revision
-// stays unchanged.
+//
+// The document is validated against the `idp-connection.json` schema before anything is stored. The
+// rules the server applies when it starts a sign-in then run on the document, so a document that could
+// never start one is refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
+// without the others. Set no endpoint, and discovery fills them, or set `authorization_endpoint`,
+// `token_endpoint`, `jwks_uri`, and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+// `id_token_mapping` is on, but setting it alone still counts as setting an endpoint. The details list
+// the missing endpoints.
+//
+// A refused document stores nothing, and on a revise the current revision stays unchanged.
 //
 // POST /idps
 func (c *Client) PublishIdp(ctx context.Context, request *CreateIdpRequest, params PublishIdpParams) (PublishIdpRes, error) {
@@ -15542,7 +16234,13 @@ func (c *Client) sendPublishIdp(ctx context.Context, request *CreateIdpRequest, 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishIdpResponse(resp)
@@ -15555,28 +16253,25 @@ func (c *Client) sendPublishIdp(ctx context.Context, request *CreateIdpRequest, 
 
 // PublishPolicy invokes publishPolicy operation.
 //
-// Publishes the project's policy for an operation as a new immutable
-// revision, creating the policy on its first publish. A revision applies
-// once a deployed release pins it. Nothing already stored is
-// re-evaluated, so a stricter password policy applies the next time a
-// password is set.
-// A policy holds a project's rules for one operation, such as setting a
-// password. The first publish records a `policy.created` event and every
-// later one a `policy.updated` event.
-// The request is typed by `operation`. An unknown operation or setting, or
-// a value of the wrong type or outside its bounds, answers `req.invalid`
-// like any malformed request.
-// The operation's template then checks the config again, together with the
-// rules that relate settings to each other (a `min_length` above
-// `max_length`), and answers `pol.invalid`. Its `details.details.violations`
-// lists everything that failed, settings first, then rules.
+// Publishes the project's policy for an operation as a new immutable revision, creating the policy on
+// its first publish. A revision applies once a deployed release pins it. Nothing already stored is
+// re-evaluated, so a stricter password policy applies the next time a password is set.
+//
+// A policy holds a project's rules for one operation, such as setting a password. The first publish
+// records a `policy.created` event and every later one a `policy.updated` event.
+//
+// The request is typed by `operation`. An unknown operation or setting, or a value of the wrong type
+// or outside its bounds, answers `req.invalid` like any malformed request.
+//
+// The operation's template then checks the config again, together with the rules that relate settings
+// to each other (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+// `details.details.violations` lists everything that failed, settings first, then rules.
 // `{"setting": "min_length"}` names one setting. `{"config_rule":
-// "min_length_not_above_max_length", "settings": ["min_length",
-// "max_length"]}` names a rule across settings, with the settings it reads.
-// Fix what the violations list and publish again. To check a config without
-// publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
-// A setting left out is off, and `{}` switches every rule off; there are no
-// defaults.
+// "min_length_not_above_max_length", "settings": ["min_length", "max_length"]}` names a rule across
+// settings, with the settings it reads. Fix what the violations list and publish again. To check a
+// config without publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
+//
+// A setting left out is off, and `{}` switches every rule off; there are no defaults.
 //
 // POST /policies
 func (c *Client) PublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error) {
@@ -15703,7 +16398,13 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishPolicyResponse(resp)
@@ -15716,18 +16417,17 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 
 // PublishSchema invokes publishSchema operation.
 //
-// Publishes a user schema, the JSON Schema that says which attributes a user
-// has and which attribute identifies the user.
-// The request is either a user schema (`kind: user-schema`) or a schema URL
-// (`kind: schema-url`) that the server resolves. The response's `id` is what
-// `createUser` (`POST /users`) takes as `schema`.
-// The optional `$id` is the JSON Schema document URI that identifies the
-// schema in later requests. It is a stable identity for GitOps, not a
-// free-form resource key. When `$id` is omitted, the server generates a
-// `sch_*` URL. When provided, `$id` must be unique within the project and
-// should ideally be a valid URI pointing at where the schema can be accessed.
-// A `$id` that already exists in the project is refused; pick another or
-// omit it.
+// Publishes a user schema, the JSON Schema that says which attributes a user has and which attribute
+// identifies the user.
+//
+// The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
+// the server resolves. The response's `id` is what `createUser` (`POST /users`) takes as `schema`.
+//
+// The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
+// is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the project and should ideally
+// be a valid URI pointing at where the schema can be accessed. A `$id` that already exists in the
+// project is refused; pick another or omit it.
 //
 // POST /schemas
 func (c *Client) PublishSchema(ctx context.Context, request PublishSchemaReq, params PublishSchemaParams) (PublishSchemaRes, error) {
@@ -15874,7 +16574,13 @@ func (c *Client) sendPublishSchema(ctx context.Context, request PublishSchemaReq
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodePublishSchemaResponse(resp)
@@ -15888,17 +16594,18 @@ func (c *Client) sendPublishSchema(ctx context.Context, request PublishSchemaReq
 // QueryGrants invokes queryGrants operation.
 //
 // Returns a page of a project's grants.
-// Only unrevoked grants this API manages are listed, which bind a user or team
-// to the viewer, editor or admin role. Expired grants are included, so a client
-// can revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding
-// again.
-// Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
-// not returned. Requires `project.read`.
-// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project
-// secrets it additionally requires `user.read` and `team.read`. A user-bound
-// console session that already passed the project check may expand without those scopes.
-// Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+//
+// Only unrevoked grants this API manages are listed, which bind a user or team to the viewer, editor
+// or admin role. Expired grants are included, so a client can revoke them with `deleteGrant`
+// (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
+// (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
+//
+// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
+// additionally requires `user.read` and `team.read`. A user-bound console session that already passed
+// the project check may expand without those scopes.
+//
+// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules.
 //
 // POST /grants/query
 func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {
@@ -16037,7 +16744,13 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryGrantsResponse(resp)
@@ -16050,9 +16763,8 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 
 // QueryIdps invokes queryIdps operation.
 //
-// Returns the identity providers of a project, external sign-ins such as
-// Google, paginated with a cursor. Each identity provider appears once, with
-// its newest revision.
+// Returns the identity providers of a project, external sign-ins such as Google, paginated with a
+// cursor. Each identity provider appears once, with its newest revision.
 //
 // POST /idps/query
 func (c *Client) QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error) {
@@ -16191,7 +16903,13 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryIdpsResponse(resp)
@@ -16204,11 +16922,10 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 
 // QueryProjects invokes queryProjects operation.
 //
-// Returns the project the project secret belongs to, as a page of at most one
-// project.
-// A credential is scoped to one project today, so the filters and sorting
-// apply to that project alone. A signed-in person lists the projects they can
-// act on with `GET /users/me/projects`.
+// Returns the project the project secret belongs to, as a page of at most one project.
+//
+// A credential is scoped to one project today, so the filters and sorting apply to that project alone.
+// A signed-in person lists the projects they can act on with `GET /users/me/projects`.
 //
 // POST /projects/query
 func (c *Client) QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error) {
@@ -16314,7 +17031,13 @@ func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryProjectsResponse(resp)
@@ -16328,8 +17051,9 @@ func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRe
 // QuerySessions invokes querySessions operation.
 //
 // Returns a page of a project's sessions.
-// Sessions of every lifecycle state are returned; each carries its `state`.
-// Requires the `session.read` scope.
+//
+// Sessions of every lifecycle state are returned; each carries its `state`. Requires the
+// `session.read` scope.
 //
 // POST /sessions/query
 func (c *Client) QuerySessions(ctx context.Context, request *QuerySessionsRequest, params QuerySessionsParams) (QuerySessionsRes, error) {
@@ -16456,7 +17180,13 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQuerySessionsResponse(resp)
@@ -16470,9 +17200,9 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 // QueryTeams invokes queryTeams operation.
 //
 // Returns a page of a project's teams.
-// Pass the response's `next_page_token` as `page_token` to fetch the next
-// page. `project_id` names the project to list; without it, the credential's
-// own project is listed.
+//
+// Pass the response's `next_page_token` as `page_token` to fetch the next page. `project_id` names the
+// project to list; without it, the credential's own project is listed.
 //
 // POST /teams/query
 func (c *Client) QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error) {
@@ -16614,7 +17344,13 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryTeamsResponse(resp)
@@ -16628,15 +17364,15 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // QueryUsers invokes queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// `project_id` names the project to list; without it, the credential's own
-// project is listed.
-// Accepts either a project secret (`oauth2`) or a user-bound console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`sessionCookie`).
-// With a project secret, embedding `teams` with `expand`, or filtering by
-// `team_id`, also needs `team_membership.read`. Embedding
-// `lifecycle_owner_team` needs `team.read`. A console session carries no
-// scopes: it may do both when it may read the whole project, and gets
+//
+// `project_id` names the project to list; without it, the credential's own project is listed.
+//
+// Accepts either a project secret (`oauth2`) or a user-bound console session cookie (`sessionCookie`).
+// Cookie-authenticated requests follow the scheme's CSRF rules (`sessionCookie`).
+//
+// With a project secret, embedding `teams` with `expand`, or filtering by `team_id`, also needs
+// `team_membership.read`. Embedding `lifecycle_owner_team` needs `team.read`. A console session
+// carries no scopes: it may do both when it may read the whole project, and gets
 // `403 user.permission_denied` otherwise.
 //
 // POST /users/query
@@ -16779,7 +17515,13 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryUsersResponse(resp)
@@ -16792,12 +17534,12 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 
 // RejectInvitation invokes rejectInvitation operation.
 //
-// Declines a pending invitation for the signed-in user and returns the
-// updated invitation with status `rejected`.
-// Send the plaintext token from the invitation link fragment. Metadata is
-// cleared. Every unknown or finished token answers the same opaque `404`.
-// Authenticate with a platform-project user session cookie (`sessionCookie`).
-// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+// Declines a pending invitation for the signed-in user and returns the updated invitation with status
+// `rejected`.
+//
+// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
+// finished token answers the same opaque `404`. Authenticate with a platform-project user session
+// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
 //
 // POST /invitations/reject
 func (c *Client) RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error) {
@@ -16903,7 +17645,13 @@ func (c *Client) sendRejectInvitation(ctx context.Context, request *InvitationTo
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRejectInvitationResponse(resp)
@@ -16917,13 +17665,12 @@ func (c *Client) sendRejectInvitation(ctx context.Context, request *InvitationTo
 // RemoveProjectOrigin invokes removeProjectOrigin operation.
 //
 // Removes one origin pattern from the project's origins.
-// Requests from URLs only that pattern admitted are refused from then on.
-// Live previews and deployment history are untouched. Removing the last
-// pattern leaves an empty list, which admits no origin except a loopback
-// origin.
-// Removing a pattern that is already absent is idempotent and answers `204`.
-// The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`)
-// stored.
+//
+// Requests from URLs only that pattern admitted are refused from then on. Live previews and deployment
+// history are untouched. Removing the last pattern leaves an empty list, which admits no origin except
+// a loopback origin. Removing a pattern that is already absent is idempotent and answers `204`.
+//
+// The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`) stored.
 //
 // POST /projects/{project_id}/origins/remove
 func (c *Client) RemoveProjectOrigin(ctx context.Context, request *RemoveProjectOriginReq, params RemoveProjectOriginParams) (RemoveProjectOriginRes, error) {
@@ -17054,7 +17801,13 @@ func (c *Client) sendRemoveProjectOrigin(ctx context.Context, request *RemovePro
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRemoveProjectOriginResponse(resp)
@@ -17068,12 +17821,13 @@ func (c *Client) sendRemoveProjectOrigin(ctx context.Context, request *RemovePro
 // RemoveProjectPreview invokes removeProjectPreview operation.
 //
 // Ends a preview before it expires: the URL stops being served at once.
-// The deployments to it stay in the history. The call is idempotent.
-// A URL with no live preview answers `204` too. That includes one that
-// expired or was removed before, so a cleanup that races the expiry still
-// succeeds.
-// The URL travels in the body rather than the path because an origin
-// contains `/`. Take it from `listProjectPreviews` (`GET /projects/{project_id}/previews`).
+//
+// The deployments to it stay in the history. The call is idempotent. A URL with no live preview
+// answers `204` too. That includes one that expired or was removed before, so a cleanup that races the
+// expiry still succeeds.
+//
+// The URL travels in the body rather than the path because an origin contains `/`. Take it from
+// `listProjectPreviews` (`GET /projects/{project_id}/previews`).
 //
 // POST /projects/{project_id}/previews/remove
 func (c *Client) RemoveProjectPreview(ctx context.Context, request *RemovePreviewRequest, params RemoveProjectPreviewParams) (RemoveProjectPreviewRes, error) {
@@ -17201,7 +17955,13 @@ func (c *Client) sendRemoveProjectPreview(ctx context.Context, request *RemovePr
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRemoveProjectPreviewResponse(resp)
@@ -17215,13 +17975,14 @@ func (c *Client) sendRemoveProjectPreview(ctx context.Context, request *RemovePr
 // RevokeMySession invokes revokeMySession operation.
 //
 // Revokes the caller's own session by deleting it, which signs the user out.
-// The request needs the session cookie issued at creation (or superseded by a
-// handoff exchange). It also needs the session's CSRF token from
-// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone,
-// this still returns `204`. Any tokens derived from the session are
-// invalidated, and the response clears the cookie.
-// With `project_id`, only a session of that project is revoked. A session of
-// another project is left alone, and so is its cookie.
+//
+// The request needs the session cookie issued at creation (or superseded by a handoff exchange). It
+// also needs the session's CSRF token from `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header.
+// Idempotent: if the session is already gone, this still returns `204`. Any tokens derived from the
+// session are invalidated, and the response clears the cookie.
+//
+// With `project_id`, only a session of that project is revoked. A session of another project is left
+// alone, and so is its cookie.
 //
 // DELETE /sessions/me
 func (c *Client) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error) {
@@ -17339,7 +18100,13 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeMySessionResponse(resp)
@@ -17352,27 +18119,26 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 
 // RevokeRelease invokes revokeRelease operation.
 //
-// Revokes a release, so that its content is never served again. Pass the
-// `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
-// `listReleases` (`GET /releases`) returns. It
-// records a `release.revoked` event.
-// From then on the release cannot be deployed. Every path that would serve
-// it refuses it with `rel.revoked`, including a build that pins its digest.
-// A release that any origin still serves cannot be revoked. An origin serves
-// the release of the newest deployment to it, so the call answers `409` with
-// `rel.in_use`, naming each such origin, that deployment and whether the
-// origin is primary or a preview. Deploy another release to a primary origin
-// or roll it back, and remove a preview, then revoke. Revoking therefore
-// never takes an origin down. Deployments that named the release earlier stay in
-// the history.
-// The call is idempotent: revoking a release that is already revoked answers
-// `200` with the release unchanged, and `revoked_at` still names the first
-// revocation. There is no un-revoke. To serve that configuration again,
-// change it and build a new release: rebuilding unchanged content returns
-// the same revoked release.
-// The call takes no body. The lookup is scoped to the project in
-// `project_id`, so a release ID of another project answers not found exactly
-// as an unknown ID does.
+// Revokes a release, so that its content is never served again. Pass the `id` that `createRelease`
+// (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`)
+// returns. It records a `release.revoked` event.
+//
+// From then on the release cannot be deployed. Every path that would serve it refuses it with
+// `rel.revoked`, including a build that pins its digest.
+//
+// A release that any origin still serves cannot be revoked. An origin serves the release of the newest
+// deployment to it, so the call answers `409` with `rel.in_use`, naming each such origin, that
+// deployment and whether the origin is primary or a preview. Deploy another release to a primary
+// origin or roll it back, and remove a preview, then revoke. Revoking therefore never takes an origin
+// down. Deployments that named the release earlier stay in the history.
+//
+// The call is idempotent: revoking a release that is already revoked answers `200` with the release
+// unchanged, and `revoked_at` still names the first revocation. There is no un-revoke. To serve that
+// configuration again, change it and build a new release: rebuilding unchanged content returns the
+// same revoked release.
+//
+// The call takes no body. The lookup is scoped to the project in `project_id`, so a release ID of
+// another project answers not found exactly as an unknown ID does.
 //
 // POST /releases/{release_id}/revoke
 func (c *Client) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error) {
@@ -17521,7 +18287,13 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeReleaseResponse(resp)
@@ -17534,14 +18306,15 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 
 // RevokeSession invokes revokeSession operation.
 //
-// Revokes a session by deleting it, immediately and for good. A later
-// `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
-// This is the operator revoke path. It requires the `session.delete` scope on a
-// project-bound credential. End-user sign-out with the session cookie is
-// `DELETE /sessions/me` (`sessionCookie` scheme).
-// Idempotent: revoking a session that does not exist, or was already revoked,
-// still returns `204`. After revocation, any tokens derived from the session are
-// invalidated.
+// Revokes a session by deleting it, immediately and for good. A later `getSession`
+// (`GET /sessions/{session_id}`) for it answers `404`.
+//
+// This is the operator revoke path. It requires the `session.delete` scope on a project-bound
+// credential. End-user sign-out with the session cookie is `DELETE /sessions/me` (`sessionCookie`
+// scheme).
+//
+// Idempotent: revoking a session that does not exist, or was already revoked, still returns `204`.
+// After revocation, any tokens derived from the session are invalidated.
 //
 // DELETE /sessions/{session_id}
 func (c *Client) RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error) {
@@ -17656,7 +18429,13 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeSessionResponse(resp)
@@ -17669,38 +18448,39 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 
 // RollbackDeployment invokes rollbackDeployment operation.
 //
-// Rolls back to an earlier deployment by deploying its release again to the
-// same origins, with the same variable values. A listed primary origin that
-// deployment left out serves nothing until the next deployment to `primary`,
-// and one it named serves its release again, even when the live deployment
+// Rolls back to an earlier deployment by deploying its release again to the same origins, with the
+// same variable values. A listed primary origin that deployment left out serves nothing until the next
+// deployment to `primary`, and one it named serves its release again, even when the live deployment
 // left it out.
-// A release is a snapshot of the project's configuration. A deployment makes
-// a release live on origins and freezes the project's variable values with
-// it.
-// The deployment ID in the path is the deployment to return to, not the one
-// to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
-// the newest deployment first.
-// A rollback is a new deployment, not an undo. It has `reason: rollback`,
-// and its `rollback_to` names the deployment you returned to. It uses the
-// variable values that deployment froze, not the project's current ones, and
-// creates no release.
-// To guard against a deployment that landed since you looked, set
-// `expected_deployment_id` in the request body to the newest primary
-// deployment, the one live now. The call then fails with `409 dep.conflict`
-// if another deployment has replaced it.
-// A rollback is idempotent like a deployment to `primary`. When nothing
-// would change, it answers `200` with the newest primary deployment.
+//
+// A release is a snapshot of the project's configuration. A deployment makes a release live on origins
+// and freezes the project's variable values with it.
+//
+// The deployment ID in the path is the deployment to return to, not the one to undo. Take it from the
+// `id` that `listDeployments` (`GET /deployments`) returns, which lists the newest deployment first.
+//
+// A rollback is a new deployment, not an undo. It has `reason: rollback`, and its `rollback_to` names
+// the deployment you returned to. It uses the variable values that deployment froze, not the project's
+// current ones, and creates no release.
+//
+// To guard against a deployment that landed since you looked, set `expected_deployment_id` in the
+// request body to the newest primary deployment, the one live now. The call then fails with
+// `409 dep.conflict` if another deployment has replaced it.
+//
+// A rollback is idempotent like a deployment to `primary`. When nothing would change, it answers `200`
+// with the newest primary deployment.
+//
 // If the request is refused:
-// - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
-// - `404 dep.not_found`: no deployment of the project has that ID, or that
-// deployment recorded no variables to restore, so it cannot be a rollback
-// target. List them with `listDeployments` and pick another.
-// - `409 dep.conflict`: `expected_deployment_id` is not the project's
-// newest primary deployment, and `details.deployment` is that deployment.
-// Inspect it, then retry with its ID, or stop.
-// - `409 rel.revoked`: the release of that deployment is revoked and cannot
-// be deployed. Roll back to a deployment of a release that is not revoked.
+//
+//   - `400 dep.invalid`: the deployment went to preview URLs, which cannot be rolled back. Deploy to
+//     the preview again with `createDeployment` (`POST /deployments`).
+//   - `404 dep.not_found`: no deployment of the project has that ID, or that deployment recorded no
+//     variables to restore, so it cannot be a rollback target. List them with `listDeployments` and
+//     pick another.
+//   - `409 dep.conflict`: `expected_deployment_id` is not the project's newest primary deployment, and
+//     `details.deployment` is that deployment. Inspect it, then retry with its ID, or stop.
+//   - `409 rel.revoked`: the release of that deployment is revoked and cannot be deployed. Roll back to
+//     a deployment of a release that is not revoked.
 //
 // POST /deployments/{deployment_id}/rollback
 func (c *Client) RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error) {
@@ -17868,7 +18648,13 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeRollbackDeploymentResponse(resp)
@@ -17883,43 +18669,42 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 //
 // Finds the resources of one project, or of the projects a person can act on, that match a text,
 // across resource types.
-// `query` is what the person typed and `types` names the kinds of result to
-// look for; only those are searched. Each result is a reference: its `type`,
-// its `id`, its `project_id`, a `title` and sometimes a `subtitle`. Read the
-// resource itself with the type's own operation, for example `getUser`
-// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the
-// result's project.
+//
+// `query` is what the person typed and `types` names the kinds of result to look for; only those are
+// searched. Each result is a reference: its `type`, its `id`, its `project_id`, a `title` and
+// sometimes a `subtitle`. Read the resource itself with the type's own operation, for example
+// `getUser` (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the result's project.
+//
 // What a type matches on:
-// - `user`: the start of the value they carry as `identifier` or of a part
-// of their `display` name, from three characters on
-// - `team`: its name
-// - `schema`: the `title` and the `objectType` of a user schema
-// - `flow_definition`: its name
-// - `idp`: the `slug` and the `display_name` of an identity provider
-// connection
-// A user matches from the start of a value. Every other type matches from
-// the start of a name or of a word in it, so `staff` finds "Partner Staff"
-// and `sso` finds `partner-sso`. Matching ignores case. A `query` that is the
-// `id` of a resource of a requested type finds that one. A schema and a flow
+//
+//   - `user`: the start of the value they carry as `identifier` or of a part of their `display` name,
+//     from three characters on
+//   - `team`: its name
+//   - `schema`: the `title` and the `objectType` of a user schema
+//   - `flow_definition`: its name
+//   - `idp`: the `slug` and the `display_name` of an identity provider connection
+//
+// A user matches from the start of a value. Every other type matches from the start of a name or of a
+// word in it, so `staff` finds "Partner Staff" and `sso` finds `partner-sso`. Matching ignores case. A
+// `query` that is the `id` of a resource of a requested type finds that one. A schema and a flow
 // definition are found at their newest revision.
-// `project_id` names the project to search. Without it, a project secret
-// searches its own project, and a console session searches the projects the
-// person can act on: the ones `listMyProjects` (`GET /users/me/projects`)
-// lists, at most the newest 10 by when each was created (`order=desc`).
-// `more_projects` says the person can act on more than that; search one of
-// the others by naming it. A caller with access to part of a project finds
-// only what that access covers.
-// Authenticate with the project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). A preview secret is refused, as on every management
-// operation.
-// Results come best match first, at most `limit_per_type` of each type
-// across every searched project, and types can be mixed in the order.
-// `incomplete_types` lists the types that have more to show: page those with
-// the type's own list, such as `queryUsers` (`POST /users/query`) or
-// `queryTeams` (`POST /teams/query`).
-// How text is matched and ranked can change, and later versions can match
-// more of a resource. Treat the results as suggestions; to filter by an exact
-// rule, use the type's own list.
+//
+// `project_id` names the project to search. Without it, a project secret searches its own project, and
+// a console session searches the projects the person can act on: the ones `listMyProjects`
+// (`GET /users/me/projects`) lists, at most the newest 10 by when each was created (`order=desc`).
+// `more_projects` says the person can act on more than that; search one of the others by naming it. A
+// caller with access to part of a project finds only what that access covers.
+//
+// Authenticate with the project secret (`oauth2`) or a console session cookie (`sessionCookie`). A
+// preview secret is refused, as on every management operation.
+//
+// Results come best match first, at most `limit_per_type` of each type across every searched project,
+// and types can be mixed in the order. `incomplete_types` lists the types that have more to show: page
+// those with the type's own list, such as `queryUsers` (`POST /users/query`) or `queryTeams`
+// (`POST /teams/query`).
+//
+// How text is matched and ranked can change, and later versions can match more of a resource. Treat
+// the results as suggestions; to filter by an exact rule, use the type's own list.
 //
 // POST /search
 func (c *Client) Search(ctx context.Context, request *SearchRequest, params SearchParams) (SearchRes, error) {
@@ -18061,7 +18846,13 @@ func (c *Client) sendSearch(ctx context.Context, request *SearchRequest, params 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeSearchResponse(resp)
@@ -18074,28 +18865,28 @@ func (c *Client) sendSearch(ctx context.Context, request *SearchRequest, params 
 
 // SetUserPassword invokes setUserPassword operation.
 //
-// Sets a user's password, hashed with the project's current password hashing
-// policy.
-// The new password replaces the current one, and setting it emits
-// `auth.factor.password.set`. A password the project's password policy
-// refuses answers `user.password_policy_violation`; send one that meets the
-// policy.
-// The password policy is the one in the release that serves the caller's
-// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
-// preview URL gets that preview's policy, and one on a primary origin the
-// newest primary deployment's. A request with no `Origin`, or from the
-// console when the project does not list the console's origin, gets the
-// project's newest primary deployment.
+// Sets a user's password, hashed with the project's current password hashing policy.
+//
+// The new password replaces the current one, and setting it emits `auth.factor.password.set`. A
+// password the project's password policy refuses answers `user.password_policy_violation`; send one
+// that meets the policy.
+//
+// The password policy is the one in the release that serves the caller's `Origin`, chosen as
+// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+// one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
+// console when the project does not list the console's origin, gets the project's newest primary
+// deployment.
+//
 // If the request is refused:
-// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
-// with `zitadel origin add`.
-// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
-// no live preview. Run `zitadel preview` on the branch.
-// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
-// `zitadel deploy`.
-// - `409 rel.no_default`: the request names no origin and the project has no
-// primary deployment. Run `zitadel deploy`.
-// - `409 rel.revoked`: the release that serves the origin is revoked.
+//
+//   - `403 proj.origin_not_allowed`: the project admits no such origin. Add it with
+//     `zitadel origin add`.
+//   - `403 proj.preview_not_live`: the origin matches a preview pattern but has no live preview. Run
+//     `zitadel preview` on the branch.
+//   - `409 rel.not_deployed`: nothing is deployed to the origin. Run `zitadel deploy`.
+//   - `409 rel.no_default`: the request names no origin and the project has no primary deployment. Run
+//     `zitadel deploy`.
+//   - `409 rel.revoked`: the release that serves the origin is revoked.
 //
 // PUT /users/{user_id}/password
 func (c *Client) SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error) {
@@ -18231,7 +19022,13 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeSetUserPasswordResponse(resp)
@@ -18244,24 +19041,24 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 
 // SetVariables invokes setVariables operation.
 //
-// Sets, replaces and removes the project's variables for the requested
-// kind, in one request. Names not in the body are untouched. Existing
-// deployments keep the values they froze.
-// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
-// stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back. `null` removes the name
-// (RFC 7386), which is how several variables are removed in one request.
-// Removing a name the project does not hold is a no-op rather than an error.
-// Without `kind`, a plain value is written for both kinds. A secret is
-// written for `primary` only and removes the name's `preview` value, so a
-// preview never keeps a plaintext copy. Set a preview secret with
-// `kind=preview`. `null` removes the name from both kinds.
-// The body is applied whole or not at all, so a rejected request leaves the
-// project's variables exactly as they were. Fix what the error reports and
-// send the request again. Writing the same name twice replaces the value
-// rather than duplicating it, which makes a retry safe.
-// Each kind written records a `variable.set` event, and each kind removed a
-// `variable.removed` event. The value never appears in either.
+// Sets, replaces and removes the project's variables for the requested kind, in one request. Names not
+// in the body are untouched. Existing deployments keep the values they froze.
+//
+// A bare scalar enters a non-secret value. `{"value": …, "secret": true}` stores the value encrypted
+// under the project's active `secret` key, after which it can be referenced but not read back. `null`
+// removes the name (RFC 7386), which is how several variables are removed in one request. Removing a
+// name the project does not hold is a no-op rather than an error.
+//
+// Without `kind`, a plain value is written for both kinds. A secret is written for `primary` only and
+// removes the name's `preview` value, so a preview never keeps a plaintext copy. Set a preview secret
+// with `kind=preview`. `null` removes the name from both kinds.
+//
+// The body is applied whole or not at all, so a rejected request leaves the project's variables
+// exactly as they were. Fix what the error reports and send the request again. Writing the same name
+// twice replaces the value rather than duplicating it, which makes a retry safe.
+//
+// Each kind written records a `variable.set` event, and each kind removed a `variable.removed` event.
+// The value never appears in either.
 //
 // PATCH /variables
 func (c *Client) SetVariables(ctx context.Context, request UpdateVariablesRequest, params SetVariablesParams) (SetVariablesRes, error) {
@@ -18405,7 +19202,13 @@ func (c *Client) sendSetVariables(ctx context.Context, request UpdateVariablesRe
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeSetVariablesResponse(resp)
@@ -18418,58 +19221,61 @@ func (c *Client) sendSetVariables(ctx context.Context, request UpdateVariablesRe
 
 // SubmitFlowStep invokes submitFlowStep operation.
 //
-// Submits the user's input for the current step of a flow. The server
-// validates it, processes it (for example, verifies a credential), advances
-// the flow through any invisible steps, and returns the next visible step.
-// The flow endpoints are the runtime calls the login component
-// (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
-// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
-// with the new flow state. The server is stateless: all orchestration
-// state is carried in this cookie between requests.
-// Sign-up additionally requires a single-use `gate_proofs.signup_pow`
-// solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
-// sends it with the submit, and a passkey registration that creates its user
-// sends it with the attestation in `challenge_response`. Pending
-// challenges and rate counters are stored on the server. Invalid or spent
-// proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
-// `429 flow.rate_limited`. GET the current step to obtain or refresh its
-// challenge before solving. Start and Submit announce the gate without a puzzle.
-// **Important:** The `id` in the response may differ from the `id` used in
-// the request. This happens when a flow pivots (pushes a new flow onto the
-// stack) or when a stacked flow completes (auto-pops to the parent flow).
-// Always use the `id` from the latest response for the next request.
-// ## Flow completion
-// When `step.type` is `complete`, the flow is terminal. The `step.behavior`
-// field tells the frontend what to do:
-// | `behavior`   | Action                                                     |
-// |------------- |------------------------------------------------------------|
-// | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
-// | `show`       | Render the step as a success screen, such as registration. |
-// A `complete` step is only returned when the **entire flow stack** is done.
-// If a stacked flow (for example, recovery pivoted from login) finishes, the
-// server auto-pops to the parent flow and returns the parent's next step.
-// The frontend never sees a `complete` for intermediate flows.
-// ## External sign-in
-// `{action: "sso", sso_provider_id, return_target}` on a step that offers
-// `sso_providers` returns the server-emitted `sso-redirect` step, whose
-// `redirect_url` the frontend navigates to.
-// - The flow state does not change, but `_zflow` is re-sealed like on
-// every response, so its ten-minute window restarts at this submission;
-// the external sign-in and the return must complete within it.
-// - A second `Set-Cookie` line carries the browser-binding cookie the
-// callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
-// - On every host except http loopback it is `__Host-_zsso` with `Secure`.
-// - When the request host is http loopback (local development, where
-// Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
-// `__Host-` prefix is dropped because it requires `Secure`.
-// An identity provider (an external sign-in such as Google) whose
-// `client_id` is a `${{ NAME }}` reference has it filled from the project's
-// variables. A provider the server cannot start a sign-in with, including a
-// reference with no variable behind it, re-renders the step with
+// Submits the user's input for the current step of a flow. The server validates it, processes it (for
+// example, verifies a credential), advances the flow through any invisible steps, and returns the next
+// visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
+// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+//
+// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
+// server is stateless: all orchestration state is carried in this cookie between requests.
+//
+// Sign-up additionally requires a single-use `gate_proofs.signup_pow` solution for
+// `step.gates.signup_pow`: a password sign-up (`create_user`) sends it with the submit, and a passkey
+// registration that creates its user sends it with the attestation in `challenge_response`. Pending
+// challenges and rate counters are stored on the server. Invalid or spent proofs return
+// `403 flow.proof_invalid`; exhausted per-flow budgets return `429 flow.rate_limited`. GET the current
+// step to obtain or refresh its challenge before solving. Start and Submit announce the gate without a
+// puzzle.
+//
+// Important: The `id` in the response may differ from the `id` used in the request. This happens when
+// a flow pivots (pushes a new flow onto the stack) or when a stacked flow completes (auto-pops to the
+// parent flow). Always use the `id` from the latest response for the next request.
+//
+// # Flow completion
+//
+// When `step.type` is `complete`, the flow is terminal. The `step.behavior` field tells the frontend
+// what to do:
+//
+//	`behavior` | Action
+//	-----------+-----------------------------------------------------------
+//	`redirect` | Navigate to `redirect_uri` (OIDC/SAML auth request done).
+//	`show`     | Render the step as a success screen, such as registration.
+//
+// A `complete` step is only returned when the entire flow stack is done. If a stacked flow (for
+// example, recovery pivoted from login) finishes, the server auto-pops to the parent flow and returns
+// the parent's next step. The frontend never sees a `complete` for intermediate flows.
+//
+// # External sign-in
+//
+// `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` returns the
+// server-emitted `sso-redirect` step, whose `redirect_url` the frontend navigates to.
+//
+//   - The flow state does not change, but `_zflow` is re-sealed like on every response, so its
+//     ten-minute window restarts at this submission; the external sign-in and the return must complete
+//     within it.
+//   - A second `Set-Cookie` line carries the browser-binding cookie the callback checks: `HttpOnly`,
+//     `Path=/`, `SameSite=Lax`.
+//   - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+//   - When the request host is http loopback (local development, where Safari rejects `Secure`), it is
+//     `_zsso` with no `Secure`; the `__Host-` prefix is dropped because it requires `Secure`.
+//
+// An identity provider (an external sign-in such as Google) whose `client_id` is a `${{ NAME }}`
+// reference has it filled from the project's variables. A provider the server cannot start a sign-in
+// with, including a reference with no variable behind it, re-renders the step with
 // `error.sso_unavailable`.
-// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
-// re-resolve from `Origin`. If that release was revoked since the attempt
-// started, the response is `409` with `rel.revoked`.
+//
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
+// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
 // POST /flow/{flow_id}/submit
 func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
@@ -18594,7 +19400,13 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeSubmitFlowStepResponse(resp)
@@ -18607,11 +19419,10 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 
 // UpdateMyUser invokes updateMyUser operation.
 //
-// Partially updates the caller's own schema-defined attributes. The merged
-// result is validated against the user's schema before commit. Concurrent
-// writes are last-write-wins.
-// With `project_id`, the user is updated only when the session belongs to
-// that project.
+// Partially updates the caller's own schema-defined attributes. The merged result is validated against
+// the user's schema before commit. Concurrent writes are last-write-wins.
+//
+// With `project_id`, the user is updated only when the session belongs to that project.
 //
 // PATCH /users/me
 func (c *Client) UpdateMyUser(ctx context.Context, request *PatchMyUserRequest, params UpdateMyUserParams) (UpdateMyUserRes, error) {
@@ -18741,7 +19552,13 @@ func (c *Client) sendUpdateMyUser(ctx context.Context, request *PatchMyUserReque
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateMyUserResponse(resp)
@@ -18755,12 +19572,13 @@ func (c *Client) sendUpdateMyUser(ctx context.Context, request *PatchMyUserReque
 // UpdateProject invokes updateProject operation.
 //
 // Updates a project's name or password hashing method.
-// Fields you leave out keep their value. Sending `password_hash: null` drops
-// the project's own method and returns to the server default. A change of
-// method rewrites no stored password: each moves to the new method when its
-// owner next signs in or sets a new password.
-// Authenticate with the project secret, or with the session of a signed-in
-// person who can act on the project.
+//
+// Fields you leave out keep their value. Sending `password_hash: null` drops the project's own method
+// and returns to the server default. A change of method rewrites no stored password: each moves to the
+// new method when its owner next signs in or sets a new password.
+//
+// Authenticate with the project secret, or with the session of a signed-in person who can act on the
+// project.
 //
 // PATCH /projects/{project_id}
 func (c *Client) UpdateProject(ctx context.Context, request *PatchProjectRequest, params UpdateProjectParams) (UpdateProjectRes, error) {
@@ -18899,7 +19717,13 @@ func (c *Client) sendUpdateProject(ctx context.Context, request *PatchProjectReq
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateProjectResponse(resp)
@@ -18913,9 +19737,9 @@ func (c *Client) sendUpdateProject(ctx context.Context, request *PatchProjectReq
 // UpdateTeam invokes updateTeam operation.
 //
 // Renames an active team.
-// Only active teams can be updated. A deactivated team answers `404`. The new
-// name must be unique within the project, and a taken name answers `409`:
-// choose another name.
+//
+// Only active teams can be updated. A deactivated team answers `404`. The new name must be unique
+// within the project, and a taken name answers `409`: choose another name.
 //
 // PATCH /teams/{team_id}
 func (c *Client) UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error) {
@@ -19054,7 +19878,13 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateTeamResponse(resp)
@@ -19067,20 +19897,21 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 // UpdateUser invokes updateUser operation.
 //
-// Partially updates a user's schema-defined attributes, and optionally
-// moves the user to another registered schema. The merged result is
-// validated against the schema before commit. Concurrent writes are
-// last-write-wins.
-// To move the user, send `schema` with the `id` of a registered schema, as
-// `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
-// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
-// the same permission and answers the same status and `details` as the real
-// request, and it changes nothing and emits no `user.updated`. The request
-// itself is still recorded as `request.api`, like any other API call. A `200`
-// holds for the moment of the check: a unique value that is free then can be
-// taken before the real request, which then answers `409`.
-// `dry_run` is a body field so that a server from before it refuses the
-// request as malformed (`400 req.invalid`) instead of applying the patch.
+// Partially updates a user's schema-defined attributes, and optionally moves the user to another
+// registered schema. The merged result is validated against the schema before commit. Concurrent
+// writes are last-write-wins.
+//
+// To move the user, send `schema` with the `id` of a registered schema, as `publishSchema`
+// (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+//
+// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes the same permission
+// and answers the same status and `details` as the real request, and it changes nothing and emits no
+// `user.updated`. The request itself is still recorded as `request.api`, like any other API call. A
+// `200` holds for the moment of the check: a unique value that is free then can be taken before the
+// real request, which then answers `409`.
+//
+// `dry_run` is a body field so that a server from before it refuses the request as malformed
+// (`400 req.invalid`) instead of applying the patch.
 //
 // PATCH /users/{user_id}
 func (c *Client) UpdateUser(ctx context.Context, request *PatchUserRequest, params UpdateUserParams) (UpdateUserRes, error) {
@@ -19219,7 +20050,13 @@ func (c *Client) sendUpdateUser(ctx context.Context, request *PatchUserRequest, 
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateUserResponse(resp)
@@ -19233,17 +20070,20 @@ func (c *Client) sendUpdateUser(ctx context.Context, request *PatchUserRequest, 
 // VerifyAuthAttemptChallenge invokes verifyAuthAttemptChallenge operation.
 //
 // Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
+//
 // The proof format depends on the challenge method. For example:
-// - `password` method: { password: "…" }
-// - `totp` method: { totp: { code: "123456" } }
-// - `passkey` method: { passkey: { assertion: "…" } }
-// - `recovery_code` method: { recovery_code: "…" }
-// On success, the factor is recorded on the authentication attempt. The
-// attempt moves to the next pending challenge, or completes when every required
-// factor is verified. Then call `createAuthAttemptHandoff` (`POST
-// /auth_attempts/{attempt_id}/handoff`).
-// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
-// again. There is no retry limit: you can retry until the attempt expires.
+//
+//   - `password` method: { password: "…" }
+//   - `totp` method: { totp: { code: "123456" } }
+//   - `passkey` method: { passkey: { assertion: "…" } }
+//   - `recovery_code` method: { recovery_code: "…" }
+//
+// On success, the factor is recorded on the authentication attempt. The attempt moves to the next
+// pending challenge, or completes when every required factor is verified. Then call
+// `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
+//
+// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try again. There is no
+// retry limit: you can retry until the attempt expires.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (c *Client) VerifyAuthAttemptChallenge(ctx context.Context, request *VerifyChallengeRequest, params VerifyAuthAttemptChallengeParams) (VerifyAuthAttemptChallengeRes, error) {
@@ -19401,7 +20241,13 @@ func (c *Client) sendVerifyAuthAttemptChallenge(ctx context.Context, request *Ve
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeVerifyAuthAttemptChallengeResponse(resp)

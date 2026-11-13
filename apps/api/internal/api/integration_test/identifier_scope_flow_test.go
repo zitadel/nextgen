@@ -91,7 +91,7 @@ func (f *identifierScopeFixture) createUser(t *testing.T, schemaURL, email strin
 
 // submitIdentifier starts a login flow on definition and submits email on its
 // identifier step. It returns the flow id and the response.
-func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.FlowDefinition, email string) (string, *api.SubmitFlowStepOK) {
+func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.FlowDefinition, email string) (string, *api.FlowResponseHeaders) {
 	t.Helper()
 	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(f.project.ID),
@@ -116,8 +116,8 @@ func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.F
 		}),
 	}, api.SubmitFlowStepParams{FlowID: created.Response.ID, Zflow: mustExtractZflow(t, created.SetCookie)})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	return created.Response.ID, resp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	return created.Response.ID, resp.(*api.FlowResponseHeaders)
 }
 
 // signIn runs definition's login with email and the test password and
@@ -134,8 +134,8 @@ func (f *identifierScopeFixture) signIn(t *testing.T, definition api.FlowDefinit
 		}),
 	}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: mustExtractZflow(t, idOK.SetCookie)})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	pwOK := resp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	pwOK := resp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	token, ok := pwOK.Response.HandoffToken.Get()
 	require.True(t, ok, "expected a handoff token")

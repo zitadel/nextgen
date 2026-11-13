@@ -278,6 +278,30 @@ func TestStandaloneRuntimeResolverMintsWhenPreviewTokenIsGone(t *testing.T) {
 	assert.Equal(t, "pk_minted", meta.PublishableKey)
 }
 
+// The bootstrapped platform project is marked as reserved, so the console
+// draws it at its root (D42). An ordinary project, pinned or first-created, is
+// never marked: TestStandaloneRuntimeResolverReusesPreviewToken's document
+// carries no platform_project_id.
+func TestStandaloneRuntimeResolverMarksReservedPlatformProject(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	project := &domain.Project{ID: domain.PlatformProjectID}
+
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().GetActivePreviewToken(gomock.Any(), project.ID).Return(nil, domain.TokenNotFound())
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("pk_platform", nil)
+
+	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), domain.PlatformProjectID)
+	meta, err := resolve(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, consoleRuntime{
+		Mode:              ConsoleModeStandalone,
+		ConsoleProjectID:  domain.PlatformProjectID,
+		PublishableKey:    "pk_platform",
+		PlatformProjectID: domain.PlatformProjectID,
+	}, meta)
+}
+
 // A lookup that fails for any other reason must not fall through to minting:
 // that would write a row per request whenever the read is broken.
 func TestStandaloneRuntimeResolverPropagatesPreviewTokenError(t *testing.T) {

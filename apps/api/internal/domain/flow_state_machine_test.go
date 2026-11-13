@@ -102,8 +102,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	hasher := cryptomock.NewMockHasher(mock)
 	hasher.EXPECT().
-		Hash(gomock.Any()).
-		DoAndReturn(func(s string) (string, error) { return "hashed:" + s, nil }).
+		Hash(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, s string) (string, error) { return "hashed:" + s, nil }).
 		AnyTimes()
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
@@ -227,12 +227,14 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 
 	w.authAttemptService.EXPECT().
 		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
-			return in.ProjectID == testProject && in.SessionID != nil && *in.SessionID == "sess-1"
+			// The attempt records the flow, or the exchange's events lose it.
+			return in.ProjectID == testProject && in.FlowID == "flow_01TEST" && in.SessionID != nil && *in.SessionID == "sess-1"
 		})).
 		Return("att_01TEST", nil).
 		Times(1)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		ID:            "flow_01TEST",
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -282,7 +284,9 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		Times(1)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.Value == email
+			// Register marks the lookup as a sign-up's, which records no
+			// failed check when the email is free.
+			return in.Value == email && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
@@ -338,7 +342,8 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, attemptID, in.AttemptID) &&
 				assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value)
+				assert.Equal(t, email, in.Value) &&
+				assert.False(t, in.Register, "a sign-in's lookup is not a sign-up's")
 		})).
 		Return(userID, nil).
 		Times(1)
@@ -3094,15 +3099,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
 		Return(domain.ErrUserAlreadyExists())
 	// Re-resolution walks the identifier-class candidates in field order:
-	// the username is fresh (rejected), the email resolves the owner.
+	// the username is fresh (rejected), the email resolves the owner. Both
+	// are a sign-up's lookups, so the fresh one writes no failed check.
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "username" && in.Value == username
+			return in.AttributeName == "username" && in.Value == username && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "email" && in.Value == email
+			return in.AttributeName == "email" && in.Value == email && in.Register
 		})).
 		Return(existingUserID, nil)
 

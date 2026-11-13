@@ -2,6 +2,7 @@ import { createFileRoute, useLoaderData, useRouter } from "@tanstack/react-route
 import { SlidersHorizontal } from "lucide-react";
 
 import { api } from "@/api/zitadel";
+import { DETAIL_STACK } from "@/components/detail-page";
 import { RenameCard } from "@/components/rename-card";
 import { readDeployedPasswordPolicy } from "@/features/project-settings/api";
 import { ProjectOrigins } from "@/features/project-settings/components/project-origins";
@@ -54,11 +55,9 @@ function ProjectGeneral() {
   const reload = () => void router.invalidate();
 
   return (
-    // The page owns the 16px between its cards.
-    <div className="flex flex-col gap-4">
+    <div className={DETAIL_STACK}>
       <RenameCard
         id="project-name"
-        layout="inline"
         label="Project name"
         value={project.name}
         onSave={async (name) => {

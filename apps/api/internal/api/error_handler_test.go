@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/validate"
@@ -38,7 +39,7 @@ import (
 // method (security check or parameter decode), so no services are needed.
 func newErrorHandlerTestServer(t *testing.T, tokenService service.TokenService) *api.Server {
 	t.Helper()
-	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(tokenService), api.WithErrorHandler(OgenErrorHandler))
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(tokenService), api.WithErrorHandler(OgenErrorHandler(0)))
 	require.NoError(t, err)
 	return srv
 }
@@ -539,7 +540,7 @@ func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
 		Err:      domain.ErrAuthCSRFInvalid().WithParent(errors.New("origin mismatch")),
 	}
 	rec := httptest.NewRecorder()
-	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+	OgenErrorHandler(0)(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
 
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	want := domain.ErrAuthCSRFInvalid()
@@ -558,7 +559,7 @@ func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 		Err:      domain.ErrInternal(errors.New("WithCSRFRequest is not wired")),
 	}
 	rec := httptest.NewRecorder()
-	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+	OgenErrorHandler(0)(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
@@ -788,7 +789,7 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 	records := recordLogs(t)
 
 	srv, err := api.NewServer(h, NewSecurityHandler(tokenService),
-		api.WithErrorHandler(OgenErrorHandler),
+		api.WithErrorHandler(OgenErrorHandler(0)),
 		api.WithMiddleware(middleware.AddOperationIdToContext()),
 	)
 	require.NoError(t, err)
@@ -1081,7 +1082,7 @@ func (h recordingHandler) WithGroup(string) slog.Handler { return h }
 func newRouterTestServer(t *testing.T, home *errorpage.Link) *api.Server {
 	t.Helper()
 	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(nil),
-		api.WithErrorHandler(OgenErrorHandler),
+		api.WithErrorHandler(OgenErrorHandler(0)),
 		api.WithNotFound(OgenNotFound(home)),
 		api.WithMethodNotAllowed(OgenMethodNotAllowed),
 	)
@@ -1231,4 +1232,67 @@ func TestInvalidRequestFields(t *testing.T) {
 	require.Equal(t, []string{"attributes.email"}, invalidRequestFields(body))
 
 	require.Nil(t, invalidRequestFields(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
+}
+
+// A busy hashing limiter is answered as "try again shortly", not as a fault of
+// the server or of the client's input.
+func TestErrorResponsePasswordHashingBusyIs429(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrUserPasswordHashingBusy().WithParent(errors.New("no slot")))
+
+	require.Equal(t, http.StatusTooManyRequests, got.StatusCode)
+	require.Equal(t, api.ErrorCode("user.password_hashing_busy"), got.Response.Code)
+	require.False(t, domain.IsServerFault(domain.ErrUserPasswordHashingBusy()), "a service span must not end in error for it")
+}
+
+// Only the password-hashing busy 429 carries Retry-After: the wait in whole
+// seconds, rounded and floored at minRetryAfter. The outermost domain code
+// decides, so a wrapped busy error still gets it and a fault that wraps one
+// does not.
+func TestOgenErrorHandlerRetryAfter(t *testing.T) {
+	t.Parallel()
+	serve := func(wait time.Duration, err error) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		OgenErrorHandler(wait)(t.Context(), rec, httptest.NewRequest(http.MethodPut, "/", nil), err)
+		return rec
+	}
+	busy := domain.ErrUserPasswordHashingBusy()
+
+	t.Run("a busy 429 tells the wait in whole seconds, rounded and floored", func(t *testing.T) {
+		t.Parallel()
+		for wait, want := range map[time.Duration]string{
+			10 * time.Second:        "10",
+			1500 * time.Millisecond: "2",
+			1200 * time.Millisecond: "1",
+			0:                       "1",
+			10 * time.Millisecond:   "1",
+			400 * time.Millisecond:  "1",
+		} {
+			rec := serve(wait, busy)
+			require.Equal(t, http.StatusTooManyRequests, rec.Code, wait)
+			require.Equal(t, want, rec.Header().Get("Retry-After"), wait)
+		}
+	})
+
+	t.Run("a wrapped busy error still gets it", func(t *testing.T) {
+		t.Parallel()
+		rec := serve(time.Second, fmt.Errorf("verify: %w", busy))
+		require.Equal(t, http.StatusTooManyRequests, rec.Code)
+		require.Equal(t, "1", rec.Header().Get("Retry-After"))
+	})
+
+	t.Run("a fault that wraps a busy error does not", func(t *testing.T) {
+		t.Parallel()
+		rec := serve(time.Second, domain.ErrInternal(busy))
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		require.Empty(t, rec.Header().Get("Retry-After"))
+	})
+
+	t.Run("other errors are left alone", func(t *testing.T) {
+		t.Parallel()
+		rec := serve(time.Second, domain.ErrRequestInvalid())
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Empty(t, rec.Header().Get("Retry-After"))
+	})
 }

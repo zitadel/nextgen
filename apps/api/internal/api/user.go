@@ -644,6 +644,10 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrUserPasswordHashingBusy().Code:
+		// Retry-After is set by OgenErrorHandler: no ResponseWriter reaches
+		// this far.
+		return errorResponseWithStatusCode(http.StatusTooManyRequests, err)
 	default:
 		return internalErrorResponse(err)
 	}

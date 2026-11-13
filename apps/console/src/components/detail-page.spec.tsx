@@ -3,7 +3,7 @@ import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import { MetaRule, MetaValue } from "./detail-meta";
-import { DetailHeader } from "./detail-page";
+import { DetailHeader, DetailRow, DetailRows } from "./detail-page";
 import { Page } from "./layout";
 
 function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
@@ -55,5 +55,59 @@ describe("detail header", () => {
       <DetailHeader icon={Box} title="Engineering" meta={<MetaValue label="ID" value="x" />} />,
     );
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+describe("detail header action", () => {
+  it("renders the action after the header card", () => {
+    renderHeader({ action: <button type="button">Actions</button> });
+    const action = screen.getByRole("button", { name: "Actions" });
+    const copy = screen.getByRole("button", { name: "Copy Team ID" });
+    expect(copy.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("detail rows", () => {
+  it("rules between rows, never after the last", () => {
+    const { container } = render(
+      <DetailRows>
+        <DetailRow label="Message">a</DetailRow>
+        <DetailRow label="Git commit">b</DetailRow>
+        <DetailRow label="Created by">c</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(container.querySelectorAll("[data-slot=separator]")).toHaveLength(2);
+    expect(list?.lastElementChild).toHaveTextContent("Created by");
+  });
+
+  it("keeps a list a list: it holds only its items, each rule inside one", () => {
+    const { container } = render(
+      <DetailRows as="ul">
+        <DetailRow label="Password">Not set</DetailRow>
+        <DetailRow label="Passkey">Not set up</DetailRow>
+      </DetailRows>,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // axe's `list` rule: no `role="none"` items or bare rules beside the rows.
+    const list = container.querySelector("ul");
+    expect([...(list?.children ?? [])].map((child) => child.tagName)).toEqual(["LI", "LI"]);
+    expect([...(list?.children ?? [])].some((child) => child.hasAttribute("role"))).toBe(false);
+    expect(list?.children[1]?.querySelector("[data-slot=separator]")).not.toBeNull();
+  });
+});
+
+describe("detail rows on their own width", () => {
+  it("lays nested rows out on the list's width, not the viewport's", () => {
+    const { container } = render(
+      <DetailRows container>
+        <DetailRow label="Length">15 characters</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(list).toHaveClass("@container/detail-rows");
+    const row = list?.firstElementChild;
+    expect(row).toHaveClass("@md/detail-rows:flex-row");
+    expect(row).not.toHaveClass("sm:flex-row");
   });
 });

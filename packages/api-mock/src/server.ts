@@ -30,7 +30,6 @@
  *   POST   /schemas                   — create user schema
  *   GET    /schemas                   — list user schemas
  *   GET    /schemas/:schema_id               — fetch user schema
- *   DELETE /schemas/:schema_id               — delete user schema
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:flow_definition_id      — get flow definition
@@ -44,6 +43,7 @@ import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
 import express from "express";
+import type { RequestHandler } from "msw";
 
 import { applyBranding } from "./branding.js";
 import { JWK, verifyHandoffToken } from "./crypto.js";
@@ -259,7 +259,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
       if (err) {
-        res.status(400).json(errorBody("invalid_json", "request body must be valid JSON"));
+        res.status(400).json(errorBody("req.invalid", "request body must be valid JSON"));
         return;
       }
       next();
@@ -275,7 +275,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           .status(400)
           .json(
             errorBody(
-              "sess.project_id_missing",
+              "req.invalid",
               "The session API currently requires the project_id query parameter to fulfill requests.",
             ),
           );
@@ -296,9 +296,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       if (!handoff_token || typeof handoff_token !== "string") {
         res
           .status(400)
-          .json(
-            errorBody("missing_handoff_token", "handoff_token is required and must be a string"),
-          );
+          .json(errorBody("req.invalid", "handoff_token is required and must be a string"));
         return;
       }
       // The server answers every token it will not exchange alike: it deletes
@@ -416,13 +414,13 @@ export function createMockApp(options: { issuer: string }): express.Express {
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+        res.status(401).json(errorBody("auth.unauthorized", "no session cookie"));
         return;
       case "unknown":
-        res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
+        res.status(401).json(errorBody("auth.unauthorized", "invalid or expired session"));
         return;
       case "expired":
-        res.status(401).json(errorBody("unauthenticated", "session expired"));
+        res.status(401).json(errorBody("auth.unauthorized", "session expired"));
         return;
       case "active": {
         if (refuseForProject(req, res, found.session)) return;
@@ -526,7 +524,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       const parsed = CompleteProjectClaimBody.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json(
-          errorBody("invalid_request", "request does not conform to spec", {
+          errorBody("req.invalid", "request does not conform to spec", {
             issues: parsed.error.issues,
           }),
         );
@@ -551,9 +549,18 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.status(204).end();
   });
 
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  app.use(createMiddleware(...mountedHandlers({ iss })));
 
   return app;
+}
+
+/**
+ * The MSW handlers the app mounts behind its own routes: the flow and session
+ * handlers, then the platform handlers. The conformance spec reads its routes
+ * from this list, so a handler set mounted anywhere else goes unchecked.
+ */
+export function mountedHandlers(options: { iss: string }): RequestHandler[] {
+  return [...setupMockHandlers({ iss: options.iss }).handlers, ...setupPlatformHandlers()];
 }
 
 /**

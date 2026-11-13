@@ -4,34 +4,34 @@ package api
 
 // AddProjectOriginParams is parameters of addProjectOrigin operation.
 type AddProjectOriginParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // BuildReleaseParams is parameters of buildRelease operation.
 type BuildReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CancelInvitationParams is parameters of cancelInvitation operation.
 type CancelInvitationParams struct {
-	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
-	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation` (`POST /invitations`) returns
+	// or `listInvitations` (`GET /invitations`) lists.
 	InvitationID InvitationID
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CompleteProjectClaimParams is parameters of completeProjectClaim operation.
 type CompleteProjectClaimParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -40,8 +40,8 @@ type CompleteUserPasskeyRegistrationParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
-	// The `registration_id` that `createUserPasskeyRegistration` (`POST
-	// /users/{user_id}/passkeys/registrations`) returns.
+	// The `registration_id` that `createUserPasskeyRegistration`
+	// (`POST /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
 }
 
@@ -55,85 +55,84 @@ type CreateAuthAttemptChallengeParams struct {
 type CreateAuthAttemptHandoffParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // CreateDeploymentParams is parameters of createDeployment operation.
 type CreateDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateFlowParams is parameters of createFlow operation.
 type CreateFlowParams struct {
-	// Standard browser `Origin` header. Selects the deployment that serves
-	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the deployment that origin serves.
-	// Browsers send it automatically; no client action is required. Absent
-	// when the caller is not a browser.
+	// Standard browser `Origin` header. Selects the deployment that serves this attempt: matched against
+	// the project's origin patterns and live previews, then against the deployment that origin serves.
+	// Browsers send it automatically; no client action is required. Absent when the caller is not a
+	// browser.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 // CreateGrantParams is parameters of createGrant operation.
 type CreateGrantParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateInvitationParams is parameters of createInvitation operation.
 type CreateInvitationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateProjectClaimParams is parameters of createProjectClaim operation.
 type CreateProjectClaimParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // CreateReleaseParams is parameters of createRelease operation.
 type CreateReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateTeamParams is parameters of createTeam operation.
 type CreateTeamParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateUserParams is parameters of createUser operation.
 type CreateUserParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Adds the new user to this team: creating the user also creates an
-	// active membership in it. Omit it to create a user with no memberships.
-	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
-	// This is team membership, not lifecycle ownership. It does not decide
-	// who may deprovision the user, and the created user stays self-owned
-	// either way. The owning team is reported on reads as
+	// Adds the new user to this team: creating the user also creates an active membership in it. Omit it
+	// to create a user with no memberships. Use the `id` that `createTeam` (`POST /teams`) returns or
+	// `queryTeams` (`POST /teams/query`) lists.
+	//
+	// This is team membership, not lifecycle ownership. It does not decide who may deprovision the user,
+	// and the created user stays self-owned either way. The owning team is reported on reads as
 	// `metadata.lifecycle_owner_team_id` and cannot be set through this API.
-	// The team also scopes team-unique attributes for this create: an
-	// attribute the schema marks unique per team is checked against this
-	// team's members.
+	//
+	// The team also scopes team-unique attributes for this create: an attribute the schema marks unique
+	// per team is checked against this team's members.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -156,9 +155,9 @@ type DeleteGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
 	// `queryGrants` (`POST /grants/query`) lists.
 	GrantID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -171,9 +170,9 @@ type DeleteUserParams struct {
 
 // DeleteVariableParams is parameters of deleteVariable operation.
 type DeleteVariableParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -183,29 +182,29 @@ type DeleteVariableParams struct {
 
 // EvaluatePolicyParams is parameters of evaluatePolicy operation.
 type EvaluatePolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // ExchangeHandoffParams is parameters of exchangeHandoff operation.
 type ExchangeHandoffParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // GetApplicationParams is parameters of getApplication operation.
 type GetApplicationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The application ID: the `id` that `publishApplication` (`POST /applications`) returns.
 	ApplicationID string
@@ -226,9 +225,9 @@ type GetBrandingParams struct {
 
 // GetDeploymentParams is parameters of getDeployment operation.
 type GetDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -239,9 +238,9 @@ type GetDeploymentParams struct {
 type GetEventParams struct {
 	// The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.
 	EventID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -253,17 +252,16 @@ type GetFlowDefinitionParams struct {
 
 // GetFlowStepParams is parameters of getFlowStep operation.
 type GetFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
+	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{flow_id}` path parameter must name that flow, any other id is
-	// refused.
-	// Browsers send this automatically; non-browser clients must capture the
-	// `Set-Cookie` header and resend it.
+	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
+	// other id is refused.
+	//
+	// Browsers send this automatically; non-browser clients must capture the `Set-Cookie` header and
+	// resend it.
 	Zflow string
 }
 
@@ -272,32 +270,31 @@ type GetGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
 	// `queryGrants` (`POST /grants/query`) lists.
 	GrantID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Extra principal fields to add onto `user` or `team`. It takes the same
-	// values and needs the same `user.read` and `team.read` scopes as
-	// `POST /grants/query`.
+	// Extra principal fields to add onto `user` or `team`. It takes the same values and needs the same
+	// `user.read` and `team.read` scopes as `POST /grants/query`.
 	Expand []GrantExpand `json:",omitempty"`
 }
 
 // GetIdpParams is parameters of getIdp operation.
 type GetIdpParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
-	// /idps/query`) lists.
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps`
+	// (`POST /idps/query`) lists.
 	IdpID string
 }
 
 // GetIdpRevisionParams is parameters of getIdpRevision operation.
 type GetIdpRevisionParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The revision ID: the `revision_id` that `publishIdp` (`POST /idps`) returns, or that
 	// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists.
@@ -306,95 +303,102 @@ type GetIdpRevisionParams struct {
 
 // GetInvitationParams is parameters of getInvitation operation.
 type GetInvitationParams struct {
-	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
-	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation` (`POST /invitations`) returns
+	// or `listInvitations` (`GET /invitations`) lists.
 	InvitationID InvitationID
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // GetMyPasswordStateParams is parameters of getMyPasswordState operation.
 type GetMyPasswordStateParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetMySessionParams is parameters of getMySession operation.
 type GetMySessionParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetMySessionCsrfTokenParams is parameters of getMySessionCsrfToken operation.
 type GetMySessionCsrfTokenParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetMyUserParams is parameters of getMyUser operation.
 type GetMyUserParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetMyUserSchemaParams is parameters of getMyUserSchema operation.
 type GetMyUserSchemaParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+// GetOAuthSettingsParams is parameters of getOAuthSettings operation.
+type GetOAuthSettingsParams struct {
+	// The OAuth settings revision ID: the `revision_id` of the `kind: oauth` pointer on the release that
+	// `buildRelease` (`POST /releases/build`) or `getRelease` (`GET /releases/{release_id}`) returns.
+	OAuthSettingsID string
 }
 
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -402,9 +406,9 @@ type GetPolicyParams struct {
 
 // GetPolicyRevisionParams is parameters of getPolicyRevision operation.
 type GetPolicyRevisionParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy revision.
 	RevisionID PolicyRevisionID
@@ -412,62 +416,59 @@ type GetPolicyRevisionParams struct {
 
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // GetProjectClaimStatusParams is parameters of getProjectClaimStatus operation.
 type GetProjectClaimStatusParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
-	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
-	// for this claim. The claim URL
-	// carries it.
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for
+	// this claim. The claim URL carries it.
 	ChallengeID ChallengeID
 }
 
 // GetProjectClaimWindowParams is parameters of getProjectClaimWindow operation.
 type GetProjectClaimWindowParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
-	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
-	// for this claim. The claim URL
-	// carries it.
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for
+	// this claim. The claim URL carries it.
 	ChallengeID ChallengeID
 }
 
 // GetReleaseParams is parameters of getRelease operation.
 type GetReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
-	// /releases`) lists.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases`
+	// (`GET /releases`) lists.
 	ReleaseID ReleaseID
 }
 
 // GetSchemaParams is parameters of getSchema operation.
 type GetSchemaParams struct {
-	// The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET
-	// /schemas`) lists.
+	// The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas`
+	// (`GET /schemas`) lists.
 	SchemaID string
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetSessionParams is parameters of getSession operation.
 type GetSessionParams struct {
-	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
-	// /sessions/exchange`) returns, or that
-	// `querySessions` (`POST /sessions/query`) lists.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff`
+	// (`POST /sessions/exchange`) returns, or that `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
@@ -480,20 +481,19 @@ type GetTeamParams struct {
 
 // GetUserParams is parameters of getUser operation.
 type GetUserParams struct {
-	// Serves the user only when they hold an active membership in this team,
-	// and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
-	// `queryTeams` (`POST /teams/query`) lists.
-	// This is team membership, not lifecycle ownership: it asks which team
-	// the user collaborates in, not which team may deprovision them. The
-	// owning team is reported separately as
-	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
-	// while owning their own lifecycle.
-	// Only active memberships match. A user who has been invited but has not
-	// accepted is not served.
-	// It reads the user's memberships, so it takes the same permission as the
-	// `team_id` filter on `POST /users/query`: `team_membership.read` for a
-	// project secret, read on the whole project for a console session.
-	// Otherwise the answer is `403 user.permission_denied`.
+	// Serves the user only when they hold an active membership in this team, and answers `404` otherwise.
+	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
+	//
+	// This is team membership, not lifecycle ownership: it asks which team the user collaborates in, not
+	// which team may deprovision them. The owning team is reported separately as
+	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams while owning their own
+	// lifecycle.
+	//
+	// Only active memberships match. A user who has been invited but has not accepted is not served.
+	//
+	// It reads the user's memberships, so it takes the same permission as the `team_id` filter on
+	// `POST /users/query`: `team_membership.read` for a project secret, read on the whole project for a
+	// console session. Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -507,9 +507,9 @@ type GetUserPasswordStateParams struct {
 
 // GetVariableParams is parameters of getVariable operation.
 type GetVariableParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -519,17 +519,17 @@ type GetVariableParams struct {
 
 // ListBrandingParams is parameters of listBranding operation.
 type ListBrandingParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // ListDeploymentVariablesParams is parameters of listDeploymentVariables operation.
 type ListDeploymentVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -538,42 +538,41 @@ type ListDeploymentVariablesParams struct {
 
 // ListDeploymentsParams is parameters of listDeployments operation.
 type ListDeploymentsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Narrows the list to the deployments that targeted this origin, given
-	// exactly as the deployment records it. An origin no deployment targeted
-	// answers an empty list, not an error.
+	// Narrows the list to the deployments that targeted this origin, given exactly as the deployment
+	// records it. An origin no deployment targeted answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
-	// Lists what each target serves now instead of the history. Defaults
-	// to `false`.
+	// Lists what each target serves now instead of the history. Defaults to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
 	Expand []DeploymentExpand `json:",omitempty"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListEventsParams is parameters of listEvents operation.
 type ListEventsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Only events of this category. Repeat the parameter to match any of
-	// several categories.
+	// Only events of this category. Repeat the parameter to match any of several categories.
 	Category []ListEventsCategoryItem `json:",omitempty"`
-	// Only events with exactly this `event_type`. Repeat the parameter to
-	// match any of several types.
+	// Only events with exactly this `event_type`. Repeat the parameter to match any of several types.
 	EventType []string `json:",omitempty"`
 	// Only events triggered by this actor ID.
 	ActorID OptString `json:",omitempty,omitzero"`
+	// Only events that concern this user ID, whoever triggered them: the user's sign-ins, sessions and
+	// credentials, and the changes made to the user. Events recorded by a server version before this
+	// filter existed are not matched; they leave the list as retention removes them.
+	UserID OptString `json:",omitempty,omitzero"`
 	// Only events produced by this application or agent.
 	ClientID OptString `json:",omitempty,omitzero"`
 	// Only events of this session ID.
@@ -590,30 +589,26 @@ type ListEventsParams struct {
 	EntityID OptString `json:",omitempty,omitzero"`
 	// Only events emitted under this team, as stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
-	// Only `request.api` events of this API operation, the
-	// `payload.operation_id` they record, such as `createUser`. Repeat the
-	// parameter to match any of up to 10 operations. Requests recorded by a
-	// server version before this filter existed are not matched; they leave
-	// the list as retention removes them.
+	// Only `request.api` events of this API operation, the `payload.operation_id` they record, such as
+	// `createUser`. Repeat the parameter to match any of up to 10 operations. Requests recorded by a
+	// server version before this filter existed are not matched; they leave the list as retention removes
+	// them.
 	OperationID []string `json:",omitempty"`
-	// Only `request.api` events whose response status, the `payload.status`
-	// they record, is in this class: `4xx` is 400 to 499. Repeat the
-	// parameter to match any of several classes: `4xx` and `5xx` are the
-	// failed requests. Requests recorded by a server version before this
-	// filter existed are not matched; they leave the list as retention
-	// removes them.
+	// Only `request.api` events whose response status, the `payload.status` they record, is in this class:
+	// `4xx` is 400 to 499. Repeat the parameter to match any of several classes: `4xx` and `5xx` are the
+	// failed requests. Requests recorded by a server version before this filter existed are not matched;
+	// they leave the list as retention removes them.
 	StatusClass []ListEventsStatusClassItem `json:",omitempty"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
 	CreatedBefore OptDateTime `json:",omitempty,omitzero"`
-	// The sort direction, by `created_at` and then `id`. The default `desc`
-	// lists the newest event first; `asc` lists the oldest first.
+	// The sort direction, by `created_at` and then `id`. The default `desc` lists the newest event first;
+	// `asc` lists the oldest first.
 	Order OptListEventsOrder `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -623,29 +618,26 @@ type ListEventsParams struct {
 type ListFlowDefinitionsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
-	// The flow name to filter by. Every revision of a flow shares its
-	// `name`, so the result is that flow's revisions, newest by creation
-	// time first.
+	// The flow name to filter by. Every revision of a flow shares its `name`, so the result is that flow's
+	// revisions, newest by creation time first.
 	Name OptString `json:",omitempty,omitzero"`
-	// Which revisions to return. Every revision of a flow shares its
-	// `name`, so publishing a definition under an existing `name` adds a new
-	// revision.
-	// `all` (the default) returns every revision: the full history an
-	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `name`, which is one entry per flow.
-	// A `page_token` is bound to the mode it was issued in and is rejected by
-	// the other.
+	// Which revisions to return. Every revision of a flow shares its `name`, so publishing a definition
+	// under an existing `name` adds a new revision.
+	//
+	// `all` (the default) returns every revision: the full history an export, an audit or a GitOps diff
+	// needs. `latest` returns the newest revision of each `name`, which is one entry per flow.
+	//
+	// A `page_token` is bound to the mode it was issued in and is rejected by the other.
 	Revisions OptListFlowDefinitionsRevisions `json:",omitempty,omitzero"`
 	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`
@@ -653,34 +645,32 @@ type ListFlowDefinitionsParams struct {
 
 // ListIdpRevisionsParams is parameters of listIdpRevisions operation.
 type ListIdpRevisionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
-	// /idps/query`) lists.
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps`
+	// (`POST /idps/query`) lists.
 	IdpID string
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListInvitationsParams is parameters of listInvitations operation.
 type ListInvitationsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Only invitations with this status.
 	Status OptInvitationStatus `json:",omitempty,omitzero"`
@@ -692,21 +682,20 @@ type ListInvitationsParams struct {
 type ListMyIdentityLinksParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -714,21 +703,20 @@ type ListMyIdentityLinksParams struct {
 type ListMyPasskeysParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -736,34 +724,32 @@ type ListMyPasskeysParams struct {
 type ListMyProjectsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// Narrows the list to the projects whose name contains this text,
-	// ignoring case, as `contains` matches text in a query endpoint's
-	// filter. Send the same value with every `page_token` the search
-	// returns: a token continues the list it came from. An empty value
-	// lists every project, as leaving it out does.
+	// Narrows the list to the projects whose name contains this text, ignoring case, as `contains` matches
+	// text in a query endpoint's filter. Send the same value with every `page_token` the search returns: a
+	// token continues the list it came from. An empty value lists every project, as leaving it out does.
 	NameContains OptString `json:",omitempty,omitzero"`
-	// Sorts the list by `created_at` and then `id`: `desc` lists the newest
-	// project first, `asc` the oldest first. Leave it out to list by
-	// project ID, which says nothing about when a project was created. Send
-	// the same value with every `page_token` the list returns: a token
-	// continues the list it came from, and under another order it is
-	// refused with `400`.
+	// Sorts the list by `created_at` and then `id`: `desc` lists the newest project first, `asc` the
+	// oldest first. Leave it out to list by project ID, which says nothing about when a project was
+	// created. Send the same value with every `page_token` the list returns: a token continues the list it
+	// came from, and under another order it is refused with `400`.
 	Order OptSortDirection `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// Leaves out the deployment's reserved platform project, the one the console signs in to. Defaults to
+	// `false`. Send the same value with every `page_token` the list returns.
+	ExcludePlatform OptBool `json:",omitempty,omitzero"`
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -771,36 +757,34 @@ type ListMyProjectsParams struct {
 type ListMyTeamsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // ListPoliciesParams is parameters of listPolicies operation.
 type ListPoliciesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Only the policy of this operation.
 	Operation OptPolicyOperation `json:",omitempty,omitzero"`
@@ -808,18 +792,17 @@ type ListPoliciesParams struct {
 
 // ListPolicyRevisionsParams is parameters of listPolicyRevisions operation.
 type ListPolicyRevisionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -827,83 +810,78 @@ type ListPolicyRevisionsParams struct {
 type ListProjectAdminsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	ProjectID ProjectID
 }
 
 // ListProjectPreviewsParams is parameters of listProjectPreviews operation.
 type ListProjectPreviewsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListReleasesParams is parameters of listReleases operation.
 type ListReleasesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Narrows the list to the release with this content digest, given in full
-	// with its `sha256:` prefix. A project holds at most one release per digest,
-	// so the result has one entry or none.
-	// A digest no release of the project carries answers an empty list, not an
-	// error: the filter asks which release has this content, and "none" is a
-	// valid answer. Paths never take a digest; read the matched entry's `id`
-	// and use that.
+	// Narrows the list to the release with this content digest, given in full with its `sha256:` prefix. A
+	// project holds at most one release per digest, so the result has one entry or none.
+	//
+	// A digest no release of the project carries answers an empty list, not an error: the filter asks
+	// which release has this content, and "none" is a valid answer. Paths never take a digest; read the
+	// matched entry's `id` and use that.
 	ContentHash OptReleaseContentHash `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListSchemasParams is parameters of listSchemas operation.
 type ListSchemasParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
-	// Which revisions to return. Schemas are immutable and versioned by URL,
-	// so editing one creates a new revision that shares its `objectType`.
-	// `all` (the default) returns every revision: the full history an export,
-	// an audit or a GitOps diff needs. `latest` returns the newest revision of
-	// each `objectType`, which is one entry per schema.
-	// A schema stored without an `objectType` is a revision of nothing, and
-	// is returned by both.
-	// A `page_token` is bound to the mode it was issued in and is rejected by
-	// the other.
+	// Which revisions to return. Schemas are immutable and versioned by URL, so editing one creates a new
+	// revision that shares its `objectType`.
+	//
+	// `all` (the default) returns every revision: the full history an export, an audit or a GitOps diff
+	// needs. `latest` returns the newest revision of each `objectType`, which is one entry per schema.
+	//
+	// A schema stored without an `objectType` is a revision of nothing, and is returned by both.
+	//
+	// A `page_token` is bound to the mode it was issued in and is rejected by the other.
 	Revisions OptListSchemasRevisions `json:",omitempty,omitzero"`
-	// The kind of schema to filter by, read from the stored document's
-	// `kind` property.
-	// `schema-url` is not a kind: it discriminates the create request body,
-	// not a stored schema. A schema registered by URL is stored as whatever
-	// document the URL served, and declares its own kind.
-	// A schema stored without its document being parsed has no kind that
-	// could be read, and is excluded from every filtered result.
+	// The kind of schema to filter by, read from the stored document's `kind` property.
+	//
+	// `schema-url` is not a kind: it discriminates the create request body, not a stored schema. A schema
+	// registered by URL is stored as whatever document the URL served, and declares its own kind.
+	//
+	// A schema stored without its document being parsed has no kind that could be read, and is excluded
+	// from every filtered result.
 	Kind OptListSchemasKind `json:",omitempty,omitzero"`
 	// Extra fields to add onto each returned schema.
 	Expand []SchemaExpand `json:",omitempty"`
@@ -913,10 +891,9 @@ type ListSchemasParams struct {
 type ListUserIdentityLinksParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -927,10 +904,9 @@ type ListUserIdentityLinksParams struct {
 type ListUserPasskeysParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -941,10 +917,9 @@ type ListUserPasskeysParams struct {
 type ListUserTeamsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -953,9 +928,9 @@ type ListUserTeamsParams struct {
 
 // ListVariablesParams is parameters of listVariables operation.
 type ListVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -963,45 +938,45 @@ type ListVariablesParams struct {
 
 // PublishApplicationParams is parameters of publishApplication operation.
 type PublishApplicationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // PublishBrandingParams is parameters of publishBranding operation.
 type PublishBrandingParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // PublishIdpParams is parameters of publishIdp operation.
 type PublishIdpParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // PublishPolicyParams is parameters of publishPolicy operation.
 type PublishPolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // PublishSchemaParams is parameters of publishSchema operation.
 type PublishSchemaParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
@@ -1010,95 +985,94 @@ type PublishSchemaParams struct {
 
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QueryIdpsParams is parameters of queryIdps operation.
 type QueryIdpsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QuerySessionsParams is parameters of querySessions operation.
 type QuerySessionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QueryTeamsParams is parameters of queryTeams operation.
 type QueryTeamsParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // QueryUsersParams is parameters of queryUsers operation.
 type QueryUsersParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // RemoveProjectOriginParams is parameters of removeProjectOrigin operation.
 type RemoveProjectOriginParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // RemoveProjectPreviewParams is parameters of removeProjectPreview operation.
 type RemoveProjectPreviewParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // RevokeMySessionParams is parameters of revokeMySession operation.
 type RevokeMySessionParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // RevokeReleaseParams is parameters of revokeRelease operation.
 type RevokeReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
-	// /releases`) lists.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases`
+	// (`GET /releases`) lists.
 	ReleaseID ReleaseID
 }
 
 // RevokeSessionParams is parameters of revokeSession operation.
 type RevokeSessionParams struct {
-	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
-	// /sessions/exchange`) returns, or that
-	// `querySessions` (`POST /sessions/query`) lists.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff`
+	// (`POST /sessions/exchange`) returns, or that `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
 // RollbackDeploymentParams is parameters of rollbackDeployment operation.
 type RollbackDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -1107,9 +1081,9 @@ type RollbackDeploymentParams struct {
 
 // SearchParams is parameters of search operation.
 type SearchParams struct {
-	// The project to search, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to search the credential's own project with a project
-	// secret, or the projects the person can act on with a session.
+	// The project to search, by the `id` that `createProject` (`POST /projects`) returns. Omit it to
+	// search the credential's own project with a project secret, or the projects the person can act on
+	// with a session.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -1118,17 +1092,16 @@ type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
-	// Standard browser `Origin` header. Selects the deployment whose password
-	// policy applies. Browsers send it automatically; no client action is
-	// required. Absent when the caller is not a browser.
+	// Standard browser `Origin` header. Selects the deployment whose password policy applies. Browsers
+	// send it automatically; no client action is required. Absent when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 // SetVariablesParams is parameters of setVariables operation.
 type SetVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -1136,46 +1109,44 @@ type SetVariablesParams struct {
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.
 type SubmitFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
+	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{flow_id}` path parameter must name that flow, any other id is
-	// refused.
-	// Browsers send this automatically; non-browser clients must capture the
-	// `Set-Cookie` header and resend it.
+	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
+	// other id is refused.
+	//
+	// Browsers send this automatically; non-browser clients must capture the `Set-Cookie` header and
+	// resend it.
 	Zflow string
-	// Standard browser `Origin` header. When a step issues a passkey
-	// challenge, the server derives the WebAuthn relying-party ID and the
-	// allowed origin from this value. An sso submission is bound to it as
-	// well: `return_target` must be on this origin, and the callback route
-	// is built under it (see External sign-in above). Browsers send it
-	// automatically on the fetch POST; no client action is required.
+	// Standard browser `Origin` header. When a step issues a passkey challenge, the server derives the
+	// WebAuthn relying-party ID and the allowed origin from this value. An sso submission is bound to it
+	// as well: `return_target` must be on this origin, and the callback route is built under it (see
+	// External sign-in above). Browsers send it automatically on the fetch POST; no client action is
+	// required.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 // UpdateMyUserParams is parameters of updateMyUser operation.
 type UpdateMyUserParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // UpdateProjectParams is parameters of updateProject operation.
 type UpdateProjectParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -1197,11 +1168,11 @@ type UpdateUserParams struct {
 type VerifyAuthAttemptChallengeParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// The `challenge_id` that `createAuthAttemptChallenge` (`POST
-	// /auth_attempts/{attempt_id}/challenges`) returns.
+	// The `challenge_id` that `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`)
+	// returns.
 	ChallengeID ChallengeID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }

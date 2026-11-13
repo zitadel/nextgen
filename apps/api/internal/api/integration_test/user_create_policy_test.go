@@ -86,8 +86,8 @@ func TestUserCreatePolicy(t *testing.T) {
 			GateProofs: currentSignupProofs(t, client, start.Response.ID, cookie),
 		}, api.SubmitFlowStepParams{FlowID: start.Response.ID, Zflow: cookie})
 		require.NoError(t, err)
-		require.IsType(t, &api.SubmitFlowStepOK{}, done, helpers.MustMarshal(t, done))
-		assert.Equal(t, "done", done.(*api.SubmitFlowStepOK).Response.Step.Name)
+		require.IsType(t, &api.FlowResponseHeaders{}, done, helpers.MustMarshal(t, done))
+		assert.Equal(t, "done", done.(*api.FlowResponseHeaders).Response.Step.Name)
 	})
 }
 

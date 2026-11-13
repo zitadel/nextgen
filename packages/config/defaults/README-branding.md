@@ -8,12 +8,13 @@ application, not in this template.
 
 ## Workflow
 
-1. Edit `login.liquid` (and `branding.json` for the logo URL).
+1. Edit `login.liquid` (and `branding.json` for logos, colours and fonts).
 2. `zitadel deploy --dry-run` — validates the template (LiquidJS parse, banned
    patterns, the required `{% mandatory_gates %}` tag) and shows the diff
    against what is live, without publishing anything.
 3. `zitadel deploy` — builds `.zitadel/` into an immutable release and makes it
-   live. The login UI picks up the newest release on the next step response.
+   live. A login that starts after the deploy uses the new release. A login
+   already open keeps the release it started with.
 
 A deploy of changed content publishes a new immutable release; there is no
 in-place update. Unchanged content is deduplicated and reuses the existing
@@ -32,7 +33,10 @@ release rather than publishing another. Roll back a deployment with
 
 ## Make it yours
 
-- Brand asset URLs go in `branding.json` and must use `https://`. Each template
+- Brand asset URLs go in `branding.json` and must use `https://`. While you
+  develop, image URLs may also use `http://` on `localhost`, a `127.x.x.x`
+  address or `[::1]`. The login shows them only when its own page is served
+  over `http://` on one of those hosts. `typography.font_url` always needs `https://`. Each template
   decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
   none until you add it to `login.liquid`. Set the typeface with
   `typography.font_family`. `typography.font_url` is loaded when the component
@@ -51,9 +55,35 @@ release rather than publishing another. Roll back a deployment with
   }
   ```
 
+  For a light and a dark look, give each side under `theme` its own logo.
+  Each side also takes a `palette` of colours.
+
+  ```json
+  {
+    "$schema": "../meta/branding.json",
+    "layout": "centered",
+    "liquid_template": { "$file": "./login.liquid" },
+    "theme": {
+      "mode": "auto",
+      "light": { "logo_url": "https://example.com/logo-on-light.svg" },
+      "dark": { "logo_url": "https://example.com/logo-on-dark.svg" }
+    }
+  }
+  ```
+
+  Set a logo on both sides or on neither. A side without its own `logo_url`
+  shows no logo, and the top-level `logo_url` applies only when neither side
+  sets one. `theme.mode` (`light`, `dark` or `auto`) picks the side, but the
+  component's `theme` attribute wins over it. A branding that sets only one
+  side always shows that side. Neither `theme.mode` nor the `theme` attribute
+  can change it.
+
+  Guide: https://preview.zitadel.com/docs/guides/customize-design
+
   A well-formed URL that serves nothing is the one branding mistake nothing
   else catches — it passes validation, publishes a revision, and then renders
-  as an invisible image. So `zitadel deploy --dry-run` probes `logo_url` and `hero_url` and warns
+  as an invisible image. So `zitadel deploy --dry-run` probes the top-level
+  `logo_url` and `hero_url` (not the logos under `theme`) and warns
   (never fails) when it is unreachable, bodyless, or not an image, and the
   login UI hides an asset that fails to load, restoring the shipped design's
   no-asset content rather than leaving a gap. If the host is only

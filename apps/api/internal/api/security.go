@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -215,6 +216,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetFlowDefinitionOperation:     true,
 	api.ListBrandingOperation:          true,
 	api.GetBrandingOperation:           true,
+	api.GetOAuthSettingsOperation:      true,
 	api.QueryIdpsOperation:             true,
 	api.GetIdpOperation:                true,
 	api.GetIdpRevisionOperation:        true,
@@ -304,37 +306,17 @@ type requestHostKey struct{}
 
 // WithRequestHostMiddleware injects the effective request proto+host into the
 // context so handlers can derive a WebAuthn RPID even when the browser omits
-// the Origin header (same-origin fetches). A chain of proxies may send either
-// forwarded header as a comma-separated list; its first entry is the one the
-// client's request arrived with.
+// the Origin header (same-origin fetches). The origin is the one the client's
+// request arrived at, read as httputil.ForwardedOrigin does.
 func WithRequestHostMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proto := firstForwarded(r.Header.Get("X-Forwarded-Proto"))
-		if proto == "" {
-			if r.TLS != nil {
-				proto = "https"
-			} else {
-				proto = "http"
-			}
-		}
-		host := firstForwarded(r.Header.Get("X-Forwarded-Host"))
-		if host == "" {
-			host = r.Host
-		}
-		if host != "" {
-			ctx := context.WithValue(r.Context(), requestHostKey{}, proto+"://"+host)
+		if origin := httputil.ForwardedOrigin(r); origin != "" {
+			ctx := context.WithValue(r.Context(), requestHostKey{}, origin)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// firstForwarded returns the first entry of a forwarded header that proxies
-// may have appended to ("a.example, b.internal").
-func firstForwarded(value string) string {
-	first, _, _ := strings.Cut(value, ",")
-	return strings.TrimSpace(first)
 }
 
 func requestOriginFromContext(ctx context.Context) (string, bool) {

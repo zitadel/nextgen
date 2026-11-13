@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/api/zitadel";
-import { CARD_ACTION_BUTTON, DetailRow, DetailSection } from "@/components/detail-page";
+import { CARD_ACTION_BUTTON, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FORM_DIALOG_BODY, FormDialog, FormDialogFooter } from "@/components/form-dialog";
 import { SHEET_CHOICE_CARD } from "@/components/form-sheet";
@@ -90,7 +90,7 @@ export function ProjectOrigins({
           No origins yet. Only a loopback origin is admitted until the first pattern is added.
         </p>
       ) : (
-        <ul className="flex flex-col">
+        <DetailRows as="ul">
           {rows.map((origin) => (
             <OriginRow
               key={origin.pattern}
@@ -100,7 +100,7 @@ export function ProjectOrigins({
               onChanged={onChanged}
             />
           ))}
-        </ul>
+        </DetailRows>
       )}
       <div className="flex justify-end">
         <OriginDialog
@@ -150,7 +150,7 @@ function OriginRow({
   const isPattern = origin.pattern.includes("*");
 
   return (
-    <DetailRow as="li" align="center" divider label={KIND_LABEL[origin.kind]}>
+    <DetailRow align="center" label={KIND_LABEL[origin.kind]}>
       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {isPattern ? (

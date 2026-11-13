@@ -1269,6 +1269,106 @@ func decodeCompleteUserPasskeyRegistrationResponse(resp *http.Response) (res Com
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
+	case 429:
+		// Code 429.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response TooManyRequests
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			var wrapper TooManyRequestsHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Retry-After" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Retry-After",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Retry-After header")
+				}
+			}
+			return &wrapper, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
 	case 500:
 		// Code 500.
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -2072,6 +2172,7 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -6149,6 +6250,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -6285,6 +6387,106 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				return res, err
 			}
 			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 429:
+		// Code 429.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response TooManyRequests
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			var wrapper TooManyRequestsHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Retry-After" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Retry-After",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Retry-After header")
+				}
+			}
+			return &wrapper, nil
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
@@ -8479,6 +8681,124 @@ func decodeGetMyUserSchemaResponse(resp *http.Response) (res GetMyUserSchemaRes,
 				return res, err
 			}
 			return &GetMyUserSchemaErrorResponseStatusCode{
+				StatusCode: resp.StatusCode,
+				Response:   response,
+			}, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	}()
+	if err != nil {
+		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
+	}
+	return res, nil
+}
+
+func decodeGetOAuthSettingsResponse(resp *http.Response) (res GetOAuthSettingsRes, _ error) {
+	switch resp.StatusCode {
+	case 200:
+		// Code 200.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response OAuthSettingsRevisionResponse
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 404:
+		// Code 404.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response ErrorDetails
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	}
+	// Default response.
+	res, err := func() (res GetOAuthSettingsRes, err error) {
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response GetOAuthSettingsErrorResponse
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			return &GetOAuthSettingsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -17880,6 +18200,106 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
+	case 429:
+		// Code 429.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response TooManyRequests
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			var wrapper TooManyRequestsHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Retry-After" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Retry-After",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Retry-After header")
+				}
+			}
+			return &wrapper, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
 	case 500:
 		// Code 500.
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -18095,7 +18515,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepOK
+			var wrapper FlowResponseHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
@@ -18144,6 +18564,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -18192,7 +18613,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowResponse
+			var response SubmitFlowStepBadRequest
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -18218,7 +18639,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepBadRequest
+			var wrapper SubmitFlowStepBadRequestHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
@@ -18267,6 +18688,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -18333,6 +18755,106 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				return res, err
 			}
 			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 429:
+		// Code 429.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response TooManyRequests
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			var wrapper TooManyRequestsHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Retry-After" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Retry-After",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Retry-After header")
+				}
+			}
+			return &wrapper, nil
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
@@ -19458,6 +19980,106 @@ func decodeVerifyAuthAttemptChallengeResponse(resp *http.Response) (res VerifyAu
 				return res, err
 			}
 			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 429:
+		// Code 429.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response TooManyRequests
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			var wrapper TooManyRequestsHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Retry-After" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Retry-After",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Retry-After header")
+				}
+			}
+			return &wrapper, nil
 		default:
 			return res, validate.InvalidContentType(ct)
 		}

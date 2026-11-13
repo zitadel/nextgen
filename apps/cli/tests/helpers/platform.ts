@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
@@ -165,6 +166,15 @@ export interface PlatformMock {
    * @returns The pattern it will answer with.
    */
   admitsAHostileOriginPattern(): string;
+
+  /**
+   * Answers a release build with a content hash holding a terminal escape
+   * sequence, before the colon that names its algorithm, which is the part a
+   * shortened hash keeps whole.
+   *
+   * @returns The hash it will answer with.
+   */
+  buildsAReleaseWithAHostileHash(): string;
 
   /**
    * Answers a release revoke with an id holding a terminal escape sequence.
@@ -443,7 +453,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     servesAHostileOrigin() {
-      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const origin = `${PRIMARY_ORIGIN}\u001b[2Jwiped`;
       const deployment = (id: string) => {
         return {
           id,
@@ -480,6 +490,22 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return origin;
+    },
+
+    buildsAReleaseWithAHostileHash() {
+      const hash = `sha256\u001b[2Jwiped:${"a".repeat(64)}`;
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({
+            id: "rel_1",
+            project_id: "proj_1",
+            content_hash: hash,
+            created_at: "2026-01-01T00:00:00Z",
+            revoked_at: null,
+          });
+        }),
+      );
+      return hash;
     },
 
     revokesAHostileReleaseId() {

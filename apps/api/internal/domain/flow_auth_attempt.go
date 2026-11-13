@@ -54,6 +54,7 @@ type FlowAuthAttemptService interface {
 // default when pinned.
 type FlowCreateAttemptInput struct {
 	ProjectID      string
+	FlowID         string
 	SessionID      *string
 	RequiredChecks []AuthCheckType
 }
@@ -62,12 +63,15 @@ type FlowCreateAttemptInput struct {
 // (AttributeName, e.g. "email") and the user-entered value the
 // auth-attempt service resolves to a user. UserSchemaURL is the schema the
 // flow is bound to: the lookup matches only users of its revisions.
+// Register is set when the flow is signing someone up: the lookup then asks
+// whether the identifier is free, and no match is not a failed sign-in.
 type FlowSubmitIdentifierInput struct {
 	ProjectID     string
 	AttemptID     string
 	AttributeName string
 	Value         string
 	UserSchemaURL string
+	Register      bool
 }
 
 type FlowSubmitPasswordInput struct {

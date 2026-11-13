@@ -1,7 +1,7 @@
 import { api } from "@/api/zitadel";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
-import { eventsQuery, type ProjectEvent, type EventsSearch } from "./model";
+import { eventsQuery, type EventsSearch, inOccurrenceOrder, type ProjectEvent } from "./model";
 
 /** One page of a project's events, newest first. */
 interface EventPage {
@@ -65,25 +65,47 @@ export async function listNewerEvents(
   return { items: answer.data, nextPageToken: answer.next_page_token ?? undefined };
 }
 
-/** How many of one request's events its panel lists. */
-const REQUEST_EVENTS_LIMIT = 50;
+/** How many events of one request or login flow the panel lists. */
+const TIMELINE_EVENTS_LIMIT = 50;
+
+/** The events an event belongs with, in the order they happened; `more` says there are others. */
+export interface EventTimeline {
+  items: ProjectEvent[];
+  more: boolean;
+}
 
 /**
  * One request's events in the order they happened, at most
- * {@link REQUEST_EVENTS_LIMIT}: the API call and the changes and sign-ins it
+ * {@link TIMELINE_EVENTS_LIMIT}: the API call and the changes and sign-ins it
  * made. One range of the request index; `more` says the request holds others.
  */
 export async function listRequestEvents(
   projectId: string,
   requestId: string,
-): Promise<{ items: ProjectEvent[]; more: boolean }> {
+): Promise<EventTimeline> {
   const answer = await api.listEvents({
     project_id: projectId,
     request_id: requestId,
     order: "asc",
-    limit: REQUEST_EVENTS_LIMIT,
+    limit: TIMELINE_EVENTS_LIMIT,
   });
-  return { items: answer.data, more: Boolean(answer.next_page_token) };
+  return { items: inOccurrenceOrder(answer.data), more: Boolean(answer.next_page_token) };
+}
+
+/**
+ * One login flow's events in the order they happened, at most
+ * {@link TIMELINE_EVENTS_LIMIT}: every API call of the sign-in or sign-up, the
+ * checks they made, and the session and token it ended in. One range of the
+ * flow index; `more` says the flow holds others.
+ */
+export async function listFlowEvents(projectId: string, flowId: string): Promise<EventTimeline> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    flow_id: flowId,
+    order: "asc",
+    limit: TIMELINE_EVENTS_LIMIT,
+  });
+  return { items: inOccurrenceOrder(answer.data), more: Boolean(answer.next_page_token) };
 }
 
 /** One event of the project. An id the project does not hold is a 404. */

@@ -133,7 +133,7 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 });
 
 export { expect } from "@playwright/test";
-export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
+export { applyAppEnvTemplate, nextAppEnv, viteAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
 export {
   clickFlowAction,

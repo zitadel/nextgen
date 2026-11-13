@@ -33,6 +33,9 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	if v, ok := params.ActorID.Get(); ok {
 		req.ActorID = v
 	}
+	if v, ok := params.UserID.Get(); ok {
+		req.UserID = v
+	}
 	if v, ok := params.ClientID.Get(); ok {
 		req.ClientID = v
 	}

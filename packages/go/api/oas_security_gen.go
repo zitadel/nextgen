@@ -15,21 +15,21 @@ type SecuritySource interface {
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
 	// SessionCookie provides sessionCookie security value.
 	// The session cookie issued at session creation or superseding handoff exchange.
-	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
-	// http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
-	// as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
-	// keeps it, and accepts that name there too; `__Host-zitadel_session` takes
-	// precedence. A program sends `__Host-zitadel_session` over any transport.
+	//
+	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain http to a loopback host
+	// (`localhost`, `127.0.0.1`, `::1`) the server sets it as `zitadel_session` instead, without `Secure`
+	// or the prefix, so that Safari keeps it, and accepts that name there too; `__Host-zitadel_session`
+	// takes precedence. A program sends `__Host-zitadel_session` over any transport.
+	//
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
 	// `Missing or invalid session token.`
-	// Cross-site request forgery (CSRF) protection: a state-changing request that
-	// this cookie authenticates must come from the same origin. A cross-site
-	// browser request is refused with `403` and code `auth.csrf_invalid`. Every
-	// such request must also send the session's token from `GET /sessions/me/csrf`
-	// in the `X-Zitadel-CSRF` header, or it answers the same `403`. The only
-	// exceptions are the `POST …/query` reads and `POST /invitations/lookup`,
-	// which need no token. Safe methods (`GET`) are not checked. A request a
-	// project secret authenticates is not affected.
+	//
+	// Cross-site request forgery (CSRF) protection: a state-changing request that this cookie
+	// authenticates must come from the same origin. A cross-site browser request is refused with `403` and
+	// code `auth.csrf_invalid`. Every such request must also send the session's token from
+	// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header, or it answers the same `403`. The only
+	// exceptions are the `POST …/query` reads and `POST /invitations/lookup`, which need no token. Safe
+	// methods (`GET`) are not checked. A request a project secret authenticates is not affected.
 	SessionCookie(ctx context.Context, operationName OperationName) (SessionCookie, error)
 }
 
@@ -130,6 +130,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetInvitationOperation: []string{
 		"project.write",
+	},
+	GetOAuthSettingsOperation: []string{
+		"oauth_settings.read",
 	},
 	GetPolicyOperation: []string{
 		"policy.read",
@@ -340,6 +343,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
 	GetMyUserSchemaOperation:       []string{},
+	GetOAuthSettingsOperation:      []string{},
 	GetPolicyOperation:             []string{},
 	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},

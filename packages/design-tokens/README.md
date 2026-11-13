@@ -64,14 +64,14 @@ A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
 CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
 runs on push to that branch under `figma-export/**` → **merges `main` into
 `design-tokens/figma-sync`** (so the long-lived branch cannot go stale) →
-`:sync-export` → `:generate` → commits generated artifacts **on top of** the
+`sync:export` → `generate` → commits generated artifacts **on top of** the
 plugin's `figma-export` commits (no rebase/force-push) → opens or **updates
-one PR** titled `chore: sync tokens from Figma` → `:test` as a **hard gate**.
+one PR** titled `chore: sync tokens from Figma` → `test` as a **hard gate**.
 The snapshot test runs after the PR is opened (so a legitimate rename still
 surfaces its diff for review) but is no longer `continue-on-error`, so a name
 change turns the PR check red instead of merging silently.
 
-`:sync-export` is intentionally **file-name agnostic**: it reads every `*.json`
+`sync:export` is intentionally **file-name agnostic**: it reads every `*.json`
 under `figma-export/`, builds one registry of leaf values, resolves every
 `{alias}` (cross-collection and per-mode) to a concrete value, and **fails loud**
 if any reference is unresolved or the themed colour surface comes out empty.
@@ -83,9 +83,9 @@ treated as a bug, not a warning.
 REST sync via `workflow_dispatch` with `figma-rest`, or locally:
 
 ```sh
-FIGMA_TOKEN=... moon run design-tokens:sync
-moon run design-tokens:generate
-moon run design-tokens:test
+FIGMA_TOKEN=... turbo run sync --filter=@zitadel/design-tokens
+turbo run generate --filter=@zitadel/design-tokens
+turbo run test --filter=@zitadel/design-tokens
 ```
 
 Sync **never** commits to `main` directly.
@@ -100,7 +100,7 @@ Sync **never** commits to `main` directly.
 - **Resolver unit test.** `src/sync-from-export.spec.ts` covers alias
   resolution, base-group flattening, concrete-wins conflicts, and fail-loud
   behaviour, and re-runs the resolver against the real checked-in exports.
-- **Fail-loud ingest.** `:sync-export` throws on any unresolved reference or
+- **Fail-loud ingest.** `sync:export` throws on any unresolved reference or
   an empty colour surface, so a broken designer push stops the workflow before
   it can open a PR with silently-dropped tokens.
 - **Declared roles.** `src/collections.ts` says what each Figma collection is
@@ -136,8 +136,8 @@ packages/design-tokens/
 │   │                                   container widths (committed)
 │   ├── tokens.snapshot.spec.ts       ← public-name guard
 │   ├── sync-from-export.spec.ts      ← resolver unit + real-export test
-│   └── generated/                    ← all committed; built by `:generate`
-│       ├── figma.tokens.json         ← resolved shadcn surface (written by :sync-export)
+│   └── generated/                    ← all committed; built by `generate`
+│       ├── figma.tokens.json         ← resolved shadcn surface (written by sync:export)
 │       ├── tokens.css
 │       ├── tokens.ts
 │       ├── tailwind.css
@@ -157,20 +157,21 @@ variables of its own.
 ## Adding a new token
 
 1. Add the variable in Figma → publish the library.
-2. Push from the Community sync plugin (or run `:sync-export` locally if you
+2. Push from the Community sync plugin (or run `sync:export` locally if you
    have a committed export under `figma-export/`). If the variable landed in a
    **new collection**, the sync stops until you give it a role in
    `src/collections.ts` — that is deliberate.
-3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
-   Update the snapshot if the new name is intentional.
+3. Run `turbo run generate --filter=@zitadel/design-tokens`, then
+   `turbo run test --filter=@zitadel/design-tokens`. Update the snapshot if
+   the new name is intentional.
 4. Commit `figma.tokens.json`, `tokens.{css,ts}`, `tailwind.css`, and
    `shadcn.css` together in the sync PR.
 
 For Enterprise REST sync instead: bump `figma-tokens.lock.version`, run
-`:sync`, then `:generate` and `:test`.
+`sync`, then `generate` and `test`.
 
 For values Figma doesn't own (typography stacks, motion, etc.), edit
-`src/overrides.ts` and re-run `:generate`.
+`src/overrides.ts` and re-run `generate`.
 
 ## Why not Style Dictionary / Tokens Studio?
 

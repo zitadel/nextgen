@@ -51,7 +51,7 @@ export default defineConfig({
     hooks: {
       // The operations as data (`src/generated/operations.ts`), which the
       // endpoints above carry only as code. Run as a hook, it reads the spec
-      // inside this task and under its `generated-sources` lock.
+      // inside this task.
       afterAllFilesWrite: writeOperations,
     },
   },

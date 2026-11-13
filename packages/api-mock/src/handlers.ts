@@ -18,7 +18,6 @@ import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
  */
 import {
   getCreateFlowMockHandler,
-  getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
@@ -26,6 +25,7 @@ import type {
   CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
+  ExchangeHandoff200,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
@@ -171,6 +171,37 @@ function returnTargetRefusal(
     };
   }
   return { target: parsed.href };
+}
+
+/**
+ * The spec's project-id pattern, written out. This file runs in the browser
+ * (Storybook, the docs' live examples), and importing it from orval's zod
+ * module would build every schema there, whose `new Function` probe a strict
+ * CSP reports as an eval. Keep validators out of the handlers' import graph.
+ */
+const PROJECT_ID = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * The session an in-process exchange answers with: active, with the verified
+ * factor a completed sign-in leaves, and ids in the spec's patterns. The
+ * project is the one the request names, when it is a valid project id.
+ */
+function exchangedSession(projectId: string | undefined): ExchangeHandoff200 {
+  const created = new Date();
+  const expires = new Date(created.getTime() + 3600 * 1000);
+  return {
+    session: {
+      session_id: "sess_mock",
+      project_id: projectId && PROJECT_ID.test(projectId) ? projectId : "proj_mock",
+      state: "active",
+      user_id: "user_mock",
+      factors: [{ method: "password", verified_at: created.toISOString() }],
+      assurance_levels: [],
+      created_at: created.toISOString(),
+      expires_at: expires.toISOString(),
+    },
+    session_token: "mock-session-token",
+  };
 }
 
 /**
@@ -671,7 +702,7 @@ export function setupMockHandlers(
           { status: 503 },
         );
       }
-      return HttpResponse.json(getExchangeHandoffResponseMock());
+      return HttpResponse.json(exchangedSession(projectId));
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
     // mount and on sign-out. In-process there is no session cookie to present,

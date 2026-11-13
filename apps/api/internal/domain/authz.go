@@ -43,6 +43,8 @@ const (
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"
 	ResourceKindPolicy         ResourceKind = "policy"
+	ResourceKindApplication    ResourceKind = "application"
+	ResourceKindOAuthSettings  ResourceKind = "oauth_settings"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -108,6 +110,15 @@ const (
 )
 
 func (k AuthzRelationKind) String() string { return string(k) }
+
+// PrincipalUserID is the user the assignment grants to; empty when its
+// principal is not a user.
+func (a *AuthzAssignment) PrincipalUserID() string {
+	if a.PrincipalType != AuthzPrincipalTypeUser {
+		return ""
+	}
+	return a.PrincipalID
+}
 
 // AuthzPrincipalType is authz_assignments.principal_type (no project principals; see D13).
 type AuthzPrincipalType string

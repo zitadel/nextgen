@@ -108,7 +108,9 @@ describe("validateConnections", () => {
 
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
-        nextCommands: ["variable set ACME_CLIENT_SECRET --secret --env staging"],
+        nextCommands: [
+          expect.stringMatching(/ variable set ACME_CLIENT_SECRET --secret --env staging$/),
+        ],
       });
     });
 
@@ -203,7 +205,11 @@ describe("validateConnections", () => {
 
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
-        nextCommands: ["variable set ACME_CLIENT_SECRET --secret --preview --env staging"],
+        nextCommands: [
+          expect.stringMatching(
+            / variable set ACME_CLIENT_SECRET --secret --preview --env staging$/,
+          ),
+        ],
       });
     });
 

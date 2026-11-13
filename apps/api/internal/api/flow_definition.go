@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strings"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -139,7 +138,6 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 		ProjectID:     string(req.GetProjectID()),
 		Name:          definition.GetName(),
 		UserSchema:    definition.GetUserSchema(),
-		Status:        strings.ToLower(string(definition.GetStatus())),
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -303,7 +301,6 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefi
 		ProjectID: flowDefinition.ProjectID,
 		FlowDefinition: api.FlowDefinition{
 			Name:       flowDefinition.Name,
-			Status:     api.FlowDefinitionStatus(flowDefinition.Status.String()),
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,

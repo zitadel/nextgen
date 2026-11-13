@@ -22,7 +22,7 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` plus active `status`:
+- Audience-based resolution by `purpose` over the revisions the release pins:
   `user_schema_id` is a hard filter, then candidates score app match > team
   match > project-wide > a definition scoped elsewhere. Equal scores prefer
   newer `created_at`, then the higher ID.
@@ -31,7 +31,6 @@ to be a fast answer to "can I build flow X right now?"
 ### Definitions
 
 - `FlowDefinitionStatements` over Postgres, Spanner, and SQLite (the storage layer).
-- API-exposed status values: `draft`, `active`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 
 ### Steps & state machine

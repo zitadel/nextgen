@@ -1,4 +1,5 @@
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -152,7 +153,11 @@ describe("local admin", () => {
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
+      nextCommands: [
+        `rm ${LOCAL_ADMIN_FILE}`,
+        { id: "reset", flags: { force: true } },
+        { id: "start" },
+      ],
     });
     expect((error as { hint: string }).hint).toContain("Both are needed");
   });

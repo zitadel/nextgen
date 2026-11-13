@@ -139,6 +139,9 @@ const (
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
+	EventTypeApplicationCreated EventType = "application.created"
+	EventTypeApplicationUpdated EventType = "application.updated"
+
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
 
@@ -182,6 +185,11 @@ type Event struct {
 
 	EntityType *string
 	EntityID   *string
+
+	// UserID is the user the event concerns, whoever acted: the user a
+	// session, a token, a sign-in check or a credential belongs to, and the
+	// user a change was made to. Nil on an event that concerns no user.
+	UserID *string
 
 	ClientID       string
 	TokenID        string
@@ -263,6 +271,7 @@ const (
 	EventFieldFlowID
 	EventFieldOperationStatus
 	EventFieldStatusClass
+	EventFieldUserID
 )
 
 func ErrEventNotFound() Error {

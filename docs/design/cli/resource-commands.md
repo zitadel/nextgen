@@ -26,7 +26,7 @@ zitadel <resource> delete  <id> [--force]
 ```
 
 The verbs are generated from one registry
-(`apps/cli/src/commands/resources.ts`)
+(`apps/cli/src/cli/commands/resources.ts`)
 by a platform-agnostic factory
 (`apps/cli/src/lib/oclif/crud/`).
 The registry names the client call per verb, the id field, the table columns,

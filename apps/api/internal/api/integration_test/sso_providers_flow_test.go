@@ -64,7 +64,6 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 func ssoLoginFlowDefinition(userSchema string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "sso-login",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
 		Steps: []api.FlowDefinitionStep{

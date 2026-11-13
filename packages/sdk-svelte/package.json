@@ -34,9 +34,7 @@
     "build": "vite build && attw --pack . --profile=esm-only",
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
     "prepack": "publint --strict"
   },
   "dependencies": {
@@ -54,6 +52,7 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/client-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",

@@ -25,7 +25,6 @@ const SCHEMAS_URL = "http://localhost/api/v1/schemas";
  */
 const DEFINITION = {
   name: "default-login",
-  status: "active",
   user_schema: "human-user",
   purposes: { register: "register", login: "identifier" },
   steps: [
@@ -100,29 +99,6 @@ describe("login flows list", () => {
     expect(schema).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
   });
 
-  it("marks a draft flow and leaves an active one unmarked", async () => {
-    const draft = {
-      ...DETAIL_RESPONSE,
-      id: "flow_2",
-      flow_definition: { ...DEFINITION, name: "passkey-login", status: "draft" },
-      user_schema: SCHEMA_EMBED,
-    };
-    server.use(
-      http.get(FLOWS_URL, () =>
-        HttpResponse.json({
-          flow_definitions: [{ ...DETAIL_RESPONSE, user_schema: SCHEMA_EMBED }, draft],
-        }),
-      ),
-    );
-    await renderAt("/flow-definitions");
-
-    // Only the draft is marked: the engine picks the newest *active*
-    // definition, so an all-active list stays exactly as the design draws it.
-    await screen.findByRole("link", { name: "Default login" });
-    expect(screen.getByText("Draft")).toBeInTheDocument();
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
-  });
-
   it("asks for the embedded user schema", async () => {
     const seen: string[] = [];
     server.use(
@@ -193,7 +169,7 @@ describe("login flows list", () => {
 });
 
 describe("login flow detail", () => {
-  it("renders the steps table, the schema badge and the flow id", async () => {
+  it("renders the steps table, the schema card and the flow id", async () => {
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
       http.get(SCHEMAS_URL, () => HttpResponse.json(schemasResponse())),
@@ -201,10 +177,18 @@ describe("login flow detail", () => {
     await renderAt("/flow-definitions/flow_1");
 
     expect(await screen.findByRole("heading", { name: "Default login" })).toBeInTheDocument();
+    // The card is titled by the schema the flow signs into: its name opens it,
+    // and the revision it resolves to sits beside it.
+    expect(screen.getByRole("heading", { level: 2, name: "User schema" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Minimal" })).toHaveAttribute(
       "href",
       scopedPath("/schemas/sch_1"),
     );
+    expect(screen.getByRole("link", { name: "Minimal sch_1" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_1"),
+    );
+    expect(screen.getByRole("table", { name: "Steps" })).toBeInTheDocument();
     expect(screen.getByText("flow_1")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "submit, passkey" })).toBeInTheDocument();
     // A terminal step collects nothing and offers nothing.
@@ -234,7 +218,7 @@ describe("login flow detail", () => {
     expect(queries[0]?.get("revisions")).toBe("latest");
   });
 
-  it("drops the schema badge when the schema cannot be read", async () => {
+  it("names the schema by its object type when the schema cannot be read", async () => {
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
       http.get(SCHEMAS_URL, () =>
@@ -243,9 +227,10 @@ describe("login flow detail", () => {
     );
     await renderAt("/flow-definitions/flow_1");
 
-    // The screen still renders — the badge is decoration on a route that is
-    // useful without it.
+    // The screen still renders, naming the schema as the flow does, with no
+    // link or revision to offer.
     expect(await screen.findByRole("heading", { name: "Default login" })).toBeInTheDocument();
     expect(screen.queryByText("Minimal")).not.toBeInTheDocument();
+    expect(screen.getByText("human-user")).toBeInTheDocument();
   });
 });

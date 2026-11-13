@@ -1,24 +1,22 @@
-import { Args, type Config, Flags } from "@oclif/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-}));
-
-import { confirm } from "@clack/prompts";
+import { Args, type Config, Flags, type Interfaces } from "@oclif/core";
+import { describe, expect, it, vi } from "vitest";
 
 import { Consent } from "@/lib/consent";
 import { BaseCommand } from "@/lib/oclif/base";
 import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
 import type { CommandResult } from "@/lib/oclif/types";
+import { answering } from "@tests/helpers/keyboard";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const GATE: Omit<DestructiveChange, "apply"> = {
+const GATE: Omit<DestructiveChange<string | undefined>, "apply"> = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",
-  preview: () => ({ status: "ok", data: { dry_run: true } }),
+  preview: () => ({
+    status: "ok",
+    data: { dry_run: true },
+    summary: { title: "Done", sections: [] },
+  }),
 };
 
 /** How a run was invoked: its arguments, and who can answer. */
@@ -34,8 +32,10 @@ type Invocation = {
 /** A destructive command that records what its act was handed. */
 class Removing extends Destructive(BaseCommand) {
   public static override readonly id: string = "variable:rm";
+  // Drawn, so a question is clack's prompt, which is the one these tests answer.
+  public static override wizard: boolean | undefined = true;
   public static override readonly args = { name: Args.string() };
-  public static override readonly flags = {
+  public static override readonly flags: Interfaces.FlagInput = {
     force: Flags.boolean({ char: "f" }),
     preview: Flags.boolean(),
     env: Flags.string(),
@@ -77,7 +77,7 @@ class Removing extends Destructive(BaseCommand) {
       apply: async (consent, ready) => {
         this.acted.push(consent);
         this.ready.push(ready);
-        return { status: "ok", data: { acted: true } };
+        return { status: "ok", data: { acted: true }, summary: { title: "Done", sections: [] } };
       },
     });
   }
@@ -89,16 +89,31 @@ class Unnamed extends Removing {
   public static override readonly args = Removing.args;
 }
 
-afterEach(() => {
-  vi.mocked(confirm).mockReset();
-});
+/** A destructive command that declares no `--force` for its retry to set. */
+class Forceless extends Removing {
+  public static override readonly flags = {
+    preview: Flags.boolean(),
+    env: Flags.string(),
+    message: Flags.string(),
+  };
+}
 
 describe("Destructive", () => {
   describe("confirmed", () => {
+    it("refuses to ask in a command that declares no --force", async () => {
+      const error = await rejectionOf(() => {
+        return new Forceless({ force: true }).remove();
+      });
+
+      expect(error).toMatchObject({
+        message: "variable:rm declares no --force, which it reruns with",
+      });
+    });
+
     it("answers a dry run with the preview", async () => {
       const command = new Removing({ dryRun: true });
 
-      expect(await command.remove()).toEqual({ status: "ok", data: { dry_run: true } });
+      expect(await command.remove()).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
     it("never acts on a dry run, even with --force", async () => {
@@ -110,9 +125,11 @@ describe("Destructive", () => {
     });
 
     it("never asks on a dry run", async () => {
+      const talk = answering(true);
+
       await new Removing({ dryRun: true, interactive: true }).remove();
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("acts with consent when --force is given", async () => {
@@ -124,14 +141,14 @@ describe("Destructive", () => {
     });
 
     it("answers with what the act returned", async () => {
-      expect(await new Removing({ force: true }).remove()).toEqual({
+      expect(await new Removing({ force: true }).remove()).toMatchObject({
         status: "ok",
         data: { acted: true },
       });
     });
 
     it("acts with consent when the person says yes", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+      answering(true);
       const command = new Removing({ interactive: true });
 
       await command.remove();
@@ -140,16 +157,17 @@ describe("Destructive", () => {
     });
 
     it("is skipped as <verb>-cancelled when the person says no", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
 
-      expect(await new Removing({ interactive: true }).remove()).toEqual({
+      expect(await new Removing({ interactive: true }).remove()).toMatchObject({
         status: "skipped",
         reason: "remove-cancelled",
+        summary: { title: "Cancelled" },
       });
     });
 
     it("does not act when the person says no", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
       const command = new Removing({ interactive: true });
 
       await command.remove();
@@ -214,18 +232,23 @@ describe("Destructive", () => {
     });
 
     it("prepares before it asks", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
-      const prepare = vi.fn(async () => "read");
+      const talk = answering(false);
+      const askedWhenPrepared: number[] = [];
 
-      await new Removing({ interactive: true }).remove(prepare);
+      await new Removing({ interactive: true }).remove(async () => {
+        askedWhenPrepared.push(talk.asked().length);
+        return "read";
+      });
 
-      expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(
-        vi.mocked(confirm).mock.invocationCallOrder[0] ?? 0,
-      );
+      expect(askedWhenPrepared).toEqual([0]);
     });
 
     it("ends the run with a settled result, without asking", async () => {
-      const settled = { status: "skipped", reason: "not-live" } as const;
+      const settled = {
+        status: "skipped",
+        reason: "not-live",
+        summary: { title: "Done", sections: [] },
+      } as const;
 
       expect(
         await new Removing({ interactive: true }).remove(async () => new Settled(settled)),
@@ -233,11 +256,18 @@ describe("Destructive", () => {
     });
 
     it("does not ask when prepare settles the run", async () => {
+      const talk = answering(true);
+
       await new Removing({ interactive: true }).remove(
-        async () => new Settled({ status: "skipped", reason: "not-live" }),
+        async () =>
+          new Settled({
+            summary: { title: "Done", sections: [] },
+            status: "skipped",
+            reason: "not-live",
+          }),
       );
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("leaves a URL's credentials out of the suggestion", async () => {

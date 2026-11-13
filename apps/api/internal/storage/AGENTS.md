@@ -13,7 +13,9 @@ the one-database rule `stmttest` runs under.
   brings up Postgres and Spanner for integration tests (testcontainers or env
   DSNs).
 - List a new package whose `spanner_integration` tests open a database in
-  `server:test-spanner` (`apps/server/moon.yml` and its `package.json` twin).
+  the `test:spanner` script of `apps/server/package.json`.
+- List a new package with `postgres_integration` or `sqlite_integration` tests
+  in `test:postgres` or `test:sqlite`; `TestDatabaseLanesListEveryTaggedPackage` fails otherwise.
 
 ## Identifier minting
 
@@ -93,6 +95,9 @@ dialects the build tags bring up (`postgres_integration`,
 `spanner_integration`, `sqlite_integration`; several at once for local
 parity).
 
+- The suites run in parallel in one database: a test touches only rows of its
+  own project. One that cannot (a statement with no project in its key) calls
+  `forEachDialectAlone`.
 - A domain-visible change under `dialect/{postgres,spanner,sqlite}/` (a new
   statement method, corrected error semantics such as `NoRowFoundError`, a
   filter, cascade or uniqueness contract) adds or extends a portable

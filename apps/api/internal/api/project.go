@@ -137,6 +137,9 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	}
+	if params.ExcludePlatform.Value {
+		req.ExcludeProjectID = domain.ReservedPlatformProjectID(h.platformProjectID)
+	}
 	var listed *service.ListProjectsResponse
 	if operator {
 		listed, err = h.projectService.ListEveryProject(ctx, req)

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { getPlatformProjectId } from "@/runtime/runtime";
+
 import { byName, type ProjectRef } from "./model";
 import type { SelectedProject } from "./project-scope";
 
@@ -21,12 +23,22 @@ export const RECENT_PROJECT_LIMIT = 5;
 /** Per person: someone else signing in on this browser must not see them. */
 const STORAGE_PREFIX = "zitadel.console.recent-projects:";
 
-/** The person's recent projects, most recent first; none without a person. */
+/**
+ * The person's recent projects, most recent first; none without a person. The
+ * reserved platform project is the root, never a project (D42): one a browser
+ * kept from before is left out.
+ */
 export function readRecentProjects(userId: string | undefined): ProjectRef[] {
   if (!userId) return [];
+  const platform = getPlatformProjectId();
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_PREFIX + userId) ?? "[]");
-    return Array.isArray(stored) ? stored.filter(isProjectRef).slice(0, RECENT_PROJECT_LIMIT) : [];
+    return Array.isArray(stored)
+      ? stored
+          .filter(isProjectRef)
+          .filter((project) => project.id !== platform)
+          .slice(0, RECENT_PROJECT_LIMIT)
+      : [];
   } catch {
     return [];
   }

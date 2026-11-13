@@ -18,7 +18,6 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
-import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
 import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
@@ -142,9 +141,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
             <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
-          {/* Drafts only: the engine never selects one, and the design draws
-              only active flows. */}
-          {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{purposes}</TableCell>

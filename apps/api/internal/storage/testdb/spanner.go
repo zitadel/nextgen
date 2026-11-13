@@ -45,6 +45,17 @@ func SpannerProvisions() bool {
 	return strings.TrimSpace(os.Getenv(instanceEnv)) != ""
 }
 
+// SpannerDSNWithSchema provisions a database as SpannerDSN does on the instance
+// ZITADEL_TEST_SPANNER_INSTANCE names, created with schema: the statements
+// take effect with the database, in seconds, where each schema change to an
+// existing database takes seconds to minutes. It needs [SpannerProvisions].
+func SpannerDSNWithSchema(ctx context.Context, schema []string) (string, func(), error) {
+	if !SpannerProvisions() {
+		return "", func() {}, fmt.Errorf("a database created with its schema needs %s", instanceEnv)
+	}
+	return provision(ctx, schema)
+}
+
 // SpannerDSN returns a Spanner database DSN for integration tests. Precedence:
 // if ZITADEL_TEST_SPANNER_INSTANCE is set it provisions a fresh, uniquely named
 // database on that shared instance (the returned stop drops it); else if
@@ -60,7 +71,7 @@ func SpannerProvisions() bool {
 // abort-retry path (#788) on Omni, the emulator or a real instance alike.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
 	if SpannerProvisions() {
-		return provision(ctx)
+		return provision(ctx, nil)
 	}
 	if SpannerSharesDatabase() {
 		return os.Getenv(spannerURLEnv), func() {}, nil
@@ -169,5 +180,5 @@ func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOptio
 		return fmt.Errorf("wait for instance: %w", err)
 	}
 
-	return createDatabase(ctx, testProject, testInstance, testDatabase, opts...)
+	return createDatabase(ctx, testProject, testInstance, testDatabase, nil, opts...)
 }

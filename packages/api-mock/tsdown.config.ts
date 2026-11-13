@@ -2,8 +2,8 @@ import { defineConfig } from "tsdown";
 
 /**
  * Build for `@zitadel/api-mock`. Never published; it builds like the other
- * workspace packages so consumers resolve it from `dist` and its moon `build`
- * task has outputs.
+ * workspace packages so consumers resolve it from `dist` and its turbo
+ * `build` task has outputs.
  */
 export default defineConfig({
   entry: {

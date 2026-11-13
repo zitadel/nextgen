@@ -115,6 +115,7 @@ var reasonOnlyOperations = map[string]reasonOnly{
 
 	"PublishApplication": {classNotImplemented, "answers 501"},
 	"GetApplication":     {classNotImplemented, "answers 501"},
+	"GetOAuthSettings":   {classNotImplemented, "answers 501 until the OAuth settings are stored"},
 }
 
 // ungatedClasses maps each ungated operation to the classes it is listed in.

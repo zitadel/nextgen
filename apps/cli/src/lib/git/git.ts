@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-
 import { execa } from "execa";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
@@ -37,7 +36,9 @@ export class GitResult {
 
   /** The NUL-separated paths git printed, for a `-z` command. */
   paths(): string[] {
-    return this.stdout.split("\0").filter((path) => path !== "");
+    return this.stdout.split("\0").filter((path) => {
+      return path !== "";
+    });
   }
 
   /**

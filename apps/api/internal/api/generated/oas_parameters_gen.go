@@ -18,8 +18,8 @@ import (
 
 // AddProjectOriginParams is parameters of addProjectOrigin operation.
 type AddProjectOriginParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -100,9 +100,9 @@ func decodeAddProjectOriginParams(args [1]string, argsEscaped bool, r *http.Requ
 
 // BuildReleaseParams is parameters of buildRelease operation.
 type BuildReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -175,12 +175,12 @@ func decodeBuildReleaseParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // CancelInvitationParams is parameters of cancelInvitation operation.
 type CancelInvitationParams struct {
-	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
-	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation` (`POST /invitations`) returns
+	// or `listInvitations` (`GET /invitations`) lists.
 	InvitationID InvitationID
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -320,8 +320,8 @@ func decodeCancelInvitationParams(args [1]string, argsEscaped bool, r *http.Requ
 
 // CompleteProjectClaimParams is parameters of completeProjectClaim operation.
 type CompleteProjectClaimParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -405,8 +405,8 @@ type CompleteUserPasskeyRegistrationParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
-	// The `registration_id` that `createUserPasskeyRegistration` (`POST
-	// /users/{user_id}/passkeys/registrations`) returns.
+	// The `registration_id` that `createUserPasskeyRegistration`
+	// (`POST /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
 }
 
@@ -622,9 +622,9 @@ func decodeCreateAuthAttemptChallengeParams(args [1]string, argsEscaped bool, r 
 type CreateAuthAttemptHandoffParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
@@ -754,9 +754,9 @@ func decodeCreateAuthAttemptHandoffParams(args [1]string, argsEscaped bool, r *h
 
 // CreateDeploymentParams is parameters of createDeployment operation.
 type CreateDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -829,11 +829,10 @@ func decodeCreateDeploymentParams(args [0]string, argsEscaped bool, r *http.Requ
 
 // CreateFlowParams is parameters of createFlow operation.
 type CreateFlowParams struct {
-	// Standard browser `Origin` header. Selects the deployment that serves
-	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the deployment that origin serves.
-	// Browsers send it automatically; no client action is required. Absent
-	// when the caller is not a browser.
+	// Standard browser `Origin` header. Selects the deployment that serves this attempt: matched against
+	// the project's origin patterns and live previews, then against the deployment that origin serves.
+	// Browsers send it automatically; no client action is required. Absent when the caller is not a
+	// browser.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
@@ -896,9 +895,9 @@ func decodeCreateFlowParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // CreateGrantParams is parameters of createGrant operation.
 type CreateGrantParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -971,9 +970,9 @@ func decodeCreateGrantParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // CreateInvitationParams is parameters of createInvitation operation.
 type CreateInvitationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1046,8 +1045,8 @@ func decodeCreateInvitationParams(args [0]string, argsEscaped bool, r *http.Requ
 
 // CreateProjectClaimParams is parameters of createProjectClaim operation.
 type CreateProjectClaimParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -1128,9 +1127,9 @@ func decodeCreateProjectClaimParams(args [1]string, argsEscaped bool, r *http.Re
 
 // CreateReleaseParams is parameters of createRelease operation.
 type CreateReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1203,9 +1202,9 @@ func decodeCreateReleaseParams(args [0]string, argsEscaped bool, r *http.Request
 
 // CreateTeamParams is parameters of createTeam operation.
 type CreateTeamParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1278,20 +1277,20 @@ func decodeCreateTeamParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // CreateUserParams is parameters of createUser operation.
 type CreateUserParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Adds the new user to this team: creating the user also creates an
-	// active membership in it. Omit it to create a user with no memberships.
-	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
-	// This is team membership, not lifecycle ownership. It does not decide
-	// who may deprovision the user, and the created user stays self-owned
-	// either way. The owning team is reported on reads as
+	// Adds the new user to this team: creating the user also creates an active membership in it. Omit it
+	// to create a user with no memberships. Use the `id` that `createTeam` (`POST /teams`) returns or
+	// `queryTeams` (`POST /teams/query`) lists.
+	//
+	// This is team membership, not lifecycle ownership. It does not decide who may deprovision the user,
+	// and the created user stays self-owned either way. The owning team is reported on reads as
 	// `metadata.lifecycle_owner_team_id` and cannot be set through this API.
-	// The team also scopes team-unique attributes for this create: an
-	// attribute the schema marks unique per team is checked against this
-	// team's members.
+	//
+	// The team also scopes team-unique attributes for this create: an attribute the schema marks unique
+	// per team is checked against this team's members.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
@@ -1603,9 +1602,9 @@ type DeleteGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
 	// `queryGrants` (`POST /grants/query`) lists.
 	GrantID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1812,9 +1811,9 @@ func decodeDeleteUserParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // DeleteVariableParams is parameters of deleteVariable operation.
 type DeleteVariableParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -2023,9 +2022,9 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // EvaluatePolicyParams is parameters of evaluatePolicy operation.
 type EvaluatePolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -2098,13 +2097,13 @@ func decodeEvaluatePolicyParams(args [0]string, argsEscaped bool, r *http.Reques
 
 // ExchangeHandoffParams is parameters of exchangeHandoff operation.
 type ExchangeHandoffParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
@@ -2226,9 +2225,9 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // GetApplicationParams is parameters of getApplication operation.
 type GetApplicationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The application ID: the `id` that `publishApplication` (`POST /applications`) returns.
 	ApplicationID string
@@ -2503,9 +2502,9 @@ func decodeGetBrandingParams(args [1]string, argsEscaped bool, r *http.Request) 
 
 // GetDeploymentParams is parameters of getDeployment operation.
 type GetDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -2650,9 +2649,9 @@ func decodeGetDeploymentParams(args [1]string, argsEscaped bool, r *http.Request
 type GetEventParams struct {
 	// The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.
 	EventID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -2843,17 +2842,16 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetFlowStepParams is parameters of getFlowStep operation.
 type GetFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
+	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{flow_id}` path parameter must name that flow, any other id is
-	// refused.
-	// Browsers send this automatically; non-browser clients must capture the
-	// `Set-Cookie` header and resend it.
+	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
+	// other id is refused.
+	//
+	// Browsers send this automatically; non-browser clients must capture the `Set-Cookie` header and
+	// resend it.
 	Zflow string
 }
 
@@ -2964,13 +2962,12 @@ type GetGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
 	// `queryGrants` (`POST /grants/query`) lists.
 	GrantID string
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Extra principal fields to add onto `user` or `team`. It takes the same
-	// values and needs the same `user.read` and `team.read` scopes as
-	// `POST /grants/query`.
+	// Extra principal fields to add onto `user` or `team`. It takes the same values and needs the same
+	// `user.read` and `team.read` scopes as `POST /grants/query`.
 	Expand []GrantExpand `json:",omitempty"`
 }
 
@@ -3109,6 +3106,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Expand = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotExpandVal GrantExpand
 					if err := func() error {
@@ -3183,12 +3181,12 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 
 // GetIdpParams is parameters of getIdp operation.
 type GetIdpParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
-	// /idps/query`) lists.
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps`
+	// (`POST /idps/query`) lists.
 	IdpID string
 }
 
@@ -3313,9 +3311,9 @@ func decodeGetIdpParams(args [1]string, argsEscaped bool, r *http.Request) (para
 
 // GetIdpRevisionParams is parameters of getIdpRevision operation.
 type GetIdpRevisionParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The revision ID: the `revision_id` that `publishIdp` (`POST /idps`) returns, or that
 	// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists.
@@ -3443,12 +3441,12 @@ func decodeGetIdpRevisionParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetInvitationParams is parameters of getInvitation operation.
 type GetInvitationParams struct {
-	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
-	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation` (`POST /invitations`) returns
+	// or `listInvitations` (`GET /invitations`) lists.
 	InvitationID InvitationID
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -3588,16 +3586,16 @@ func decodeGetInvitationParams(args [1]string, argsEscaped bool, r *http.Request
 
 // GetMyPasswordStateParams is parameters of getMyPasswordState operation.
 type GetMyPasswordStateParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -3684,16 +3682,16 @@ func decodeGetMyPasswordStateParams(args [0]string, argsEscaped bool, r *http.Re
 
 // GetMySessionParams is parameters of getMySession operation.
 type GetMySessionParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -3780,16 +3778,16 @@ func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // GetMySessionCsrfTokenParams is parameters of getMySessionCsrfToken operation.
 type GetMySessionCsrfTokenParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -3876,16 +3874,16 @@ func decodeGetMySessionCsrfTokenParams(args [0]string, argsEscaped bool, r *http
 
 // GetMyUserParams is parameters of getMyUser operation.
 type GetMyUserParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -3972,16 +3970,16 @@ func decodeGetMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // GetMyUserSchemaParams is parameters of getMyUserSchema operation.
 type GetMyUserSchemaParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -4066,11 +4064,78 @@ func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
+// GetOAuthSettingsParams is parameters of getOAuthSettings operation.
+type GetOAuthSettingsParams struct {
+	// The OAuth settings revision ID: the `revision_id` of the `kind: oauth` pointer on the release that
+	// `buildRelease` (`POST /releases/build`) or `getRelease` (`GET /releases/{release_id}`) returns.
+	OAuthSettingsID string
+}
+
+func unpackGetOAuthSettingsParams(packed middleware.Parameters) (params GetOAuthSettingsParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "oauth_settings_id",
+			In:   "path",
+		}
+		params.OAuthSettingsID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetOAuthSettingsParams(args [1]string, argsEscaped bool, r *http.Request) (params GetOAuthSettingsParams, _ error) {
+	// Decode path: oauth_settings_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "oauth_settings_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.OAuthSettingsID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "oauth_settings_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -4212,9 +4277,9 @@ func decodeGetPolicyParams(args [1]string, argsEscaped bool, r *http.Request) (p
 
 // GetPolicyRevisionParams is parameters of getPolicyRevision operation.
 type GetPolicyRevisionParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy revision.
 	RevisionID PolicyRevisionID
@@ -4356,8 +4421,8 @@ func decodeGetPolicyRevisionParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -4438,12 +4503,11 @@ func decodeGetProjectParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // GetProjectClaimStatusParams is parameters of getProjectClaimStatus operation.
 type GetProjectClaimStatusParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
-	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
-	// for this claim. The claim URL
-	// carries it.
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for
+	// this claim. The claim URL carries it.
 	ChallengeID ChallengeID
 }
 
@@ -4583,12 +4647,11 @@ func decodeGetProjectClaimStatusParams(args [1]string, argsEscaped bool, r *http
 
 // GetProjectClaimWindowParams is parameters of getProjectClaimWindow operation.
 type GetProjectClaimWindowParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
-	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns
-	// for this claim. The claim URL
-	// carries it.
+	// The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for
+	// this claim. The claim URL carries it.
 	ChallengeID ChallengeID
 }
 
@@ -4728,12 +4791,12 @@ func decodeGetProjectClaimWindowParams(args [1]string, argsEscaped bool, r *http
 
 // GetReleaseParams is parameters of getRelease operation.
 type GetReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
-	// /releases`) lists.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases`
+	// (`GET /releases`) lists.
 	ReleaseID ReleaseID
 }
 
@@ -4873,14 +4936,14 @@ func decodeGetReleaseParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // GetSchemaParams is parameters of getSchema operation.
 type GetSchemaParams struct {
-	// The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET
-	// /schemas`) lists.
+	// The schema ID: the `id` that `publishSchema` (`POST /schemas`) returns or `listSchemas`
+	// (`GET /schemas`) lists.
 	SchemaID string
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -5091,9 +5154,8 @@ func decodeGetSchemaParams(args [1]string, argsEscaped bool, r *http.Request) (p
 
 // GetSessionParams is parameters of getSession operation.
 type GetSessionParams struct {
-	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
-	// /sessions/exchange`) returns, or that
-	// `querySessions` (`POST /sessions/query`) lists.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff`
+	// (`POST /sessions/exchange`) returns, or that `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
@@ -5256,20 +5318,19 @@ func decodeGetTeamParams(args [1]string, argsEscaped bool, r *http.Request) (par
 
 // GetUserParams is parameters of getUser operation.
 type GetUserParams struct {
-	// Serves the user only when they hold an active membership in this team,
-	// and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
-	// `queryTeams` (`POST /teams/query`) lists.
-	// This is team membership, not lifecycle ownership: it asks which team
-	// the user collaborates in, not which team may deprovision them. The
-	// owning team is reported separately as
-	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
-	// while owning their own lifecycle.
-	// Only active memberships match. A user who has been invited but has not
-	// accepted is not served.
-	// It reads the user's memberships, so it takes the same permission as the
-	// `team_id` filter on `POST /users/query`: `team_membership.read` for a
-	// project secret, read on the whole project for a console session.
-	// Otherwise the answer is `403 user.permission_denied`.
+	// Serves the user only when they hold an active membership in this team, and answers `404` otherwise.
+	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
+	//
+	// This is team membership, not lifecycle ownership: it asks which team the user collaborates in, not
+	// which team may deprovision them. The owning team is reported separately as
+	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams while owning their own
+	// lifecycle.
+	//
+	// Only active memberships match. A user who has been invited but has not accepted is not served.
+	//
+	// It reads the user's memberships, so it takes the same permission as the `team_id` filter on
+	// `POST /users/query`: `team_membership.read` for a project secret, read on the whole project for a
+	// console session. Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -5506,9 +5567,9 @@ func decodeGetUserPasswordStateParams(args [1]string, argsEscaped bool, r *http.
 
 // GetVariableParams is parameters of getVariable operation.
 type GetVariableParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -5717,9 +5778,9 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 
 // ListBrandingParams is parameters of listBranding operation.
 type ListBrandingParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -5792,9 +5853,9 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListDeploymentVariablesParams is parameters of listDeploymentVariables operation.
 type ListDeploymentVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -5937,25 +5998,22 @@ func decodeListDeploymentVariablesParams(args [1]string, argsEscaped bool, r *ht
 
 // ListDeploymentsParams is parameters of listDeployments operation.
 type ListDeploymentsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Narrows the list to the deployments that targeted this origin, given
-	// exactly as the deployment records it. An origin no deployment targeted
-	// answers an empty list, not an error.
+	// Narrows the list to the deployments that targeted this origin, given exactly as the deployment
+	// records it. An origin no deployment targeted answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
-	// Lists what each target serves now instead of the history. Defaults
-	// to `false`.
+	// Lists what each target serves now instead of the history. Defaults to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
 	Expand []DeploymentExpand `json:",omitempty"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -6187,6 +6245,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Expand = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotExpandVal DeploymentExpand
 					if err := func() error {
@@ -6377,18 +6436,20 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // ListEventsParams is parameters of listEvents operation.
 type ListEventsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Only events of this category. Repeat the parameter to match any of
-	// several categories.
+	// Only events of this category. Repeat the parameter to match any of several categories.
 	Category []ListEventsCategoryItem `json:",omitempty"`
-	// Only events with exactly this `event_type`. Repeat the parameter to
-	// match any of several types.
+	// Only events with exactly this `event_type`. Repeat the parameter to match any of several types.
 	EventType []string `json:",omitempty"`
 	// Only events triggered by this actor ID.
 	ActorID OptString `json:",omitempty,omitzero"`
+	// Only events that concern this user ID, whoever triggered them: the user's sign-ins, sessions and
+	// credentials, and the changes made to the user. Events recorded by a server version before this
+	// filter existed are not matched; they leave the list as retention removes them.
+	UserID OptString `json:",omitempty,omitzero"`
 	// Only events produced by this application or agent.
 	ClientID OptString `json:",omitempty,omitzero"`
 	// Only events of this session ID.
@@ -6405,30 +6466,26 @@ type ListEventsParams struct {
 	EntityID OptString `json:",omitempty,omitzero"`
 	// Only events emitted under this team, as stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
-	// Only `request.api` events of this API operation, the
-	// `payload.operation_id` they record, such as `createUser`. Repeat the
-	// parameter to match any of up to 10 operations. Requests recorded by a
-	// server version before this filter existed are not matched; they leave
-	// the list as retention removes them.
+	// Only `request.api` events of this API operation, the `payload.operation_id` they record, such as
+	// `createUser`. Repeat the parameter to match any of up to 10 operations. Requests recorded by a
+	// server version before this filter existed are not matched; they leave the list as retention removes
+	// them.
 	OperationID []string `json:",omitempty"`
-	// Only `request.api` events whose response status, the `payload.status`
-	// they record, is in this class: `4xx` is 400 to 499. Repeat the
-	// parameter to match any of several classes: `4xx` and `5xx` are the
-	// failed requests. Requests recorded by a server version before this
-	// filter existed are not matched; they leave the list as retention
-	// removes them.
+	// Only `request.api` events whose response status, the `payload.status` they record, is in this class:
+	// `4xx` is 400 to 499. Repeat the parameter to match any of several classes: `4xx` and `5xx` are the
+	// failed requests. Requests recorded by a server version before this filter existed are not matched;
+	// they leave the list as retention removes them.
 	StatusClass []ListEventsStatusClassItem `json:",omitempty"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
 	CreatedBefore OptDateTime `json:",omitempty,omitzero"`
-	// The sort direction, by `created_at` and then `id`. The default `desc`
-	// lists the newest event first; `asc` lists the oldest first.
+	// The sort direction, by `created_at` and then `id`. The default `desc` lists the newest event first;
+	// `asc` lists the oldest first.
 	Order OptListEventsOrder `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -6467,6 +6524,15 @@ func unpackListEventsParams(packed middleware.Parameters) (params ListEventsPara
 		}
 		if v, ok := packed[key]; ok {
 			params.ActorID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.UserID = v.(OptString)
 		}
 	}
 	{
@@ -6670,6 +6736,7 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Category = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotCategoryVal ListEventsCategoryItem
 					if err := func() error {
@@ -6735,6 +6802,7 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.EventType = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotEventTypeVal string
 					if err := func() error {
@@ -6805,6 +6873,47 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "actor_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: user_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "user_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID.SetTo(paramsDotUserIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -7147,6 +7256,7 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.OperationID = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotOperationIDVal string
 					if err := func() error {
@@ -7206,6 +7316,7 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.StatusClass = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotStatusClassVal ListEventsStatusClassItem
 					if err := func() error {
@@ -7527,29 +7638,26 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 type ListFlowDefinitionsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
-	// The flow name to filter by. Every revision of a flow shares its
-	// `name`, so the result is that flow's revisions, newest by creation
-	// time first.
+	// The flow name to filter by. Every revision of a flow shares its `name`, so the result is that flow's
+	// revisions, newest by creation time first.
 	Name OptString `json:",omitempty,omitzero"`
-	// Which revisions to return. Every revision of a flow shares its
-	// `name`, so publishing a definition under an existing `name` adds a new
-	// revision.
-	// `all` (the default) returns every revision: the full history an
-	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `name`, which is one entry per flow.
-	// A `page_token` is bound to the mode it was issued in and is rejected by
-	// the other.
+	// Which revisions to return. Every revision of a flow shares its `name`, so publishing a definition
+	// under an existing `name` adds a new revision.
+	//
+	// `all` (the default) returns every revision: the full history an export, an audit or a GitOps diff
+	// needs. `latest` returns the newest revision of each `name`, which is one entry per flow.
+	//
+	// A `page_token` is bound to the mode it was issued in and is rejected by the other.
 	Revisions OptListFlowDefinitionsRevisions `json:",omitempty,omitzero"`
 	// Related entities to embed on each returned flow definition.
 	Expand []FlowDefinitionExpand `json:",omitempty"`
@@ -7984,6 +8092,7 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Expand = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotExpandVal FlowDefinitionExpand
 					if err := func() error {
@@ -8044,19 +8153,18 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 
 // ListIdpRevisionsParams is parameters of listIdpRevisions operation.
 type ListIdpRevisionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps` (`POST
-	// /idps/query`) lists.
+	// The connection ID: the `id` that `publishIdp` (`POST /idps`) returns or `queryIdps`
+	// (`POST /idps/query`) lists.
 	IdpID string
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -8315,16 +8423,15 @@ func decodeListIdpRevisionsParams(args [1]string, argsEscaped bool, r *http.Requ
 
 // ListInvitationsParams is parameters of listInvitations operation.
 type ListInvitationsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Only invitations with this status.
 	Status OptInvitationStatus `json:",omitempty,omitzero"`
@@ -8667,21 +8774,20 @@ func decodeListInvitationsParams(args [0]string, argsEscaped bool, r *http.Reque
 type ListMyIdentityLinksParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -8904,21 +9010,20 @@ func decodeListMyIdentityLinksParams(args [0]string, argsEscaped bool, r *http.R
 type ListMyPasskeysParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -9141,34 +9246,32 @@ func decodeListMyPasskeysParams(args [0]string, argsEscaped bool, r *http.Reques
 type ListMyProjectsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// Narrows the list to the projects whose name contains this text,
-	// ignoring case, as `contains` matches text in a query endpoint's
-	// filter. Send the same value with every `page_token` the search
-	// returns: a token continues the list it came from. An empty value
-	// lists every project, as leaving it out does.
+	// Narrows the list to the projects whose name contains this text, ignoring case, as `contains` matches
+	// text in a query endpoint's filter. Send the same value with every `page_token` the search returns: a
+	// token continues the list it came from. An empty value lists every project, as leaving it out does.
 	NameContains OptString `json:",omitempty,omitzero"`
-	// Sorts the list by `created_at` and then `id`: `desc` lists the newest
-	// project first, `asc` the oldest first. Leave it out to list by
-	// project ID, which says nothing about when a project was created. Send
-	// the same value with every `page_token` the list returns: a token
-	// continues the list it came from, and under another order it is
-	// refused with `400`.
+	// Sorts the list by `created_at` and then `id`: `desc` lists the newest project first, `asc` the
+	// oldest first. Leave it out to list by project ID, which says nothing about when a project was
+	// created. Send the same value with every `page_token` the list returns: a token continues the list it
+	// came from, and under another order it is refused with `400`.
 	Order OptSortDirection `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// Leaves out the deployment's reserved platform project, the one the console signs in to. Defaults to
+	// `false`. Send the same value with every `page_token` the list returns.
+	ExcludePlatform OptBool `json:",omitempty,omitzero"`
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -9207,6 +9310,15 @@ func unpackListMyProjectsParams(packed middleware.Parameters) (params ListMyProj
 		}
 		if v, ok := packed[key]; ok {
 			params.Order = v.(OptSortDirection)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "exclude_platform",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ExcludePlatform = v.(OptBool)
 		}
 	}
 	{
@@ -9436,6 +9548,47 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 			Err:  err,
 		}
 	}
+	// Decode query: exclude_platform.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "exclude_platform",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotExcludePlatformVal bool
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToBool(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotExcludePlatformVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ExcludePlatform.SetTo(paramsDotExcludePlatformVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "exclude_platform",
+			In:   "query",
+			Err:  err,
+		}
+	}
 	// Decode query: project_id.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
@@ -9506,21 +9659,20 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 type ListMyTeamsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -9741,16 +9893,15 @@ func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // ListPoliciesParams is parameters of listPolicies operation.
 type ListPoliciesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// Only the policy of this operation.
 	Operation OptPolicyOperation `json:",omitempty,omitzero"`
@@ -10024,18 +10175,17 @@ func decodeListPoliciesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListPolicyRevisionsParams is parameters of listPolicyRevisions operation.
 type ListPolicyRevisionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -10311,10 +10461,9 @@ func decodeListPolicyRevisionsParams(args [1]string, argsEscaped bool, r *http.R
 type ListProjectAdminsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	ProjectID ProjectID
 }
@@ -10531,15 +10680,14 @@ func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Req
 
 // ListProjectPreviewsParams is parameters of listProjectPreviews operation.
 type ListProjectPreviewsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -10755,24 +10903,22 @@ func decodeListProjectPreviewsParams(args [1]string, argsEscaped bool, r *http.R
 
 // ListReleasesParams is parameters of listReleases operation.
 type ListReleasesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Narrows the list to the release with this content digest, given in full
-	// with its `sha256:` prefix. A project holds at most one release per digest,
-	// so the result has one entry or none.
-	// A digest no release of the project carries answers an empty list, not an
-	// error: the filter asks which release has this content, and "none" is a
-	// valid answer. Paths never take a digest; read the matched entry's `id`
-	// and use that.
+	// Narrows the list to the release with this content digest, given in full with its `sha256:` prefix. A
+	// project holds at most one release per digest, so the result has one entry or none.
+	//
+	// A digest no release of the project carries answers an empty list, not an error: the filter asks
+	// which release has this content, and "none" is a valid answer. Paths never take a digest; read the
+	// matched entry's `id` and use that.
 	ContentHash OptReleaseContentHash `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
@@ -11051,36 +11197,35 @@ func decodeListReleasesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListSchemasParams is parameters of listSchemas operation.
 type ListSchemasParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
-	// Which revisions to return. Schemas are immutable and versioned by URL,
-	// so editing one creates a new revision that shares its `objectType`.
-	// `all` (the default) returns every revision: the full history an export,
-	// an audit or a GitOps diff needs. `latest` returns the newest revision of
-	// each `objectType`, which is one entry per schema.
-	// A schema stored without an `objectType` is a revision of nothing, and
-	// is returned by both.
-	// A `page_token` is bound to the mode it was issued in and is rejected by
-	// the other.
+	// Which revisions to return. Schemas are immutable and versioned by URL, so editing one creates a new
+	// revision that shares its `objectType`.
+	//
+	// `all` (the default) returns every revision: the full history an export, an audit or a GitOps diff
+	// needs. `latest` returns the newest revision of each `objectType`, which is one entry per schema.
+	//
+	// A schema stored without an `objectType` is a revision of nothing, and is returned by both.
+	//
+	// A `page_token` is bound to the mode it was issued in and is rejected by the other.
 	Revisions OptListSchemasRevisions `json:",omitempty,omitzero"`
-	// The kind of schema to filter by, read from the stored document's
-	// `kind` property.
-	// `schema-url` is not a kind: it discriminates the create request body,
-	// not a stored schema. A schema registered by URL is stored as whatever
-	// document the URL served, and declares its own kind.
-	// A schema stored without its document being parsed has no kind that
-	// could be read, and is excluded from every filtered result.
+	// The kind of schema to filter by, read from the stored document's `kind` property.
+	//
+	// `schema-url` is not a kind: it discriminates the create request body, not a stored schema. A schema
+	// registered by URL is stored as whatever document the URL served, and declares its own kind.
+	//
+	// A schema stored without its document being parsed has no kind that could be read, and is excluded
+	// from every filtered result.
 	Kind OptListSchemasKind `json:",omitempty,omitzero"`
 	// Extra fields to add onto each returned schema.
 	Expand []SchemaExpand `json:",omitempty"`
@@ -11515,6 +11660,7 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				params.Expand = nil
 				return d.DecodeArray(func(d uri.Decoder) error {
 					var paramsDotExpandVal SchemaExpand
 					if err := func() error {
@@ -11591,10 +11737,9 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 type ListUserIdentityLinksParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -11815,10 +11960,9 @@ func decodeListUserIdentityLinksParams(args [1]string, argsEscaped bool, r *http
 type ListUserPasskeysParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -12039,10 +12183,9 @@ func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Requ
 type ListUserTeamsParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
-	// Token for fetching the next page of results.
-	// Obtain this value from `next_page_token` in the previous response.
-	// Omit to start from the beginning.
-	// Its format is opaque and may change between releases.
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
@@ -12261,9 +12404,9 @@ func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request
 
 // ListVariablesParams is parameters of listVariables operation.
 type ListVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -12403,13 +12546,13 @@ func decodeListVariablesParams(args [0]string, argsEscaped bool, r *http.Request
 
 // PublishApplicationParams is parameters of publishApplication operation.
 type PublishApplicationParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
@@ -12531,9 +12674,9 @@ func decodePublishApplicationParams(args [0]string, argsEscaped bool, r *http.Re
 
 // PublishBrandingParams is parameters of publishBranding operation.
 type PublishBrandingParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12606,9 +12749,9 @@ func decodePublishBrandingParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // PublishIdpParams is parameters of publishIdp operation.
 type PublishIdpParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12681,9 +12824,9 @@ func decodePublishIdpParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // PublishPolicyParams is parameters of publishPolicy operation.
 type PublishPolicyParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12756,9 +12899,9 @@ func decodePublishPolicyParams(args [0]string, argsEscaped bool, r *http.Request
 
 // PublishSchemaParams is parameters of publishSchema operation.
 type PublishSchemaParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
@@ -12906,9 +13049,9 @@ func decodePublishSchemaParams(args [0]string, argsEscaped bool, r *http.Request
 
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12981,9 +13124,9 @@ func decodeQueryGrantsParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // QueryIdpsParams is parameters of queryIdps operation.
 type QueryIdpsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -13056,9 +13199,9 @@ func decodeQueryIdpsParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // QuerySessionsParams is parameters of querySessions operation.
 type QuerySessionsParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -13131,8 +13274,8 @@ func decodeQuerySessionsParams(args [0]string, argsEscaped bool, r *http.Request
 
 // QueryTeamsParams is parameters of queryTeams operation.
 type QueryTeamsParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -13219,8 +13362,8 @@ func decodeQueryTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // QueryUsersParams is parameters of queryUsers operation.
 type QueryUsersParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`) returns. Omit
+	// it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -13307,8 +13450,8 @@ func decodeQueryUsersParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // RemoveProjectOriginParams is parameters of removeProjectOrigin operation.
 type RemoveProjectOriginParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -13389,8 +13532,8 @@ func decodeRemoveProjectOriginParams(args [1]string, argsEscaped bool, r *http.R
 
 // RemoveProjectPreviewParams is parameters of removeProjectPreview operation.
 type RemoveProjectPreviewParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -13471,16 +13614,16 @@ func decodeRemoveProjectPreviewParams(args [1]string, argsEscaped bool, r *http.
 
 // RevokeMySessionParams is parameters of revokeMySession operation.
 type RevokeMySessionParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -13567,12 +13710,12 @@ func decodeRevokeMySessionParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // RevokeReleaseParams is parameters of revokeRelease operation.
 type RevokeReleaseParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
-	// /releases`) lists.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases`
+	// (`GET /releases`) lists.
 	ReleaseID ReleaseID
 }
 
@@ -13712,9 +13855,8 @@ func decodeRevokeReleaseParams(args [1]string, argsEscaped bool, r *http.Request
 
 // RevokeSessionParams is parameters of revokeSession operation.
 type RevokeSessionParams struct {
-	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
-	// /sessions/exchange`) returns, or that
-	// `querySessions` (`POST /sessions/query`) lists.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff`
+	// (`POST /sessions/exchange`) returns, or that `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
@@ -13795,9 +13937,9 @@ func decodeRevokeSessionParams(args [1]string, argsEscaped bool, r *http.Request
 
 // RollbackDeploymentParams is parameters of rollbackDeployment operation.
 type RollbackDeploymentParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
@@ -13940,9 +14082,9 @@ func decodeRollbackDeploymentParams(args [1]string, argsEscaped bool, r *http.Re
 
 // SearchParams is parameters of search operation.
 type SearchParams struct {
-	// The project to search, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to search the credential's own project with a project
-	// secret, or the projects the person can act on with a session.
+	// The project to search, by the `id` that `createProject` (`POST /projects`) returns. Omit it to
+	// search the credential's own project with a project secret, or the projects the person can act on
+	// with a session.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -14032,9 +14174,8 @@ type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
-	// Standard browser `Origin` header. Selects the deployment whose password
-	// policy applies. Browsers send it automatically; no client action is
-	// required. Absent when the caller is not a browser.
+	// Standard browser `Origin` header. Selects the deployment whose password policy applies. Browsers
+	// send it automatically; no client action is required. Absent when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
@@ -14164,9 +14305,9 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 
 // SetVariablesParams is parameters of setVariables operation.
 type SetVariablesParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
-	// it as "Project id" in its summary and as `project_id` with `--json`, and
-	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints it
+	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
+	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -14306,24 +14447,22 @@ func decodeSetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.
 type SubmitFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
+	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{flow_id}` path parameter must name that flow, any other id is
-	// refused.
-	// Browsers send this automatically; non-browser clients must capture the
-	// `Set-Cookie` header and resend it.
+	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
+	// other id is refused.
+	//
+	// Browsers send this automatically; non-browser clients must capture the `Set-Cookie` header and
+	// resend it.
 	Zflow string
-	// Standard browser `Origin` header. When a step issues a passkey
-	// challenge, the server derives the WebAuthn relying-party ID and the
-	// allowed origin from this value. An sso submission is bound to it as
-	// well: `return_target` must be on this origin, and the callback route
-	// is built under it (see External sign-in above). Browsers send it
-	// automatically on the fetch POST; no client action is required.
+	// Standard browser `Origin` header. When a step issues a passkey challenge, the server derives the
+	// WebAuthn relying-party ID and the allowed origin from this value. An sso submission is bound to it
+	// as well: `return_target` must be on this origin, and the callback route is built under it (see
+	// External sign-in above). Browsers send it automatically on the fetch POST; no client action is
+	// required.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 
@@ -14480,16 +14619,16 @@ func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // UpdateMyUserParams is parameters of updateMyUser operation.
 type UpdateMyUserParams struct {
-	// The project the caller signs its users in to. The cookie's session is used
-	// only when it belongs to this project; a session of any other project answers
-	// `403` with `sess.project_mismatch`.
-	// A session belongs to one project, while a browser sends its cookie to every
-	// app on the same host. An app passes its own project, so that a session of
-	// another project never reads or acts as one of its users, and signing out of
-	// the app never ends it. The SDKs pass it when they read the session or sign
+	// The project the caller signs its users in to. The cookie's session is used only when it belongs to
+	// this project; a session of any other project answers `403` with `sess.project_mismatch`.
+	//
+	// A session belongs to one project, while a browser sends its cookie to every app on the same host. An
+	// app passes its own project, so that a session of another project never reads or acts as one of its
+	// users, and signing out of the app never ends it. The SDKs pass it when they read the session or sign
 	// out.
-	// `sess.project_mismatch` does not mean the session is invalid: it is live in
-	// its own project, so keep its cookie.
+	//
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in its own project, so keep
+	// its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -14576,8 +14715,8 @@ func decodeUpdateMyUserParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // UpdateProjectParams is parameters of updateProject operation.
 type UpdateProjectParams struct {
-	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -14824,12 +14963,12 @@ func decodeUpdateUserParams(args [1]string, argsEscaped bool, r *http.Request) (
 type VerifyAuthAttemptChallengeParams struct {
 	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// The `challenge_id` that `createAuthAttemptChallenge` (`POST
-	// /auth_attempts/{attempt_id}/challenges`) returns.
+	// The `challenge_id` that `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`)
+	// returns.
 	ChallengeID ChallengeID
-	// Optional retry key for safe retries of the call.
-	// Retries carrying the same key within the call window return the cached
-	// payload without creating a new resource. See details in the endpoint description.
+	// Optional retry key for safe retries of the call. Retries carrying the same key within the call
+	// window return the cached payload without creating a new resource. See details in the endpoint
+	// description.
 	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 

@@ -135,6 +135,9 @@ type CreateAuthAttemptInput struct {
 	// RuntimeResolutionFromContext when the caller leaves them empty.
 	DeploymentID string
 	ReleaseID    string
+	// FlowID is the login flow creating the attempt. Never settable through
+	// the REST surface.
+	FlowID string
 }
 
 // BeginPasskeyEnrollmentInput starts a management-plane enrollment ceremony
@@ -269,10 +272,16 @@ type Proof interface {
 // nothing, resolves the login name against the designated identifier of every
 // user schema in the project instead, and must match exactly one user. A
 // direct-API caller never chooses the property. See resolveIdentifier.
+//
+// Register marks the lookup of a sign-up, which asks whether the login name is
+// free: matching no user is the answer a sign-up expects, so it counts against
+// the challenge's failures but writes no auth.check.failed. A sign-in with an
+// unknown login name still writes one.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
 	UserSchemaURL string
+	Register      bool
 }
 
 func (UserProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
@@ -338,8 +347,8 @@ type authAttemptService struct {
 // whose rehash would not be stored.
 type verifyOnly struct{ crypto.HashVerifier }
 
-func (v verifyOnly) VerifyAndRehash(encoded, target string) (string, error) {
-	return "", v.VerifyHash(encoded, target)
+func (v verifyOnly) VerifyAndRehash(ctx context.Context, encoded, target string) (string, error) {
+	return "", v.VerifyHash(ctx, encoded, target)
 }
 
 func NewAuthAttemptService(
@@ -392,6 +401,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	attempt.Internal = input.Internal
 	attempt.DeploymentID = input.DeploymentID
 	attempt.ReleaseID = input.ReleaseID
+	attempt.FlowID = input.FlowID
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if attempt.DeploymentID == "" && resolution.Deployment != nil {
 			attempt.DeploymentID = resolution.Deployment.ID
@@ -411,6 +421,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
 			Payload:    domain.AuthAttemptCreatedPayload{},
 		})
@@ -500,22 +511,26 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 	ctx, end := startSpan(ctx, "AuthAttemptService.SetSSOCallbackResult")
 	defer end(&err)
 
-	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	var flowID string
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
 		}
-		// The session the event carries lives on the attempt.
+		// The session and the login flow the event carries live on the attempt.
 		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
 		if err != nil {
 			return err
 		}
+		flowID = attempt.FlowID
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       eventType,
 			Category:   domain.EventCategoryAuth,
 			ProjectID:  projectID,
 			EntityType: "check",
 			EntityID:   check.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
+			FlowID:     &attempt.FlowID,
 			Payload: domain.AuthCheckPayload{
 				CheckID:       check.ID,
 				CheckType:     check.Type().String(),
@@ -523,6 +538,13 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			},
 		})
 	})
+	if err != nil {
+		return err
+	}
+	// The provider's redirect reaches the callback without the flow's cookie,
+	// so its request event joins the flow only through the attempt.
+	audit.BindFlow(ctx, flowID)
+	return nil
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
@@ -546,7 +568,8 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		s.recordProofFailure(ctx, attempt, challenge)
+		userProof, ok := input.Proof.(UserProof)
+		s.recordProofFailure(ctx, attempt, challenge, !ok || !userProof.Register)
 		return nil, err
 	}
 
@@ -562,7 +585,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, factor)
 	})
 	if err != nil {
 		// A provisional registration's create-user action can lose the
@@ -607,6 +630,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
 			Payload:    domain.AuthAttemptHandedOffPayload{},
 		})
@@ -639,6 +663,7 @@ func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *d
 		ProjectID:  attempt.ProjectID,
 		EntityType: "check",
 		EntityID:   checkID,
+		UserID:     checkUserID(attempt, factor),
 		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
 			CheckID:       checkID,
@@ -648,9 +673,30 @@ func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *d
 	})
 }
 
-func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
+// checkUserID is the user a check's event concerns: the one the check itself
+// resolved, when its factor names one, else the one the attempt already had.
+// factor is nil for a check that failed.
+func checkUserID(attempt *domain.AuthAttempt, factor domain.AuthFactor) string {
+	var userID string
+	switch f := factor.(type) {
+	case *domain.AuthFactorUser:
+		userID = f.UserID
+	case *domain.AuthFactorPasskey:
+		userID = f.UserID
+	case *domain.AuthFactorPasskeyRegistration:
+		userID = f.UserID
+	}
+	if userID != "" {
+		return userID
+	}
+	return attempt.ResolvedUserID()
+}
+
+// emitAuthCheck records a check's outcome. factor is the verified factor of a
+// check that succeeded, nil for one that failed.
+func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, factor domain.AuthFactor) error {
 	eventType := domain.EventTypeAuthCheckFailed
-	if succeeded {
+	if factor != nil {
 		eventType = domain.EventTypeAuthCheckSucceeded
 	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
@@ -659,6 +705,7 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 		ProjectID:  attempt.ProjectID,
 		EntityType: "check",
 		EntityID:   challenge.GetID(),
+		UserID:     checkUserID(attempt, factor),
 		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
 			CheckID:       challenge.GetID(),
@@ -861,9 +908,9 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
-		_, end := startSpan(ctx, "password.Verify")
+		verifyCtx, end := startSpan(ctx, "password.Verify")
 		start := time.Now()
-		updated, verifyErr := password.Verify(p.Password, verifier)
+		updated, verifyErr := password.Verify(verifyCtx, p.Password, verifier)
 		spanErr := verifyErr
 		if errors.Is(spanErr, crypto.ErrRehashFailed) {
 			// The password matched; the warning below logs the failed rehash.
@@ -878,8 +925,17 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				slog.String("user_id", userFactor.UserID),
 				slog.Any("error", verifyErr),
 			)
-		case verifyErr != nil:
+		case errors.Is(verifyErr, domain.ErrUserPasswordInvalid()):
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
+		case errors.Is(verifyErr, domain.ErrUserPasswordHashingBusy()):
+			// The check never ran: no failed check, as for a fault above, or
+			// the server's load would lock the user out. Rebuilt rather than
+			// returned as is, so the generator does not count the wrong
+			// password Verify also answers with as returnable here.
+			return nil, nil, nil, domain.ErrUserPasswordHashingBusy().WithParent(verifyErr)
+		case verifyErr != nil:
+			// The caller gave up while the check waited for its slot.
+			return nil, nil, nil, domain.ErrInternal(verifyErr)
 		case updated != "":
 			// Best-effort: the password already matched, and the next sign-in
 			// rehashes again.
@@ -1002,6 +1058,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				ProjectID:  attempt.ProjectID,
 				EntityType: "user_passkey",
 				EntityID:   newPasskey.ID,
+				UserID:     registrationChallenge.UserID,
 				SessionID:  attempt.SessionID,
 				Payload: domain.AuthFactorPayload{
 					UserID:   registrationChallenge.UserID,
@@ -1017,9 +1074,9 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 }
 
 // recordProofFailure records a failed proof for rate limiting — best effort,
-// never shadowing the original error. Skipped when verify could not identify
-// a challenge row.
-func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge) {
+// never shadowing the original error — and, when emit is set, its
+// auth.check.failed. Skipped when verify could not identify a challenge row.
+func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, emit bool) {
 	if challenge == nil {
 		return
 	}
@@ -1027,7 +1084,10 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 		if err := tx.Statements().AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
+		if !emit {
+			return nil
+		}
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, nil)
 	})
 }
 
@@ -1111,7 +1171,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 	proof := PasskeyRegistrationProof{AttestationResponse: input.Attestation, Name: input.Name}
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, proof, check.GetID())
 	if err != nil {
-		s.recordProofFailure(ctx, attempt, challenge)
+		s.recordProofFailure(ctx, attempt, challenge, true)
 		return nil, err
 	}
 	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
@@ -1123,7 +1183,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, attempt.ProjectID, attempt.ID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		if err := emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true); err != nil {
+		if err := emitAuthCheck(ctx, tx.Statements(), attempt, challenge, factor); err != nil {
 			return err
 		}
 		// Consume the internal attempt in the same transaction: the ceremony
