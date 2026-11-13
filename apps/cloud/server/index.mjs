@@ -49,7 +49,7 @@ import { fileURLToPath } from "node:url";
 
 import { collectorHandler } from "./collector.mjs";
 import { LogRelay, vercelRequestId } from "./logs.mjs";
-import { MetricQueue } from "./metrics.mjs";
+import { deploymentAttributes, MetricQueue } from "./metrics.mjs";
 import { decodeMetricsRequest, decodeTraceRequest } from "./otlp.mjs";
 import { sendsToVercel } from "./sink.mjs";
 import { SpanRouter } from "./spans.mjs";
@@ -88,7 +88,7 @@ const clientTraceContext = new Set(["traceparent", "tracestate", "baggage"]);
 
 const toVercel = sendsToVercel(process.env);
 const router = new SpanRouter();
-const metrics = new MetricQueue();
+const metrics = new MetricQueue({ attributes: deploymentAttributes(process.env) });
 // The context is taken while the module loads, outside every request.
 const logs = new LogRelay({ outside: AsyncLocalStorage.snapshot() });
 let warnedOfMissingSpans = false;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { MetricQueue } from "./metrics.mjs";
+import { deploymentAttributes, MetricQueue } from "./metrics.mjs";
 
 const DELTA = 1;
 const CUMULATIVE = 2;
@@ -271,6 +271,44 @@ test("attributes are strings Vercel accepts", () => {
       attributes: { long: "x".repeat(62), status: "200", root: "true" },
     },
   ]);
+});
+
+test("every data point carries the deployment's attributes", () => {
+  const queue = queueOfAll({ attributes: { environment: "preview" } });
+  queue.ingest(
+    exportOf(
+      counter("events", 2, DELTA, [
+        attr("type", "session.created"),
+        // The deployment's replaces a data point's own.
+        attr("environment", "theirs"),
+      ]),
+      level("connections", 3),
+      histogram("duration", { count: 1, sum: 4, bucketCounts: [1], explicitBounds: [] }),
+    ),
+  );
+  assert.deepEqual(queue.take(100), [
+    { name: "events", value: 2, attributes: { type: "session.created", environment: "preview" } },
+    { name: "connections", value: 3, attributes: { environment: "preview" } },
+    { name: "duration", value: 4, attributes: { environment: "preview" } },
+  ]);
+
+  // They count toward the 50 attributes Vercel takes.
+  const many = Array.from({ length: 60 }, (_, n) => attr(`a${n}`, "v"));
+  queue.ingest(exportOf(counter("wide", 1, DELTA, many)));
+  const [{ attributes }] = queue.take(100);
+  assert.equal(Object.keys(attributes).length, 50);
+  assert.equal(attributes.environment, "preview");
+  assert.equal(attributes.a48, "v");
+  assert.equal(attributes.a49, undefined);
+});
+
+test("the environment is the deployment's, and absent outside one", () => {
+  assert.deepEqual(deploymentAttributes({ VERCEL_ENV: "production" }), {
+    environment: "production",
+  });
+  assert.deepEqual(deploymentAttributes({ VERCEL_ENV: "preview" }), { environment: "preview" });
+  assert.deepEqual(deploymentAttributes({ VERCEL_ENV: "" }), {});
+  assert.deepEqual(deploymentAttributes({}), {});
 });
 
 test("take hands out at most what an invocation may send, counters and levels first", () => {

@@ -706,8 +706,10 @@ project and imports the root admin.
 
   - Vercel bills a custom metric by the data point, so the wrapper sends
     only the instruments its list names, with the reasons
-    ([`metrics.mjs`](../../apps/cloud/server/metrics.mjs)). A custom metric
-    has no `environment`: filter it by `deploymentId`, not `--prod`.
+    ([`metrics.mjs`](../../apps/cloud/server/metrics.mjs)). Vercel gives a
+    custom metric no `environment`; the wrapper adds it to every data point,
+    so `--prod` and `environment:production` filter one as they do Vercel's
+    own metrics.
 
 - **Policy violations:** a browser's report of a Content-Security-Policy
   violation is a `WARN` line `content security policy violation` from the
