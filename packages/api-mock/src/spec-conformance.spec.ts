@@ -593,7 +593,7 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     expect(typeof body.message).toBe("string");
   });
 
-  test("POST /schemas returns 201 with a schema id", async () => {
+  test("POST /schemas returns 201 with the stored schema", async () => {
     const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -612,6 +612,8 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     const body = (await res.json()) as Record<string, unknown>;
     expect(typeof body.id).toBe("string");
     expect((body.id as string).startsWith("sch_")).toBe(true);
+    expect(body.schema).toMatchObject({ kind: "user-schema", objectType: "conformance" });
+    expect(typeof (body.metadata as Record<string, unknown>).created_at).toBe("string");
   });
 
   test("GET /schemas/:schema_id looks up by id without project_id", async () => {

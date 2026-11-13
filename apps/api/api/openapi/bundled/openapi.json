@@ -4123,7 +4123,7 @@
       "post": {
         "operationId": "publishSchema",
         "summary": "Publish a schema",
-        "description": "Publishes a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response's `id` is what\n`createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
+        "description": "Publishes a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response is the stored\nschema, as `getSchema` (`GET /schemas/{schema_id}`) returns it; its `id` is\nwhat `createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
         "tags": [
           "Schemas"
         ],
@@ -4301,17 +4301,45 @@
         },
         "responses": {
           "201": {
-            "description": "The ID of the created schema.",
+            "description": "The published schema.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/create-schema-response"
+                  "$ref": "#/components/schemas/schema"
                 },
                 "examples": {
                   "userSchemaResponse": {
-                    "summary": "An example of the response to creating a user schema.\n",
+                    "summary": "An example of the response to publishing a user schema.\n",
                     "value": {
-                      "id": "sch_abcd1234_efgh5678"
+                      "id": "sch_01H455VB4213EF62K49QF6M73F",
+                      "schema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "kind": "user-schema",
+                        "type": "object",
+                        "description": "This is an example of a user schema definition.",
+                        "objectType": "human-user",
+                        "x-auth-methods": {
+                          "password": {
+                            "enabled": false
+                          },
+                          "passkey": {
+                            "enabled": true
+                          }
+                        },
+                        "required": [
+                          "email"
+                        ],
+                        "properties": {
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "description": "The user's email address."
+                          }
+                        }
+                      },
+                      "metadata": {
+                        "created_at": "2026-07-14T09:11:00Z"
+                      }
                     }
                   }
                 }
@@ -18213,18 +18241,6 @@
             ]
           }
         ]
-      },
-      "create-schema-response": {
-        "type": "object",
-        "required": [
-          "id"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The ID of the created schema."
-          }
-        }
       },
       "flow-definition-expand": {
         "type": "string",
