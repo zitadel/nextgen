@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
-import { Members, fetchMembers } from "@/features/teams/components/team-members";
+import { TeamUsers } from "@/features/teams/components/team-users";
+import { fetchTeamUsers } from "@/features/users/api";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -23,26 +24,33 @@ import { Members, fetchMembers } from "@/features/teams/components/team-members"
  * claims a team is security-relevant, so it needs its own model — verification,
  * and more than one domain per team — rather than a string on `team-response`.
  * That model is not defined yet, so the cell is left out rather than shown empty.
+ *
+ * The Users tab lists the team's users in either of the two relations ADR 024
+ * keeps apart — who collaborates in the team, and whose lifecycle it owns —
+ * each its own query, loaded with the team. It is one tab, filtered, rather
+ * than a tab per relation: the team's other sections (branding, login flows)
+ * become tabs of their own.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project", resource: "team" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [team, members] = await Promise.all([
+    const [team, members, owned] = await Promise.all([
       api.getTeam(params.teamId),
       // Listing members needs `team_membership.read`, which a grant on only
-      // part of the project does not carry: a refusal costs the Members tab
-      // its list, not the team its page.
-      nullOnForbidden(fetchMembers(projectId, params.teamId)),
+      // part of the project does not carry: a refusal costs the Users tab its
+      // members, not the team its page. Owned users need only `user.read`.
+      nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "members")),
+      nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "owned")),
     ]);
-    return { team, members };
+    return { team, members, owned };
   },
   component: TeamDetail,
 });
 
 function TeamDetail() {
-  const { team, members } = Route.useLoaderData();
+  const { team, members, owned } = Route.useLoaderData();
   const router = useRouter();
 
   return (
@@ -63,7 +71,7 @@ function TeamDetail() {
       <Tabs defaultValue="overview" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="Team detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -80,14 +88,13 @@ function TeamDetail() {
           />
         </TabsContent>
 
-        <TabsContent value="members">
-          {members ? (
-            <Members teamId={team.id} loaded={members} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Your access does not include this team&apos;s members.
-            </p>
-          )}
+        <TabsContent value="users">
+          <TeamUsers
+            team={team}
+            members={members}
+            owned={owned}
+            onChanged={() => router.invalidate()}
+          />
         </TabsContent>
       </Tabs>
     </Page>

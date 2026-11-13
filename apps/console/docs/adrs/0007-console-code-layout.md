@@ -81,7 +81,7 @@ to maintain. The dependency graph must stay free of cycles.
 When two features would need each other, split or move the shared part. Two
 examples:
 
-- `fetchTeamMembers` lives in `features/users/` because it is a query on users,
+- `fetchTeamUsers` lives in `features/users/` because it is a query on users,
   and `features/teams/` imports it.
 - Every deployment screen needs the selected project, and the project page lists
   deployments' origins. So `features/projects/` holds the selection and the
