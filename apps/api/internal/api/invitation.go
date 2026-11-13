@@ -56,6 +56,7 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 		JourneyID:     inv.JourneyID,
 		AcceptedBy:    inv.AcceptedBy,
 		AcceptedAt:    inv.AcceptedAt,
+		RejectedAt:    inv.RejectedAt,
 		Type:          api.CreateInvitationProjectMemberResponseTypeProjectMember,
 		ProjectMember: inv.ProjectMember,
 		Link:          created.Link,
