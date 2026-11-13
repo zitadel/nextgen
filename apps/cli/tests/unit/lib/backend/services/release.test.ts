@@ -1,3 +1,4 @@
+import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConflictError } from "@/lib/backend/errors";
@@ -84,6 +85,12 @@ describe("ReleaseService.revoke", () => {
       };
     }
 
+    /** The URL the server refused the revoke at. */
+    const REVOKE_URL = "https://zitadel.test/api/v1/releases/rel_1/revoke";
+
+    /** The request id the server refused the revoke under. */
+    const REQUEST_ID = "req_1";
+
     /**
      * A service whose server refuses the revoke.
      *
@@ -94,8 +101,9 @@ describe("ReleaseService.revoke", () => {
       const revokeRelease = async () => {
         throw new ConflictError("release: still served by an origin", {
           status: 409,
-          url: "https://zitadel.test/api/v1/releases/rel_1/revoke",
+          url: REVOKE_URL,
           body,
+          requestId: REQUEST_ID,
         });
       };
 
@@ -133,11 +141,29 @@ describe("ReleaseService.revoke", () => {
       const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
 
       expect(refusal).toBeInstanceOf(ConflictError);
-      expect(refusal).toMatchObject({ status: 409, serverCode: "rel.in_use" });
+      expect(refusal).toMatchObject({
+        status: 409,
+        url: REVOKE_URL,
+        body: anInUseAnswer([PRIMARY]),
+        requestId: REQUEST_ID,
+        serverCode: "rel.in_use",
+        cause: expect.any(ConflictError),
+      });
     });
 
+    it.each(Object.values(RevokeRelease409DetailsOriginsItemKind))(
+      "fails with the origins when one is of the kind %s the API documents",
+      async (kind) => {
+        const releaseService = refusedWith(anInUseAnswer([{ ...PRIMARY, kind }]));
+
+        const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+
+        expect(refusal).toBeInstanceOf(ReleaseInUseError);
+      },
+    );
+
     it.each([
-      ["another code", { code: "rel.revoked", message: "revoked" }],
+      ["another code", { ...anInUseAnswer([PRIMARY]), code: "rel.revoked" }],
       ["no origins", anInUseAnswer([])],
       ["an origin of no known kind", anInUseAnswer([{ ...PRIMARY, kind: "other" }])],
       ["an origin that is empty", anInUseAnswer([{ ...PRIMARY, origin: "" }])],

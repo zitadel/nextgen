@@ -29,10 +29,12 @@ export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
  * The refusal to revoke a release an origin still serves.
  *
  * @remarks
- * Raised only when the server's answer names the origins, so a caller that
- * catches it always has at least one. It is a {@link ConflictError} that
- * carries the server's answer as it came, so a caller that does not know it
- * handles it as the plain conflict it also is.
+ * Raised only when the server's answer names the origins and every one is a
+ * primary origin or a preview, so a caller that catches it always has at least
+ * one, and {@link ReleaseInUseError.primaries} and
+ * {@link ReleaseInUseError.previews} between them hold all of them. It is a
+ * {@link ConflictError} that carries the server's answer as it came, so a
+ * caller that does not know it handles it as the plain conflict it also is.
  */
 export class ReleaseInUseError extends ConflictError {
   /** The error's name, which a caller that cannot import the class matches on. */
@@ -86,8 +88,9 @@ export class ReleaseInUseError extends ConflictError {
  * @remarks
  * The generated client types the 409 body but, as every error body, does not
  * validate it, so the answer is checked here before it is trusted. The kinds
- * are the generated ones, so a kind the API adds is not left out by this schema
- * alone.
+ * are the two {@link ReleaseInUseError} explains. A kind the API adds is
+ * therefore not parsed, and the refusal stays the plain conflict rather than
+ * naming an origin it cannot say how to free.
  */
 const InUseBody = z.object({
   details: z.object({
@@ -96,7 +99,10 @@ const InUseBody = z.object({
         z.object({
           origin: z.string().min(1),
           deployment_id: z.string().min(1),
-          kind: z.enum(RevokeRelease409DetailsOriginsItemKind),
+          kind: z.enum([
+            RevokeRelease409DetailsOriginsItemKind.primary,
+            RevokeRelease409DetailsOriginsItemKind.preview,
+          ]),
         }),
       )
       .min(1),

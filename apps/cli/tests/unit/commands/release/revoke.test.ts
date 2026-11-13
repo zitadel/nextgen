@@ -134,6 +134,7 @@ describe("release revoke refused for a release an origin serves", () => {
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 
+    expect(project[kind]).toBeDefined();
     expect(result).toHintAt(`${origin} (${kind}, ${project[kind]})`);
   });
 
