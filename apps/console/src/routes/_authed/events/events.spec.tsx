@@ -719,7 +719,7 @@ describe("events views", () => {
       "Audit eventsSign-ins and changes to the project",
       "Sign-insOne row per sign-in, and how it ended",
       "API requestsOne per call to the API",
-      "AllBoth, in the order they happened",
+      "AllAudit events and API requests",
     ]);
     expect(items[0]).toHaveAttribute("aria-current", "page");
     expect(items[1]).not.toHaveAttribute("aria-current");

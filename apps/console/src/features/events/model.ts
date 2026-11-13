@@ -93,12 +93,16 @@ export const VIEW_LABEL: Record<EventView, string> = {
   all: "All",
 };
 
-/** What each view holds, under its name in the view picker. */
+/**
+ * What each view holds, under its name in the view picker. Each stands on its
+ * own: "both" stopped saying which two once the sign-ins had a view between
+ * the audit events and the requests.
+ */
 export const VIEW_DESCRIPTION: Record<EventView, string> = {
   audit: "Sign-ins and changes to the project",
   signins: "One row per sign-in, and how it ended",
   requests: "One per call to the API",
-  all: "Both, in the order they happened",
+  all: "Audit events and API requests",
 };
 
 /**
