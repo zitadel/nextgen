@@ -1,238 +1,243 @@
+import { readFile } from "node:fs/promises";
 import { relative, sep } from "node:path";
+
+import ts from "typescript";
 
 import { sourceFiles } from "./source-files";
 
 /**
- * A const a module declares as a type: its name, and the object it holds from
- * its opening brace to its matching closing one.
+ * A const a module declares as a type, as the TypeScript parser reads it: its
+ * name, and the object literal it holds.
  */
 export type Declaration = Readonly<{
   /** The const's name, as the module spells it. */
   name: string;
-  /** The object, braces included, exactly as the module writes it. */
-  literal: string;
+  /** The object it holds, `as const` and `satisfies` taken off. */
+  literal: ts.ObjectLiteralExpression;
 }>;
 
 /**
- * Where a const that holds an object is declared, with or without a type
- * after its name. The type's arguments may nest (`Refused<ReadonlyArray<string>>`):
- * they run to the `>` that the ` = {` follows.
- */
-const DECLARED = /\bconst (\w+)(?:: (\w+)(?:<.*?>)?)? = \{/g;
-
-/**
- * What follows an object declared without a type, naming the type it
- * satisfies, with or without `as const`, on the same line or the next.
- */
-const SATISFIES = /^\s*(?:as const\s+)?satisfies\s+(\w+)\b/;
-
-/**
- * The characters after which a `/` opens a regex literal rather than dividing:
- * an operator, an opening bracket, or the start of the text.
- */
-const BEFORE_A_REGEX = /[(,=:[!&|?{};+\-*%<>~^]$/;
-
-/**
- * The end of the string, template, comment or regex literal that opens at
- * `at`, or `at` itself when nothing opens there.
+ * `text` parsed as TypeScript, with each node's parent set so a test can walk
+ * up as well as down.
  *
- * @param source - The module's source.
- * @param at - Where one may open.
- * @returns The index just after it closes.
+ * @param file - The file's path, which names it in the parser's output.
+ * @param text - Its source.
+ * @returns The parsed file.
  */
-function skipped(source: string, at: number): number {
-  const opener = source[at];
-  if (opener === '"' || opener === "'" || opener === "`") {
-    for (let end = at + 1; end < source.length; end++) {
-      if (source[end] === "\\") {
-        end++;
-        continue;
-      }
-      if (source[end] === opener) {
-        return end + 1;
-      }
-    }
-    return source.length;
-  }
-  if (source.startsWith("//", at)) {
-    const end = source.indexOf("\n", at);
-    return end === -1 ? source.length : end;
-  }
-  if (source.startsWith("/*", at)) {
-    const end = source.indexOf("*/", at + 2);
-    return end === -1 ? source.length : end + 2;
-  }
-  if (opener === "/" && BEFORE_A_REGEX.test(source.slice(0, at).trimEnd() || "(")) {
-    let inClass = false;
-    for (let end = at + 1; end < source.length; end++) {
-      const character = source[end];
-      if (character === "\\") {
-        end++;
-        continue;
-      }
-      if (character === "\n") {
-        return end;
-      }
-      if (character === "[") {
-        inClass = true;
-      }
-      if (character === "]") {
-        inClass = false;
-      }
-      if (character === "/" && !inClass) {
-        return end + 1;
-      }
-    }
-    return source.length;
-  }
-  return at;
+export function parsedSource(file: string, text: string): ts.SourceFile {
+  return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 }
 
 /**
- * `source` with every string, template and regex literal written as `""` and
- * every comment as a space, read in one pass so that none can hide another:
- * a `//` in a URL stays in its string, and a quote or a backtick in a comment
- * starts nothing.
+ * `file` read from disk and parsed ({@link parsedSource}).
  *
- * @param source - Code.
- * @returns The code, its structure kept and its text taken out.
+ * @param file - The file's path.
+ * @returns The parsed file.
  */
-export function codeOf(source: string): string {
-  let code = "";
-  let at = 0;
-  while (at < source.length) {
-    const after = skipped(source, at);
-    if (after === at) {
-      code += source[at];
-      at++;
-      continue;
-    }
-    code += source.startsWith("//", at) || source.startsWith("/*", at) ? " " : '""';
-    at = after;
-  }
-  return code;
+export async function parsedFile(file: string): Promise<ts.SourceFile> {
+  return parsedSource(file, await readFile(file, "utf8"));
 }
 
 /**
- * The object that opens at `opened`, read to its matching brace. A brace inside
- * a string, a template, a comment or a regex literal does not count, so
- * wording such as `"Pass '{'"` cannot end the object early.
+ * Every node under `root`, `root` included, that `is` accepts, in source order.
  *
- * @param source - The module's source.
- * @param opened - Where the object's `{` is.
- * @returns The object's text, braces included.
+ * @typeParam Found - What `is` narrows a node to.
+ * @param root - Where to start.
+ * @param is - Which nodes to keep.
+ * @returns The nodes.
  */
-export function objectAt(source: string, opened: number): string {
-  let depth = 0;
-  let at = opened;
-  while (at < source.length) {
-    const after = skipped(source, at);
-    if (after !== at) {
-      at = after;
-      continue;
+export function nodesOf<Found extends ts.Node>(
+  root: ts.Node,
+  is: (node: ts.Node) => node is Found,
+): Found[] {
+  const found: Found[] = [];
+  const visit = (node: ts.Node): void => {
+    if (is(node)) {
+      found.push(node);
     }
-    if (source[at] === "{") {
-      depth++;
-    }
-    if (source[at] === "}") {
-      depth--;
-      if (depth === 0) {
-        return source.slice(opened, at + 1);
-      }
-    }
-    at++;
-  }
-  return source.slice(opened);
+    ts.forEachChild(node, visit);
+  };
+  visit(root);
+  return found;
 }
 
 /**
- * A property's key where it opens, quoted (`"sso-client-id"`) or not, with
- * the `:`, `,` or `}` after it looked ahead to, not taken.
- */
-const KEY = /^\s*(?:"([^"\n]+)"|'([^'\n]+)'|([\w$-]+))\s*(?=[:,}])/;
-
-/**
- * Where the next key starts from `at`: past whitespace and any comment, which
- * may sit above a key and say why it is there.
+ * Whether `node` names the type `type`, with or without type arguments:
+ * `Refused` and `Refused<ReadonlyArray<string>>` both name `Refused`.
  *
- * @param literal - The object.
- * @param at - Just after the `{` or `,` that opens the key.
- * @returns The index of the key's first character.
+ * @param node - A type, if there is one.
+ * @param type - The type's name.
+ * @returns Whether it names it.
  */
-function keyAt(literal: string, at: number): number {
-  let next = at;
-  while (next < literal.length) {
-    if (/\s/.test(literal[next] ?? "")) {
-      next++;
-      continue;
-    }
-    if (literal.startsWith("//", next) || literal.startsWith("/*", next)) {
-      next = skipped(literal, next);
-      continue;
-    }
-    return next;
-  }
-  return next;
+function names(node: ts.TypeNode | undefined, type: string): boolean {
+  return (
+    node !== undefined &&
+    ts.isTypeReferenceNode(node) &&
+    ts.isIdentifier(node.typeName) &&
+    node.typeName.text === type
+  );
 }
 
 /**
- * The keys an object literal gives a value for itself, written every way a
- * property can be: `reason: reason`, or the shorthand `reason`. Only its own
- * keys count: a key of an object nested in it, an argument of a call in it, a
- * list's items, and a spread, which hides what it brings, give it nothing.
+ * Each const in `source` that holds an object literal declared as `type`,
+ * however the module writes it: `const NAME: Type = { … }`,
+ * `const NAME = { … } satisfies Type`, or the same with `as const` before the
+ * `satisfies`.
  *
- * @param literal - The object, braces included.
- * @returns Its keys.
- */
-export function keysOf(literal: string): string[] {
-  const keys: string[] = [];
-  let depth = 0;
-  let at = 0;
-  while (at < literal.length) {
-    const after = skipped(literal, at);
-    if (after !== at) {
-      at = after;
-      continue;
-    }
-    const character = literal[at] ?? "";
-    if ("([{".includes(character)) {
-      depth++;
-    }
-    if (")]}".includes(character)) {
-      depth--;
-    }
-    if (depth === 1 && (character === "{" || character === ",")) {
-      const key = KEY.exec(literal.slice(keyAt(literal, at + 1)));
-      const name = key?.[1] ?? key?.[2] ?? key?.[3];
-      if (name !== undefined) {
-        keys.push(name);
-      }
-    }
-    at++;
-  }
-  return keys;
-}
-
-/**
- * Each const in `source` that holds an object declared as `type`, either way a
- * module writes one: `const NAME: Type = { … }`, or
- * `const NAME = { … } as const satisfies Type`.
- *
- * @param source - The module's source.
+ * @param source - The parsed module.
  * @param type - The type's name, without type arguments: `Refused`, `Refusal`.
  * @returns The declarations, in the order they appear.
  */
-export function declaredAs(source: string, type: string): Declaration[] {
-  return [...source.matchAll(DECLARED)].flatMap((match) => {
-    const name = match[1];
-    if (name === undefined) {
+export function declaredAs(source: ts.SourceFile, type: string): Declaration[] {
+  return nodesOf(source, ts.isVariableDeclaration).flatMap((declaration) => {
+    if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) {
       return [];
     }
-    const opened = match.index + match[0].length - 1;
-    const literal = objectAt(source, opened);
-    const declared = match[2] ?? SATISFIES.exec(source.slice(opened + literal.length))?.[1];
+    let held = declaration.initializer;
+    let declared = names(declaration.type, type);
+    if (ts.isSatisfiesExpression(held)) {
+      declared = declared || names(held.type, type);
+      held = held.expression;
+    }
+    if (ts.isAsExpression(held)) {
+      held = held.expression;
+    }
 
-    return declared === type ? [{ name, literal }] : [];
+    return declared && ts.isObjectLiteralExpression(held)
+      ? [{ name: declaration.name.text, literal: held }]
+      : [];
+  });
+}
+
+/**
+ * The keys an object literal gives a value for itself: `reason: reason`, the
+ * shorthand `reason`, or a quoted `"sso-client-id": …`. A spread, which hides
+ * what it brings, and a computed key give it nothing, and nothing that is not
+ * an object literal has keys.
+ *
+ * @param node - What may be an object literal.
+ * @returns Its keys.
+ */
+export function keysOf(node: ts.Node | undefined): string[] {
+  if (node === undefined || !ts.isObjectLiteralExpression(node)) {
+    return [];
+  }
+  return node.properties.flatMap((property) => {
+    if (ts.isShorthandPropertyAssignment(property)) {
+      return [property.name.text];
+    }
+    if (
+      ts.isPropertyAssignment(property) &&
+      (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+    ) {
+      return [property.name.text];
+    }
+    return [];
+  });
+}
+
+/**
+ * The value `literal` gives `key` itself, if it gives one.
+ *
+ * @param literal - An object literal.
+ * @param key - A key it may give.
+ * @returns The value's expression.
+ */
+export function valueOf(
+  literal: ts.ObjectLiteralExpression,
+  key: string,
+): ts.Expression | undefined {
+  const property = literal.properties.find((one) => {
+    return ts.isPropertyAssignment(one) && ts.isIdentifier(one.name) && one.name.text === key;
+  });
+  return property !== undefined && ts.isPropertyAssignment(property)
+    ? property.initializer
+    : undefined;
+}
+
+/**
+ * Whether `node` is a string as the code writes it: a literal, a template
+ * without substitutions, or a literal part of a template with them.
+ *
+ * @param node - A node.
+ * @returns Whether it is one.
+ */
+function isText(
+  node: ts.Node,
+): node is
+  | ts.StringLiteral
+  | ts.NoSubstitutionTemplateLiteral
+  | ts.TemplateHead
+  | ts.TemplateMiddle
+  | ts.TemplateTail {
+  return (
+    ts.isStringLiteral(node) ||
+    ts.isNoSubstitutionTemplateLiteral(node) ||
+    ts.isTemplateHead(node) ||
+    ts.isTemplateMiddle(node) ||
+    ts.isTemplateTail(node)
+  );
+}
+
+/**
+ * The text of each string under `node` ({@link isText}). What a `${…}` holds
+ * is code, already resolved where it was written, so it is left out.
+ *
+ * @param node - Where to look.
+ * @returns The texts, in source order.
+ */
+export function textsIn(node: ts.Node): string[] {
+  return nodesOf(node, isText).map((text) => {
+    return text.text;
+  });
+}
+
+/**
+ * Whether anything under `node` joins a string with `+`, which the compiler
+ * then reads only as `string`.
+ *
+ * @param node - Where to look.
+ * @returns Whether a string is joined.
+ */
+export function joinsStrings(node: ts.Node): boolean {
+  const stringish = (side: ts.Expression): boolean => {
+    return isText(side) || ts.isTemplateExpression(side);
+  };
+  return nodesOf(node, ts.isBinaryExpression).some((binary) => {
+    return (
+      binary.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+      (stringish(binary.left) || stringish(binary.right))
+    );
+  });
+}
+
+/**
+ * The name of each identifier under `node`, as the code names it; a word in a
+ * string or a comment is no identifier.
+ *
+ * @param node - Where to look, if anywhere.
+ * @returns The names, in source order.
+ */
+export function identifiersIn(node: ts.Node | undefined): string[] {
+  if (node === undefined) {
+    return [];
+  }
+  return nodesOf(node, ts.isIdentifier).map((identifier) => {
+    return identifier.text;
+  });
+}
+
+/**
+ * Each call under `root` of a function named one of `callees`, called by its
+ * bare name: `refusalError(…)`, `reads(…)`.
+ *
+ * @param root - Where to look.
+ * @param callees - The functions' names.
+ * @returns The calls, in source order.
+ */
+export function callsOf(root: ts.Node, callees: readonly string[]): ts.CallExpression[] {
+  return nodesOf(root, ts.isCallExpression).filter((call) => {
+    return ts.isIdentifier(call.expression) && callees.includes(call.expression.text);
   });
 }
 

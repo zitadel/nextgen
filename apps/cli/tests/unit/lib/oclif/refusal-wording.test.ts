@@ -1,34 +1,29 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { codeOf, declaredAs, keysOf, objectAt, sourcesUnder } from "@tests/helpers/declarations";
+import {
+  callsOf,
+  declaredAs,
+  identifiersIn,
+  joinsStrings,
+  keysOf,
+  nodesOf,
+  parsedFile,
+  sourcesUnder,
+  textsIn,
+  valueOf,
+} from "@tests/helpers/declarations";
 
 const root = fileURLToPath(new URL("../../../../src", import.meta.url));
 
 /** What `read` fills for every flag and argument (`src/lib/oclif/flags.ts`). */
 const ALWAYS = ["value", "input", "problem"];
 
-/**
- * The name inside each `{…}` of a refusal's wording. A `${…}` is JavaScript's
- * own interpolation, already resolved where the refusal was written.
- */
-const PLACEHOLDER = /(?<!\$)\{([\w-]+)\}/g;
-
-/** Where a `Refused` declaration's own `values` open. */
-const VALUES = /\bvalues:\s*\{/;
-
-/**
- * Where a refusal is thrown: everything from the call to the values it hands
- * over, so a refusal chosen by a condition — `problem === "too-long" ? A : B`
- * — is paired with its values as surely as one named outright.
- */
-const THROWN = /refusalError\(([^{]*)\{/g;
-
-/** Wording joined with `+`, which the compiler can read only as `string`. */
-const JOINED = /["'`]\s*\+|\+\s*["'`]/;
+/** The name inside each `{…}` of a refusal's wording, as `interpolate` reads one. */
+const PLACEHOLDER = /\{([\w-]+)\}/g;
 
 /** One refusal, with its wording and the names something fills it with. */
 type Weighed = Readonly<{
@@ -36,75 +31,97 @@ type Weighed = Readonly<{
   file: string;
   /** The const that holds it. */
   name: string;
-  /** Its declaration, wording and all. */
-  wording: string;
+  /** Its declaration, as parsed. */
+  literal: ts.ObjectLiteralExpression;
   /** Each name a value is given for wherever it is raised. */
   filled: readonly string[];
 }>;
 
 /**
- * The values each throw of `name` in `source` hands over: the wording's values
- * and, after them, the values its whole-placeholder `next` entries are filled
- * from. A throw counts when its first argument names `name` as a whole word,
- * so `LIMIT` is not credited with what a throw of `MAX_LIMIT` passes.
+ * The keys each throw of `name` in `source` gives values for: its wording's
+ * values and the values its whole-placeholder `next` entries are filled from.
+ * A throw counts when its first argument names `name` as an identifier, a
+ * refusal chosen by a condition included, so `LIMIT` is not credited with what
+ * a throw of `MAX_LIMIT` passes.
  *
- * @param source - The module's source.
+ * @param source - The parsed module.
  * @param name - The refusal's const.
- * @returns The keys the throws give values for.
+ * @returns The keys.
  */
-function thrownWith(source: string, name: string): string[] {
-  const named = new RegExp(`\\b${name}\\b`);
-  return [...source.matchAll(THROWN)]
-    .filter((throwing) => {
-      return named.test(throwing[1] ?? "");
+function thrownWith(source: ts.SourceFile, name: string): string[] {
+  return callsOf(source, ["refusalError"])
+    .filter((call) => {
+      return identifiersIn(call.arguments[0]).includes(name);
     })
-    .flatMap((throwing) => {
-      const opened = throwing.index + throwing[0].length - 1;
-      const values = objectAt(source, opened);
-      const after = source.slice(opened + values.length);
-      const next = /^\s*,\s*\{/.exec(after);
-      const nextValues =
-        next === null ? "" : objectAt(source, opened + values.length + next[0].length - 1);
-
-      return [...keysOf(values), ...keysOf(nextValues)];
+    .flatMap((call) => {
+      return [...keysOf(call.arguments[1]), ...keysOf(call.arguments[2])];
     });
 }
 
 /**
- * Every refusal declared in `src`, each with its wording and what fills it.
- * A `Refused` is filled by `read` and its own `values`, nothing else. A
- * `Refusal` is filled wherever it is thrown, so each `refusalError` of it in
- * the same file counts — a name no throw of it passes reaches the person as
- * braces — and by `read` too where a flag's declaration names it as its
- * `refusal`, or a `ParseRefusal` is given it, as `readsFilled`'s empty value is.
+ * Whether `read` fills `name` as a flag's refusal: a declaration names it as
+ * its `refusal`, or a `ParseRefusal` is given it, as `readsFilled`'s empty
+ * value is.
+ *
+ * @param source - The parsed module.
+ * @param name - The refusal's const.
+ * @returns Whether `read` raises it.
+ */
+function readWith(source: ts.SourceFile, name: string): boolean {
+  const asRefusal = nodesOf(source, ts.isPropertyAssignment).some((property) => {
+    return (
+      ts.isIdentifier(property.name) &&
+      property.name.text === "refusal" &&
+      ts.isIdentifier(property.initializer) &&
+      property.initializer.text === name
+    );
+  });
+  const asParseRefusal = nodesOf(source, ts.isVariableDeclaration).some((declaration) => {
+    return (
+      declaration.type !== undefined &&
+      ts.isTypeReferenceNode(declaration.type) &&
+      ts.isIdentifier(declaration.type.typeName) &&
+      declaration.type.typeName.text === "ParseRefusal" &&
+      identifiersIn(declaration.initializer).includes(name)
+    );
+  });
+  return asRefusal || asParseRefusal;
+}
+
+/**
+ * Every refusal declared in `src`, each with what fills it. A `Refused` is
+ * filled by `read` and its own `values`, nothing else. A `Refusal` is filled
+ * wherever it is thrown in its module, and by `read` where a flag raises it
+ * ({@link readWith}) — a name nothing passes reaches the person as braces.
  *
  * @returns The refusals.
  */
 async function weighed(): Promise<Weighed[]> {
   const found: Weighed[] = [];
   for (const file of await sourcesUnder(root)) {
-    const source = await readFile(join(root, file), "utf8");
-    const code = codeOf(source);
+    const source = await parsedFile(join(root, file));
     for (const { name, literal } of declaredAs(source, "Refused")) {
-      const values = VALUES.exec(literal);
-      const own =
-        values === null ? [] : keysOf(objectAt(literal, values.index + values[0].length - 1));
-      found.push({ file, name, wording: literal, filled: [...ALWAYS, ...own] });
-    }
-    for (const { name, literal } of declaredAs(source, "Refusal")) {
-      const parsed = new RegExp(`(?:refusal:\\s*|: ParseRefusal = [^;\\n]*)\\b${name}\\b`).test(
-        code,
-      );
       found.push({
         file,
         name,
-        wording: literal,
-        filled: [...(parsed ? ALWAYS : []), ...thrownWith(source, name)],
+        literal,
+        filled: [...ALWAYS, ...keysOf(valueOf(literal, "values"))],
+      });
+    }
+    for (const { name, literal } of declaredAs(source, "Refusal")) {
+      found.push({
+        file,
+        name,
+        literal,
+        filled: [...(readWith(source, name) ? ALWAYS : []), ...thrownWith(source, name)],
       });
     }
   }
   return found;
 }
+
+/** The refusals, read once for every test that weighs them. */
+const REFUSALS = weighed();
 
 /**
  * A refusal's wording reaches the person, so a placeholder nothing fills shows
@@ -115,9 +132,11 @@ async function weighed(): Promise<Weighed[]> {
  */
 describe("what a flag or argument is refused for", () => {
   it("asks only for what something fills", async () => {
-    const defective = (await weighed()).flatMap((refusal) => {
-      const asked = [...refusal.wording.matchAll(PLACEHOLDER)].flatMap((match) => {
-        return match[1] === undefined ? [] : [match[1]];
+    const defective = (await REFUSALS).flatMap((refusal) => {
+      const asked = textsIn(refusal.literal).flatMap((text) => {
+        return [...text.matchAll(PLACEHOLDER)].flatMap((match) => {
+          return match[1] === undefined ? [] : [match[1]];
+        });
       });
       const unfilled = [...new Set(asked)].filter((name) => {
         return !refusal.filled.includes(name);
@@ -131,8 +150,8 @@ describe("what a flag or argument is refused for", () => {
   });
 
   it("is worded in literals the compiler can read, never joined with +", async () => {
-    const joined = (await weighed()).flatMap((refusal) => {
-      return JOINED.test(refusal.wording) ? [`${refusal.file}: ${refusal.name}`] : [];
+    const joined = (await REFUSALS).flatMap((refusal) => {
+      return joinsStrings(refusal.literal) ? [`${refusal.file}: ${refusal.name}`] : [];
     });
 
     expect(joined).toEqual([]);
