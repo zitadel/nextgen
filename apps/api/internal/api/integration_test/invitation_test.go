@@ -68,7 +68,8 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.NotEmpty(t, created.JourneyID)
 		// A project secret names no user.
 		assert.True(t, created.CreatedBy.IsNull())
-		assert.True(t, created.RejectedAt.IsNull())
+		assert.True(t, created.RespondedBy.IsNull())
+		assert.True(t, created.RespondedAt.IsNull())
 		link, err := url.Parse(created.Link)
 		require.NoError(t, err)
 		assert.Equal(t, "/ui/console/invitations/accept", link.Path)
@@ -456,8 +457,8 @@ func TestInvitationRedeem(t *testing.T) {
 		member, ok := got.GetInvitationProjectMember()
 		require.True(t, ok)
 		assert.Equal(t, api.InvitationStatusAccepted, member.Status)
-		assert.Equal(t, colleagueID, member.AcceptedBy.Value)
-		assert.True(t, member.AcceptedAt.Set)
+		assert.Equal(t, colleagueID, member.RespondedBy.Value)
+		assert.True(t, member.RespondedAt.Set)
 		assert.True(t, member.Metadata.IsNull())
 
 		after, err := colleague.GetProject(t.Context(), api.GetProjectParams{ProjectID: projectID})
@@ -488,8 +489,9 @@ func TestInvitationRedeem(t *testing.T) {
 		member, ok := got.GetInvitationProjectMember()
 		require.True(t, ok)
 		assert.Equal(t, api.InvitationStatusRejected, member.Status)
-		assert.True(t, member.AcceptedBy.IsNull())
-		assert.True(t, member.RejectedAt.Set)
+		// A decline records who answered, as accept does.
+		assert.Equal(t, colleagueID, member.RespondedBy.Value)
+		assert.True(t, member.RespondedAt.Set)
 		// The link holder doesn't see the metadata; the administrators still do.
 		assert.True(t, member.Metadata.IsNull())
 
@@ -524,7 +526,8 @@ func TestInvitationRedeem(t *testing.T) {
 		})
 		require.True(t, ok, "a rejected invitation matches pending or rejected")
 		assert.Equal(t, "Jane Doe", item.Metadata.Value.Name)
-		assert.Equal(t, member.RejectedAt.Value.Unix(), item.RejectedAt.Value.Unix())
+		assert.Equal(t, colleagueID, item.RespondedBy.Value)
+		assert.Equal(t, member.RespondedAt.Value.Unix(), item.RespondedAt.Value.Unix())
 		inviter, ok := item.Inviter.Get()
 		require.True(t, ok, "expanded")
 		assert.Equal(t, api.UserID(ownerID), inviter.UserID)

@@ -122,9 +122,10 @@ type Invitation struct {
 	CreatedAt     time.Time
 	ExpiresAt     time.Time
 	JourneyID     string
-	AcceptedBy    *string
-	AcceptedAt    *time.Time
-	RejectedAt    *time.Time
+	// RespondedBy and RespondedAt say who accepted or declined and when;
+	// Status says which. Nil while pending or expired.
+	RespondedBy *string
+	RespondedAt *time.Time
 	// TokenHash is HashSecret of the link's token.
 	TokenHash string
 }

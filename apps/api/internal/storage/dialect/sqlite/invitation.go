@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, accepted_by, accepted_at, rejected_at, token_hash`
+	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, responded_by, responded_at, token_hash`
 	createInvitationStmt = `INSERT INTO invitations` +
 		` (project_id, id, type, payload, metadata, created_by, created_by_type, created_at, expires_at, journey_id, token_hash)` +
 		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	invitationQuery              = `SELECT ` + invitationColumns + ` FROM invitations`
 	getInvitationByTokenHashStmt = invitationQuery + ` WHERE token_hash = ?`
 	// Accept clears the metadata; a decline keeps it for the administrators.
-	changeInvitationStatusStmt = `UPDATE invitations SET status = ?, accepted_by = ?, accepted_at = ?, rejected_at = ?,` +
+	changeInvitationStatusStmt = `UPDATE invitations SET status = ?, responded_by = ?, responded_at = ?,` +
 		` metadata = CASE WHEN ? = 'accepted' THEN NULL ELSE metadata END` +
 		` WHERE project_id = ? AND id = ? AND status = 'pending' AND expires_at > ?` +
 		` RETURNING ` + invitationColumns
@@ -113,13 +113,12 @@ func (s invitationStatements) ListInvitations(ctx context.Context, filter *datab
 }
 
 // ChangeInvitationStatus implements [service.InvitationStatements].
-func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
-	acceptedAt, rejectedAt, err := invitation.StatusChange(status, acceptedBy, now)
-	if err != nil {
+func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
+	if err := invitation.StatusChange(status, respondedBy); err != nil {
 		return nil, err
 	}
 	return s.queryOne(ctx, changeInvitationStatusStmt,
-		string(status), acceptedBy, nullUnixNano(acceptedAt), nullUnixNano(rejectedAt), string(status), projectID, id, now.UnixNano(),
+		string(status), respondedBy, now.UnixNano(), string(status), projectID, id, now.UnixNano(),
 	)
 }
 
@@ -168,12 +167,11 @@ func (s invitationStatements) execOne(ctx context.Context, query string, args ..
 
 func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 	var (
-		scanned        invitation.Row
-		payload        string
-		createdNano    int64
-		expiresNano    int64
-		acceptedAtNano sql.NullInt64
-		rejectedAtNano sql.NullInt64
+		scanned         invitation.Row
+		payload         string
+		createdNano     int64
+		expiresNano     int64
+		respondedAtNano sql.NullInt64
 	)
 	if err := rows.Scan(
 		&scanned.ProjectID,
@@ -187,9 +185,8 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 		&createdNano,
 		&expiresNano,
 		&scanned.JourneyID,
-		&scanned.AcceptedBy,
-		&acceptedAtNano,
-		&rejectedAtNano,
+		&scanned.RespondedBy,
+		&respondedAtNano,
 		&scanned.TokenHash,
 	); err != nil {
 		return nil, err
@@ -197,11 +194,8 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 	scanned.Payload = []byte(payload)
 	scanned.CreatedAt = timeFromUnixNano(createdNano)
 	scanned.ExpiresAt = timeFromUnixNano(expiresNano)
-	if acceptedAtNano.Valid {
-		scanned.AcceptedAt = new(timeFromUnixNano(acceptedAtNano.Int64))
-	}
-	if rejectedAtNano.Valid {
-		scanned.RejectedAt = new(timeFromUnixNano(rejectedAtNano.Int64))
+	if respondedAtNano.Valid {
+		scanned.RespondedAt = new(timeFromUnixNano(respondedAtNano.Int64))
 	}
 	return invitation.ToDomain(scanned)
 }

@@ -620,16 +620,16 @@ func expectInvitationByToken(s *servicemocks.MockAllStatements, entity *domain.I
 }
 
 // expectStatusChange expects the guarded write and returns its row as storage would.
-func expectStatusChange(s *servicemocks.MockAllStatements, entity *domain.Invitation, status domain.InvitationStatus, acceptedBy *string) {
-	s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, status, acceptedBy, gomock.Any()).DoAndReturn(
-		func(_ context.Context, _, _ string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
+func expectStatusChange(s *servicemocks.MockAllStatements, entity *domain.Invitation, status domain.InvitationStatus, respondedBy string) {
+	s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, status, respondedBy, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _, _ string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
 			changed := *entity
 			changed.Status = status
-			changed.EncryptedMetadata = nil
-			changed.AcceptedBy = acceptedBy
-			if acceptedBy != nil {
-				changed.AcceptedAt = &now
+			if status == domain.InvitationStatusAccepted {
+				changed.EncryptedMetadata = nil
 			}
+			changed.RespondedBy = &respondedBy
+			changed.RespondedAt = &now
 			return &changed, nil
 		})
 }
@@ -826,12 +826,12 @@ func TestInvitationService_Accept(t *testing.T) {
 						return nil
 					})
 			}
-			expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+			expectStatusChange(s, entity, domain.InvitationStatusAccepted, accepter)
 
 			got, err := svc.Accept(t.Context(), invitationToken, accepter, inviterAdmin(true))
 			require.NoError(t, err)
 			assert.Equal(t, domain.InvitationStatusAccepted, got.Status)
-			assert.Equal(t, new(accepter), got.AcceptedBy)
+			assert.Equal(t, new(accepter), got.RespondedBy)
 			assert.Nil(t, got.Metadata)
 
 			types := make([]domain.EventType, 0, len(*events))
@@ -881,7 +881,7 @@ func TestInvitationService_Accept(t *testing.T) {
 			name: "an accepting user no longer active",
 			setup: func(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
 				expectClaimedProject(s, invitationProjectID)
-				expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+				expectStatusChange(s, entity, domain.InvitationStatusAccepted, accepter)
 				s.EXPECT().GetResourceScope(gomock.Any(), accepter).Return(&domain.ResourceScope{
 					ResourceID:   accepter,
 					ResourceKind: domain.ResourceKindUser,
@@ -935,7 +935,7 @@ func TestInvitationService_Accept(t *testing.T) {
 		expectActiveUserPrincipal(s, accepter)
 		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)
 		s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
-		expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+		expectStatusChange(s, entity, domain.InvitationStatusAccepted, accepter)
 
 		_, err := svc.Accept(t.Context(), invitationToken, accepter, func(context.Context, service.AllStatements, string, string) (bool, error) {
 			t.Error("the inviter check ran for an invitation without a creator")
@@ -955,12 +955,13 @@ func TestInvitationService_Reject(t *testing.T) {
 		entity := pendingInvitation(new("user_admin"))
 		entity.EncryptedMetadata = new("ciphertext")
 		expectInvitationByToken(s, entity)
-		expectStatusChange(s, entity, domain.InvitationStatusRejected, nil)
+		expectStatusChange(s, entity, domain.InvitationStatusRejected, "user_colleague")
 
 		got, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
 		require.NoError(t, err)
 		assert.Equal(t, domain.InvitationStatusRejected, got.Status)
-		assert.Nil(t, got.AcceptedBy)
+		assert.Equal(t, new("user_colleague"), got.RespondedBy)
+		assert.NotNil(t, got.RespondedAt)
 
 		require.Len(t, *events, 1)
 		rejected := invitationEvent[domain.InvitationRejectedPayload](t, (*events)[0], domain.EventTypeInvitationRejected, "inv_1")

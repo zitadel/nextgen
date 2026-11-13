@@ -817,10 +817,10 @@ type InvitationStatements interface {
 	// project, status and type filters.
 	ListInvitations(ctx context.Context, filter *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error)
 	// ChangeInvitationStatus moves a pending, unexpired invitation to
-	// accepted, recording acceptedBy and now and nulling its metadata, or to
-	// rejected with a nil acceptedBy, recording now. Any other invitation
-	// returns a [database.NoRowFoundError].
-	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
+	// accepted, nulling its metadata, or to rejected, recording respondedBy
+	// and now either way. Any other invitation returns a
+	// [database.NoRowFoundError].
+	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error)
 	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
 	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
 	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error

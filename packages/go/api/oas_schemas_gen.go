@@ -20109,12 +20109,11 @@ type CreateInvitationProjectMemberResponse struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime `json:"accepted_at"`
-	// When the invitation was declined. Null until declined.
-	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
@@ -20171,19 +20170,14 @@ func (s *CreateInvitationProjectMemberResponse) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *CreateInvitationProjectMemberResponse) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *CreateInvitationProjectMemberResponse) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *CreateInvitationProjectMemberResponse) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
-}
-
-// GetRejectedAt returns the value of RejectedAt.
-func (s *CreateInvitationProjectMemberResponse) GetRejectedAt() OptNilDateTime {
-	return s.RejectedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *CreateInvitationProjectMemberResponse) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
 }
 
 // GetInviter returns the value of Inviter.
@@ -20251,19 +20245,14 @@ func (s *CreateInvitationProjectMemberResponse) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *CreateInvitationProjectMemberResponse) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *CreateInvitationProjectMemberResponse) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *CreateInvitationProjectMemberResponse) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
-}
-
-// SetRejectedAt sets the value of RejectedAt.
-func (s *CreateInvitationProjectMemberResponse) SetRejectedAt(val OptNilDateTime) {
-	s.RejectedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *CreateInvitationProjectMemberResponse) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
 }
 
 // SetInviter sets the value of Inviter.
@@ -20628,12 +20617,11 @@ type CreateInvitationTeamMemberResponse struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime `json:"accepted_at"`
-	// When the invitation was declined. Null until declined.
-	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
@@ -20690,19 +20678,14 @@ func (s *CreateInvitationTeamMemberResponse) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *CreateInvitationTeamMemberResponse) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *CreateInvitationTeamMemberResponse) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *CreateInvitationTeamMemberResponse) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
-}
-
-// GetRejectedAt returns the value of RejectedAt.
-func (s *CreateInvitationTeamMemberResponse) GetRejectedAt() OptNilDateTime {
-	return s.RejectedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *CreateInvitationTeamMemberResponse) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
 }
 
 // GetInviter returns the value of Inviter.
@@ -20770,19 +20753,14 @@ func (s *CreateInvitationTeamMemberResponse) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *CreateInvitationTeamMemberResponse) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *CreateInvitationTeamMemberResponse) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *CreateInvitationTeamMemberResponse) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
-}
-
-// SetRejectedAt sets the value of RejectedAt.
-func (s *CreateInvitationTeamMemberResponse) SetRejectedAt(val OptNilDateTime) {
-	s.RejectedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *CreateInvitationTeamMemberResponse) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
 }
 
 // SetInviter sets the value of Inviter.
@@ -52538,12 +52516,11 @@ type InvitationProjectMember struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime `json:"accepted_at"`
-	// When the invitation was declined. Null until declined.
-	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
@@ -52597,19 +52574,14 @@ func (s *InvitationProjectMember) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *InvitationProjectMember) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *InvitationProjectMember) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *InvitationProjectMember) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
-}
-
-// GetRejectedAt returns the value of RejectedAt.
-func (s *InvitationProjectMember) GetRejectedAt() OptNilDateTime {
-	return s.RejectedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *InvitationProjectMember) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
 }
 
 // GetInviter returns the value of Inviter.
@@ -52672,19 +52644,14 @@ func (s *InvitationProjectMember) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *InvitationProjectMember) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *InvitationProjectMember) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *InvitationProjectMember) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
-}
-
-// SetRejectedAt sets the value of RejectedAt.
-func (s *InvitationProjectMember) SetRejectedAt(val OptNilDateTime) {
-	s.RejectedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *InvitationProjectMember) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
 }
 
 // SetInviter sets the value of Inviter.
@@ -53424,12 +53391,11 @@ type InvitationTeamMember struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime `json:"accepted_at"`
-	// When the invitation was declined. Null until declined.
-	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
 	// The user who created the invitation, resolved for display: render `display`, falling back to
 	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
 	// null when a project secret created the invitation.
@@ -53483,19 +53449,14 @@ func (s *InvitationTeamMember) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *InvitationTeamMember) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *InvitationTeamMember) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *InvitationTeamMember) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
-}
-
-// GetRejectedAt returns the value of RejectedAt.
-func (s *InvitationTeamMember) GetRejectedAt() OptNilDateTime {
-	return s.RejectedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *InvitationTeamMember) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
 }
 
 // GetInviter returns the value of Inviter.
@@ -53558,19 +53519,14 @@ func (s *InvitationTeamMember) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *InvitationTeamMember) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *InvitationTeamMember) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *InvitationTeamMember) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
-}
-
-// SetRejectedAt sets the value of RejectedAt.
-func (s *InvitationTeamMember) SetRejectedAt(val OptNilDateTime) {
-	s.RejectedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *InvitationTeamMember) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
 }
 
 // SetInviter sets the value of Inviter.

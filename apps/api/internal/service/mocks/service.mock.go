@@ -364,18 +364,18 @@ func (c *MockAllStatementsAuthAttemptChallengeSucceededCall) DoAndReturn(f func(
 }
 
 // ChangeInvitationStatus mocks base method.
-func (m *MockAllStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
+func (m *MockAllStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ChangeInvitationStatus", ctx, projectID, id, status, acceptedBy, now)
+	ret := m.ctrl.Call(m, "ChangeInvitationStatus", ctx, projectID, id, status, respondedBy, now)
 	ret0, _ := ret[0].(*domain.Invitation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ChangeInvitationStatus indicates an expected call of ChangeInvitationStatus.
-func (mr *MockAllStatementsMockRecorder) ChangeInvitationStatus(ctx, projectID, id, status, acceptedBy, now any) *MockAllStatementsChangeInvitationStatusCall {
+func (mr *MockAllStatementsMockRecorder) ChangeInvitationStatus(ctx, projectID, id, status, respondedBy, now any) *MockAllStatementsChangeInvitationStatusCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangeInvitationStatus", reflect.TypeOf((*MockAllStatements)(nil).ChangeInvitationStatus), ctx, projectID, id, status, acceptedBy, now)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangeInvitationStatus", reflect.TypeOf((*MockAllStatements)(nil).ChangeInvitationStatus), ctx, projectID, id, status, respondedBy, now)
 	return &MockAllStatementsChangeInvitationStatusCall{Call: call}
 }
 
@@ -391,13 +391,13 @@ func (c *MockAllStatementsChangeInvitationStatusCall) Return(arg0 *domain.Invita
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsChangeInvitationStatusCall) Do(f func(context.Context, string, string, domain.InvitationStatus, *string, time.Time) (*domain.Invitation, error)) *MockAllStatementsChangeInvitationStatusCall {
+func (c *MockAllStatementsChangeInvitationStatusCall) Do(f func(context.Context, string, string, domain.InvitationStatus, string, time.Time) (*domain.Invitation, error)) *MockAllStatementsChangeInvitationStatusCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsChangeInvitationStatusCall) DoAndReturn(f func(context.Context, string, string, domain.InvitationStatus, *string, time.Time) (*domain.Invitation, error)) *MockAllStatementsChangeInvitationStatusCall {
+func (c *MockAllStatementsChangeInvitationStatusCall) DoAndReturn(f func(context.Context, string, string, domain.InvitationStatus, string, time.Time) (*domain.Invitation, error)) *MockAllStatementsChangeInvitationStatusCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

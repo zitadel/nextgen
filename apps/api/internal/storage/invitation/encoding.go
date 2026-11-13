@@ -23,9 +23,8 @@ type Row struct {
 	CreatedAt         time.Time
 	ExpiresAt         time.Time
 	JourneyID         string
-	AcceptedBy        *string
-	AcceptedAt        *time.Time
-	RejectedAt        *time.Time
+	RespondedBy       *string
+	RespondedAt       *time.Time
 	TokenHash         string
 }
 
@@ -44,18 +43,13 @@ func MarshalPayload(entity *domain.Invitation) ([]byte, error) {
 	}
 }
 
-// StatusChange returns the accepted_at and rejected_at a
-// ChangeInvitationStatus writes. A change it cannot write is a server fault:
-// accepted needs the accepter, rejected takes none.
-func StatusChange(status domain.InvitationStatus, acceptedBy *string, now time.Time) (acceptedAt, rejectedAt *time.Time, err error) {
-	switch {
-	case status == domain.InvitationStatusAccepted && acceptedBy != nil && *acceptedBy != "":
-		return &now, nil, nil
-	case status == domain.InvitationStatusRejected && acceptedBy == nil:
-		return nil, &now, nil
-	default:
-		return nil, nil, domain.ErrInternal(fmt.Errorf("cannot change an invitation's status to %q", status))
+// StatusChange checks a ChangeInvitationStatus it can write: accepted or
+// rejected, by a user. Anything else is a server fault.
+func StatusChange(status domain.InvitationStatus, respondedBy string) error {
+	if (status == domain.InvitationStatusAccepted || status == domain.InvitationStatusRejected) && respondedBy != "" {
+		return nil
 	}
+	return domain.ErrInternal(fmt.Errorf("cannot change an invitation's status to %q", status))
 }
 
 // CreatedByType is the created_by_type column value, nil when unset.
@@ -76,20 +70,17 @@ func ToDomain(row Row) (*domain.Invitation, error) {
 		Status:            domain.InvitationStatus(row.Status),
 		CreatedBy:         row.CreatedBy,
 		// Spanner returns UTC while pgx defaults to local; normalize.
-		CreatedAt:  row.CreatedAt.UTC(),
-		ExpiresAt:  row.ExpiresAt.UTC(),
-		JourneyID:  row.JourneyID,
-		AcceptedBy: row.AcceptedBy,
-		TokenHash:  row.TokenHash,
+		CreatedAt:   row.CreatedAt.UTC(),
+		ExpiresAt:   row.ExpiresAt.UTC(),
+		JourneyID:   row.JourneyID,
+		RespondedBy: row.RespondedBy,
+		TokenHash:   row.TokenHash,
 	}
 	if row.CreatedByType != nil {
 		entity.CreatedByType = new(domain.EventActorType(*row.CreatedByType))
 	}
-	if row.AcceptedAt != nil {
-		entity.AcceptedAt = new(row.AcceptedAt.UTC())
-	}
-	if row.RejectedAt != nil {
-		entity.RejectedAt = new(row.RejectedAt.UTC())
+	if row.RespondedAt != nil {
+		entity.RespondedAt = new(row.RespondedAt.UTC())
 	}
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:

@@ -478,3 +478,26 @@ This refines §10's rule that `lookup`, `accept` and `reject` are rate-limited.
 - A server guard waits for [ADR 088](088-abuse-protection-per-operation.md).
   The 128-bit token and the same `404` for every unknown or finished one
   already make guessing a link impractical.
+
+## Amendment (2026-11-13): one who and when for the answer
+
+This replaces `accepted_by` and `accepted_at` in §1, and `rejected_at` in the
+earlier amendment of this date.
+
+- **`responded_by`** and **`responded_at`** say who accepted or declined the
+  link and when; `status` says which. Both are null while the invitation is
+  pending or expired.
+- A decline records the user, as accept does. The `invitation.rejected`
+  event already carried it.
+- The shape follows `created_by` and `created_at`: no nested object, and no
+  outcome field beside `status`.
+
+  ```json
+  {
+    "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
+    "status": "accepted",
+    "metadata": null,
+    "responded_by": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
+    "responded_at": "2026-11-05T08:12:44Z"
+  }
+  ```

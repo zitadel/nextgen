@@ -426,7 +426,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 		}
 		// The guarded status change goes first: it locks the row, so a racing
 		// accept misses here instead of colliding on the grant.
-		accepted, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusAccepted, &userID, now)
+		accepted, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusAccepted, userID, now)
 		if err != nil {
 			return notPendingOnMiss(err)
 		}
@@ -488,7 +488,7 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfReject()
 		}
-		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, nil, now)
+		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, userID, now)
 		if err != nil {
 			return notPendingOnMiss(err)
 		}
