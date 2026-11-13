@@ -32,11 +32,11 @@ func (c clients) Client(_ context.Context, _, _, clientID string) (domain.Applic
 	return doc, nil
 }
 
-// unavailable is a ClientResolver whose storage is down.
-type unavailable struct{}
+// failing is a ClientResolver whose lookup fails with err.
+type failing struct{ err error }
 
-func (unavailable) Client(context.Context, string, string, string) (domain.ApplicationClientDocument, error) {
-	return domain.ApplicationClientDocument{}, domain.ErrUnavailable()
+func (f failing) Client(context.Context, string, string, string) (domain.ApplicationClientDocument, error) {
+	return domain.ApplicationClientDocument{}, f.err
 }
 
 // authRequests is a fake AuthRequestStore that records what it stores.
@@ -124,21 +124,20 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 }
 
 // A loopback issuer on plain http gets a cookie without the __Host- prefix,
-// which a browser only accepts with Secure, and a loopback redirect URI
-// matches on any port.
+// which a browser only accepts with Secure.
 func TestAuthorizeOnLoopback(t *testing.T) {
 	t.Parallel()
 	store := &authRequests{}
 	mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: store})
 
-	query := authorizeQuery(map[string]string{"redirect_uri": "http://127.0.0.1:4000/callback"})
+	query := authorizeQuery(map[string]string{"redirect_uri": "http://127.0.0.1:3000/callback"})
 	rec := send(t, mux, http.MethodGet, authorizePath+query, "localhost:8080", map[string]string{"Accept": "text/html"})
 
 	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	assert.Equal(t, "http://localhost:8080/login?auth_request=authreq_1", rec.Header().Get("Location"))
 	assert.Equal(t, "_zauth_authreq_1=nonce; Path=/; Max-Age=900; HttpOnly; SameSite=Lax", rec.Header().Get("Set-Cookie"))
 	require.Len(t, store.stored, 1)
-	assert.Equal(t, "http://127.0.0.1:4000/callback", store.stored[0].RedirectURI)
+	assert.Equal(t, "http://127.0.0.1:3000/callback", store.stored[0].RedirectURI)
 }
 
 // A request without a scope is accepted. Until the server serves the
@@ -222,9 +221,15 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "unknown_client", set: map[string]string{"client_id": "nobody"}, wantStatus: http.StatusBadRequest},
+		// Refused before the lookup, which a database answers with an error.
+		{name: "client_id_with_nul", clients: failing{errors.New("the database refuses the id")}, set: map[string]string{"client_id": "shop\x00"}, wantStatus: http.StatusBadRequest},
+		{name: "client_id_not_utf8", clients: failing{errors.New("the database refuses the id")}, set: map[string]string{"client_id": "shop\xff"}, wantStatus: http.StatusBadRequest},
 		{name: "unregistered_redirect_uri", set: map[string]string{"redirect_uri": "https://evil.example/callback"}, wantStatus: http.StatusBadRequest},
+		// Any port is for native apps (ADR 082 §2), and every client is a web client.
+		{name: "loopback_on_other_port", set: map[string]string{"redirect_uri": "http://127.0.0.1:4000/callback"}, wantStatus: http.StatusBadRequest},
 		{name: "missing_redirect_uri", set: map[string]string{"redirect_uri": ""}, wantStatus: http.StatusBadRequest},
-		{name: "clients_unavailable", clients: unavailable{}, wantStatus: http.StatusInternalServerError},
+		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantStatus: http.StatusServiceUnavailable},
+		{name: "clients_fail", clients: failing{errors.New("boom")}, wantStatus: http.StatusInternalServerError},
 		{name: "oauth_off", settings: settings{}, wantStatus: http.StatusNotFound},
 		{name: "settings_without_deployment", settings: settings{settings: Settings{Enabled: true, ReleaseID: "rel_1"}}, wantStatus: http.StatusInternalServerError},
 		{name: "settings_without_release", settings: settings{settings: Settings{Enabled: true, DeploymentID: "dep_1"}}, wantStatus: http.StatusInternalServerError},
@@ -277,9 +282,14 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "plain_method", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "plain"}, wantError: "invalid_request"},
 		{name: "no_method", set: map[string]string{"code_challenge": challenge}, wantError: "invalid_request"},
 		{name: "unknown_method", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S512"}, wantError: "invalid_request"},
+		{name: "challenge_too_short", set: map[string]string{"code_challenge": challenge[:42], "code_challenge_method": "S256"}, wantError: "invalid_request"},
+		{name: "challenge_not_base64url", set: map[string]string{"code_challenge": challenge[:42] + "+", "code_challenge_method": "S256"}, wantError: "invalid_request"},
+		{name: "state_with_nul", set: map[string]string{"state": "xyz\x00"}, wantError: "invalid_request"},
+		{name: "state_not_utf8", set: map[string]string{"state": "xyz\xff"}, wantError: "invalid_request"},
 		{name: "no_authorization_code_grant", set: map[string]string{"client_id": "no-codes"}, wantError: "unauthorized_client"},
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
+		{name: "store_unavailable", storeErr: domain.ErrUnavailable().WithParent(errors.New("contention")), wantError: "temporarily_unavailable"},
 		{name: "store_fails", storeErr: domain.ErrInternal(errors.New("boom")), wantError: "server_error"},
 	}
 	for _, tt := range tests {
@@ -301,7 +311,11 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantError, params.Get("error"))
-			assert.Equal(t, "xyz", params.Get("state"))
+			wantState := "xyz"
+			if state, ok := tt.set["state"]; ok {
+				wantState = state
+			}
+			assert.Equal(t, wantState, params.Get("state"))
 			assert.Empty(t, rec.Header().Get("Set-Cookie"))
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 		})

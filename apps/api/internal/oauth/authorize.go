@@ -2,11 +2,14 @@ package oauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -24,6 +27,9 @@ const (
 	// noScope stands in for a missing scope. No client allows it, so the
 	// library drops it.
 	noScope = "urn:zitadel:no-scope"
+	// temporarilyUnavailable tells the client it may retry (RFC 6749
+	// §4.1.2.1). The library has no constructor for it.
+	temporarilyUnavailable = "temporarily_unavailable"
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
@@ -52,19 +58,26 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 	if settings.DeploymentID == "" || settings.ReleaseID == "" {
 		return nil, metadataError(domain.ErrInternal(errors.New("the OAuth settings name no deployment or release")))
 	}
+	unknownClient := op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
+	// A lookup with text a dialect cannot hold fails as a 500.
+	if !storable(r.Data.ClientID) {
+		return nil, unknownClient
+	}
 	doc, err := s.clients.Client(ctx, issuer.ProjectID, settings.DeploymentID, r.Data.ClientID)
-	if err != nil {
-		if domain.IsServerFault(err) {
-			return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
-		}
-		return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
+	switch {
+	case errors.Is(err, domain.ErrApplicationNotFound()):
+		return nil, unknownClient
+	case errors.Is(err, domain.ErrUnavailable()):
+		return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
+	case err != nil:
+		return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
 	}
 	// TODO(zitadel/oidc#1041): drop the placeholder once an op.Server client
 	// can allow a request without a scope, which the library refuses.
 	if len(r.Data.Scopes) == 0 {
 		r.Data.Scopes = oidc.SpaceDelimitedArray{noScope}
 	}
-	c := newClient(r.Data.ClientID, doc, r.Data.RedirectURI)
+	c := newClient(r.Data.ClientID, doc)
 	c.settings = settings
 	return &op.ClientRequest[oidc.AuthRequest]{Request: r, Client: c}, nil
 }
@@ -86,9 +99,18 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	if !slices.Contains(c.grantTypes, oidc.GrantTypeCode) {
 		return nil, oidc.ErrUnauthorizedClient().WithDescription("the client may not use the authorization code grant")
 	}
-	// The library reads a missing method as plain; this server accepts S256 only.
-	if req.CodeChallenge != "" && req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
-		return nil, oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
+	// state is stored, so it must be text every dialect can hold.
+	if !storable(req.State) {
+		return nil, oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
+	}
+	if req.CodeChallenge != "" {
+		// The library reads a missing method as plain; this server accepts S256 only.
+		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
+			return nil, oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
+		}
+		if digest, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil || len(digest) != sha256.Size {
+			return nil, oidc.ErrInvalidRequest().WithDescription("code_challenge must be a base64url SHA-256 digest")
+		}
 	}
 	issuer, _ := IssuerFromContext(ctx)
 	login, err := loginURL(issuer, r.Header.Get(LoginPathHeader))
@@ -116,6 +138,9 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 		ReleaseID:     c.settings.ReleaseID,
 	}
 	nonce, err := s.authRequests.Create(ctx, request)
+	if errors.Is(err, domain.ErrUnavailable()) {
+		return nil, (&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err)
+	}
 	if err != nil {
 		return nil, oidc.ErrServerError().WithParent(err)
 	}
@@ -150,8 +175,8 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 // bindingCookie binds the request's handle to the browser that started it.
 // Each request has its own cookie, so a second request in the same browser
 // does not end the first (ADR 081 §8.3). The name is `__Host-` prefixed
-// unless the issuer is plain http on loopback, where a browser refuses
-// Secure cookies (ADR 083).
+// unless the issuer is plain http on loopback, where Safari drops Secure
+// cookies (ADR 083).
 func bindingCookie(issuer Issuer, handle, nonce string) string {
 	secure := issuer.URL.Scheme != "http" || !domain.IsLoopbackOrigin(issuer.Origin())
 	name := "_zauth_" + handle
@@ -205,8 +230,8 @@ func (w *errorPageWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// errorPageFor is the page for status. Its text is fixed: the library's
-// description can quote the request.
+// errorPageFor is the page for status, in ADR 076 §4's words. A refusal has
+// no sentence: the library's description can quote the request.
 func errorPageFor(status int) errorpage.Page {
 	switch {
 	case status == http.StatusNotFound:
@@ -214,14 +239,15 @@ func errorPageFor(status int) errorpage.Page {
 	case status >= http.StatusInternalServerError:
 		return errorpage.Page{
 			Status:      status,
-			Title:       "Sign-in could not start",
-			Description: "Something went wrong on our side. Go back to the app and try again in a moment.",
+			Title:       "Something went wrong",
+			Description: "The server could not complete this request. Try again in a moment.",
 		}
 	default:
-		return errorpage.Page{
-			Status:      status,
-			Title:       "Sign-in could not start",
-			Description: "The app sent a sign-in request this server cannot accept. Go back to the app and try again.",
-		}
+		return errorpage.Page{Status: status, Title: "Request failed"}
 	}
+}
+
+// storable reports whether s is text every dialect stores: UTF-8 without NUL.
+func storable(s string) bool {
+	return utf8.ValidString(s) && !strings.ContainsRune(s, 0)
 }

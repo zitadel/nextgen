@@ -2,19 +2,16 @@ package oauth
 
 import (
 	"context"
-	"net/url"
-	"slices"
 	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/httputil"
 )
 
-// ClientResolver finds a client in the release a deployment serves, or among
-// the project's registered applications (ADR 082 §3). An unknown client is
+// ClientResolver finds a client among the project's registered applications
+// only, for now (ADR 082 §3). An unknown client is
 // [domain.ErrApplicationNotFound].
 type ClientResolver interface {
 	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
@@ -31,18 +28,9 @@ type client struct {
 	settings Settings
 }
 
-// newClient wraps doc, the client holding clientID, for the request to
-// requestedRedirectURI. A loopback redirect URI matches a registered one on
-// any port (RFC 8252 §7.3), so the requested URI joins the registered ones
-// when only its port differs. The library does this for native clients
-// alone.
-func newClient(clientID string, doc domain.ApplicationClientDocument, requestedRedirectURI string) *client {
+// newClient wraps doc, the client holding clientID.
+func newClient(clientID string, doc domain.ApplicationClientDocument) *client {
 	c := &client{id: clientID, redirectURIs: doc.RedirectURIs}
-	if !slices.Contains(doc.RedirectURIs, requestedRedirectURI) && slices.ContainsFunc(doc.RedirectURIs, func(registered string) bool {
-		return loopbackOnOtherPort(requestedRedirectURI, registered)
-	}) {
-		c.redirectURIs = append(slices.Clip(doc.RedirectURIs), requestedRedirectURI)
-	}
 	for _, grant := range doc.GrantTypes {
 		c.grantTypes = append(c.grantTypes, oidc.GrantType(grant))
 	}
@@ -72,22 +60,3 @@ func (c *client) RestrictAdditionalAccessTokenScopes() func([]string) []string {
 func (c *client) LoginURL(string) string { return "" }
 
 var _ op.Client = (*client)(nil)
-
-// loopbackOnOtherPort reports whether requested is the loopback URI
-// registered apart from its port. requested comes from the request, so it is
-// parsed as a redirect target and must already be in canonical form, as
-// every registered URI is.
-func loopbackOnOtherPort(requested, registered string) bool {
-	r, err := url.Parse(registered)
-	if err != nil || r.Scheme != "http" || !domain.IsLoopbackOrigin(r.Scheme+"://"+r.Host) {
-		return false
-	}
-	u, err := httputil.ParseRedirectTarget(requested)
-	if err != nil || u.String() != requested || u.Hostname() != r.Hostname() {
-		return false
-	}
-	// Only the port may differ: with the registered host and port swapped in,
-	// the rest must match exactly.
-	u.Host = r.Host
-	return u.String() == registered
-}
