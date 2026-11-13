@@ -47,6 +47,9 @@ const LOCKOUT_MESSAGE =
 
 const A_SHA = expect.stringMatching(/^[0-9a-f]{40}$/);
 
+/** A deploy message written over two lines, as `git commit -m` keeps one. */
+const TWO_LINE_MESSAGE = "add a nickname\nand a title";
+
 /** A set-up app with Google sign-in enabled, ready for a deploy. */
 async function anAppWithGoogle(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
@@ -1627,7 +1630,7 @@ describe("deploy", () => {
             },
             next_commands: [
               expectedPublicCliCommand(app.againAsRun("deployment list")),
-              `git -C '${app.path}' add .zitadel && git -C '${app.path}' commit -m 'test deploy' -- .zitadel`,
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m 'test deploy' -- .zitadel`,
             ],
           },
           warnings: [UNCOMMITTED],
@@ -1666,10 +1669,27 @@ describe("deploy", () => {
             },
             next_commands: [
               expectedPublicCliCommand(app.againAsRun("deployment list")),
-              `git -C '${app.path}' add .zitadel && git -C '${app.path}' commit -m 'add a nickname' -- .zitadel`,
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m 'add a nickname' -- .zitadel`,
             ],
           },
           warnings: [UNCOMMITTED],
+        });
+      });
+
+      it("writes a message that spans lines as one word in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", TWO_LINE_MESSAGE]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          data: {
+            next_commands: expect.arrayContaining([
+              `git -C ${app.path} add .zitadel && git -C ${app.path} commit -m $'add a nickname\\nand a title' -- .zitadel`,
+            ]),
+          },
         });
       });
 

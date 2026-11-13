@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Origins } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
@@ -142,10 +143,7 @@ const NO_PRIMARY_ORIGIN_REFUSAL = {
  * @returns `git add` then `git commit` of `.zitadel/`, one after the other.
  */
 function commitConfig(deployed: string, message: string | undefined): SuggestedCommand {
-  const quote = (text: string): string => {
-    return `'${text.replaceAll("'", "'\\''")}'`;
-  };
-  const where = resolve(deployed) === process.cwd() ? [] : ["-C", quote(deployed)];
+  const where = resolve(deployed) === process.cwd() ? [] : ["-C", Cmd.quote(deployed)];
   return shellSteps(
     shellCommand("git", ...where, "add", ".zitadel"),
     shellCommand(
@@ -153,7 +151,7 @@ function commitConfig(deployed: string, message: string | undefined): SuggestedC
       ...where,
       "commit",
       "-m",
-      quote(message ?? "<what changed>"),
+      Cmd.quote(message ?? "<what changed>"),
       "--",
       ".zitadel",
     ),
