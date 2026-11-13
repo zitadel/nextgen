@@ -37284,7 +37284,7 @@
         "name": "release_id",
         "in": "query",
         "required": false,
-        "description": "Narrows the list to the deployments of this release: the `id` that\n`createRelease` (`POST /releases`) returns or `listReleases`\n(`GET /releases`) lists. A release no deployment of the project made live\nanswers an empty list, not an error.\n",
+        "description": "Narrows the list to the deployments of this release: the `id` that\n`createRelease` (`POST /releases`) returns or `listReleases`\n(`GET /releases`) lists. A release with nothing to list, one never\ndeployed, one no longer served with `live=true`, or one of another\nproject, answers an empty list, not an error.\n",
         "schema": {
           "$ref": "#/components/schemas/release-id"
         }

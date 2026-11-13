@@ -2489,7 +2489,7 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const origin = record.origin;
-      const releaseId = record.release_id;
+      const releaseId = query.data.release_id;
       const live = liveRaw === "true";
       const ofRelease = (deployment: DeploymentRecord): boolean => {
         return releaseId === undefined || deployment.releaseId === releaseId;

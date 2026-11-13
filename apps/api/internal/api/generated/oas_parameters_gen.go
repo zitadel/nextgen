@@ -6576,8 +6576,9 @@ type ListDeploymentsParams struct {
 	// records it. An origin no deployment targeted answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
 	// Narrows the list to the deployments of this release: the `id` that `createRelease`
-	// (`POST /releases`) returns or `listReleases` (`GET /releases`) lists. A release no deployment of the
-	// project made live answers an empty list, not an error.
+	// (`POST /releases`) returns or `listReleases` (`GET /releases`) lists. A release with nothing to
+	// list, one never deployed, one no longer served with `live=true`, or one of another project, answers
+	// an empty list, not an error.
 	ReleaseID OptReleaseID `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
