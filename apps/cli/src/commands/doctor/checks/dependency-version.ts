@@ -1,10 +1,7 @@
 import semver from "semver";
 
-import {
-  addExactCommandFor,
-  detectPackageManager,
-  suggestedCommandOf,
-} from "@/lib/package-manager";
+import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
+import { suggestedCommandOf } from "@/lib/suggestion";
 import { exactZitadelPins } from "@/lib/zitadel-pins";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";

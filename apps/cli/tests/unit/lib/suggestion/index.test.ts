@@ -12,25 +12,37 @@ import {
   type FlagsOf,
   type HelpNext,
   helpOf,
-  inShell,
+  andTheRest,
   isSuggestion,
   type Next,
   renderSuggestion,
   type SuggestedCommand,
   type SuggestionId,
   type Suggestion,
+  pipedFrom,
+  readingFrom,
   shellCommand,
   shellSteps,
+  suggestedCommandOf,
   spelled,
   suggestionWords,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { relatedFlags } from "@/lib/suggestion/relations";
+import {
+  addExactCommandFor,
+  devCommandFor,
+  inDirectory,
+  installCommandFor,
+  type PackageCommand,
+  removeCommandFor,
+} from "@/lib/package-manager";
+import { CLI_BINARY, CLI_PACKAGE_NAME } from "@/lib/public-cli";
 
 const VERSION = "1.0.0-alpha.25";
 
-/** A program known only when the code runs, which may be the CLI. */
-const CHOSEN_PROGRAM: "zitadel" | "ls" = VERSION.length > 0 ? "zitadel" : "ls";
+/** An SDK pinned at an exact version, as a dependency check installs it. */
+const SDK_PIN = "@zitadel/sdk-next@1.0.0";
 
 /** A commit message quoted as one shell word, which names the CLI and a `;`. */
 const QUOTED_MESSAGE = "'don'\\''t; zitadel deploy again'";
@@ -254,90 +266,105 @@ describe("a suggested help", () => {
 
 describe("shellCommand", () => {
   it("is its program and its words, as written", () => {
-    expect(shellCommand("npm", "install", "@zitadel/cli@alpha")).toBe(
-      "npm install @zitadel/cli@alpha",
+    expect(shellCommand("docker", "pull", "ghcr.io/zitadel/zitadel")).toBe(
+      "docker pull ghcr.io/zitadel/zitadel",
     );
   });
 
-  it("does not compile for a program or words that run the CLI, which it refuses too", () => {
-    const refused = [
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("zitadel", "deploy");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error a path to the binary is the CLI too
-        return shellCommand("./node_modules/.bin/zitadel", "doctor");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error a runner runs whatever it is given, the CLI included
-        return shellCommand("npx", "@zitadel/cli");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error a wrapper runs whatever it is given, the CLI included
-        return shellCommand("env", "FOO=1", "zitadel");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error a package manager's dlx runs a package
-        return shellCommand("pnpm", "dlx", "@zitadel/cli");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error a package manager given the binary runs it
-        return shellCommand("pnpm", "zitadel", "deploy");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error one of the programs it may be is the CLI
-        return shellCommand(CHOSEN_PROGRAM, "deploy");
-      }),
+  it("does not compile for a program a suggestion may not name", () => {
+    const written = [
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("zitadel", "deploy"),
+      // @ts-expect-error a runner runs whatever it is given, the CLI included
+      shellCommand("npx", CLI_PACKAGE_NAME),
+      // @ts-expect-error a package manager's command goes through suggestedCommandOf
+      shellCommand("pnpm", "dlx", CLI_PACKAGE_NAME),
     ];
 
-    expect(refused).toEqual(Array(refused.length).fill(expect.any(Error)));
+    expect(written).toEqual([
+      "zitadel deploy",
+      `npx ${CLI_PACKAGE_NAME}`,
+      `pnpm dlx ${CLI_PACKAGE_NAME}`,
+    ]);
   });
 
-  it.each<[string, string, readonly string[]]>([
-    ["the binary", "zitadel", ["deploy"]],
-    ["npm exec after a directory", "npm", ["--prefix", "app", "exec", "zitadel"]],
-    ["yarn dlx", "yarn", ["dlx", "@zitadel/cli", "deploy"]],
-    ["sudo", "sudo", ["zitadel", "start"]],
-  ])("refuses a command built at run time that runs the CLI through %s", (_how, program, words) => {
+  it("takes a word that only names the CLI, as a commit message does", () => {
+    expect(shellCommand("git", "commit", "-m", QUOTED_MESSAGE)).toBe(
+      `git commit -m ${QUOTED_MESSAGE}`,
+    );
+  });
+});
+
+describe("suggestedCommandOf", () => {
+  it.each<[string, PackageCommand]>([
+    ["an install", addExactCommandFor("npm", [SDK_PIN])],
+    ["a script in another directory", inDirectory(devCommandFor("npm"), "app", "/abs/app")],
+    ["an install in a directory named exec", inDirectory(installCommandFor("pnpm"), "exec", "/x")],
+    ["a removal of a package named like the CLI", removeCommandFor("npm", [CLI_BINARY])],
+  ])("is %s as its display shows it", (_what, command) => {
+    expect(suggestedCommandOf(command)).toBe(command.display);
+  });
+
+  it.each<[string, PackageCommand]>([
+    ["dlx", { command: "pnpm", args: ["dlx", CLI_PACKAGE_NAME], display: "pnpm dlx" }],
+    [
+      "exec behind a flag",
+      { command: "npm", args: ["--silent", "exec", CLI_BINARY], display: "npm" },
+    ],
+    [
+      "x behind a boolean flag",
+      { command: "bun", args: ["-r", "x", CLI_PACKAGE_NAME], display: "bun" },
+    ],
+    ["run of the binary", { command: "yarn", args: ["run", CLI_BINARY], display: "yarn run" }],
+    ["the binary as a script", { command: "pnpm", args: [CLI_BINARY, "deploy"], display: "pnpm" }],
+  ])("refuses a command that runs a package or the CLI through %s", (_how, command) => {
     const error = thrownBy(() => {
-      return shellCommand(program, ...words);
+      return suggestedCommandOf(command);
     });
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
-      message: `${program} runs the CLI: suggest it as { id, args, flags } instead`,
+      message: `${command.display} may run a package: suggest the CLI as { id, args, flags }`,
     });
-  });
-
-  it.each<[string, string, readonly string[]]>([
-    ["commits a message that names the CLI", "git", ["commit", "-m", QUOTED_MESSAGE]],
-    ["runs a script in a directory named exec", "npm", ["--prefix", "exec", "run", "dev"]],
-    ["uninstalls a package named like it", "npm", ["uninstall", "zitadel"]],
-    ["pulls the server's image", "docker", ["pull", "ghcr.io/zitadel/zitadel"]],
-    ["changes to a directory named like it", "cd", ["/home/me/zitadel"]],
-  ])("takes a command that only %s", (_what, program, words) => {
-    expect(shellCommand(program, ...words)).toBe([program, ...words].join(" "));
   });
 });
 
 describe("shellSteps", () => {
   it("runs each command after the one before it worked", () => {
-    expect(shellSteps(shellCommand("cd", "app"), shellCommand("npm", "uninstall", "x"))).toBe(
-      "cd app && npm uninstall x",
+    expect(
+      shellSteps(shellCommand("cd", "app"), suggestedCommandOf(removeCommandFor("npm", ["x"]))),
+    ).toBe("cd app && npm uninstall x");
+  });
+});
+
+describe("pipedFrom", () => {
+  it("feeds the command a secret from a shell variable", () => {
+    expect(pipedFrom("CLIENT_SECRET", shellCommand("git", "status"))).toBe(
+      `printf '%s' "$CLIENT_SECRET" | git status`,
+    );
+  });
+
+  it("refuses a name no shell variable has", () => {
+    const error = thrownBy(() => {
+      return pipedFrom("A; zitadel", shellCommand("git", "status"));
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "A; zitadel is no shell variable's name" });
+  });
+});
+
+describe("readingFrom", () => {
+  it("puts the redirection after the command", () => {
+    expect(readingFrom(shellCommand("git", "status"), "my value.txt")).toBe(
+      "git status < 'my value.txt'",
     );
   });
 });
 
-describe("inShell", () => {
-  it("puts a pipe before the command", () => {
-    expect(inShell(shellCommand("cat"), { before: "printf '%s' \"$S\" | " })).toBe(
-      "printf '%s' \"$S\" | cat",
-    );
-  });
-
-  it("puts a redirection after it", () => {
-    expect(inShell(shellCommand("cat"), { after: " < value.txt" })).toBe("cat < value.txt");
+describe("andTheRest", () => {
+  it("follows the command with an ellipsis for everything else it was given", () => {
+    expect(andTheRest(shellCommand("git", "status"))).toBe("git status ...");
   });
 });
 

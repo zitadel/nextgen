@@ -132,7 +132,8 @@ import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import {
-  inShell,
+  andTheRest,
+  pipedFrom,
   type NextOf,
   type Scope,
   type Suggest,
@@ -3056,12 +3057,9 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: inShell(
-      suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }),
-      {
-        before: `printf '%s' "$CLIENT_SECRET" | `,
-        after: " ...",
-      },
+    retry: pipedFrom(
+      "CLIENT_SECRET",
+      andTheRest(suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } })),
     ),
   });
   return {

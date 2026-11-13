@@ -5,12 +5,14 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  addCommandFor,
   addExactCommandFor,
   detectPackageManager,
   devCommandFor,
   inDirectory,
   installCommandFor,
   type PackageManager,
+  removeCommandFor,
 } from "@/lib/package-manager";
 
 const dirs: string[] = [];
@@ -67,6 +69,19 @@ describe("package manager commands", () => {
     (packageManager, install, dev) => {
       expect(installCommandFor(packageManager).display).toBe(install);
       expect(devCommandFor(packageManager).display).toBe(dev);
+    },
+  );
+
+  it.each([
+    ["npm", "npm install pkg@1", "npm uninstall pkg"],
+    ["pnpm", "pnpm add pkg@1", "pnpm remove pkg"],
+    ["yarn", "yarn add pkg@1", "yarn remove pkg"],
+    ["bun", "bun add pkg@1", "bun remove pkg"],
+  ] satisfies Array<[PackageManager, string, string]>)(
+    "adds and removes a package with %s",
+    (packageManager, add, remove) => {
+      expect(addCommandFor(packageManager, ["pkg@1"]).display).toBe(add);
+      expect(removeCommandFor(packageManager, ["pkg"]).display).toBe(remove);
     },
   );
 

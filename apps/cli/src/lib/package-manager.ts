@@ -5,7 +5,6 @@ import { Cmd } from "./cmd";
 import { pathExists } from "./fs";
 import { readPackageJson } from "./npm";
 import { optionArgs } from "./public-cli";
-import { type SuggestedCommand, shellCommand } from "./suggestion";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
@@ -28,25 +27,37 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
   return "npm";
 }
 
-/**
- * `packageCommand` as a suggestion, each of its words written as the shell
- * reads it back, so a directory with a space in it stays one word.
- *
- * @param packageCommand - The package manager's command.
- * @returns The command.
- * @throws {Error} When it would run this CLI, as `pnpm dlx` would.
- */
-export function suggestedCommandOf(packageCommand: PackageCommand): SuggestedCommand {
-  return shellCommand(
-    packageCommand.command,
-    ...packageCommand.args.map((word) => {
-      return Cmd.quote(word);
-    }),
-  );
-}
-
 export function installCommandFor(packageManager: PackageManager): PackageCommand {
   return command(packageManager, ["install"]);
+}
+
+/**
+ * Installs `packages` with npm's `install` or the others' `add`, at whatever
+ * version each spec names: `npm install @zitadel/cli@latest`.
+ *
+ * @param packageManager - The project's package manager.
+ * @param packages - The `name@version` specs.
+ * @returns The command.
+ */
+export function addCommandFor(
+  packageManager: PackageManager,
+  packages: ReadonlyArray<string>,
+): PackageCommand {
+  return command(packageManager, [packageManager === "npm" ? "install" : "add", ...packages]);
+}
+
+/**
+ * Removes `packages` with npm's `uninstall` or the others' `remove`.
+ *
+ * @param packageManager - The project's package manager.
+ * @param packages - The packages' names.
+ * @returns The command.
+ */
+export function removeCommandFor(
+  packageManager: PackageManager,
+  packages: ReadonlyArray<string>,
+): PackageCommand {
+  return command(packageManager, [packageManager === "npm" ? "uninstall" : "remove", ...packages]);
 }
 
 /**
@@ -97,6 +108,16 @@ const DIRECTORY_FLAG: Record<PackageManager, { flag: string; relative: boolean }
   yarn: { flag: "--cwd", relative: false },
   bun: { flag: "--cwd", relative: false },
 };
+
+/**
+ * Each option {@link DIRECTORY_FLAG} names, whose next word is a directory and
+ * never what the command does.
+ */
+export const DIRECTORY_FLAGS: ReadonlySet<string> = new Set(
+  Object.values(DIRECTORY_FLAG).map(({ flag }) => {
+    return flag;
+  }),
+);
 
 /**
  * `packageCommand` as suggested from the shell's directory when the project is

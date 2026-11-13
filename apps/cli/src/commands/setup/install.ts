@@ -10,9 +10,8 @@ import {
   type PackageCommand,
   type PackageManager,
   runPackageCommand,
-  suggestedCommandOf,
 } from "@/lib/package-manager";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import { type Suggest, type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 

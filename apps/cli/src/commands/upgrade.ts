@@ -12,14 +12,13 @@ import {
   inDirectory,
   type PackageCommand,
   runPackageCommand,
-  suggestedCommandOf,
 } from "@/lib/package-manager";
 import { hasZitadelConfig } from "@/lib/project";
 import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";

@@ -19,7 +19,13 @@ import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/g
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { type SuggestedCommand, shellCommand, shellSteps } from "@/lib/suggestion";
+import { removeCommandFor } from "@/lib/package-manager";
+import {
+  type SuggestedCommand,
+  shellCommand,
+  shellSteps,
+  suggestedCommandOf,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -79,12 +85,12 @@ function assembleNextCommands(
     // `<rel> -> <backup>`), so this destructive glob can't also sweep up
     // unrelated `.env*.ejected-*` files a user happens to keep.
     const patterns = backedUp.map((entry) => {
-      return `${entry.split(" -> ")[0]}.ejected-*`;
+      return `${Cmd.quote(entry.split(" -> ")[0] ?? "")}.ejected-*`;
     });
     commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
   }
   for (const dep of dependencies) {
-    commands.push(inDir(shellCommand("npm", "uninstall", dep)));
+    commands.push(inDir(suggestedCommandOf(removeCommandFor("npm", [dep]))));
   }
   return commands;
 }

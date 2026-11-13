@@ -9,7 +9,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import { type FillIn, inShell, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import { type FillIn, pipedFrom, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
@@ -124,7 +124,7 @@ export class CredentialPrompt {
       flag: "--client-id",
       parse: parseClientId,
       given: givenClientId,
-      retry: this.retryFor(CLIENT_ID_PLACEHOLDER, ""),
+      retry: this.retryFor(CLIENT_ID_PLACEHOLDER, false),
     });
     const secretVariable = this.run.secretVariable;
     const secret = await this.run.ask.secret({
@@ -132,7 +132,7 @@ export class CredentialPrompt {
       message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
-      retry: this.retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
+      retry: this.retryFor(clientId, true),
     });
 
     return {
@@ -168,7 +168,7 @@ export class CredentialPrompt {
    * @param pipe - What feeds the secret on stdin, if anything.
    * @returns The command, or `undefined` for a custom provider.
    */
-  private retryFor(clientId: ClientId | FillIn, pipe: string): SuggestedCommand | undefined {
+  private retryFor(clientId: ClientId | FillIn, piped: boolean): SuggestedCommand | undefined {
     const selection = this.run.selection;
     if (selection.kind !== "catalog") {
       return undefined;
@@ -181,6 +181,6 @@ export class CredentialPrompt {
       },
     });
 
-    return inShell(command, { before: pipe });
+    return piped ? pipedFrom("CLIENT_SECRET", command) : command;
   }
 }

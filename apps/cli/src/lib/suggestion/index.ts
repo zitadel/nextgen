@@ -2,7 +2,7 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import type { PackageManager } from "@/lib/package-manager";
+import { DIRECTORY_FLAGS, type PackageCommand } from "@/lib/package-manager";
 import { CLI_BINARY, newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
 import type { RELATIONS } from "./relations";
@@ -34,7 +34,10 @@ declare const suggestedCommand: unique symbol;
 
 /**
  * A rendered suggestion: the command line a person or an agent runs. Only the
- * renderer and {@link shellCommand} make one, so a raw string does not
+ * renderer makes one of this CLI; {@link shellCommand} and
+ * {@link suggestedCommandOf} make one of a program that is not it, and
+ * {@link shellSteps}, {@link pipedFrom}, {@link readingFrom} and
+ * {@link andTheRest} join or wrap ones already made. A raw string does not
  * typecheck where a suggestion is expected.
  */
 export type SuggestedCommand = string & { readonly [suggestedCommand]: true };
@@ -447,162 +450,73 @@ function canonical(value: unknown): string {
 }
 
 /**
- * Programs a shell suggestion never names: they run another program rather
- * than being one (`npx`, `sudo`, `sh`), so naming one would let this CLI in
- * through its arguments, where nothing checks it.
+ * The programs a shell suggestion may name: each one runs only itself, so a
+ * suggestion of one can never run this CLI. A package manager is not among
+ * them, since it can run a package (`pnpm dlx`); its commands are suggested
+ * through {@link suggestedCommandOf}, which knows their verbs.
  */
-const WRAPPERS = [
-  "bash",
-  "builtin",
-  "bunx",
-  "command",
-  "env",
-  "eval",
-  "exec",
-  "nice",
-  "nohup",
-  "npx",
-  "pnpx",
-  "sh",
-  "sudo",
-  "time",
-  "xargs",
-  "zsh",
-] as const;
+const PROGRAMS = ["cd", "docker", "git", "rm"] as const;
+
+/** A program a shell suggestion may name ({@link PROGRAMS}). */
+type Program = (typeof PROGRAMS)[number];
 
 /**
- * Each package manager, which runs a package or a binary through one of
- * {@link RUNNING} but otherwise installs and runs a project's own scripts. A
- * record of every {@link PackageManager}, so a new one does not compile until
- * it is listed.
- */
-const MANAGERS: Readonly<Record<PackageManager, true>> = {
-  bun: true,
-  npm: true,
-  pnpm: true,
-  yarn: true,
-};
-
-/**
- * What a package manager is given to run a package or a binary rather than its
- * own command: `pnpm dlx`, `npm exec`, `bun x`, or this CLI's binary straight
- * after it (`pnpm zitadel`).
- */
-const RUNNING = ["dlx", "exec", "x", CLI_BINARY] as const;
-
-/**
- * A program a shell suggestion may not be: this CLI's binary, a path to it,
- * or one of the {@link WRAPPERS} that would run it.
- */
-type Refused = typeof CLI_BINARY | `${string}/${typeof CLI_BINARY}` | (typeof WRAPPERS)[number];
-
-/**
- * Nothing more than the program, unless it runs this CLI: a {@link Refused}
- * program, or a package manager whose first word is one of {@link RUNNING}
- * ({@link FirstOf}). Then a property
- * no string has, so the call does not compile and the error says what to
- * write instead. A program or word known only as `string` is left to the run
- * time check in {@link shellCommand}.
- *
- * @typeParam Program - The program, as the call names it.
- * @typeParam Words - Its words, as the call gives them.
- */
-type NotTheCli<Program extends string, Words extends readonly string[]> =
-  true extends AnyOf<Program, Refused>
-    ? { readonly "suggest the CLI as { id, args, flags }": never }
-    : true extends AnyOf<Program, PackageManager>
-      ? true extends AnyOf<FirstOf<Words>, (typeof RUNNING)[number]>
-        ? { readonly "suggest the CLI as { id, args, flags }": never }
-        : unknown
-      : unknown;
-
-/**
- * The first of `Words`, which for a package manager given literal words says
- * what it does: `pnpm dlx …` runs a package, `npm uninstall …` does not.
- *
- * @typeParam Words - A command's words.
- */
-type FirstOf<Words extends readonly string[]> = Words extends readonly [
-  infer First,
-  ...(readonly string[]),
-]
-  ? First
-  : never;
-
-/**
- * `true` when some member of `Union` is one of `Members`, and `never`
- * otherwise, so `true extends AnyOf<…>` asks whether any one of them is.
- *
- * @typeParam Union - What may be one of them: a literal, or a union of them.
- * @typeParam Members - What it is checked against.
- */
-type AnyOf<Union, Members> = Union extends Members ? true : never;
-
-/**
- * Whether `program`, given `words`, runs this CLI. It reads words, never shell
- * text: the program is one word the call names, and for a package manager the
- * word that says what it does is the first that is neither an option nor the
- * value of one (`npm --prefix app exec zitadel` runs `exec`). A word that came
- * from a person, such as a path or a commit message, is never that word.
+ * A command that is not the CLI (`docker pull …`, `git commit …`), suggested as
+ * its program and its words, joined with spaces. The program is one of
+ * {@link PROGRAMS}, so the CLI cannot be written here at all; suggest it as
+ * `{ id, args, flags }`. Each word is written as the shell should read it:
+ * quote a value that came from a person with `Cmd.quote`, and leave a glob
+ * bare. Run several one after another with {@link shellSteps}.
  *
  * @param program - The program.
- * @param words - Its words, each one as the shell will read it.
- * @returns Whether it runs the CLI.
+ * @param words - What follows it.
+ * @returns The command.
  */
-function runsTheCli(program: string, words: readonly string[]): boolean {
-  if (
-    program === CLI_BINARY ||
-    program.endsWith(`/${CLI_BINARY}`) ||
-    (WRAPPERS as readonly string[]).includes(program)
-  ) {
-    return true;
-  }
-  if (!Object.hasOwn(MANAGERS, program)) {
-    return false;
-  }
-  const subcommand = words.find((word, at) => {
-    const before = words[at - 1];
-    return !word.startsWith("-") && !(before?.startsWith("-") === true && !before.includes("="));
-  });
-
-  return subcommand !== undefined && (RUNNING as readonly string[]).includes(subcommand);
+export function shellCommand(program: Program, ...words: readonly string[]): SuggestedCommand {
+  return [program, ...words].join(" ") as SuggestedCommand;
 }
 
 /**
- * A command that is not the CLI (`npm install …`, `docker pull …`), suggested
- * as its program and its words, joined with spaces. Each word is written as
- * the shell should read it: quote a value that came from a person with
- * `Cmd.quote`, and leave a glob bare. One that runs the CLI is refused, since
- * only the renderer checks a CLI command against the command it names: by the
- * compiler where the program and words are literals ({@link NotTheCli}), and
- * when it is made otherwise. Run several one after another with
- * {@link shellSteps}.
- *
- * @typeParam Program - The program, as the call names it.
- * @typeParam Words - Its words, as the call gives them.
- * @param program - The program: `docker`, `rm`, a package manager.
- * @param words - What follows it.
- * @returns The command.
- * @throws {Error} When it runs this CLI.
+ * The verbs a package manager's suggestion may use: each installs, removes or
+ * runs a project's own script, and none runs a package the way `dlx`, `exec`
+ * or `x` would.
  */
-export function shellCommand<const Program extends string, const Words extends readonly string[]>(
-  program: Program & NotTheCli<Program, Words>,
-  ...words: Words
-): SuggestedCommand {
-  const named: string = program;
-  if (runsTheCli(named, words)) {
-    throw new Error(`${named} runs the CLI: suggest it as { id, args, flags } instead`);
-  }
-  const line = [named, ...words].join(" ");
+const VERBS = ["add", "dev", "install", "remove", "run", "uninstall"] as const;
 
-  return line as SuggestedCommand;
+/**
+ * A package manager's command as a suggestion, written as its own `display`
+ * shows it, so the suggestion and the hint that quotes the command read the
+ * same. Its verb, the first word that is neither an option nor the directory
+ * an option names, must be one of {@link VERBS}, and `run` may not run this
+ * CLI's binary: anything else could run the CLI where nothing checks it.
+ *
+ * @param command - The package manager's command, as `lib/package-manager`
+ *   builds it.
+ * @returns The command.
+ * @throws {Error} When it runs a package, or this CLI.
+ */
+export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
+  const operands = command.args.filter((word, at) => {
+    return !word.startsWith("-") && !DIRECTORY_FLAGS.has(command.args[at - 1] ?? "");
+  });
+  const [verb, script] = operands;
+  if (
+    verb === undefined ||
+    !(VERBS as readonly string[]).includes(verb) ||
+    (verb === "run" && script === CLI_BINARY)
+  ) {
+    throw new Error(`${command.display} may run a package: suggest the CLI as { id, args, flags }`);
+  }
+
+  return command.display as SuggestedCommand;
 }
 
 /**
  * Commands run one after another, each only if the one before it worked:
  * `cd app && npm uninstall x`.
  *
- * @param steps - The commands, each made by {@link shellCommand}.
+ * @param steps - The commands, each made by {@link shellCommand} or
+ *   {@link suggestedCommandOf}.
  * @returns The line that runs them in turn.
  */
 export function shellSteps(
@@ -611,16 +525,47 @@ export function shellSteps(
   return steps.join(" && ") as SuggestedCommand;
 }
 
+/** The name of a shell variable a suggestion may read from: `CLIENT_SECRET`. */
+const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
+
 /**
- * A suggestion wrapped in shell around it: a pipe that feeds it a secret
- * (`printf '%s' "$SECRET" | `) or the `< value.txt` redirection that must
- * follow the selector. The command itself stays the one the renderer made.
+ * `command` fed a secret on stdin from the caller's own environment, so the
+ * secret never appears on the command line: `printf '%s' "$CLIENT_SECRET" | …`.
+ *
+ * @param variable - The shell variable that holds the secret.
+ * @param command - The command that reads it.
+ * @returns The command with the pipe in front of it.
+ * @throws {Error} When `variable` is no shell variable's name.
  */
-export function inShell(
-  command: SuggestedCommand,
-  shell: { before?: string; after?: string },
-): SuggestedCommand {
-  return `${shell.before ?? ""}${command}${shell.after ?? ""}` as SuggestedCommand;
+export function pipedFrom(variable: string, command: SuggestedCommand): SuggestedCommand {
+  if (!VARIABLE.test(variable)) {
+    throw new Error(`${variable} is no shell variable's name`);
+  }
+
+  return `printf '%s' "$${variable}" | ${command}` as SuggestedCommand;
+}
+
+/**
+ * `command` reading its stdin from `file`: `… < value.txt`. It follows the
+ * whole command, the scope the renderer appended included.
+ *
+ * @param command - The command that reads it.
+ * @param file - The file, as a person would name it.
+ * @returns The command with the redirection after it.
+ */
+export function readingFrom(command: SuggestedCommand, file: string): SuggestedCommand {
+  return `${command} < ${Cmd.quote(file)}` as SuggestedCommand;
+}
+
+/**
+ * `command` with ` ...` after it, for a retry that stands for the run again
+ * with everything else it was given: `setup --sso-client-id '<id>' ...`.
+ *
+ * @param command - The command.
+ * @returns The command, followed by the ellipsis.
+ */
+export function andTheRest(command: SuggestedCommand): SuggestedCommand {
+  return `${command} ...` as SuggestedCommand;
 }
 
 /**

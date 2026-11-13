@@ -8,7 +8,12 @@ import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { inShell, type SuggestedCommand, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
+import {
+  readingFrom,
+  type SuggestedCommand,
+  type SuggestInput,
+  WHAT_CHANGED,
+} from "@/lib/suggestion";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
@@ -132,9 +137,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         ].join(" "),
         next:
           args.value === undefined
-            ? inShell(this.suggest({ id: "variable:set", ...real }), {
-                after: " < value.txt",
-              })
+            ? readingFrom(this.suggest({ id: "variable:set", ...real }), "value.txt")
             : this.suggest({ id: "variable:set", ...real }),
       });
 
@@ -163,11 +166,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       message: `What should the value of ${args.name} be?`,
       stdin: true,
       // The scope this.suggest appends must precede the stdin redirection.
-      retry: inShell(
+      retry: readingFrom(
         this.suggest({ id: "variable:set", ...pipeInput(args.name, write, flags.as) }),
-        {
-          after: " < value.txt",
-        },
+        "value.txt",
       ),
       parse: (raw: string) => {
         return parseVariableValue(raw, flags.as);
@@ -196,15 +197,13 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           {
             hint: "Set the preview value with --secret, piped in or prompted for.",
             nextCommands: [
-              inShell(
+              readingFrom(
                 this.suggest({
                   id: "variable:set",
                   args: { name: args.name },
                   flags: { secret: true, preview: true },
                 }),
-                {
-                  after: " < value.txt",
-                },
+                "value.txt",
               ),
             ],
           },

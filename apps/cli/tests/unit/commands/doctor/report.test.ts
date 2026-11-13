@@ -11,7 +11,8 @@ import {
   renderDoctorReport,
   withCategories,
 } from "@/commands/doctor/report";
-import { shellCommand } from "@/lib/suggestion";
+import { addExactCommandFor } from "@/lib/package-manager";
+import { suggestedCommandOf } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
@@ -298,7 +299,7 @@ describe("renderDoctorReport", () => {
           name: "dependency-version",
           status: "warn",
           message: "pins differ",
-          remedy: shellCommand("npm", "install", "--save-exact", SDK_PIN),
+          remedy: suggestedCommandOf(addExactCommandFor("npm", [SDK_PIN])),
         },
       ]);
 
