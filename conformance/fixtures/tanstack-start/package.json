@@ -1,0 +1,52 @@
+{
+  "name": "@zitadel/conformance-tanstack-start",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss"
+    ]
+  },
+  "scripts": {
+    "dev": "vite dev --port 3220 --strictPort",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@tanstack/react-devtools": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-router-devtools": "catalog:",
+    "@tanstack/react-start": "1.169.5",
+    "@zitadel/sdk-tanstack-start": "workspace:*",
+    "nitro": "3.0.260610-beta",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@tanstack/devtools-vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "conformance": {
+    "framework": "tanstack-start",
+    "appPort": 3220,
+    "zitadelPort": 8220,
+    "generatePort": 8320,
+    "generatorPinned": false
+  }
+}
