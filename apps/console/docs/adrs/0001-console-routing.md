@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05, 2026-11-12)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -248,6 +248,20 @@ the sidebar.
 > what an add-on adds; `/project` shows that list while the platform project
 > is selected. `/events` leads back to Projects then. The `_authed` guard
 > drops the selection for someone who may not act on that project.
+
+> **Amendment (2026-11-12, design decision D44):** the top bar is a path from
+> the root down, as Vercel's runs from the team to the project. On every
+> screen that shows the account or root Settings list, and on any drawn for
+> the platform project, it is the root's pill alone: `Platform` for someone
+> who may act on the platform project, `All projects` for anyone else. A
+> project kept selected there (D36, D38) stays in the URL but is not named.
+> Inside a project the bar reads the root, a link to Projects, then the
+> project's pill (`Platform / fabis-app ▾`), then the team on a team's page.
+> The pill's list offers the platform in a section of its own above the
+> projects and checks the row the pill stands for; choosing the platform keeps
+> a list screen the root has and otherwise opens Projects. This replaces
+> D38's pill on Projects and `/settings` and D42's `All projects` for the
+> root.
 
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first

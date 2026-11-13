@@ -6,7 +6,16 @@ import {
   useNavigate,
   useParams,
 } from "@tanstack/react-router";
-import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from "lucide-react";
+import {
+  Box,
+  Boxes,
+  Check,
+  ChevronsUpDown,
+  Hexagon,
+  type LucideIcon,
+  Plus,
+  Slash,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
@@ -22,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+import { usePlatformAccess } from "@/features/platform/access";
 import { queryActiveTeams } from "@/features/teams/api";
 import { useAsync } from "@/hooks/use-async";
 import { withoutTrailingSlash } from "@/lib/base-path";
@@ -40,19 +50,24 @@ import {
 } from "@/features/projects/recent-projects";
 
 /**
- * The top bar's context: the project switcher, then — on a team's page — a
- * slash and the team switcher, as the design's navbar draws them.
+ * The top bar's context, a path from the root down, as Vercel's bar runs from
+ * the team to the project (D44): at the root, the root's pill alone; in a
+ * project, the root as the way up, a slash, and the project's pill; on a
+ * team's page, a slash and the team switcher after that.
  *
- * The project switcher is the design system's searchable picker (`Combobox`):
- * it opens on a search field, matched on the server across every project the
- * person can act on, above the selected project and the ones they opened
- * recently, and, while all their projects fit on one page, every other one by
- * name. Its footer opens Projects. The pill names the selected project on
- * every screen, Projects and Settings too (D36); with none selected there it
- * says `All projects`, and its list is the way into one (D27). The team
- * switcher is a `Popover` over the
- * project's active teams; its footer adds a team, opening the Add team drawer
- * and then the new team.
+ * The root is the platform for someone who may act on it (D42), whose screens
+ * it holds, and otherwise All projects. Every screen above every project is
+ * the root's, Projects and Settings too: the bar names the root there, even
+ * while a project stays selected for the way back (D36).
+ *
+ * The pill is the design system's searchable picker (`Combobox`): it opens on
+ * a search field, matched on the server across every project the person can
+ * act on, above the platform, in a section of its own, the selected project
+ * and the ones they opened recently, and, while all their projects fit on one
+ * page, every other one by name. The row the pill stands for is checked. Its
+ * footer opens Projects. The team switcher is a `Popover` over the project's
+ * active teams; its footer adds a team, opening the Add team drawer and then
+ * the new team.
  */
 
 /**
@@ -64,8 +79,17 @@ const NO_PROJECTS = "No projects";
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
 
-/** What it says above every project with none selected, and what its footer opens. */
+/**
+ * The root for someone who may not act on the platform, whose root holds only
+ * their projects (D44), and what the list's footer opens: Projects.
+ */
 const ALL_PROJECTS = "All projects";
+
+/** The root for someone who may act on the platform project (D42, D44). */
+const PLATFORM = "Platform";
+
+/** What tells the platform's row from a project's in the list. */
+const PLATFORM_DESCRIPTION = "Above every project";
 
 /** The project list's search field, label and placeholder alike. */
 const FIND_PROJECT = "Find a project";
@@ -94,16 +118,13 @@ interface SwitcherOption {
 
 export function ContextSwitcher({
   userId,
-  allProjects = false,
   root = false,
 }: {
   userId?: string;
-  /** The screen is above every project: with none selected, the pill says so. */
-  allProjects?: boolean;
   /**
-   * The screen is the root's own: it is drawn for the reserved platform
-   * project, which is the selection then (D42). The pill says the root, never
-   * a project named for the platform, and its list marks and remembers none.
+   * The screen is the root's (D44): Projects, Settings, the person's profile,
+   * or a screen drawn for the reserved platform project (D42). The bar names
+   * the root alone then, never a project, whichever stays selected (D36).
    */
   root?: boolean;
 }) {
@@ -116,21 +137,33 @@ export function ContextSwitcher({
   // project selected anywhere — the switcher, Projects, search, a link — is the
   // one they opened last.
   const current = useSelectedProject();
-  // The platform project is the root, never one of the person's projects.
+  // The root is never one of the person's projects, nor is a project kept
+  // selected above every project newly opened there.
   useRememberRecentProject(userId, root ? undefined : current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
+  // The platform project, for someone who may act on it: the root is named
+  // for it then, and its list offers it apart from the projects.
+  const platform = usePlatformAccess();
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} root={root} />
+      {/* The root heads the bar, as Vercel's team heads a project: at the root
+          it is the pill, in a project the way up to it, then the project's pill. */}
+      {!root && (
+        <>
+          <RootCrumb platform={platform} />
+          <CrumbSlash />
+        </>
+      )}
+      <ProjectSwitcher userId={userId} current={current} root={root} platform={platform} />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
           other than the team's own reads one. */}
-      {teamId && selected && (
+      {teamId && selected && !root && (
         <>
-          <Slash aria-hidden className="size-3.5 shrink-0 -rotate-[20deg] text-border" />
+          <CrumbSlash />
           {/* Keyed: another project's teams must not show while this one's load. */}
           <TeamSwitcher key={selected} projectId={selected} teamId={teamId} />
         </>
@@ -139,23 +172,54 @@ export function ContextSwitcher({
   );
 }
 
+/** The slash between two levels of the bar, as the design's navbar draws it. */
+function CrumbSlash() {
+  return <Slash aria-hidden className="size-3.5 shrink-0 -rotate-[20deg] text-border" />;
+}
+
 /**
- * The project pill and its list. Choosing a project is a navigation, as a link
- * would be: the selection lives in the URL. Past the first page the list opens
- * on no more than the selected and recent projects, since that page is only the
- * oldest ones; the search reaches the rest.
+ * What the root is called, and its glyph (D44): the platform, for someone who
+ * may act on it, whose screens it holds; for anyone else it holds only their
+ * projects, and says so.
+ */
+function rootName(platform: string | undefined): { label: string; Icon: LucideIcon } {
+  return platform ? { label: PLATFORM, Icon: Hexagon } : { label: ALL_PROJECTS, Icon: Boxes };
+}
+
+/**
+ * The way up from a project to the root, in the bar: Projects, which the root
+ * opens on. The selection rides along (D36), so the way back is the pill.
+ */
+function RootCrumb({ platform }: { platform: string | undefined }) {
+  const { label, Icon } = rootName(platform);
+  return (
+    <Link to="/projects" className={cn(TRIGGER, "text-muted-foreground hover:text-foreground")}>
+      <Icon size={16} className="shrink-0" aria-hidden />
+      <span className="min-w-0 truncate leading-5">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * The pill and its list. At the root it names the root; in a project, the
+ * project. Choosing one is a navigation, as a link would be: the selection
+ * lives in the URL. The list offers the platform apart, in a section of its
+ * own above the projects, for someone who may act on it; then the selected and
+ * recent projects and, past the first page, no more than those, since that
+ * page is only the oldest ones; the search reaches the rest. Its footer opens
+ * Projects, the list of all of them.
  */
 function ProjectSwitcher({
   userId,
   current,
-  allProjects,
   root,
+  platform,
 }: {
   userId: string | undefined;
   /** The selected project, named once it is read. */
   current: SelectedProject | undefined;
-  allProjects: boolean;
   root: boolean;
+  platform: string | undefined;
 }) {
   // The first page says whether there are more projects than it shows, and so
   // whether the list can open on all of them.
@@ -176,6 +240,22 @@ function ProjectSwitcher({
   };
 
   const term = query.trim().toLowerCase();
+  // The platform is the root, not a project: its own section, first, and
+  // found by its name like the rest.
+  const platformGroup: ComboboxGroup = {
+    heading: PLATFORM,
+    options:
+      platform && PLATFORM.toLowerCase().includes(term)
+        ? [
+            {
+              value: platform,
+              label: PLATFORM,
+              description: PLATFORM_DESCRIPTION,
+              icon: <Hexagon aria-hidden />,
+            },
+          ]
+        : [],
+  };
   let groups: ComboboxGroup[] = [];
   let emptyLabel = LOADING;
   if (term) {
@@ -184,13 +264,14 @@ function ProjectSwitcher({
     const matches = (found?.projects ?? []).filter((project) =>
       project.name.toLowerCase().includes(term),
     );
-    groups = [{ options: byName(matches).map(toOption) }];
+    groups = [platformGroup, { heading: "Projects", options: byName(matches).map(toOption) }];
     emptyLabel = found?.term.toLowerCase() === term ? NO_MATCHES : SEARCHING;
   } else if (mine) {
     const named =
       root || current?.name === undefined ? undefined : { ...current, name: current.name };
     const { recent, rest } = openingList(mine, named, recents);
     groups = [
+      platformGroup,
       { heading: "Recent", options: recent.map(toOption) },
       { heading: "Projects", options: rest.map(toOption) },
     ];
@@ -198,22 +279,25 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
-  // A selection outlives the way up to Projects and Settings (D36). While it
-  // is the platform project the pill names the root (D42).
-  const shown = root ? undefined : selected;
-  const unselected = root || (allProjects && !selected);
+  // The row the pill stands for, which the list marks: the root, or the
+  // project. A project kept selected above every project (D36) is not where
+  // the person is, so the root is marked then.
+  const marked = root ? platform : selected;
+  const { label: rootLabel, Icon: RootIcon } = rootName(platform);
 
   return (
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
         <button type="button" aria-label="Switch project" className={TRIGGER}>
-          {shown ? (
-            <ProjectMark projectId={shown} className="size-4" />
+          {root ? (
+            <RootIcon size={16} className="shrink-0 text-foreground" aria-hidden />
+          ) : selected ? (
+            <ProjectMark projectId={selected} className="size-4" />
           ) : (
             <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
           )}
-          {unselected ? (
-            <span className="min-w-0 truncate leading-5 text-foreground">{ALL_PROJECTS}</span>
+          {root ? (
+            <span className="min-w-0 truncate leading-5 text-foreground">{rootLabel}</span>
           ) : mine === undefined ? (
             <Skeleton className="h-4 w-24" />
           ) : label === undefined ? (
@@ -228,7 +312,7 @@ function ProjectSwitcher({
       </ComboboxAnchor>
       <ComboboxContent
         groups={groups}
-        selected={shown ? [shown] : []}
+        selected={marked ? [marked] : []}
         searchPlaceholder={FIND_PROJECT}
         emptyLabel={emptyLabel}
         search={{ query, onQueryChange: setQuery }}
@@ -240,7 +324,7 @@ function ProjectSwitcher({
         label="Projects"
         // Wider than the pill: a row carries a name and its host or id.
         className="w-72"
-        onSelect={(projectId) => void navigate(scopeTo(projectId))}
+        onSelect={(projectId) => void navigate(scopeTo(projectId, projectId === platform))}
         onClose={() => changeOpen(false)}
       />
     </Combobox>
@@ -316,19 +400,29 @@ const TEAM_PAGE = 25;
  * previous project, or an unscoped screen such as Projects — goes where a
  * Projects row would (`useSelectProjectTarget`): the screen `?next=` names, or
  * the console's landing for that project.
+ *
+ * The platform is the root's (D42): a list of the root's stays too, but the
+ * root has no Overview, so from anywhere else it opens Projects, the root's
+ * home.
  */
-function useScopeTarget(): (projectId: string) => SwitcherOption["link"] {
+function useScopeTarget(): (projectId: string, toRoot: boolean) => SwitcherOption["link"] {
   const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
   const selectTarget = useSelectProjectTarget();
+  const path = leaf && withoutTrailingSlash(leaf.fullPath);
   const stays = leaf?.staticData.scope === "project" && leaf.staticData.nav !== undefined;
-  return (projectId) =>
-    stays && leaf
-      ? {
-          to: withoutTrailingSlash(leaf.fullPath),
-          search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
-        }
-      : selectTarget(projectId);
+  return (projectId, toRoot) => {
+    if (stays && path && !(toRoot && path === OVERVIEW_PATH)) {
+      return {
+        to: path,
+        search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
+      };
+    }
+    return toRoot ? { to: "/projects" } : selectTarget(projectId);
+  };
 }
+
+/** A project's home, Overview, which the root leaves out (D42). */
+const OVERVIEW_PATH = "/";
 
 function Switcher({
   icon: Icon,

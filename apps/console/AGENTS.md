@@ -78,6 +78,9 @@ between files are the sign the component is missing.
   a copy of a screen for the root. A row that opens one sets `project` to it.
 - The chrome treats that selection as the root (`usePlatformSelected`): never
   show the platform project's name, or list or remember it as a project.
+- The bar names where the person is (D44): on a root screen the root alone
+  (`Platform`, or `All projects` without platform access), never a kept
+  project; in a project, the root then the project.
 - A project's Settings opens its own list too (`nav.view: "project-settings"`,
   D40); add a project setting as a page there, never as a tab.
 - Going up to Projects or Settings never drops the selected project (D36):

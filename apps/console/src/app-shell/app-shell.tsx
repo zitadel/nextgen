@@ -404,25 +404,21 @@ function ListHeading({
 }
 
 /**
- * The top bar: the project switcher, and the team switcher on a team's page.
- * 56px and ruled underneath, level with the sidebar's brand header. Search and
- * the collapse toggle live in the sidebar and the theme in the account menu,
- * so the bar carries none of them.
+ * The top bar: the way from the root down to the project, and the team on a
+ * team's page (D44). 56px and ruled underneath, level with the sidebar's brand
+ * header. Search and the collapse toggle live in the sidebar and the theme in
+ * the account menu, so the bar carries none of them.
  */
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
-  // A screen drawn for the platform project is the root's (D42): the pill
-  // says the root there, never a project named Platform.
-  const root = usePlatformSelected();
+  // The root's screens: those above every project (Projects, Settings, the
+  // profile), and any drawn for the platform project (D42). The bar names the
+  // root on them, never a project, not even one kept selected (D36).
+  const atPlatform = usePlatformSelected();
+  const root = view === "account" || view === "settings" || atPlatform;
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project, with none selected, the pill says so, and its
-          list leads into one. */}
-      <ContextSwitcher
-        userId={userId}
-        allProjects={view === "account" || view === "settings"}
-        root={root}
-      />
+      <ContextSwitcher userId={userId} root={root} />
     </div>
   );
 }
