@@ -6,7 +6,9 @@ import { field, isPresent } from "@/lib/record";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import type { UserFilter, ColumnGroup } from "./list";
 import { columnsFor } from "./list";
+import { userIdentity } from "./model";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
+import { sessionKept } from "@/lib/session-cache";
 
 type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
 
@@ -180,4 +182,43 @@ export async function fetchUserDetail(userId: string, projectId: string) {
     idps,
     passwordSetAt,
   };
+}
+
+/**
+ * What each user is called now (`display`, else `identifier`), by ID: one
+ * `GET /users/{id}` per user, read once for the signed-in person and shared by
+ * every screen that names users by ID (Events' rows). The server finds the
+ * user's project from the ID. A user who is gone, or one the person may not
+ * read, has no name and stays an ID; that answer is not kept, and every name
+ * is dropped with the session (`lib/session-cache.ts`).
+ */
+const userNames = sessionKept(() => new Map<string, Promise<string | undefined>>());
+
+export async function readUserNames(ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  const kept = userNames();
+  const names = await Promise.all(
+    unique.map((id) => {
+      let name = kept.get(id);
+      if (!name) {
+        const reading = api
+          .getUserByID(id)
+          .then((user) => userIdentity(user))
+          .catch(() => {
+            // Not kept: a later page asks again.
+            if (kept.get(id) === reading) kept.delete(id);
+            return undefined;
+          });
+        kept.set(id, reading);
+        name = reading;
+      }
+      return name;
+    }),
+  );
+  const named = new Map<string, string>();
+  unique.forEach((id, index) => {
+    const name = names[index];
+    if (name && name !== id) named.set(id, name);
+  });
+  return named;
 }
