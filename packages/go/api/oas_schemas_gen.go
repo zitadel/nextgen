@@ -6222,9 +6222,9 @@ type AuthRequestCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// The category of the event.
 	Category AuthRequestCreatedEventCategory `json:"category"`
-	// When the action happened, on the server's clock.
+	// When the action happened, on the server's clock, to the millisecond.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the event was stored, on the server's clock.
+	// When the event was stored, on the server's clock, to the millisecond.
 	CreatedAt time.Time `json:"created_at"`
 	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -6234,6 +6234,10 @@ type AuthRequestCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -6244,9 +6248,8 @@ type AuthRequestCreatedEvent struct {
 	Grantor        OptString                                `json:"grantor"`
 	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// The ID of the HTTP request that caused the event. Events of one request
-	// share it. Only the `request.api` event of a request carries
-	// `metadata.client`.
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
 	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
@@ -6309,6 +6312,11 @@ func (s *AuthRequestCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthRequestCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthRequestCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -6419,6 +6427,11 @@ func (s *AuthRequestCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthRequestCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthRequestCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -69625,6 +69638,11 @@ func (o *OptNilAuthRequestCreatedEventActorType) SetToNull() {
 	o.Null = true
 	var v AuthRequestCreatedEventActorType
 	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilAuthRequestCreatedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
 }
 
 // Get returns value and boolean that denotes whether value was set.

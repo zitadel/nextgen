@@ -35,17 +35,13 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 	if err := ensureManagedID(&request.ID, domain.PrefixAuthRequest); err != nil {
 		return err
 	}
-	scopes := request.Scopes
-	if scopes == nil {
-		scopes = []string{}
-	}
 	stmt := buildStatement(createAuthRequestStmt,
 		request.ProjectID,
 		request.ID,
 		request.ClientID,
 		request.RedirectURI,
 		request.State,
-		scopes,
+		request.Scopes,
 		request.CodeChallenge,
 		request.Issuer,
 		request.DeploymentID,

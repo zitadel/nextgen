@@ -807,7 +807,8 @@ type VariableSetStatements interface {
 // hands to the login (ADR 081 §8). Rows are never updated.
 type AuthRequestStatements interface {
 	Statements
-	// CreateAuthRequest inserts request and generates its id and created_at.
+	// CreateAuthRequest inserts request, generates its id when empty, and sets
+	// created_at.
 	CreateAuthRequest(ctx context.Context, request *domain.AuthRequest) error
 	// GetAuthRequest returns the request, expired or not, or a
 	// [database.NoRowFoundError].

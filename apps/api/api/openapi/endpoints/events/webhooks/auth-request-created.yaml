@@ -3,9 +3,8 @@ post:
   operationId: authRequestCreated
   summary: auth.request.created
   description: |
-    An app sent a browser to the OAuth authorization endpoint, and the
-    request was stored for the login. The event carries the app's
-    `client_id`.
+    An app started a sign-in at the OAuth authorization endpoint. The
+    payload names the app by its `client_id`.
 
     The body is the event as `GET /events` returns it.
   tags:

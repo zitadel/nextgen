@@ -7,7 +7,7 @@
 //
 // The package wires the metadata server and the OP handler of
 // github.com/zitadel/oidc/v3/pkg/op. Every endpoint not implemented yet
-// answers the library's 404.
+// answers 404, with the error page for a browser.
 package oauth
 
 import "github.com/zitadel/oidc/v3/pkg/op"

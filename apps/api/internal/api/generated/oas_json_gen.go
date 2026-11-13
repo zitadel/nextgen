@@ -10832,11 +10832,11 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -10860,6 +10860,12 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -10926,7 +10932,7 @@ func (s *AuthRequestCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthRequestCreatedEvent = [22]string{
+var jsonFieldsNameOfAuthRequestCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -10938,17 +10944,18 @@ var jsonFieldsNameOfAuthRequestCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthRequestCreatedEvent from json.
@@ -11017,7 +11024,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -11029,7 +11036,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -11078,8 +11085,18 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -11181,7 +11198,7 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -11201,8 +11218,8 @@ func (s *AuthRequestCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -44431,11 +44448,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44459,6 +44476,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{

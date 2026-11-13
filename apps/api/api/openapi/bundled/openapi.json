@@ -11253,7 +11253,7 @@
       "post": {
         "operationId": "authRequestCreated",
         "summary": "auth.request.created",
-        "description": "An app sent a browser to the OAuth authorization endpoint, and the\nrequest was stored for the login. The event carries the app's\n`client_id`.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An app started a sign-in at the OAuth authorization endpoint. The\npayload names the app by its `client_id`.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],

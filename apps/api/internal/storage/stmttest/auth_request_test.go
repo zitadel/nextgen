@@ -36,11 +36,12 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 				},
 			},
 			{
-				// Nil scopes are stored as an empty array and read back empty.
+				// Empty scopes are read back empty, not nil.
 				name: "no_state_scopes_or_pkce",
 				request: domain.AuthRequest{
 					ClientID:     "client_1",
 					RedirectURI:  "http://127.0.0.1:4000/callback",
+					Scopes:       []string{},
 					Issuer:       "https://app.example.com/oauth/proj_1",
 					DeploymentID: "dep_1",
 					ReleaseID:    "rel_1",
@@ -60,11 +61,7 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 
 				got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
 				require.NoError(t, err)
-				want := request
-				if want.Scopes == nil {
-					want.Scopes = []string{}
-				}
-				assert.Equal(t, &want, got)
+				assert.Equal(t, &request, got)
 			})
 		}
 	})

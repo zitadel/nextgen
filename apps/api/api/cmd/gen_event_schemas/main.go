@@ -173,8 +173,8 @@ var webhookByEventType = map[string]webhookDoc{
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
 		"when a factor is recorded without a challenge, as on sign-up."},
-	"auth.request.created": {description: "An app sent a browser to the OAuth authorization endpoint, and the " +
-		"request was stored for the login. The event carries the app's `client_id`."},
+	"auth.request.created": {description: "An app started a sign-in at the OAuth authorization endpoint. The " +
+		"payload names the app by its `client_id`."},
 
 	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
 		"It answered with an error, `access_denied` included, or the callback carried no code."},

@@ -40,8 +40,8 @@ type server struct {
 	admission       Admission
 }
 
-// opServer is the OP behind the endpoints. It answers the library's 404 at
-// every endpoint not implemented yet.
+// opServer is the OP behind the endpoints. It answers 404, with the error
+// page for a browser, at every endpoint not implemented yet.
 type opServer struct {
 	op.UnimplementedServer
 	settings     SettingsSource
