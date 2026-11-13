@@ -118,11 +118,11 @@ export default class Upgrade extends BaseCommand {
       await this.install(install, installSuggestion);
     }
     const refreshes = install !== undefined && (await hasZitadelConfig(this.cwd));
-    const refresh: Refresh = !refreshes
-      ? "skipped"
-      : this.dryRun
-        ? "planned"
-        : await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal);
+    const unrun: Refresh = refreshes ? "planned" : "skipped";
+    const refresh: Refresh =
+      refreshes && !this.dryRun
+        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal)
+        : unrun;
 
     // A command to run at the new version, written for `target` rather than
     // for the release that is running.
@@ -143,12 +143,11 @@ export default class Upgrade extends BaseCommand {
         : []),
     ];
 
-    const note = this.dryRun ? " (dry run)" : "";
-    const title = upToDate
-      ? `Zitadel is up to date at ${target}${note}`
-      : this.dryRun
-        ? `Zitadel can be upgraded to ${target}${note}`
-        : `Zitadel upgraded to ${target}`;
+    const upgrade = this.dryRun
+      ? `Zitadel can be upgraded to ${target}`
+      : `Zitadel upgraded to ${target}`;
+    const verdict = upToDate ? `Zitadel is up to date at ${target}` : upgrade;
+    const said = `${verdict}${this.dryRun ? " (dry run)" : ""}`;
     const done = this.dryRun ? arrow : mark.pass;
     const rows = [
       // A package's name and versions are what the registry answered, and this
@@ -173,7 +172,7 @@ export default class Upgrade extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title,
+        title: said,
         ...(this.dryRun ? { dry_run: true } : {}),
         current_version: this.cliVersion,
         latest_version: target,
@@ -190,9 +189,9 @@ export default class Upgrade extends BaseCommand {
         refresh,
         ...(installSuggestion === undefined ? {} : { install_command: installSuggestion }),
       },
-      pretty: painted([strong(title), ...rows].join("\n")),
+      pretty: painted([strong(said), ...rows].join("\n")),
       summary: {
-        title,
+        title: said,
         sections: [],
         lines: rows,
       },

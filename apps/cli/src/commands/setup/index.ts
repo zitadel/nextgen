@@ -1265,25 +1265,32 @@ export default class Setup extends Destructive(BaseCommand) {
     // it patches it, so cancelling a question leaves the directory as it was,
     // and a dry run never creates one. Until then only its framework and dev
     // port are known.
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
-    let app: Readonly<{ framework: string; devPort: number }>;
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
-    let detected: FrameworkFacts | undefined;
-    // Whether `--force` scaffolds beside entries the directory already held,
-    // other than the local runtime `start` leaves, which counts as empty.
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
-    let scaffoldedBesideFiles = false;
-    try {
-      detected = await orca.detect(this.cwd, flags.framework);
-      app = {
-        framework: detected.id,
-        devPort: detected.devPort,
-      };
-      detecting.done(
-        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
+    const found: Readonly<{
+      app: Readonly<{ framework: string; devPort: number }>;
+      detected: FrameworkFacts | undefined;
+      // Whether `--force` scaffolds beside entries the directory already held,
+      // other than the local runtime `start` leaves, which counts as empty.
+      scaffoldedBesideFiles: boolean;
+    }> = await orca
+      .detect(this.cwd, flags.framework)
+      .then((facts) => {
+        detecting.done(
+          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
+        );
+        return {
+          app: {
+            framework: facts.id,
+            devPort: facts.devPort,
+          },
+          detected: facts,
+          scaffoldedBesideFiles: false,
+        };
+      })
+      .catch(async (error) => {
+        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+          detecting.fail();
+          throw error;
+        }
         const target = await inspectScaffoldTarget(this.cwd);
         if (!target.scaffoldable && !this.force) {
           detecting.fail();
@@ -1294,24 +1301,24 @@ export default class Setup extends Destructive(BaseCommand) {
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        app = await orca.planScaffold(
-          this.cwd,
-          await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
-            retry: retryOptionsOf(flags),
-            serverFlag: this.meta.serverFlag,
-            ask: wizardQuestions,
-          }),
-        );
-        scaffoldedBesideFiles = !target.scaffoldable;
-      } else {
-        detecting.fail();
-        throw error;
-      }
-    }
+        return {
+          app: await orca.planScaffold(
+            this.cwd,
+            await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
+              retry: retryOptionsOf(flags),
+              serverFlag: this.meta.serverFlag,
+              ask: wizardQuestions,
+            }),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
+      });
+    const { detected, scaffoldedBesideFiles } = found;
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
     this.recordTelemetry({
-      framework: app.framework,
+      framework: found.app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags.skipInstall),
@@ -1328,12 +1335,13 @@ export default class Setup extends Destructive(BaseCommand) {
     // dev-server port only when it is unset, so a project that already pins a
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
-    if (flags.devPort !== undefined) {
-      app = {
-        ...app,
-        devPort: flags.devPort,
-      };
-    }
+    const app =
+      flags.devPort === undefined
+        ? found.app
+        : {
+            ...found.app,
+            devPort: flags.devPort,
+          };
 
     const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
@@ -1443,7 +1451,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
     const scaffolding = detected === undefined && !this.dryRun;
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
+    // biome-ignore lint/plugin: the active step, reassigned across scaffold, create and patch, and failed by the outer catch
     let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
       this.ui
@@ -1453,16 +1461,12 @@ export default class Setup extends Destructive(BaseCommand) {
     if (scaffolding) {
       current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
     }
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
-    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
-    if (scaffolding) {
-      try {
-        newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
-      } catch (error) {
-        current?.fail();
-        throw error;
-      }
-    }
+    const newApp = scaffolding
+      ? await orca.scaffoldUndoably(this.cwd, app.framework, this.force).catch((error) => {
+          current?.fail();
+          throw error;
+        })
+      : undefined;
     if (newApp !== undefined) {
       current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
@@ -1484,11 +1488,11 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let project: CreatedProject;
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let result: Awaited<ReturnType<typeof patcher.patch>>;
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let scaffolded: ScaffoldedConfiguration;
     try {
       if (framework !== undefined && !this.dryRun) {
@@ -1847,7 +1851,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // admin, so the project is attached to their team right away and
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
-    // biome-ignore lint/plugin: setup's execute is split up in a later refactor
+    // biome-ignore lint/plugin: assigned inside a best-effort try
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
@@ -1980,134 +1984,138 @@ export default class Setup extends Destructive(BaseCommand) {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     const title = this.dryRun ? WOULD_SET_UP_TITLE : SET_UP_TITLE;
+    // biome-ignore lint/plugin: assigned only for a person's output, after the project facts are read
+    let summary: Summary = {
+      title,
+      sections: [],
+    };
+    // biome-ignore lint/plugin: assigned only when nothing is drawn live, from the summary
+    let report = "";
     if (!this.dryRun) {
       this.ui.ranAgainst(project.id, answers.server);
     }
-    const nextActions = [
-      ...deployStep.boxActions,
-      ...installOutcome.boxActions,
-      ...consoleStep.boxActions,
-      ...ssoStep.boxActions,
-      ...claimNudge.boxActions,
-      ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
-    ];
-    const connectionLines = planned.connections.flatMap((entry) => {
-      const connection = entry.connection;
-      const text = (value: string) => {
-        return escapeControlCharacters(value, { keepLayout: false });
-      };
-      const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
-        planned.change.after.connections.summarize(connection);
-      const verifiedBy = new Map(
-        verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
-          if (claim === true) {
-            return [[property, "always counts as verified"]];
-          }
-          if (typeof claim === "string") {
-            return [[property, `counts as verified when ${text(claim)} is true`]];
-          }
-          return [];
-        }),
-      );
-      const sections = [
-        mappings.length === 0
-          ? []
-          : [
-              createsUsers
-                ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-                : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-              ...mappings.map(({ property, claim }) => {
-                const verified = verifiedBy.get(property) ?? "is not treated as verified";
-                return [
-                  `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                  `  It ${verified}.`,
-                ].join("\n");
-              }),
-            ],
-        scopes.length === 0
-          ? []
-          : [
-              `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
-            ],
-        unmapped.length === 0
-          ? []
-          : [
-              "These attributes have no claim yet:",
-              ...unmapped.map(({ property, required }) => {
-                if (!required) {
-                  return `- ${text(property)} is optional, so it can stay empty.`;
-                }
-                return createsUsers
-                  ? `- ${text(property)} is required, so sign-up will have to ask for it.`
-                  : `- ${text(property)} is required, but this connection does not create users.`;
-              }),
-            ],
-        usedBy.length === 0
-          ? []
-          : [
-              `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
-            ],
-        [
-          `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
-        ],
-      ].filter((section) => {
-        return section.length > 0;
+    if (!this.isJson) {
+      const projectFacts = await detectProjectFacts(this.cwd, app.framework);
+      const sections = buildSummary({
+        projectFacts,
+        writtenRel,
+        depsAdded: result.depsAdded,
+        project,
+        server: answers.server,
+        issuer,
+        scaffoldedFramework,
+        scaffoldedBesideFiles,
+        connections: planned.connections,
+        signIn,
       });
-      return [
-        "",
-        ...sections.flatMap((section, at) => {
-          return at === 0 ? section : ["", ...section];
-        }),
+      const nextActions = [
+        ...deployStep.boxActions,
+        ...installOutcome.boxActions,
+        ...consoleStep.boxActions,
+        ...ssoStep.boxActions,
+        ...claimNudge.boxActions,
+        ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
       ];
-    });
-    const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
-      .split("\n")
-      .map((line) => {
-        return line.trim();
-      });
-    const summary: Summary = this.isJson
-      ? {
-          title,
-          sections: [],
-        }
-      : {
-          title,
-          sections: summarySections(
-            buildSummary({
-              projectFacts: await detectProjectFacts(this.cwd, app.framework),
-              writtenRel,
-              depsAdded: result.depsAdded,
-              project,
-              server: answers.server,
-              issuer,
-              scaffoldedFramework,
-              scaffoldedBesideFiles: scaffoldedBesideFiles,
-              connections: planned.connections,
-              signIn,
-            }),
-          ),
-          lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
-          next: nextActions,
-          boxed: true,
+      const connectionLines = planned.connections.flatMap((entry) => {
+        const connection = entry.connection;
+        const text = (value: string) => {
+          return escapeControlCharacters(value, { keepLayout: false });
         };
-    // The ending is only what sits under the closing line, so the headline is added.
-    const report =
-      this.isJson || this.ui.interactive
-        ? ""
-        : `${title}\n${this.ui.ending({
-            ...summary,
-            next: [
-              ...nextActions,
-              ...(exploreCommand === undefined
-                ? []
-                : [
-                    {
-                      text: exploreText,
-                      command: exploreCommand,
-                    },
-                  ]),
-            ],
-          })}`;
+        const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+          planned.change.after.connections.summarize(connection);
+        const verifiedBy = new Map(
+          verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+            if (claim === true) {
+              return [[property, "always counts as verified"]];
+            }
+            if (typeof claim === "string") {
+              return [[property, `counts as verified when ${text(claim)} is true`]];
+            }
+            return [];
+          }),
+        );
+        const sections = [
+          mappings.length === 0
+            ? []
+            : [
+                createsUsers
+                  ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                  : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+                ...mappings.map(({ property, claim }) => {
+                  const verified = verifiedBy.get(property) ?? "is not treated as verified";
+                  return [
+                    `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                    `  It ${verified}.`,
+                  ].join("\n");
+                }),
+              ],
+          scopes.length === 0
+            ? []
+            : [
+                `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
+              ],
+          unmapped.length === 0
+            ? []
+            : [
+                "These attributes have no claim yet:",
+                ...unmapped.map(({ property, required }) => {
+                  if (!required) {
+                    return `- ${text(property)} is optional, so it can stay empty.`;
+                  }
+                  return createsUsers
+                    ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                    : `- ${text(property)} is required, but this connection does not create users.`;
+                }),
+              ],
+          usedBy.length === 0
+            ? []
+            : [
+                `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+              ],
+          [
+            `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+          ],
+        ].filter((section) => {
+          return section.length > 0;
+        });
+        return [
+          "",
+          ...sections.flatMap((section, at) => {
+            return at === 0 ? section : ["", ...section];
+          }),
+        ];
+      });
+      summary = {
+        title,
+        sections: summarySections(sections),
+        lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
+        next: nextActions,
+        boxed: true,
+      };
+      if (!this.ui.interactive) {
+        const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
+          .split("\n")
+          .map((line) => {
+            return line.trim();
+          });
+        const ending = this.ui.ending({
+          ...summary,
+          next: [
+            ...nextActions,
+            ...(exploreCommand === undefined
+              ? []
+              : [
+                  {
+                    text: exploreText,
+                    command: exploreCommand,
+                  },
+                ]),
+          ],
+        });
+        // The ending is only what sits under the closing line, so the headline is added.
+        report = `${title}\n${ending}`;
+      }
+    }
 
     return this.emit({
       status: "ok",

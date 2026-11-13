@@ -353,6 +353,30 @@ describe("a normal command's chain, which is no chain at all", () => {
     running.clear();
   });
 
+  it.each([
+    ["plain", normally],
+    ["wizard", watching],
+  ] as const)(
+    "draws a running spinner again when the question is walked away from in a %s chain",
+    async (_shape, make) => {
+      const person = answering(undefined);
+      const chain = make();
+      const running = aSpinnerRunning(chain, "Deploying");
+
+      await expect(
+        asTerminal(() => {
+          return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
+        }),
+      ).rejects.toMatchObject({ code: "E_CANCELLED" });
+      vi.advanceTimersByTime(FRAME);
+
+      const shown = printed(person);
+      expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Deploy it now?"));
+      expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.lastIndexOf("Deploy it now?"));
+      running.clear();
+    },
+  );
+
   it("clears a spinner still running when the run is cancelled, before Cancelled is said", () => {
     const chain = watching();
     chain.spinner("Deploying");

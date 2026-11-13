@@ -228,32 +228,28 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         });
         const applies =
           "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.";
-        const next = !write.preview
-          ? {
-              actions: [
-                "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
-              ],
-              commands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
-            }
-          : verdict === "preview"
-            ? {
-                actions: [applies],
-                commands: [
-                  this.suggest({
-                    id: "preview",
-                    flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
-                  }),
-                ],
-              }
-            : {
-                actions: [
-                  applies,
-                  verdict === "unnamed-ci-build"
-                    ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
-                    : "Run it in the preview or development environment: preview skips any other.",
-                ],
-                commands: [],
-              };
+        const hint =
+          verdict === "unnamed-ci-build"
+            ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
+            : "Run it in the preview or development environment: preview skips any other.";
+        const previewActions = verdict === "preview" ? [applies] : [applies, hint];
+        const actions = write.preview
+          ? previewActions
+          : [
+              "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
+            ];
+        const previewCommands =
+          verdict === "preview"
+            ? [
+                this.suggest({
+                  id: "preview",
+                  flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
+                }),
+              ]
+            : [];
+        const commands = write.preview
+          ? previewCommands
+          : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })];
 
         return this.emit({
           status: "ok",
@@ -272,7 +268,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }).split("\n"),
           },
-          next,
+          next: { actions, commands },
         });
       }
     }

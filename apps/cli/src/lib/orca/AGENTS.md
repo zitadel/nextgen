@@ -18,6 +18,4 @@ runs as the CLI's own control flow, so the CLI's code style does not apply to it
   with a unit test of the output it writes.
 - A scanner's edge cases (unbalanced brackets, quotes, escapes) are pinned by
   its tests; a rewrite that is not a behaviour change has no reason to exist.
-- Treat a sweep that touches this directory as a mistake and revert it: brief
-  every agent and subagent with this rule, because a repo-wide refactor reaches
-  here first.
+- Brief every agent and subagent with these rules before any repo-wide sweep.

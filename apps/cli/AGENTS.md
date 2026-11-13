@@ -15,9 +15,8 @@
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
   [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
-- Declare no `let`, in `src` or `tests`: compute a `const`, or use an array method,
-  `for...of` or recursion. `biome-plugins/no-let.grit` rejects it. `src/lib/orca/patchers`
-  is exempt: it is code that edits the customer's files, not code the CLI runs on itself.
+- No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
+  `// biome-ignore lint/plugin: <reason>` stating the mechanism.
 - `src/lib/orca/patchers` edits and drops code into the customer's project, so no
   style or lint sweep may touch it: [`src/lib/orca/AGENTS.md`](src/lib/orca/AGENTS.md).
 - Imports: reach `src/` with `@/` (`@/lib/errors`), never `../`; `./` stays for siblings.

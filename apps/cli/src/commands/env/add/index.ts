@@ -444,40 +444,38 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // The runnable `origin add` is in the next steps; the line here is
     // for the one they cannot hold: a placeholder origin, or a file
     // without the project secret it would authenticate with.
-    const needsProjectSecret = needsOrigin && !writtenKeys.has("ZITADEL_PROJECT_SECRET");
-    const needsPlaceholder = needsOrigin && !needsProjectSecret && issuer === undefined;
-    const originGuidance = [
-      ...(needsPlaceholder
+    const awaitingProjectSecret = needsOrigin && !writtenKeys.has("ZITADEL_PROJECT_SECRET");
+    const secretGuidance = awaitingProjectSecret
+      ? [
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew({ id: "origin:add", args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
+        ]
+      : [];
+    const placeholderGuidance =
+      needsOrigin && !awaitingProjectSecret && issuer === undefined
         ? [
             `Allow this project's origin: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
           ]
-        : []),
-      ...(needsProjectSecret
-        ? [
-            `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew({ id: "origin:add", args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
-          ]
-        : []),
-    ];
+        : [];
+    const originGuidance = [...placeholderGuidance, ...secretGuidance];
     // Said even when nobody could be asked, because it is the one thing
     // standing between this environment and a working app: until a
     // release is deployed the project refuses sign-in, and the `.zitadel/`
     // files in this directory are not served.
     const undeployed = createdProject && deployment === undefined;
-    const needsOriginFirst = undeployed && !hasSomewhereToLand;
-    const deployGuidance = [
-      ...(undeployed
-        ? [
-            `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
-          ]
-        : []),
-      // With an origin, the deploy is in the next steps.
-      ...(needsOriginFirst
+    const undeployedGuidance = undeployed
+      ? [
+          `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
+        ]
+      : [];
+    // With an origin, the deploy is in the next steps.
+    const originFirstGuidance =
+      undeployed && !hasSomewhereToLand
         ? [
             `Give it an origin first: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
             `Then deploy to it: ${suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })}`,
           ]
-        : []),
-    ];
+        : [];
+    const deployGuidance = [...undeployedGuidance, ...originFirstGuidance];
 
     const title = `Added the ${args.name} environment, bound to ${projectId}`;
 

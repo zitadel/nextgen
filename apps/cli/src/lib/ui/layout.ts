@@ -258,38 +258,33 @@ export class Facts implements Renderable {
  * it as an opening quote inverted the quote state for the rest
  * of the line. A quote does not open inside a word, so `it's` is not one.
  */
-const argumentBreaks = (command: string): readonly number[] => {
+const argumentBreaks = (command: string): number[] => {
+  const at: number[] = [];
+  // biome-ignore lint/plugin: the quote the scan is inside, changed as it reads
+  let quote: string | undefined;
+  // biome-ignore lint/plugin: whether the last character was a backslash
+  let escaped = false;
   // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
-  return command.split("").reduce<{ at: number[]; quote?: string; escaped: boolean }>(
-    (scan, character, index) => {
-      if (scan.escaped) {
-        return { at: scan.at, quote: scan.quote, escaped: false };
-      }
-      if (character === "\\" && scan.quote !== "'") {
-        return { at: scan.at, quote: scan.quote, escaped: true };
-      }
-      if (scan.quote !== undefined) {
-        return {
-          at: scan.at,
-          quote: character === scan.quote ? undefined : scan.quote,
-          escaped: false,
-        };
-      }
-      if (
-        (character === "'" || character === '"') &&
-        !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
-        command.includes(character, index + 1)
-      ) {
-        return { at: scan.at, quote: character, escaped: false };
-      }
-      if (character === " ") {
-        scan.at.push(index);
-        return { at: scan.at, quote: scan.quote, escaped: false };
-      }
-      return scan;
-    },
-    { at: [], escaped: false },
-  ).at;
+  // biome-ignore lint/plugin: the scan position, read through one character at a time
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command.charAt(index);
+    if (escaped) {
+      escaped = false;
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote !== undefined) {
+      quote = character === quote ? undefined : quote;
+    } else if (
+      (character === "'" || character === '"') &&
+      !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
+      command.includes(character, index + 1)
+    ) {
+      quote = character;
+    } else if (character === " ") {
+      at.push(index);
+    }
+  }
+  return at;
 };
 
 /**

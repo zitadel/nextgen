@@ -512,7 +512,7 @@ describe("asker", () => {
   describe("the hooks around a prompt", () => {
     it("sees the prompt throw", async () => {
       vi.mocked(confirm).mockRejectedValueOnce(new Error("boom"));
-      const thrown = vi.fn();
+      const thrown: unknown[] = [];
 
       await asker({
         ...ask,
@@ -520,7 +520,7 @@ describe("asker", () => {
           try {
             return await draw();
           } catch (error) {
-            thrown(error);
+            thrown.push(error);
             throw error;
           }
         },
@@ -528,7 +528,7 @@ describe("asker", () => {
         .confirm({ name: "x", message: "X?" })
         .catch(() => undefined);
 
-      expect(thrown).toHaveBeenCalledOnce();
+      expect(thrown).toHaveLength(1);
     });
   });
 

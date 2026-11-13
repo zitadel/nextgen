@@ -98,10 +98,12 @@ export class NotFound extends BaseCommand {
     // A real command with no subcommands followed by a word it does not take:
     // the command's own refusal. After one with subcommands, the word is a
     // subcommand that does not exist.
-    // biome-ignore lint/plugin: counts down while looking for the longest real command
-    for (let length = words.length - 1; length > 0; length -= 1) {
-      const prefix = words.slice(0, length);
-      const exists = known.some((c) => c.length === length && prefix.every((w, i) => c[i] === w));
+    for (const prefix of Array.from({ length: words.length - 1 }, (_, drop) => {
+      return words.slice(0, words.length - 1 - drop);
+    })) {
+      const exists = known.some(
+        (c) => c.length === prefix.length && prefix.every((w, i) => c[i] === w),
+      );
       if (exists && under(prefix).length === 0) {
         this.id = prefix.join(":");
         throw new ZitadelError(
@@ -114,11 +116,9 @@ export class NotFound extends BaseCommand {
 
     // A word that is no command where it was typed: the longest run of visible
     // topics, then that word.
-    // biome-ignore lint/plugin: grows while each longer run of words is still a visible topic
-    let depth = 0;
-    while (depth < words.length - 1 && under(words.slice(0, depth + 1)).length > 0) {
-      depth += 1;
-    }
+    const depth = words.findIndex((_, at) => {
+      return at === words.length - 1 || under(words.slice(0, at + 1)).length === 0;
+    });
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
     const meant = near(typed[depth] as string, under(parent));

@@ -2,7 +2,6 @@ import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
-import { Lazy } from "@/lib/once";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { reportWarning } from "@/lib/warnings";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
@@ -269,14 +268,13 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
-  const listed = new Lazy(() => {
-    return objectTypes(ctx).catch(() => {
+  // biome-ignore lint/plugin: the memoised read, started on first use
+  let listed: Promise<Listing | undefined> | undefined;
+  return () => {
+    listed ??= objectTypes(ctx).catch(() => {
       return undefined;
     });
-  });
-  return () => {
-    return listed.get();
+    return listed;
   };
 }
 
