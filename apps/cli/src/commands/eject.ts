@@ -116,9 +116,12 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
   if (!dryRun) {
     Consent.assert(permit);
   }
-  const actions = await resolveEjectActions(cwd);
-  // Read before anything is removed, so nothing the ejection deletes can change it.
-  const packageManager = await detectPackageManager(cwd);
+  // The package manager is read before anything is removed, so nothing the
+  // ejection deletes can change it.
+  const [actions, packageManager] = await Promise.all([
+    resolveEjectActions(cwd),
+    detectPackageManager(cwd),
+  ]);
   const removed: string[] = [];
   const preserved: string[] = [];
   const backedUp: string[] = [];
