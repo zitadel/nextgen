@@ -34,7 +34,7 @@ import {
 /**
  * The flags the re-run of a refused change sets: the schema every `auth-method`
  * command takes, `--force`, and the `--provider` an SSO command names its
- * change by. A command without one of them refuses the re-run that names it.
+ * change by. A command without one of them is refused before it asks.
  */
 type RetryFlags = Readonly<{
   schema: Interfaces.OptionFlag<string | undefined>;
@@ -398,6 +398,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     make: (options: ForceOptions) => Change,
     naming: Readonly<{ provider?: string }> = {},
   ): Promise<ConfirmedChange | undefined> {
+    this.relyOn<RetryFlags>(
+      "force",
+      ...(naming.provider === undefined ? [] : ["provider" as const]),
+    );
     try {
       return {
         change: make({
