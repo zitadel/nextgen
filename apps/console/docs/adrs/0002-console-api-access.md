@@ -195,7 +195,7 @@ that follows from who serves the console:
 
 - **Production** — the built console is embedded in the Go binary, which
   serves the ogen API under `/api/v1` (root ADR 077). The base is `""`: the
-  generated client calls `/api/v1/flow`, `/api/v1/sessions/me`, … on the
+  generated client calls `/api/v1/flows`, `/api/v1/sessions/me`, … on the
   same origin.
 - **Dev** — Vite serves the console on `:5174`, the API is on `:8080`. The
   console calls the same `/api/v1` paths on Vite's origin, and the Vite dev

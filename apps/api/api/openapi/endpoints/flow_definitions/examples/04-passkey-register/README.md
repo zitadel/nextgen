@@ -40,7 +40,7 @@ flowchart TD
 
 ## Walk-through
 
-1. `POST /flow` with `purpose: register` → engine returns the `signup` step
+1. `POST /flows` with `purpose: register` → engine returns the `signup` step
    with the `email` field and `passkey_register` action.
 2. The user enters `email` and picks `passkey_register`. The engine validates
    `email` against the schema, merges it into collected data, mints a

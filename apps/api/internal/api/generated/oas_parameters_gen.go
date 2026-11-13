@@ -2842,11 +2842,11 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetFlowStepParams is parameters of getFlowStep operation.
 type GetFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// Flow ID returned by POST /flows or the latest POST /flows/{flow_id}/submit. Used to look up the
 	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
 	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// Encrypted flow state cookie set by `POST /flows` or the previous `POST /flows/{flow_id}/submit`. The
 	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
 	// other id is refused.
 	//
@@ -14587,11 +14587,11 @@ func decodeSetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.
 type SubmitFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{flow_id}/submit. Used to look up the
+	// Flow ID returned by POST /flows or the latest POST /flows/{flow_id}/submit. Used to look up the
 	// correct flow state from the encrypted cookie, which can hold multiple concurrent flows. May change
 	// between responses when a flow pivot or pop occurs — always use the `id` from the latest response.
 	FlowID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous `POST /flow/{flow_id}/submit`. The
+	// Encrypted flow state cookie set by `POST /flows` or the previous `POST /flows/{flow_id}/submit`. The
 	// cookie holds the sealed state of one flow; the `{flow_id}` path parameter must name that flow, any
 	// other id is refused.
 	//

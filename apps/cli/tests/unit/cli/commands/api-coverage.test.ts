@@ -47,7 +47,7 @@ const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
 const NOT_RESOURCES: Readonly<Record<string, string>> = {
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
-  flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
+  flows: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
   // Deployments are acts, not files: creating one is `zitadel deploy`'s
   // orchestration (build the release, then make it live — ADR 035), and the

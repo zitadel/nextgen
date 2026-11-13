@@ -6,7 +6,7 @@ post:
     validates it, processes it (for example, verifies a credential), advances
     the flow through any invisible steps, and returns the next visible step.
     The flow endpoints are the runtime calls the login component
-    (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+    (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flows`) starts a flow.
 
     The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
     with the new flow state. The server is stateless: all orchestration

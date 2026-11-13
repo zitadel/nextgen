@@ -3,7 +3,9 @@
   "extends": ["//"],
   // The conformance lane's tasks, defined once: every fixture's turbo.json is
   // `"extends": ["//", "@zitadel/conformance"]` (conformance/README.md). The
-  // suite itself has only the typecheck and lint scripts, so only those run here.
+  // suite itself has only the typecheck, lint and install-browsers scripts, so
+  // only those run here. It installs the lane's Chromium once for every
+  // fixture.
   //
   // `^build` follows a package's dependencies, devDependencies included, which
   // the rest of the graph avoids (docs/design/build/turborepo.md). A fixture
@@ -47,7 +49,7 @@
     // the switches that change what it tests.
     "conformance": {
       "outputs": [],
-      "dependsOn": ["^build", "install-browsers", "@zitadel/conformance#typecheck", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["^build", "@zitadel/conformance#install-browsers", "@zitadel/conformance#typecheck", "@zitadel/cli#build", "@zitadel/server#build"],
       "env": ["ZITADEL_*", "NEXTGEN_*", "!ZITADEL_TELEMETRY*"],
       "passThroughEnv": ["ZITADEL_TELEMETRY*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG"]
     }

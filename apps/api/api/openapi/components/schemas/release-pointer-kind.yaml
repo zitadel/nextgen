@@ -8,7 +8,7 @@ description: |
   URL.
 
   `flow_definition` rather than `flow`: a release pins the definitions served
-  at `/flow_definitions`, not the runtime flows at `/flow`.
+  at `/flow_definitions`, not the runtime flows at `/flows`.
 enum:
   - schema
   - flow_definition

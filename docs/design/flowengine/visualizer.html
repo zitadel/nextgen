@@ -1579,11 +1579,11 @@ function resetSim() {
 
   advanceThroughInvisible();
 
-  // Log POST /flow
+  // Log POST /flows
   const step = findStep(simState.stepName);
   const request = { purpose };
   const response = buildFlowResponse(step);
-  logApi('POST', '/flow', request, 201, response);
+  logApi('POST', '/flows', request, 201, response);
 
   onSimStepChanged();
 }
@@ -1726,7 +1726,7 @@ function simAction(actionName, providerId) {
       simState.error = null;
 
       const newStep = findStep(simState.stepName);
-      logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
+      logApi('POST', `/flows/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
       highlightedLines = { start: -1, end: -1 };
       updateFromEditor();
       onSimStepChanged();
@@ -1757,7 +1757,7 @@ function simAction(actionName, providerId) {
       simState.error = null;
 
       const newStep = findStep(simState.stepName);
-      logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
+      logApi('POST', `/flows/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(newStep));
       highlightedLines = { start: -1, end: -1 };
       updateFromEditor();
       onSimStepChanged();
@@ -1790,14 +1790,14 @@ function simAction(actionName, providerId) {
 
     // The parent resumes at its current step (re-render)
     const parentStep = findStep(simState.stepName);
-    logApi('POST', `/flow/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(parentStep));
+    logApi('POST', `/flows/${oldFlowId}/submit`, submitRequest, 200, buildFlowResponse(parentStep));
     highlightedLines = { start: -1, end: -1 };
     updateFromEditor();
     onSimStepChanged();
     return;
   }
 
-  logApi('POST', `/flow/${simState.flowId}/submit`, submitRequest, newStep ? 200 : 404, buildFlowResponse(newStep));
+  logApi('POST', `/flows/${simState.flowId}/submit`, submitRequest, newStep ? 200 : 404, buildFlowResponse(newStep));
   onSimStepChanged();
 }
 

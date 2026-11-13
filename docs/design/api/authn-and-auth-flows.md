@@ -9,7 +9,7 @@
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and `assurance_levels[]`. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The `/flow/{flow_id}` handle is the flow's own `id` from the latest response — it is distinct from the stable underlying `session_id` and from `auth_attempt_id`, and it may change on pivot or pop.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The `/flows/{flow_id}` handle is the flow's own `id` from the latest response — it is distinct from the stable underlying `session_id` and from `auth_attempt_id`, and it may change on pivot or pop.
 
 ## Pre-session concepts
 
@@ -50,7 +50,7 @@ POST   /auth_attempts/{id}/handoff                 # terminal: mint handoff_toke
 `POST /auth_attempts` accepts only the project context, the bootstrap challenge
 nonce, and an optional existing session for step-up. A step-up attempt inherits
 the session's verified factors, so it names the session with that session's own
-`session_token` as proof; a `session_id` alone is refused (`POST /flow` alike):
+`session_token` as proof; a `session_id` alone is refused (`POST /flows` alike):
 
 ```http
 POST /auth_attempts
@@ -185,7 +185,7 @@ sequenceDiagram
 
     Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
 
-    Browser->>FlowEngine: POST /flow { project_id, challenge_nonce, session_id? }
+    Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
     FlowEngine->>AuthAttempts: svc.Create({ project_id, challenge_nonce, session_id? })
     AuthAttempts-->>FlowEngine: { attempt_id }
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "identifier" })
@@ -194,24 +194,24 @@ sequenceDiagram
 
     Note over Browser,CustomerBackend: Factor 1 — identifier + password
 
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { login_name: "alice@acme.com" }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { login_name: "alice@acme.com" }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { login_name: "alice@acme.com" })
     AuthAttempts-->>FlowEngine: OK — identifier verified
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "password" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "password" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "password" }
 
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { password: "…" }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { password: "…" }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { password: "…" })
     AuthAttempts-->>FlowEngine: OK — factor written to auth_attempt
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "totp" }
 
     Note over Browser,CustomerBackend: Factor 2 — TOTP (policy required MFA)
 
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { method: "totp" }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { method: "totp" }
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "totp" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "totp" }
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { totp: { code: "123456" } }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { totp: { code: "123456" } }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { totp: { code: "123456" } })
     AuthAttempts-->>FlowEngine: OK — factor written, assurance_levels[] updated
     FlowEngine->>AuthAttempts: svc.Handoff(attempt_id)
@@ -324,7 +324,7 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine drives login (same as Path 1, steps omitted)
 
-    Browser->>FlowEngine: POST /flow { attempt_id }
+    Browser->>FlowEngine: POST /flows { attempt_id }
     FlowEngine-->>Browser: { step: "identifier" }
     Note right of Browser: … identifier → password → totp steps …
     FlowEngine-->>Browser: { step: "complete" }
@@ -381,14 +381,14 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine resolves acr_values from auth_request, renders only missing factor
 
-    Browser->>FlowEngine: POST /flow { attempt_id }
+    Browser->>FlowEngine: POST /flows { attempt_id }
     Note right of FlowEngine: lookup auth_request via attempt_id → acr_values = aal:2<br/>policy_check: session has password, only totp missing
     FlowEngine-->>Browser: { step: "totp" }
 
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { method: "totp" }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { method: "totp" }
     FlowEngine-)AuthService: issue_challenge(method: "totp")
     AuthService--)FlowEngine: { challenge_id }
-    Browser->>FlowEngine: POST /flow/{flow_id}/submit { totp: { code: "123456" } }
+    Browser->>FlowEngine: POST /flows/{flow_id}/submit { totp: { code: "123456" } }
     FlowEngine-)AuthService: verify_challenge(challenge_id, totp: { code: "123456" })
     AuthService-)DB: write totp factor, recompute assurance_levels[]
     DB--)AuthService: assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"]

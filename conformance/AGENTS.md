@@ -13,7 +13,5 @@ What the lane is and its commands: [README.md](README.md).
   treats anything else as generated.
 - Define the fixtures' tasks once, in `suite/turbo.json`; `^build` there is
   what gives a fixture its SDKs' builds.
-- When `generate` says the catalog is behind, bump the catalog
-  (`pnpm-workspace.yaml`), never the fixture's range.
 - Put framework knowledge the spec needs in the fixture's `conformance.spec.ts`
   options, never as a branch on the framework in `suite/src/suite.ts`.

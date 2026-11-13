@@ -117,7 +117,8 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - A task that opens Chromium depends on its package's `install-browsers`
   (`playwright install chromium`, never cached), so a run installs it only
   when such a task runs: the browser test suites, the e2e lanes,
-  `@zitadel/testing#test:integration`.
+  `@zitadel/testing#test:integration`. The conformance fixtures share the
+  suite's (`@zitadel/conformance#install-browsers`).
 - A package imports only its own files and the workspace packages its
   `package.json` declares, each through its exports, never a relative path
   into its folder; `turbo boundaries` checks it in CI. Shared config

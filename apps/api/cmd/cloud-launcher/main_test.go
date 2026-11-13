@@ -710,7 +710,8 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 // its prefix, the few paths the server answers at the root and, until 1.0.0,
 // the root paths of the API's resources, which clients released before the
 // prefix call (ADR 077 §4). Their names are fixed: a client can only call an
-// operation it knows, so a resource added since needs no root rule. Every
+// operation it knows, so a resource added since needs no root rule, and
+// neither does `/flows`, which no client calls without the prefix. Every
 // other path is the website's, whose 404 answers what nothing serves
 // (ADR 076, as amended). A missed rule shows here, not in production.
 func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
@@ -775,7 +776,7 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/schemas/v1/user-schema.json": "schemas",
 		"/console/users":               "console",
 		"/docs/reference/api":          "docs",
-		"/cloud/zitadel/flow":          "cloud-functions",
+		"/cloud/zitadel/api/v1/flows":  "cloud-functions",
 		"/telemetry/mixpanel/track":    "(external)",
 	}
 	for path, want := range others {

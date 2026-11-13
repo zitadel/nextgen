@@ -1,7 +1,7 @@
 /**
  * Standalone HTTP server for the api-mock.
  *
- * Flow routes (POST /flow, GET /flow/:flow_id, POST /flow/:flow_id/submit) and the
+ * Flow routes (POST /flows, GET /flows/:flow_id, POST /flows/:flow_id/submit) and the
  * platform CRUD routes (projects, schemas, flow_definitions) are served by
  * reusing the existing MSW handlers via @mswjs/http-middleware — zero
  * duplication of routing logic.
