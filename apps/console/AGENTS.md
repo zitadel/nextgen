@@ -78,10 +78,13 @@ between files are the sign the component is missing.
   a copy of a screen for the root. A row that opens one sets `project` to it.
 - The chrome treats that selection as the root (`usePlatformSelected`): never
   show the platform project's name, or list or remember it as a project.
+- The bar names where the person is (D44): on a root screen the root alone
+  (`Platform`, or `All projects` without platform access); in a project, the
+  root then the project.
 - A project's Settings opens its own list too (`nav.view: "project-settings"`,
   D40); add a project setting as a page there, never as a tab.
-- Going up to Projects or Settings never drops the selected project (D36):
-  never link with `project: undefined`.
+- Root screens (`isRootPath`) hold the root, never a project (D44): link up
+  with `useRootSearch`; the `_authed` guard enforces it for any URL.
 - `/` is the project's Overview (D35): only reads a screen already makes, and no
   figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,

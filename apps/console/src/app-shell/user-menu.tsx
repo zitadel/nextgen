@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
+import { useRootSearch } from "@/features/platform/access";
 import { DOCS_URL } from "@/lib/docs";
 import { type ThemePreference, useTheme } from "@/theme";
 
@@ -181,6 +182,8 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
 function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const { name, second } = accountName(user);
   const { isMobile } = useSidebar();
+  // The profile is the root's: it holds the root, not a project (D44).
+  const rootSearch = useRootSearch();
 
   return (
     <DropdownMenuContent
@@ -191,7 +194,7 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
     >
       <DropdownMenuGroup className="p-1">
         <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
-          <Link to="/account">
+          <Link to="/account" search={rootSearch}>
             <span className="max-w-full truncate text-sm font-medium">{name}</span>
             {second && (
               <span className="max-w-full truncate text-xs leading-none text-muted-foreground">

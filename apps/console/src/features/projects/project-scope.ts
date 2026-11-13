@@ -86,6 +86,22 @@ function isRefusal(cause: unknown): boolean {
   return cause instanceof ApiError && (cause.status === 403 || cause.status === 404);
 }
 
+/**
+ * Whether a route path is one of the root's own screens, above every project
+ * (D44): Projects, Settings with its pages, and the person's profile. They
+ * hold the root as the selection, never a project: the platform project for
+ * someone who may act on it (D42), and none for anyone else. The `_authed`
+ * guard makes it so, whatever the link carried.
+ */
+export function isRootPath(path: string): boolean {
+  return (
+    path === "/projects" ||
+    path === "/account" ||
+    path === "/settings" ||
+    path.startsWith("/settings/")
+  );
+}
+
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */
 export function validateProjectScopeSearch(search: Record<string, unknown>): ProjectScopeSearch {
   const project = search[PROJECT_SCOPE_PARAM];

@@ -40,6 +40,7 @@ import { recentHits, rememberHit } from "@/features/search/recents";
 import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
 import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
+import { useRootSearch } from "@/features/platform/access";
 import { getPlatformProjectId } from "@/runtime/runtime";
 
 import type { NavIcon } from "@/nav";
@@ -50,6 +51,7 @@ import {
   useNavItems,
   useSettingsListItems,
 } from "./use-nav-items";
+import { PLATFORM } from "./root-name";
 import { SETTINGS_PATH } from "./user-menu";
 
 /**
@@ -190,7 +192,8 @@ export function SearchDialog({
   userId?: string;
   /**
    * The person is above every project (Projects, Settings), so the server
-   * searches all their projects even while one stays selected (D39).
+   * searches all their projects (D39). The root holds the platform there for
+   * someone who may act on it, whose matches then rank first (D44).
    */
   allProjects?: boolean;
 }) {
@@ -323,9 +326,14 @@ function SearchPalette({
   const platformProjectId = getPlatformProjectId();
   const atPlatform = projectId !== undefined && projectId === platformProjectId;
   const projectName = atPlatform ? undefined : selected?.name;
+  // What the root is called (D44): the platform for someone who may act on it,
+  // whose screens it holds, and the account's for anyone else.
+  // The profile is the root's too, so opening it holds the root (`useRootSearch`).
+  const { project: platformAccess } = useRootSearch();
+  const rootPlace = platformAccess ? PLATFORM : ACCOUNT;
   // Where the selected project's rows are: its name, or its id until that is
-  // read. The root's are above every project.
-  const place = atPlatform ? ACCOUNT : projectId ? (projectName ?? projectId) : undefined;
+  // read. The root's are the root's.
+  const place = atPlatform ? rootPlace : projectId ? (projectName ?? projectId) : undefined;
   const q = query.trim().toLowerCase();
 
   const groups = useMemo((): ResultGroup[] => {
@@ -505,17 +513,17 @@ function SearchPalette({
             id: "page:/account",
             icon: <CircleUser aria-hidden />,
             label: PROFILE,
-            description: where(ACCOUNT),
+            description: where(rootPlace),
             inProject: false,
             kind: KIND.account,
-            go: close(() => void navigate({ to: "/account" })),
+            go: close(() => void navigate({ to: "/account", search: { project: platformAccess } })),
           },
         ]
       : [];
     const accountResults = [
       ...navResults(
         account.filter((item) => item.to !== SETTINGS_PATH),
-        { description: where(ACCOUNT), inProject: false, kind: KIND.account },
+        { description: where(rootPlace), inProject: false, kind: KIND.account },
       ),
       ...profile,
       ...navResults(settings, { list: "Settings", inProject: false, kind: KIND.account }),
@@ -547,7 +555,7 @@ function SearchPalette({
             .slice(0, PROJECT_RESULTS)
             .map(projectResult),
         },
-        { heading: ACCOUNT, results: accountResults },
+        { heading: rootPlace, results: accountResults },
       ].filter((group) => group.results.length > 0);
     }
 
@@ -605,6 +613,8 @@ function SearchPalette({
     scope,
     projectName,
     place,
+    rootPlace,
+    platformAccess,
     platformProjectId,
     atPlatform,
     q,
@@ -716,7 +726,11 @@ interface NavPlace {
 /** Beneath a project's page while no project is selected: opening it asks for one. */
 const CHOOSE_A_PROJECT = "Choose a project";
 
-/** What is above every project: the menu's heading, and beneath its rows once typed. */
+/**
+ * What is above every project for someone who may not act on the platform:
+ * the menu's heading, and beneath its rows once typed. For someone who may,
+ * the root is the platform (D44).
+ */
 const ACCOUNT = "Account";
 
 /** The person's own page, which the account menu opens (`/account`, D42). */
