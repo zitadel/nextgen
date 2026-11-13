@@ -98,5 +98,4 @@ It does not catch:
 2. Copy `turbo.json`, `playwright.config.mts` and `conformance.spec.ts` from
    a fixture of the same family; set the env template and the spec's options
    for the framework.
-3. Run `pnpm install && turbo run generate --filter=@zitadel/conformance-<id> && pnpm install`,
-   then `git add -f` any file it reports as ignored.
+3. Run `pnpm install && turbo run generate --filter=@zitadel/conformance-<id> && pnpm install`.

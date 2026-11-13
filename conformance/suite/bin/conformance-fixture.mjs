@@ -266,15 +266,6 @@ async function write(fixtureDir, generated) {
   if (changed.some((line) => line.endsWith(" package.json"))) {
     console.log("package.json changed: run `pnpm install` to update the lockfile");
   }
-  // The generated .gitignore can ignore a file setup writes; the fixture
-  // commits what setup writes all the same.
-  const ignored = spawnSync("git", ["check-ignore", "--no-index", "--", ...generated.keys()], {
-    cwd: fixtureDir,
-    encoding: "utf8",
-  }).stdout.trim();
-  if (ignored !== "") {
-    console.log(`git ignores files setup wrote; commit them with \`git add -f\`:\n${ignored}`);
-  }
 }
 
 /** Fails, with a diff, when the committed fixture is not what setup writes. */
@@ -286,8 +277,6 @@ async function check(fixtureDir, work, generated, name) {
   }
   const expectedDir = join(work, "expected");
   for (const [path, contents] of generated) {
-    // Read from disk, not git's list: a file the generated .gitignore ignores
-    // is still committed (`git add -f`).
     const current = await readFile(join(fixtureDir, path)).catch(() => undefined);
     if (!current) {
       problems.push(`${path}: setup writes it, but the fixture does not have it`);
