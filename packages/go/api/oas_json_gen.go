@@ -3143,11 +3143,11 @@ func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -3335,7 +3335,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -3347,7 +3347,7 @@ func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -4084,11 +4084,11 @@ func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -4276,7 +4276,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -4288,7 +4288,7 @@ func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -6230,11 +6230,11 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -6422,7 +6422,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -6434,7 +6434,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -6832,11 +6832,11 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -7024,7 +7024,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -7036,7 +7036,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -7755,11 +7755,11 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -7947,7 +7947,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -7959,7 +7959,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -8487,11 +8487,11 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -8679,7 +8679,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -8691,7 +8691,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -9277,11 +9277,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -9469,7 +9469,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -9481,7 +9481,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -9879,11 +9879,11 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -10071,7 +10071,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -10083,7 +10083,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -10832,11 +10832,11 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -11024,7 +11024,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -11036,7 +11036,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -11434,11 +11434,11 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -11626,7 +11626,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -11638,7 +11638,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -12036,11 +12036,11 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -12228,7 +12228,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -12240,7 +12240,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -12638,11 +12638,11 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -12830,7 +12830,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -12842,7 +12842,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -13316,11 +13316,11 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -13508,7 +13508,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -13520,7 +13520,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -14106,11 +14106,11 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -14298,7 +14298,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -14310,7 +14310,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -14805,11 +14805,11 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -14997,7 +14997,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -15009,7 +15009,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -16515,11 +16515,11 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -16707,7 +16707,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -16719,7 +16719,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -39136,11 +39136,11 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -39328,7 +39328,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -39340,7 +39340,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -42758,11 +42758,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42882,11 +42882,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43006,11 +43006,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43130,11 +43130,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43254,11 +43254,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43378,11 +43378,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43502,11 +43502,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43626,11 +43626,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43750,11 +43750,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43874,11 +43874,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43998,11 +43998,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44122,11 +44122,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44246,11 +44246,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44370,11 +44370,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44494,11 +44494,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44618,11 +44618,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44742,11 +44742,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44866,11 +44866,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44990,11 +44990,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45114,11 +45114,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45238,11 +45238,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45362,11 +45362,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45486,11 +45486,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45610,11 +45610,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45734,11 +45734,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45858,11 +45858,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45982,11 +45982,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46106,11 +46106,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46230,11 +46230,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46354,11 +46354,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46478,11 +46478,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46602,11 +46602,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46726,11 +46726,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46850,11 +46850,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -46974,11 +46974,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47098,11 +47098,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47222,11 +47222,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47346,11 +47346,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47470,11 +47470,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47594,11 +47594,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47718,11 +47718,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47842,11 +47842,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -47966,11 +47966,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48090,11 +48090,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48214,11 +48214,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48338,11 +48338,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48462,11 +48462,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48586,11 +48586,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48710,11 +48710,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48834,11 +48834,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -48958,11 +48958,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -49082,11 +49082,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -56723,11 +56723,11 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -56915,7 +56915,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -56927,7 +56927,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -57325,11 +57325,11 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -57517,7 +57517,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -57529,7 +57529,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -59555,11 +59555,11 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -59747,7 +59747,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -59759,7 +59759,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -60157,11 +60157,11 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -60349,7 +60349,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -60361,7 +60361,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -62539,11 +62539,11 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -62731,7 +62731,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -62743,7 +62743,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -76349,11 +76349,11 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -76541,7 +76541,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -76553,7 +76553,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -77555,11 +77555,11 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -77747,7 +77747,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -77759,7 +77759,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -79591,11 +79591,11 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -79783,7 +79783,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -79795,7 +79795,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -82333,11 +82333,11 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -82525,7 +82525,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -82537,7 +82537,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -83730,11 +83730,11 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -83922,7 +83922,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -83934,7 +83934,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -84438,11 +84438,11 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -84630,7 +84630,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -84642,7 +84642,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -86947,11 +86947,11 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -87139,7 +87139,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -87151,7 +87151,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -111908,11 +111908,11 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -112100,7 +112100,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -112112,7 +112112,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -113601,11 +113601,11 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -113793,7 +113793,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -113805,7 +113805,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -119453,11 +119453,11 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -119645,7 +119645,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -119657,7 +119657,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -120321,11 +120321,11 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -120513,7 +120513,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -120525,7 +120525,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -121249,11 +121249,11 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -121441,7 +121441,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -121453,7 +121453,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -124689,11 +124689,11 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -124881,7 +124881,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -124893,7 +124893,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -125291,11 +125291,11 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -125483,7 +125483,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -125495,7 +125495,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -126589,11 +126589,11 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -126781,7 +126781,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -126793,7 +126793,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -135676,11 +135676,11 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -135868,7 +135868,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -135880,7 +135880,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -137072,11 +137072,11 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -137264,7 +137264,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -137276,7 +137276,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -138896,11 +138896,11 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -139088,7 +139088,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -139100,7 +139100,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -144108,11 +144108,11 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -144300,7 +144300,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -144312,7 +144312,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -147909,11 +147909,11 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -148101,7 +148101,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -148113,7 +148113,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -148574,11 +148574,11 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -148766,7 +148766,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -148778,7 +148778,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -151093,6 +151093,209 @@ func (s *StepTexts) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SubmitFlowStepBadRequest as json.
+func (s SubmitFlowStepBadRequest) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.Encode(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.Encode(e)
+	}
+}
+
+func (s SubmitFlowStepBadRequest) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.encodeFields(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.encodeFields(e)
+	}
+}
+
+// Decode decodes SubmitFlowStepBadRequest from json.
+func (s *SubmitFlowStepBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SubmitFlowStepBadRequest to nil")
+	}
+	// Sum type fields.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			switch string(key) {
+			case "branding":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "code":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "details":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token_expires_at":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "message":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "redirect_uri":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "step":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		if err := s.FlowResponse.Decode(d); err != nil {
+			return err
+		}
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		if err := s.ErrorDetails.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SubmitFlowStepBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SubmitFlowStepBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SubmitFlowStepErrorResponse as json.
 func (s SubmitFlowStepErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -152417,11 +152620,11 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -152609,7 +152812,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -152621,7 +152824,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -153019,11 +153222,11 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -153211,7 +153414,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -153223,7 +153426,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -155101,11 +155304,11 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -155293,7 +155496,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -155305,7 +155508,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -158546,11 +158749,11 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -158738,7 +158941,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -158750,7 +158953,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -159584,11 +159787,11 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -159776,7 +159979,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -159788,7 +159991,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -160354,11 +160557,11 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -160546,7 +160749,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -160558,7 +160761,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -163921,11 +164124,11 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -164113,7 +164316,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -164125,7 +164328,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -166181,11 +166384,11 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -166373,7 +166576,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -166385,7 +166588,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -166945,11 +167148,11 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -167137,7 +167340,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -167149,7 +167352,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err

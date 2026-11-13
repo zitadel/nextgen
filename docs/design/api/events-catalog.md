@@ -192,7 +192,7 @@ tracked below.
 | Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
-| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Challenge failed (not a sign-up's identifier that matches no account: that lookup asks whether the identifier is free, and counts only toward the challenge's failures) | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | SSO authorization failed (the provider's error response, `access_denied` included, or a callback with no code, including one refused because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.authorization.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived, including a callback refused before the exchange because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |

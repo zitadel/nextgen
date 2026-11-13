@@ -1508,6 +1508,39 @@ function primaryOrigins(project: ProjectRecord): string[] {
 }
 
 /**
+ * The primary origins a project lists now, none for a project that is gone.
+ *
+ * @param projectId - The project.
+ * @returns Its primary origins, as exact URLs, sorted.
+ */
+function listedPrimaries(projectId: string): string[] {
+  const project = store.projects.get(projectId);
+
+  return project === undefined ? [] : primaryOrigins(project);
+}
+
+/**
+ * Compares two strings by code unit, which for the ASCII URLs the mock holds is
+ * the byte order the server sorts them in (`strings.Compare`). `localeCompare`
+ * orders punctuation differently, so `https://a.test:3000` would come before
+ * `https://a.test.dev` here and after it on the server.
+ *
+ * @param a - The first string.
+ * @param b - The second string.
+ * @returns A negative number when `a` sorts first, a positive one when `b` does, else zero.
+ */
+function byteOrder(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * Whether a concrete origin matches one of the project's preview patterns. A
  * `*` in a pattern matches one or more characters that are not a dot, as the
  * origin rule (#1582) defines it.
@@ -1538,24 +1571,127 @@ function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRe
 }
 
 /**
- * The newest deployment to an origin, treating a preview that is gone as gone.
- * A preview's liveness is its preview row, not the expiry frozen onto the
- * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
- * every endpoint has to agree on which previews are live.
+ * The newest deployment to an origin, whatever it went there as and whether or
+ * not it still serves it. The server's newest-per-origin read answers the
+ * `expected_deployment_id` guard this way, which the contract words as "the
+ * newest deployment to any of the preview URLs": a preview that was removed or
+ * has expired is still the deployment a new one replaces. What serves the
+ * origin now is a different question, which {@link servedOrigins} answers.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin.
+ * @returns The newest deployment of the project that names the origin, if any.
  */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
-  return [...store.deployments.values()]
-    .filter((deployment) => deployment.projectId === projectId)
-    .filter((deployment) =>
-      deployment.targets.some(
-        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
-      ),
-    )
-    .sort((a, b) => b.seq - a.seq)[0];
+  return projectDeployments(projectId).find((deployment) => {
+    return deployment.targets.some((target) => {
+      return target.origin === origin;
+    });
+  });
+}
+
+/**
+ * An origin a deployment serves now.
+ */
+type ServedOrigin = {
+  /**
+   * The origin's URL.
+   */
+  origin: string;
+  /**
+   * The deployment that serves it.
+   */
+  deployment: DeploymentRecord;
+  /**
+   * Whether the deployment serves it as a primary origin or as a preview.
+   */
+  kind: "primary" | "preview";
+  /**
+   * The expiry of the preview the deployment serves it as, null for a primary
+   * origin.
+   */
+  expiresAt: string | null;
+};
+
+/**
+ * Where the deployments of a project are live now, one entry per origin a
+ * deployment serves (a row of the server's deployment origins), newest
+ * deployment first, decided row by row as the server's `RowServes` does.
+ *
+ * A primary row serves while its deployment is the project's newest primary
+ * deployment, on every origin it names, whatever the project lists now. A
+ * preview row serves while its deployment is the newest preview deployment to
+ * that origin, the origin is not a primary origin of the project, and the
+ * preview is live: removing the preview or letting it expire ends it without
+ * rewriting the deployment, and a renewed preview is reported on the clock it
+ * now runs on. One origin can be served by a primary row and a preview row at
+ * once, as on the server. The live deployment list, the check that refuses to
+ * revoke a served release and a deployment's status all read this.
+ *
+ * @param projectId - The project.
+ * @param deployments - The project's deployments, newest first, which the
+ * caller reads once.
+ * @returns One entry for each origin of each deployment of the project that is
+ * served.
+ */
+function servedOrigins(
+  projectId: string,
+  deployments: readonly DeploymentRecord[],
+): ServedOrigin[] {
+  const primaries = listedPrimaries(projectId);
+  const previewed = new Set<string>();
+  const served: ServedOrigin[] = [];
+  const newestPrimary = firstPrimary(deployments);
+  for (const deployment of deployments) {
+    for (const { origin, expiresAt } of deployment.targets) {
+      if (expiresAt === null) {
+        if (deployment.id === newestPrimary?.id) {
+          served.push({ origin, deployment, kind: "primary", expiresAt });
+        }
+        continue;
+      }
+      if (previewed.has(origin)) {
+        continue;
+      }
+      previewed.add(origin);
+      const preview = store.previews.get(previewKey(projectId, origin));
+      if (previewIsLive(preview) && !primaries.includes(origin)) {
+        served.push({ origin, deployment, kind: "preview", expiresAt: preview.expiresAt });
+      }
+    }
+  }
+  return served;
+}
+
+/**
+ * What serves one origin of a project, as the server answers a live list for
+ * an origin. It decides that with `OriginRowServes` rather than `RowServes`: a
+ * primary row counts only while the project still lists the origin as a
+ * primary origin, and a preview row only while it does not, so at most one row
+ * serves an origin.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin asked about.
+ * @param served - What serves in the project now.
+ * @returns The entries that serve the origin: none, or one.
+ */
+function servedOn(
+  projectId: string,
+  origin: string,
+  served: readonly ServedOrigin[],
+): ServedOrigin[] {
+  const listed = listedPrimaries(projectId);
+
+  return served.filter((entry) => {
+    if (entry.origin !== origin) {
+      return false;
+    }
+
+    return entry.kind === "preview" || listed.includes(origin);
+  });
 }
 
 /** The release metadata block, nulls written explicitly as the server does. */
@@ -1590,33 +1726,98 @@ function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
   return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
 }
 
-/** The project's newest primary deployment, what a deploy or rollback replaces. */
-function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
+/**
+ * The deployments of a project, newest first.
+ *
+ * @param projectId - The project.
+ * @returns Its deployments ordered by sequence, newest first.
+ */
+function projectDeployments(projectId: string): DeploymentRecord[] {
   return [...store.deployments.values()]
-    .filter(
-      (deployment) =>
-        deployment.projectId === projectId && deploymentKind(deployment) === "primary",
-    )
-    .sort((a, b) => b.seq - a.seq)[0];
+    .filter((deployment) => {
+      return deployment.projectId === projectId;
+    })
+    .sort((a, b) => {
+      return b.seq - a.seq;
+    });
 }
 
 /**
- * Whether the deployment still serves its release: the newest primary deployment
- * always does, and a preview deployment while a target is served by it. A later
- * deployment, or its previews expiring or being removed, makes it `inactive`.
+ * The newest primary deployment among deployments ordered newest first.
+ *
+ * @param deployments - A project's deployments, newest first.
+ * @returns The newest one that went to the primary origins, if any.
  */
-function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
-  if (deploymentKind(deployment) === "primary") {
-    return newestPrimaryDeployment(deployment.projectId)?.id === deployment.id
-      ? "live"
-      : "inactive";
+function firstPrimary(deployments: readonly DeploymentRecord[]): DeploymentRecord | undefined {
+  return deployments.find((deployment) => {
+    return deploymentKind(deployment) === "primary";
+  });
+}
+
+/**
+ * The project's newest primary deployment, what a deploy or rollback replaces.
+ *
+ * @param projectId - The project.
+ * @returns Its newest deployment that went to the primary origins, if any.
+ */
+function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
+  return firstPrimary(projectDeployments(projectId));
+}
+
+/**
+ * A live deployment with every origin it serves.
+ */
+type LiveGroup = {
+  /**
+   * The deployment that serves the origins.
+   */
+  deployment: DeploymentRecord;
+  /**
+   * The origins it serves, with the expiry of each preview.
+   */
+  targets: DeploymentTargetRow[];
+};
+
+/**
+ * The deployments that serve what a live list asked about, each with every
+ * origin it serves, as the server attaches them.
+ *
+ * @param served - Everything that serves in the project now.
+ * @param asked - The entries the live list asked about, all of them or the
+ * ones for one origin.
+ * @returns One group per matching deployment, newest first, as `served` is.
+ */
+function liveGroups(served: readonly ServedOrigin[], asked: readonly ServedOrigin[]): LiveGroup[] {
+  const matched = new Set(
+    asked.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
+  const groups = new Map<string, LiveGroup>();
+  for (const entry of served) {
+    if (!matched.has(entry.deployment.id)) {
+      continue;
+    }
+    const group = groups.get(entry.deployment.id) ?? { deployment: entry.deployment, targets: [] };
+    group.targets.push({ origin: entry.origin, expiresAt: entry.expiresAt });
+    groups.set(entry.deployment.id, group);
   }
-  return deployment.targets.some(
-    (target) =>
-      newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
-  )
-    ? "live"
-    : "inactive";
+
+  return [...groups.values()];
+}
+
+/**
+ * The ids of the deployments that serve at least one origin.
+ *
+ * @param served - What serves in a project now.
+ * @returns The ids of the deployments in `served`.
+ */
+function servingIds(served: readonly ServedOrigin[]): ReadonlySet<string> {
+  return new Set(
+    served.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
 }
 
 /** Whether a deployment has this release and exactly these origins. */
@@ -1630,12 +1831,25 @@ function repeats(deployment: DeploymentRecord, releaseId: string, origins: strin
   );
 }
 
-/** The wire shape of a deployment, optionally over a restricted target set. */
+/**
+ * The wire shape of a deployment, optionally over a restricted target set.
+ *
+ * @param deployment - The deployment.
+ * @param serving - The ids of the deployments that serve an origin of its
+ * project now. It is `live` while it is among them, and `inactive` once a later
+ * deployment, or its previews expiring or being removed, leaves it serving
+ * nothing.
+ * @param targets - The targets to report, all of them when not given.
+ * @param expand - Whether to expand its release.
+ * @returns The deployment as the API answers it.
+ */
 function deploymentResponse(
   deployment: DeploymentRecord,
+  serving: ReadonlySet<string>,
   targets: DeploymentTargetRow[] = deployment.targets,
   expand?: { release: boolean },
 ): Record<string, unknown> {
+  const status = serving.has(deployment.id) ? "live" : "inactive";
   const body: Record<string, unknown> = {
     id: deployment.id,
     project_id: deployment.projectId,
@@ -1646,7 +1860,7 @@ function deploymentResponse(
         : { origin: target.origin, expires_at: target.expiresAt },
     ),
     kind: deploymentKind(deployment),
-    status: deploymentStatus(deployment),
+    status,
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,
@@ -1663,6 +1877,43 @@ function deploymentResponse(
     }
   }
   return body;
+}
+
+/**
+ * The wire shape of a deployment a write answers with. The server reports the
+ * deployment it wrote, or the one a refused write would have replaced, as live
+ * without asking what serves (`toAPIDeployment(..., api.DeploymentStatusLive)`
+ * in apps/api/internal/api/deployment.go), so this does too.
+ *
+ * @param deployment - The deployment the write answers with.
+ * @returns The deployment as the API answers it, `live`.
+ */
+function answeredLive(deployment: DeploymentRecord): Record<string, unknown> {
+  return deploymentResponse(deployment, new Set([deployment.id]));
+}
+
+/**
+ * The refusal of a write whose `expected_deployment_id` is not the deployment
+ * it replaces. It names that deployment, the newest to the targets whether or
+ * not a removed or expired preview still serves them, as live.
+ *
+ * @param newest - The deployment the write replaces, if there is one.
+ * @returns The `409 dep.conflict` answer, naming no deployment when there is none.
+ */
+function guardConflict(newest: DeploymentRecord | undefined) {
+  let named: Record<string, unknown> | null = null;
+  if (newest !== undefined) {
+    named = answeredLive(newest);
+  }
+
+  return HttpResponse.json(
+    errorBody(
+      "dep.conflict",
+      "deployment: the newest deployment to the targets does not match expected_deployment_id",
+      { deployment: named },
+    ),
+    { status: 409 },
+  );
 }
 
 /**
@@ -2021,24 +2272,22 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(releaseResponse(release), { status: 200 });
       }
 
-      // A release an origin still serves cannot be revoked: the live deployment
-      // to any origin must not pin it.
-      const servedBy: { origin: string; deployment_id: string; kind: "primary" | "preview" }[] = [];
-      const origins = new Set(
-        [...store.deployments.values()]
-          .filter((deployment) => deployment.projectId === release.projectId)
-          .flatMap((deployment) => deployment.targets.map((target) => target.origin)),
-      );
-      for (const origin of origins) {
-        const newest = newestDeploymentForOrigin(release.projectId, origin);
-        if (newest?.releaseId === release.id) {
-          servedBy.push({ origin, deployment_id: newest.id, kind: deploymentKind(newest) });
-        }
-      }
+      // A release an origin still serves cannot be revoked: what is live on an
+      // origin must not pin it. Each origin names the deployment that pins the
+      // release there, and whether it is a primary origin or a preview.
+      const servedBy = servedOrigins(release.projectId, projectDeployments(release.projectId))
+        .filter((entry) => {
+          return entry.deployment.releaseId === release.id;
+        })
+        .map((entry) => {
+          return { origin: entry.origin, deployment_id: entry.deployment.id, kind: entry.kind };
+        });
       if (servedBy.length > 0) {
         return HttpResponse.json(
           errorBody("rel.in_use", "release: still served by an origin", {
-            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+            origins: servedBy.sort((a, b) => {
+              return byteOrder(a.origin, b.origin);
+            }),
           }),
           { status: 409 },
         );
@@ -2159,7 +2408,8 @@ export function setupPlatformHandlers() {
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
       // The contract's guard: the newest primary deployment, or the newest
-      // deployment to any of the preview URLs.
+      // deployment to any of the preview URLs. An id given where there is no
+      // such deployment does not match either, and the answer names none.
       if (expectedId !== undefined) {
         const newest = sawPreview
           ? targets
@@ -2167,15 +2417,8 @@ export function setupPlatformHandlers() {
               .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
               .sort((a, b) => b.seq - a.seq)[0]
           : newestPrimaryDeployment(project.id);
-        if (newest && newest.id !== expectedId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newest) },
-            ),
-            { status: 409 },
-          );
+        if (newest?.id !== expectedId) {
+          return guardConflict(newest);
         }
       }
 
@@ -2208,7 +2451,7 @@ export function setupPlatformHandlers() {
       // deployment (201), which is how its expiry is renewed.
       const newestPrimary = newestPrimaryDeployment(project.id);
       if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2226,7 +2469,7 @@ export function setupPlatformHandlers() {
         variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2248,85 +2491,34 @@ export function setupPlatformHandlers() {
       const origin = record.origin;
       const live = liveRaw === "true";
 
-      let deployments = [...store.deployments.values()]
-        .filter((deployment) => deployment.projectId === query.data.project_id)
-        .sort((a, b) => b.seq - a.seq);
-      if (origin !== undefined) {
-        deployments = deployments.filter((deployment) =>
-          deployment.targets.some((target) => target.origin === origin),
-        );
-      }
-
+      const deployments = projectDeployments(query.data.project_id);
+      const served = servedOrigins(query.data.project_id, deployments);
+      const serving = servingIds(served);
       let items: Record<string, unknown>[];
       if (live) {
-        // What each target serves now: the newest deployment per origin, each
-        // carrying only the targets it still serves.
-        const serving = new Map<string, DeploymentTargetRow[]>();
-        const liveOrigins = new Set(
-          deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
-        );
-        for (const target of liveOrigins) {
-          if (origin !== undefined && target !== origin) {
-            continue;
-          }
-          // Pick the newest deployment targeting this origin by sequence,
-          // without applying the target's frozen historical expiry: a renewed
-          // preview extends its own row's clock (checked below), so filtering on
-          // the deployment's stale expiry here would wrongly drop a live preview.
-          const newest = [...store.deployments.values()]
-            .filter((deployment) => deployment.projectId === query.data.project_id)
-            .filter((deployment) => deployment.targets.some((t) => t.origin === target))
-            .sort((a, b) => b.seq - a.seq)[0];
-          if (!newest) {
-            continue;
-          }
-          // A primary origin is served only by the newest primary deployment:
-          // an older one that names it, such as before a rollback, serves nothing.
-          if (
-            deploymentKind(newest) === "primary" &&
-            newest.id !== newestPrimaryDeployment(query.data.project_id)?.id
-          ) {
-            continue;
-          }
-          const row = newest.targets.find((candidate) => candidate.origin === target);
-          if (!row) {
-            continue;
-          }
-          // A preview-origin target (one with an expiry) is admitted by its
-          // preview row, not by the expiry frozen onto the deployment: removing
-          // the preview drops the URL from this live view without the historical
-          // deployment being rewritten, and a renewed preview is reported on the
-          // clock it now runs on. A primary target has no preview row and stands
-          // on the deployment alone.
-          let served = row;
-          if (row.expiresAt !== null) {
-            const preview = store.previews.get(previewKey(query.data.project_id, target));
-            if (!previewIsLive(preview)) {
-              continue;
-            }
-            served = { origin: row.origin, expiresAt: preview.expiresAt };
-          }
-          const rows = serving.get(newest.id) ?? [];
-          rows.push(served);
-          serving.set(newest.id, rows);
+        let asked = served;
+        if (origin !== undefined) {
+          asked = servedOn(query.data.project_id, origin, served);
         }
-        items = [...serving.entries()]
-          .map(([id, rows]) => {
-            const deployment = store.deployments.get(id);
-            return deployment ? { deployment, rows } : undefined;
-          })
-          .filter(
-            (entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
-              entry !== undefined,
-          )
-          .sort((a, b) => b.deployment.seq - a.deployment.seq)
-          .map((entry) =>
-            deploymentResponse(entry.deployment, entry.rows, { release: expandRelease }),
-          );
+        items = liveGroups(served, asked).map((group) => {
+          return deploymentResponse(group.deployment, serving, group.targets, {
+            release: expandRelease,
+          });
+        });
       } else {
-        items = deployments.map((deployment) =>
-          deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
-        );
+        let named = deployments;
+        if (origin !== undefined) {
+          named = named.filter((deployment) => {
+            return deployment.targets.some((target) => {
+              return target.origin === origin;
+            });
+          });
+        }
+        items = named.map((deployment) => {
+          return deploymentResponse(deployment, serving, deployment.targets, {
+            release: expandRelease,
+          });
+        });
       }
       // The real cursor is opaque; the mock's is the next start index, like the
       // schemas list. A target beyond the first page is only reachable by
@@ -2357,7 +2549,10 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
-      return HttpResponse.json(deploymentResponse(deployment));
+      const deployments = projectDeployments(deployment.projectId);
+      const serving = servingIds(servedOrigins(deployment.projectId, deployments));
+
+      return HttpResponse.json(deploymentResponse(deployment, serving));
     }),
 
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
@@ -2414,22 +2609,11 @@ export function setupPlatformHandlers() {
           ? rollbackData.expected_deployment_id
           : undefined;
       const newestPrimary = newestPrimaryDeployment(project.id);
-      if (
-        expectedRollbackId !== undefined &&
-        newestPrimary &&
-        newestPrimary.id !== expectedRollbackId
-      ) {
-        return HttpResponse.json(
-          errorBody(
-            "dep.conflict",
-            "deployment: the newest deployment to the targets does not match expected_deployment_id",
-            { deployment: deploymentResponse(newestPrimary) },
-          ),
-          { status: 409 },
-        );
+      if (expectedRollbackId !== undefined && newestPrimary?.id !== expectedRollbackId) {
+        return guardConflict(newestPrimary);
       }
       if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
+        return HttpResponse.json(answeredLive(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2449,7 +2633,7 @@ export function setupPlatformHandlers() {
         variables: target.variables,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(answeredLive(record), { status: 201 });
     }),
 
     // --- previews --------------------------------------------------------

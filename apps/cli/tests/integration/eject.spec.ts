@@ -67,6 +67,9 @@ async function aPatchedApp(): Promise<ScaffoldedApp> {
   return app;
 }
 
+/** A project's declared package manager that is not npm. */
+const PNPM = "pnpm@10.0.0";
+
 describe("eject", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -212,6 +215,15 @@ describe("eject", () => {
           },
           warnings: [],
         });
+      });
+
+      it("suggests removing the SDK with the project's own package manager", async () => {
+        const app = await aPatchedApp();
+        await app.usePackageManager(PNPM);
+
+        const result = await app.run(["eject", "--force", "--json"]);
+
+        expect(result).toSuggest("pnpm remove @zitadel/sdk-next");
       });
 
       it("removes the managed files from the project", async () => {

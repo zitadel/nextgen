@@ -409,6 +409,15 @@ Each invocation prints one JSON object:
   trimmed) before they ask or call the server, saying what one looks like and
   suggesting the list command. `claim --challenge-id` refuses a malformed
   challenge id the same way.
+- `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
+  When the server names the origins that serve it, the `hint` names each with
+  its kind (`primary` or `preview`) and the deployment that pins the release
+  there, and `next_commands` lists what frees them: `deploy` and
+  `deployment rollback` for primary origins (each only helps if the release it
+  puts live is a different one), `preview rm <url>` for each preview, which
+  cannot be rolled back and also stops serving when it expires. Without them
+  the conflict has no `hint` and no `next_commands`. Revoke again once none
+  serves it.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
@@ -1027,6 +1036,28 @@ session-cookie hooks a CLI wrote before these names: the server no longer
 reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
 wrote them; ones changed by hand must be updated by hand, which the failure
 says. Browsers signed in before the change sign in again.
+
+## Testing the app
+
+When the developer wants automated tests of the sign-in, or of pages behind
+it, reach for `@zitadel/testing`. It boots its own Zitadel server and
+project per test run, seeds users and sessions through the API, and ships
+Playwright fixtures and login helpers. It never uses the project `setup`
+created or the runtime `start` runs.
+
+- Install it only when asked: `npm install --save-dev @zitadel/testing@latest @playwright/test`.
+- Seed a user per test (`seed.user()`) and drive the real login
+  (`loginWithPassword`) to test the sign-in itself.
+- Start other tests signed in (`authenticatedPage`, or `seed.session()` for a
+  backend call) instead of driving the login again. Headless sessions cover
+  password flows only.
+- Passkey tests need Chromium and the kit's virtual authenticator.
+- Preview, macOS and Linux only.
+
+The kit's README holds its API; read it and the package's types rather than
+guessing: <https://github.com/zitadel/nextgen/tree/main/packages/testing#readme>.
+The worked setup for an app `setup` scaffolded is
+<https://preview.zitadel.com/docs/guides/test-your-app.md>.
 
 ## Claiming a project
 

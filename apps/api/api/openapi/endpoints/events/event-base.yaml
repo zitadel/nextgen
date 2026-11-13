@@ -45,12 +45,20 @@ properties:
     type: string
     format: date-time
     # The timestamp comes from the server or storage clock, which the dialect owns.
-    description: When the action happened, on the server's clock.
+    # ogen writes a date-time in whole seconds; this layout keeps the
+    # milliseconds (truncated, never rounded up, so a `created_after` read
+    # from it still holds the event) and reads any fraction back.
+    x-ogen-time-format: 2006-01-02T15:04:05.999Z07:00
+    description: |
+      When the action happened, on the server's clock, to the millisecond.
   created_at:
     type: string
     format: date-time
     # The timestamp comes from the server or storage clock, which the dialect owns.
-    description: When the event was stored, on the server's clock.
+    # Milliseconds, as occurred_at.
+    x-ogen-time-format: 2006-01-02T15:04:05.999Z07:00
+    description: |
+      When the event was stored, on the server's clock, to the millisecond.
   actor_id:
     description: The ID of the actor that triggered the event.
     oneOf:

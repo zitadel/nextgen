@@ -4,6 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -14,7 +15,7 @@ describe("origin add", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.addOrigin("https://app.acme.com", "primary");
+        const result = await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         expect(result).toFailWith("E_NOT_FOUND");
         expect(app.envelopeOf(result)).toEqual({
@@ -38,7 +39,7 @@ describe("origin add", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.addOrigin("https://app.acme.com", "primary");
+        const result = await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
@@ -62,7 +63,7 @@ describe("origin add", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.addOrigin("https://app.acme.com", "primary");
+        const result = await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
@@ -86,7 +87,7 @@ describe("origin add", () => {
         const app = await aSetUpApp();
         const waiting = platform.hangs();
 
-        const result = app.addOrigin("https://app.acme.com", "primary");
+        const result = app.addOrigin(PRIMARY_ORIGIN, "primary");
         await waiting;
         pressCtrlC();
 
@@ -125,7 +126,7 @@ describe("origin add", () => {
         const result = await app.run([
           "origin",
           "add",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--kind",
           "primary",
           "--env",
@@ -153,7 +154,7 @@ describe("origin add", () => {
       it("stores a primary origin on the project", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.addOrigin("https://app.acme.com", "primary");
+        const result = await app.addOrigin(PRIMARY_ORIGIN, "primary");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -161,8 +162,8 @@ describe("origin add", () => {
           command: "origin:add",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Added https://app.acme.com (primary)",
-            pattern: "https://app.acme.com",
+            title: `Added ${PRIMARY_ORIGIN} (primary)`,
+            pattern: PRIMARY_ORIGIN,
             kind: "primary",
             next_commands: [expectedPublicCliCommand(app.againAsRun("origin list"))],
           },
@@ -170,14 +171,14 @@ describe("origin add", () => {
         });
         expect(await app.projectOrigins()).toEqual([
           SETUP_ORIGIN,
-          { pattern: "https://app.acme.com", kind: "primary" },
+          { pattern: PRIMARY_ORIGIN, kind: "primary" },
         ]);
       });
 
       it("stores a preview pattern on the project", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.addOrigin("https://*-acme.vercel.app", "preview");
+        const result = await app.addOrigin(PREVIEW_PATTERN, "preview");
 
         expect(app.envelopeOf(result)).toEqual({
           status: "ok",
@@ -185,8 +186,8 @@ describe("origin add", () => {
           command: "origin:add",
           source: "http://mock.zitadel.test",
           data: {
-            title: "Added https://*-acme.vercel.app (preview)",
-            pattern: "https://*-acme.vercel.app",
+            title: `Added ${PREVIEW_PATTERN} (preview)`,
+            pattern: PREVIEW_PATTERN,
             kind: "preview",
             next_commands: [expectedPublicCliCommand(app.againAsRun("origin list"))],
           },
@@ -194,7 +195,7 @@ describe("origin add", () => {
         });
         expect(await app.projectOrigins()).toEqual([
           SETUP_ORIGIN,
-          { pattern: "https://*-acme.vercel.app", kind: "preview" },
+          { pattern: PREVIEW_PATTERN, kind: "preview" },
         ]);
       });
 
@@ -224,7 +225,7 @@ describe("origin add", () => {
         const result = await app.run([
           "origin",
           "add",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--kind",
           "primary",
           "--dry-run",
@@ -238,14 +239,14 @@ describe("origin add", () => {
           source: "http://mock.zitadel.test",
           data: {
             dry_run: true,
-            title: "Would add origin https://app.acme.com (dry run)",
+            title: `Would add origin ${PRIMARY_ORIGIN} (dry run)`,
             verb: "add",
             topic: "origin",
-            id: "https://app.acme.com",
+            id: PRIMARY_ORIGIN,
             body: { kind: "primary" },
             next_commands: [
               expectedPublicCliCommand(
-                app.againAsRun("origin add https://app.acme.com --kind primary"),
+                app.againAsRun(`origin add ${PRIMARY_ORIGIN} --kind primary`),
               ),
             ],
           },
@@ -259,7 +260,7 @@ describe("origin add", () => {
         await app.run([
           "origin",
           "add",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--kind",
           "primary",
           "--dry-run",
@@ -275,7 +276,7 @@ describe("origin add", () => {
         const result = await app.run([
           "origin",
           "add",
-          "https://*-acme.vercel.app",
+          PREVIEW_PATTERN,
           "--kind",
           "preview",
           "--dry-run",
@@ -289,14 +290,14 @@ describe("origin add", () => {
           source: "http://mock.zitadel.test",
           data: {
             dry_run: true,
-            title: "Would add origin https://*-acme.vercel.app (dry run)",
+            title: `Would add origin ${PREVIEW_PATTERN} (dry run)`,
             verb: "add",
             topic: "origin",
-            id: "https://*-acme.vercel.app",
+            id: PREVIEW_PATTERN,
             body: { kind: "preview" },
             next_commands: [
               expectedPublicCliCommand(
-                app.againAsRun("origin add 'https://*-acme.vercel.app' --kind preview"),
+                app.againAsRun(`origin add '${PREVIEW_PATTERN}' --kind preview`),
               ),
             ],
           },
@@ -345,24 +346,18 @@ describe("origin add", () => {
         const app = await aSetUpApp();
 
         const result = await asTerminal(() =>
-          app.run(["origin", "add", "https://app.acme.com", "--kind", "primary"], colour),
+          app.run(["origin", "add", PRIMARY_ORIGIN, "--kind", "primary"], colour),
         );
 
-        expect(result).toPrint("Added https://app.acme.com (primary)");
+        expect(result).toPrint(`Added ${PRIMARY_ORIGIN} (primary)`);
       });
 
       it("draws the headline the envelope carries, piped", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run([
-          "origin",
-          "add",
-          "https://app.acme.com",
-          "--kind",
-          "primary",
-        ]);
+        const result = await app.run(["origin", "add", PRIMARY_ORIGIN, "--kind", "primary"]);
 
-        expect(result.stdout.split("\n")[0]).toBe("Added https://app.acme.com (primary)");
+        expect(result.stdout.split("\n")[0]).toBe(`Added ${PRIMARY_ORIGIN} (primary)`);
       });
 
       it("draws the dry run's headline, piped", async () => {
@@ -371,27 +366,19 @@ describe("origin add", () => {
         const result = await app.run([
           "origin",
           "add",
-          "https://app.acme.com",
+          PRIMARY_ORIGIN,
           "--kind",
           "primary",
           "--dry-run",
         ]);
 
-        expect(result.stdout.split("\n")[0]).toBe(
-          "Would add origin https://app.acme.com (dry run)",
-        );
+        expect(result.stdout.split("\n")[0]).toBe(`Would add origin ${PRIMARY_ORIGIN} (dry run)`);
       });
 
       it("suggests listing the origins once", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run([
-          "origin",
-          "add",
-          "https://app.acme.com",
-          "--kind",
-          "primary",
-        ]);
+        const result = await app.run(["origin", "add", PRIMARY_ORIGIN, "--kind", "primary"]);
 
         expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("origin list")));
       });
@@ -414,13 +401,10 @@ describe("origin add", () => {
         "writes a pattern the server wrote a bidi override into as a JSON escape, %s",
         async (_how, colour) => {
           const app = await aSetUpApp();
-          platform.storesOrigin("https://app.acme.com‮evil");
+          platform.storesOrigin(`${PRIMARY_ORIGIN}‮evil`);
 
           const result = await asTerminal(() =>
-            app.run(
-              ["origin", "add", "https://app.acme.com", "--kind", "primary", "--json"],
-              colour,
-            ),
+            app.run(["origin", "add", PRIMARY_ORIGIN, "--kind", "primary", "--json"], colour),
           );
 
           expect(result).toSucceed();
@@ -434,10 +418,10 @@ describe("origin add", () => {
         "spells out a pattern the server answered with a colour sequence in it, %s",
         async (_how, colour) => {
           const app = await aSetUpApp();
-          platform.storesOrigin("https://app.acme.com\u001b[31m");
+          platform.storesOrigin(`${PRIMARY_ORIGIN}\u001b[31m`);
 
           const result = await asTerminal(() =>
-            app.run(["origin", "add", "https://app.acme.com", "--kind", "primary"], colour),
+            app.run(["origin", "add", PRIMARY_ORIGIN, "--kind", "primary"], colour),
           );
 
           expect(result).toSucceed();
