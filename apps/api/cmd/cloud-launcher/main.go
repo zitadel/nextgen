@@ -571,8 +571,10 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
-	// An OTLP endpoint on the environment turns telemetry export on. The OTLP
-	// SDK reads it and OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
+	// An OTLP endpoint on the environment makes that backend the telemetry
+	// sink, for spans, metrics and logs; behind the wrapper's collector none
+	// is left to name one (exportToWrapper). The OTLP SDK reads it and
+	// OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
 	// itself, so the exporters' own endpoint stays unset; an environment
 	// without it exports nothing rather than retry localhost:4318. The batch
 	// durations are the SDK's defaults, named so the cloud's export cadence is
@@ -740,11 +742,26 @@ func renderConfig(s *serving) ([]byte, error) {
 // its loopback collector.
 const otlpCollectorEnv = "CLOUD_OTLP_COLLECTOR"
 
+// otlpBackendEnv is what names an OTLP backend to the SDK's exporters: where
+// it is, for every signal or for one, and its credentials.
+var otlpBackendEnv = []string{
+	"OTEL_EXPORTER_OTLP_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+	"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+	"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+}
+
 // exportToWrapper points the server's traces and metrics at the wrapper when
-// it runs behind one, and keeps the server off every other interface. The
-// settings are set, not defaulted: they follow from how the wrapper runs the
-// server, and they win over an OTLP backend named on the environment
-// (OTEL_EXPORTER_OTLP_ENDPOINT), which then gets the logs only.
+// the wrapper names its collector, and keeps the server off every other
+// interface. Vercel is the telemetry sink then, and the only one: the wrapper
+// names its collector only while the environment names no OTLP backend
+// (apps/cloud/server/sink.mjs), and prints the server's log lines as Vercel's
+// logs. The settings are set, not defaulted: they follow from how the wrapper
+// runs the server.
 //
 //   - Spans go to the wrapper's collector over OTLP/HTTP, batched for at most
 //     100ms, so a request's spans arrive soon after its response.
@@ -762,6 +779,11 @@ const otlpCollectorEnv = "CLOUD_OTLP_COLLECTOR"
 //     instance exports after its last request waits until it serves again,
 //     and is lost if it never does. At 10s, a quarter of the sessions a burst
 //     of requests created never showed up.
+//   - What names an OTLP backend is cleared, so nothing is exported a second
+//     time, and so the exports to the wrapper stay where it serves them: an
+//     exporter given only a host takes its path from
+//     OTEL_EXPORTER_OTLP_ENDPOINT, and beside Grafana Cloud's /otlp every
+//     export went to /otlp/v1/…, which the collector answers with 404.
 func exportToWrapper(port string) error {
 	collector := os.Getenv(otlpCollectorEnv)
 	if collector == "" {
@@ -770,6 +792,11 @@ func exportToWrapper(port string) error {
 	host, _, err := net.SplitHostPort(collector)
 	if err != nil || host != "127.0.0.1" {
 		return fmt.Errorf("%s must be 127.0.0.1:<port>, the wrapper's loopback collector, got %q", otlpCollectorEnv, collector)
+	}
+	for _, key := range otlpBackendEnv {
+		if err := os.Unsetenv(key); err != nil {
+			return err
+		}
 	}
 	for key, value := range map[string]string{
 		"NEXTGEN_SERVER_ADDRESS":                                 "127.0.0.1:" + port,

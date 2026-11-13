@@ -27,7 +27,7 @@ One Vercel deployment, seven [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | a Node.js function, `apps/cloud/server/index.mjs`, rooted at `apps/cloud`: it runs the launcher and hands the server's spans to Vercel Tracing and its metrics to Vercel custom metrics, which only a Node.js function can. The build command enters the repo root, puts Go on `PATH` (`apps/cloud/install-go.sh`, as the Node.js build image has none), and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` checks the binary is in `dist/`, where the function's `includeFiles` ships it from, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `server` | a Node.js function, `apps/cloud/server/index.mjs`, rooted at `apps/cloud`: it runs the launcher and hands the server's spans to Vercel Tracing, its metrics to Vercel custom metrics and its log lines to Vercel's logs at their level and under their request, which only a Node.js function can. The build command enters the repo root, puts Go on `PATH` (`apps/cloud/install-go.sh`, as the Node.js build image has none), and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` checks the binary is in `dist/`, where the function's `includeFiles` ships it from, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
@@ -283,8 +283,8 @@ Environment variables (add secrets with
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Production; optional | the OTLP/HTTP endpoint of the telemetry backend, path included (Grafana Cloud: `https://otlp-gateway-prod-<region>.grafana.net/otlp`); set, the launcher turns on the server's log export to it; traces and metrics go to Vercel through the `server` service's wrapper either way; unset exports no logs |
-| `OTEL_EXPORTER_OTLP_HEADERS` | Production; sensitive; with the endpoint | the backend's credentials, kept in 1Password (Grafana Cloud: `Authorization=Basic%20<base64 of instanceID:token>`) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Any; optional | the OTLP/HTTP endpoint of a telemetry backend, path included (Grafana Cloud: `https://otlp-gateway-prod-<region>.grafana.net/otlp`). Unset, Vercel is the telemetry sink. Set, the backend is the sink instead: the server exports its traces, metrics and logs to it, and Vercel Tracing and Vercel's custom metrics get none of them (**Traces and metrics** under [Operating](#operating)) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Any; sensitive; with the endpoint | the backend's credentials, kept in 1Password (Grafana Cloud: `Authorization=Basic%20<base64 of instanceID:token>`) |
 | `NEXTGEN_PLATFORM_OPERATORS` | Production or Preview; optional | the platform operators' user ids, comma-separated; unset means the root admin alone |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
 | `TURBO_TELEMETRY_DISABLED` | Production, Preview | `1`: turbo sends no telemetry from the builds, as in CI |
@@ -654,16 +654,25 @@ project and imports the root admin.
   The browser sends it, so a blocker drops a sign-up as it drops page views;
   the contacts' `signup_*` count every sign-up that reached onboarding.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
+  wrapper prints each line of the server's output at the line's own `level`
+  and under the request its `request_id` names
+  ([`logs.mjs`](../../apps/cloud/server/logs.mjs)); a line from startup or
+  background work belongs to no request. The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's
   Request ID for the request (the launcher sets `server.request_id_header`
   to `x-vercel-id`), the one an error page and `X-Request-Id` quote: search
   for it. On a protected preview the response's `x-vercel-id` names an outer
   hop that Vercel does not log; search for `X-Request-Id` instead.
-- **Errors:** Vercel tags every line of the Go function `info`, whatever
-  stream it is written to and whatever its `level` field says, Vercel's own
-  crash messages included, so the dashboard's level filter finds no error.
-  Find a failed request by its status instead, then read its lines by its
+- **Errors:** the dashboard's level filter finds the server's `WARN` and
+  `ERROR` lines, and so does the CLI:
+
+  ```sh
+  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --environment production --since 24h --query 'level:error'
+  ```
+
+  A failed request is also found by its status, and its lines by its
   request ID (the `requests` source needs Vercel CLI 64 or newer):
 
   ```sh
@@ -673,21 +682,30 @@ project and imports the root admin.
     --project cloud --since 24h --query 'requestId:"<request id>"'
   ```
 
-  A server that fails to start shows up the same way: the request that
-  started the instance answers 500, and its lines end with the launcher's
-  error and `the user server exited during startup`. An error outside a
-  request, such as a failed flush of the request audit events, has no
-  request line to find it by: search the messages for the word, which also
-  matches the `api error` lines of refused requests, and keep the `ERROR`
-  ones (an `api error` line's status is on the `request served` line with
-  the same `request_id`):
+  A server that fails to start ends the instance: the request that started
+  it answers 500, and the launcher's error is the line before
+  `server wrapper: the launcher exited`, outside any request.
 
-  ```sh
-  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
-    --project cloud --environment production --since 24h --limit 1000 \
-    --query ERROR --json \
-    | jq -r 'select(.type == "log") | .data.message | fromjson? | select(.level == "ERROR") | .msg'
-  ```
+- **Traces and metrics:** Vercel is the telemetry sink unless
+  `OTEL_EXPORTER_OTLP_ENDPOINT` names an OTLP backend, which then takes the
+  traces, metrics and logs instead; there is one sink at a time
+  ([`sink.mjs`](../../apps/cloud/server/sink.mjs)). A second copy is
+  forwarded from the sink: a Vercel Drain takes logs and traces, not custom
+  metrics.
+  - The server's spans are in Vercel Tracing for the requests the project's
+    tracing rules sample (`vercel traces config ls --project cloud`). They
+    are also where durations and counts come from, per operation and per
+    statement:
+
+    ```sh
+    npx -y vercel@64.5.0 metrics vercel.span.duration_ms --scope zitadel --project cloud \
+      --prod -a p95 -f 'serviceName = "Zitadel"' -f 'spanKind = "2"' --group-by spanName
+    ```
+
+  - Vercel bills a custom metric by the data point, so the wrapper sends
+    only the instruments its list names, with the reasons
+    ([`metrics.mjs`](../../apps/cloud/server/metrics.mjs)). A custom metric
+    has no `environment`: filter it by `deploymentId`, not `--prod`.
 
 - **Policy violations:** a browser's report of a Content-Security-Policy
   violation is a `WARN` line `content security policy violation` from the
