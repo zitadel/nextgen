@@ -51,12 +51,12 @@
     "svelte": "^5.0.0"
   },
   "devDependencies": {
-    "@sveltejs/kit": "^3.0.1",
+    "@sveltejs/kit": "^3.1.1",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/server-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
-    "svelte": "^5.57.2",
+    "svelte": "^5.57.3",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
