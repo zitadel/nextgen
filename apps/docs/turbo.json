@@ -13,9 +13,9 @@
     // every task of this package. The hosted cloud's project has Skew
     // Protection on, so every deployment brings a new ID (see build). Vercel's
     // NEXT_PUBLIC_VERCEL_* (its URL, its commit) change with it, and turbo
-    // drops those only where Vercel names their prefix (see the root's
-    // globalEnv). Neither task reads any of them, so both drop them all and
-    // hit the cache across deployments.
+    // drops those only where Vercel names their prefix in
+    // TURBO_CI_VENDOR_ENV_KEY. Neither task reads any of them, so both drop
+    // them all and hit the cache across deployments.
     "generate": {
       "env": ["!NEXT_*", "!VERCEL_DEPLOYMENT_ID"],
       "inputs": [
