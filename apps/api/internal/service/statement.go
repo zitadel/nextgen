@@ -62,6 +62,7 @@ type AllStatements interface {
 	AuthzCatalogStatements
 	AuthzResolverStatements
 	EventStatements
+	WebhookStatements
 	Statements
 }
 
@@ -1087,4 +1088,37 @@ type EventStatements interface {
 	// settled, because the dialect stamps events in commit order. Call it
 	// outside a transaction, or at READ COMMITTED, before the list it bounds.
 	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
+}
+
+// WebhookStatements persists a project's webhooks (ADR 090). A method that
+// names a webhook returns *database.NoRowFoundError for an unknown id and for
+// another project's.
+//
+// A webhook carries its delivery cursor. "Now" is the point after which the
+// project's events are delivered: each dialect takes it from the clock that
+// stamps events.created_at (EventStatements.EventsSettledBefore), so no event
+// stored before it is delivered and none stored after it is skipped.
+type WebhookStatements interface {
+	Statements
+	// CreateWebhook writes an enabled webhook holding entity's URL,
+	// Description, EventTypes and Secret with its cursor at now, so it gets no
+	// history, and sets ID and CreatedAt on entity. A project that already
+	// holds domain.WebhookProjectLimit webhooks returns
+	// domain.ErrWebhookLimitReached, also when creates race. The cursor is
+	// not set on entity: Spanner knows it only at commit.
+	CreateWebhook(ctx context.Context, entity *domain.Webhook) error
+	GetWebhook(ctx context.Context, projectID, id string) (*domain.Webhook, error)
+	// ListWebhooks pages the project's webhooks, newest first unless the page
+	// orders otherwise (webhook.NewestFirst).
+	ListWebhooks(ctx context.Context, projectID string, page database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error)
+	// UpdateWebhook writes the fields update names and returns the webhook as
+	// stored. Enabling a disabled webhook also sets its cursor to now: what
+	// happened while it was disabled is not delivered. On Spanner the cursor
+	// it returns is then zero, as the commit decides it.
+	UpdateWebhook(ctx context.Context, projectID, id string, update domain.WebhookUpdate) (*domain.Webhook, error)
+	DeleteWebhook(ctx context.Context, projectID, id string) error
+	// RotateWebhookSecret makes the stored secret the previous one, valid
+	// until previousExpiresAt, and stores secret in its place, and returns the
+	// webhook as stored.
+	RotateWebhookSecret(ctx context.Context, projectID, id, secret string, previousExpiresAt time.Time) (*domain.Webhook, error)
 }

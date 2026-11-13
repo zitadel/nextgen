@@ -1088,6 +1088,8 @@ func TestShouldRecreatePreviewOnMigrateError(t *testing.T) {
 		"detected 1 missing (out-of-order) migration lower than database version (3): version 2")))
 	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
 		`launcher: unknown database error: ERROR: column "deployment_id" of relation "auth_attempts" already exists (SQLSTATE 42701)`)))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
+		`launcher: unknown database error: ERROR: relation "webhooks" already exists (SQLSTATE 42P07)`)))
 }
 
 func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {

@@ -265,15 +265,17 @@ func idlePreviewDatabases(databases []previewDatabase, cutoff time.Time) (idle [
 
 // shouldRecreatePreviewOnMigrateError reports migrate failures that a fresh
 // empty preview database would clear after a migration renumber on the branch:
-// goose out-of-order versions, or Postgres duplicate_column (42701) when the
-// sticky DB still has columns from the migration under its previous number.
+// goose out-of-order versions, or Postgres duplicate_column (42701) or
+// duplicate_table (42P07) when the sticky DB still has the columns or the
+// table of the migration under its previous number.
 func shouldRecreatePreviewOnMigrateError(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "missing (out-of-order) migration") ||
-		strings.Contains(msg, "SQLSTATE 42701")
+		strings.Contains(msg, "SQLSTATE 42701") ||
+		strings.Contains(msg, "SQLSTATE 42P07")
 }
 
 // productionBranch is the branch production deploys from: main, unless

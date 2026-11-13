@@ -1625,6 +1625,44 @@ func (c *MockAllStatementsCreateUserTOTPCall) DoAndReturn(f func(context.Context
 	return c
 }
 
+// CreateWebhook mocks base method.
+func (m *MockAllStatements) CreateWebhook(ctx context.Context, entity *domain.Webhook) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWebhook", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateWebhook indicates an expected call of CreateWebhook.
+func (mr *MockAllStatementsMockRecorder) CreateWebhook(ctx, entity any) *MockAllStatementsCreateWebhookCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWebhook", reflect.TypeOf((*MockAllStatements)(nil).CreateWebhook), ctx, entity)
+	return &MockAllStatementsCreateWebhookCall{Call: call}
+}
+
+// MockAllStatementsCreateWebhookCall wrap *gomock.Call
+type MockAllStatementsCreateWebhookCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateWebhookCall) Return(arg0 error) *MockAllStatementsCreateWebhookCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateWebhookCall) Do(f func(context.Context, *domain.Webhook) error) *MockAllStatementsCreateWebhookCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateWebhookCall) DoAndReturn(f func(context.Context, *domain.Webhook) error) *MockAllStatementsCreateWebhookCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DeactivateTeam mocks base method.
 func (m *MockAllStatements) DeactivateTeam(ctx context.Context, projectID, id string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -2578,6 +2616,44 @@ func (c *MockAllStatementsDeleteVariableCall) Do(f func(context.Context, domain.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteVariableCall) DoAndReturn(f func(context.Context, domain.VariableOwner, domain.DeploymentOriginKind, string) error) *MockAllStatementsDeleteVariableCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteWebhook mocks base method.
+func (m *MockAllStatements) DeleteWebhook(ctx context.Context, projectID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteWebhook", ctx, projectID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteWebhook indicates an expected call of DeleteWebhook.
+func (mr *MockAllStatementsMockRecorder) DeleteWebhook(ctx, projectID, id any) *MockAllStatementsDeleteWebhookCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteWebhook", reflect.TypeOf((*MockAllStatements)(nil).DeleteWebhook), ctx, projectID, id)
+	return &MockAllStatementsDeleteWebhookCall{Call: call}
+}
+
+// MockAllStatementsDeleteWebhookCall wrap *gomock.Call
+type MockAllStatementsDeleteWebhookCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteWebhookCall) Return(arg0 error) *MockAllStatementsDeleteWebhookCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteWebhookCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteWebhookCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteWebhookCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteWebhookCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4925,6 +5001,45 @@ func (c *MockAllStatementsGetVariablesCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// GetWebhook mocks base method.
+func (m *MockAllStatements) GetWebhook(ctx context.Context, projectID, id string) (*domain.Webhook, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWebhook", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.Webhook)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWebhook indicates an expected call of GetWebhook.
+func (mr *MockAllStatementsMockRecorder) GetWebhook(ctx, projectID, id any) *MockAllStatementsGetWebhookCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWebhook", reflect.TypeOf((*MockAllStatements)(nil).GetWebhook), ctx, projectID, id)
+	return &MockAllStatementsGetWebhookCall{Call: call}
+}
+
+// MockAllStatementsGetWebhookCall wrap *gomock.Call
+type MockAllStatementsGetWebhookCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetWebhookCall) Return(arg0 *domain.Webhook, arg1 error) *MockAllStatementsGetWebhookCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetWebhookCall) Do(f func(context.Context, string, string) (*domain.Webhook, error)) *MockAllStatementsGetWebhookCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetWebhookCall) DoAndReturn(f func(context.Context, string, string) (*domain.Webhook, error)) *MockAllStatementsGetWebhookCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // HandoffAuthAttempt mocks base method.
 func (m *MockAllStatements) HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
 	m.ctrl.T.Helper()
@@ -6789,6 +6904,45 @@ func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *da
 	return c
 }
 
+// ListWebhooks mocks base method.
+func (m *MockAllStatements) ListWebhooks(ctx context.Context, projectID string, page database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListWebhooks", ctx, projectID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Webhook])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListWebhooks indicates an expected call of ListWebhooks.
+func (mr *MockAllStatementsMockRecorder) ListWebhooks(ctx, projectID, page any) *MockAllStatementsListWebhooksCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListWebhooks", reflect.TypeOf((*MockAllStatements)(nil).ListWebhooks), ctx, projectID, page)
+	return &MockAllStatementsListWebhooksCall{Call: call}
+}
+
+// MockAllStatementsListWebhooksCall wrap *gomock.Call
+type MockAllStatementsListWebhooksCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListWebhooksCall) Return(arg0 *database.ListResult[*domain.Webhook], arg1 error) *MockAllStatementsListWebhooksCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListWebhooksCall) Do(f func(context.Context, string, database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error)) *MockAllStatementsListWebhooksCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListWebhooksCall) DoAndReturn(f func(context.Context, string, database.Page[domain.WebhookField]) (*database.ListResult[*domain.Webhook], error)) *MockAllStatementsListWebhooksCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // LoadCatalogMutations mocks base method.
 func (m *MockAllStatements) LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error) {
 	m.ctrl.T.Helper()
@@ -7436,6 +7590,45 @@ func (c *MockAllStatementsRevokeReleaseCall) Do(f func(context.Context, string, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsRevokeReleaseCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RotateWebhookSecret mocks base method.
+func (m *MockAllStatements) RotateWebhookSecret(ctx context.Context, projectID, id, secret string, previousExpiresAt time.Time) (*domain.Webhook, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RotateWebhookSecret", ctx, projectID, id, secret, previousExpiresAt)
+	ret0, _ := ret[0].(*domain.Webhook)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RotateWebhookSecret indicates an expected call of RotateWebhookSecret.
+func (mr *MockAllStatementsMockRecorder) RotateWebhookSecret(ctx, projectID, id, secret, previousExpiresAt any) *MockAllStatementsRotateWebhookSecretCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RotateWebhookSecret", reflect.TypeOf((*MockAllStatements)(nil).RotateWebhookSecret), ctx, projectID, id, secret, previousExpiresAt)
+	return &MockAllStatementsRotateWebhookSecretCall{Call: call}
+}
+
+// MockAllStatementsRotateWebhookSecretCall wrap *gomock.Call
+type MockAllStatementsRotateWebhookSecretCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRotateWebhookSecretCall) Return(arg0 *domain.Webhook, arg1 error) *MockAllStatementsRotateWebhookSecretCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRotateWebhookSecretCall) Do(f func(context.Context, string, string, string, time.Time) (*domain.Webhook, error)) *MockAllStatementsRotateWebhookSecretCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRotateWebhookSecretCall) DoAndReturn(f func(context.Context, string, string, string, time.Time) (*domain.Webhook, error)) *MockAllStatementsRotateWebhookSecretCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -8179,6 +8372,45 @@ func (c *MockAllStatementsUpdateUserTOTPCall) Do(f func(context.Context, databas
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField], ...domain.UserTOTPUpdate) error) *MockAllStatementsUpdateUserTOTPCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateWebhook mocks base method.
+func (m *MockAllStatements) UpdateWebhook(ctx context.Context, projectID, id string, update domain.WebhookUpdate) (*domain.Webhook, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateWebhook", ctx, projectID, id, update)
+	ret0, _ := ret[0].(*domain.Webhook)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateWebhook indicates an expected call of UpdateWebhook.
+func (mr *MockAllStatementsMockRecorder) UpdateWebhook(ctx, projectID, id, update any) *MockAllStatementsUpdateWebhookCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateWebhook", reflect.TypeOf((*MockAllStatements)(nil).UpdateWebhook), ctx, projectID, id, update)
+	return &MockAllStatementsUpdateWebhookCall{Call: call}
+}
+
+// MockAllStatementsUpdateWebhookCall wrap *gomock.Call
+type MockAllStatementsUpdateWebhookCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUpdateWebhookCall) Return(arg0 *domain.Webhook, arg1 error) *MockAllStatementsUpdateWebhookCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUpdateWebhookCall) Do(f func(context.Context, string, string, domain.WebhookUpdate) (*domain.Webhook, error)) *MockAllStatementsUpdateWebhookCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUpdateWebhookCall) DoAndReturn(f func(context.Context, string, string, domain.WebhookUpdate) (*domain.Webhook, error)) *MockAllStatementsUpdateWebhookCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

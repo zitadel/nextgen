@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // PrefixWebhook is the dialect-minted ID prefix for a project's webhooks
 // (hook_<opaque>, ADR 090). The operator's configured sinks keep
 // PrefixEventSink.
@@ -30,3 +32,66 @@ func ErrWebhookPermissionDenied() Error {
 func ErrWebhookLimitReached() Error {
 	return newError("webhook.limit_reached", "the project has reached its limit of 10 webhooks", nil, nil)
 }
+
+// Webhook is a project's webhook (ADR 090 §1). The shipper's configured sinks
+// stay [EventSink].
+type Webhook struct {
+	ID          string
+	ProjectID   string
+	URL         string
+	Description string
+	// EventTypes is the filter: event types as GET /events names them, or the
+	// single entry "*".
+	EventTypes []string
+	Enabled    bool
+	// Secret and PreviousSecret are the signing secrets as the service layer
+	// encrypted them (ADR 090 §3). Storage keeps them as given.
+	Secret         string
+	PreviousSecret *string
+	// PreviousSecretExpiresAt is until when PreviousSecret also signs.
+	PreviousSecretExpiresAt *time.Time
+	LastDeliveredAt         *time.Time
+	LastErrorAt             *time.Time
+	// LastErrorStatus is the HTTP status of the last failed attempt, nil when
+	// it got no response.
+	LastErrorStatus *int32
+	// CursorCreatedAt and CursorEventID are the delivery watermark, keyset
+	// ordered on an event's (created_at, id) as [EventSinkCursor] is: the
+	// project's events after it are still to deliver. They are not on the
+	// wire.
+	CursorCreatedAt time.Time
+	CursorEventID   string
+	CreatedAt       time.Time
+}
+
+// WebhookUpdate is a partial update of a webhook: a nil field keeps the
+// stored value.
+type WebhookUpdate struct {
+	URL         *string
+	Description *string
+	EventTypes  []string
+	Enabled     *bool
+}
+
+// WebhookField enumerates the columns of a webhook that lists filter and
+// order on, and whose nullability the schema test checks.
+type WebhookField uint8
+
+const (
+	WebhookFieldUnspecified WebhookField = iota
+	WebhookFieldProjectID
+	WebhookFieldID
+	WebhookFieldURL
+	WebhookFieldDescription
+	WebhookFieldEventTypes
+	WebhookFieldEnabled
+	WebhookFieldSecret
+	WebhookFieldPreviousSecret
+	WebhookFieldPreviousSecretExpiresAt
+	WebhookFieldLastDeliveredAt
+	WebhookFieldLastErrorAt
+	WebhookFieldLastErrorStatus
+	WebhookFieldCursorCreatedAt
+	WebhookFieldCursorEventID
+	WebhookFieldCreatedAt
+)
