@@ -90,39 +90,8 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRequest]) (*op.Redirect, error) {
 	req := r.Data
 	c := r.Client.(*client)
-	if req.RequestParam != "" {
-		return nil, oidc.ErrRequestNotSupported()
-	}
-	// With PKCE optional, state is what protects the client from CSRF.
-	if req.State == "" {
-		return nil, oidc.ErrInvalidRequest().WithDescription("state is required")
-	}
-	// state is stored, so it must be text every dialect can hold.
-	if !storable(req.State) {
-		return nil, oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
-	}
-	if len(req.State) > maxStateBytes {
-		return nil, oidc.ErrInvalidRequest().WithDescription("state must be at most %d bytes", maxStateBytes)
-	}
-	// The metadata offers the query mode only.
-	if req.ResponseMode != "" && req.ResponseMode != oidc.ResponseModeQuery {
-		return nil, oidc.ErrInvalidRequest().WithDescription("response_mode must be query")
-	}
-	if !slices.Contains(c.grantTypes, oidc.GrantTypeCode) {
-		return nil, oidc.ErrUnauthorizedClient().WithDescription("the client's grant_types do not include authorization_code")
-	}
-	// Until consent ships, a request may not ask for it (ADR 082, step 2).
-	if slices.Contains(req.Prompt, oidc.PromptConsent) {
-		return nil, oidc.ErrUnauthorizedClient().WithDescription("consent is not supported yet")
-	}
-	if req.CodeChallenge != "" {
-		// The library reads a missing method as plain; this server accepts S256 only.
-		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
-			return nil, oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
-		}
-		if digest, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil || len(digest) != sha256.Size {
-			return nil, oidc.ErrInvalidRequest().WithDescription("code_challenge must be a base64url SHA-256 digest")
-		}
+	if err := checkAuthRequest(req, c); err != nil {
+		return nil, err
 	}
 	issuer, _ := IssuerFromContext(ctx)
 	login, err := loginURL(issuer, r.Header.Get(LoginPathHeader))
@@ -161,6 +130,46 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	login.RawQuery = url.Values{"auth_request": {request.ID}}.Encode()
 	header := http.Header{"Set-Cookie": {bindingCookie(issuer, request.ID, nonce)}}
 	return &op.Redirect{URL: login.String(), Header: header}, nil
+}
+
+// checkAuthRequest refuses what this server cannot serve. The redirect URI
+// is valid by now, so each error goes back to the client.
+func checkAuthRequest(req *oidc.AuthRequest, c *client) error {
+	if req.RequestParam != "" {
+		return oidc.ErrRequestNotSupported()
+	}
+	// With PKCE optional, state is what protects the client from CSRF.
+	if req.State == "" {
+		return oidc.ErrInvalidRequest().WithDescription("state is required")
+	}
+	// state is stored, so it must be text every dialect can hold.
+	if !storable(req.State) {
+		return oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
+	}
+	if len(req.State) > maxStateBytes {
+		return oidc.ErrInvalidRequest().WithDescription("state must be at most %d bytes", maxStateBytes)
+	}
+	// The metadata offers the query mode only.
+	if req.ResponseMode != "" && req.ResponseMode != oidc.ResponseModeQuery {
+		return oidc.ErrInvalidRequest().WithDescription("response_mode must be query")
+	}
+	if !slices.Contains(c.grantTypes, oidc.GrantTypeCode) {
+		return oidc.ErrUnauthorizedClient().WithDescription("the client's grant_types do not include authorization_code")
+	}
+	// Until consent ships, a request may not ask for it (ADR 082, step 2).
+	if slices.Contains(req.Prompt, oidc.PromptConsent) {
+		return oidc.ErrUnauthorizedClient().WithDescription("consent is not supported yet")
+	}
+	if req.CodeChallenge != "" {
+		// The library reads a missing method as plain; this server accepts S256 only.
+		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
+			return oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
+		}
+		if digest, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil || len(digest) != sha256.Size {
+			return oidc.ErrInvalidRequest().WithDescription("code_challenge must be a base64url SHA-256 digest")
+		}
+	}
+	return nil
 }
 
 // loginURL is the issuer's login page: its origin and loginPath, or
