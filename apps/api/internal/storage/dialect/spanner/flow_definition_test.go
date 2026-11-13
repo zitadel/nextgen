@@ -25,7 +25,6 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		ID:            id,
 		Name:          "Default Login",
 		SchemaVersion: "1.0.0",
-		Status:        domain.FlowDefinitionStatusDraft,
 		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",
@@ -65,7 +64,6 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, def.ID, got.ID)
 	assert.Equal(t, def.Name, got.Name)
-	assert.Equal(t, def.Status, got.Status)
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
 

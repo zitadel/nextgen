@@ -2300,6 +2300,7 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -7775,6 +7776,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -20250,6 +20252,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -20373,6 +20376,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {

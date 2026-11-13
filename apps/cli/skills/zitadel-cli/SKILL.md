@@ -296,6 +296,13 @@ schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
 
+To find what happened to one user's account, whoever did it: `events list
+--filter user_id=<user-id> --json` returns the user's sign-ins with the
+passwords that were rejected, their sessions and credentials, and the changes
+made to the user. Add `--filter category=auth` for the sign-ins alone.
+`--filter actor_id=<user-id>` is the other question, what that user did. Only
+events recorded by a server that has this filter carry `user_id`.
+
 To find the API requests that failed: `events list --filter status_class=4xx
 --filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
 (such as `createUser`) for one operation. Only requests recorded by a server
@@ -402,6 +409,15 @@ Each invocation prints one JSON object:
   trimmed) before they ask or call the server, saying what one looks like and
   suggesting the list command. `claim --challenge-id` refuses a malformed
   challenge id the same way.
+- `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
+  When the server names the origins that serve it, the `hint` names each with
+  its kind (`primary` or `preview`) and the deployment that pins the release
+  there, and `next_commands` lists what frees them: `deploy` and
+  `deployment rollback` for primary origins (each only helps if the release it
+  puts live is a different one), `preview rm <url>` for each preview, which
+  cannot be rolled back and also stops serving when it expires. Without them
+  the conflict has no `hint` and no `next_commands`. Revoke again once none
+  serves it.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
@@ -954,9 +970,9 @@ whose users are managed through the API, and ask the user first. That refusal's
 could be enabled instead. A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
-offered by any active flow is reported in `warnings` (and in `data.not_offered`
+offered by any flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
-names the active login flow files to add it to. Every command reports `data.changed`, the
+names the login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the

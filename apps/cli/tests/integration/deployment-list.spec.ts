@@ -9,6 +9,7 @@ import {
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -408,7 +409,7 @@ describe("deployment list", () => {
 
         expect(result).toSucceed();
         expect(result.stdout).not.toContain("\u001b[2J");
-        expect(result.stdout).toContain("https://app.acme.com\\x1b[2Jwiped");
+        expect(result.stdout).toContain(`${PRIMARY_ORIGIN}\\x1b[2Jwiped`);
       });
 
       it.each(RENDERINGS)("suggests the next page once, %s", async (_how, colour) => {

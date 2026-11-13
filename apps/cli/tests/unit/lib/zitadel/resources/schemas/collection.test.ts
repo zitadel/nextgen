@@ -82,7 +82,6 @@ const OTHER_SCHEMA = "staff";
  */
 const PASSWORD_FLOW = {
   name: "password-login",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "password" },
   steps: [{ name: "password", fields: ["x-auth-methods#password"] }],
@@ -93,7 +92,6 @@ const PASSWORD_FLOW = {
  */
 const PASSKEY_FLOW = {
   name: "passkey-login",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "passkey" },
   steps: [{ name: "passkey", actions: [{ name: "passkey", kind: "passkey" }] }],
@@ -104,7 +102,6 @@ const PASSKEY_FLOW = {
  */
 const LOGIN_FLOW = {
   name: "login",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "identifier" },
   steps: [
@@ -344,7 +341,7 @@ describe("Schemas.disable", () => {
 });
 
 describe("Schemas.listReachableMethods", () => {
-  it("counts only methods an active flow offers", () => {
+  it("counts only methods a flow offers", () => {
     const config = aConfig({
       schemas: {
         [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": authMethods("password", "passkey") }),
@@ -384,7 +381,6 @@ describe("Schemas.listReachableMethods", () => {
   });
 
   it.each([
-    ["a flow that is not active", aUserSchema(), { ...PASSWORD_FLOW, status: "draft" }],
     [
       "a flow that runs against another schema",
       aUserSchema(),
@@ -608,7 +604,7 @@ describe("Schemas.describeSignIn", () => {
   it("points at the flows directory when no flow signs anyone in", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: aUserSchema() },
-      flows: { [FLOW_FILE]: { ...PASSWORD_FLOW, status: "draft" } },
+      flows: { [FLOW_FILE]: { ...PASSWORD_FLOW, purposes: { register: "password" } } },
     });
     const edit = aMethodEdit(config, "passkey", true);
 
@@ -616,9 +612,7 @@ describe("Schemas.describeSignIn", () => {
 
     expect(notices).toContainEqual({
       severity: WARNING,
-      message: expect.stringContaining(
-        "In an active login flow for customers in .zitadel/flows/, add",
-      ),
+      message: expect.stringContaining("In a login flow for customers in .zitadel/flows/, add"),
     });
   });
 
@@ -637,7 +631,7 @@ describe("Schemas.describeSignIn", () => {
       {
         severity: WARNING,
         message:
-          "No active login flow for customers offers a method it enables, so nobody can sign in until one does.",
+          "No login flow for customers offers a method it enables, so nobody can sign in until one does.",
       },
     ]);
   });

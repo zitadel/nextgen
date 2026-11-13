@@ -85,17 +85,18 @@ Each step's package has its own `AGENTS.md`; follow it.
    focus) only if needed, the tag in `src/manifests.spec.ts` and its events in
    `src/atoms/event-contract.spec.ts`.
 6. **Story**: `src/<id>.stories.ts`, one `Default` under `Atoms/<Name>`.
-7. **Verify** with `moon run storybook:dev` (HMR from source), then
-   `moon run components:test storybook:typecheck storybook:test`. While
+7. **Verify** with `turbo run dev --filter=@zitadel/storybook` (HMR from
+   source), then `turbo run test --filter=@zitadel/components` and
+   `turbo run typecheck test --filter=@zitadel/storybook`. While
    iterating, `pnpm --filter @zitadel/components test:unit` is the fast lane.
 
 ## Local checks
 
 ```sh
-moon run storybook:typecheck storybook:build storybook:test
+turbo run typecheck build test --filter=@zitadel/storybook
 ```
 
-`storybook:test` runs real Chromium and re-bundles its dependencies on every
+`@zitadel/storybook#test` runs real Chromium and re-bundles its dependencies on every
 start (`optimizeDeps.force`), so every run starts cold. Never pipe it through
 `tail`, and clear strays before a retry; see
 [`packages/components/AGENTS.md`](../../packages/components/AGENTS.md#the-browser-projects-cold-start).

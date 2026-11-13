@@ -8,6 +8,7 @@ import { afterEach, describe, expect } from "vitest";
 import { it } from "@tests/helpers/fixtures";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -71,23 +72,23 @@ describe("origin add", () => {
   it("sends the pattern and kind to the project's origins endpoint", async () => {
     const cwd = await anAppDir();
 
-    await add(cwd, "https://app.acme.com", "--kind", "primary");
+    await add(cwd, PRIMARY_ORIGIN, "--kind", "primary");
 
-    expect(requests).toEqual([{ pattern: "https://app.acme.com", kind: "primary" }]);
+    expect(requests).toEqual([{ pattern: PRIMARY_ORIGIN, kind: "primary" }]);
   });
 
   it("reports the stored pattern and kind", async () => {
     const cwd = await anAppDir();
 
-    const { envelope } = await add(cwd, "https://*-acme.vercel.app", "--kind", "preview");
+    const { envelope } = await add(cwd, PREVIEW_PATTERN, "--kind", "preview");
 
-    expect(envelope.data).toMatchObject({ pattern: "https://*-acme.vercel.app", kind: "preview" });
+    expect(envelope.data).toMatchObject({ pattern: PREVIEW_PATTERN, kind: "preview" });
   });
 
   it("requires --kind", async () => {
     const cwd = await anAppDir();
 
-    const { result } = await add(cwd, "https://app.acme.com");
+    const { result } = await add(cwd, PRIMARY_ORIGIN);
 
     expect(result.exitCode).not.toBe(0);
     expect(requests).toEqual([]);
@@ -96,7 +97,7 @@ describe("origin add", () => {
   it("rejects a kind that is neither primary nor preview", async () => {
     const cwd = await anAppDir();
 
-    const { result } = await add(cwd, "https://app.acme.com", "--kind", "sandbox");
+    const { result } = await add(cwd, PRIMARY_ORIGIN, "--kind", "sandbox");
 
     expect(result.exitCode).not.toBe(0);
     expect(requests).toEqual([]);
@@ -105,13 +106,7 @@ describe("origin add", () => {
   it("makes no request on a dry run", async () => {
     const cwd = await anAppDir();
 
-    const { result, envelope } = await add(
-      cwd,
-      "https://app.acme.com",
-      "--kind",
-      "primary",
-      "--dry-run",
-    );
+    const { result, envelope } = await add(cwd, PRIMARY_ORIGIN, "--kind", "primary", "--dry-run");
 
     expect(result.exitCode).toBe(0);
     expect(requests).toEqual([]);
@@ -125,14 +120,7 @@ describe("origin add", () => {
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
     );
 
-    const { envelope } = await add(
-      cwd,
-      "https://app.acme.com",
-      "--kind",
-      "primary",
-      "--env",
-      "production",
-    );
+    const { envelope } = await add(cwd, PRIMARY_ORIGIN, "--kind", "primary", "--env", "production");
 
     expect((envelope.data.next_commands as string[])[0]).toContain("--env production");
   });

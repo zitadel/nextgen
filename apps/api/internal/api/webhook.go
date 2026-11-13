@@ -9,7 +9,7 @@ import (
 )
 
 // webhookStubPhase stays 0 so the contract stubs answer not_implemented at
-// runtime (ADR 089). The non-zero cases exist only so gen_openapi_errors
+// runtime (ADR 090). The non-zero cases exist only so gen_openapi_errors
 // records the codes each operation can return once storage and delivery land.
 // Keep each switch limited to that operation's reachable set; do not share
 // one fan-out across operations.

@@ -37,7 +37,7 @@ Skip a changeset **only** when the change is *exclusively*:
   (`packages/config/defaults/README-*.md`) definitely does. The guards
   (`scripts/check-pr-title.mjs`, `scripts/check-changesets-status.mjs`)
   encode this split.
-- CI / build wiring (`.github/`, `moon.yml`, `.changeset/`)
+- CI / build wiring (`.github/`, `turbo.json`, `.changeset/`)
 - a refactor with no behavior change
 
 ## Decision table
@@ -130,7 +130,8 @@ The public packages publish to npm's `latest` tag as `0.x`
   that starts with `**Breaking:**` says what breaks and what to do; the website
   changelog lists such a change under Breaking. A `major` would release every
   public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
-  refuses it; CI runs it on every PR.
+  refuses it; CI runs it (`@zitadel/release#check-changesets`) whenever a
+  changeset or a package manifest changes.
 - 1.0.0 is cut by a PR that deletes that check and adds a `major` changeset.
   Release candidates, if any, run in prerelease mode on a release branch.
 
@@ -156,10 +157,10 @@ to run. That check asks the npm registry before the dry-run branch, so an offlin
 `release publish --dry-run` fails closed; this is intended. The version PR's
 `full-pr` runs the same check (`node scripts/release.mjs check-npm`), so a new
 public package fails the version PR instead of landing a version on `main` that
-cannot be published. The release job runs on
-Depot, which npm treats as self-hosted; keep `PNPM_CONFIG_PROVENANCE=false` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`) until npm
-provenance is supported for that runner environment or the publish job moves to
-GitHub-hosted runners.
+cannot be published. The publish job requests npm provenance with
+`PNPM_CONFIG_PROVENANCE=true` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`); npm
+signs it only from a GitHub-hosted runner, so keep that job off self-hosted
+runners such as Depot.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

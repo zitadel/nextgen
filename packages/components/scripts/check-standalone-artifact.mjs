@@ -6,15 +6,15 @@
  *
  * - a bare package specifier surviving the bundle (an import the standalone
  *   `noExternal` list misses, or an import rolldown could not resolve because
- *   a workspace dep's dist was not built yet — see the `config:build-release`
- *   dep in moon.yml), which a browser cannot resolve;
+ *   a workspace dep's dist was not built yet — see the `@zitadel/config#build`
+ *   edge in turbo.json), which a browser cannot resolve;
  * - a `node:` builtin leaking in (rolldown's CJS-interop `createRequire`
  *   helper when the build platform is not "browser").
  *
  * The bundler exits successfully in both cases — only loading the file in a
- * browser fails. `components:build-release` runs this after building, and
- * `src/standalone-artifact.spec.ts` runs the same checks against the dev
- * build. Single source: both import {@link findArtifactViolations}.
+ * browser fails. `src/standalone-artifact.spec.ts` runs these checks against
+ * the build, which is the one a release packs; run this script by hand to
+ * check a file. Single source: the spec imports {@link findArtifactViolations}.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -90,7 +90,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 >
 > Amended by [ADR 086](086-invitations.md): registers the `inv` prefix for invitations.
 >
-> Amended by [ADR 089](089-project-webhooks.md): registers the `hook` prefix for a project's webhooks. The operator's configured sinks keep `sink`.
+> Amended by [ADR 090](090-project-webhooks.md): registers the `hook` prefix for a project's webhooks. The operator's configured sinks keep `sink`.
 
 Existing style mix (`brnd` / `flowdef` / `enc_key` / `upw`) stays until a
 dedicated rename PR. Do not add more without the selection rules below.
