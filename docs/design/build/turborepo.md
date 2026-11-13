@@ -261,9 +261,15 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   cache keys in that one build than everywhere else. The package lists it in
   its `env` and its config reads it (the console's `CONSOLE_*` variables and
   `vite.config.ts`).
-- On Vercel, turbo puts `VERCEL_TARGET_ENV` (`production` or `preview`)
-  into every task's hash, its default, so production and preview builds
-  keep separate cache entries. The `VITE_VERCEL_*` variables Vercel sets
+- On Vercel, turbo's default puts `VERCEL_TARGET_ENV` (`production` or
+  `preview`) into every task's hash, and a preview then never restores what
+  main's production build stored. The root `turbo.json` drops it
+  (`globalEnv`), so both environments compute the same keys; which artifacts
+  a build may restore is Vercel's to enforce, by branch
+  ([Commands](#commands)). `VERCEL` is hashed in its place, which keeps the
+  keys of Vercel's builds apart from CI's and a checkout's. A build whose
+  output depends on the environment lists it (the console's `VERCEL_ENV`).
+  The `VITE_VERCEL_*` variables Vercel sets
   are kept out of every hash (`globalEnv` in the root `turbo.json`): turbo
   leaves them out only in the Vite service's build, and the same packages
   would get other keys in the storybook's and the server's builds.
@@ -380,8 +386,14 @@ needs, and strict mode would hide one nobody listed. Two project variables, `TUR
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The other services use the cache as Vercel sets it up:
-their builds read and write the team's remote cache, production and
-previews in separate entries, and keep no local cache. Writing takes the
+their builds read and write the team's remote cache and keep no local
+cache. Vercel sorts the artifacts by branch
+([cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)):
+a build of `main` reads and writes main's; a preview reads main's and its
+own branch's, never another branch's, and writes only its own. Production
+and previews compute the same keys ([Environment](#environment)), so a
+branch's first preview restores from main's build every package it does not
+change, and no branch can put an artifact before production. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
