@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, formatRecent } from "./date";
+import { formatDate, formatDateTime, formatEventDay, formatRecent } from "./date";
 
 describe("formatRecent", () => {
   const now = new Date("2026-10-15T12:00:00Z");
@@ -22,5 +22,27 @@ describe("formatRecent", () => {
 
   it("shows what arrived when it cannot be parsed", () => {
     expect(formatRecent("not a date", now)).toBe("not a date");
+  });
+});
+
+describe("formatEventDay", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+  const yearless = (value: string) =>
+    new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  it("leaves the year out of a day within eleven months, last year's included", () => {
+    expect(formatEventDay("2026-10-06T14:00:00Z", now)).toBe(yearless("2026-10-06T14:00:00Z"));
+    expect(formatEventDay("2025-12-28T14:00:00Z", now)).toBe(yearless("2025-12-28T14:00:00Z"));
+    expect(formatEventDay("2026-10-06T14:00:00Z", now)).not.toContain("2026");
+  });
+
+  it("writes the year of a day further off, which the month alone would misplace", () => {
+    const old = "2025-10-20T14:00:00Z";
+    expect(formatEventDay(old, now)).toBe(formatDate(old));
+    expect(formatEventDay(old, now)).toContain("2025");
+  });
+
+  it("shows what arrived when it cannot be parsed", () => {
+    expect(formatEventDay("not a date", now)).toBe("not a date");
   });
 });

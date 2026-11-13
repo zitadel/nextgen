@@ -33,7 +33,8 @@ function angularProjectName(cwd: string): string {
  *
  * The Angular CLI refuses Node versions outside its `engines.node` range, so
  * {@link nodeEngines} declares it with `refuse` enforcement and the base
- * class checks the range before `ng new` runs.
+ * class checks the range before `ng new` runs. It installs nothing: setup's
+ * own install step does, once, and not under `--skip-install`.
  */
 export class AngularScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Angular";
@@ -61,6 +62,9 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
         "--style=css",
         "--ssr=false",
         "--skip-git",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--skip-install",
       ],
       cwd,
     );

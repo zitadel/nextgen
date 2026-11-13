@@ -52,17 +52,22 @@ Fixtures take `32xx`, `82xx` and `83xx` with the same `xx`.
 `.nuxt/` and `next-env.d.ts`), less what no fixture commits: the secret and
 the env files that carry it, the CLI's own state (`zitadel.json`,
 `.zitadel/`), which the app never reads, the docs setup writes for a person
-(`README.md`, `AGENTS.md`), and editor and npm settings. Of the generated
-scripts it keeps `dev` and the generator's own type-check as `typecheck`
-(sv's `check`, the `tsc -b` or `vue-tsc -b` create-vite's `build` starts
-with). It points `@zitadel/*` at the workspace and a dependency the pnpm
-catalog holds at `catalog:`, and fails when the catalog's floor is below
-what the generator writes, naming the bump; a catalog ahead of it
-(create-next-app's exact pins and older majors) stays `catalog:`, so a
-fixture never runs an older release than a customer gets. It adds the
-lane's scripts and dev dependencies. Beside the app, a fixture has three files of its own:
-`playwright.config.mts`, `conformance.spec.ts` and `turbo.json`, which only
-extends the suite's.
+(`README.md`, `AGENTS.md`), editor and npm settings, and the tooling only the
+scripts it drops would load, with its config files (one list in
+`suite/bin/conformance-fixture.mjs`). Of the generated scripts it keeps `dev`
+and the generator's own type-check as `typecheck` (sv's `check`, the `tsc -b`
+or `vue-tsc -b` create-vite's `build` starts with). It points `@zitadel/*` at
+the workspace and every dependency the pnpm catalog holds at `catalog:`. It
+adds the lane's scripts and dev dependencies. Beside the app, a fixture has
+three files of its own: `playwright.config.mts`, `conformance.spec.ts` and
+`turbo.json`, which only extends the suite's.
+
+This lane runs the workspace's versions: the catalog's, and the lockfile's
+for a dependency the catalog does not hold. For the frameworks CI runs a
+journey for (`ciFrameworkIds` in `e2e/journey/scripts/frameworks.mjs`), the
+journeys run the generator's, installed as a customer installs them. Bump the
+catalog when a lane fails on the workspace's version, not to follow a
+generator.
 
 The lane runs the app with the SDKs linked from the workspace, so it proves
 the SDKs' code, not the packed package (exports, `files`, peer ranges); the
@@ -88,7 +93,12 @@ It does not catch:
 - what setup does to an app that is already set up, or to a pre-existing app
   (`doctor --fix`, upgrade rewrites): it covers only a fresh scaffold;
 - generator output that changes without a pin moving, which shows up on the
-  next run that misses the cache (and every night for `generatorPinned: false`).
+  next run that misses the cache (and every night for `generatorPinned: false`);
+- the scaffolded pages of a fixture with no `typecheck` script: its generator
+  writes no type-check, and this lane and the journeys both run `dev`, so
+  nothing compiles those pages against the SDK's types;
+- the versions `zitadel setup` installs for a framework CI runs no journey for:
+  nothing in CI installs them.
 
 ## Adding a fixture
 

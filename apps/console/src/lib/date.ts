@@ -67,6 +67,22 @@ function format(value: string, options: Intl.DateTimeFormatOptions): string {
 /** A day: the window in which a moment reads as "how long ago". */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Eleven months: within it, a day and a month name one date without a year. */
+const YEARLESS_MS = 334 * DAY_MS;
+
+/**
+ * `2026-04-28T15:32:07.123Z` → `28 Apr`, or `Apr 28`: the day a log row leads
+ * with, before its {@link formatClockTime}. The year is left out while the
+ * day and month cannot be another year's, within eleven months of `now`, and
+ * written for anything further off. The same fallback as {@link formatDate}.
+ */
+export function formatEventDay(value: string, now: Date = new Date()): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const near = Math.abs(now.getTime() - parsed.getTime()) < YEARLESS_MS;
+  return parsed.toLocaleDateString(undefined, near ? { day: "numeric", month: "short" } : DATE);
+}
+
 /**
  * A moment within the last day as `6h ago` or `12m ago`, and anything older
  * as {@link formatDateTime}: a deployment made today is read against now, one

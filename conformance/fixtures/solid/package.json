@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc -b",
-    "install-browsers": "playwright install chromium",
     "generate": "conformance-fixture generate",
     "check-generate": "conformance-fixture check",
     "conformance": "playwright test"
