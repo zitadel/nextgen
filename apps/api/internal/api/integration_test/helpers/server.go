@@ -203,7 +203,8 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			db,
 			platform.ID,
 		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
-			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID))
+			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID)).
+			WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
 	}
 	return h.handler.value
 }

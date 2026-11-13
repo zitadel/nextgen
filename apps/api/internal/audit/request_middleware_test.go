@@ -291,3 +291,42 @@ func TestRequestEventMiddleware_IndexesTheOperationAndStatusClass(t *testing.T) 
 		})
 	}
 }
+
+// A request event records the operation, the method, the status and the
+// duration, and nothing the handler wrote: the two webhook responses that
+// carry a signing secret leave none of it in the event (ADR 090 §3).
+func TestRequestEventMiddleware_RecordsNoResponseBody(t *testing.T) {
+	const secret = "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oDZJQk1o3DdH8="
+	for _, operationID := range []string{"createWebhook", "rotateWebhookSecret"} {
+		t.Run(operationID, func(t *testing.T) {
+			ins, buf := startPathA(t)
+			h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middleware.WithOperationIDContext(r.Context(), operationID)
+				ac, ok := ActorSlotFromContext(r.Context())
+				require.True(t, ok)
+				ac.ProjectID = "proj_1"
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, err := w.Write([]byte(`{"id":"hook_1","secret":"` + secret + `"}`))
+				require.NoError(t, err)
+			}))
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/webhooks?project_id=proj_1", nil)
+			h.ServeHTTP(rec, req.WithContext(middleware.WithOperationIDContext(req.Context(), "")))
+			require.Contains(t, rec.Body.String(), secret, "the caller still gets the secret")
+
+			require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+			ins.mu.Lock()
+			defer ins.mu.Unlock()
+			require.Len(t, ins.events, 1)
+			var payload domain.RequestAPIPayload
+			require.NoError(t, json.Unmarshal(ins.events[0].Payload, &payload))
+			assert.Equal(t, operationID, payload.OperationID)
+			// The whole row, not the payload alone: no column may hold it.
+			row, err := json.Marshal(ins.events[0])
+			require.NoError(t, err)
+			assert.NotContains(t, string(row), "secret")
+			assert.NotContains(t, string(row), "whsec_")
+		})
+	}
+}

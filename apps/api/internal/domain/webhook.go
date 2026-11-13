@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"time"
+)
 
 // PrefixWebhook is the dialect-minted ID prefix for a project's webhooks
 // (hook_<opaque>, ADR 090). The operator's configured sinks keep
@@ -14,6 +18,28 @@ const WebhookErrorCodePrefix = "webhook."
 
 // WebhookProjectLimit is how many webhooks one project holds (ADR 090 §1).
 const WebhookProjectLimit = 10
+
+// WebhookPreviousSecretTTL is how long the secret a rotation replaced keeps
+// signing deliveries (ADR 090 §3).
+const WebhookPreviousSecretTTL = 24 * time.Hour
+
+// WebhookSecretPrefix starts every signing secret, as Standard Webhooks
+// writes them.
+const WebhookSecretPrefix = "whsec_"
+
+// WebhookAllEventTypes is the event_types entry that stands for every type
+// except request.api (ADR 090 §1).
+const WebhookAllEventTypes = "*"
+
+// NewWebhookSecret generates a signing secret: 32 random bytes, shown as
+// whsec_ and their base64 (ADR 090 §3).
+func NewWebhookSecret() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return WebhookSecretPrefix + base64.StdEncoding.EncodeToString(b), nil
+}
 
 func ErrWebhookInvalid() Error {
 	return newError("webhook.invalid", "the webhook request is invalid", nil, nil)

@@ -99,6 +99,9 @@ post:
     Creates a webhook for the project in `project_id` and returns it with its
     signing secret.
 
+    The create records a `webhook.created` event, which never holds the
+    secret.
+
     The server then POSTs each of the project's events whose type is in
     `event_types` to `url`, one event per request, signed with the secret.
     Delivery starts with the events stored after this call: a new webhook
@@ -118,12 +121,10 @@ post:
     The `secret` appears only in this response. Store it where the endpoint
     can read it, and verify each request with it.
 
-    To recover from a lost response, send `Idempotency-Key` and repeat the
-    request with the same key: it returns the first response, `secret`
-    included, and creates nothing. Without the key, a repeated request
-    creates a second webhook. Then find both with `listWebhooks`
-    (`GET /webhooks`), delete one, and issue a secret for the other with
-    `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+    A repeated request creates a second webhook. To recover from a lost
+    response, find the webhook with `listWebhooks` (`GET /webhooks`) and
+    issue a secret for it with `rotateWebhookSecret`
+    (`POST /webhooks/{id}/rotate_secret`), or delete it and create it again.
 
     Authenticate with a project secret (`oauth2`), or with the session cookie
     (`sessionCookie`) of a signed-in person who can change the project.
@@ -136,12 +137,6 @@ post:
     - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/idempotency-key.yaml
-      description: |
-        Optional retry key. A retry carrying the same key within the retry
-        window returns the first response, `secret` included, instead of
-        creating another webhook. Without it, a retry after a lost response
-        creates a second webhook, and the first one's secret is lost.
   requestBody:
     required: true
     content:

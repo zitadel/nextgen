@@ -152,8 +152,8 @@ tags:
     description: |
       Webhooks are the URLs a project's events are sent to. These operations
       create, list, read, update and delete a project's webhooks and rotate a
-      webhook's signing secret. They are not available yet: each answers
-      `501` `not_implemented`.
+      webhook's signing secret. The server does not deliver events to a
+      project's webhooks yet: it stores a webhook and delivers nothing to it.
 
       A webhook names the event types it receives, or `*` for all of them
       except `request.api`. The server POSTs each matching event to the

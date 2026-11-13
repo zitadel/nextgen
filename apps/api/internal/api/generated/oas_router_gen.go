@@ -256,7 +256,7 @@ var (
 	}
 	rn35AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
-		"POST": "Authorization,Content-Type,Idempotency-Key",
+		"POST": "Authorization,Content-Type",
 	}
 	rn43AllowedHeaders = map[string]string{
 		"DELETE": "Authorization",
@@ -264,7 +264,7 @@ var (
 		"PATCH":  "Authorization,Content-Type",
 	}
 	rn125AllowedHeaders = map[string]string{
-		"POST": "Authorization,Idempotency-Key",
+		"POST": "Authorization",
 	}
 )
 

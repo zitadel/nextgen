@@ -143,9 +143,9 @@ the target catalog for the planned paths in
 | `signing_key.create` | Create a successor signing key | **Rotation = create successor** (no `signing_key.rotate`). Manual or sweep-driven; activation follows [ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md). Not in-place secret replacement. |
 | `signing_key.read` | Read/list `/projects/{id}/signing_keys` | Public/status metadata only; never exposes private key material. |
 | `signing_key.delete` | Delete a signing key | Includes emergency removal after a successor exists. Keep `create`/`delete`; do not fold rotation into a single rotate verb. |
-| `webhook.read` | Read/list `/projects/{id}/webhooks` | |
-| `webhook.write` | Create/update a webhook | Create + manage. |
-| `webhook.delete` | Remove a webhook | |
+| `webhook.read` | `GET /webhooks`, `GET /webhooks/{id}` | A session needs the project's viewer role. Never returns the signing secret. |
+| `webhook.write` | `POST /webhooks`, `PATCH /webhooks/{id}`, `POST /webhooks/{id}/rotate_secret` | Create + manage. A session needs the editor role. Create and rotate return the secret once. |
+| `webhook.delete` | `DELETE /webhooks/{id}` | A session needs the admin role. |
 
 Some configuration may continue to be delivered through `zitadel push` rather
 than resource-specific REST endpoints; the pushed operation must still require
@@ -643,7 +643,8 @@ enforcement. Two related consequences:
    contract.
 4. **Project configuration endpoint shapes** — permission names are locked
    independently from `project.*`; exact REST operations for domains, features,
-   allowed origins, signing keys, and webhooks still need specification.
+   allowed origins and signing keys still need specification. Webhooks have
+   theirs ([ADR 090](../../adrs/090-project-webhooks.md)).
 5. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
    Catalog names may change if app_groups are restructured.
 6. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is

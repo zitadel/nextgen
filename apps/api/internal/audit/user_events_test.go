@@ -36,6 +36,7 @@ var variableTypeEmitters = map[string][]string{
 	"emitOperatorEvent":      {"authz.granted", "authz.revoked"},
 	"emitIDPConnectionEvent": {"idp.created", "idp.updated"},
 	"emitPolicyEvent":        {"policy.created", "policy.updated"},
+	"emitWebhookEvent":       {"webhook.created", "webhook.updated", "webhook.deleted", "webhook.secret_rotated"},
 }
 
 // manualEmitter is the one function that builds its event without an
