@@ -427,7 +427,7 @@ describe("list nouns", () => {
     expect(await nothingListed("identity providers")).toContain("No identity providers found");
   });
 
-  it("adds an s to the singular when the descriptor names no plural", async () => {
+  it("says the singular's regular plural when the descriptor names none", async () => {
     expect(await nothingListed(undefined)).toContain("No identity providers found");
   });
 });

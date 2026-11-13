@@ -1023,7 +1023,6 @@ export const RESOURCES = {
   policy: resource({
     group: CommandGroups.configuration,
     singular: "policy",
-    plural: "policies",
     idField: "id",
     // Addressed by operation as well as by id: the operation is what the
     // file is named after and what a developer knows the policy by.

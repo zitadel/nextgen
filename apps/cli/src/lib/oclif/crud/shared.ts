@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ZitadelError } from "@/lib/errors";
 import { nonBlankArg, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/names";
+import { regularPlural } from "@/lib/plural";
 import { prose } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
 import { resourceSuggestion, type SuggestedCommand } from "@/lib/suggestion";
@@ -73,11 +74,12 @@ export const capitalize = (word: string): string => {
 };
 
 /**
- * What a list calls its rows: the resource's own plural, else its singular
- * with an `s`. Never the topic, which is the command's name and singular.
+ * What a list calls its rows: the resource's own plural, else the regular
+ * plural of its singular. Never the topic, which is the command's name and
+ * singular.
  */
 export const pluralOf = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
-  return resource.plural ?? `${resource.singular}s`;
+  return resource.plural ?? regularPlural(resource.singular);
 };
 
 /**

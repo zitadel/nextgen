@@ -493,6 +493,14 @@ describe("the cli", () => {
             127,
           ],
           [
+            "the plural of a command's noun",
+            ["policies", "list"],
+            "policies",
+            "policies is not a zitadel command",
+            ["policy --help"],
+            127,
+          ],
+          [
             "a typo of an alias",
             ["ejct"],
             "ejct",

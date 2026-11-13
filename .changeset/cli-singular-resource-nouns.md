@@ -16,5 +16,8 @@ flags are unchanged, and `branding` keeps its name. Rename the calls in your
 scripts and CI: `zitadel users list` is `zitadel user list`, and
 `zitadel policies test` is `zitadel policy test`. With `--json`, the
 envelope's `command` (`user:list`) and the `topic` that `zitadel resources`
-and a `--dry-run` report change with them. The old CLI reference pages
-redirect, and `zitadel --help` lists the current names.
+and a `--dry-run` report change with them. A plural typed out of habit
+fails as any unknown command does and names the singular command's help as
+its next command (`zitadel policies list` names `zitadel policy --help`). The
+old CLI reference pages redirect, and `zitadel --help` lists the current
+names.

@@ -4,6 +4,7 @@ import { distance } from "fastest-levenshtein";
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
 import type { JsonEnvelope } from "@/lib/oclif/types";
+import { regularPlural } from "@/lib/plural";
 import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
@@ -20,9 +21,10 @@ export const UNKNOWN_COMMAND_EXIT_CODE = 127;
  * is a topic, and the one word after it that is not a command there, which it
  * repeats as typed. The words after that one may be arguments, which a refusal
  * never repeats. It suggests the
- * help of the one visible command a word is a single edit from, never the
- * command itself, which would run without the flags typed, so a typo can never
- * turn into a different, possibly destructive, command.
+ * help of the one visible command a word is the plural of (`policies` for
+ * `policy`), or else is a single edit from, never the command itself, which
+ * would run without the flags typed, so a typo can never turn into a
+ * different, possibly destructive, command.
  */
 export class NotFound extends BaseCommand {
   static override readonly id = "not-found";
@@ -87,6 +89,17 @@ export class NotFound extends BaseCommand {
       return close.length === 1 ? close[0] : undefined;
     };
 
+    // The one candidate a word is the plural of. A command names its noun in
+    // the singular, and a plural is not always an edit away: `policies` is
+    // three from `policy`.
+    const singular = (word: string, candidates: readonly string[]): string | undefined => {
+      const plural = word.toLowerCase();
+      const singulars = [...new Set(candidates)].filter((candidate) => {
+        return regularPlural(candidate) === plural;
+      });
+      return singulars.length === 1 ? singulars[0] : undefined;
+    };
+
     if (words[0] === undefined) {
       this.id = "(default)";
       this.unknown = true;
@@ -122,7 +135,9 @@ export class NotFound extends BaseCommand {
     });
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
-    const meant = near(typed[depth] as string, under(parent));
+    const word = typed[depth] as string;
+    const candidates = under(parent);
+    const meant = singular(word, candidates) ?? near(word, candidates);
     const next: SuggestedCommand[] = [];
     if (meant !== undefined) {
       next.push(help([...parent, meant]));

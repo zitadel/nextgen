@@ -566,9 +566,10 @@ without an envelope. In human mode a cancel prints no error block. A name the
 CLI cannot resolve to a command, an unknown command or an unknown subcommand,
 is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
 does for a command it cannot find. Its `next_commands` are the `--help` of the
-command it was one edit from and of the topic. It is never run as a different
-command. Its message names the first word that is no command where it was
-typed, as typed, and never a word after that one. A stray extra word after a
+command it was the plural of (`policies` names `policy --help`) or one edit
+from, and of the topic. It is never run as a different command. Its message
+names the first word that is no command where it was typed, as typed, and
+never a word after that one. A stray extra word after a
 real command is that command refusing an argument it does not take: an
 `E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help
 on such a name is the one exception: the help layer answers, with nothing on stdout. With `--help`
