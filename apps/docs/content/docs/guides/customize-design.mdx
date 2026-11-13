@@ -100,7 +100,13 @@ The example applies the same stylesheet to a live login, which runs against a mo
 
 The login renders in a light or a dark theme. It marks the active one on the element as `data-theme="light"` or `data-theme="dark"`.
 
-A token you set on `zitadel-login` applies to both themes. When you change a surface, change its text colour with it. Set `--zl-card` together with `--zl-card-foreground`, or the card text can become hard to read in one theme.
+A token you set on `zitadel-login` applies to both themes. When you change `--zl-card`, also set every text colour on the card:
+
+- `--zl-card-foreground`: the title.
+- `--zl-foreground`: field labels and the text people type.
+- `--zl-muted-foreground`: the subtitle, help text and placeholders.
+
+Otherwise some card text can become hard to read in one theme.
 
 To give one theme its own values, select on `data-theme`:
 
@@ -113,6 +119,8 @@ zitadel-login {
 zitadel-login[data-theme="dark"] {
   --zl-card: #111827;
   --zl-card-foreground: #f9fafb;
+  --zl-foreground: #e5e7eb;
+  --zl-muted-foreground: #9ca3af;
 }
 ```
 
@@ -124,11 +132,11 @@ The login picks its theme in this order:
 
 A branding that sets only one side, such as only `theme.dark`, always shows that side.
 
-When `zitadel setup` adds sign-in pages to an existing Next.js or Nuxt app, the pages use `variant="widget"` and also set `theme="auto"`. That attribute wins over `theme.mode`. Remove `theme="auto"` from those pages to let your branding decide. Setup sets no `theme` on any other page it writes.
+When `zitadel setup` adds sign-in pages to an existing Next.js or Nuxt app, the pages use `variant="widget"` and also set `theme="auto"`. That attribute wins over `theme.mode`. Remove `theme="auto"` from those pages to let your branding decide.
 
 With `variant="widget"`, the theme changes only the login's card. The page around the card is your app's, so set its colours in your own stylesheet. With `variant="page"`, the login paints the whole page in the theme.
 
-`<zitadel-session>` and `<zitadel-logout>` do not read your branding, so `theme.mode` does not reach them. Set their `theme` attribute yourself.
+`<zitadel-session>` and `<zitadel-logout>` do not read your branding, so `theme.mode` does not reach them. In an existing Next.js or Nuxt app, the profile page that setup adds also sets `theme="auto"` on `<zitadel-session>`. Removing it there changes nothing, because the widget default is also `auto`. Set `theme="light"` or `theme="dark"` on these two components to match the login.
 
 ## Put the login in your own page
 
