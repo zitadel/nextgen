@@ -144,7 +144,7 @@ export function keysOf(node: ts.Node | undefined): string[] {
  * @param key - A key it may give.
  * @returns The value's expression.
  */
-export function valueOf(
+export function propertyValue(
   literal: ts.ObjectLiteralExpression,
   key: string,
 ): ts.Expression | undefined {

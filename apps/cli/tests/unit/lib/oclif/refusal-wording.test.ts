@@ -14,7 +14,7 @@ import {
   parsedFile,
   sourcesUnder,
   textsIn,
-  valueOf,
+  propertyValue,
 } from "@tests/helpers/declarations";
 
 const root = fileURLToPath(new URL("../../../../src", import.meta.url));
@@ -106,7 +106,7 @@ async function weighed(): Promise<Weighed[]> {
         file,
         name,
         literal,
-        filled: [...ALWAYS, ...keysOf(valueOf(literal, "values"))],
+        filled: [...ALWAYS, ...keysOf(propertyValue(literal, "values"))],
       });
     }
     for (const { name, literal } of [

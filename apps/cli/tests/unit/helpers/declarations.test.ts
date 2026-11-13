@@ -9,7 +9,7 @@ import {
   keysOf,
   parsedSource,
   textsIn,
-  valueOf,
+  propertyValue,
 } from "@tests/helpers/declarations";
 
 /** A module declaring refusals every way one is written, and a const of another type. */
@@ -83,13 +83,13 @@ describe("callsOf", () => {
 });
 
 /** An object that quotes the key it gives a value for. */
-const QUOTED = parsedSource("quoted.ts", "x({ \"values\": { min: 1 } });");
+const QUOTED = parsedSource("quoted.ts", 'x({ "values": { min: 1 } });');
 
-describe("valueOf", () => {
+describe("propertyValue", () => {
   it("is the value an object gives a key itself", () => {
     const [typed] = declaredAs(MODULE, "Refused");
 
-    expect(typed === undefined ? [] : keysOf(valueOf(typed.literal, "refusal"))).toEqual([
+    expect(typed === undefined ? [] : keysOf(propertyValue(typed.literal, "refusal"))).toEqual([
       "message",
     ]);
   });
@@ -100,7 +100,7 @@ describe("valueOf", () => {
 
     expect(
       literal !== undefined && ts.isObjectLiteralExpression(literal)
-        ? keysOf(valueOf(literal, "values"))
+        ? keysOf(propertyValue(literal, "values"))
         : [],
     ).toEqual(["min"]);
   });
