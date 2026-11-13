@@ -94,7 +94,7 @@ func TestBuildHTTPMuxTracesTheAuditEventUnderTheServerSpan(t *testing.T) {
 			for _, s := range muxSpans.GetSpans() {
 				spans[s.Name] = s
 			}
-			server, ok := spans["PatchUserByID"]
+			server, ok := spans["UpdateUser"]
 			require.True(t, ok, "no server span")
 			enqueue, ok := spans["audit.EnqueueRequestEvent"]
 			require.True(t, ok, "no enqueue span")

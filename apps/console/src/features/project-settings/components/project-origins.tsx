@@ -263,7 +263,7 @@ function OriginForm({
       if (current) {
         await replaceOrigin(projectId, current, next, onChanged);
       } else {
-        await api.addOrigin(projectId, next);
+        await api.addProjectOrigin(projectId, next);
       }
       toast.success(current ? "Origin edited" : "Origin added");
       onClose();
@@ -373,12 +373,12 @@ async function replaceOrigin(
   next: Origin,
   onChanged: () => void,
 ): Promise<void> {
-  await api.removeOrigin(projectId, { pattern: current.pattern });
+  await api.removeProjectOrigin(projectId, { pattern: current.pattern });
   try {
-    await api.addOrigin(projectId, next);
+    await api.addProjectOrigin(projectId, next);
   } catch (refusal) {
     try {
-      await api.addOrigin(projectId, current);
+      await api.addProjectOrigin(projectId, current);
     } catch (cause) {
       onChanged();
       throw new Error(
@@ -425,7 +425,7 @@ function RemoveOriginDialog({
       action="Remove origin"
       fallback="The origin could not be removed."
       onConfirm={async () => {
-        await api.removeOrigin(projectId, { pattern: origin.pattern });
+        await api.removeProjectOrigin(projectId, { pattern: origin.pattern });
         toast.success("Origin removed");
         onRemoved();
       }}

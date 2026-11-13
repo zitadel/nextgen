@@ -1,5 +1,5 @@
 post:
-  operationId: createIdp
+  operationId: publishIdp
   x-zitadel-cli: idps create
   summary: Create or revise an identity provider
   description: |
@@ -234,4 +234,4 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      $ref: createIdp-error-response.yaml
+      $ref: publishIdp-error-response.yaml

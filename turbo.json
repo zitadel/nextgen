@@ -403,6 +403,8 @@
         "scripts/openapi-casing-rules.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",
+        // The verb allow-list test reads the spec's operationIds.
+        "apps/api/api/openapi/endpoints/**/methods.yaml",
         "redocly.yaml",
         ".redocly.lint-ignore.yaml",
         "vitest.config.ts"

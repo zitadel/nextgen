@@ -1,6 +1,6 @@
 import {
-  CreateIdpBody,
-  PatchProjectBody,
+  PublishIdpBody,
+  UpdateProjectBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -13,7 +13,7 @@ const references: References = {
   matches: (value) => /^\$\{\{ *\w+ *\}\}$/.test(value),
   example: "'${{ NAME }}'",
 };
-const connection = (CreateIdpBody as unknown as { shape: { idp: ZodLike } }).shape.idp;
+const connection = (PublishIdpBody as unknown as { shape: { idp: ZodLike } }).shape.idp;
 
 describe("isSecretKey", () => {
   it.each(["password", "api_key", "userToken", "client_secret", "PRIVATE_KEY", "access-token"])(
@@ -168,7 +168,7 @@ describe("findCredential", () => {
         {
           password_hash: { algorithm: "argon2id", params: { time: 3, memory: 65536, threads: 4 } },
         },
-        { schema: PatchProjectBody as unknown as ZodLike },
+        { schema: UpdateProjectBody as unknown as ZodLike },
       ),
     ).toBeUndefined();
   });
@@ -221,7 +221,7 @@ describe("redactCredentials", () => {
       },
     };
     expect(
-      redactCredentials(body, { schema: CreateIdpBody as unknown as ZodLike, references }),
+      redactCredentials(body, { schema: PublishIdpBody as unknown as ZodLike, references }),
     ).toEqual(body);
   });
 });

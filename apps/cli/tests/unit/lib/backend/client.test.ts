@@ -99,7 +99,7 @@ describe("a client's destructive operations", () => {
 
   it("leave every other operation reachable, updates included", () => {
     expect(typeof client().getVariable).toBe("function");
-    expect(typeof client().updateVariables).toBe("function");
+    expect(typeof client().setVariables).toBe("function");
   });
 
   it("are handed back by allowDestructive", () => {
@@ -119,8 +119,7 @@ describe("a client's destructive operations", () => {
    * generated from the one marker in the spec, and nothing else holds them
    * together, so an operation withheld from one caller and not the other would
    * otherwise go unnoticed. Compared without case, because a client function is
-   * named after the operation id and `DeleteUserByID` is spelled
-   * `deleteUserByID` as a function.
+   * named after the operation id with its first letter lower-cased.
    */
   it("are the same operations the raw sender refuses", () => {
     const withheld = destructiveOperations.map((name) => {

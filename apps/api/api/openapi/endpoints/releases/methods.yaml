@@ -9,7 +9,7 @@ post:
     A release is a snapshot of the project's configuration: it pins one
     revision of each resource it includes, and it is not tied to an origin.
     Take each `revision_id` from the operation that created the revision, for
-    example the `id` that `createBranding` (`POST /branding`) or `createFlowDefinition` (`POST /flow_definitions`) returns.
+    example the `id` that `publishBranding` (`POST /branding`) or `publishFlowDefinition` (`POST /flow_definitions`) returns.
 
     Each revision must exist in the project and is recorded under the handle
     it declares. The release must be complete and consistent:
@@ -161,9 +161,9 @@ get:
     project's configuration.
 
     Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-    omitted: read one release with `getReleaseById` (`GET /releases/{release_id}`) to get its pointers.
+    omitted: read one release with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
 
-    The `id` of an entry is the release ID that `getReleaseById`,
+    The `id` of an entry is the release ID that `getRelease`,
     `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
 
     `content_hash` looks a release up by its content, as the CLI does when a

@@ -1,5 +1,5 @@
 get:
-  operationId: getSchemaById
+  operationId: getSchema
   x-zitadel-cli: schemas get
   summary: Get a schema by ID
   description: |
@@ -31,4 +31,4 @@ get:
           schema:
             $ref: ../schema.yaml
     default:
-      $ref: getSchemaById-error-response.yaml
+      $ref: getSchema-error-response.yaml

@@ -28,7 +28,7 @@
     },
     "user_schema": {
       "type": "string",
-      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
+      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `publishSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
       "examples": [
         "human-user"
       ]

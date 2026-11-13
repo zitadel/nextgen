@@ -25,7 +25,7 @@ export default defineConfig({
       mock: true,
       // A path parameter is any string the API accepts, and schema ids are
       // routinely `$id` URIs (`https://…/default-human-user.json`). Without
-      // this, orval interpolates them raw and `/schemas/{id}` collapses the
+      // this, orval interpolates them raw and `/schemas/{schema_id}` collapses the
       // `//` on a redirect and 404s. orval only encodes the parameters —
       // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
       urlEncodeParameters: true,

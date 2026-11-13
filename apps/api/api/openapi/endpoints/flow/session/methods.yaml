@@ -7,7 +7,7 @@ get:
 
     The flow endpoints are the runtime calls the login component
     (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
-    `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
+    `submitFlowStep` (`POST /flow/{flow_id}/submit`) advances it.
 
     For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
     creates its user on submit, or one carrying a passkey registration that

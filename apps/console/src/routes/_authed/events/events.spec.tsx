@@ -61,10 +61,10 @@ function request(id: string, payload: Record<string, unknown> = {}) {
     entity_type: null,
     entity_id: null,
     payload: {
-      operation_id: "deleteUserByID",
+      operation_id: "deleteUser",
       method: "DELETE",
       // The server records the operation as the route, never the raw path.
-      route_template: "deleteUserByID",
+      route_template: "deleteUser",
       status: 204,
       duration_ms: 12,
       ...payload,
@@ -135,7 +135,7 @@ function serveFlowEvents(data: unknown[], more = false) {
   return queries;
 }
 
-/** `GET /events/{id}`, answering with one of `events` by its id. */
+/** `GET /events/{event_id}`, answering with one of `events` by its id. */
 function serveEvent(...events: ReturnType<typeof event>[]) {
   server.use(
     http.get(`${EVENTS_URL}/:id`, ({ params }) => {
@@ -291,7 +291,7 @@ describe("events", () => {
       "href",
       scopedPath("/events/evt_2?view=all"),
     );
-    expect(first.getByText("DELETE deleteUserByID")).toBeInTheDocument();
+    expect(first.getByText("DELETE deleteUser")).toBeInTheDocument();
     expect(first.getByText("204")).toBeInTheDocument();
     expect(first.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
 

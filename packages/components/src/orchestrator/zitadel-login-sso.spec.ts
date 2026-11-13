@@ -347,7 +347,7 @@ describe("<zitadel-login> with identity providers", () => {
    * The whole round trip against the mock, the way the engine runs it: the
    * provider button assigns `redirect_url`, the provider sends the browser to
    * the callback route, the callback answers `303` to the `return_target` the
-   * submission carried, and the fresh page load resumes with `GET /flow/{id}`.
+   * submission carried, and the fresh page load resumes with `GET /flow/{flow_id}`.
    * Only the provider itself is missing, so the test makes its redirect.
    */
   describe("the provider round trip", () => {

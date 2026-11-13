@@ -115,25 +115,25 @@ describe("Variable.inventory", () => {
 
 describe("VariableService.inventory", () => {
   it("reads every kind at once, so a preview-only name is listed too", async () => {
-    const getVariables = vi.fn(async () => ({
+    const listVariables = vi.fn(async () => ({
       API_URL: { primary: "https://acme.com", preview: "https://preview.acme.com" },
       PREVIEW_ONLY: { preview: "x" },
     }));
 
-    const variables = await service({ getVariables }).inventory();
+    const variables = await service({ listVariables }).inventory();
 
-    expect(getVariables).toHaveBeenCalledWith({ project_id: "proj_1" });
+    expect(listVariables).toHaveBeenCalledWith({ project_id: "proj_1" });
     expect(variables.map((variable) => variable.name)).toEqual(["API_URL", "PREVIEW_ONLY"]);
   });
 });
 
 describe("VariableService.previews", () => {
   it("reads the preview kind alone, and never merges the primary values in", async () => {
-    const getVariables = vi.fn(async () => ({ API_URL: { preview: "https://preview.acme.com" } }));
+    const listVariables = vi.fn(async () => ({ API_URL: { preview: "https://preview.acme.com" } }));
 
-    const variables = await service({ getVariables }).previews();
+    const variables = await service({ listVariables }).previews();
 
-    expect(getVariables).toHaveBeenCalledWith({ project_id: "proj_1", kind: "preview" });
+    expect(listVariables).toHaveBeenCalledWith({ project_id: "proj_1", kind: "preview" });
     expect(variables.map((variable) => variable.value)).toEqual(["https://preview.acme.com"]);
   });
 });
@@ -165,7 +165,7 @@ describe("VariableService.get", () => {
 describe("VariableService.heldByName", () => {
   it("says of each name whether it is a secret", async () => {
     const held = await service({
-      getVariables: async () => ({
+      listVariables: async () => ({
         TOKEN: { primary: SECRET },
         API_URL: { primary: "https://acme.com" },
       }),
@@ -180,7 +180,7 @@ describe("VariableService.heldByName", () => {
   it("raises a token's refusal to read the values of that kind", async () => {
     await expect(
       service({
-        getVariables: async () => {
+        listVariables: async () => {
           throw new ForbiddenError("Forbidden", { status: 403 });
         },
       }).heldByName("primary"),
@@ -211,15 +211,15 @@ describe("VariableService.set", () => {
   function setPreviewOver(primary: () => Promise<GetVariable200>) {
     return service({
       getVariable: primary,
-      getVariables: async () => ({}),
-      updateVariables: async () => ({ API_KEY: { preview: "x" } }),
+      listVariables: async () => ({}),
+      setVariables: async () => ({ API_KEY: { preview: "x" } }),
     }).set("API_KEY", "x", VariableWrite.of({ secret: false, preview: true }));
   }
 
   it("reads back the kinds the write did not answer together, not one after the other", async () => {
     const answer = [promise(), promise()];
     const inFlight = { now: 0, most: 0 };
-    const getVariables = vi.fn(async () => {
+    const listVariables = vi.fn(async () => {
       inFlight.now += 1;
       inFlight.most = Math.max(inFlight.most, inFlight.now);
       await answer[inFlight.now - 1]?.settled;
@@ -228,45 +228,45 @@ describe("VariableService.set", () => {
     });
 
     const written = service({
-      getVariables,
-      updateVariables: async () => ({}),
+      listVariables,
+      setVariables: async () => ({}),
     }).set("API_KEY", "x", VariableWrite.of({ secret: false, preview: false }));
     for (const one of answer) {
       one.settle();
     }
     await written;
 
-    expect(getVariables).toHaveBeenCalledTimes(2);
+    expect(listVariables).toHaveBeenCalledTimes(2);
     // Asked in turn, the second read would not have started until the first
     // had answered, so only one would ever have been in flight.
     expect(inFlight.most).toBe(2);
   });
 
   it("writes the value and the secret flag the write carries", async () => {
-    const updateVariables = vi.fn(async () => ({ API_KEY: { primary: SECRET } }));
+    const setVariables = vi.fn(async () => ({ API_KEY: { primary: SECRET } }));
 
-    await service({ updateVariables, getVariables: async () => ({}) }).set(
+    await service({ setVariables, listVariables: async () => ({}) }).set(
       "API_KEY",
       "s3cret",
       VariableWrite.of({ secret: true, preview: false }),
     );
 
-    expect(updateVariables).toHaveBeenCalledWith(
+    expect(setVariables).toHaveBeenCalledWith(
       { API_KEY: { value: "s3cret", secret: true } },
       { project_id: "proj_1" },
     );
   });
 
   it("scopes a preview write to the preview kind alone", async () => {
-    const updateVariables = vi.fn(async () => ({ API_KEY: { preview: "x" } }));
+    const setVariables = vi.fn(async () => ({ API_KEY: { preview: "x" } }));
 
     await service({
-      updateVariables,
+      setVariables,
       getVariable: async () => ({ primary: "x" }),
-      getVariables: async () => ({}),
+      listVariables: async () => ({}),
     }).set("API_KEY", "x", VariableWrite.of({ secret: false, preview: true }));
 
-    expect(updateVariables).toHaveBeenCalledWith(expect.anything(), {
+    expect(setVariables).toHaveBeenCalledWith(expect.anything(), {
       project_id: "proj_1",
       kind: "preview",
     });
@@ -274,8 +274,8 @@ describe("VariableService.set", () => {
 
   it("answers what the name holds in each kind afterwards", async () => {
     const written = await service({
-      updateVariables: async () => ({ API_KEY: { primary: "new" } }),
-      getVariables: async () => ({ API_KEY: { preview: "old-preview" } }),
+      setVariables: async () => ({ API_KEY: { primary: "new" } }),
+      listVariables: async () => ({ API_KEY: { preview: "old-preview" } }),
     }).set("API_KEY", "new", VariableWrite.of({ secret: false, preview: false }));
 
     expect(written).toMatchObject({
@@ -295,8 +295,8 @@ describe("VariableService.set", () => {
 
     const written = await service({
       // The write names the primary kind, so only the preview kind is read back.
-      updateVariables: async () => ({ API_KEY: { primary: "new" } }),
-      getVariables: async () => {
+      setVariables: async () => ({ API_KEY: { primary: "new" } }),
+      listVariables: async () => {
         throw refused;
       },
     }).set("API_KEY", "new", VariableWrite.of({ secret: true, preview: false }));
@@ -316,8 +316,8 @@ describe("VariableService.set", () => {
 
   it("holds nothing against a kind it read back as empty", async () => {
     const written = await service({
-      updateVariables: async () => ({ API_KEY: { primary: "new" } }),
-      getVariables: async () => ({}),
+      setVariables: async () => ({ API_KEY: { primary: "new" } }),
+      listVariables: async () => ({}),
     }).set("API_KEY", "new", VariableWrite.of({ secret: true, preview: false }));
 
     // Read and found empty is not the same as never read: nothing is unverified.

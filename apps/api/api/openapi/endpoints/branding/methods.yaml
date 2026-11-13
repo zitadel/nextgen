@@ -1,5 +1,5 @@
 post:
-  operationId: createBranding
+  operationId: publishBranding
   summary: Publish a branding revision
   description: |
     Publishes a new immutable branding revision for the project, and records a
@@ -41,7 +41,7 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      $ref: createBranding-error-response.yaml
+      $ref: publishBranding-error-response.yaml
 
 get:
   operationId: listBranding
@@ -54,7 +54,7 @@ get:
     Lists a project's branding revisions, newest first, capped at the 100 most
     recent and not paginated. The first entry is the newest revision.
 
-    The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
+    The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
     that a release pins for `kind: branding`.
   tags:
     - Branding

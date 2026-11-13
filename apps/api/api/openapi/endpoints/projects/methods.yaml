@@ -6,7 +6,7 @@ post:
     other endpoint returns.
 
     A project is the top-level boundary that holds users, sessions and
-    configuration. It has no owning team until someone claims it; see `initClaim` (`POST /projects/{project_id}/claim/init`).
+    configuration. It has no owning team until someone claims it; see `createProjectClaim` (`POST /projects/{project_id}/claim/init`).
 
     The request needs no credential and is rate-limited. On `429`, wait and retry.
     Unless `seed_defaults` is `false`, the project starts with a default user schema

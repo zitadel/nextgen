@@ -279,7 +279,7 @@ DESCRIPTION
 EXAMPLES
   $ zitadel api queryUsers -F limit=5
 
-  $ zitadel api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+  $ zitadel api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
 
   $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
 

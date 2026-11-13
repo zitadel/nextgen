@@ -3,8 +3,8 @@ in: cookie
 required: true
 description: |
   Encrypted flow state cookie set by `POST /flow` or the previous
-  `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-  flow; the `{id}` path parameter must name that flow, any other id is
+  `POST /flow/{flow_id}/submit`. The cookie holds the sealed state of one
+  flow; the `{flow_id}` path parameter must name that flow, any other id is
   refused.
 
   Browsers send this automatically; non-browser clients must capture the

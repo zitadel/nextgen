@@ -726,6 +726,14 @@ anything, naming what stops the commit.
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
 
+`setup` appends to `.gitignore` only what it needs, judged by what the lines
+already there do, so every file that holds a secret is ignored and
+`.env.example` stays committable after a generator's own `.env.*` and
+`!.env.example`. `doctor` fails (`gitignore`) when a file that holds a secret
+is not ignored, and warns when `.env.example` is, as an older setup left
+SvelteKit, Nuxt and SolidStart apps; `doctor --fix` appends `!.env.example`
+while the file names variables without values.
+
 In an app that already exists, `setup` adds the sign-in, sign-up and profile
 pages and the protection for the pages it guards, and leaves the app's own
 pages as they are. Read the app's pages afterwards and add what the developer

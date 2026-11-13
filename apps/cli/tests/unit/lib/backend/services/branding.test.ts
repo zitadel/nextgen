@@ -27,11 +27,11 @@ describe("BrandingService.list", () => {
 
 describe("BrandingService.get", () => {
   it("reads one revision by its own id, which names the project already", async () => {
-    const getBrandingById = vi.fn(async () => ({ id: "brand_1" }));
-    const brandingService = new BrandingService(fakeClient({ getBrandingById }), "proj_1");
+    const getBranding = vi.fn(async () => ({ id: "brand_1" }));
+    const brandingService = new BrandingService(fakeClient({ getBranding }), "proj_1");
 
     await brandingService.get("brand_1");
 
-    expect(getBrandingById).toHaveBeenCalledWith("brand_1");
+    expect(getBranding).toHaveBeenCalledWith("brand_1");
   });
 });

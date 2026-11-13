@@ -8,7 +8,7 @@ post:
     The project is the one named by the `project_id` query parameter. Name the
     principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
     `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-    `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not
+    `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant` (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not
     created here: a claim, which attaches a project to a team, creates them.
 
     An unrevoked grant with the same principal and relation holds that binding

@@ -10,7 +10,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import {
-  type GetReleaseById200,
+  type GetRelease200,
   ListEventsCategoryItem,
   ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
@@ -24,31 +24,31 @@ import {
 } from "@/lib/backend/model";
 import {
   CreateGrantBody,
-  CreateIdpBody,
+  PublishIdpBody,
   CreateTeamBody,
   CreateUserBody,
-  GetBrandingByIdResponse,
+  GetBrandingResponse,
   GetFlowDefinitionResponse,
   GetGrantResponse,
-  GetIdpByIdResponse,
+  GetIdpResponse,
   GetPolicyResponse,
   GetProjectResponse,
-  GetReleaseByIdParams,
-  GetReleaseByIdResponse,
-  GetSchemaByIdResponse,
+  GetReleaseParams,
+  GetReleaseResponse,
+  GetSchemaResponse,
   GetSessionParams,
   GetSessionResponse,
   GetTeamResponse,
-  GetUserByIDParams,
-  GetUserByIDResponse,
+  GetUserParams,
+  GetUserResponse,
   ListBrandingResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListPoliciesResponse,
   ListReleasesResponse,
   ListSchemasResponse,
-  PatchProjectBody,
-  PatchUserByIDBody,
+  UpdateProjectBody,
+  UpdateUserBody,
   PublishPolicyBody,
   QueryGrantsBody,
   QueryGrantsResponse,
@@ -85,7 +85,7 @@ import { CommandGroups } from "@/lib/oclif/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
-const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
+const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -349,7 +349,7 @@ const OPERATIONS: readonly Operation[] = [
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = async (
-  release: Pick<GetReleaseById200, "pointers">,
+  release: Pick<GetRelease200, "pointers">,
   tabulate: Tabulate,
 ): Promise<string> => {
   const { pointers } = release;
@@ -378,7 +378,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
-    idSchema: GetUserByIDParams.shape.user_id,
+    idSchema: GetUserParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
     // schema); the schema URL it replaced is identical on every row.
@@ -441,9 +441,9 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client }, id) => {
-        return client.getUserByID(id);
+        return client.getUser(id);
       },
-      response: GetUserByIDResponse,
+      response: GetUserResponse,
     }),
     create: create(CreateUserBody, ({ client, projectId }, body) => {
       return client.createUser(body, { project_id: projectId });
@@ -452,13 +452,13 @@ export const RESOURCES = {
     update: update(
       USER_UPDATE_BODY,
       ({ client }, id, body) => {
-        return client.patchUserByID(id, body);
+        return client.updateUser(id, body);
       },
       {
         // A server from before dry_run refuses the field rather than applying
         // the patch, so a dry run needs no check of the server first.
         check: ({ client }, id, body) => {
-          return client.patchUserByID(id, {
+          return client.updateUser(id, {
             ...body,
             dry_run: true,
           });
@@ -467,7 +467,7 @@ export const RESOURCES = {
     ),
     delete: {
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteUserByID(id);
+        return consent.unlock(client).deleteUser(id);
       },
     },
   }),
@@ -521,7 +521,7 @@ export const RESOURCES = {
     delete: {
       verb: "deactivate",
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteTeam(id);
+        return consent.unlock(client).deactivateTeam(id);
       },
     },
   }),
@@ -780,18 +780,18 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getIdpById(id, { project_id: projectId });
+        return client.getIdp(id, { project_id: projectId });
       },
-      response: GetIdpByIdResponse,
+      response: GetIdpResponse,
     }),
     // The body nests the connection under `idp`. Rooted there, the flags and
     // `--set` paths address the connection itself (`--oidc-issuer`), and
     // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
     // that already exists is revised rather than duplicated.
     create: create(
-      CreateIdpBody,
+      PublishIdpBody,
       ({ client, projectId }, body) => {
-        return client.createIdp(body, { project_id: projectId });
+        return client.publishIdp(body, { project_id: projectId });
       },
       {
         root: "idp",
@@ -832,8 +832,8 @@ export const RESOURCES = {
       },
       response: GetProjectResponse,
     }),
-    update: update(PatchProjectBody, ({ client }, id, body) => {
-      return client.patchProject(id, body);
+    update: update(UpdateProjectBody, ({ client }, id, body) => {
+      return client.updateProject(id, body);
     }),
   }),
 
@@ -886,7 +886,7 @@ export const RESOURCES = {
       },
     }),
     get: get({
-      response: GetSchemaByIdResponse,
+      response: GetSchemaResponse,
       call: ({ client, projectId }, reference) => {
         const schemaService = new SchemaService(client, projectId);
         return schemaService.get(reference);
@@ -898,7 +898,7 @@ export const RESOURCES = {
     group: CommandGroups.configuration,
     singular: "release",
     plural: "releases",
-    idSchema: GetReleaseByIdParams.shape.release_id,
+    idSchema: GetReleaseParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
@@ -924,9 +924,9 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getReleaseById(id, { project_id: projectId });
+        return client.getRelease(id, { project_id: projectId });
       },
-      response: GetReleaseByIdResponse,
+      response: GetReleaseResponse,
       sections: async (release, tabulate) => {
         return [await releasePointers(release, tabulate)];
       },
@@ -1011,7 +1011,7 @@ export const RESOURCES = {
         const brandingService = new BrandingService(client, projectId);
         return brandingService.get(id);
       },
-      response: GetBrandingByIdResponse,
+      response: GetBrandingResponse,
     }),
   }),
 

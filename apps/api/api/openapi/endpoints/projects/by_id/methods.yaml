@@ -46,7 +46,7 @@ get:
       $ref: getProject-error-response.yaml
 
 patch:
-  operationId: patchProject
+  operationId: updateProject
   x-zitadel-cli: projects update
   summary: Update a project
   description: |
@@ -102,4 +102,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: patchProject-error-response.yaml
+      $ref: updateProject-error-response.yaml

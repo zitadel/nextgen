@@ -1,3 +1,4 @@
+import { entriesToAppend } from "@/lib/gitignore";
 import {
   type Change,
   Operation,
@@ -5,7 +6,9 @@ import {
 } from "@/lib/orca/patchers/rule/file-writer/operation";
 
 /**
- * Adds the entries `.gitignore` does not hold yet, at the end.
+ * Appends the entries `.gitignore` needs for each rule's path to be ignored
+ * or kept as the rule says, judged by what the file's lines do, not by
+ * whether it holds the entry's text.
  */
 export class AppendGitignoreOp extends Operation<"append-gitignore"> {
   /**
@@ -16,17 +19,10 @@ export class AppendGitignoreOp extends Operation<"append-gitignore"> {
   }
 
   /**
-   * @returns `.gitignore` with the missing entries added, or as it is when it holds them all.
+   * @returns `.gitignore` with the missing entries added, or as it is when every rule holds.
    */
   protected change(source: Source): Change {
-    const held = new Set(
-      source.text.split(/\r?\n/g).map((line) => {
-        return line.trim();
-      }),
-    );
-    const missing = this.op.entries.filter((entry) => {
-      return !held.has(entry);
-    });
+    const missing = entriesToAppend(source.text, this.op.rules);
 
     if (missing.length === 0) {
       return this.file(source, source.text);

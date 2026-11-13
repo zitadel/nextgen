@@ -792,7 +792,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
 
   it("comes back on a reload, which re-renders the step from flow state", async () => {
     // A reload loses `formValues` — the widget keeps collected values in memory
-    // only — so the pairing has to survive on what GET /flow/{id} returns.
+    // only — so the pairing has to survive on what GET /flow/{flow_id} returns.
     setup([pairedPasswordStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";

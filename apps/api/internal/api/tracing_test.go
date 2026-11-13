@@ -34,7 +34,7 @@ func TestOgenTracerProvider_RecordError(t *testing.T) {
 			exporter := tracetest.NewInMemoryExporter()
 			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter)))
 
-			_, span := provider.Tracer("ogen").Start(t.Context(), "PatchUserByID")
+			_, span := provider.Tracer("ogen").Start(t.Context(), "UpdateUser")
 			span.RecordError(tt.err)
 			span.End()
 
@@ -58,7 +58,7 @@ func TestOgenTracerProvider_usesTheRequestsServerSpan(t *testing.T) {
 
 	handler := middleware.WithServerSpan(sdk)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		request := trace.SpanContextFromContext(r.Context())
-		ctx, span := ogen.Start(r.Context(), "PatchUserByID",
+		ctx, span := ogen.Start(r.Context(), "UpdateUser",
 			trace.WithSpanKind(trace.SpanKindServer),
 			trace.WithAttributes(attribute.String("http.route", "/users/{user_id}")),
 		)
@@ -75,7 +75,7 @@ func TestOgenTracerProvider_usesTheRequestsServerSpan(t *testing.T) {
 
 	spans := exporter.GetSpans()
 	require.Len(t, spans, 1)
-	assert.Equal(t, "PatchUserByID", spans[0].Name)
+	assert.Equal(t, "UpdateUser", spans[0].Name)
 	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
 	assert.Empty(t, spans[0].Events, "the message would carry user values")
 	assert.Equal(t, sdktrace.Status{}, spans[0].Status, "a 4xx leaves the status unset")
@@ -115,7 +115,7 @@ func TestOgenTracerProvider_unsampledRequest(t *testing.T) {
 	ogen := NewOgenTracerProvider(sdk).Tracer("ogen")
 
 	handler := middleware.WithServerSpan(sdk)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		_, span := ogen.Start(r.Context(), "PatchUserByID", trace.WithSpanKind(trace.SpanKindServer))
+		_, span := ogen.Start(r.Context(), "UpdateUser", trace.WithSpanKind(trace.SpanKindServer))
 		assert.False(t, span.IsRecording())
 		assert.Equal(t, trace.SpanContextFromContext(r.Context()), span.SpanContext(), "no second span")
 		span.End()
@@ -145,7 +145,7 @@ func TestOgenTracerProvider_SetStatus(t *testing.T) {
 			exporter := tracetest.NewInMemoryExporter()
 			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter)))
 
-			_, span := provider.Tracer("ogen").Start(t.Context(), "PatchUserByID", trace.WithSpanKind(trace.SpanKindServer))
+			_, span := provider.Tracer("ogen").Start(t.Context(), "UpdateUser", trace.WithSpanKind(trace.SpanKindServer))
 			span.SetStatus(tt.code, tt.description)
 			span.End()
 

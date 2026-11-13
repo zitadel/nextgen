@@ -40,7 +40,7 @@ back action by kind, never by name:
 When submitted:
 
 ```
-POST /flow/{id}/submit { session_token, action: "back" }
+POST /flow/{flow_id}/submit { session_token, action: "back" }
 ```
 
 The engine pops the previous step from the runtime `history` array stored
@@ -220,7 +220,7 @@ broken and increase abandonment rates.
 
 ## Alternatives Considered
 
-### 1. Dedicated `POST /flow/{id}/back` endpoint
+### 1. Dedicated `POST /flow/{flow_id}/back` endpoint
 
 A separate API endpoint for back-navigation.
 

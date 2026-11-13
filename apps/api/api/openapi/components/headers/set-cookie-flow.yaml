@@ -8,7 +8,7 @@ description: |
   The first element is always `_zflow`, the encrypted flow state: HttpOnly,
   Secure, SameSite=Strict, Path=/. Starting a flow and every submit
   response that returns a step rotate it, including validation failures; a
-  submission refused with an error sets no cookie. `GET /flow/{id}`
+  submission refused with an error sets no cookie. `GET /flow/{flow_id}`
   sets it only when the render resolved a parked SSO identity. The
   `sso-redirect` response appends the browser-binding cookie the callback
   checks.

@@ -166,8 +166,8 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionCsrfTokenOperation: true,
 	api.RevokeMySessionOperation:       true,
 	api.GetMyUserOperation:             true,
-	api.PatchMyUserOperation:           true,
-	api.CompleteClaimOperation:         true,
+	api.UpdateMyUserOperation:          true,
+	api.CompleteProjectClaimOperation:  true,
 	api.ListMyProjectsOperation:        true,
 	api.GetMyUserSchemaOperation:       true,
 	api.ListMyTeamsOperation:           true,
@@ -196,45 +196,45 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyIdentityLinksOperation: true,
 	api.GetMyPasswordStateOperation:  true,
 	api.GetProjectOperation:          true,
-	api.PatchProjectOperation:        true,
+	api.UpdateProjectOperation:       true,
 	api.ListProjectAdminsOperation:   true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
-	api.GetUserByIDOperation:           true,
-	api.PatchUserByIDOperation:         true,
+	api.GetUserOperation:               true,
+	api.UpdateUserOperation:            true,
 	api.ListUserTeamsOperation:         true,
 	api.ListUserPasskeysOperation:      true,
 	api.GetUserPasswordStateOperation:  true,
 	api.ListUserIdentityLinksOperation: true,
-	api.DeleteUserByIDOperation:        true,
+	api.DeleteUserOperation:            true,
 	api.CreateTeamOperation:            true,
 	api.UpdateTeamOperation:            true,
 	api.ListSchemasOperation:           true,
-	api.GetSchemaByIdOperation:         true,
+	api.GetSchemaOperation:             true,
 	api.ListFlowDefinitionsOperation:   true,
 	api.GetFlowDefinitionOperation:     true,
 	api.ListBrandingOperation:          true,
-	api.GetBrandingByIdOperation:       true,
-	api.GetOAuthSettingsByIdOperation:  true,
+	api.GetBrandingOperation:           true,
+	api.GetOAuthSettingsOperation:      true,
 	api.QueryIdpsOperation:             true,
-	api.GetIdpByIdOperation:            true,
-	api.GetIdpRevisionByIdOperation:    true,
+	api.GetIdpOperation:                true,
+	api.GetIdpRevisionOperation:        true,
 	// The Releases screens read a project's releases and where each went,
 	// deploy one, roll a deployment back and revoke a release.
 	api.ListReleasesOperation:       true,
-	api.GetReleaseByIdOperation:     true,
+	api.GetReleaseOperation:         true,
 	api.ListDeploymentsOperation:    true,
-	api.GetDeploymentByIdOperation:  true,
+	api.GetDeploymentOperation:      true,
 	api.CreateDeploymentOperation:   true,
 	api.RollbackDeploymentOperation: true,
 	api.RevokeReleaseOperation:      true,
 	// The Project settings page adds and removes origins and reads variables
 	// (#2320). Variable writes stay with the project secret.
-	api.AddOriginOperation:    true,
-	api.RemoveOriginOperation: true,
-	api.GetVariablesOperation: true,
-	api.GetVariableOperation:  true,
+	api.AddProjectOriginOperation:    true,
+	api.RemoveProjectOriginOperation: true,
+	api.ListVariablesOperation:       true,
+	api.GetVariableOperation:         true,
 	// The Project settings page shows the password policy and the release
 	// detail a pinned policy revision. Publishing stays with the project
 	// secret.
@@ -256,8 +256,8 @@ const sessionUnauthorizedMessage = "Missing or invalid session token."
 // (ADR 046 §3). An operation missing here gets an empty hash and the claim
 // service answers 403, so a new claim leg must be added to this map.
 var secretHashOperations = map[api.OperationName]bool{
-	api.InitClaimOperation:      true,
-	api.GetClaimStatusOperation: true,
+	api.CreateProjectClaimOperation:    true,
+	api.GetProjectClaimStatusOperation: true,
 }
 
 type sessionTokenKey struct{}

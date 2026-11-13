@@ -44,7 +44,7 @@ post:
       the request.
     - `400 dep.variables_missing`: a variable the release references has no
       value for the kind. `details` names the kind and every missing variable.
-      Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
+      Set each one for that kind with `setVariables` (`PATCH /variables`), then deploy again.
     - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
       of the project, or is a loopback URL. Use a URL that matches a pattern.
     - `404 rel.not_found`: the release ID or digest names no release in this
@@ -286,8 +286,8 @@ get:
     serves. Combined with `origin`, it is the one deployment that origin
     serves, or empty, as it is for an origin the project no longer lists.
 
-    The `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),
-    `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
+    The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
+    `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
 
     `expand: ["release"]` embeds the release each deployment made live. It
     requires `release.read` and does not change the ordering or the page

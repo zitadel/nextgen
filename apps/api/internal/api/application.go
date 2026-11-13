@@ -8,9 +8,9 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// CreateApplication ignores params.IdempotencyKey: rotating the secrets of the
+// PublishApplication ignores params.IdempotencyKey: rotating the secrets of the
 // clients a keyed request created comes in its own change.
-func (h *Handler) CreateApplication(ctx context.Context, req *api.CreateApplicationRequest, params api.CreateApplicationParams) (api.CreateApplicationRes, error) {
+func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplicationRequest, params api.PublishApplicationParams) (api.PublishApplicationRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), applicationAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -38,17 +38,17 @@ func (h *Handler) CreateApplication(ctx context.Context, req *api.CreateApplicat
 		resp.ClientSecrets = append(resp.ClientSecrets, api.ApplicationClientSecret{Client: secret.Slug, ClientID: secret.ClientID, Secret: secret.Secret})
 	}
 	if result.Created {
-		return new(api.CreateApplicationCreated(resp)), nil
+		return new(api.PublishApplicationCreated(resp)), nil
 	}
-	return new(api.CreateApplicationOK(resp)), nil
+	return new(api.PublishApplicationOK(resp)), nil
 }
 
-func (h *Handler) GetApplicationById(ctx context.Context, params api.GetApplicationByIdParams) (api.GetApplicationByIdRes, error) {
-	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, applicationAccess, opRead)
+func (h *Handler) GetApplication(ctx context.Context, params api.GetApplicationParams) (api.GetApplicationRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ApplicationID, applicationAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	entity, err := h.applicationService.Get(ctx, projectID, params.ID)
+	entity, err := h.applicationService.Get(ctx, projectID, params.ApplicationID)
 	if err != nil {
 		return nil, err
 	}

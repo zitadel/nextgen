@@ -19,8 +19,8 @@ properties:
     type: string
     description: |
       The ID of the revision this entry holds, pinned by authentication
-      attempts and releases. `getIdpById` (`GET /idps/{id}`) and `queryIdps` (`POST /idps/query`)
-      return the newest one; `getIdpRevisionById` (`GET /idps/revisions/{revision_id}`)
+      attempts and releases. `getIdp` (`GET /idps/{idp_id}`) and `queryIdps` (`POST /idps/query`)
+      return the newest one; `getIdpRevision` (`GET /idps/revisions/{revision_id}`)
       (`GET /idps/revisions/{revision_id}`) returns the requested revision.
     example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
   slug:

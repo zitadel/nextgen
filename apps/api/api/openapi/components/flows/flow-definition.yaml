@@ -48,7 +48,7 @@ properties:
       The user schema this flow operates on, named by its `objectType`. The
       flow runs against the revision of that schema its release pins, so
       publishing a schema revision needs no change to the flow. A schema ID
-      as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
+      as `publishSchema` (`POST /schemas`) returns it is also accepted and is stored as that
       schema's `objectType`; reading the definition back returns the
       `objectType`. A value naming no schema of the project is refused with
       `flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)

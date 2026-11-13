@@ -25,8 +25,7 @@ function request(options: { kind?: string; name?: string; body?: unknown }): Req
 
 function update(options: { kind?: string; body: unknown }): string {
   return (
-    cliSample(operation("updateVariables", "variable set"), "/variables", {}, request(options)) ??
-    ""
+    cliSample(operation("setVariables", "variable set"), "/variables", {}, request(options)) ?? ""
   );
 }
 
@@ -43,7 +42,8 @@ function remove(kind?: string): string {
 
 function list(kind?: string): string {
   return (
-    cliSample(operation("getVariables", "variable list"), "/variables", {}, request({ kind })) ?? ""
+    cliSample(operation("listVariables", "variable list"), "/variables", {}, request({ kind })) ??
+    ""
   );
 }
 
@@ -73,9 +73,7 @@ test("a preview delete adds --preview", () => {
 });
 
 test("a primary-only update is the api call, which the variable command cannot say", () => {
-  expect(update({ kind: "primary", body: { API_URL: "x" } })).toContain(
-    `${cli} api updateVariables`,
-  );
+  expect(update({ kind: "primary", body: { API_URL: "x" } })).toContain(`${cli} api setVariables`);
 });
 
 test("a primary-only delete is the api call", () => {
@@ -83,11 +81,11 @@ test("a primary-only delete is the api call", () => {
 });
 
 test("a primary-only list is the api call", () => {
-  expect(list("primary")).toContain(`${cli} api getVariables`);
+  expect(list("primary")).toContain(`${cli} api listVariables`);
 });
 
 test("a numeric secret is the api call, which variable set rejects", () => {
   expect(update({ body: { TOKEN: { value: 42, secret: true } } })).toContain(
-    `${cli} api updateVariables`,
+    `${cli} api setVariables`,
   );
 });

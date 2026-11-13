@@ -38,14 +38,14 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	oidcConn.ClientID = "${{ GOOGLE_CLIENT_ID }}"
 	connection.Oidc = api.NewOptIdpConnectionOidc(oidcConn)
 	created := f.create(t, connection)
-	varsResp, err := f.client.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+	varsResp, err := f.client.SetVariables(t.Context(), api.UpdateVariablesRequest{
 		"GOOGLE_CLIENT_ID": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("google-client")),
-	}, api.UpdateVariablesParams{ProjectID: f.projectID()})
+	}, api.SetVariablesParams{ProjectID: f.projectID()})
 	require.NoError(t, err)
 	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
 	// A deployment freezes the variables, so these need one of their own.
 
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: ssoLoginFlowDefinition(apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)),
 	})

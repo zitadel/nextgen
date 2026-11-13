@@ -37,7 +37,7 @@ get:
       $ref: getTeam-error-response.yaml
 
 delete:
-  operationId: deleteTeam
+  operationId: deactivateTeam
   x-zitadel-cli: teams deactivate
   summary: Deactivate a team
   description: |
@@ -91,7 +91,7 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: deleteTeam-error-response.yaml
+      $ref: deactivateTeam-error-response.yaml
 
 patch:
   operationId: updateTeam
