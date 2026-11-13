@@ -3713,8 +3713,9 @@
       "flags": [
         {
           "name": "status",
-          "description": "Only invitations with this status.",
+          "description": "Only invitations with this status; repeat it for several. Without it, every status but accepted.",
           "type": "option",
+          "multiple": true,
           "options": [
             "pending",
             "accepted",
@@ -3777,6 +3778,9 @@
           "command": "invitation list --status pending"
         },
         {
+          "command": "invitation list --status accepted --status pending"
+        },
+        {
           "command": "invitation list --all --json"
         }
       ]
@@ -3814,11 +3818,11 @@
     {
       "id": "invitation cancel",
       "group": "Project administration",
-      "description": "Cancel a pending invitation so its link stops working.",
+      "description": "Cancel a pending invitation so its link stops working, or remove a declined one.",
       "args": [
         {
           "name": "invitation_id",
-          "description": "The invitation to cancel. Omit it to pick one of the pending invitations."
+          "description": "The invitation to cancel. Omit it to pick a pending or declined one."
         }
       ],
       "flags": [

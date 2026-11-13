@@ -69,6 +69,16 @@ describe("invitation cancel", () => {
         expect(await app.invitationIds()).toEqual([]);
       });
 
+      it("removes a declined invitation", async () => {
+        const app = await aSetUpApp();
+        const invitation = await app.invite();
+        platform.declinesInvitation(invitation);
+
+        await app.run(["invitation", "cancel", invitation, "--force", "--json"]);
+
+        expect(await app.invitationIds()).toEqual([]);
+      });
+
       it("refuses an accepted invitation", async () => {
         const app = await aSetUpApp();
         const invitation = await app.invite();

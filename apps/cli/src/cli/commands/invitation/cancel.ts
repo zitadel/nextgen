@@ -16,8 +16,8 @@ const INVITATION_ID: Refused<string> = {
   schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel invitation list --status pending`.",
-    next: [{ id: "invitation:list", flags: { status: "pending" } }],
+    hint: "Find one with `zitadel invitation list --status pending --status rejected`.",
+    next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
     details: {
       argument: "{input}",
     },
@@ -33,31 +33,33 @@ const INVITATION_CANCELLED = "invitation_cancelled";
  */
 const NO_ID_REFUSAL = {
   message: "Name the invitation to cancel",
-  hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
-  next: [{ id: "invitation:list", flags: { status: "pending" } }],
+  hint: "Pass its id; find one with `zitadel invitation list --status pending --status rejected`.",
+  next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
 } as const satisfies Refusal;
 
 /** How a cancel of an invitation that has already finished is refused. */
-const NOT_PENDING_REFUSAL = {
+const NOT_CANCELLABLE_REFUSAL = {
   message: "{id} is {status}, so there is nothing to cancel",
-  hint: "Only a pending invitation can be cancelled.",
-  next: [{ id: "invitation:list", flags: { status: "pending" } }],
+  hint: "Only a pending or declined invitation can be cancelled.",
+  next: [{ id: "invitation:list", flags: { status: ["pending", "rejected"] } }],
 } as const satisfies Refusal;
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
-const NOTHING_PENDING_REFUSAL = {
-  message: "The project has no pending invitations",
-  hint: "Only a pending invitation can be cancelled.",
+const NOTHING_CANCELLABLE_REFUSAL = {
+  message: "The project has no pending or declined invitations",
+  hint: "Only a pending or declined invitation can be cancelled.",
   next: [{ id: "invitation:list" }],
 } as const satisfies Refusal;
 
 /**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
- * so its link can no longer be redeemed. Without an id it offers the pending
+ * so its link can no longer be redeemed, or remove a declined one. Without an
+ * id it offers the pending and declined
  * invitations to pick from.
  */
 export default class InvitationCancel extends Destructive(EnvironmentCommand) {
-  static override description = "Cancel a pending invitation so its link stops working.";
+  static override description =
+    "Cancel a pending invitation so its link stops working, or remove a declined one.";
   static override group = CommandGroups.projectAdministration;
   static override groupOrder = 4;
   static override examples = [
@@ -67,7 +69,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   ];
   static override args = {
     invitation_id: Args.custom<string>({ parse: taken(INVITATION_ID) })({
-      description: "The invitation to cancel. Omit it to pick one of the pending invitations.",
+      description: "The invitation to cancel. Omit it to pick a pending or declined one.",
     }),
   };
   static override flags = {
@@ -82,7 +84,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
     if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
       throw refusalError(NO_ID_REFUSAL, {});
     }
-    const target = args.invitationId ?? (await this.pickPending());
+    const target = args.invitationId ?? (await this.pickCancellable());
     const invitationId = typeof target === "string" ? target : target.id;
 
     return this.emit(
@@ -90,7 +92,9 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
         verb: "cancel",
         name: `cancel ${invitationId}`,
         message: ({ invitation }) => {
-          return `Cancel ${describe(invitation)} so its link stops working?`;
+          return invitation.status === "pending"
+            ? `Cancel ${describe(invitation)} so its link stops working?`
+            : `Cancel ${describe(invitation)} and remove its record?`;
         },
         // A bare cancel picked its invitation, which a retry must name.
         arguments: [invitationId],
@@ -108,7 +112,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
           const connection = await this.connect();
           const invitation =
             typeof target === "string"
-              ? await this.readPending(
+              ? await this.readCancellable(
                   new InvitationService(connection.client, connection.projectId),
                   target,
                 )
@@ -118,11 +122,18 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
-          this.trackEvent(INVITATION_CANCELLED, {
-            role: invitationGrant(invitation),
-            invitation_journey_id: invitation.journey_id,
-          });
-          const title = `Cancelled ${escapeControlCharacters(invitation.id)}; its link no longer works`;
+          // A declined journey already ended with invitation_rejected.
+          if (invitation.status === "pending") {
+            this.trackEvent(INVITATION_CANCELLED, {
+              role: invitationGrant(invitation),
+              invitation_journey_id: invitation.journey_id,
+            });
+          }
+          const id = escapeControlCharacters(invitation.id);
+          const title =
+            invitation.status === "pending"
+              ? `Cancelled ${id}; its link no longer works`
+              : `Cancelled ${id}; its record is removed`;
           return {
             status: "ok",
             data: deletedData({ title, id: invitation.id }),
@@ -137,24 +148,25 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   }
 
   /**
-   * The pending invitation a person picks when the command line named none.
+   * The pending or declined invitation a person picks when the command line
+   * named none.
    * A script is told to name one instead.
    */
-  private async pickPending(): Promise<Invitation> {
+  private async pickCancellable(): Promise<Invitation> {
     const { client, projectId } = await this.connect();
-    const pending = await new InvitationService(client, projectId).pending();
-    if (pending.length === 0) {
-      throw refusalError(NOTHING_PENDING_REFUSAL, {});
+    const cancellable = await new InvitationService(client, projectId).cancellable();
+    if (cancellable.length === 0) {
+      throw refusalError(NOTHING_CANCELLABLE_REFUSAL, {});
     }
     return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
-      retry: this.suggest({ id: "invitation:list", flags: { status: "pending" } }),
-      options: pending.map((invitation) => {
+      retry: this.suggest({ id: "invitation:list", flags: { status: ["pending", "rejected"] } }),
+      options: cancellable.map((invitation) => {
         return {
           value: invitation,
           label: invitation.id,
-          hint: pendingHint(invitation),
+          hint: cancellableHint(invitation),
         };
       }),
     });
@@ -162,16 +174,16 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 
   /**
    * The invitation the command line named, read before anyone is asked, so
-   * the question can name it and one that is no longer pending is refused:
+   * the question can name it and one a cancel cannot delete is refused:
    * the server answers that cancel with the same 404 as a miss.
    */
-  private async readPending(
+  private async readCancellable(
     invitationService: InvitationService,
     invitationId: string,
   ): Promise<Invitation> {
     const invitation = await invitationService.get(invitationId);
-    if (invitation.status !== "pending") {
-      throw refusalError(NOT_PENDING_REFUSAL, {
+    if (invitation.status !== "pending" && invitation.status !== "rejected") {
+      throw refusalError(NOT_CANCELLABLE_REFUSAL, {
         id: invitation.id,
         status: invitation.status,
       });
@@ -189,11 +201,13 @@ function describe(invitation: Invitation): string {
     : `${invitation.id} for ${whom} (${role})`;
 }
 
-/** Who a pending invitation is for and when it expires, beside its id in the picker. */
-function pendingHint(invitation: Invitation): string {
+/** Who an invitation is for and where it stands, beside its id in the picker. */
+function cancellableHint(invitation: Invitation): string {
   const whom = invitation.metadata?.name;
   // The name is whatever an administrator typed; the picker draws hints as given.
   return escapeControlCharacters(
-    `${whom === undefined ? "" : `${whom}, `}expires ${invitation.expires_at}`,
+    `${whom === undefined ? "" : `${whom}, `}${
+      invitation.status === "pending" ? `expires ${invitation.expires_at}` : "declined"
+    }`,
   );
 }

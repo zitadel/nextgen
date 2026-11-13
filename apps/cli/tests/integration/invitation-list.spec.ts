@@ -73,6 +73,38 @@ describe("invitation list", () => {
         expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: pending }], count: 1 });
       });
 
+      it("leaves accepted invitations out without --status", async () => {
+        const app = await aSetUpApp();
+        const accepted = await app.invite();
+        const pending = await app.invite();
+        platform.acceptsInvitation(accepted);
+
+        const result = await app.run([...LIST, "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({ items: [{ id: pending }], count: 1 });
+      });
+
+      it("lists every status --status names when it repeats", async () => {
+        const app = await aSetUpApp();
+        const accepted = await app.invite();
+        const pending = await app.invite();
+        platform.acceptsInvitation(accepted);
+
+        const result = await app.run([
+          ...LIST,
+          "--status",
+          "pending",
+          "--status",
+          "accepted",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          items: [{ id: pending }, { id: accepted }],
+          count: 2,
+        });
+      });
+
       it("narrows to one type with --type", async () => {
         const app = await aSetUpApp();
         await app.invite();

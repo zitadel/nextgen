@@ -491,8 +491,8 @@ type InvitationRecord = {
   createdAt: string;
   expiresAt: string;
   journeyId: string;
-  acceptedBy: string | null;
-  acceptedAt: string | null;
+  respondedBy: string | null;
+  respondedAt: string | null;
   seq: number;
 };
 
@@ -1080,8 +1080,21 @@ export function acceptInvitation(invitationId: string): void {
   if (invitation) {
     invitation.status = "accepted";
     invitation.metadata = null;
-    invitation.acceptedBy = `user_${shortId()}`;
-    invitation.acceptedAt = nowIso();
+    invitation.respondedBy = `user_${shortId()}`;
+    invitation.respondedAt = nowIso();
+  }
+}
+
+/**
+ * Marks an invitation declined, as the invitee's decline would: final, and it
+ * keeps its metadata. The mock serves no reject, so a test arranges it here.
+ */
+export function rejectInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.status = "rejected";
+    invitation.respondedBy = `user_${shortId()}`;
+    invitation.respondedAt = nowIso();
   }
 }
 
@@ -2023,8 +2036,8 @@ function invitationResponse(invitation: InvitationRecord): Record<string, unknow
     created_at: invitation.createdAt,
     expires_at: invitation.expiresAt,
     journey_id: invitation.journeyId,
-    accepted_by: invitation.acceptedBy,
-    accepted_at: invitation.acceptedAt,
+    responded_by: invitation.respondedBy,
+    responded_at: invitation.respondedAt,
   };
 }
 
@@ -3695,8 +3708,8 @@ export function setupPlatformHandlers() {
         createdAt: new Date(now).toISOString(),
         expiresAt: new Date(now + INVITATION_TTL_MS).toISOString(),
         journeyId,
-        acceptedBy: null,
-        acceptedAt: null,
+        respondedBy: null,
+        respondedAt: null,
         seq: ++store.lastSeq,
       };
       store.invitations.set(invitation.id, invitation);
@@ -3712,7 +3725,12 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/invitations", ({ request }) => {
-      const query = parse(ListInvitationsQueryParams, listQueryRecord(request));
+      // `status` repeats, one per status, so every value is read, not the last.
+      const statuses = new URL(request.url).searchParams.getAll("status");
+      const query = parse(ListInvitationsQueryParams, {
+        ...listQueryRecord(request),
+        ...(statuses.length === 0 ? {} : { status: statuses }),
+      });
       if (!query.ok) {
         return query.response;
       }
@@ -3720,7 +3738,9 @@ export function setupPlatformHandlers() {
       // The mock keeps project invitations only, so a `team_member` filter matches none.
       const invitations = [...store.invitations.values()]
         .filter((invitation) => invitation.projectId === projectId)
-        .filter((invitation) => status === undefined || invitationStatus(invitation) === status)
+        .filter(
+          (invitation) => status === undefined || status.includes(invitationStatus(invitation)),
+        )
         .filter(() => type === undefined || type === "project_member")
         .sort((a, b) => b.seq - a.seq);
       const paged = pageOf(invitations, limit, pageToken);
@@ -3767,8 +3787,10 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const invitation = projectInvitation(query.data.project_id, path.data.id);
-      // Only a pending invitation can be cancelled; the server answers any other as not found.
-      if (invitation === undefined || invitationStatus(invitation) !== "pending") {
+      // Only a pending or declined invitation can be cancelled; the server answers
+      // any other as not found.
+      const status = invitation === undefined ? undefined : invitationStatus(invitation);
+      if (invitation === undefined || (status !== "pending" && status !== "rejected")) {
         return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
       }
       store.invitations.delete(invitation.id);

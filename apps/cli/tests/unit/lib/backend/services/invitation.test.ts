@@ -74,14 +74,14 @@ describe("InvitationService.create", () => {
   });
 });
 
-describe("InvitationService.pending", () => {
-  it("lists only the project's pending invitations", async () => {
+describe("InvitationService.cancellable", () => {
+  it("lists only the project's pending and declined invitations", async () => {
     const all = vi.fn(async () => [projectInvitation()]);
     const service = new InvitationService(fakeClient({ listInvitations: { all } }), PROJECT);
 
-    await service.pending();
+    await service.cancellable();
 
-    expect(all).toHaveBeenCalledWith({ project_id: PROJECT, status: "pending" });
+    expect(all).toHaveBeenCalledWith({ project_id: PROJECT, status: ["pending", "rejected"] });
   });
 });
 

@@ -54,6 +54,16 @@ func ErrInvitationSelfAccept() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("self_accept"), "the inviter cannot accept their own invitation", nil, nil)
 }
 
+func ErrInvitationSelfReject() Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("self_reject"), "the inviter cannot decline their own invitation", nil, nil)
+}
+
+// ErrInvitationInviterNotAdmin refuses an accept whose creator no longer
+// administers the project (ADR 086 §10).
+func ErrInvitationInviterNotAdmin() Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("inviter_not_admin"), "the inviter no longer administers the project", nil, nil)
+}
+
 func ErrInvitationPendingLimit() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("pending_limit"), "the project has reached its pending invitation limit", nil, nil)
 }

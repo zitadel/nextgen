@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  rejectInvitation,
   completeClaimChallenge,
   resetPlatformStore,
   setupPlatformHandlers,
@@ -230,6 +231,12 @@ export interface PlatformMock {
    * @param invitationId - The invitation to accept.
    */
   acceptsInvitation(invitationId: string): void;
+  /**
+   * Declines the invitation, as the person it was for following its link would.
+   *
+   * @param invitationId - The invitation to decline.
+   */
+  declinesInvitation(invitationId: string): void;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -270,8 +277,8 @@ function hostileInvitation(id: string, metadata: { name: string } | null): Recor
     created_at: "2026-01-01T00:00:00Z",
     expires_at: "2026-01-04T00:00:00Z",
     journey_id: "journey_1",
-    accepted_by: null,
-    accepted_at: null,
+    responded_by: null,
+    responded_at: null,
   };
 }
 
@@ -706,6 +713,10 @@ export function usePlatformMock(): PlatformMock {
 
     acceptsInvitation(invitationId) {
       acceptInvitation(invitationId);
+    },
+
+    declinesInvitation(invitationId) {
+      rejectInvitation(invitationId);
     },
 
     recovers() {

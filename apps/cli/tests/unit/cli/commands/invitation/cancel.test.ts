@@ -26,12 +26,12 @@ describe("invitation cancel", () => {
     it.each([
       ["a blank", "   "],
       ["a space inside", "inv_has space"],
-    ])("refuses %s, saying where to list pending invitations", async (_, value) => {
+    ])("refuses %s, saying where to list the invitations it can cancel", async (_, value) => {
       await expect(
         parseArg(InvitationCancel.args.invitation_id, value, "invitation_id"),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
-        hint: "Find one with `zitadel invitation list --status pending`.",
+        hint: "Find one with `zitadel invitation list --status pending --status rejected`.",
       });
     });
   });
