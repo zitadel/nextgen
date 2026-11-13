@@ -2213,16 +2213,32 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 
 // resolveTakenUniqueValue looks up the owner of each collected unique value
 // and pins the first one found on the attempt and the state. It reports
-// whether an owner was found.
+// whether a value is taken, which holds even when no owner can be pinned.
 func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, passkeyResolved FlowResolvedFields) (bool, error) {
 	state := pc.state
 	candidates := uniqueFieldValues(state.CollectedData.UserData, passkeyResolved)
 	if visited, err := r.resolveVisitedFields(pc); err == nil {
 		candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 	}
+	taken := false
 	for _, candidate := range candidates {
-		// Only a sign-up looks here, so a free candidate is the sign-up's own
-		// value, not a failed sign-in: Register keeps it from writing one.
+		// The new user has no team, so only the claims it would collide with
+		// count: a value unique within some team is still free here.
+		owner, err := r.ssoIdentities.FindUniqueOwner(pc.ctx, state.ProjectID, state.UserSchemaURL, candidate[0], candidate[1])
+		if errors.Is(err, ErrSSOOwnerOtherSchema) {
+			// Creation would collide, but the flow cannot continue with that
+			// user; a later field may still name one it can.
+			taken = true
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: look up unique value %q: %w", candidate[0], err)
+		}
+		if owner == "" {
+			continue
+		}
+		// Only a sign-up looks here, so a miss is not a failed sign-in:
+		// Register keeps it from writing one.
 		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
@@ -2238,10 +2254,11 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, passke
 		if !errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 			return false, fmt.Errorf("flow state machine: resolve conflicting user: %w", err)
 		}
-		// Rejected means this field's value is not the taken one (or the
-		// owner vanished again); try the next candidate.
+		// The owner holds the value, but the sign-in lookup cannot single it
+		// out (another team holds it too, or the owner vanished): still taken.
+		taken = true
 	}
-	return false, nil
+	return taken, nil
 }
 
 func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput, actionKind FlowActionKind) bool {
