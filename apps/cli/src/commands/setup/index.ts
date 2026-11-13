@@ -89,7 +89,14 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { filled, type ParseRefusal, type Refused, reads, whole } from "@/lib/oclif/flags";
+import {
+  type Declaration,
+  filled,
+  type ParseRefusal,
+  type Refused,
+  reads,
+  whole,
+} from "@/lib/oclif/flags";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
@@ -897,14 +904,26 @@ function made<T>(parse: (value: string) => Parsed<T>) {
 
 /**
  * The `parse` of a flag that refuses an empty value as any flag does, and
- * everything else as `refused` words it.
+ * everything else as `refused` words it. It takes the declaration as
+ * {@link reads} does, so the wording is checked where the flag is declared.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
+ * @param refused - What a value that is not empty is refused for.
+ * @param empty - What an empty value is refused with.
+ * @returns The `parse`.
  */
-function readsFilled<T>(refused: Refused<T>, empty: ParseRefusal = EMPTY_SETTING) {
+function readsFilled<T, const R extends ParseRefusal, const Declared extends Refused<T>>(
+  refused: Declaration<T, R, Declared>,
+  empty: ParseRefusal = EMPTY_SETTING,
+) {
   const blank = reads({
     schema: filled,
     refusal: empty,
   });
-  const value = reads(refused);
+  const declared: Refused<T> = refused;
+  const value = reads(declared);
   return async (given: string, command: unknown, definition: { name: string }): Promise<T> => {
     await blank(given, command, definition);
     return value(given, command, definition);

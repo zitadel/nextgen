@@ -104,7 +104,7 @@ type Known<R, Declared> = {
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
  */
-type Declaration<T, R, Declared> = Declared &
+export type Declaration<T, R, Declared> = Declared &
   Refused<T> & { readonly refusal: R } & Known<R, Declared> &
   Filled<R, Declared>;
 
