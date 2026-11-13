@@ -69,9 +69,11 @@ function schemaVersion(dataDir) {
   if (!existsSync(path)) return 0;
   const db = new DatabaseSync(path, { readOnly: true });
   try {
-    return db
-      .prepare("SELECT MAX(version_id) AS version FROM goose_db_version WHERE is_applied")
-      .get().version;
+    // MAX over no applied rows is NULL.
+    return (
+      db.prepare("SELECT MAX(version_id) AS version FROM goose_db_version WHERE is_applied").get()
+        .version ?? 0
+    );
   } finally {
     db.close();
   }
