@@ -138,7 +138,7 @@ Give the page behind the login a background that suits the active theme, or set 
 
 `<zitadel-session>` and `<zitadel-logout>` do not read your branding, so `theme.mode` does not reach them. In an existing Next.js or Nuxt app, the profile page that setup adds also sets `theme="auto"` on `<zitadel-session>`. Removing it there changes nothing, because the widget default is also `auto`. When setup creates the Next.js or Nuxt app itself, the profile page uses `variant="page"` and sets no `theme`, so it is dark. It stays dark when your branding makes the login light or `auto`. Set `theme="light"`, `theme="dark"` or `theme="auto"` on these two components to match the login. `theme="auto"` matches a branding with `theme.mode: "auto"` and both sides set.
 
-The sign-in, sign-up and profile pages that setup creates this way also wrap the component in a `<main>` element set to dark. When you set another theme on one of these pages, also change that wrapper's `color-scheme`, and in Next.js its `background`. Otherwise the page shows dark first.
+The sign-in, sign-up and profile pages that setup creates this way also wrap the component in a `<main>` element set to dark. When you set another theme on one of these pages, also change that wrapper's `color-scheme`, and in Next.js its `background`. In Nuxt, also change the `<style>` block in `app/app.vue`: the `color-scheme` on `:root`, and the `background` and `color` on `body`. Otherwise the page shows dark first.
 
 ## Put the login in your own page
 
