@@ -1702,6 +1702,42 @@ function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefine
 }
 
 /**
+ * The deployments that serve what a live list asked about, each with every
+ * origin it serves, as the server attaches them.
+ *
+ * @param served - Everything that serves in the project now.
+ * @param asked - The entries the live list asked about, all of them or the
+ * ones for one origin.
+ * @returns One group per matching deployment, newest first.
+ */
+function liveGroups(
+  served: readonly ServedOrigin[],
+  asked: readonly ServedOrigin[],
+): { deployment: DeploymentRecord; targets: DeploymentTargetRow[] }[] {
+  const matched = new Set(
+    asked.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
+  const groups = new Map<
+    string,
+    { deployment: DeploymentRecord; targets: DeploymentTargetRow[] }
+  >();
+  for (const entry of served) {
+    if (!matched.has(entry.deployment.id)) {
+      continue;
+    }
+    const group = groups.get(entry.deployment.id) ?? { deployment: entry.deployment, targets: [] };
+    group.targets.push({ origin: entry.origin, expiresAt: entry.expiresAt });
+    groups.set(entry.deployment.id, group);
+  }
+
+  return [...groups.values()].sort((a, b) => {
+    return b.deployment.seq - a.deployment.seq;
+  });
+}
+
+/**
  * Whether the deployment still serves its release: while some origin of its
  * project is served by it. A later deployment, or its previews expiring or
  * being removed, makes it `inactive`.
@@ -2368,49 +2404,25 @@ export function setupPlatformHandlers() {
       const served = servedOrigins(query.data.project_id);
       let items: Record<string, unknown>[];
       if (live) {
-        // The deployments that serve the origin asked about, or every serving
-        // one; each reports every origin it serves, as the server attaches them.
-        const asked =
-          origin === undefined ? served : servedOn(query.data.project_id, origin, served);
-        const matched = new Set(
-          asked.map((entry) => {
-            return entry.deployment.id;
-          }),
-        );
-        const serving = new Map<
-          string,
-          { deployment: DeploymentRecord; targets: DeploymentTargetRow[] }
-        >();
-        for (const entry of served) {
-          if (!matched.has(entry.deployment.id)) {
-            continue;
-          }
-          const group = serving.get(entry.deployment.id) ?? {
-            deployment: entry.deployment,
-            targets: [],
-          };
-          group.targets.push({ origin: entry.origin, expiresAt: entry.expiresAt });
-          serving.set(entry.deployment.id, group);
+        let asked = served;
+        if (origin !== undefined) {
+          asked = servedOn(query.data.project_id, origin, served);
         }
-        items = [...serving.values()]
-          .sort((a, b) => {
-            return b.deployment.seq - a.deployment.seq;
-          })
-          .map((group) => {
-            return deploymentResponse(group.deployment, group.targets, {
-              release: expandRelease,
-              served,
+        items = liveGroups(served, asked).map((group) => {
+          return deploymentResponse(group.deployment, group.targets, {
+            release: expandRelease,
+            served,
+          });
+        });
+      } else {
+        let named = projectDeployments(query.data.project_id);
+        if (origin !== undefined) {
+          named = named.filter((deployment) => {
+            return deployment.targets.some((target) => {
+              return target.origin === origin;
             });
           });
-      } else {
-        const named = projectDeployments(query.data.project_id).filter((deployment) => {
-          return (
-            origin === undefined ||
-            deployment.targets.some((target) => {
-              return target.origin === origin;
-            })
-          );
-        });
+        }
         items = named.map((deployment) => {
           return deploymentResponse(deployment, deployment.targets, {
             release: expandRelease,

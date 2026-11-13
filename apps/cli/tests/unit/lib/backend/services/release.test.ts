@@ -71,6 +71,20 @@ describe("ReleaseService.revoke", () => {
     const PREVIEW = { origin: "https://x.vercel.app", deployment_id: "dep_2", kind: "preview" };
 
     /**
+     * The answer the server refuses a revoke with when origins serve the release.
+     *
+     * @param origins - The origins the answer names.
+     * @returns The answer's body.
+     */
+    function anInUseAnswer(origins: readonly unknown[]) {
+      return {
+        code: "rel.in_use",
+        message: "release: still served by an origin",
+        details: { origins },
+      };
+    }
+
+    /**
      * A service whose server refuses the revoke.
      *
      * @param body - The answer the server refuses with.
@@ -89,11 +103,7 @@ describe("ReleaseService.revoke", () => {
     }
 
     it("fails with every origin that serves it", async () => {
-      const releaseService = refusedWith({
-        code: "rel.in_use",
-        message: "release: still served by an origin",
-        details: { origins: [PRIMARY, PREVIEW] },
-      });
+      const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
 
       const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
 
@@ -101,12 +111,24 @@ describe("ReleaseService.revoke", () => {
       expect(refusal).toMatchObject({ origins: [PRIMARY, PREVIEW] });
     });
 
+    it("lists the origins that serve it as primary origins", async () => {
+      const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
+
+      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+
+      expect(refusal).toMatchObject({ primaries: [PRIMARY] });
+    });
+
+    it("lists the origins that serve it as previews", async () => {
+      const releaseService = refusedWith(anInUseAnswer([PRIMARY, PREVIEW]));
+
+      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+
+      expect(refusal).toMatchObject({ previews: [PREVIEW] });
+    });
+
     it("fails as a conflict that keeps the server's answer", async () => {
-      const releaseService = refusedWith({
-        code: "rel.in_use",
-        message: "release: still served by an origin",
-        details: { origins: [PRIMARY] },
-      });
+      const releaseService = refusedWith(anInUseAnswer([PRIMARY]));
 
       const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
 
@@ -116,32 +138,11 @@ describe("ReleaseService.revoke", () => {
 
     it.each([
       ["another code", { code: "rel.revoked", message: "revoked" }],
-      ["no origins", { code: "rel.in_use", message: "in use", details: { origins: [] } }],
-      [
-        "an origin of no known kind",
-        {
-          code: "rel.in_use",
-          message: "in use",
-          details: { origins: [{ ...PRIMARY, kind: "other" }] },
-        },
-      ],
-      [
-        "an origin that is empty",
-        {
-          code: "rel.in_use",
-          message: "in use",
-          details: { origins: [{ ...PRIMARY, origin: "" }] },
-        },
-      ],
-      [
-        "a deployment that is empty",
-        {
-          code: "rel.in_use",
-          message: "in use",
-          details: { origins: [{ ...PRIMARY, deployment_id: "" }] },
-        },
-      ],
-      ["no details", { code: "rel.in_use", message: "in use" }],
+      ["no origins", anInUseAnswer([])],
+      ["an origin of no known kind", anInUseAnswer([{ ...PRIMARY, kind: "other" }])],
+      ["an origin that is empty", anInUseAnswer([{ ...PRIMARY, origin: "" }])],
+      ["a deployment that is empty", anInUseAnswer([{ ...PRIMARY, deployment_id: "" }])],
+      ["no details", { code: "rel.in_use", message: "release: still served by an origin" }],
     ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
       const releaseService = refusedWith(body);
 

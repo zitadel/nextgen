@@ -343,14 +343,17 @@ expect.extend({
       suggested.every((command, index) => {
         return command === commands[index];
       });
+    const wanted = commands.join(", ") || "(none)";
+    const found = suggested.join(", ") || "(none)";
     return {
       pass,
-      message: () =>
-        pass
-          ? `expected the suggestions not to be exactly: ${commands.join(", ")}`
-          : `expected the suggestions to be exactly: ${commands.join(", ") || "(none)"}, but next_commands were: ${
-              suggested.join(", ") || "(none)"
-            }`,
+      message: () => {
+        if (pass) {
+          return `expected the suggestions not to be exactly: ${wanted}`;
+        }
+
+        return `expected the suggestions to be exactly: ${wanted}, but next_commands were: ${found}`;
+      },
     };
   },
 

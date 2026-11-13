@@ -9,9 +9,9 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
 import { DEFAULT_SERVER } from "@/lib/server";
-import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = DEFAULT_SERVER;

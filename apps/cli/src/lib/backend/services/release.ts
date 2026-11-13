@@ -1,14 +1,14 @@
-import type {
-  BuildRelease200,
-  BuildRelease201,
-  BuildReleaseBody,
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
-  RevokeRelease409,
-  RevokeRelease409DetailsOriginsItem,
+import {
+  type BuildRelease200,
+  type BuildRelease201,
+  type BuildReleaseBody,
+  type GetReleaseById200,
+  type GetReleaseById200PointersItem,
+  type GetReleaseById200PointersItemKind,
+  type RevokeRelease409,
+  type RevokeRelease409DetailsOriginsItem,
+  RevokeRelease409DetailsOriginsItemKind,
 } from "@zitadel/api/generated/model";
-import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
@@ -53,6 +53,30 @@ export class ReleaseInUseError extends ConflictError {
   ) {
     super(message, options);
     this.origins = origins;
+  }
+
+  /**
+   * The origins that serve the release as primary origins, which a different
+   * release put live on them frees.
+   *
+   * @returns Those of {@link ReleaseInUseError.origins} that are primary origins.
+   */
+  get primaries(): readonly ServingOrigin[] {
+    return this.origins.filter((origin) => {
+      return origin.kind === RevokeRelease409DetailsOriginsItemKind.primary;
+    });
+  }
+
+  /**
+   * The origins that serve the release as previews, which removing the preview
+   * frees.
+   *
+   * @returns Those of {@link ReleaseInUseError.origins} that are previews.
+   */
+  get previews(): readonly ServingOrigin[] {
+    return this.origins.filter((origin) => {
+      return origin.kind === RevokeRelease409DetailsOriginsItemKind.preview;
+    });
   }
 }
 
@@ -178,19 +202,20 @@ export class ReleaseService extends ApiService {
         project_id: this.projectId,
       });
     } catch (error) {
-      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
-        const served = InUseBody.safeParse(error.body);
-        if (served.success) {
-          throw new ReleaseInUseError(error.message, served.data.details.origins, {
-            status: error.status,
-            url: error.url,
-            body: error.body,
-            requestId: error.requestId,
-            cause: error,
-          });
-        }
+      if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
+        throw error;
       }
-      throw error;
+      const served = InUseBody.safeParse(error.body);
+      if (!served.success) {
+        throw error;
+      }
+      throw new ReleaseInUseError(error.message, served.data.details.origins, {
+        status: error.status,
+        url: error.url,
+        body: error.body,
+        requestId: error.requestId,
+        cause: error,
+      });
     }
   }
 }
