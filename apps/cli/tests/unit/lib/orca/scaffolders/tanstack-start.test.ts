@@ -65,9 +65,7 @@ describe("TanStackStartScaffolder", () => {
     refused: [],
   });
 
-  // `vite build` in the template writes src/routeTree.gen.ts with the routes
-  // the patcher wrote, so setup's commit holds the tree the first dev run writes.
-  it("regenerates the route tree with the template's generate-routes script after the install", () => {
+  it("names the template's generate-routes script as its after-install script", () => {
     expect(new TanStackStartScaffolder().afterInstallScript).toBe("generate-routes");
   });
 

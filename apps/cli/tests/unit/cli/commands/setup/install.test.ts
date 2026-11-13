@@ -1,10 +1,15 @@
 import { describe, expect, vi } from "vitest";
 
-import { installDependenciesForSetup, type SetupInstallInput } from "@/cli/commands/setup/install";
+import {
+  afterInstallScriptFor,
+  installDependenciesForSetup,
+  type SetupInstallInput,
+} from "@/cli/commands/setup/install";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { installLogSink } from "@/lib/log";
-import type { runPackageCommand } from "@/lib/package-manager";
+import { createOrca } from "@/lib/orca";
+import type { PackageCommand, runPackageCommand } from "@/lib/package-manager";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -85,16 +90,46 @@ function aFailingRunner() {
 
 /**
  * A package-command runner whose install succeeds and whose next command exits
- * with code 1.
+ * with code 1, its captured output on the error as `runPackageCommand` puts it.
  *
+ * @param output - What the failed command printed.
  * @returns The runner, recording each call.
  */
-function aRunnerFailingAfterInstall() {
+function aRunnerFailingAfterInstall(output = "") {
   return vi.fn<typeof runPackageCommand>(async (command) => {
     if (command.verb === "run") {
-      throw new Error(`${command.display} failed with exit 1`);
+      throw Object.assign(new Error(`${command.display} failed with exit 1`), { output });
     }
   });
+}
+
+/**
+ * A package-command runner whose install succeeds and whose next command is
+ * stopped by Ctrl-C: the run's signal aborts, then the child dies of SIGINT.
+ *
+ * @param controller - The run's interrupt, aborted as Ctrl-C aborts it.
+ * @returns The runner.
+ */
+function aRunnerInterruptedAfterInstall(controller: AbortController) {
+  return vi.fn<typeof runPackageCommand>(async (command) => {
+    if (command.verb === "run") {
+      controller.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+      throw new Error(`${command.display} failed with signal SIGINT`);
+    }
+  });
+}
+
+/**
+ * The options the runner was given for the command shown as `display`.
+ *
+ * @param run - The runner.
+ * @param display - The command, as it reads.
+ * @returns The options, or `undefined` when it never ran.
+ */
+function optionsOf(run: ReturnType<typeof aRunner>, display: string) {
+  return run.mock.calls.find(([command]: [PackageCommand, unknown]) => {
+    return command.display === display;
+  })?.[1];
 }
 
 /**
@@ -131,6 +166,7 @@ function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstal
     suggest: SUGGEST,
     scaffoldedFramework: false,
     skipInstall: false,
+    signal: new AbortController().signal,
     task: recordingTask([]),
     ...overrides,
   };
@@ -511,13 +547,16 @@ describe("installDependenciesForSetup", () => {
       ).toEqual(["pnpm install", "pnpm run generate-routes"]);
     });
 
-    it("runs it in the project directory with its output on stderr", async ({ dir }) => {
+    it("runs it in the project directory with its output kept back", async ({ dir }) => {
       await aProject(dir);
       const run = aRunner();
 
       await installDependenciesForSetup(aNewAppInput(dir, { run }));
 
-      expect(run.mock.calls[1]?.[1]).toMatchObject({ cwd: dir, redirectStdoutToStderr: true });
+      expect(optionsOf(run, "npm run generate-routes")).toMatchObject({
+        cwd: dir,
+        captureOutput: true,
+      });
     });
 
     it("reports it as a step of the command's own chain", async ({ dir }) => {
@@ -534,6 +573,21 @@ describe("installDependenciesForSetup", () => {
       ]);
     });
 
+    // Its output is kept back, so a spinner draws over nothing, unlike the
+    // install's, which writes to the terminal itself.
+    it("reports it as a step without --json too", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+      const restore = installLogSink(() => {});
+
+      await installDependenciesForSetup(
+        aNewAppInput(dir, { json: false, run: aRunner(), task: recordingTask(steps) }),
+      );
+      restore();
+
+      expect(steps).toEqual(["Running npm run generate-routes", "Ran npm run generate-routes"]);
+    });
+
     it.for(SKIPS)("does not run it with %s", async ([, skip], { dir }) => {
       await aProject(dir);
       const run = aRunner();
@@ -543,18 +597,87 @@ describe("installDependenciesForSetup", () => {
       expect(run).not.toHaveBeenCalled();
     });
 
-    it("warns, naming the script to rerun, when it fails", async ({ dir }) => {
+    it("still reports the install completed when it fails", async ({ dir }) => {
       await aProject(dir);
-      takeReportedWarnings();
 
       const result = await installDependenciesForSetup(
         aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }),
       );
+      takeReportedWarnings();
 
       expect(result.install).toMatchObject({ status: "completed" });
+    });
+
+    it("warns, naming the script to rerun, when it fails", async ({ dir }) => {
+      await aProject(dir);
+      takeReportedWarnings();
+
+      await installDependenciesForSetup(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
+
       expect(takeReportedWarnings()).toEqual([
-        "npm run generate-routes failed after the install, so setup's commit leaves out the files it writes; run it, then commit them: npm run generate-routes failed with exit 1",
+        "npm run generate-routes failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: npm run generate-routes failed with exit 1",
       ]);
+    });
+
+    it("names the directory in the script to rerun with --cwd", async ({ dir }) => {
+      await aProject(dir);
+      takeReportedWarnings();
+
+      await installDependenciesForSetup(
+        aNewAppInput(dir, { cwdFlag: CWD_FLAG, run: aRunnerFailingAfterInstall() }),
+      );
+
+      expect(takeReportedWarnings()[0]).toMatch(/^npm --prefix shop run generate-routes failed/);
+    });
+
+    it("quotes the last lines of its output when it fails", async ({ dir }) => {
+      await aProject(dir);
+      takeReportedWarnings();
+      const output = Array.from({ length: 30 }, (_, line) => {
+        return `line ${String(line + 1)}`;
+      }).join("\n");
+
+      await installDependenciesForSetup(
+        aNewAppInput(dir, { run: aRunnerFailingAfterInstall(`${output}\n`) }),
+      );
+
+      expect(takeReportedWarnings()[0]?.split("\n").slice(1)).toEqual(
+        output.split("\n").slice(-20),
+      );
+    });
+
+    // Setup awaits this before its commit and deploy, so the rejection is
+    // what keeps a Ctrl-C from committing.
+    it("stops setup with the cancellation when Ctrl-C stops it", async ({ dir }) => {
+      await aProject(dir);
+      takeReportedWarnings();
+      const controller = new AbortController();
+
+      const error = await rejectionOf(() => {
+        return installDependenciesForSetup(
+          aNewAppInput(dir, {
+            run: aRunnerInterruptedAfterInstall(controller),
+            signal: controller.signal,
+          }),
+        );
+      });
+
+      expect(error).toMatchObject({ code: "E_CANCELLED" });
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+  });
+
+  describe("afterInstallScriptFor", () => {
+    it("names the scaffolder's script for an app setup scaffolded", () => {
+      expect(afterInstallScriptFor(createOrca(), "tanstack-start", true)).toBe("generate-routes");
+    });
+
+    it("names none for an app that was already there", () => {
+      expect(afterInstallScriptFor(createOrca(), "tanstack-start", false)).toBeUndefined();
+    });
+
+    it("names none for a scaffolder without one", () => {
+      expect(afterInstallScriptFor(createOrca(), "next", true)).toBeUndefined();
     });
   });
 

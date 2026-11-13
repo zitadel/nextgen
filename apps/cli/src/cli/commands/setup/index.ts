@@ -170,7 +170,7 @@ import {
   unavailableWarning,
   type WorktreeState,
 } from "./initial-commit";
-import { installDependenciesForSetup } from "./install";
+import { afterInstallScriptFor, installDependenciesForSetup } from "./install";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -1778,9 +1778,8 @@ export default class Setup extends Destructive(BaseCommand) {
       suggest: this.suggest,
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
-      afterInstallScript: scaffoldedFramework
-        ? orca.scaffolderFor(app.framework).afterInstallScript
-        : undefined,
+      afterInstallScript: afterInstallScriptFor(orca, app.framework, scaffoldedFramework),
+      signal: this.signal,
       task: (label, work, done) => {
         return this.ui.task(label, work, done);
       },

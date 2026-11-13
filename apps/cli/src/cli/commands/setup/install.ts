@@ -2,7 +2,7 @@ import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { type DependencyInstall, installDependencies } from "@/lib/install";
 import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
-import { log } from "@/lib/log";
+import type { Orca } from "@/lib/orca";
 import {
   detectPackageManager,
   devCommandFor,
@@ -57,10 +57,12 @@ export type SetupInstallInput = {
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   /**
-   * The scaffolder's `afterInstallScript`, for an app setup scaffolded: run
-   * once the install completes, and not at all when there was none.
+   * {@link afterInstallScriptFor} the app: run once the install completes,
+   * and not at all when there was none.
    */
   afterInstallScript?: string | undefined;
+  /** The run's Ctrl-C; a cancelled after-install script stops setup. */
+  signal: AbortSignal;
   /**
    * How the install is drawn: the command's `this.ui.task`, so the step sits
    * in the same chain as every other one setup reports. Passed in rather than
@@ -119,36 +121,58 @@ export async function installDependenciesForSetup(
 }
 
 /**
- * Runs the new app's after-install script. A failure is a warning: the app
- * works without what it writes, and the framework writes that on its first
- * dev run, only after setup's commit.
+ * The after-install script setup runs for an app: the one its scaffolder names
+ * when setup scaffolded it, and none for an app that was already there, whose
+ * scripts setup does not know.
+ */
+export function afterInstallScriptFor(
+  orca: Pick<Orca, "scaffolderFor">,
+  framework: string,
+  scaffolded: boolean,
+): string | undefined {
+  return scaffolded ? orca.scaffolderFor(framework).afterInstallScript : undefined;
+}
+
+/** How many of a failed after-install script's last output lines its warning quotes. */
+const QUOTED_OUTPUT_LINES = 20;
+
+/**
+ * Runs the new app's after-install script as one step, its output kept back
+ * (a production build's log, whose last line reads like a next step) and
+ * quoted only when it fails. A failure is a warning: the app works without
+ * what the script writes, and the framework writes that on its first dev run.
+ * Ctrl-C is not a failure: it stops setup before its commit.
  */
 async function runAfterInstallScript(
   command: PackageCommand,
   input: SetupInstallInput,
 ): Promise<void> {
-  const label = `Running ${command.display}`;
-  const work = async (): Promise<void> => {
-    await (input.run ?? runPackageCommand)(command, {
-      cwd: input.cwd,
-      env: input.env,
-      redirectStdoutToStderr: input.json,
-    });
-  };
   try {
-    if (input.json) {
-      await input.task(label, work, () => {
+    await input.task(
+      `Running ${command.display}`,
+      async () => {
+        await (input.run ?? runPackageCommand)(command, {
+          cwd: input.cwd,
+          env: input.env,
+          captureOutput: true,
+        });
+      },
+      () => {
         return `Ran ${command.display}`;
-      });
-    } else {
-      // The script writes to the terminal itself, as the install does.
-      log.start(label);
-      await work();
-      log.done(`Ran ${command.display}`);
-    }
+      },
+    );
   } catch (error) {
+    if (input.signal.aborted) {
+      throw input.signal.reason;
+    }
+    const shown = suggestedCommandOf(inDirectory(command, input.cwdFlag, input.cwd));
+    const output = (error as { output?: unknown }).output;
+    const quoted =
+      typeof output === "string" && output.trim() !== ""
+        ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
+        : "";
     reportWarning(
-      `${command.display} failed after the install, so setup's commit leaves out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}`,
+      `${shown} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${quoted}`,
     );
   }
 }
