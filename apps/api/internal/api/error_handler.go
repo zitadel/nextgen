@@ -324,9 +324,12 @@ func apiError(err error) (status int, logged domain.Error, details api.ErrorDeta
 // navigation gets the error page, with home as its way on; everything else
 // gets the req.not_found envelope, so a client can tell a path this server
 // lacks from one that is not a Zitadel API at all. The Accept header decides,
-// and Vary says so to caches.
+// and Vary says so to caches. The request gets the server span no operation
+// started for it.
 func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r, span := startUnmatchedSpan(r, http.StatusNotFound)
+		defer span.End()
 		w.Header().Add("Vary", "Accept")
 		notFound := domain.ErrRequestNotFound()
 		if errorpage.Wants(r) {
@@ -346,12 +349,17 @@ func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
 // header ogen would have set (ADR 076). A path the API defines answers the
 // envelope even to a browser: it is an API URL. A CORS preflight keeps ogen's
 // own answer, 204 with the Access-Control-Allow-* headers ogen has already
-// set.
+// set. Either way the request gets the server span no operation started for
+// it.
 func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string) {
 	if r.Method == http.MethodOptions {
+		_, span := startUnmatchedSpan(r, http.StatusNoContent)
+		defer span.End()
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	r, span := startUnmatchedSpan(r, http.StatusMethodNotAllowed)
+	defer span.End()
 	w.Header().Set("Allow", allowed)
 	notAllowed := domain.ErrRequestMethodNotAllowed()
 	resp := errorResponse(notAllowed)

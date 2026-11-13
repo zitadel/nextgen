@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
@@ -80,4 +81,35 @@ func (s ogenSpan) RecordError(err error, _ ...trace.EventOption) {
 		errType = de.Code
 	}
 	s.SetAttributes(semconv.ErrorTypeKey.String(errType))
+}
+
+// startUnmatchedSpan starts the server span of a request that names no
+// operation, a path the API lacks or a method its path does not take, and
+// returns the request that carries it. ogen starts the server span in an
+// operation's handler, so without this one such a request leaves no trace and
+// its log lines no trace ID. status is what the caller answers with.
+//
+// The span has no http.route and is named after the method alone, as the HTTP
+// conventions ask of a request without a route: the path matched no template,
+// so it is the caller's text, of any cardinality.
+func startUnmatchedSpan(r *http.Request, status int) (*http.Request, trace.Span) {
+	method, name := requestMethod(r.Method)
+	ctx, span := tracer.Start(r.Context(), name,
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(method, semconv.HTTPResponseStatusCode(status)),
+	)
+	middleware.SetServerSpanContext(ctx, span.SpanContext())
+	return r.WithContext(ctx), span
+}
+
+// requestMethod returns the http.request.method of method, and the name of a
+// span that has no route to put after it. net/http takes any token for a
+// method, so one the conventions do not list is _OTHER, and its span "HTTP".
+func requestMethod(method string) (attribute.KeyValue, string) {
+	switch method {
+	case http.MethodConnect, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodOptions,
+		http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodTrace, "QUERY":
+		return semconv.HTTPRequestMethodKey.String(method), method
+	}
+	return semconv.HTTPRequestMethodOther, "HTTP"
 }
