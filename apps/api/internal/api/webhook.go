@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// WithWebhookService wires the webhook endpoints (ADR 089). A chainable
+// WithWebhookService wires the webhook endpoints (ADR 090). A chainable
 // setter like WithPolicyService, so NewHandler's call sites stay unchanged;
 // without it the endpoints answer an internal error.
 func (h *Handler) WithWebhookService(s *service.WebhookService) *Handler {
@@ -141,7 +141,7 @@ func fromAPIWebhookEventTypes(eventTypes api.WebhookEventTypes) []string {
 func toAPIWebhook(entity *domain.Webhook) *api.Webhook {
 	eventTypes := make(api.WebhookEventTypes, len(entity.EventTypes))
 	for i, eventType := range entity.EventTypes {
-		eventTypes[i] = api.WebhookEventType(eventType)
+		eventTypes[i] = api.WebhookEventSelector(eventType)
 	}
 	out := &api.Webhook{
 		ID:                      api.WebhookID(entity.ID),

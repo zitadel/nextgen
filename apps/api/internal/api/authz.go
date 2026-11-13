@@ -64,6 +64,11 @@ type resourceAccess struct {
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
+	// configuration marks what a project deploys or registers: what a release
+	// ships, a deployment serves, an origin admits, and an application whose
+	// clients sign in to it. On the reserved platform project only its admins
+	// write it (requirePlatformConfigurationAdmin).
+	configuration bool
 }
 
 func (res resourceAccess) miss(op accessOp) error {
@@ -74,17 +79,19 @@ func (res resourceAccess) miss(op accessOp) error {
 }
 
 var schemaAccess = resourceAccess{
-	kind:      domain.ResourceKindSchema,
-	readMiss:  domain.ErrJSONSchemaNotFound,
-	writeMiss: func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
-	denied:    domain.ErrJSONSchemaPermissionDenied,
+	kind:          domain.ResourceKindSchema,
+	readMiss:      domain.ErrJSONSchemaNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
+	denied:        domain.ErrJSONSchemaPermissionDenied,
+	configuration: true,
 }
 
 var flowDefinitionAccess = resourceAccess{
-	kind:      domain.ResourceKindFlowDefinition,
-	readMiss:  domain.ErrFlowDefinitionNotFound,
-	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
-	denied:    domain.ErrFlowDefinitionPermissionDenied,
+	kind:          domain.ResourceKindFlowDefinition,
+	readMiss:      domain.ErrFlowDefinitionNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
+	denied:        domain.ErrFlowDefinitionPermissionDenied,
+	configuration: true,
 }
 
 var userAccess = resourceAccess{
@@ -114,10 +121,11 @@ var sessionAccess = resourceAccess{
 }
 
 var brandingAccess = resourceAccess{
-	kind:      domain.ResourceKindBranding,
-	readMiss:  domain.ErrBrandingNotFound,
-	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
-	denied:    domain.ErrBrandingPermissionDenied,
+	kind:          domain.ResourceKindBranding,
+	readMiss:      domain.ErrBrandingNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
+	denied:        domain.ErrBrandingPermissionDenied,
+	configuration: true,
 }
 
 // policyAccess gates operation policies (ADR 066). Publish and the revision
@@ -130,7 +138,8 @@ var policyAccess = resourceAccess{
 	writeMiss: func() domain.Error {
 		return domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: project does not exist")
 	},
-	denied: domain.ErrPolicyPermissionDenied,
+	denied:        domain.ErrPolicyPermissionDenied,
+	configuration: true,
 }
 
 // variableAccess gates the project's variables and secrets (ADR 062). Like
@@ -138,9 +147,10 @@ var policyAccess = resourceAccess{
 // row — it is addressed by name under the project_id the request carries — so
 // every op is project-scoped and there is no kind to check.
 var variableAccess = resourceAccess{
-	readMiss:  domain.ErrVariableNotFound,
-	writeMiss: domain.ErrVariableNotFound,
-	denied:    domain.ErrVariablePermissionDenied,
+	readMiss:      domain.ErrVariableNotFound,
+	writeMiss:     domain.ErrVariableNotFound,
+	denied:        domain.ErrVariablePermissionDenied,
+	configuration: true,
 }
 
 // releaseAccess gates the project's release snapshots (ADR 035, #531).
@@ -148,10 +158,11 @@ var variableAccess = resourceAccess{
 // filters its lookup by it, so no route resolves a path id through RSI and the
 // kind is only used to narrow a partial-access list.
 var releaseAccess = resourceAccess{
-	kind:      domain.ResourceKindRelease,
-	readMiss:  domain.ErrReleaseNotFound,
-	writeMiss: domain.ErrReleaseProjectNotFound,
-	denied:    domain.ErrReleasePermissionDenied,
+	kind:          domain.ResourceKindRelease,
+	readMiss:      domain.ErrReleaseNotFound,
+	writeMiss:     domain.ErrReleaseProjectNotFound,
+	denied:        domain.ErrReleasePermissionDenied,
+	configuration: true,
 }
 
 // idpAccess guards the project's identity provider connections (#1003). Every
@@ -161,19 +172,21 @@ var releaseAccess = resourceAccess{
 // stay project-scoped: revisions have no RSI row. On the query the kind
 // narrows a partial-access list.
 var idpAccess = resourceAccess{
-	kind:      domain.ResourceKindIDPConnection,
-	readMiss:  domain.ErrIDPConnectionNotFound,
-	writeMiss: domain.ErrIDPConnectionNotFound,
-	denied:    domain.ErrIDPConnectionPermissionDenied,
+	kind:          domain.ResourceKindIDPConnection,
+	readMiss:      domain.ErrIDPConnectionNotFound,
+	writeMiss:     domain.ErrIDPConnectionNotFound,
+	denied:        domain.ErrIDPConnectionPermissionDenied,
+	configuration: true,
 }
 
 // applicationAccess guards the project's registered applications. Create is
 // project-scoped; the get resolves the path id through RSI in the project.
 var applicationAccess = resourceAccess{
-	kind:      domain.ResourceKindApplication,
-	readMiss:  domain.ErrApplicationNotFound,
-	writeMiss: domain.ErrApplicationNotFound,
-	denied:    domain.ErrApplicationPermissionDenied,
+	kind:          domain.ResourceKindApplication,
+	readMiss:      domain.ErrApplicationNotFound,
+	writeMiss:     domain.ErrApplicationNotFound,
+	denied:        domain.ErrApplicationPermissionDenied,
+	configuration: true,
 }
 
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
@@ -182,19 +195,21 @@ var applicationAccess = resourceAccess{
 // path id through RSI and the kind is only used to narrow a partial-access
 // list.
 var deploymentAccess = resourceAccess{
-	kind:      domain.ResourceKindDeployment,
-	readMiss:  domain.ErrDeploymentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrDeploymentPermissionDenied,
+	kind:          domain.ResourceKindDeployment,
+	readMiss:      domain.ErrDeploymentNotFound,
+	writeMiss:     domain.ErrEnvironmentProjectNotFound,
+	denied:        domain.ErrDeploymentPermissionDenied,
+	configuration: true,
 }
 
 // originAccess gates add/remove of project origin patterns. Origins have no
 // minted id and no RSI row — they are addressed by pattern under the
 // project_id the request carries — so every op is project-scoped.
 var originAccess = resourceAccess{
-	readMiss:  domain.ErrOriginNotFound,
-	writeMiss: domain.ErrOriginNotFound,
-	denied:    domain.ErrOriginPermissionDenied,
+	readMiss:      domain.ErrOriginNotFound,
+	writeMiss:     domain.ErrOriginNotFound,
+	denied:        domain.ErrOriginPermissionDenied,
+	configuration: true,
 }
 
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
@@ -222,13 +237,16 @@ var invitationAccess = resourceAccess{
 	denied:    domain.ErrInvitationPermissionDenied,
 }
 
-// webhookAccess gates a project's webhooks (ADR 089). A webhook has no
+// webhookAccess gates a project's webhooks (ADR 090). A webhook has no
 // resource_scope_index row and every op takes project_id from the query
-// (same as grants and invitations), so there is no kind to check.
+// (same as grants and invitations), so there is no kind to check. It is
+// configuration: a webhook is an address the project registers to send its
+// events to.
 var webhookAccess = resourceAccess{
-	readMiss:  domain.ErrWebhookNotFound,
-	writeMiss: domain.ErrWebhookNotFound,
-	denied:    domain.ErrWebhookPermissionDenied,
+	readMiss:      domain.ErrWebhookNotFound,
+	writeMiss:     domain.ErrWebhookNotFound,
+	denied:        domain.ErrWebhookPermissionDenied,
+	configuration: true,
 }
 
 var projectAccess = resourceAccess{
@@ -383,7 +401,39 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 	if h == nil || h.pool == nil {
 		return domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
+	if err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op); err != nil {
+		return err
+	}
+	return h.requirePlatformConfigurationAdmin(ctx, projectID, res, op)
+}
+
+// requirePlatformConfigurationAdmin holds a write to the configuration of the
+// reserved platform project to that project's admins (Console ADR 0004 §1).
+// The project holds who may use the platform, never an application's end
+// users: each of its users can be granted any project and can claim, so what
+// signs someone in to it (an origin, a deployment, a schema, an application) is
+// for the people who own the platform to change. A platform operator is one
+// of them (root ADR 075); an editor of the platform project is not.
+//
+// It asks the admin relation only after the operation's own check allowed
+// the caller, so the answers to anyone else are unchanged, and an editor's
+// refusal reads as a missing permission. A project the deployment merely pins
+// is not reserved (domain.ReservedPlatformProjectID) and keeps the relations
+// every project asks. The server's own start-up deploy (bootstrap/platform)
+// calls the services, not this gate.
+func (h *Handler) requirePlatformConfigurationAdmin(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
+	// A read asks nothing more, and a removal already asked for admin.
+	if !res.configuration || op != opWrite {
+		return nil
+	}
+	if reserved := domain.ReservedPlatformProjectID(h.platformProjectID); reserved == "" || projectID != reserved {
+		return nil
+	}
+	err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, opDelete)
+	if denied := res.denied(); errors.Is(err, denied) {
+		return denied.WithMessage(denied.Message + ": the platform project's configuration is written with its admin role")
+	}
+	return err
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {

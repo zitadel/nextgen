@@ -10,6 +10,7 @@ import { asTerminal } from "@tests/helpers/terminal";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import DeploymentGet from "@/commands/deployment/get";
 import { parseArg } from "@tests/helpers/inputs";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.cloud";
 const server = setupServer();
@@ -32,7 +33,7 @@ const DEPLOYMENT = {
   id: "dep_1",
   project_id: "proj_test",
   release_id: "rel_1",
-  targets: [{ origin: "https://app.acme.com", expires_at: null }],
+  targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
   kind: "primary",
   status: "live",
   metadata: { reason: "deploy" },

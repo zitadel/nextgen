@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  abandonedAttempts,
   AROUND_MINUTES,
+  ATTEMPT_LIFETIME_MS,
+  belongingWith,
+  flowPlaces,
+  flowSummary,
+  formatSpan,
+  inOccurrenceOrder,
+  SIGNIN_OUTCOME_TYPES,
+  signinOf,
+  withOutcome,
   AUDIT_CATEGORIES,
   chipFilters,
   around,
@@ -652,6 +662,7 @@ describe("what gives way, on every way into a list", () => {
       "request_id",
       "session_id",
       "status_class",
+      "user_id",
     ]);
   }
 
@@ -695,19 +706,32 @@ describe("what gives way, on every way into a list", () => {
   });
 
   it("holds one click on from every URL", () => {
+    // Most clicks land on a search another URL's click already reached (a
+    // filter set from an event is the same search from every URL), so each
+    // search is checked once. Checked on every click, the sweep outlasted the
+    // test timeout on a loaded CI runner.
+    const checked = new Set<string>();
+    const expectServedOnce = (search: EventsSearch) => {
+      const key = JSON.stringify(search);
+      if (checked.has(key)) return;
+      checked.add(key);
+      expectServed(search);
+    };
     for (const url of urls) {
       const current = parseEventsSearch(url);
-      for (const view of EVENT_VIEWS) expectServed(withView(current, view));
+      for (const view of EVENT_VIEWS) expectServedOnce(withView(current, view));
       for (const category of [...AUDIT_CATEGORIES, undefined]) {
-        expectServed(withCategory(current, category));
+        expectServedOnce(withCategory(current, category));
       }
-      for (const since of [...TIME_RANGES, undefined]) expectServed(withTimeRange(current, since));
-      expectServed(withCustomRange(current, "2026-11-10T08:00:00Z", "2026-11-10T09:00:00Z"));
-      expectServed(withTypes(current, FAILURE_TYPES));
+      for (const since of [...TIME_RANGES, undefined]) {
+        expectServedOnce(withTimeRange(current, since));
+      }
+      expectServedOnce(withCustomRange(current, "2026-11-10T08:00:00Z", "2026-11-10T09:00:00Z"));
+      expectServedOnce(withTypes(current, FAILURE_TYPES));
       for (const { key } of VALUE_FILTERS) {
-        expectServed(narrowedBy(current, key, "value_2"));
-        expectServed(narrowedBy(current, key, undefined));
-        expectServed(sharing(key, "value_2"));
+        expectServedOnce(narrowedBy(current, key, "value_2"));
+        expectServedOnce(narrowedBy(current, key, undefined));
+        expectServedOnce(sharing(key, "value_2"));
       }
     }
   });
@@ -782,8 +806,14 @@ describe("searchMeanings", () => {
     ]);
   });
 
+  it("leaves a user's ID to the person: the account or the actor", () => {
+    // What happened to the account holds the changes to the user too, so the
+    // resource is not a third reading.
+    expect(meanings("user_1")).toEqual(["user user_1", "actor user_1"]);
+    expect(meanings("user:team_1")).toEqual(["user team_1"]);
+  });
+
   it("leaves any other ID to the person: an actor or a resource", () => {
-    expect(meanings("user_1")).toEqual(["actor user_1", "resource user_1"]);
     expect(meanings("team_1")).toEqual(["actor team_1", "resource team_1"]);
     // An email address is not an ID of an event, but it is one whole value.
     expect(meanings("User.Name@example.com")).toEqual([
@@ -831,15 +861,16 @@ describe("eventsCsv", () => {
         actor_id: "user_1",
         entity_type: "user",
         entity_id: "user_2",
+        user_id: "user_2",
         payload: { note: 'a "quoted", value' },
       }),
     ]);
     const [header, row, end] = csv.split("\r\n");
     expect(header).toBe(
-      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,client_id,request_id,session_id,flow_id,fingerprint,payload",
+      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,user_id,client_id,request_id,session_id,flow_id,fingerprint,payload",
     );
     expect(row).toBe(
-      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
+      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
     );
     expect(end).toBe("");
   });
@@ -973,5 +1004,269 @@ describe("EVENT_TYPE_GROUPS", () => {
     }
     const headings = EVENT_TYPE_GROUPS.map((group) => group.heading);
     expect(new Set(headings).size).toBe(headings.length);
+  });
+});
+
+describe("the sign-ins", () => {
+  const at = (seconds: number) => new Date(Date.UTC(2026, 10, 10, 8, 0, seconds)).toISOString();
+  /** A step of one login flow, `seconds` after 08:00. */
+  function step(
+    id: string,
+    type: string,
+    seconds: number,
+    overrides: Record<string, unknown> = {},
+  ) {
+    return event({
+      id,
+      event_type: type,
+      category: "auth",
+      occurred_at: at(seconds),
+      created_at: at(seconds),
+      flow_id: "flow_1",
+      ...overrides,
+    });
+  }
+
+  it("reads the types a sign-in ends in, with no category, narrowed by how it ended", () => {
+    const signins = parseEventsSearch({ view: "signins" });
+    expect(eventsQuery(signins)).toMatchObject({
+      category: undefined,
+      event_type: SIGNIN_OUTCOME_TYPES,
+    });
+    expect(eventsQuery(withOutcome(signins, "signed_in")).event_type).toEqual([
+      "session.established",
+    ]);
+    expect(eventsQuery(withOutcome(signins, "failed")).event_type).toEqual([
+      "auth.check.failed",
+      "auth.sso.authorization.failed",
+      "auth.sso.exchange.failed",
+    ]);
+    expect(filterCount(withOutcome(signins, "failed"))).toBe(1);
+  });
+
+  it("keeps an outcome only in the sign-ins, and takes no category or type there", () => {
+    expect(parseEventsSearch({ view: "audit", outcome: "failed" }).outcome).toBeUndefined();
+    expect(parseEventsSearch({ view: "signins", outcome: "nope" }).outcome).toBeUndefined();
+    expect(parseEventsSearch({ view: "signins", category: "auth" })).toMatchObject({
+      view: "signins",
+      category: undefined,
+    });
+    // A type reads the All view, as everywhere.
+    expect(
+      parseEventsSearch({ view: "signins", type: "user.created", outcome: "failed" }),
+    ).toMatchObject({
+      view: "all",
+      outcome: undefined,
+    });
+    const failed = parseEventsSearch({ view: "signins", outcome: "failed" });
+    expect(withView(failed, "audit").outcome).toBeUndefined();
+    expect(withView(failed, "signins").outcome).toBe("failed");
+    // A session's events are in every view.
+    expect(narrowedBy(failed, "session", "sess_1")).toMatchObject({
+      view: "all",
+      outcome: undefined,
+    });
+  });
+
+  it("says how each sign-in ended, whose account it was and what failed", () => {
+    expect(
+      signinOf(event({ event_type: "session.established", user_id: "user_1", payload: {} })),
+    ).toEqual({ outcome: "signed_in", userId: "user_1" });
+    // Written before the column: the payload names the user.
+    expect(
+      signinOf(event({ event_type: "session.established", payload: { user_id: "user_2" } })),
+    ).toEqual({ outcome: "signed_in", userId: "user_2" });
+    expect(signinOf(event({ event_type: "session.established", payload: {} }))).toEqual({
+      outcome: "opened",
+    });
+    expect(
+      signinOf(event({ event_type: "auth.check.failed", payload: { check_type: "Password" } })),
+    ).toEqual({ outcome: "failed", userId: undefined, failure: "Password check failed" });
+    expect(signinOf(event({ event_type: "auth.check.failed", payload: {} }))?.failure).toBe(
+      "A check failed",
+    );
+    expect(
+      signinOf(event({ event_type: "auth.check.failed", payload: { check_type: "User" } }))
+        ?.failure,
+    ).toBe("No account matched");
+    expect(signinOf(event({ event_type: "auth.sso.exchange.failed", payload: {} }))?.failure).toBe(
+      "Single sign-on failed",
+    );
+    expect(signinOf(event({ event_type: "user.created" }))).toBeUndefined();
+  });
+
+  it("tells a login flow from its events: what it came to, whose, how and how long", () => {
+    const signUp = [
+      step("evt_1", "auth.attempt.created", 0),
+      step("evt_2", "auth.sso.exchange.succeeded", 19),
+      step("evt_3", "user.created", 19, { user_id: "user_1" }),
+      step("evt_4", "auth.check.succeeded", 19, { payload: { check_type: "User" } }),
+      step("evt_5", "auth.check.succeeded", 19, { payload: { check_type: "SSOCallback" } }),
+      step("evt_6", "session.established", 20, {
+        category: "session",
+        user_id: "user_1",
+        payload: { user_id: "user_1" },
+      }),
+    ];
+    const now = new Date(at(30));
+    expect(flowSummary(signUp, { complete: true, now })).toEqual({
+      title: "Signed up with single sign-on",
+      outcome: "signed_in",
+      userId: "user_1",
+      startedAt: at(0),
+      durationMs: 20_000,
+    });
+
+    const password = [
+      step("evt_1", "auth.attempt.created", 0),
+      step("evt_2", "auth.check.failed", 3, { payload: { check_type: "Password" } }),
+    ];
+    const expired = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1);
+    // Refused, while the visitor may still try again: in progress.
+    expect(flowSummary(password, { complete: true, now })?.outcome).toBe("in_progress");
+    expect(flowSummary(password, { complete: true, now: expired })?.title).toBe("Sign-in failed");
+    // Not all of the flow is at hand: a success could follow the failure.
+    expect(flowSummary(password, { complete: false, now: expired })?.outcome).toBeUndefined();
+    // A retry that passed is a sign-in.
+    const retried = [
+      ...password,
+      step("evt_3", "auth.check.succeeded", 9, { payload: { check_type: "Password" } }),
+      step("evt_4", "session.established", 10, { user_id: "user_1", payload: {} }),
+    ];
+    expect(flowSummary(retried, { complete: true, now })?.title).toBe("Signed in with a password");
+
+    // Nothing after the attempt: abandoned once it has expired, until then in progress.
+    const started = [step("evt_1", "auth.attempt.created", 0)];
+    expect(flowSummary(started, { complete: true, now })?.outcome).toBe("in_progress");
+    const later = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1);
+    expect(flowSummary(started, { complete: true, now: later })?.title).toBe("Sign-in abandoned");
+    // Not all of the flow is at hand: what is missing could have ended it.
+    expect(flowSummary(started, { complete: false, now: later })).toMatchObject({
+      title: "This login flow",
+      outcome: undefined,
+    });
+    expect(flowSummary([], { complete: true, now })).toBeUndefined();
+  });
+
+  it("marks an attempt abandoned when its flow never finished before it expired", () => {
+    const loadedAt = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1000);
+    const left = step("evt_left", "auth.attempt.created", 0, { flow_id: "flow_left" });
+    // A step taken and then left: the flow still never ended.
+    const checked = step("evt_checked", "auth.check.succeeded", 5, { flow_id: "flow_left" });
+    const went = step("evt_went", "auth.attempt.created", 0, { flow_id: "flow_went" });
+    const handedOff = step("evt_handed", "auth.attempt.handed_off", 4, { flow_id: "flow_went" });
+    // Refused (no account, a wrong password): it ended, and its own row says how.
+    const refusedAttempt = step("evt_refused", "auth.attempt.created", 0, { flow_id: "flow_no" });
+    const refused = step("evt_no", "auth.check.failed", 3, {
+      flow_id: "flow_no",
+      payload: { check_type: "User" },
+    });
+    const fresh = step("evt_fresh", "auth.attempt.created", 950, { flow_id: "flow_fresh" });
+    const rows = [fresh, handedOff, refused, checked, refusedAttempt, went, left];
+
+    expect(abandonedAttempts(rows, { view: "all" }, loadedAt)).toEqual(new Set(["evt_left"]));
+    expect(abandonedAttempts(rows, { view: "audit", since: "24h" }, loadedAt)).toEqual(
+      new Set(["evt_left"]),
+    );
+    // A filter beyond the view and the time could hide what finished it.
+    expect(abandonedAttempts(rows, { view: "audit", category: "auth" }, loadedAt).size).toBe(0);
+    // A range that ends before now may stop short of what ended a flow.
+    expect(abandonedAttempts(rows, { view: "all", to: at(600) }, loadedAt).size).toBe(0);
+    expect(
+      abandonedAttempts(rows, { view: "audit", type: ["auth.attempt.created"] }, loadedAt).size,
+    ).toBe(0);
+    expect(abandonedAttempts(rows, { view: "signins" }, loadedAt).size).toBe(0);
+  });
+
+  it("finds the loaded rows of an open event's login flow, or else of its request", () => {
+    const rows = [
+      step("evt_a", "auth.attempt.created", 0, { request_id: "req_1" }),
+      step("evt_b", "auth.check.succeeded", 1, { request_id: "req_2" }),
+      step("evt_c", "auth.attempt.created", 2, { flow_id: "flow_2", request_id: "req_2" }),
+      event({ id: "evt_d", request_id: "req_3", flow_id: null }),
+      event({ id: "evt_e", request_id: "req_3", flow_id: null }),
+    ];
+    expect(belongingWith(rows, rows[1])).toEqual({ ids: new Set(["evt_a"]), by: "login flow" });
+    expect(belongingWith(rows, rows[3])).toEqual({ ids: new Set(["evt_e"]), by: "request" });
+    expect(belongingWith(rows, undefined).ids.size).toBe(0);
+    expect(
+      belongingWith(rows, event({ id: "evt_x", request_id: null, flow_id: null })).ids.size,
+    ).toBe(0);
+  });
+
+  it("orders events by when they happened, keeping the server's order within a moment", () => {
+    const later = step("evt_later", "auth.check.succeeded", 12);
+    const request = step("evt_request", "request.api", 11, { category: "request" });
+    const first = step("evt_first", "auth.attempt.created", 12);
+    const second = step("evt_second", "auth.check.succeeded", 12);
+    expect(inOccurrenceOrder([first, second, later, request]).map((event) => event.id)).toEqual([
+      "evt_request",
+      "evt_first",
+      "evt_second",
+      "evt_later",
+    ]);
+  });
+
+  it("places a login flow's steps to the millisecond, one offset per request", () => {
+    const ms = (iso: string) => ({ occurred_at: iso, created_at: iso });
+    // A password sign-in as preview.zitadel.com stored it: the request event
+    // at the request's start, its other events as they were stored.
+    const flow = [
+      step("evt_req1", "request.api", 0, {
+        category: "request",
+        request_id: "req_1",
+        payload: { duration_ms: 29 },
+        ...ms("2026-11-12T23:33:50.892Z"),
+      }),
+      step("evt_attempt", "auth.attempt.created", 0, {
+        request_id: "req_1",
+        ...ms("2026-11-12T23:33:50.915Z"),
+      }),
+      step("evt_check", "auth.check.succeeded", 0, {
+        request_id: "req_2",
+        ...ms("2026-11-12T23:34:00.640Z"),
+      }),
+      step("evt_req2", "request.api", 0, {
+        category: "request",
+        request_id: "req_2",
+        payload: { duration_ms: 412 },
+        ...ms("2026-11-12T23:34:00.601Z"),
+      }),
+      step("evt_session", "session.established", 0, {
+        category: "session",
+        user_id: "user_1",
+        ...ms("2026-11-12T23:34:01.050Z"),
+      }),
+    ];
+    const { offsets, spanMs } = flowPlaces(flow);
+    expect(Object.fromEntries(offsets)).toEqual({
+      evt_req1: 0,
+      // Stored 23 ms into its request, not a step of its own.
+      evt_attempt: 0,
+      evt_check: 9709,
+      evt_req2: 9709,
+      evt_session: 10_158,
+    });
+    // To where the last event, or the last request, ended.
+    expect(spanMs).toBe(10_158);
+    expect(flowPlaces(flow.slice(0, 4)).spanMs).toBe(9709 + 412);
+    expect(flowPlaces([]).spanMs).toBe(0);
+    expect(
+      flowSummary(flow, { complete: true, now: new Date("2026-11-12T23:35:00Z") })?.durationMs,
+    ).toBe(10_158);
+    expect(formatSpan(spanMs)).toBe("10 s");
+  });
+
+  it("writes a span of time as the drawer's timeline does", () => {
+    expect(formatSpan(0)).toBe("0 ms");
+    expect(formatSpan(29)).toBe("29 ms");
+    expect(formatSpan(999.6)).toBe("1.0 s");
+    expect(formatSpan(1500)).toBe("1.5 s");
+    // Tenths that round up to ten seconds read as ten seconds.
+    expect(formatSpan(9960)).toBe("10 s");
+    expect(formatSpan(19_000)).toBe("19 s");
+    expect(formatSpan(125_000)).toBe("2 min 5 s");
+    expect(formatSpan(120_000)).toBe("2 min");
+    expect(formatSpan(-5)).toBe("0 ms");
   });
 });

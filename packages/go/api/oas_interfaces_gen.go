@@ -117,6 +117,10 @@ type EvaluatePolicyRes interface {
 	evaluatePolicyRes()
 }
 
+type EventStoredRes interface {
+	eventStoredRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }

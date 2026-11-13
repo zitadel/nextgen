@@ -9,6 +9,16 @@ import { PORT_WORKERS } from "./tests/helpers/ports";
 /** Three quarters of the cores, at least one: 3 workers on CI's 4-core runners. */
 const WORKERS = Math.max(Math.floor((availableParallelism() * 3) / 4), 1);
 
+/**
+ * How long a test or hook may take. CI gets three times the room: there the
+ * suite runs in one turbo graph beside the journeys and the e2e lanes, and
+ * when only the CLI changed they all start with it. A test's first load of
+ * the built CLI then took 24 s where a run that builds everything first took
+ * 13 s. A retry does not recover such a test: the attempt that timed out is
+ * still writing into the fixture directory the next one clears.
+ */
+const TIMEOUT = process.env.CI ? 60_000 : 20_000;
+
 export default defineConfig({
   cacheDir: ".vitest",
   resolve: { alias: aliases },
@@ -23,7 +33,7 @@ export default defineConfig({
     unstubGlobals: true,
     // The integration specs drive the built CLI; keep their telemetry off with
     // the cross-tool standard (https://consoledonottrack.com) so a unit run
-    // never ships events, independent of the moon/CI env.
+    // never ships events, independent of the task runner's or CI's env.
     // CI markers are blanked for the code under test (the retry below reads the
     // real one at config time), so a suite behaves the same on a CI runner as
     // on a laptop: `preview` and the skills hint branch on running in CI, and
@@ -72,11 +82,11 @@ export default defineConfig({
     // isn't ready when a spec's `aSetUpApp()` arrange runs, and the
     // "against an invalid server" specs deliberately talk to a down/invalid
     // host and wait out a real network timeout — both comfortably exceed
-    // Vitest's 5s default under load. Give them room, and retry in CI only
-    // (locally we want a flake to surface, not be papered over). A genuine
-    // regression still fails deterministically after the retries.
-    testTimeout: 20_000,
-    hookTimeout: 20_000,
+    // Vitest's 5s default under load. Give them room (TIMEOUT), and retry in
+    // CI only (locally we want a flake to surface, not be papered over). A
+    // genuine regression still fails deterministically after the retries.
+    testTimeout: TIMEOUT,
+    hookTimeout: TIMEOUT,
     retry: process.env.CI ? 2 : 0,
     coverage: {
       ...baseTest.coverage,
@@ -86,8 +96,7 @@ export default defineConfig({
       // emits sourcemaps, so v8 reports these back against `src`.
       include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
     },
-    // The oclif dist the integration suite drives is built by the `pretest`
-    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
-    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
+    // The oclif dist the integration suite drives comes from the package's
+    // `build`, which turbo's `test` depends on (turbo.json).
   },
 });

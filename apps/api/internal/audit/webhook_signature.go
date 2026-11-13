@@ -13,7 +13,7 @@ import (
 )
 
 // The headers of a delivery to a project's webhook, as Standard Webhooks
-// (https://www.standardwebhooks.com) names them (ADR 089 §2).
+// (https://www.standardwebhooks.com) names them (ADR 090 §2).
 const (
 	webhookIDHeader        = "webhook-id"
 	webhookTimestampHeader = "webhook-timestamp"
@@ -29,7 +29,7 @@ var errWebhookSecretMalformed = errors.New("webhook signing secret is not whsec_
 // separated by a space; a receiver accepts the delivery if one matches.
 //
 // It fails on no secret and on one it cannot decode, so that nothing is ever
-// sent unsigned (ADR 089 §3).
+// sent unsigned (ADR 090 §3).
 func signWebhook(secrets []string, id string, at time.Time, body []byte) (string, error) {
 	if len(secrets) == 0 {
 		return "", errWebhookSecretMalformed

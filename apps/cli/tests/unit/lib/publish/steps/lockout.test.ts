@@ -293,7 +293,6 @@ function withoutIdentifier(objectType: string): JsonObject {
  */
 const PASSKEY_FIRST: JsonObject = {
   name: "default-login",
-  status: "active",
   user_schema: "human-user",
   purposes: { login: "passkey-first" },
   steps: [
@@ -312,7 +311,6 @@ const PASSKEY_FIRST: JsonObject = {
  */
 const SIGN_UP_ONLY_COLLECTS: JsonObject = {
   name: "default-login",
-  status: "active",
   user_schema: "human-user",
   purposes: { login: "start", register: "register" },
   steps: [
@@ -943,48 +941,6 @@ describe("lockoutStep", () => {
       expect(said).toEqual([
         expect.stringContaining('of "employee"'),
         expect.stringContaining('of "human-user"'),
-      ]);
-    });
-
-    it("does not count a draft flow as serving its schema", async () => {
-      const context = aStepContext({
-        config: aConfig({
-          schemas: {
-            "1.json": withoutIdentifier("employee"),
-            "2.json": withoutIdentifier("human-user"),
-          },
-          flows: {
-            "1.json": aLoginFlow({ userSchema: "employee" }),
-            "2.json": aLoginFlow({ status: "draft" }),
-          },
-        }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
-      });
-
-      const said = await everythingSaid(context);
-
-      expect(said).toEqual([
-        expect.stringContaining(
-          'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
-        ),
-      ]);
-    });
-
-    it("still checks them when no active flow is left", async () => {
-      const context = aStepContext({
-        config: aConfig({
-          schemas: { "1.json": withoutIdentifier("employee") },
-          flows: { "1.json": aLoginFlow({ userSchema: "employee", status: "draft" }) },
-        }),
-        client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
-      });
-
-      const said = await everythingSaid(context);
-
-      expect(said).toEqual([
-        expect.stringContaining(
-          'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
-        ),
       ]);
     });
 

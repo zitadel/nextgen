@@ -31,7 +31,7 @@ type ListWebhooksOutput struct {
 	NextPageToken string
 }
 
-// WebhookService manages a project's webhooks (ADR 089). It does not deliver:
+// WebhookService manages a project's webhooks (ADR 090). It does not deliver:
 // the shipper does.
 //
 // A webhook it returns holds its signing secrets as stored, encrypted. Create

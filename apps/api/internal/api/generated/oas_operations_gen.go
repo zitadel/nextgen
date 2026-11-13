@@ -119,4 +119,5 @@ const (
 	UpdateVariablesOperation               OperationName = "UpdateVariables"
 	UpdateWebhookOperation                 OperationName = "UpdateWebhook"
 	VerifyChallengeProofOperation          OperationName = "VerifyChallengeProof"
+	EventStoredOperation                   OperationName = "EventStored"
 )

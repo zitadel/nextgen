@@ -69,12 +69,12 @@ func echo(mount string) http.HandlerFunc {
 	}
 }
 
-// requireEmbeddedUI fails rather than skips: `server:test` depends on
-// console:build, so a missing dist means the tree was built wrong, not that
-// this case is inapplicable.
+// requireEmbeddedUI fails rather than skips: the server's test tasks depend on
+// @zitadel/console#build, so a missing dist means the tree was built wrong,
+// not that this case is inapplicable.
 func requireEmbeddedUI(t *testing.T) {
 	t.Helper()
-	require.NoError(t, console.ValidateDist(), "run `moon run console:build`")
+	require.NoError(t, console.ValidateDist(), "run `turbo run build --filter=@zitadel/console`")
 }
 
 func idpCallbackEcho() http.Handler {

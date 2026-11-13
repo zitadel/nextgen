@@ -9,7 +9,7 @@ import (
 )
 
 // WebhookDeliveryAdapter implements audit.WebhookSource for the webhook
-// shipper (ADR 089 §4), as EventExportAdapter does for the operator's export.
+// shipper (ADR 090 §4), as EventExportAdapter does for the operator's export.
 type WebhookDeliveryAdapter struct {
 	Pool *DB
 	Keys KeyService
@@ -48,7 +48,7 @@ func (a WebhookDeliveryAdapter) ListEventsAfterCursor(ctx context.Context, proje
 
 // WebhookSecrets decrypts the webhook's signing secret with the key
 // WebhookService encrypted it with, and the secret a rotation replaced while
-// that one has not expired (ADR 089 §3). The newest secret comes first.
+// that one has not expired (ADR 090 §3). The newest secret comes first.
 func (a WebhookDeliveryAdapter) WebhookSecrets(ctx context.Context, hook *domain.Webhook, at time.Time) (_ []string, err error) {
 	ctx, end := startSpan(ctx, "WebhookDeliveryAdapter.WebhookSecrets")
 	defer end(&err)

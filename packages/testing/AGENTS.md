@@ -3,7 +3,7 @@
 `@zitadel/testing` is the customer-facing test kit: it boots or connects to a
 real instance and drives it, and the login, from Playwright. Its API:
 [`README.md`](README.md). The repo dogfoods it in `e2e/demo-next`'s real lane,
-`e2e/console`, `console:dev-real` and `e2e/journey`, whose testkit variant
+`e2e/console`, the console's `dev:real` and `e2e/journey`, whose testkit variant
 installs the kit from the local registry as a customer would.
 
 ## Which layer a test belongs in
@@ -35,8 +35,8 @@ upward.
 - Never edit versions or dist-tags or publish by hand: the train owns them.
 - Keep `LICENSE`, `publishConfig.access` and the `license` field, and the
   package in [`LICENSING.md`](../../LICENSING.md)'s MIT exceptions.
-- `build-release` is part of `tools/release/moon.yml`'s
-  `build-public-packages`, which `release:check-graph` enforces.
+- Its `build` is an edge of `@zitadel/release#build-public-packages`, which
+  `scripts/task-graph.test.mjs` enforces.
 
 ## Build shape
 
@@ -83,26 +83,24 @@ Test credentials come from the kit's boot contract, never from the server
 - Add a credential field only once its design is settled, as an optional
   field, never with an invented wire prefix. Serialize only state that cannot
   be derived (a session is `{ sessionToken, expiresAt }`, not a cookie).
-- Dev loops feed from boot output: `console:dev-real` uses
+- Dev loops feed from boot output: the console's `dev:real` uses
   `handle.projectSecret` server-side only. Never reintroduce remembered
   credential env vars.
 - Keep every seed op meaningful against a `connectZitadel` target, not only a
   local instance, and let helpers do only what a customer's test could (no
   `page.evaluate` shortcuts).
 
-## Moon and the e2e lanes
+## Turbo and the e2e lanes
 
-- The moon layer is `tool`, between the e2e suites (`automation`) and the CLI
-  (`tool`). Consumers add `dependsOn: testing` and a `testing:build` task dep.
-- Unit gate: `moon run testing:test testing:lint testing:typecheck`; real
-  instances: `moon run testing:test-integration`.
-- `e2e:all` (`e2e/moon.yml`) depends on every lane CI runs,
-  `testing:test-integration` among them, and `ci.yml` runs it in its own e2e
-  step after the build-and-test graph. The lanes are `runInCI: "skip"` only to
-  stay out of that graph, so a plain `:test` stays unit tests.
-- Run one lane with `moon run e2e:<lane>`, or all with `moon run e2e:all`;
-  the journey lane then needs prebuilt tarballs in `JOURNEY_TARBALLS_DIR`
-  (`e2e/moon.yml` says why).
-- Serialize moon invocations: two concurrent graphs produce spurious
-  failures. `moon run workspace:cli -- stop --all` sweeps the runtimes an
-  aborted run left on fixed ports.
+- Consumers declare `@zitadel/testing` in `package.json` and depend on
+  `@zitadel/testing#build`.
+- Unit gate: `turbo run test lint typecheck --filter=@zitadel/testing`; real
+  instances: `turbo run test:integration --filter=@zitadel/testing`.
+- Keep every lane out of `test`, so a plain `test` stays unit tests: CI runs
+  the lanes, `@zitadel/testing#test:integration` among them, in a turbo run
+  of their own after the build-and-test run (the root `ci` script).
+- Run a lane with `turbo run <lane> --filter=@zitadel/e2e`.
+- Run one turbo invocation of the lanes at a time: two collide on their fixed
+  ports. `pnpm run cli -- stop --all` sweeps the runtimes an aborted run left.
+- A mock lane turbo runs fails on a taken port; stop what holds it. Only a
+  direct `playwright test --config …` uses a server you started by hand.

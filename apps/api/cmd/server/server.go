@@ -468,7 +468,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// A webhook's URL is a customer's: deliveries go through the hardened
 	// egress client (ADR 061), built apart from the schema one because it
-	// follows no redirect and has the delivery's deadline (ADR 089 §4).
+	// follows no redirect and has the delivery's deadline (ADR 090 §4).
 	webhookClient, err := audit.WebhookClientConfig(cfg.HTTPClient).NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to build webhook http client: %w", err)
@@ -1111,7 +1111,7 @@ func buildHTTPMux(
 	// The triggers by path, each present when a scheduler outside the process
 	// runs its job: the event retention purge
 	// (events.retention.trigger_secret, ADR 049) and delivery to the
-	// projects' webhooks (events.webhooks.trigger_secret, ADR 089). They are
+	// projects' webhooks (events.webhooks.trigger_secret, ADR 090). They are
 	// the operator's, not the API's, so they take the request ID and the
 	// request line but none of the middleware a client's request passes.
 	for path, trigger := range triggers {

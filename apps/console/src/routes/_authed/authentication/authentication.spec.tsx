@@ -75,7 +75,6 @@ const LOGIN_FLOW = {
   updated_at: CREATED_AT,
   flow_definition: {
     name: "default-login",
-    status: "active",
     user_schema: "sch_customers",
     purposes: { login: "identifier" },
     steps: [{ name: "identifier", sso_providers: ["google"] }],

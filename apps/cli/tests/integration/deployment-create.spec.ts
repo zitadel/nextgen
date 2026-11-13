@@ -9,6 +9,7 @@ import {
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -103,7 +104,7 @@ describe("deployment create", () => {
     describe("--json", () => {
       it("makes an existing release live on every primary origin", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
 
         const result = await app.run([
@@ -125,7 +126,7 @@ describe("deployment create", () => {
             title: `Deployed ${releaseId}`,
             deployment_id: expect.stringMatching(DEPLOYMENT_ID),
             release_id: releaseId,
-            origins: [SETUP_ORIGIN.pattern, "https://app.acme.com"],
+            origins: [SETUP_ORIGIN.pattern, PRIMARY_ORIGIN],
             next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list"))],
           },
           warnings: [],
@@ -134,7 +135,7 @@ describe("deployment create", () => {
 
       it("keeps an origin the server put an escape sequence in as it came", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
         const origin = platform.servesAHostileOrigin();
 
@@ -165,7 +166,7 @@ describe("deployment create", () => {
 
       it("plans the deployment on a dry run, keeping the flags it was typed with", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
 
         const result = await app.run([
@@ -203,7 +204,7 @@ describe("deployment create", () => {
 
       it("writes no deployment on a dry run", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
         const before = await app.liveDeploymentCount();
 
@@ -404,7 +405,7 @@ describe("deployment create", () => {
     describe("rendered for a terminal", () => {
       it.each(RENDERINGS)("headlines the release it deployed, %s", async (_how, colour) => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
 
         const result = await asTerminal(() =>
@@ -416,7 +417,7 @@ describe("deployment create", () => {
 
       it("names every origin it deployed to, piped", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const releaseId = await aRelease(app);
 
         const result = await app.run([
@@ -427,7 +428,7 @@ describe("deployment create", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint("Live on http://localhost:3000 and https://app.acme.com.");
+        expect(result).toPrint(`Live on http://localhost:3000 and ${PRIMARY_ORIGIN}.`);
       });
 
       it("suggests listing the deployments once", async () => {
@@ -490,7 +491,7 @@ describe("deployment create", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toPrint("Live on https://app.acme.com\\x1b[2Jwiped.");
+        expect(result).toPrint(`Live on ${PRIMARY_ORIGIN}\\x1b[2Jwiped.`);
         expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
       });
 
