@@ -46,7 +46,8 @@ export type RevokeOutcome = Readonly<
  * @remarks
  * The generated client types the 409 body but, as every error body, does not
  * validate it, so the answer is checked here before it is trusted. The kinds
- * are the two the API documents: a primary origin is freed by putting another release live on it, a preview by removing it. A kind the API adds is
+ * are the two the API documents: a primary origin is freed by putting another
+ * release live on it, a preview by removing it. A kind the API adds is
  * therefore not parsed, and the refusal stays the plain conflict rather than
  * naming an origin it cannot say how to free.
  */

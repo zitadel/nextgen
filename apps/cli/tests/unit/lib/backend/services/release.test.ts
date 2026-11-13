@@ -66,8 +66,10 @@ describe("ReleaseService.revoke", () => {
   });
 
   it("answers revoked with the release the server revoked", async () => {
-    const revokeRelease = vi.fn(async () => ({ id: "rel_1" }));
-    const releaseService = new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+    const releaseService = new ReleaseService(
+      fakeClient({ revokeRelease: async () => ({ id: "rel_1" }) }),
+      "proj_1",
+    );
 
     await expect(releaseService.revoke("rel_1")).resolves.toEqual({
       outcome: "revoked",

@@ -28,7 +28,14 @@ const RELEASE_ID: Refused<string> = {
   },
 };
 
-/** How many serving origins the refusal names; its details list them all. */
+/**
+ * How many serving origins the refusal names in its hint, and how many previews
+ * it suggests removing.
+ *
+ * @remarks
+ * The refusal's details list every serving origin, so nothing is lost. Once the
+ * named previews are removed, revoking again suggests the next ones.
+ */
 const SERVED_NAMED = 3;
 
 /**
@@ -136,7 +143,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             if (previews.length > 0) {
               steps.push("remove each preview");
               next.push(
-                ...previews.map((preview) => {
+                ...previews.slice(0, SERVED_NAMED).map((preview) => {
                   return { id: "preview:rm", args: { url: preview.origin } } satisfies Suggestion;
                 }),
               );

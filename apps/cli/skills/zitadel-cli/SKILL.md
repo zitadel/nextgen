@@ -412,13 +412,15 @@ Each invocation prints one JSON object:
 - `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
   When the server names the origins that serve it, the `hint` names the first
   three with their kind (`primary` or `preview`) and the deployment that pins
-  the release there and counts the rest, `details.origins` lists every one as
-  `{ origin, deployment_id, kind }`, and `next_commands` lists what frees them: `deploy` and
-  `deployment rollback` for primary origins (each only helps if the release it
-  puts live is a different one), `preview rm <url>` for each preview, which
-  cannot be rolled back and also stops serving when it expires. Without them
-  the conflict has no `hint`, no `next_commands` and no `details.origins`. Revoke again once none
-  serves it.
+  the release there, and counts the rest. `details` is `{ release_id, origins }`
+  and `origins` lists every one as `{ origin, deployment_id, kind }`; the
+  server's own `status`, `url` and `body` are not in it. `next_commands` lists
+  what frees them: `deploy` and `deployment rollback` for primary origins (each
+  only helps if the release it puts live is a different one), and
+  `preview rm <url>` for the first three previews, which cannot be rolled back
+  and also stop serving when they expire. Revoke again once none serves it.
+  Without origins the CLI can read, the conflict is the plain one: no `hint`, no
+  `next_commands`, and `details` holds the server's `status`, `url` and `body`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
