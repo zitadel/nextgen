@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc -b",
-    "install-browsers": "playwright install chromium",
     "generate": "conformance-fixture generate",
     "check-generate": "conformance-fixture check",
     "conformance": "playwright test"
@@ -21,7 +20,6 @@
     "@types/node": "catalog:",
     "@zitadel/conformance": "workspace:*",
     "@zitadel/testing": "workspace:*",
-    "serve": "^14.2.6",
     "typescript": "catalog:",
     "vite": "catalog:"
   },

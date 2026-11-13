@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc -b",
-    "install-browsers": "playwright install chromium",
     "generate": "conformance-fixture generate",
     "check-generate": "conformance-fixture check",
     "conformance": "playwright test"
@@ -25,7 +24,6 @@
     "@vitejs/plugin-react": "catalog:",
     "@zitadel/conformance": "workspace:*",
     "@zitadel/testing": "workspace:*",
-    "oxlint": "^1.88.0",
     "typescript": "catalog:",
     "vite": "catalog:"
   },

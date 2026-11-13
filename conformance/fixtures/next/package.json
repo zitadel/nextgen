@@ -5,7 +5,6 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev --port 3216",
-    "install-browsers": "playwright install chromium",
     "generate": "conformance-fixture generate",
     "check-generate": "conformance-fixture check",
     "conformance": "playwright test"
@@ -24,8 +23,6 @@
     "@types/react-dom": "catalog:",
     "@zitadel/conformance": "workspace:*",
     "@zitadel/testing": "workspace:*",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.2",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   },

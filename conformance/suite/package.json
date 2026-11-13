@@ -14,13 +14,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/cli": "workspace:*",
-    "@zitadel/testing": "workspace:*",
-    "semver": "catalog:"
+    "@zitadel/testing": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
