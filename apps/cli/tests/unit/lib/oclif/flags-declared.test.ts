@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { declaredAs, sourcesUnder } from "@tests/helpers/declarations";
+import { codeOf, declaredAs, sourcesUnder } from "@tests/helpers/declarations";
 
 import { WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
@@ -20,20 +20,6 @@ const RAISED_BY_THE_FLAG = /\b(?:reads|taken|readsFilled)\(\s*(\w+)/g;
 
 /** Where a command's class begins: everything after it runs, nothing before it does. */
 const CLASS = /^export default class /m;
-
-/**
- * `source` with its comments and its strings taken out, so a flag's name
- * counts where the code names it and not where the prose beside it happens to
- * use the same word.
- */
-function code(source: string): string {
-  // Strings go first: a `//` in a URL is not a comment, and taking it out as
-  // one would cut the string in two.
-  return source
-    .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""')
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\/\/[^\n]*/g, " ");
-}
 
 /**
  * What a command declares and what its class does with it. The class is the
@@ -54,7 +40,7 @@ async function declared(): Promise<Command[]> {
     if (refused.length === 0 || at === undefined) {
       continue;
     }
-    found.push({ file, refused, body: code(source.slice(at)) });
+    found.push({ file, refused, body: codeOf(source.slice(at)) });
   }
   return found;
 }
