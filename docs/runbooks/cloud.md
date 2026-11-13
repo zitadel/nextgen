@@ -825,8 +825,8 @@ project and imports the root admin.
   upload. A CLI `vercel redeploy` also builds without the build cache and
   Turbo's remote cache.
 
-  The compressed archive must stay below the Standard build machine's
-  1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
+  The archive must stay below Vercel's 5 GB limit, the same on every build
+  machine type. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
   the Go caches and removes duplicate data while preserving the preset's
   toolchain. A successful deployment alone does not prove its cache was
   saved: check production's final log for `Uploading build cache [...]`, not
