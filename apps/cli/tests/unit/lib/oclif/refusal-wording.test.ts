@@ -90,9 +90,10 @@ function readWith(source: ts.SourceFile, name: string): boolean {
 
 /**
  * Every refusal declared in `src`, each with what fills it. A `Refused` is
- * filled by `read` and its own `values`, nothing else. A `Refusal` is filled
- * wherever it is thrown in its module, and by `read` where a flag raises it
- * ({@link readWith}) — a name nothing passes reaches the person as braces.
+ * filled by `read` and its own `values`, nothing else. A `Refusal` or a
+ * `ParseRefusal` is filled wherever it is thrown in its module, and by `read`
+ * where a flag raises it ({@link readWith}) — a name nothing passes reaches the
+ * person as braces.
  *
  * @returns The refusals.
  */
@@ -108,7 +109,10 @@ async function weighed(): Promise<Weighed[]> {
         filled: [...ALWAYS, ...keysOf(valueOf(literal, "values"))],
       });
     }
-    for (const { name, literal } of declaredAs(source, "Refusal")) {
+    for (const { name, literal } of [
+      ...declaredAs(source, "Refusal"),
+      ...declaredAs(source, "ParseRefusal"),
+    ]) {
       found.push({
         file,
         name,
