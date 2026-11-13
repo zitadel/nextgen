@@ -47,13 +47,14 @@ Setup installs the SDK. To add it yourself, run:
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI writes the root component (`src/app/app.ts`), adds auth routes and a proxy config, wires `angular.json`, adds environment files, and installs the SDK.
+    The CLI writes the root component (`src/app/app.ts`), adds auth routes and a proxy config, wires `angular.json`, adds environment files, and installs the SDK. The component names no project: it reads `ZITADEL_PROJECT_ID`, which `zitadel-ng.cjs` defines when it runs the Angular CLI. Setup runs your serve and build scripts through it, those still as `ng new` wrote them; `doctor` names any other that runs `ng serve` or `ng build`.
 
     <Files>
       <File name="src/app/app.ts" />
       <File name="src/app/app.html" />
       <File name="src/app/app.routes.ts" />
       <File name="proxy.conf.cjs" />
+      <File name="zitadel-ng.cjs" />
       <File name="angular.json" />
       <File name=".env.local" />
       <File name=".env.example" />
@@ -140,13 +141,17 @@ The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and
   <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, and a plain rewrite cannot add the project secret ([SPAs in production](/docs/sdks/proxy#spas-in-production)).</Step>
 </Steps>
 
+## Build for production
+
+Build with `npm run build`, which runs `node zitadel-ng.cjs build`. The Angular CLI reads no environment into client code, so `zitadel-ng.cjs` reads `ZITADEL_PROJECT_ID` from the environment, then from `.env.local`, and passes it to the build as a `--define`. On a build server without `.env.local`, set `ZITADEL_PROJECT_ID` in the environment. A plain `ng build` stops with a message that says to build with `npm run build`.
+
 ## Render on the server
 
 If your app renders on the server, mount the component on the client only, after hydration. The `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup. Alternatively, use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes. A component that starts before its configuration arrives shows an error instead of the flow.
 
 ## Check that sign-in works
 
-1. Run `npm run dev`. Setup adds a `dev` script (`ng serve`) if your `package.json` has none.
+1. Run `npm run dev`. Setup adds a `dev` script (`node zitadel-ng.cjs serve`) if your `package.json` has none.
 2. Open the dev server URL, usually `http://localhost:3000/register`. Use the origin that setup registered: `localhost`, not `127.0.0.1`.
 3. Register at `/register`, or sign in at `/login`. A completed sign-in lands on `/profile`.
 4. Sign out from the session card (`zitadel-auth-session`) that the generated profile renders. You return to `/login`.

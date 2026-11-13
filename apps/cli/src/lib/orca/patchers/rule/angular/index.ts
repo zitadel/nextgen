@@ -1,5 +1,3 @@
-import { ZitadelError } from "@/lib/errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { sdkVersionForCli } from "@/lib/public-cli";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
@@ -9,11 +7,19 @@ import {
   assertMountsRootComponent,
   type RootMount,
 } from "@/lib/orca/patchers/rule/root-component";
-import { angularProxyEdit } from "./angular-json";
+import { angularDefineGuardEdit, angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
 import {
+  appComponentProjectIdEdit,
+  appComponentProjectIdVerdict,
   appComponentTemplate,
   appTemplateHtml,
+  devScriptEdit,
+  LAUNCHER_PATH,
+  launcherEdit,
+  launcherScriptsEdit,
+  launcherScriptsVerdict,
+  PROJECT_ID_GUARD,
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
   proxyConfEdit,
@@ -37,40 +43,13 @@ const ROOT: RootMount = {
 };
 
 /**
- * Adds a `dev: "ng serve"` script only when the project does not already define
- * one. `ng new` ships only a `start` script, but the CLI tells every framework
- * to run `npm run dev` (and `ng serve` reads the proxy + port from
- * `angular.json`). Non-destructive: an existing `dev` script is preserved, so
- * patching a project that already wires its own `dev` leaves it untouched.
- */
-function ensureDevScript(source: string | undefined): string {
-  if (source === undefined) {
-    throw new ZitadelError("E_VALIDATION", "package.json is required to add the dev script", {
-      hint: "Run setup from a project that has a package.json.",
-    });
-  }
-  const pkg = parseJsonObject(source, "package.json");
-  const scripts = isObject(pkg.scripts) ? pkg.scripts : undefined;
-  // Leave an existing dev script untouched, returning the source unchanged so
-  // the edit op skips the file instead of reformatting the user's package.json.
-  if (scripts?.dev !== undefined) {
-    return source;
-  }
-  // package.json is user-owned: splice only the scripts value; every byte
-  // outside it stays untouched.
-  return setTopLevelJsonKey(source, "package.json", "scripts", {
-    ...(scripts ?? {}),
-    dev: "ng serve",
-  });
-}
-
-/**
  * Rule-based patcher for an Angular app. Inherits the shared `.zitadel/` base
  * files from {@link AbstractRulePatcher} and contributes the managed root
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
  * widgets, a `proxy.conf.cjs` dev proxy (attaching the project secret from
  * `ZITADEL_PROJECT_SECRET` only to `POST /sessions/exchange`) wired into `angular.json`,
- * and the SDK dep.
+ * the `zitadel-ng.cjs` launcher the `ng serve`/`ng build` scripts run through
+ * (it defines the client's project id from `ZITADEL_PROJECT_ID`), and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the
@@ -106,6 +85,16 @@ export class AngularPatcher extends AbstractRulePatcher {
         kind: "write",
         path: ROOT.path,
         contents: appComponentTemplate(ctx),
+      },
+      {
+        kind: "edit",
+        path: ROOT.path,
+        edit: appComponentProjectIdEdit(ctx),
+        // A component an earlier CLI wrote names the project it was set up
+        // against, while its proxy reads ZITADEL_PROJECT_ID: it still signs in,
+        // so the doctor only warns until `doctor --fix` moves it.
+        wiring: "convenience",
+        verify: appComponentProjectIdVerdict(ctx.project.id),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml(ctx) },
       {
@@ -153,8 +142,33 @@ export class AngularPatcher extends AbstractRulePatcher {
       },
       {
         kind: "edit",
+        path: LAUNCHER_PATH,
+        edit: launcherEdit,
+        // The launcher defines the client's project id: without it the
+        // scripts that run it fail.
+        wiring: "infrastructure",
+      },
+      {
+        kind: "edit",
         path: "package.json",
-        edit: ensureDevScript,
+        edit: launcherScriptsEdit,
+        // `ng serve` or `ng build` run without the launcher leave the client
+        // without its project id, so the doctor fails until `doctor --fix`.
+        wiring: "infrastructure",
+        verify: launcherScriptsVerdict,
+      },
+      {
+        kind: "edit",
+        path: "angular.json",
+        edit: angularDefineGuardEdit(PROJECT_ID_GUARD),
+        // Makes a plain `ng serve` or `ng build` stop with what to run
+        // instead; the app works without it, so the doctor only warns.
+        wiring: "convenience",
+      },
+      {
+        kind: "edit",
+        path: "package.json",
+        edit: devScriptEdit,
         // Golden-path convenience (`npm run dev`); its absence only warns.
         wiring: "convenience",
       },
@@ -167,13 +181,14 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return [ROOT.path, "src/app/app.html", "proxy.conf.cjs"];
+    return [ROOT.path, "src/app/app.html", "proxy.conf.cjs", LAUNCHER_PATH];
   }
 
   protected override infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
     // The dev proxy is the auth request path (it also attaches the project
-    // secret); the root component pair is the user's customization surface.
-    return ["proxy.conf.cjs"];
+    // secret), and the launcher gives the client its project id; the root
+    // component pair is the user's customization surface.
+    return ["proxy.conf.cjs", LAUNCHER_PATH];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { angularProxyEdit } from "@/lib/orca/patchers/rule/angular/angular-json";
+import {
+  angularDefineGuardEdit,
+  angularProxyEdit,
+} from "@/lib/orca/patchers/rule/angular/angular-json";
 
 const edit = angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: 4200 });
 
@@ -84,5 +87,55 @@ describe("angularProxyEdit", () => {
 
   it("throws E_VALIDATION when the file is missing", () => {
     expect(() => edit(undefined)).toThrowError(/not found/);
+  });
+});
+
+describe("angularDefineGuardEdit", () => {
+  const guard = angularDefineGuardEdit({ name: "ID", message: "ID is not set: run npm run dev" });
+
+  it("defines the message for a plain serve and a plain production build", () => {
+    const out = guard(
+      ng({
+        architect: {
+          build: { configurations: { production: {}, development: {} } },
+          serve: { options: { port: 4200 } },
+          test: {},
+        },
+      }),
+    );
+
+    const targets = JSON.parse(out).projects.app.architect;
+    expect(targets.serve.options).toEqual({
+      port: 4200,
+      define: { ID: "ID is not set: run npm run dev" },
+    });
+    expect(targets.build.configurations).toEqual({
+      production: { define: { ID: "ID is not set: run npm run dev" } },
+      development: {},
+    });
+    expect(targets.test).toEqual({});
+  });
+
+  it("keeps the project's own defines, and a value it set for the name", () => {
+    const source = ng({
+      architect: {
+        build: { configurations: { production: { define: { ID: '"proj_own"' } } } },
+        serve: { options: { define: { OTHER: "1" } } },
+      },
+    });
+
+    const targets = JSON.parse(guard(source)).projects.app.architect;
+
+    expect(targets.build.configurations.production.define).toEqual({ ID: '"proj_own"' });
+    expect(targets.serve.options.define).toEqual({
+      OTHER: "1",
+      ID: "ID is not set: run npm run dev",
+    });
+  });
+
+  it("returns the source untouched once both are set, and without a production configuration", () => {
+    const once = guard(ng({ architect: { build: {}, serve: { options: {} } } }));
+    expect(guard(once)).toBe(once);
+    expect(JSON.parse(once).projects.app.architect.build).toEqual({});
   });
 });

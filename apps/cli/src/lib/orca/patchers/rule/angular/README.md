@@ -6,12 +6,31 @@ The detector requires `@angular/core` 17 or newer; older versions are refused.
 
 ## What it patches
 
-- `src/app/app.ts`, `src/app/app.html` — root component that renders the Zitadel widgets
+- `src/app/app.ts`, `src/app/app.html` — root component that renders the Zitadel widgets;
+  `app.ts` reads its project id from `ZITADEL_PROJECT_ID`, which `zitadel-ng.cjs` defines
 - `src/app/app.routes.ts` — auth routes (`angular-routes.ts`; doctor verifies this wiring)
 - `proxy.conf.cjs` — dev-server proxy
-- `angular.json` — wires `proxyConfig` into the `serve` target
-- `package.json` — adds `@zitadel/sdk-angular`, and a `dev` script (`ng serve`)
-  when the project doesn't already define one
+- `angular.json` — wires `proxyConfig` into the `serve` target, and defines
+  `ZITADEL_PROJECT_ID` there and in the build's `production` configuration as a
+  message, so a plain `ng serve` or `ng build` stops saying what to run
+- `zitadel-ng.cjs` — the launcher the `ng serve` and `ng build` scripts run through
+- `package.json` — adds `@zitadel/sdk-angular`, runs the serve and build scripts
+  that are still as `ng new` or an earlier setup wrote them through
+  `zitadel-ng.cjs`, and adds a `dev` script (`node zitadel-ng.cjs serve`) when
+  the project doesn't already define one
+
+## How the client gets its project id
+
+Angular's CLI reads no environment into client code, and `define` in
+`angular.json` takes only literals. `zitadel-ng.cjs` loads `.env.local` with
+Node's `process.loadEnvFile`, which leaves a value the environment already sets,
+and runs the Angular CLI in its own process with
+`--define ZITADEL_PROJECT_ID="…"`, which replaces the message `angular.json`
+defines. So no managed file names a project, and the client and the dev proxy
+read the same variable. A serve or build script the developer changed is not
+moved; the doctor names it. `ng test` builds with the `development`
+configuration, which defines nothing, so `app.ts` falls back to an empty id
+there, and the login widget says it has none.
 
 ## How the proxy works
 

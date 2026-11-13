@@ -6,6 +6,9 @@ import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
+  devScriptEdit,
+  launcherScriptsEdit,
+  launcherScriptsVerdict,
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
 } from "@/lib/orca/patchers/rule/angular/templates";
@@ -485,15 +488,89 @@ describe("AngularPatcher.plan", () => {
     });
   });
 
-  it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {
-    const result = JSON.parse(packageJsonEdit()(`{ "scripts": { "start": "ng serve" } }`));
-    expect(result.scripts.dev).toBe("ng serve");
-    expect(result.scripts.start).toBe("ng serve");
+  it("runs the scripts `ng new` writes that serve or build through the launcher", () => {
+    const scripts = {
+      ng: "ng",
+      start: "ng serve",
+      build: "ng build",
+      watch: "ng build --watch --configuration development",
+      test: "ng test",
+    };
+
+    const result = JSON.parse(launcherScriptsEdit(JSON.stringify({ scripts })));
+
+    expect(result.scripts).toEqual({
+      ng: "ng",
+      start: "node zitadel-ng.cjs serve",
+      build: "node zitadel-ng.cjs build",
+      watch: "node zitadel-ng.cjs build --watch --configuration development",
+      test: "ng test",
+    });
   });
 
-  it("preserves an existing `dev` script instead of overwriting it", () => {
-    const result = JSON.parse(packageJsonEdit()(`{ "scripts": { "dev": "ng serve --hmr" } }`));
-    expect(result.scripts.dev).toBe("ng serve --hmr");
+  it("moves the scripts that are still as `ng new` or an earlier setup wrote them, and the doctor says so", () => {
+    const source = `{ "scripts": { "dev": "ng serve", "build": "ng build" } }`;
+
+    expect(launcherScriptsVerdict(source)).toBe("detached");
+    const out = launcherScriptsEdit(source);
+    expect(JSON.parse(out).scripts).toEqual({
+      dev: "node zitadel-ng.cjs serve",
+      build: "node zitadel-ng.cjs build",
+    });
+    expect(launcherScriptsVerdict(out)).toBe("applied");
+  });
+
+  it("leaves a serve or build script the developer changed, and the doctor names it with what to run", () => {
+    const source = `{ "scripts": { "dev": "ng serve --hmr", "both": "concurrently \\"ng build --watch\\" api", "build": "ng build" } }`;
+
+    const out = launcherScriptsEdit(source);
+
+    expect(JSON.parse(out).scripts).toEqual({
+      dev: "ng serve --hmr",
+      both: 'concurrently "ng build --watch" api',
+      build: "node zitadel-ng.cjs build",
+    });
+    expect(launcherScriptsVerdict(out)).toEqual({
+      unknown:
+        'its "dev" script (ng serve --hmr) runs the Angular CLI without zitadel-ng.cjs, so the app gets no project id; ' +
+        'its "both" script (concurrently "ng build --watch" api) runs the Angular CLI without zitadel-ng.cjs, so the app gets no project id: ' +
+        'run "node zitadel-ng.cjs serve …" where it runs "ng serve …", and "node zitadel-ng.cjs build …" for "ng build …"',
+    });
+  });
+
+  it("leaves a script that runs something else alone", () => {
+    const source = `{ "scripts": { "dev": "concurrently api web" } }`;
+    expect(launcherScriptsEdit(source)).toBe(source);
+    expect(devScriptEdit(source)).toBe(source);
+  });
+
+  it("leaves package.json byte for byte once its scripts run through the launcher", () => {
+    const once = launcherScriptsEdit(
+      `{\n  "name": "a",\n  "scripts": { "build": "ng build" }\n}\n`,
+    );
+    expect(launcherScriptsEdit(once)).toBe(once);
+  });
+
+  it("adds a `dev` script that serves through the launcher, so `npm run dev` works like the other frameworks", () => {
+    const result = JSON.parse(devScriptEdit(`{ "scripts": { "start": "ng serve" } }`));
+    expect(result.scripts).toEqual({ start: "ng serve", dev: "node zitadel-ng.cjs serve" });
+  });
+
+  it("only warns in the doctor while the `dev` script is missing, and fails while a script serves without the launcher", () => {
+    const wirings = new AngularPatcher()
+      .plan(ctx())
+      .ops.filter(
+        (op): op is Extract<FileOp, { kind: "edit" }> =>
+          op.kind === "edit" && op.path === "package.json",
+      )
+      .map((op) => {
+        return [op.edit, op.wiring];
+      });
+
+    expect(wirings).toEqual([
+      [launcherScriptsEdit, "infrastructure"],
+      [devScriptEdit, "convenience"],
+    ]);
   });
 
   it("fails fast when package.json is absent instead of fabricating one", () => {

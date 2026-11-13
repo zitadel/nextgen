@@ -18,39 +18,7 @@ export function angularProxyEdit(opts: {
   previousPort?: number;
 }): (source: string | undefined) => string {
   return (source) => {
-    if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "Cannot wire Angular proxy: angular.json not found", {
-        hint: "Run setup from an Angular project.",
-      });
-    }
-    const root = parseJsonObject(source, "angular.json");
-    const projects = isObject(root.projects)
-      ? (root.projects as Record<string, unknown>)
-      : undefined;
-    const projectNames = Object.keys(projects ?? {});
-    if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        "angular.json has multiple projects and no defaultProject to choose from",
-        {
-          hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
-        },
-      );
-    }
-    const projectName =
-      typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
-    const project = projects && projectName ? projects[projectName] : undefined;
-    if (!isObject(project)) {
-      throw new ZitadelError("E_VALIDATION", "No project found in angular.json", {
-        hint: 'Add "proxyConfig" to your serve target manually.',
-      });
-    }
-    // Angular CLI has used both "architect" and "targets" for the target map.
-    const targets = isObject(project.architect)
-      ? (project.architect as Record<string, unknown>)
-      : isObject(project.targets)
-        ? (project.targets as Record<string, unknown>)
-        : undefined;
+    const { source: text, root, targets } = angularTargets(source);
     const serve =
       targets && isObject(targets.serve) ? (targets.serve as Record<string, unknown>) : undefined;
     if (!serve) {
@@ -75,10 +43,105 @@ export function angularProxyEdit(opts: {
     // Nothing to add — return the source untouched so the edit op skips it
     // instead of reformatting (re-indenting) the user's angular.json.
     if (!changed) {
-      return source;
+      return text;
     }
     serve.options = options;
     // Preserve the user's key order (JSON, no comments) instead of sorting.
     return `${JSON.stringify(root, null, 2)}\n`;
+  };
+}
+
+/**
+ * `angular.json`'s parsed root and the target map of the project setup
+ * patches: `defaultProject`, else the sole project. Throws `E_VALIDATION` when
+ * the file is absent or that project cannot be located, rather than guessing.
+ */
+function angularTargets(source: string | undefined): {
+  source: string;
+  root: Record<string, unknown>;
+  targets: Record<string, unknown> | undefined;
+} {
+  if (source === undefined) {
+    throw new ZitadelError("E_VALIDATION", "Cannot wire Angular proxy: angular.json not found", {
+      hint: "Run setup from an Angular project.",
+    });
+  }
+  const root = parseJsonObject(source, "angular.json");
+  const projects = isObject(root.projects) ? (root.projects as Record<string, unknown>) : undefined;
+  const projectNames = Object.keys(projects ?? {});
+  if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      "angular.json has multiple projects and no defaultProject to choose from",
+      {
+        hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
+      },
+    );
+  }
+  const projectName =
+    typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
+  const project = projects && projectName ? projects[projectName] : undefined;
+  if (!isObject(project)) {
+    throw new ZitadelError("E_VALIDATION", "No project found in angular.json", {
+      hint: 'Add "proxyConfig" to your serve target manually.',
+    });
+  }
+  // Angular CLI has used both "architect" and "targets" for the target map.
+  const targets = isObject(project.architect)
+    ? (project.architect as Record<string, unknown>)
+    : isObject(project.targets)
+      ? (project.targets as Record<string, unknown>)
+      : undefined;
+  return { source, root, targets };
+}
+
+/** `container[key]` as an object, set to a new empty one when it is not. */
+function objectAt(container: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = container[key];
+  if (isObject(value)) {
+    return value as Record<string, unknown>;
+  }
+  const created: Record<string, unknown> = {};
+  container[key] = created;
+  return created;
+}
+
+/**
+ * Builds the `edit` transform that makes a plain `ng serve` and a plain
+ * production `ng build` stop with `message`: it sets `name` in the `define` of
+ * the serve target's options and of the build's `production` configuration to
+ * `message`, which is no JavaScript literal, so the build refuses it and
+ * prints it. The launcher's `--define` replaces the value, and `ng test`,
+ * which builds with the `development` configuration, never sees it. A value
+ * the project already sets is left as it is, and so is a project without a
+ * serve target or a production configuration. Returns the source unchanged
+ * when there is nothing to add.
+ */
+export function angularDefineGuardEdit(opts: {
+  name: string;
+  message: string;
+}): (source: string | undefined) => string {
+  return (source) => {
+    const { source: text, root, targets } = angularTargets(source);
+    const serve = targets && isObject(targets.serve) ? targets.serve : undefined;
+    const build = targets && isObject(targets.build) ? targets.build : undefined;
+    const production =
+      build && isObject(build.configurations) && isObject(build.configurations.production)
+        ? build.configurations.production
+        : undefined;
+    let changed = false;
+    for (const options of [serve && objectAt(serve, "options"), production]) {
+      if (!options) {
+        continue;
+      }
+      const define = isObject(options.define) ? options.define : undefined;
+      if (define?.[opts.name] !== undefined) {
+        continue;
+      }
+      options.define = { ...(define ?? {}), [opts.name]: opts.message };
+      changed = true;
+    }
+    // Preserve the user's key order (JSON, no comments) instead of sorting.
+    return changed ? `${JSON.stringify(root, null, 2)}\n` : text;
   };
 }

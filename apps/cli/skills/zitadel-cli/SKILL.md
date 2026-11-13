@@ -1066,6 +1066,27 @@ server, and it warns about a proxy changed by hand or a target set on purpose
 without touching either. Angular's `proxy.conf.cjs` reads the process
 environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
 
+An Angular app's `src/app/app.ts` reads its project id from
+`ZITADEL_PROJECT_ID`, which `zitadel-ng.cjs` defines: `setup` runs the app's
+serve and build scripts through it (`dev` is `node zitadel-ng.cjs serve`,
+`build` is `node zitadel-ng.cjs build`). It takes the id from the process
+environment, then `.env.local`, and stops when neither sets it, so a
+production build on a machine without `.env.local` needs `ZITADEL_PROJECT_ID`
+exported. A plain `ng serve` or production `ng build` stops with
+`Invalid define value … ZITADEL_PROJECT_ID is defined by zitadel-ng.cjs: run
+the app with npm run dev and build it with npm run build`; `ng test` builds
+without the id, and the login widget shows that it requires one. An app an
+older CLI set up names its project as a literal in `app.ts` and runs
+`ng serve`/`ng build` directly: `doctor` fails (`managed-files`, `detached
+managed config wiring: zitadel-ng.cjs, package.json`), and its
+`details.config_wiring` lists `src/app/app.ts` and the `angular.json` guard as
+detached convenience wirings. `doctor --fix`, which `upgrade` runs, writes
+`zitadel-ng.cjs`, adds the guard, and moves the `projectId` line and the
+scripts still as `ng new` or setup wrote them. A script changed by hand that
+runs `ng serve` or `ng build` is unverifiable and named in the warning with
+what to run instead; an `app.ts` whose line was changed by hand is
+unverifiable too. Both must be moved by hand.
+
 ## Testing the app
 
 When the developer wants automated tests of the sign-in, or of pages behind
