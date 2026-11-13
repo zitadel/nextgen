@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
@@ -452,7 +453,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     servesAHostileOrigin() {
-      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const origin = `${PRIMARY_ORIGIN}\u001b[2Jwiped`;
       const deployment = (id: string) => {
         return {
           id,

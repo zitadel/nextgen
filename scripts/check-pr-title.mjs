@@ -32,7 +32,6 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
   ".changeset",
   ".devcontainer",
   ".github",
-  ".moon",
   ".run",
   "docs",
   "examples",
@@ -41,13 +40,14 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
 ];
 
 // Workspaces that build or exercise the product without ever reaching a user:
-// mocks, demos, the docs site and the shared test config. (`packages/testing`
+// mocks, demos, the docs site, the shared test config and test cases. (`packages/testing`
 // left this list when it joined the release train in #692 — the
 // manifest-derived PUBLISHED_ROOTS covers it now.)
 const NON_SHIPPING_WORKSPACES = [
   "apps/docs/",
   "apps/storybook/",
   "packages/api-mock/",
+  "packages/server-sdk-contract/",
   "packages/vitest-config/",
 ];
 
@@ -71,13 +71,13 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "LICENSE",
   "devbox.json",
   "devbox.lock",
-  "moon.yml",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "redocly.yaml",
   "tsconfig.base.json",
   "tsconfig.json",
+  "turbo.json",
   "vitest.config.ts",
 ]);
 
@@ -161,7 +161,7 @@ export function isNonShippingFile(file) {
     return true;
   }
 
-  if (path.endsWith("/moon.yml")) {
+  if (path.endsWith("/turbo.json")) {
     return true;
   }
 

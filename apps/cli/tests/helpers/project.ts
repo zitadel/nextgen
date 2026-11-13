@@ -459,6 +459,27 @@ export class ScaffoldedApp {
   }
 
   /**
+   * Runs `tests add`, with a fake npm on `PATH` that records the install when
+   * `install` is set, and `--skip-install` otherwise.
+   */
+  async addTests(
+    extraArgs: string[] = [],
+    { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    if (!install) {
+      return this.cli(["tests", "add", "--skip-install", ...extraArgs], env);
+    }
+    const npm = await fakePackageManager();
+    this.installLogPath = npm.logPath;
+    return this.cli(["tests", "add", ...extraArgs], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
+      ...env,
+    });
+  }
+
+  /**
    * Runs setup with a git that does everything but commit, as a full disk or a
    * broken git would: setup creates the repository and then cannot commit.
    */
@@ -2063,6 +2084,19 @@ export class ScaffoldedApp {
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
     return this.editDocument("package.json", PackageJsonSchema, edit);
+  }
+
+  /**
+   * Declares the project's package manager in `package.json`, as a project
+   * set up with pnpm, yarn or bun does, so a command that suggests one picks it.
+   *
+   * @param spec - The manager and its version, as the field holds them: `pnpm@10.0.0`.
+   * @returns When the file is written.
+   */
+  usePackageManager(spec: string): Promise<void> {
+    return this.editDocument("package.json", AnyObjectSchema, (pkg) => {
+      pkg.packageManager = spec;
+    });
   }
 
   /** Adds a second flow definition, for a spec whose input is the flow itself. */

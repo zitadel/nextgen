@@ -3,6 +3,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
 import { useAsync } from "@/hooks/use-async";
+import { getPlatformProjectId } from "@/runtime/runtime";
 
 import { toProjectRef } from "./model";
 import { listMyProjectsCached, useMyProjects } from "./my-projects";
@@ -85,10 +86,39 @@ function isRefusal(cause: unknown): boolean {
   return cause instanceof ApiError && (cause.status === 403 || cause.status === 404);
 }
 
+/**
+ * Whether a route path is one of the root's own screens, above every project
+ * (D44): Projects, Settings with its pages, and the person's profile. They
+ * hold the root as the selection, never a project: the platform project for
+ * someone who may act on it (D42), and none for anyone else. The `_authed`
+ * guard makes it so, whatever the link carried.
+ */
+export function isRootPath(path: string): boolean {
+  return (
+    path === "/projects" ||
+    path === "/account" ||
+    path === "/settings" ||
+    path.startsWith("/settings/")
+  );
+}
+
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */
 export function validateProjectScopeSearch(search: Record<string, unknown>): ProjectScopeSearch {
   const project = search[PROJECT_SCOPE_PARAM];
   return typeof project === "string" && project.trim() !== "" ? { project: project.trim() } : {};
+}
+
+/**
+ * Whether `?project=` names the reserved platform project, the console's root
+ * (D42). It is never offered as a project to choose; its screens are the
+ * root's, which the root's sidebar opens by selecting it. The `_authed` guard
+ * lets that selection stand only for someone who may act on the project
+ * (`readPlatformAccess`), and drops it for anyone else.
+ */
+export function selectsPlatformProject(search: Record<string, unknown>): boolean {
+  const platform = getPlatformProjectId();
+  const project = search[PROJECT_SCOPE_PARAM];
+  return !!platform && typeof project === "string" && project.trim() === platform;
 }
 
 /**
@@ -144,6 +174,16 @@ export function useSelectProjectTarget(): (project: string) => {
 /** The selected project id, or `undefined` when none is selected. */
 export function useProjectScope(): string | undefined {
   return useSearch({ strict: false, select: (search) => search.project });
+}
+
+/**
+ * Whether the selected project is the reserved platform project: the screen
+ * is one of the root's (D42), drawn for that project like any project's, and
+ * the chrome around it is the root's (its sidebar, its pill).
+ */
+export function usePlatformSelected(): boolean {
+  const platform = getPlatformProjectId();
+  return useProjectScope() === platform && platform !== undefined;
 }
 
 /**

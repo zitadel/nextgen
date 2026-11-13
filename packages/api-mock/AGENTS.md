@@ -3,11 +3,11 @@
 `@zitadel/api-mock` stands in for the Zitadel API: MSW handlers for the typed
 `@zitadel/api` Flow API and the platform API, and a standalone server built on
 the same handlers. Storybook, the component, SDK and CLI tests use it in
-process; the demos run the server (`moon run api-mock:start`).
+process; the demos run the server (`turbo run start --filter=@zitadel/api-mock`).
 
 It is not published, but it builds to `dist/` (tsdown) like every package:
 consumers resolve its export map (`@zitadel/source` points in-repo tooling at
-the source) and depend on `api-mock:build`.
+the source) and depend on `@zitadel/api-mock#build`.
 
 ## The flow shape mirrors the real default flow
 
@@ -98,3 +98,11 @@ default flow's switch between sign-in and sign-up (its JSDoc has the rules).
   `pnpm exec playwright install`). `pnpm test:unit` is the fast lane.
 - `src/index.spec.ts` is the handlers' contract: for a step-routing
   regression, add its case there first.
+- `src/spec-conformance.spec.ts` checks each answer it gets against the OpenAPI
+  spec, and fails a server route with no success answer. Only answers through
+  that file's `fetch` count: test a new handler and its refusals there.
+- The check proves an error code is one the operation declares, not that it is
+  the right one, and `default` lets any error status through.
+- When the mock and the spec disagree, the spec wins; where the spec is wrong
+  about the server, fix the spec first. A route the spec lacks goes in
+  `src/__tests__/spec-exceptions.ts` with its reason.

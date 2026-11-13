@@ -5,27 +5,29 @@ details and secret handling: [`README.md`](README.md).
 
 ## Lanes
 
-- `moon run e2e:console-smoke`: the built console in Vite preview under its
+Run each with `turbo run <lane> --filter=@zitadel/e2e`.
+
+- `console-smoke`: the built console in Vite preview under its
   embed base `/ui/console/`, with no API.
-- `moon run e2e:console-real`: one real instance through `@zitadel/testing`,
+- `console-real`: one real instance through `@zitadel/testing`,
   the console on the Vite dev server behind its credential-free proxy. Each
   test grants and signs in its own user (`signIn` in `support/sign-in.ts`).
-- `moon run e2e:console-embedded`: the built Go binary serves the console,
+- `console-embedded`: the built Go binary serves the console,
   the login and the API from one origin. The only lane that proves the API
   base and the Go mux agree on the path customers receive.
-- `moon run e2e:console-platform`: the same binary with the platform project
+- `console-platform`: the same binary with the platform project
   bootstrapped, as `zitadel start` (and so `@zitadel/testing`) does by
   default; the server alone leaves it off (`platform.bootstrap_project`). An
   operator works in a granted project other than the one the console signs
   into.
-- `moon run e2e:console-deployment`: checks the hosted-cloud deployment
+- `console-deployment`: checks the hosted-cloud deployment
   `CLOUD_URL` names. It holds only `VERCEL_AUTOMATION_BYPASS_SECRET`, so it
   records no traces and no HTML report. `pnpm check:cloud` runs it with the
   docs and schemas deployment suites; `deployment-checks.yml` runs it for
   every deployment.
 
 How the other four run in CI and locally:
-[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
+[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#turbo-and-the-e2e-lanes).
 
 ## Rules
 
