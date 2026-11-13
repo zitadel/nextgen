@@ -137,7 +137,8 @@ export function keysOf(node: ts.Node | undefined): string[] {
 }
 
 /**
- * The value `literal` gives `key` itself, if it gives one.
+ * The value `literal` gives `key` itself, if it gives one, under the key as an
+ * identifier or quoted: `values: …` and `"values": …` alike.
  *
  * @param literal - An object literal.
  * @param key - A key it may give.
@@ -148,7 +149,11 @@ export function valueOf(
   key: string,
 ): ts.Expression | undefined {
   const property = literal.properties.find((one) => {
-    return ts.isPropertyAssignment(one) && ts.isIdentifier(one.name) && one.name.text === key;
+    return (
+      ts.isPropertyAssignment(one) &&
+      (ts.isIdentifier(one.name) || ts.isStringLiteral(one.name)) &&
+      one.name.text === key
+    );
   });
   return property !== undefined && ts.isPropertyAssignment(property)
     ? property.initializer

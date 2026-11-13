@@ -1,3 +1,4 @@
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -81,6 +82,9 @@ describe("callsOf", () => {
   });
 });
 
+/** An object that quotes the key it gives a value for. */
+const QUOTED = parsedSource("quoted.ts", "x({ \"values\": { min: 1 } });");
+
 describe("valueOf", () => {
   it("is the value an object gives a key itself", () => {
     const [typed] = declaredAs(MODULE, "Refused");
@@ -88,5 +92,16 @@ describe("valueOf", () => {
     expect(typed === undefined ? [] : keysOf(valueOf(typed.literal, "refusal"))).toEqual([
       "message",
     ]);
+  });
+
+  it("is the value an object gives a quoted key", () => {
+    const [call] = callsOf(QUOTED, ["x"]);
+    const literal = call?.arguments[0];
+
+    expect(
+      literal !== undefined && ts.isObjectLiteralExpression(literal)
+        ? keysOf(valueOf(literal, "values"))
+        : [],
+    ).toEqual(["min"]);
   });
 });
