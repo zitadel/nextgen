@@ -87,27 +87,19 @@ export function unmetBy(
 }
 
 /**
- * Each string `details` holds, in a list or a plain object as deep as it goes,
- * which {@link fill} fills as it fills the message.
+ * Each string `details` holds, read by the walk {@link fill} fills them with,
+ * so the check and the fill can never disagree about where a string is.
  *
  * @param details - A refusal's details.
  * @returns The strings, in order.
  */
 function textsIn(details: unknown): string[] {
-  if (typeof details === "string") {
-    return [details];
-  }
-  if (Array.isArray(details)) {
-    return details.flatMap((one) => {
-      return textsIn(one);
-    });
-  }
-  if (typeof details === "object" && details !== null && isPlain(details)) {
-    return Object.values(details).flatMap((one) => {
-      return textsIn(one);
-    });
-  }
-  return [];
+  const texts: string[] = [];
+  eachText(details, (text) => {
+    texts.push(text);
+    return text;
+  });
+  return texts;
 }
 
 /**
@@ -217,32 +209,50 @@ function isPlain(value: object): boolean {
 }
 
 /**
- * `details` with each string filled in. A string that is only a placeholder
- * takes the value as it is, so a list stays a list in the error's details.
+ * `details` with each string it holds, in a list or a plain object as deep as
+ * it goes, replaced by what `change` makes of it. Only a plain object is
+ * rebuilt: anything else — a Date, a Map, a class — would come apart into its
+ * entries and lose what it held, so it is kept as it is.
+ *
+ * @param details - A refusal's details.
+ * @param change - What becomes of each string.
+ * @returns The details, changed.
  */
-function fill(details: unknown, values: Placeholders): unknown {
+function eachText(details: unknown, change: (text: string) => unknown): unknown {
   if (typeof details === "string") {
-    const whole = WHOLE_PLACEHOLDER.exec(details);
-    if (whole?.[1] !== undefined && values[whole[1]] !== undefined) {
-      return values[whole[1]];
-    }
-    return interpolate(details, values);
+    return change(details);
   }
   if (Array.isArray(details)) {
     return details.map((one) => {
-      return fill(one, values);
+      return eachText(one, change);
     });
   }
-  // Only a plain object is rebuilt: anything else — a Date, a Map, a class —
-  // would come apart into its entries and lose what it held.
   if (typeof details === "object" && details !== null && isPlain(details)) {
     return Object.fromEntries(
       Object.entries(details).map(([key, one]) => {
-        return [key, fill(one, values)];
+        return [key, eachText(one, change)];
       }),
     );
   }
   return details;
+}
+
+/**
+ * `details` with each string filled in. A string that is only a placeholder
+ * takes the value as it is, so a list stays a list in the error's details.
+ *
+ * @param details - A refusal's details.
+ * @param values - What its placeholders are filled from.
+ * @returns The details, filled.
+ */
+function fill(details: unknown, values: Placeholders): unknown {
+  return eachText(details, (text) => {
+    const whole = WHOLE_PLACEHOLDER.exec(text);
+    if (whole?.[1] !== undefined && values[whole[1]] !== undefined) {
+      return values[whole[1]];
+    }
+    return interpolate(text, values);
+  });
 }
 
 /**
