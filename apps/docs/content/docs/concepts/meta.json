@@ -6,6 +6,7 @@
     "releases-and-deployments",
     "origins-and-previews",
     "flows-and-schemas",
+    "policies",
     "sessions-auth-attempts",
     "databases"
   ]

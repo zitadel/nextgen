@@ -4,6 +4,7 @@
     "local-runtime",
     "edit-login-flow",
     "deploy",
+    "password-policy",
     "test-policies",
     "test-your-app",
     "migrate-user-schema",

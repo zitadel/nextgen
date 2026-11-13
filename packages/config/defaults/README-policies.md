@@ -3,11 +3,13 @@
 This folder holds your project's operation policies: the rules Zitadel checks
 before an operation runs. One file per operation, named after it, and
 optionally a test file beside it (see [Testing a policy](#testing-a-policy)).
+The guide [Set the password policy](https://preview.zitadel.com/docs/guides/password-policy)
+walks through the settings.
 
 `auth.factor.password.set.json` is the password policy, checked whenever a
-password is set: at sign-up, through the API, and by a user changing their own.
-`zitadel setup` writes it with a minimum length of 15 characters, unless you
-chose another minimum or none:
+password is set: at sign-up and through the API. `zitadel setup` writes it
+with the minimum length you chose during setup: 15 characters by default,
+another minimum, or none. With the default:
 
 ``` json
 {
@@ -26,13 +28,13 @@ file sets is what applies.
 | Setting | What it does | Bounds |
 | --- | --- | --- |
 | `min_length` | The fewest characters a new password may have, counted as Unicode code points after NFC normalization. | 1 to 64 |
-| `max_length` | The most characters a new password may have. A password above 64 characters is refused either way. | 1 to 64 |
-| `history_depth` | How many of the user's passwords, the current one included, a new one may not repeat. Checked only when users set their own password. | 1 to 4 |
+| `max_length` | The most characters a new password may have. A password above 64 characters is refused either way. | `min_length` to 64 |
+| `history_depth` | How many of the user's passwords, the current one included, a new one may not repeat. Checked only when users set their own password, which no sign-up or API call does yet: set it now, and it applies once users can change their own password. | 1 to 4 |
 
-`min_length` may not be above `max_length`. The bounds are technical limits,
-not recommendations. NIST SP 800-63B asks for at least 15 characters when the
-password is the only factor, and at least 8 when it is always used with a
-second one.
+The bounds are technical limits, not recommendations.
+[NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver)
+asks for at least 15 characters when the password is the only factor, and at
+least 8 when it is always used with a second one.
 
 ## The sign-up policy
 
