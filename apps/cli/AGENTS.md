@@ -15,6 +15,11 @@
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
   [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+- Declare no `let`, in `src` or `tests`: compute a `const`, or use an array method,
+  `for...of` or recursion. `biome-plugins/no-let.grit` rejects it. `src/lib/orca/patchers`
+  is exempt: it is code that edits the customer's files, not code the CLI runs on itself.
+- `src/lib/orca/patchers` edits and drops code into the customer's project, so no
+  style or lint sweep may touch it: [`src/lib/orca/AGENTS.md`](src/lib/orca/AGENTS.md).
 - Imports: reach `src/` with `@/` (`@/lib/errors`), never `../`; `./` stays for siblings.
 - Scaffold posture: [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)
   (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:

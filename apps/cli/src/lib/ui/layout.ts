@@ -121,9 +121,9 @@ const columnRows = (lines: readonly string[]): boolean[] => {
     return /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
   };
   const neighbour = (index: number, step: 1 | -1): number[] | undefined => {
-    let at = index + step;
-    while (lines[at] !== undefined && isRule(lines[at] ?? "")) {
-      at += step;
+    const at = index + step;
+    if (lines[at] !== undefined && isRule(lines[at] ?? "")) {
+      return neighbour(at, step);
     }
     return starts[at];
   };
@@ -258,30 +258,37 @@ export class Facts implements Renderable {
  * it as an opening quote inverted the quote state for the rest
  * of the line. A quote does not open inside a word, so `it's` is not one.
  */
-const argumentBreaks = (command: string): number[] => {
-  const at: number[] = [];
-  let quote: string | undefined;
-  let escaped = false;
+const argumentBreaks = (command: string): readonly number[] => {
   // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command.charAt(index);
-    if (escaped) {
-      escaped = false;
-    } else if (character === "\\" && quote !== "'") {
-      escaped = true;
-    } else if (quote !== undefined) {
-      quote = character === quote ? undefined : quote;
-    } else if (
-      (character === "'" || character === '"') &&
-      !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
-      command.includes(character, index + 1)
-    ) {
-      quote = character;
-    } else if (character === " ") {
-      at.push(index);
-    }
-  }
-  return at;
+  return command.split("").reduce<{ at: readonly number[]; quote?: string; escaped: boolean }>(
+    (scan, character, index) => {
+      if (scan.escaped) {
+        return { at: scan.at, quote: scan.quote, escaped: false };
+      }
+      if (character === "\\" && scan.quote !== "'") {
+        return { at: scan.at, quote: scan.quote, escaped: true };
+      }
+      if (scan.quote !== undefined) {
+        return {
+          at: scan.at,
+          quote: character === scan.quote ? undefined : scan.quote,
+          escaped: false,
+        };
+      }
+      if (
+        (character === "'" || character === '"') &&
+        !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
+        command.includes(character, index + 1)
+      ) {
+        return { at: scan.at, quote: character, escaped: false };
+      }
+      if (character === " ") {
+        return { at: [...scan.at, index], quote: scan.quote, escaped: false };
+      }
+      return scan;
+    },
+    { at: [], escaped: false },
+  ).at;
 };
 
 /**
@@ -304,23 +311,21 @@ const argumentBreaks = (command: string): number[] => {
  *   command fits or has no space to break at.
  */
 export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
-  const lines: string[] = [];
-  let rest = command;
-  let indent = lead;
-  while (indent.length + rest.length > width) {
-    const cut = argumentBreaks(rest)
-      .filter((at) => {
-        return at > 0 && at <= Math.max(1, width - indent.length - 2);
-      })
-      .at(-1);
-    if (cut === undefined) {
-      break;
-    }
-    lines.push(`${indent}${rest.slice(0, cut)} \\`);
-    rest = rest.slice(cut + 1);
-    indent = lead;
+  if (lead.length + command.length <= width) {
+    return [`${lead}${command}`];
   }
-  return [...lines, `${indent}${rest}`];
+  const cut = argumentBreaks(command)
+    .filter((at) => {
+      return at > 0 && at <= Math.max(1, width - lead.length - 2);
+    })
+    .at(-1);
+  if (cut === undefined) {
+    return [`${lead}${command}`];
+  }
+  return [
+    `${lead}${command.slice(0, cut)} \\`,
+    ...wrapCommand(command.slice(cut + 1), width, lead),
+  ];
 };
 
 /**

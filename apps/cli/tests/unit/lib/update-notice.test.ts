@@ -1,20 +1,19 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
 
 import { updateNotice } from "@/lib/update-notice";
+import { it } from "@tests/helpers/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
 const server = setupServer();
-let dir: string;
 
-function notice(cliVersion: string, env: NodeJS.ProcessEnv = {}) {
+function notice(dir: string, cliVersion: string, env: NodeJS.ProcessEnv = {}) {
   return updateNotice({
     cliVersion,
     upgrade: aSuggest({}, cliVersion)({ id: "upgrade" }),
@@ -24,34 +23,32 @@ function notice(cliVersion: string, env: NodeJS.ProcessEnv = {}) {
   });
 }
 
-function pins(dependencies: Record<string, string>): Promise<void> {
+function pins(dir: string, dependencies: Record<string, string>): Promise<void> {
   return writeFile(join(dir, "package.json"), JSON.stringify({ dependencies }));
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-update-notice-"));
+beforeEach(() => {
   server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
 });
-afterEach(async () => {
+afterEach(() => {
   server.resetHandlers();
-  await rm(dir, { recursive: true, force: true });
 });
 
 describe("updateNotice", () => {
-  it("boxes the new version and the command, on the dist-tag", async () => {
-    const box = await notice("1.0.0");
+  it("boxes the new version and the command, on the dist-tag", async ({ dir }) => {
+    const box = await notice(dir, "1.0.0");
 
     expect(box).toContain("Update available");
     expect(box).toContain("CLI 1.0.0 → 2.0.0");
     expect(box).toContain("npx @zitadel/cli@latest upgrade");
   });
 
-  it("names a pinned package that is behind, even with the newest CLI", async () => {
-    await pins({ "@zitadel/sdk-next": "1.0.0" });
+  it("names a pinned package that is behind, even with the newest CLI", async ({ dir }) => {
+    await pins(dir, { "@zitadel/sdk-next": "1.0.0" });
 
-    const box = await notice("2.0.0");
+    const box = await notice(dir, "2.0.0");
 
     expect(box).toContain("@zitadel/sdk-next 1.0.0 → 2.0.0");
     expect(box).not.toContain("CLI 2.0.0");
@@ -59,46 +56,48 @@ describe("updateNotice", () => {
 
   // The box goes straight to stderr rather than through `emit`, and a name is
   // only known to start with `@zitadel/`.
-  it("spells out a pinned package's name, which the project's package.json carries", async () => {
-    await pins({ "@zitadel/sdk-next\u001b[2Jwiped": "1.0.0" });
+  it("spells out a pinned package's name, which the project's package.json carries", async ({
+    dir,
+  }) => {
+    await pins(dir, { "@zitadel/sdk-next\u001b[2Jwiped": "1.0.0" });
 
-    const box = await notice("2.0.0");
+    const box = await notice(dir, "2.0.0");
 
     expect(box).not.toContain("\u001b[2J");
     expect(box).toContain("@zitadel/sdk-next\\x1b[2Jwiped 1.0.0 → 2.0.0");
   });
 
-  it("leaves a range alone", async () => {
-    await pins({ "@zitadel/sdk-next": "^1.0.0" });
+  it("leaves a range alone", async ({ dir }) => {
+    await pins(dir, { "@zitadel/sdk-next": "^1.0.0" });
 
-    await expect(notice("2.0.0")).resolves.toBeUndefined();
+    await expect(notice(dir, "2.0.0")).resolves.toBeUndefined();
   });
 
-  it("says nothing when everything is current", async () => {
-    await pins({ "@zitadel/sdk-next": "2.0.0" });
+  it("says nothing when everything is current", async ({ dir }) => {
+    await pins(dir, { "@zitadel/sdk-next": "2.0.0" });
 
-    await expect(notice("2.0.0")).resolves.toBeUndefined();
+    await expect(notice(dir, "2.0.0")).resolves.toBeUndefined();
   });
 
-  it("says nothing when the lookup found nothing", async () => {
+  it("says nothing when the lookup found nothing", async ({ dir }) => {
     server.use(http.get(REGISTRY, () => HttpResponse.error()));
 
-    await expect(notice("1.0.0")).resolves.toBeUndefined();
+    await expect(notice(dir, "1.0.0")).resolves.toBeUndefined();
   });
 
-  it("does not ask when the check is off", async () => {
+  it("does not ask when the check is off", async ({ dir }) => {
     server.use(
       http.get(REGISTRY, () => {
         throw new Error("the registry was asked");
       }),
     );
 
-    await expect(notice("1.0.0", { ZITADEL_UPDATE_CHECK: "0" })).resolves.toBeUndefined();
+    await expect(notice(dir, "1.0.0", { ZITADEL_UPDATE_CHECK: "0" })).resolves.toBeUndefined();
   });
 
-  it("carries on past a package.json that does not parse", async () => {
+  it("carries on past a package.json that does not parse", async ({ dir }) => {
     await writeFile(join(dir, "package.json"), "{ not json");
 
-    await expect(notice("1.0.0")).resolves.toContain("CLI 1.0.0 → 2.0.0");
+    await expect(notice(dir, "1.0.0")).resolves.toContain("CLI 1.0.0 → 2.0.0");
   });
 });

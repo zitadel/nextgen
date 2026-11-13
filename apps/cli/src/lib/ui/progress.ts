@@ -1,6 +1,7 @@
 import { log } from "@clack/prompts";
 
 import { log as narration } from "@/lib/log";
+import { Once } from "@/lib/once";
 
 import { stripColumnMarks } from "./layout";
 import { GUIDE, MARK } from "./marks";
@@ -86,13 +87,15 @@ export class Progress {
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
       narration.start(label);
-      let result: T;
-      try {
-        result = await work(report);
-      } catch (error) {
-        narration.fail(`${label} failed`);
-        throw error;
-      }
+      const worked = async (): Promise<T> => {
+        try {
+          return await work(report);
+        } catch (error) {
+          narration.fail(`${label} failed`);
+          throw error;
+        }
+      };
+      const result = await worked();
       for (const { verb, subject } of lines) {
         narration.info(`${verb} ${subject}`);
       }
@@ -125,26 +128,19 @@ export class Progress {
   begin(label: string): Step {
     if (!this.drawing.interactive) {
       narration.start(label);
-      let narrated = false;
-      const once = (narrate: () => void) => {
-        if (narrated) {
-          return;
-        }
-        narrated = true;
-        narrate();
-      };
+      const narrated = new Once();
 
       return {
         detail: (text) => {
           return narration.info(text);
         },
         done: (text) => {
-          return once(() => {
+          return narrated.run(() => {
             return narration.done(text ?? label);
           });
         },
         fail: (text) => {
-          return once(() => {
+          return narrated.run(() => {
             return narration.fail(text ?? `${label} failed`);
           });
         },
@@ -153,23 +149,21 @@ export class Progress {
     this.drawing.open();
     const details: string[] = [];
     const progress = new DrawnSpinner(label, this.drawing.chained);
-    let ended = false;
+    const ended = new Once();
     const end = (symbol: string, text: string) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      progress.clear();
-      this.drawing.closeGap();
-      this.line(symbol, text);
-      for (const line of details) {
-        this.detail(line);
-      }
+      ended.run(() => {
+        progress.clear();
+        this.drawing.closeGap();
+        this.line(symbol, text);
+        for (const line of details) {
+          this.detail(line);
+        }
+      });
     };
 
     return {
       detail: (text) => {
-        if (ended) {
+        if (ended.hasRun) {
           this.detail(text);
           return;
         }

@@ -7,7 +7,7 @@ import type { Summary } from "@/lib/ui";
 
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
-import { painted, type Rendering, rows } from "./rendering";
+import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
 
 /**
@@ -251,16 +251,13 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
             })),
         ...more,
       ];
-      let rendered: { pretty?: Rendering } = {};
-      if (plain) {
-        rendered = { pretty: rows(await this.renderList(plain, view)) };
-      } else if (this.jsonEnabled()) {
-        rendered = { pretty: painted(await this.renderList(plain, view)) };
-      }
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...rendered,
+        ...(plain ? { pretty: rows(await this.renderList(plain, view)) } : {}),
+        ...(!plain && this.jsonEnabled()
+          ? { pretty: painted(await this.renderList(plain, view)) }
+          : {}),
         ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
         summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),

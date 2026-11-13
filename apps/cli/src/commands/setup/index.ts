@@ -143,7 +143,7 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { Questions, Step, Summary } from "@/lib/ui";
+import type { Questions, Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -319,6 +319,26 @@ const isKnownSsoName = (name: string): boolean => {
 };
 
 /**
+ * The provider `--sso` names, as the flags typed it.
+ *
+ * @param flags - The parsed `--sso` and `--sso-*` flags.
+ * @returns The selection, or `undefined` when `--sso` was not given or the
+ *   checks refuse what was typed for it.
+ */
+const selectionOfFlags = (
+  flags: Parameters<typeof customSettingsOf>[0] & { sso?: string },
+): ProviderSelection | undefined => {
+  if (flags.sso === undefined) {
+    return undefined;
+  }
+  try {
+    return selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Retry options straight from parsed flags, for failures before the wizard
  * resolves answers. How the run answered (`--non-interactive`) is not carried:
  * a suggested command never says it, and it re-infers itself on the retry.
@@ -347,14 +367,7 @@ export function retryOptionsFromFlags(flags: {
   // A custom connection is restated as typed, minus the credentials. One the
   // checks refuse is left out: it was refused, and a retry carrying it would be
   // refused again.
-  let selection: ProviderSelection | undefined;
-  if (flags.sso !== undefined) {
-    try {
-      selection = selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
-    } catch {
-      selection = undefined;
-    }
-  }
+  const selection = selectionOfFlags(flags);
   // What was typed for a provider this run knows, kept when it cannot become a
   // selection yet, so a retry reproduces it.
   const typed: SsoFlags | undefined =
@@ -1266,22 +1279,33 @@ export default class Setup extends Destructive(BaseCommand) {
     // it patches it, so cancelling a question leaves the directory as it was,
     // and a dry run never creates one. Until then only its framework and dev
     // port are known.
-    let app: Readonly<{ framework: string; devPort: number }>;
-    let detected: FrameworkFacts | undefined;
-    // Whether `--force` scaffolds beside entries the directory already held,
+    // `detected` is absent when the app is a new one. `scaffoldedBesideFiles` is
+    // whether `--force` scaffolds beside entries the directory already held,
     // other than the local runtime `start` leaves, which counts as empty.
-    let scaffoldedBesideFiles = false;
-    try {
-      detected = await orca.detect(this.cwd, flags.framework);
-      app = {
-        framework: detected.id,
-        devPort: detected.devPort,
-      };
-      detecting.done(
-        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
+    const detection: Readonly<{
+      app: Readonly<{ framework: string; devPort: number }>;
+      detected: FrameworkFacts | undefined;
+      scaffoldedBesideFiles: boolean;
+    }> = await orca
+      .detect(this.cwd, flags.framework)
+      .then((detected) => {
+        detecting.done(
+          `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        );
+        return {
+          app: {
+            framework: detected.id,
+            devPort: detected.devPort,
+          },
+          detected,
+          scaffoldedBesideFiles: false,
+        };
+      })
+      .catch(async (error) => {
+        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+          detecting.fail();
+          throw error;
+        }
         const target = await inspectScaffoldTarget(this.cwd);
         if (!target.scaffoldable && !this.force) {
           detecting.fail();
@@ -1292,24 +1316,23 @@ export default class Setup extends Destructive(BaseCommand) {
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        app = await orca.planScaffold(
-          this.cwd,
-          await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
-            retry: retryOptionsOf(flags),
-            serverFlag: this.meta.serverFlag,
-            ask: wizardQuestions,
-          }),
-        );
-        scaffoldedBesideFiles = !target.scaffoldable;
-      } else {
-        detecting.fail();
-        throw error;
-      }
-    }
+        return {
+          app: await orca.planScaffold(
+            this.cwd,
+            await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
+              retry: retryOptionsOf(flags),
+              serverFlag: this.meta.serverFlag,
+              ask: wizardQuestions,
+            }),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
+      });
     // A new app, created below, or on a dry run only previewed.
-    const scaffoldedFramework = detected === undefined;
+    const scaffoldedFramework = detection.detected === undefined;
     this.recordTelemetry({
-      framework: app.framework,
+      framework: detection.app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags.skipInstall),
@@ -1326,12 +1349,13 @@ export default class Setup extends Destructive(BaseCommand) {
     // dev-server port only when it is unset, so a project that already pins a
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
-    if (flags.devPort !== undefined) {
-      app = {
-        ...app,
-        devPort: flags.devPort,
-      };
-    }
+    const app =
+      flags.devPort === undefined
+        ? detection.app
+        : {
+            ...detection.app,
+            devPort: flags.devPort,
+          };
 
     const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
@@ -1394,12 +1418,10 @@ export default class Setup extends Destructive(BaseCommand) {
     // value space has to stay enumerable: comma-joining n providers makes it
     // combinatorial, and the question telemetry answers here is whether a
     // project enabled a provider at all, not which combination.
-    let ssoDimension = "multiple";
-    if (answers.sso.length === 0) {
-      ssoDimension = "none";
-    } else if (answers.sso.length === 1) {
-      ssoDimension = answers.sso[0] ? selectionName(answers.sso[0].selection) : "none";
-    }
+    const ssoDimension =
+      answers.sso.length > 1
+        ? "multiple"
+        : (answers.sso.map((draft) => selectionName(draft.selection)).at(0) ?? "none");
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
@@ -1440,29 +1462,26 @@ export default class Setup extends Destructive(BaseCommand) {
 
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
-    const scaffolding = detected === undefined && !this.dryRun;
-    let current: Step | undefined;
-    if (detected === undefined && this.dryRun) {
+    const scaffolding = detection.detected === undefined && !this.dryRun;
+    if (detection.detected === undefined && this.dryRun) {
       this.ui
         .begin(`Scaffolding a new ${app.framework} project (dry run)`)
         .done(`Would scaffold a new ${app.framework} project (dry run)`);
     }
-    if (scaffolding) {
-      current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
-    }
-    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
-    if (scaffolding) {
-      try {
-        newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
-      } catch (error) {
-        current?.fail();
-        throw error;
-      }
-    }
+    const scaffold = scaffolding
+      ? this.ui.begin(`Scaffolding a new ${app.framework} project`)
+      : undefined;
+    const newApp =
+      scaffold === undefined
+        ? undefined
+        : await orca.scaffoldUndoably(this.cwd, app.framework, this.force).catch((error) => {
+            scaffold.fail();
+            throw error;
+          });
     if (newApp !== undefined) {
-      current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
+      scaffold?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
-    const created = detected ?? newApp?.facts;
+    const created = detection.detected ?? newApp?.facts;
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
     // `framework.devPort`, and it must agree with the issuer and the registered
@@ -1480,162 +1499,176 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
-    let project: CreatedProject;
-    let result: Awaited<ReturnType<typeof patcher.patch>>;
-    let scaffolded: ScaffoldedConfiguration;
-    try {
-      if (framework !== undefined && !this.dryRun) {
-        // Patch as a dry run first, against a placeholder project: a file setup
-        // would refuse to overwrite (E_CONFLICT), such as an existing app's own
-        // root component, stops setup here, before it creates a project and
-        // writes `zitadel.json`. Without this, the conflict surfaced after both,
-        // and every rerun skipped the directory as already set up.
-        await patcher.patch(patchContext(framework, dryRunProject(issuer)), {
-          cwd: this.cwd,
-          dryRun: true,
-          force: this.force,
-        });
-      }
-
-      // `POST /projects` is unauthenticated. CLI-managed projects opt out of
-      // server fallback defaults; setup writes the default configuration files
-      // and the first deploy publishes them.
-      // Resolved values, not raw flags: the wizard may have picked the preset,
-      // use case, or dev port interactively, and a retry must reproduce those
-      // choices — the issuer registered with the project derives from the port.
-      const retry: SetupRetryOptions = {
-        ...retryOptionsOf(flags),
-        framework: app.framework,
-        preset: answers.preset,
-        useCase: answers.useCase,
-        devPort: answers.devPort,
-        sso: answers.sso.map((answer) => {
-          return answer.selection;
-        }),
-        passwordMinLength: answers.passwordMinLength,
-      };
-      current = this.ui.begin(
-        `Creating project on ${escapeControlCharacters(answers.server)}${this.dryRun ? " (dry run)" : ""}`,
-      );
-      const unauthClient = createZitadelClient({
-        userAgent: userAgent(),
-        baseUrl: answers.server,
-        signal: this.signal,
-      });
-      const projectName = defaultProjectName(this.cwd, app.framework);
-      // Register the app's own origin so the backend's origin check allows
-      // requests the dev proxy forwards from it.
-      project = this.dryRun
-        ? dryRunProject(issuer)
-        : await createProjectWithLocalHint(
-            unauthClient,
-            answers.server,
-            this.suggest,
-            projectName,
-            issuer,
-            retry,
-          );
-      current.done(
-        this.dryRun
-          ? "Would create a project (dry run)"
-          : `Created project ${escapeControlCharacters(project.id)}`,
-      );
-      this.recordTelemetry({ step: "project_created" });
-
-      // `.env.local` as it is before the patch merges this project's id and
-      // secret into it, so a failure below can put it back.
-      const envFilesBefore = await readCredentialEnvFiles(this.cwd);
-      if (framework === undefined) {
-        // What the patch writes depends on the files the scaffold creates.
-        this.ui
-          .begin("Patching project files (dry run)")
-          .done("Would patch the new project (dry run): its files come from the scaffold");
-        result = {
-          dryRun: this.dryRun,
-          files: [],
-          filesWritten: [],
-          filesSkipped: [],
-          depsAdded: [],
-        };
-      } else {
-        current = this.ui.begin(`Patching project files${this.dryRun ? " (dry run)" : ""}`);
-        try {
-          result = await patcher.patch(patchContext(framework, project), {
+    const { project, result, scaffolded, patching } = await (async () => {
+      try {
+        if (framework !== undefined && !this.dryRun) {
+          // Patch as a dry run first, against a placeholder project: a file setup
+          // would refuse to overwrite (E_CONFLICT), such as an existing app's own
+          // root component, stops setup here, before it creates a project and
+          // writes `zitadel.json`. Without this, the conflict surfaced after both,
+          // and every rerun skipped the directory as already set up.
+          await patcher.patch(patchContext(framework, dryRunProject(issuer)), {
             cwd: this.cwd,
-            dryRun: this.dryRun,
+            dryRun: true,
             force: this.force,
           });
-        } catch (error) {
-          // The dry run above already ruled out conflicts, so this is an I/O
-          // failure partway through. Remove the setup markers and put
-          // `.env.local` back, as a failed configuration write does below, so a
-          // rerun starts over.
-          if (!this.dryRun) {
-            await removeSetupMarkers(this.cwd);
-            await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
-          }
-          throw error;
         }
-      }
-      for (const file of result.filesWritten) {
-        const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-        if (sentence) {
-          current?.detail(sentence);
-        }
-      }
-      for (const file of result.filesSkipped) {
-        current?.detail(
-          `Left ${escapeControlCharacters(relativeDisplay(this.cwd, file))} unchanged (already matches target)`,
+
+        // `POST /projects` is unauthenticated. CLI-managed projects opt out of
+        // server fallback defaults; setup writes the default configuration files
+        // and the first deploy publishes them.
+        // Resolved values, not raw flags: the wizard may have picked the preset,
+        // use case, or dev port interactively, and a retry must reproduce those
+        // choices — the issuer registered with the project derives from the port.
+        const retry: SetupRetryOptions = {
+          ...retryOptionsOf(flags),
+          framework: app.framework,
+          preset: answers.preset,
+          useCase: answers.useCase,
+          devPort: answers.devPort,
+          sso: answers.sso.map((answer) => {
+            return answer.selection;
+          }),
+          passwordMinLength: answers.passwordMinLength,
+        };
+        const project = await this.ui.task(
+          `Creating project on ${escapeControlCharacters(answers.server)}${this.dryRun ? " (dry run)" : ""}`,
+          async () => {
+            const unauthClient = createZitadelClient({
+              userAgent: userAgent(),
+              baseUrl: answers.server,
+              signal: this.signal,
+            });
+            const projectName = defaultProjectName(this.cwd, app.framework);
+            // Register the app's own origin so the backend's origin check allows
+            // requests the dev proxy forwards from it.
+            return this.dryRun
+              ? dryRunProject(issuer)
+              : await createProjectWithLocalHint(
+                  unauthClient,
+                  answers.server,
+                  this.suggest,
+                  projectName,
+                  issuer,
+                  retry,
+                );
+          },
+          (created) => {
+            return this.dryRun
+              ? "Would create a project (dry run)"
+              : `Created project ${escapeControlCharacters(created.id)}`;
+          },
         );
-      }
-      try {
-        scaffolded = this.dryRun
-          ? {
-              filesWritten: [],
-              passwordMinLength: signInOf(answers).password_min_length,
-            }
-          : await this.writeConfiguration(answers, project);
+        this.recordTelemetry({ step: "project_created" });
+
+        // `.env.local` as it is before the patch merges this project's id and
+        // secret into it, so a failure below can put it back.
+        const envFilesBefore = await readCredentialEnvFiles(this.cwd);
+        const patching = this.ui.begin(
+          framework === undefined
+            ? "Patching project files (dry run)"
+            : `Patching project files${this.dryRun ? " (dry run)" : ""}`,
+        );
+        if (framework === undefined) {
+          // What the patch writes depends on the files the scaffold creates.
+          patching.done("Would patch the new project (dry run): its files come from the scaffold");
+        }
+        const result =
+          framework === undefined
+            ? {
+                dryRun: this.dryRun,
+                files: [],
+                filesWritten: [],
+                filesSkipped: [],
+                depsAdded: [],
+              }
+            : await patcher
+                .patch(patchContext(framework, project), {
+                  cwd: this.cwd,
+                  dryRun: this.dryRun,
+                  force: this.force,
+                })
+                .catch(async (error) => {
+                  // The dry run above already ruled out conflicts, so this is an I/O
+                  // failure partway through. Remove the setup markers and put
+                  // `.env.local` back, as a failed configuration write does below, so a
+                  // rerun starts over.
+                  patching.fail();
+                  if (!this.dryRun) {
+                    await removeSetupMarkers(this.cwd);
+                    await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
+                  }
+                  throw error;
+                });
+        for (const file of result.filesWritten) {
+          const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
+          if (sentence) {
+            patching.detail(sentence);
+          }
+        }
+        for (const file of result.filesSkipped) {
+          patching.detail(
+            `Left ${escapeControlCharacters(relativeDisplay(this.cwd, file))} unchanged (already matches target)`,
+          );
+        }
+        try {
+          return {
+            project,
+            result,
+            scaffolded: this.dryRun
+              ? {
+                  filesWritten: [],
+                  passwordMinLength: signInOf(answers).password_min_length,
+                }
+              : await this.writeConfiguration(answers, project),
+            patching,
+          };
+        } catch (error) {
+          patching.fail();
+          // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+          // marker the already-initialized guard skips on) and `.zitadel/secret`.
+          // Remove both so a rerun starts a fresh setup instead of being skipped
+          // forever with no default schema or login flow anywhere. The project
+          // has nothing deployed, so its credentials are not worth keeping, and
+          // `.env.local`, where the patch merged them, goes back to what it held
+          // before.
+          // Only these, and never a connection file: those are tenant-owned, and
+          // setup neither writes over nor removes one -- unless it is part of a
+          // new app, which goes as a whole.
+          await removeSetupMarkers(this.cwd);
+          await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
+          const cause = toZitadelError(error);
+          const rerun = setupRetryFlags({
+            ...retry,
+            server: this.meta.serverFlag ?? null,
+          });
+          throw new ZitadelError(
+            cause.code,
+            `Default configuration setup failed: ${cause.message}`,
+            {
+              hint: this.configurationFailureHint(
+                cause,
+                newApp !== undefined,
+                this.suggest({ id: "setup", flags: rerun }),
+              ),
+              nextCommands:
+                cause.nextCommands ??
+                (newApp === undefined
+                  ? [this.suggest({ id: "setup", flags: { ...rerun, force: true } })]
+                  : []),
+              details: cause.details,
+            },
+          );
+        }
       } catch (error) {
-        // Setup is not atomic: the patcher already wrote `zitadel.json` (the
-        // marker the already-initialized guard skips on) and `.zitadel/secret`.
-        // Remove both so a rerun starts a fresh setup instead of being skipped
-        // forever with no default schema or login flow anywhere. The project
-        // has nothing deployed, so its credentials are not worth keeping, and
-        // `.env.local`, where the patch merged them, goes back to what it held
-        // before.
-        // Only these, and never a connection file: those are tenant-owned, and
-        // setup neither writes over nor removes one -- unless it is part of a
-        // new app, which goes as a whole.
-        await removeSetupMarkers(this.cwd);
-        await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
-        const cause = toZitadelError(error);
-        const rerun = setupRetryFlags({
-          ...retry,
-          server: this.meta.serverFlag ?? null,
-        });
-        throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
-          hint: this.configurationFailureHint(
-            cause,
-            newApp !== undefined,
-            this.suggest({ id: "setup", flags: rerun }),
-          ),
-          nextCommands:
-            cause.nextCommands ??
-            (newApp === undefined
-              ? [this.suggest({ id: "setup", flags: { ...rerun, force: true } })]
-              : []),
-          details: cause.details,
-        });
+        if (newApp !== undefined) {
+          await removeNewApp(newApp, this.cwd, this.env, (text) => {
+            this.ui.say(text);
+          });
+        }
+        throw error;
       }
-    } catch (error) {
-      current?.fail();
-      if (newApp !== undefined) {
-        await removeNewApp(newApp, this.cwd, this.env, (text) => {
-          this.ui.say(text);
-        });
-      }
-      throw error;
-    }
+    })();
     try {
       await newApp?.keep();
     } catch (error) {
@@ -1647,12 +1680,12 @@ export default class Setup extends Destructive(BaseCommand) {
     for (const file of scaffolded.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
       if (sentence) {
-        current?.detail(sentence);
+        patching.detail(sentence);
       }
     }
     const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
-      current?.done(
+      patching.done(
         `${this.dryRun ? "Would patch" : "Patched"} ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}${result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""}${this.dryRun ? " (dry run)" : ""}`,
       );
     }
@@ -1840,65 +1873,65 @@ export default class Setup extends Destructive(BaseCommand) {
     // admin, so the project is attached to their team right away and
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
-    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
       !this.dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
-    if (hostsPlatform) {
-      // The runtime document naming the platform project does not prove a
-      // claim can complete (a deployment can pin that project without the
-      // platform bootstrap, which leaves the admin without a personal team),
-      // so attaching the project is best-effort: on failure the project stays
-      // unclaimed and setup falls back to the usual claim nudge instead of
-      // failing after it has already written the app files. Reading the admin
-      // belongs inside the guard for the same reason — a malformed
-      // `admin.json` must not fail a setup that already wrote the app.
-      try {
-        const admin = await findLocalAdminFor(this.cwd, answers.server);
-        if (!admin) {
-          // The console lists only projects the signed-in person can manage,
-          // so an unattached project is one the local admin never sees. A
-          // server started by hand has no local admin anywhere, hence the "if".
-          reportWarning(
-            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggest({ id: "start" })} started this server, run setup from the directory it ran in, or one inside it.`,
-          );
-        }
-        if (admin) {
-          const owner = await claimProjectAsAdmin({
-            serverUrl: answers.server,
-            projectId: project.id,
-            projectSecret: project.project_secret,
-            admin,
-            signal: this.signal,
-          });
-          // The team is whichever one the platform attached the project to —
-          // the admin's earliest active membership, which need not be the team
-          // its bootstrap document named.
-          const secret = await readZitadelSecret(this.cwd);
-          await writeZitadelSecret(this.cwd, {
-            ...secret,
-            team_id: owner.team_id,
-            claimed_at: owner.claimed_at,
-          });
-          ownedByLocalAdmin = {
-            email: admin.email,
-            team_id: owner.team_id,
-          };
-          this.ui
-            .begin("Attaching the project to the local admin")
-            .done(
-              `Project owned by ${escapeControlCharacters(admin.email)} (team ${escapeControlCharacters(owner.team_id)})`,
+    // The runtime document naming the platform project does not prove a
+    // claim can complete (a deployment can pin that project without the
+    // platform bootstrap, which leaves the admin without a personal team),
+    // so attaching the project is best-effort: on failure the project stays
+    // unclaimed and setup falls back to the usual claim nudge instead of
+    // failing after it has already written the app files. Reading the admin
+    // belongs inside the guard for the same reason — a malformed
+    // `admin.json` must not fail a setup that already wrote the app.
+    const ownedByLocalAdmin = !hostsPlatform
+      ? undefined
+      : await findLocalAdminFor(this.cwd, answers.server)
+          .then(async (admin) => {
+            if (!admin) {
+              // The console lists only projects the signed-in person can manage,
+              // so an unattached project is one the local admin never sees. A
+              // server started by hand has no local admin anywhere, hence the "if".
+              reportWarning(
+                `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggest({ id: "start" })} started this server, run setup from the directory it ran in, or one inside it.`,
+              );
+              return undefined;
+            }
+            const owner = await claimProjectAsAdmin({
+              serverUrl: answers.server,
+              projectId: project.id,
+              projectSecret: project.project_secret,
+              admin,
+              signal: this.signal,
+            });
+            // The team is whichever one the platform attached the project to —
+            // the admin's earliest active membership, which need not be the team
+            // its bootstrap document named.
+            const secret = await readZitadelSecret(this.cwd);
+            await writeZitadelSecret(this.cwd, {
+              ...secret,
+              team_id: owner.team_id,
+              claimed_at: owner.claimed_at,
+            });
+            this.ui
+              .begin("Attaching the project to the local admin")
+              .done(
+                `Project owned by ${escapeControlCharacters(admin.email)} (team ${escapeControlCharacters(owner.team_id)})`,
+              );
+            return {
+              email: admin.email,
+              team_id: owner.team_id,
+            };
+          })
+          .catch((error) => {
+            if (isCancellation(error) || this.signal.aborted) {
+              throw error;
+            }
+            reportWarning(
+              `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
             );
-        }
-      } catch (error) {
-        if (isCancellation(error) || this.signal.aborted) {
-          throw error;
-        }
-        reportWarning(
-          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
-        );
-      }
-    }
+            return undefined;
+          });
 
     const deadline = this.dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
@@ -1972,138 +2005,134 @@ export default class Setup extends Destructive(BaseCommand) {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     const title = this.dryRun ? WOULD_SET_UP_TITLE : SET_UP_TITLE;
-    let summary: Summary = {
-      title,
-      sections: [],
-    };
-    let report = "";
     if (!this.dryRun) {
       this.ui.ranAgainst(project.id, answers.server);
     }
-    if (!this.isJson) {
-      const projectFacts = await detectProjectFacts(this.cwd, app.framework);
-      const sections = buildSummary({
-        projectFacts,
-        writtenRel,
-        depsAdded: result.depsAdded,
-        project,
-        server: answers.server,
-        issuer,
-        scaffoldedFramework,
-        scaffoldedBesideFiles,
-        connections: planned.connections,
-        signIn,
-      });
-      const nextActions = [
-        ...deployStep.boxActions,
-        ...installOutcome.boxActions,
-        ...consoleStep.boxActions,
-        ...ssoStep.boxActions,
-        ...claimNudge.boxActions,
-        ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
-      ];
-      const connectionLines = planned.connections.flatMap((entry) => {
-        const connection = entry.connection;
-        const text = (value: string) => {
-          return escapeControlCharacters(value, { keepLayout: false });
-        };
-        const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
-          planned.change.after.connections.summarize(connection);
-        const verifiedBy = new Map(
-          verifications.map(({ property, claim }) => {
-            return [property, claim];
-          }),
-        );
-        let mappingSection: string[] = [];
-        if (mappings.length > 0) {
-          mappingSection = [
-            createsUsers
-              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-            ...mappings.map(({ property, claim }) => {
-              const how = verifiedBy.get(property);
-              let verified = "is not treated as verified";
-              if (how === true) {
-                verified = "always counts as verified";
-              } else if (typeof how === "string") {
-                verified = `counts as verified when ${text(how)} is true`;
-              }
-              return [
-                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                `  It ${verified}.`,
-              ].join("\n");
-            }),
-          ];
-        }
-        const sections = [
-          mappingSection,
-          scopes.length === 0
-            ? []
-            : [
-                `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
-              ],
-          unmapped.length === 0
-            ? []
-            : [
-                "These attributes have no claim yet:",
-                ...unmapped.map(({ property, required }) => {
-                  if (!required) {
-                    return `- ${text(property)} is optional, so it can stay empty.`;
-                  }
-                  return createsUsers
-                    ? `- ${text(property)} is required, so sign-up will have to ask for it.`
-                    : `- ${text(property)} is required, but this connection does not create users.`;
-                }),
-              ],
-          usedBy.length === 0
-            ? []
-            : [
-                `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
-              ],
-          [
-            `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
-          ],
-        ].filter((section) => {
-          return section.length > 0;
-        });
-        return [
-          "",
-          ...sections.flatMap((section, at) => {
-            return at === 0 ? section : ["", ...section];
-          }),
-        ];
-      });
-      summary = {
-        title,
-        sections: summarySections(sections),
-        lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
-        next: nextActions,
-        boxed: true,
+    const nextActions = [
+      ...deployStep.boxActions,
+      ...installOutcome.boxActions,
+      ...consoleStep.boxActions,
+      ...ssoStep.boxActions,
+      ...claimNudge.boxActions,
+      ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
+    ];
+    const connectionLines = planned.connections.flatMap((entry) => {
+      const connection = entry.connection;
+      const text = (value: string) => {
+        return escapeControlCharacters(value, { keepLayout: false });
       };
-      if (!this.ui.interactive) {
-        const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
-          .split("\n")
-          .map((line) => {
-            return line.trim();
-          });
-        const ending = this.ui.ending({
-          ...summary,
-          next: [
-            ...nextActions,
-            ...(exploreCommand === undefined
-              ? []
-              : [
-                  {
-                    text: exploreText,
-                    command: exploreCommand,
-                  },
-                ]),
-          ],
-        });
-        // The ending is only what sits under the closing line, so the headline is added.
-        report = `${title}\n${ending}`;
-      }
-    }
+      const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+        planned.change.after.connections.summarize(connection);
+      const verifiedBy = new Map(
+        verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+          if (claim === true) {
+            return [[property, "always counts as verified"]];
+          }
+          if (typeof claim === "string") {
+            return [[property, `counts as verified when ${text(claim)} is true`]];
+          }
+          return [];
+        }),
+      );
+      const sections = [
+        mappings.length === 0
+          ? []
+          : [
+              createsUsers
+                ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+              ...mappings.map(({ property, claim }) => {
+                const verified = verifiedBy.get(property) ?? "is not treated as verified";
+                return [
+                  `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                  `  It ${verified}.`,
+                ].join("\n");
+              }),
+            ],
+        scopes.length === 0
+          ? []
+          : [
+              `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
+            ],
+        unmapped.length === 0
+          ? []
+          : [
+              "These attributes have no claim yet:",
+              ...unmapped.map(({ property, required }) => {
+                if (!required) {
+                  return `- ${text(property)} is optional, so it can stay empty.`;
+                }
+                return createsUsers
+                  ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                  : `- ${text(property)} is required, but this connection does not create users.`;
+              }),
+            ],
+        usedBy.length === 0
+          ? []
+          : [
+              `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+            ],
+        [
+          `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+        ],
+      ].filter((section) => {
+        return section.length > 0;
+      });
+      return [
+        "",
+        ...sections.flatMap((section, at) => {
+          return at === 0 ? section : ["", ...section];
+        }),
+      ];
+    });
+    const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
+      .split("\n")
+      .map((line) => {
+        return line.trim();
+      });
+    const summary: Summary = this.isJson
+      ? {
+          title,
+          sections: [],
+        }
+      : {
+          title,
+          sections: summarySections(
+            buildSummary({
+              projectFacts: await detectProjectFacts(this.cwd, app.framework),
+              writtenRel,
+              depsAdded: result.depsAdded,
+              project,
+              server: answers.server,
+              issuer,
+              scaffoldedFramework,
+              scaffoldedBesideFiles: detection.scaffoldedBesideFiles,
+              connections: planned.connections,
+              signIn,
+            }),
+          ),
+          lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
+          next: nextActions,
+          boxed: true,
+        };
+    // The ending is only what sits under the closing line, so the headline is added.
+    const report =
+      this.isJson || this.ui.interactive
+        ? ""
+        : `${title}\n${this.ui.ending({
+            ...summary,
+            next: [
+              ...nextActions,
+              ...(exploreCommand === undefined
+                ? []
+                : [
+                    {
+                      text: exploreText,
+                      command: exploreCommand,
+                    },
+                  ]),
+            ],
+          })}`;
 
     return this.emit({
       status: "ok",
@@ -2517,7 +2546,6 @@ export default class Setup extends Destructive(BaseCommand) {
     const moving = this.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
     );
-    let ended = false;
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -2543,12 +2571,10 @@ export default class Setup extends Destructive(BaseCommand) {
             `${dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
           );
         }
-        ended = true;
       },
     }).catch((error: unknown) => {
-      if (!ended) {
-        moving.fail();
-      }
+      // A step ends once, so this says nothing more when `filesMoved` ended it.
+      moving.fail();
       throw error;
     });
     // Pinned to the project just moved, as the other recoveries are: its env

@@ -118,12 +118,11 @@ export default class Upgrade extends BaseCommand {
       await this.install(install, installSuggestion);
     }
     const refreshes = install !== undefined && (await hasZitadelConfig(this.cwd));
-    let refresh: Refresh = "skipped";
-    if (refreshes) {
-      refresh = this.dryRun
-        ? "planned"
-        : await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal);
-    }
+    const refreshed =
+      refreshes && !this.dryRun
+        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal)
+        : undefined;
+    const refresh: Refresh = refreshed ?? (refreshes && this.dryRun ? "planned" : "skipped");
 
     // A command to run at the new version, written for `target` rather than
     // for the release that is running.
@@ -144,13 +143,11 @@ export default class Upgrade extends BaseCommand {
         : []),
     ];
 
-    let said = `Zitadel upgraded to ${target}`;
-    if (upToDate) {
-      said = `Zitadel is up to date at ${target}`;
-    } else if (this.dryRun) {
-      said = `Zitadel can be upgraded to ${target}`;
-    }
-    said = `${said}${this.dryRun ? " (dry run)" : ""}`;
+    const upgraded = this.dryRun
+      ? `Zitadel can be upgraded to ${target}`
+      : `Zitadel upgraded to ${target}`;
+    const stated = upToDate ? `Zitadel is up to date at ${target}` : upgraded;
+    const said = `${stated}${this.dryRun ? " (dry run)" : ""}`;
     const done = this.dryRun ? arrow : mark.pass;
     const rows = [
       // A package's name and versions are what the registry answered, and this

@@ -510,15 +510,25 @@ describe("asker", () => {
   });
 
   describe("the hooks around a prompt", () => {
-    it("runs the one after it even when the prompt throws", async () => {
+    it("sees the prompt throw", async () => {
       vi.mocked(confirm).mockRejectedValueOnce(new Error("boom"));
-      const after = vi.fn();
+      const thrown = vi.fn();
 
-      await asker({ ...ask, after })
+      await asker({
+        ...ask,
+        around: async (draw) => {
+          try {
+            return await draw();
+          } catch (error) {
+            thrown(error);
+            throw error;
+          }
+        },
+      })
         .confirm({ name: "x", message: "X?" })
         .catch(() => undefined);
 
-      expect(after).toHaveBeenCalledOnce();
+      expect(thrown).toHaveBeenCalledOnce();
     });
   });
 
@@ -759,16 +769,17 @@ describe("asker", () => {
           const screen = flatOutput(process.stdout);
           const drawing = prompt(false) as ReturnType<typeof vi.fn>;
           vi.mocked(isCancel).mockReturnValue(true);
-          let onScreen = 0;
-          drawing.mockImplementationOnce((options: { output: Writable }) => {
-            options.output.write("\u001b[?25l\n\n");
-            onScreen = screen.showing;
-            return Promise.resolve(Symbol("cancel"));
+          const onScreen = new Promise<number>((resolve) => {
+            drawing.mockImplementationOnce((options: { output: Writable }) => {
+              options.output.write("\u001b[?25l\n\n");
+              resolve(screen.showing);
+              return Promise.resolve(Symbol("cancel"));
+            });
           });
 
           await act({ ...ask, guide: false }).catch(() => undefined);
 
-          expect([onScreen, screen.showing]).toEqual([2, 0]);
+          expect([await onScreen, screen.showing]).toEqual([2, 0]);
         },
       );
 

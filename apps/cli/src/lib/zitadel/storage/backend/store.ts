@@ -377,11 +377,19 @@ export abstract class Store implements ConfigStore {
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    let text: string;
     try {
-      text = (
+      const text = (
         await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8")
       ).toString();
+      try {
+        const body: unknown = JSON.parse(text);
+        if (!isJsonValue(body) || !isJsonObject(body)) {
+          return UnparsedFile.notAnObject(path);
+        }
+        return { path, body };
+      } catch {
+        return UnparsedFile.invalidJson(path, text);
+      }
     } catch (error) {
       const code = Store.errnoOf(error);
       // A directory named like a file cannot be parsed, but it hides nothing
@@ -391,16 +399,6 @@ export abstract class Store implements ConfigStore {
       }
       throw Store.unreadable(path, code);
     }
-    let body: unknown;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      return UnparsedFile.invalidJson(path, text);
-    }
-    if (!isJsonValue(body) || !isJsonObject(body)) {
-      return UnparsedFile.notAnObject(path);
-    }
-    return { path, body };
   }
 
   /**

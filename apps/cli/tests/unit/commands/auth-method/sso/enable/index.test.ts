@@ -156,9 +156,8 @@ async function enterCustom(
   ...flags: string[]
 ): Promise<{ failure: unknown; shown: string; asked: string[] }> {
   const talk = answering(...answers);
-  let failure: unknown;
-  await asTerminal(async () => {
-    failure = await rejectionOf(() => {
+  const failure = await asTerminal(() => {
+    return rejectionOf(() => {
       return AuthMethodSsoEnable.run(customArgs(cwd, ...flags), CONFIG);
     });
   });
@@ -1017,32 +1016,29 @@ describe("auth-method sso enable when the schema cannot be written", () => {
     const schemaFile = join(cwd, ".zitadel/schemas/default-human-user.json");
     await chmod(schemaFile, 0o400);
     await chmod(join(cwd, ".zitadel/schemas"), 0o500);
-    let failure: unknown;
 
-    try {
-      failure = await withStdin(ACME.secret, () => {
-        return rejectionOf(() => {
-          return AuthMethodSsoEnable.run(
-            [
-              ...customArgs(cwd),
-              "--slug",
-              ACME.slug,
-              "--display-name",
-              ACME.displayName,
-              "--issuer",
-              ACME.issuer,
-              "--client-id",
-              ACME.clientId,
-            ],
-            CONFIG,
-          );
-        });
+    const failure = await withStdin(ACME.secret, () => {
+      return rejectionOf(() => {
+        return AuthMethodSsoEnable.run(
+          [
+            ...customArgs(cwd),
+            "--slug",
+            ACME.slug,
+            "--display-name",
+            ACME.displayName,
+            "--issuer",
+            ACME.issuer,
+            "--client-id",
+            ACME.clientId,
+          ],
+          CONFIG,
+        );
       });
-    } finally {
+    }).finally(async () => {
       await chmod(join(cwd, ".zitadel/schemas"), 0o700);
       await chmod(schemaFile, 0o600);
       server.events.removeAllListeners();
-    }
+    });
 
     expect(failure).toMatchObject({ code: "EEXIT", oclif: { exit: 1 } });
     expect(

@@ -17,17 +17,14 @@ const pipe = (): PassThrough => new PassThrough();
 
 /** Runs `act` and returns how many SIGINTs reached the process meanwhile. */
 const interrupts = (act: () => void): number => {
-  let count = 0;
-  const listener = (): void => {
-    count += 1;
-  };
+  const listener = vi.fn();
   process.on("SIGINT", listener);
   try {
     act();
   } finally {
     process.off("SIGINT", listener);
   }
-  return count;
+  return listener.mock.calls.length;
 };
 
 /** How long clack waits between one frame of a spinner and the next. */

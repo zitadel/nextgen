@@ -65,23 +65,23 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
  * project, such as a home directory's stray lockfile, can choose for it.
  *
  * @param cwd - The project's directory.
+ * @param below - The directories already walked, nearest first.
  * @returns The directories, nearest first.
  */
-async function projectDirectories(cwd: string): Promise<string[]> {
-  const start = resolve(cwd);
-  const dirs: string[] = [];
-  let dir = start;
-  for (;;) {
-    dirs.push(dir);
-    if (await pathExists(join(dir, ".git"))) {
-      return dirs;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return [start];
-    }
-    dir = parent;
+async function projectDirectories(
+  cwd: string,
+  below: readonly string[] = [],
+): Promise<readonly string[]> {
+  const dir = resolve(cwd);
+  const dirs = [...below, dir];
+  if (await pathExists(join(dir, ".git"))) {
+    return dirs;
   }
+  const parent = dirname(dir);
+  if (parent === dir) {
+    return dirs.slice(0, 1);
+  }
+  return projectDirectories(parent, dirs);
 }
 
 /**

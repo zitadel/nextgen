@@ -69,29 +69,29 @@ export function captureStreams(): {
   read(): { stdout: string; stderr: string };
   restore(): void;
 } {
-  let stdout = "";
-  let stderr = "";
+  const stdout: string[] = [];
+  const stderr: string[] = [];
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stdout.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stdout.write;
   process.stderr.write = ((chunk: string | Uint8Array): boolean => {
-    stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stderr.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stderr.write;
   console.log = (...args: unknown[]): void => {
-    stdout += `${format(...args)}\n`;
+    stdout.push(`${format(...args)}\n`);
   };
   console.error = (...args: unknown[]): void => {
-    stderr += `${format(...args)}\n`;
+    stderr.push(`${format(...args)}\n`);
   };
   return {
     read: () => {
-      return { stdout, stderr };
+      return { stdout: stdout.join(""), stderr: stderr.join("") };
     },
     restore: () => {
       process.stdout.write = originalOut;

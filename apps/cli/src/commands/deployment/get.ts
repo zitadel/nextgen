@@ -55,26 +55,29 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
       shows ? deploymentService.variables(args.deploymentId) : undefined,
     ]);
 
-    let frozen: string[] | undefined;
-    if (variables !== undefined && variables.length === 0) {
-      frozen = ["variables  none"];
-    } else if (variables !== undefined) {
-      frozen = [
-        "variables",
-        ...(
-          await this.tabulate(
-            ["name", "value"],
-            variables.map((variable) => {
-              return variableCell(variable);
-            }),
-          )
-        )
-          .split("\n")
-          .map((line) => {
-            return `  ${line}`;
-          }),
-      ];
-    }
+    const frozen =
+      variables === undefined
+        ? undefined
+        : [
+            ...(variables.length === 0 ? ["variables  none"] : []),
+            ...(variables.length === 0
+              ? []
+              : [
+                  "variables",
+                  ...(
+                    await this.tabulate(
+                      ["name", "value"],
+                      variables.map((variable) => {
+                        return variableCell(variable);
+                      }),
+                    )
+                  )
+                    .split("\n")
+                    .map((line) => {
+                      return `  ${line}`;
+                    }),
+                ]),
+          ];
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
     if (!shows) {
       return this.emit({

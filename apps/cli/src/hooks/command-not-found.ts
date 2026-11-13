@@ -98,9 +98,17 @@ export class NotFound extends BaseCommand {
     // A real command with no subcommands followed by a word it does not take:
     // the command's own refusal. After one with subcommands, the word is a
     // subcommand that does not exist.
-    for (let length = words.length - 1; length > 0; length -= 1) {
-      const prefix = words.slice(0, length);
-      const exists = known.some((c) => c.length === length && prefix.every((w, i) => c[i] === w));
+    // The prefixes of the words, the longest first, the whole of them left out.
+    const prefixes = words
+      .map((_, length) => {
+        return words.slice(0, length);
+      })
+      .slice(1)
+      .reverse();
+    for (const prefix of prefixes) {
+      const exists = known.some(
+        (c) => c.length === prefix.length && prefix.every((w, i) => c[i] === w),
+      );
       if (exists && under(prefix).length === 0) {
         this.id = prefix.join(":");
         throw new ZitadelError(
@@ -113,10 +121,10 @@ export class NotFound extends BaseCommand {
 
     // A word that is no command where it was typed: the longest run of visible
     // topics, then that word.
-    let depth = 0;
-    while (depth < words.length - 1 && under(words.slice(0, depth + 1)).length > 0) {
-      depth += 1;
-    }
+    const stop = words.slice(0, -1).findIndex((_, index) => {
+      return under(words.slice(0, index + 1)).length === 0;
+    });
+    const depth = stop === -1 ? words.length - 1 : stop;
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
     const meant = near(typed[depth] as string, under(parent));
@@ -226,39 +234,56 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       return flag.char === letter;
     });
   };
-  const words: string[] = [];
-  let json = false;
-  let passed = false;
-  let closed = false;
-  for (let index = 0; index < typed.length; index += 1) {
-    const word = typed[index] as string;
+  /**
+   * What reading the words typed has found so far.
+   */
+  type Read = Readonly<{
+    words: readonly string[];
+    json: boolean;
+    passed: boolean;
+    closed: boolean;
+  }>;
+  /**
+   * Reads the words typed from `index` on, as the name of the command.
+   *
+   * @param index - The word to read next.
+   * @param found - What the words before it gave.
+   * @returns What the words gave, up to where the name ends.
+   */
+  const read = (
+    index = 0,
+    found: Read = { words: [], json: false, passed: false, closed: false },
+  ): Read => {
+    const word = typed[index];
+    if (word === undefined) {
+      return found;
+    }
     const next = typed[index + 1];
-    const takesNext = (always: boolean): void => {
+    const after = (always: boolean): number => {
       if (always || (next !== undefined && !next.startsWith("-"))) {
-        index += 1;
+        return index + 2;
       }
+      return index + 1;
     };
-    if (word === "--" && !passed) {
-      if (words.length > 0) {
-        break;
+    if (word === "--" && !found.passed) {
+      if (found.words.length > 0) {
+        return found;
       }
-      passed = true;
-      continue;
+      return read(index + 1, { ...found, passed: true });
     }
     if (!word.startsWith("-")) {
-      if (!closed) {
-        words.push(word);
+      if (found.closed) {
+        return read(index + 1, found);
       }
-      continue;
+      return read(index + 1, { ...found, words: [...found.words, word] });
     }
     // After `--` a word that reads as a flag is an argument, so it ends the
     // name rather than letting a later word, a secret even, be named.
-    if (passed) {
-      break;
+    if (found.passed) {
+      return found;
     }
     if (word === "--json") {
-      json = true;
-      continue;
+      return read(index + 1, { ...found, json: true });
     }
     if (word.startsWith("--")) {
       // `--no-color` turns `color` off, but `--no-open` is a switch of its own.
@@ -266,13 +291,12 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       const name =
         switches.has(typedName) || !typedName.startsWith("no-") ? typedName : typedName.slice(3);
       if (greedy.has(name)) {
-        closed = true;
-        continue;
+        return read(index + 1, { ...found, closed: true });
       }
       if (!word.includes("=") && switches.get(name) !== true) {
-        takesNext(valued.has(name));
+        return read(after(valued.has(name)), found);
       }
-      continue;
+      return read(index + 1, found);
     }
     // A cluster of short flags (`-nc`): the first letter that takes a value
     // takes the rest of the cluster, or the next word when it is the last one.
@@ -284,13 +308,16 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
         continue;
       }
       if (flag === undefined) {
-        takesNext(false);
-      } else if (position === word.length - 2) {
-        takesNext(true);
+        return read(after(false), found);
+      }
+      if (position === word.length - 2) {
+        return read(after(true), found);
       }
       break;
     }
-  }
+    return read(index + 1, found);
+  };
+  const { words, json } = read();
   const handed = [...words, ...(json ? ["--json"] : [])];
   // It runs as oclif runs a command it found, after the `prerun` hooks.
   await config.runHook("prerun", { argv: handed, Command: NotFound });

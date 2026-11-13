@@ -279,7 +279,9 @@ export default class Claim extends EnvironmentCommand {
 
     // Set by whichever branch runs: minting a link has early returns and prompts
     // in the middle, so it cannot be one expression.
+    // biome-ignore lint/plugin: the one `let` left; see the comment above.
     let waitFor: { challengeId: string; deadline: number };
+    // biome-ignore lint/plugin: the one `let` left; see the comment above.
     let opened: boolean | undefined;
     if (flags.challengeId === undefined) {
       const started = await claimService.start();

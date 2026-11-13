@@ -2,6 +2,7 @@ import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
+import { Lazy } from "@/lib/once";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { reportWarning } from "@/lib/warnings";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
@@ -269,12 +270,13 @@ function merged(scans: readonly Scan[]): Scan {
  */
 function lazyNames(ctx: StepContext): Names {
   // The one piece of state the check keeps: the read, once it is started.
-  let listed: Promise<Listing | undefined> | undefined;
-  return () => {
-    listed ??= objectTypes(ctx).catch(() => {
+  const listed = new Lazy(() => {
+    return objectTypes(ctx).catch(() => {
       return undefined;
     });
-    return listed;
+  });
+  return () => {
+    return listed.get();
   };
 }
 

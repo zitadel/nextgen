@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { walk } from "@/lib/zitadel/utils/graph";
 
@@ -74,19 +74,18 @@ describe("walk", () => {
     const start = Array.from({ length: 200 }, (_unused, index) => {
       return `n${index}`;
     });
-    let asked = 0;
+    const key = vi.fn((node: string) => {
+      return node;
+    });
 
     walk(
       start,
       () => {
         return [];
       },
-      (node) => {
-        asked += 1;
-        return node;
-      },
+      key,
     );
 
-    expect(asked).toBe(200);
+    expect(key).toHaveBeenCalledTimes(200);
   });
 });

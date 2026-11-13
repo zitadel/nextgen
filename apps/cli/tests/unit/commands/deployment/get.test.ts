@@ -16,14 +16,14 @@ const SERVER = "https://api.zitadel.cloud";
 const server = setupServer();
 const dirs: string[] = [];
 
-/** How many times the run asked for the frozen set, which only a terminal does. */
-let variableReads = 0;
+/** Each time the run asked for the frozen set, which only a terminal does. */
+const variableReads: string[] = [];
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 afterEach(async () => {
   server.resetHandlers();
-  variableReads = 0;
+  variableReads.splice(0);
   for (const dir of dirs.splice(0)) {
     await rm(dir, { recursive: true, force: true });
   }
@@ -58,8 +58,8 @@ async function aProject(): Promise<string> {
   );
   server.use(
     http.get(`${SERVER}/api/v1/deployments/dep_1`, () => HttpResponse.json(DEPLOYMENT)),
-    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, () => {
-      variableReads += 1;
+    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, ({ request }) => {
+      variableReads.push(request.url);
       return HttpResponse.json(FROZEN);
     }),
   );
@@ -130,10 +130,10 @@ describe("deployment get", () => {
     const cwd = await aProject();
 
     await read(cwd);
-    expect(variableReads).toBe(0);
+    expect(variableReads).toHaveLength(0);
 
     await asTerminal(() => read(cwd));
-    expect(variableReads).toBe(1);
+    expect(variableReads).toHaveLength(1);
   });
 });
 
