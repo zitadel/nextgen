@@ -53,13 +53,13 @@ jobs:
       # server's schema, which production's does.
       CLOUD_MIGRATOR_DATABASE_URL: ${{ secrets.CLOUD_PREVIEW_MIGRATOR_DATABASE_URL }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       # No cache: a run is rare enough to compile the launcher from scratch,
       # and an entry of this job's would only take space from CI's.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
           cache: false
