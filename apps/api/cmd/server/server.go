@@ -534,6 +534,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
 			Admission:       oauth.DenyAll{},
 			Settings:        oauth.NotEnabled{},
+			Clients:         applicationService,
+			AuthRequests:    service.NewAuthRequestService(serviceDBPool),
 		})
 	}
 

@@ -21,6 +21,7 @@ func TestAuthRequestService_Create(t *testing.T) {
 	tests := []struct {
 		name      string
 		createErr error
+		emitErr   error
 		sweep     bool
 		sweepErr  error
 		wantErr   error
@@ -31,6 +32,7 @@ func TestAuthRequestService_Create(t *testing.T) {
 		{name: "failed_sweep", sweep: true, sweepErr: errors.New("aborted")},
 		{name: "storage_unavailable", createErr: database.NewUnavailableError(nil), wantErr: domain.ErrUnavailable()},
 		{name: "storage_fails", createErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
+		{name: "emit_fails", emitErr: errors.New("boom"), wantErr: domain.ErrInternal(nil)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,7 +56,7 @@ func TestAuthRequestService_Create(t *testing.T) {
 			if tt.createErr == nil {
 				stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 					event = ev
-					return nil
+					return tt.emitErr
 				})
 			}
 			if tt.sweep {
@@ -65,6 +67,7 @@ func TestAuthRequestService_Create(t *testing.T) {
 			nonce, err := service.NewAuthRequestServiceForTest(service.NewPool(pool), tt.sweep).Create(t.Context(), request)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, nonce)
 				return
 			}
 			require.NoError(t, err)
