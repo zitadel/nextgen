@@ -32,6 +32,12 @@ const fixtureSpec = `{
         "204": {"description": "Gone.", "headers": {"X-Thing-Version": {"required": true, "schema": {"type": "integer"}}}}
       }}
     },
+    "/flows/{flow_id}": {
+      "parameters": [{"name": "flow_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+      "get": {"operationId": "getFlowStep", "responses": {
+        "200": {"description": "The step.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/thing"}}}}
+      }}
+    },
     "/live": {"get": {"operationId": "getLive", "responses": {
       "200": {"description": "Up.", "content": {"text/plain": {"schema": {"type": "string"}}}}
     }}}
@@ -92,6 +98,10 @@ func TestSpecValidatorPassesWhatTheSpecDeclares(t *testing.T) {
 	for _, e := range []exchange{
 		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusOK, goodThing),
 		jsonAnswer(http.MethodGet, "/things/t1", http.StatusOK, goodThing), // the root alias
+		jsonAnswer(http.MethodGet, "/api/v1/flows/f1", http.StatusOK, goodThing),
+		jsonAnswer(http.MethodGet, "/api/v1/flow/f1", http.StatusOK, goodThing), // the flow operations' old path
+		jsonAnswer(http.MethodGet, "/flow/f1", http.StatusOK, goodThing),
+		jsonAnswer(http.MethodGet, "/api/v1/flowsx/f1", http.StatusNotFound, `{}`),
 		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusNotFound, thingNotFound),
 		jsonAnswer(http.MethodGet, "/api/v1/things/t1", http.StatusForbidden, thingNotFound),
 		{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{"X-Thing-Version": {"3"}}, ""},
@@ -128,6 +138,10 @@ func TestSpecValidatorCatchesWhatTheSpecDoesNotDeclare(t *testing.T) {
 			exchange{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{"X-Thing-Version": {"3"}, "Content-Type": {jsonContentType}}, `{}`}, "declares no body"},
 		{"a missing required header",
 			exchange{http.MethodDelete, "/api/v1/things/t1", http.StatusNoContent, http.Header{}, ""}, "X-Thing-Version"},
+		{"a body at the flow operations' old path, against the operation's schema",
+			jsonAnswer(http.MethodGet, "/api/v1/flow/f1", http.StatusOK, `{"id":"t1"}`), "created_at"},
+		{"a path that only starts as the flow collection does, answered",
+			jsonAnswer(http.MethodGet, "/api/v1/flowsx/f1", http.StatusOK, goodThing), "names no operation"},
 		{"a path the spec lacks, answered",
 			jsonAnswer(http.MethodGet, "/api/v1/nothing", http.StatusOK, `{}`), "names no operation"},
 		{"a method the path lacks, answered",

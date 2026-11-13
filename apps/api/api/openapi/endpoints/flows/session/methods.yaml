@@ -6,8 +6,8 @@ get:
     the step again after a page reload or a network error.
 
     The flow endpoints are the runtime calls the login component
-    (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
-    `submitFlowStep` (`POST /flow/{flow_id}/submit`) advances it.
+    (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flows`) starts a flow, and
+    `submitFlowStep` (`POST /flows/{flow_id}/submit`) advances it.
 
     For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that
     creates its user on submit, or one carrying a passkey registration that
@@ -50,7 +50,7 @@ get:
         of a schema this flow does not serve (`flow.sso_user_schema_mismatch`,
         which starting again does not fix), or the sealed release was revoked
         (`rel.revoked`). Otherwise start a new flow with `createFlow`
-        (`POST /flow`).
+        (`POST /flows`).
       content:
         application/json:
           schema:

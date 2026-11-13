@@ -55,7 +55,7 @@ const userHandlers = [
 
 const server = setupServer(
   ...userHandlers,
-  http.post(`${BASE}/api/v1/flow`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/flows`, async ({ request }) => {
     captured.flowStart = (await request.json()) as Record<string, unknown>;
     captured.flowStartOrigin = request.headers.get("origin");
     return HttpResponse.json(identifierStep, {
@@ -63,7 +63,7 @@ const server = setupServer(
       headers: { "set-cookie": "_zflow=state-1; HttpOnly; Path=/" },
     });
   }),
-  http.post(`${BASE}/api/v1/flow/:id/submit`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/flows/:id/submit`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     captured.submits.push(body);
     captured.submitCookies.push(request.headers.get("cookie"));
@@ -162,7 +162,7 @@ describe("seedSession", () => {
 
   it("fails loudly on a step declaring fields it cannot fill", async () => {
     server.use(
-      http.post(`${BASE}/api/v1/flow`, () =>
+      http.post(`${BASE}/api/v1/flows`, () =>
         HttpResponse.json(
           {
             id: "flow_1",
@@ -181,7 +181,7 @@ describe("seedSession", () => {
 
   it("explains a missing Origin when the allowlist rejects the call", async () => {
     server.use(
-      http.post(`${BASE}/api/v1/flow`, () =>
+      http.post(`${BASE}/api/v1/flows`, () =>
         HttpResponse.json(
           { code: "req.invalid", message: 'origin "x" is not allowed for this project' },
           { status: 400 },
@@ -194,7 +194,7 @@ describe("seedSession", () => {
 
   it("caps the number of flow steps instead of looping", async () => {
     server.use(
-      http.post(`${BASE}/api/v1/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
+      http.post(`${BASE}/api/v1/flows/:id/submit`, () => HttpResponse.json(identifierStep)),
     );
     const zitadel = connectZitadel(handle);
     await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);

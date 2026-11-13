@@ -502,7 +502,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       const calls = captureFetch();
 
       const served = await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
+        `${ORIGIN}/__nextgen/v1/flows`,
         { headers: { "x-nextgen-auth-token": "forged" } },
         PROXY,
       );
@@ -516,7 +516,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       upstream.append("set-cookie", `${SHARED}=abc; HttpOnly; SameSite=Lax`);
       captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
 
-      const served = await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+      const served = await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, PROXY);
 
       expect(served.headers.get("set-cookie")).toBe(`${SHARED}=abc; HttpOnly; SameSite=Lax`);
     });
@@ -753,7 +753,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       const calls = captureFetch();
 
       await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
+        `${ORIGIN}/__nextgen/v1/flows`,
         { headers: { "x-forwarded-for": "10.0.0.1" }, clientIp: "10.0.0.2" },
         PROXY,
       );
@@ -764,7 +764,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it("sets X-Forwarded-For from the client IP when no chain exists", async () => {
       const calls = captureFetch();
 
-      await serve(`${ORIGIN}/__nextgen/v1/flow`, { clientIp: "10.0.0.2" }, PROXY);
+      await serve(`${ORIGIN}/__nextgen/v1/flows`, { clientIp: "10.0.0.2" }, PROXY);
 
       expect(calls[0]?.headers.get("x-forwarded-for")).toBe("10.0.0.2");
     });
@@ -772,7 +772,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it("omits X-Forwarded-For when no client IP is available", async () => {
       const calls = captureFetch();
 
-      await serve(`${ORIGIN}/__nextgen/v1/flow`, { headers: { "x-real-ip": "10.9.9.9" } }, PROXY);
+      await serve(`${ORIGIN}/__nextgen/v1/flows`, { headers: { "x-real-ip": "10.9.9.9" } }, PROXY);
 
       expect(calls[0]?.headers.has("x-forwarded-for")).toBe(false);
     });
@@ -781,7 +781,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       const calls = captureFetch();
 
       await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
+        `${ORIGIN}/__nextgen/v1/flows`,
         { headers: { "x-real-ip": "10.9.9.9" }, clientIp: "10.0.0.2" },
         PROXY,
       );
@@ -793,7 +793,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       const calls = captureFetch();
 
       await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
+        `${ORIGIN}/__nextgen/v1/flows`,
         {
           headers: { "x-forwarded-for": "10.0.0.1", "x-real-ip": "10.9.9.9" },
           clientIp: "10.0.0.2",
@@ -1364,7 +1364,9 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it.each([
       ["GET", "/__nextgen/api/v1/sessions/me"],
       ["DELETE", "/__nextgen/api/v1/sessions/me"],
-      ["POST", "/__nextgen/flow"],
+      ["POST", "/__nextgen/api/v1/flows"],
+      ["POST", "/__nextgen/api/v1/flows/flow_1/submit"],
+      ["POST", "/__nextgen/flows"],
       ["GET", "/__nextgen/projects"],
       ["GET", "/__nextgen/api/v1/sessions/exchange"],
       ["POST", "/__nextgen/api/v1/sessions/exchange/extra"],
@@ -1415,7 +1417,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
           }),
       );
 
-      const served = await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+      const served = await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, PROXY);
 
       // Only the path is taken, so the upstream's own host never reaches the browser.
       expect(served.headers.get("location")).toBe("http://localhost:3000/callback");
@@ -1427,7 +1429,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       captureFetch();
 
       const served = await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
+        `${ORIGIN}/__nextgen/v1/flows`,
         { headers: { "x-middleware-override-headers": "x-evil-header,x-another-evil" } },
         PROXY,
       );
@@ -1447,7 +1449,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
     it("proxies paths under proxyPath", async () => {
       const calls = captureFetch();
 
-      const served = await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+      const served = await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, PROXY);
 
       expect(calls).toHaveLength(1);
       expect(served.status).toBe(200);
@@ -1506,7 +1508,7 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       vi.stubEnv("ZITADEL_URL", environment);
       const calls = captureFetch();
 
-      await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, { url: option });
+      await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, { url: option });
 
       expect(calls[0]?.url.startsWith(expected)).toBe(true);
     });
@@ -1515,12 +1517,12 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
       vi.stubEnv("ZITADEL_URL", "http://env.test:4000/");
       const calls = captureFetch();
 
-      await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, { url: "http://option.test:4000/" });
-      await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, {});
+      await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, { url: "http://option.test:4000/" });
+      await serve(`${ORIGIN}/__nextgen/v1/flows`, {}, {});
 
       expect(calls.map(({ url }) => url)).toEqual([
-        "http://option.test:4000/v1/flow",
-        "http://env.test:4000/v1/flow",
+        "http://option.test:4000/v1/flows",
+        "http://env.test:4000/v1/flows",
       ]);
     });
 

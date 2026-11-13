@@ -3693,15 +3693,15 @@ describe("api-mock error paths — each refusal a handler names", () => {
 
   describe("the login flow", () => {
     const start = async (purpose: "login" | "register") => {
-      const res = await send("POST", "/flow", { purpose, project_id: "proj_error_paths" });
+      const res = await send("POST", "/flows", { purpose, project_id: "proj_error_paths" });
       expect(res.status).toBe(201);
       return (await res.json()) as { id: string; session_token: string };
     };
 
     test("starts, reads back and advances a sign-in", async () => {
       const flow = await start("login");
-      expect((await send("GET", `/flow/${flow.id}`)).status).toBe(200);
-      const next = await send("POST", `/flow/${flow.id}/submit`, {
+      expect((await send("GET", `/flows/${flow.id}`)).status).toBe(200);
+      const next = await send("POST", `/flows/${flow.id}/submit`, {
         session_token: flow.session_token,
         action: "submit",
         fields: { email: "error-paths@example.com" },
@@ -3717,14 +3717,14 @@ describe("api-mock error paths — each refusal a handler names", () => {
         fields: {},
         sso_provider_id: "google",
       };
-      await expectRefusal(await send("POST", `/flow/${flow.id}/submit`, sso), 400, "req.invalid");
-      const redirect = await send("POST", `/flow/${flow.id}/submit`, {
+      await expectRefusal(await send("POST", `/flows/${flow.id}/submit`, sso), 400, "req.invalid");
+      const redirect = await send("POST", `/flows/${flow.id}/submit`, {
         ...sso,
         return_target: `${BASE}/login`,
       });
       expect(redirect.status).toBe(200);
       await expectRefusal(
-        await send("POST", `/flow/${flow.id}/submit`, { action: "submit", fields: {} }),
+        await send("POST", `/flows/${flow.id}/submit`, { action: "submit", fields: {} }),
         400,
         "flow.invalid_action",
       );
@@ -3733,7 +3733,7 @@ describe("api-mock error paths — each refusal a handler names", () => {
     test("refuses a sign-up without its proof of work", async () => {
       const flow = await start("register");
       const password = (await (
-        await send("POST", `/flow/${flow.id}/submit`, {
+        await send("POST", `/flows/${flow.id}/submit`, {
           session_token: flow.session_token,
           action: "submit",
           fields: { email: "error-paths-signup@example.com", given_name: "E", family_name: "P" },
@@ -3741,7 +3741,7 @@ describe("api-mock error paths — each refusal a handler names", () => {
       ).json()) as { id: string; session_token: string; step: { name: string } };
       expect(password.step.name).toBe("register-password");
       await expectRefusal(
-        await send("POST", `/flow/${password.id}/submit`, {
+        await send("POST", `/flows/${password.id}/submit`, {
           session_token: password.session_token,
           action: "submit",
           fields: { [PASSWORD_FIELD]: "hunter2-hunter2" },
@@ -3788,13 +3788,13 @@ describe("api-mock error paths — each refusal a handler names", () => {
     // submitFlowStep's 400 is either shape: this is the step with its error,
     // the server-transport tests above send the error envelope.
     test("refuses a submit as the same step with an error when told to", async () => {
-      const start = await call("POST", "/flow", {
+      const start = await call("POST", "/flows", {
         purpose: "login",
         project_id: "proj_in_process",
       });
       const flow = (await start.json()) as { id: string; session_token: string };
       mock.rejectNextSubmit("error.invalid_credentials");
-      const res = await call("POST", `/flow/${flow.id}/submit`, {
+      const res = await call("POST", `/flows/${flow.id}/submit`, {
         session_token: flow.session_token,
         action: "submit",
         fields: { email: "in-process@example.com" },

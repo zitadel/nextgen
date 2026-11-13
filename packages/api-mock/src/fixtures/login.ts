@@ -2,7 +2,7 @@
  * Orval-typed step fixtures for the canonical login flow.
  *
  * Each builder returns a `CreateFlow201` shape. The wire is identical for
- * `POST /flow`, `POST /flow/{flow_id}/submit`, and `GET /flow/{flow_id}` (orval emits
+ * `POST /flows`, `POST /flows/{flow_id}/submit`, and `GET /flows/{flow_id}` (orval emits
  * three structurally identical aliases), so a single fixture set drives all
  * three handlers.
  *

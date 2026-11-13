@@ -15,7 +15,7 @@ import (
 )
 
 // These tests resolve an unlinked identity into the register-sso step through
-// GET /flow/{flow_id}, then submit that step. Like the resolution tests they run
+// GET /flows/{flow_id}, then submit that step. Like the resolution tests they run
 // sequentially.
 
 // ssoCollectionFixture is an sso resolution fixture whose flows start on a

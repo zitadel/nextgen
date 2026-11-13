@@ -8268,7 +8268,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flow/{flow_id}` instead of `POST /flow` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
+              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flows/{flow_id}` instead of `POST /flows` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
               "attribute": "resume-flow-id"
             },
             {
@@ -9441,7 +9441,7 @@
               "type": {
                 "text": "string"
               },
-              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flow/{flow_id}` instead of `POST /flow` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
+              "description": "Existing flow handle to resume rather than start a new flow. When set,\nthe orchestrator hits `GET /flows/{flow_id}` instead of `POST /flows` on\nmount, so a page reload after a network blip can re-render the same\nstep without losing collected state. A handle that no longer resolves\nstarts a new flow instead, with a console warning.\n\nLeaving it empty falls back to the `flow` query parameter, which is how a\nprovider callback hands the flow back (see flowIdFromLocation), so\na host page needs no code of its own for external sign-in to finish.\nUnset, `null` or `\"\"` all mean \"no handle\".",
               "fieldName": "resumeFlowId"
             },
             {

@@ -40,9 +40,7 @@ const KNOWN_VIOLATIONS = {
     queryIdps: "sorts by `idp-filter-field`, its filter's enum",
     queryGrants: "names its enum `grant-sorting-field`",
   },
-  "collection-plural": {
-    "/flow": "singular, though `{flow_id}` names one of many flows",
-  },
+  "collection-plural": {},
 };
 
 /** Lists that return one map keyed by name, which has no page to turn. */
