@@ -30,6 +30,12 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+/** A rule whose entry is its path, so the text a test finds is the rule it gave. */
+const ENV_LOCAL = { path: ".env.local", ignored: true, entry: ".env.local" } as const;
+
+/** A rule met by ignoring the directory its path lies in. */
+const ZITADEL_DIRECTORY = { path: ".zitadel/secret", ignored: true, entry: ".zitadel" } as const;
+
 describe("scaffold - mkdir", () => {
   it("creates a directory recursively and reports it as a dir row, not a written file", async ({
     dir,
@@ -409,7 +415,7 @@ describe("scaffold - merge-json", () => {
 
 describe("scaffold - append-gitignore", () => {
   it("creates .gitignore with the entries", async ({ dir }) => {
-    await scaffold(plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }), {
+    await scaffold(plan({ kind: "append-gitignore", rules: [ENV_LOCAL, ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -421,7 +427,7 @@ describe("scaffold - append-gitignore", () => {
 
   it("only appends entries not already listed", async ({ dir }) => {
     await writeFile(join(dir, ".gitignore"), ".env.local\nnode_modules\n");
-    await scaffold(plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }), {
+    await scaffold(plan({ kind: "append-gitignore", rules: [ENV_LOCAL, ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -433,7 +439,7 @@ describe("scaffold - append-gitignore", () => {
 
   it("skips when all entries are present", async ({ dir }) => {
     await writeFile(join(dir, ".gitignore"), ".zitadel\n");
-    const result = await scaffold(plan({ kind: "append-gitignore", entries: [".zitadel"] }), {
+    const result = await scaffold(plan({ kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] }), {
       cwd: dir,
       dryRun: false,
       force: false,
@@ -681,7 +687,7 @@ describe("scaffold - multi-op plans", () => {
       plan(
         { kind: "mkdir", path: "app/login" },
         { kind: "write", path: "app/login/page.tsx", contents: "<page />" },
-        { kind: "append-gitignore", entries: [".zitadel"] },
+        { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
         { kind: "add-dep", name: "sdk", version: "1.0.0" },
       ),
       { cwd: dir, dryRun: false, force: false },
@@ -704,7 +710,7 @@ describe("scaffold - multi-op plans", () => {
       { kind: "mkdir", path: "app" },
       { kind: "write", path: "app/page.tsx", contents: "<page />" },
       { kind: "merge-env", path: ".env.local", entries: { FOO: "1" } },
-      { kind: "append-gitignore", entries: [".zitadel"] },
+      { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
       { kind: "add-dep", name: "sdk", version: "1.0.0" },
     );
     await scaffold(full, { cwd: dir, dryRun: false, force: false });
@@ -759,7 +765,7 @@ describe("scaffold - reporting", () => {
     const result = await scaffold(
       plan(
         { kind: "write", path: "app/page.tsx", contents: "<page />" },
-        { kind: "append-gitignore", entries: [".zitadel"] },
+        { kind: "append-gitignore", rules: [ZITADEL_DIRECTORY] },
       ),
       { cwd: dir, dryRun: false, force: false },
     );

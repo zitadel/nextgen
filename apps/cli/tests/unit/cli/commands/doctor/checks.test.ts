@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -27,7 +27,8 @@ import { hashScaffoldFile } from "@/lib/scaffold-manifest";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
 import { aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
-import { write } from "@tests/helpers/git-repo";
+import { git, ignoredByGit, isolateGit, write } from "@tests/helpers/git-repo";
+import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { readJson } from "@tests/helpers/local-project";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -633,8 +634,27 @@ describe("SecretPermissionsCheck", () => {
   });
 });
 
+/** A SvelteKit `.gitignore` as an older setup left it: its `.env*` after the generator's `!.env.example`. */
+const AN_OLDER_SETUPS_GITIGNORE = asAnOlderSetupLeft(SVELTEKIT_GITIGNORE);
+
+/** An `.env.example` someone filled in: a value in it may be a secret. */
+const A_FILLED_IN_ENV_EXAMPLE = "ZITADEL_PROJECT_ID=\nZITADEL_PROJECT_SECRET=s3cr3t\n";
+
+/** Every file setup writes that holds a secret, and a customer's own env files. */
+const IGNORED_PATHS = [
+  SECRET_FILE,
+  ".env.local",
+  ".env.development.local",
+  ".env.test",
+  ".env.production",
+];
+
 describe("GitignoreCheck", () => {
-  it("fails when an entry is missing", async ({ dir }) => {
+  beforeEach(() => {
+    isolateGit();
+  });
+
+  it("fails when a file holding a secret is not ignored", async ({ dir }) => {
     await aNextProject(dir);
     await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
 
@@ -643,16 +663,56 @@ describe("GitignoreCheck", () => {
     expect(outcome.status).toBe("fail");
   });
 
-  describe("fix", () => {
-    it("appends the missing entries", async ({ dir }) => {
+  it("passes when the generator's own lines already ignore the env files", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, { ".gitignore": `.env\n.env.*\n!.env.example\n${SECRET_FILE}\n` });
+
+    const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+    expect(outcome.status).toBe("pass");
+  });
+
+  describe("with .env.example ignored, as an older setup left a SvelteKit app", () => {
+    it("warns rather than fails", async ({ dir }) => {
       await aNextProject(dir);
+      await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("warn");
+    });
+
+    it("offers doctor --fix", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.remedy).toContain("doctor --fix");
+    });
+
+    it("offers no repair while .env.example holds a value", async ({ dir }) => {
+      await aNextProject(dir);
+      await write(dir, {
+        ".gitignore": AN_OLDER_SETUPS_GITIGNORE,
+        ".env.example": A_FILLED_IN_ENV_EXAMPLE,
+      });
+
+      const outcome = await new GitignoreCheck().run(aCheckContext(dir));
+
+      expect(outcome.remedy).toBeUndefined();
+    });
+  });
+
+  describe("fix", () => {
+    it("makes git ignore every missing secret", async ({ dir }) => {
+      await aNextProject(dir);
+      await git(dir, "init", "--quiet");
       await write(dir, { ".gitignore": `${SECRET_FILE}\n` });
 
       await new GitignoreCheck().fix(aCheckContext(dir));
 
-      expect((await textOf(dir, ".gitignore")).split("\n")).toEqual(
-        expect.arrayContaining([".env*", "!.env.example"]),
-      );
+      expect(await ignoredByGit(dir, [...IGNORED_PATHS, ".env.example"])).toEqual(IGNORED_PATHS);
     });
 
     it("leaves the check passing", async ({ dir }) => {
@@ -680,6 +740,41 @@ describe("GitignoreCheck", () => {
       await new GitignoreCheck().fix(aCheckContext(dir, { dryRun: true }));
 
       expect((await new GitignoreCheck().run(aCheckContext(dir))).status).toBe("fail");
+    });
+
+    describe("with .env.example ignored, as an older setup left a SvelteKit app", () => {
+      it("makes git keep .env.example", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, [".env.example"])).toEqual([]);
+      });
+
+      it("un-ignores no file that holds a secret", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, { ".gitignore": AN_OLDER_SETUPS_GITIGNORE });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, IGNORED_PATHS)).toEqual(IGNORED_PATHS);
+      });
+
+      it("leaves .env.example ignored while it holds a value", async ({ dir }) => {
+        await aNextProject(dir);
+        await git(dir, "init", "--quiet");
+        await write(dir, {
+          ".gitignore": AN_OLDER_SETUPS_GITIGNORE,
+          ".env.example": A_FILLED_IN_ENV_EXAMPLE,
+        });
+
+        await new GitignoreCheck().fix(aCheckContext(dir));
+
+        expect(await ignoredByGit(dir, [".env.example"])).toEqual([".env.example"]);
+      });
     });
   });
 });
