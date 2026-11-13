@@ -1,8 +1,9 @@
+import { rmSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runCli, tail, type RunCliResult } from "./cli";
+import { runCli, runCliSync, tail, type RunCliResult } from "./cli";
 import {
   describeEnvelopeError,
   parseCliEnvelope,
@@ -45,10 +46,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
   const ownsDir = options.dir === undefined;
   const dir = options.dir ?? (await mkdtemp(join(tmpdir(), "zitadel-testing-")));
   const port = options.port ?? (await getFreePort());
-  const env: NodeJS.ProcessEnv = {};
-  if (options.serverBinary) {
-    env.ZITADEL_SERVER_BINARY = options.serverBinary;
-  }
+  const env = cliEnv(options);
 
   const result = await runCli({
     args: ["start", "--port", String(port), "--non-interactive", "--json", "-c", dir],
@@ -144,6 +142,34 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     },
     stop,
   };
+}
+
+/**
+ * Stop the server `bootLocalServer(options)` booted in `dir`, blocking until
+ * the CLI returns, and remove the dir when the boot owned it. For a signal
+ * handler, where the process exits before an awaited stop could finish;
+ * everywhere else use `BootedServer.stop`.
+ */
+export function stopLocalServerSync(dir: string, options: BootServerOptions = {}): void {
+  const result = runCliSync({
+    args: ["stop", "--non-interactive", "--json", "-c", dir],
+    bin: options.cliBin,
+    env: cliEnv(options),
+    timeoutMs: options.timeoutMs,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `zitadel stop exited with code ${result.exitCode}.\n${failureDetail(result)}\n` +
+        `state dir kept for inspection: ${dir}`,
+    );
+  }
+  if (options.dir === undefined && !options.keep) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function cliEnv(options: BootServerOptions): NodeJS.ProcessEnv {
+  return options.serverBinary ? { ZITADEL_SERVER_BINARY: options.serverBinary } : {};
 }
 
 /**

@@ -62,10 +62,14 @@ export type Session = {
    * command's are the same prompts with nothing beside them.
    */
   guide?: boolean;
-  /** Called just before a prompt is drawn, so the caller can open the chain it belongs to. */
-  before?: () => void;
-  /** Called when a prompt has been answered, so the caller can space what follows it. */
-  after?: () => void;
+  /**
+   * Draws a prompt between the caller's own steps: what it does before `draw`
+   * opens the chain the prompt belongs to, and what it does once `draw`
+   * settles, answered or not, spaces what follows it.
+   *
+   * @typeParam T - What the prompt resolves to.
+   */
+  around?: <T>(draw: () => Promise<T>) => Promise<T>;
 };
 
 /**
@@ -395,16 +399,14 @@ async function askOne(
 }
 
 /**
- * Draws a prompt between the session's hooks. The one after it runs when the
- * prompt throws too, so a spinner paused for the prompt is never left paused.
+ * Draws a prompt inside the session's hook. The hook sees the prompt throw too,
+ * so a spinner paused for the prompt is never left paused.
  */
 async function drawn<T>(session: Session, draw: () => Promise<T>): Promise<T> {
-  session.before?.();
-  try {
-    return await draw();
-  } finally {
-    session.after?.();
+  if (session.around === undefined) {
+    return draw();
   }
+  return session.around(draw);
 }
 
 /**

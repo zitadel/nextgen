@@ -40,7 +40,8 @@ carries no hook. A `<zitadel-logout>` with a `<template>` child shows no menu:
 click the app's own element marked `data-action="logout"`. The canonical
 component hook list lives in `packages/components/README.md`.
 
-The checked-in automated regression path is `moon run e2e:journey`, which
+The checked-in automated regression path is
+`turbo run journey --filter=@zitadel/e2e`, which
 exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
@@ -113,12 +114,15 @@ what the user wants enforced; never invent expectations for them. `setup` writes
 the password policy with a `min_length` of 15; pass `--password-min-length <n>`
 only when the user asks for another value (`0` sets none). Managed files carry
 a marker comment; `eject` removes only
-files that still carry it, preserving anything the user replaced. For app-local
+files that still carry it, preserving anything the user replaced. It leaves the
+SDK installed: `next_commands` holds its removal, in the project's own package
+manager (`pnpm remove @zitadel/sdk-next`), for the user to run. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
 `npx @zitadel/cli@latest start` runtime. The `.zitadel/local/` that `start`
 writes into the directory still counts as empty, so a same-directory `setup`
 scaffolds without `--force` (this is exactly what the golden path does).
 `setup` installs dependencies
-with the detected package manager by default; pass `--skip-install` when the
+with the detected package manager by default (an app in a workspace uses the
+one its repository's root names); pass `--skip-install` when the
 agent or host workflow will install dependencies separately.

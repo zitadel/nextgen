@@ -27,7 +27,6 @@ import (
 // sso_user_not_found routes, which a bound attempt never reaches.
 const ssoConflictFlowDefinition = `{
 	"name": "sso-conflict-login",
-	"status": "active",
 	"user_schema": %q,
 	"purposes": {"login": "identifier", "register": "register"},
 	"steps": [
@@ -140,10 +139,10 @@ func advance(t *testing.T, flow *ssoFlow, resp any) api.FlowResponse {
 	switch r := resp.(type) {
 	case *api.FlowResponseHeaders:
 		got = r
-	case *api.SubmitFlowStepOK:
-		got = (*api.FlowResponseHeaders)(r)
-	case *api.SubmitFlowStepBadRequest:
-		got = (*api.FlowResponseHeaders)(r)
+	case *api.SubmitFlowStepBadRequestHeaders:
+		step, ok := r.Response.GetFlowResponse()
+		require.True(t, ok, "a refusal, not a step: %s", helpers.MustMarshal(t, resp))
+		got = &api.FlowResponseHeaders{CacheControl: r.CacheControl, SetCookie: r.SetCookie, Response: step}
 	default:
 		require.Failf(t, "not a step response", "%s", helpers.MustMarshal(t, resp))
 	}
@@ -223,8 +222,8 @@ func TestSSOConflictBackAfterSignInAsksToSignIn(t *testing.T) {
 	require.Equal(t, "sso-conflict", back.Step.Name)
 
 	resp := f.submitAction(t, flow, "submit", map[string]string{"x-auth-methods#password": "correct-horse-battery-staple"})
-	require.IsType(t, &api.SubmitFlowStepBadRequest{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepBadRequest).Response
+	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := badRequestStep(t, resp)
 	assert.Equal(t, "sso-conflict", got.Step.Name)
 	assert.Equal(t, "error.sign_in_first", got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)

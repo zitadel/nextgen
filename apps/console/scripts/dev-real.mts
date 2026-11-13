@@ -7,7 +7,7 @@
  * from it is a fiction. This script boots the packaged server (binary runtime +
  * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
  * with the default schema and login flow, seeds users, and then starts
- * `console:dev` with the dev proxy pointed at that instance:
+ * `@zitadel/console#dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *
@@ -40,8 +40,6 @@ import { fileURLToPath } from "node:url";
 
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
-
-import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
@@ -111,12 +109,10 @@ if (configuredServerBinary) {
     process.exit(1);
   });
 } else {
-  // Build (or cache-hit) the embedded server binary. Spawned here instead of
-  // declared as a task dep: server:build depends on console:build, so a
-  // dev-real -> server:build task dep would cycle the project graph.
-  const serverBuild = runnerCommand(["server:build"]);
+  // Build the embedded server binary, for a direct `pnpm run dev:real`;
+  // `turbo run dev:real` has built it already (turbo.json).
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn(serverBuild.command, serverBuild.args, {
+    const build = spawn("turbo", ["run", "@zitadel/server#build"], {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -127,7 +123,7 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
+      rejectBuild(new Error(`turbo run @zitadel/server#build failed with ${detail}`));
     });
   });
 }

@@ -2,9 +2,9 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The server's Go module, which turbo finds through go.work as the package
-  // `nextgen`. Its tasks are @zitadel/server's (apps/server/turbo.json), as
-  // in moon, so turbo's built-in Go tasks are dropped here. What remains is
-  // the root's `go-sources`, which @zitadel/server#go-sources depends on.
+  // `nextgen`. Its tasks are @zitadel/server's (apps/server/turbo.json), so
+  // turbo's built-in Go tasks are dropped here. What remains is the root's
+  // `go-sources`, which @zitadel/server#go-sources depends on.
   "tasks": {
     "build": { "extends": false },
     "test": { "extends": false },

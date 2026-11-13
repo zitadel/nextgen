@@ -101,3 +101,7 @@ CLI dev proxy covers local development.
 For local development you can also skip the proxy and point `proxyPath`
 straight at the backend (cross-origin), e.g. `proxyPath: "http://localhost:8080"`
 (the `zitadel start` local runtime default port).
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

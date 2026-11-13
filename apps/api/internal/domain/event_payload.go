@@ -168,7 +168,6 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 // carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
 	Name       string                  `json:"name,omitempty"`
-	Status     string                  `json:"status,omitempty"`
 	UserSchema string                  `json:"user_schema,omitempty"`
 	Purposes   map[string]string       `json:"purposes,omitempty"`
 	Audience   *FlowdefAudiencePayload `json:"audience,omitempty"`
@@ -187,7 +186,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 	}
 	return FlowdefPayload{
 		Name:       fd.Name,
-		Status:     fd.Status.String(),
 		UserSchema: fd.UserSchema,
 		Purposes:   flowdefPurposesWire(fd.Purposes),
 		Audience:   flowdefAudiencePayload(fd.Audience),

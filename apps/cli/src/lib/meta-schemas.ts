@@ -18,7 +18,8 @@ import { isDeepStrictEqual } from "node:util";
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import semver from "semver";
 
-import { exactZitadelPins } from "@/lib/zitadel-pins";
+import { Dependencies } from "@/lib/upgrade/dependencies";
+import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
@@ -256,16 +257,16 @@ async function newerPinFor(cwd: string, stale: readonly Stale[]): Promise<NewerP
   if (semver.valid(cliVersion) === null) {
     return undefined;
   }
-  const pins = await exactZitadelPins(cwd).catch(() => {
+  const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
     return undefined;
   });
-  const pin = pins?.find(([, version]) => {
-    return semver.gt(version, cliVersion);
+  const pin = dependencies?.exact().find((dependency) => {
+    return dependency.isAhead(cliVersion);
   });
   if (pin === undefined) {
     return undefined;
   }
-  return { name: pin[0], version: pin[1] };
+  return { name: pin.name, version: pin.specifier };
 }
 
 /**

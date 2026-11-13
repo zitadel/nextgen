@@ -23,19 +23,19 @@ contains it.
   it, forced because the add-on's files are no inputs of that build:
 
   ```sh
-  CONSOLE_ADDON=../cloud-console CONSOLE_BASE_PATH=/console/ moon run --force console:build
+  CONSOLE_ADDON=../cloud-console CONSOLE_BASE_PATH=/console/ turbo run build --filter=@zitadel/console --force
   ```
 
 - Run the screens locally with the console's dev server and the functions'
   side by side; the add-on's dev proxy sends `/cloud/` to the second:
 
   ```sh
-  moon run cloud-functions:dev
-  CONSOLE_ADDON=../cloud-console moon run console:dev-real
+  turbo run dev --filter=@zitadel/cloud-functions
+  CONSOLE_ADDON=../cloud-console turbo run dev:real --filter=@zitadel/console
   ```
 
-- When `CONSOLE_DEV_ZITADEL_PORT` moves dev-real's instance, export
-  `CLOUD_ZITADEL_URL` to match for `cloud-functions:dev`.
+- When `CONSOLE_DEV_ZITADEL_PORT` moves `dev:real`'s instance, export
+  `CLOUD_ZITADEL_URL` to match for the functions' `dev`.
 
-- That `dev-real` also builds the console its server embeds with the add-on
+- That `dev:real` also builds the console its server embeds with the add-on
   in; the next build without `CONSOLE_ADDON` restores the embedded one.

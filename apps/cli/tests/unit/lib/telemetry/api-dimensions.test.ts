@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  * transport, so running the command proves nothing about what a dimension is
  * called.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/api");
+const commandsDir = join(import.meta.dirname, "../../../../src/cli/commands/api");
 
 /** The dimension names each command passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {

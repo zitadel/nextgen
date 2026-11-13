@@ -268,7 +268,7 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
+  // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
     listed ??= objectTypes(ctx).catch(() => {
@@ -384,9 +384,8 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
  *
  * @remarks
  * A flow's `user_schema` is an object type, or a schema id or `$id` URL that
- * the server resolves to one; a draft flow is never selected. A schema the
- * release carries is resolved the way the configuration resolves it, and any
- * other through the project's listing.
+ * the server resolves to one. A schema the release carries is resolved the way
+ * the configuration resolves it, and any other through the project's listing.
  *
  * Only the schema's designated identifier performs a lookup, and only when a
  * step on the login path ({@link Flow.loginFields}) collects it. The release
@@ -405,7 +404,7 @@ async function servedFlows(ctx: StepContext, names: Names): Promise<ServedFlows>
   // One flow at a time: the first to need the listing reads it for the rest.
   const lookups = await mapBounded(ctx.config.flows.all, 1, async (flow): Promise<FlowLookup> => {
     const reference = flow.userSchema;
-    if (reference === undefined || flow.body.status === "draft") {
+    if (reference === undefined) {
       return { kind: "ignored" };
     }
     const carried = ctx.config.flows.findSchemaOf(flow)?.objectType;
