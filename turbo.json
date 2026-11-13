@@ -501,8 +501,8 @@
     },
     // The latest published @zitadel/server writes a data dir (a project and
     // a user); the current build migrates it and reads the user back. It
-    // installs that release from npm, so it is never cached. The nightly
-    // artifacts workflow runs it.
+    // installs that release from npm, so it is never cached. The root `ci`
+    // script and the nightly artifacts workflow run it.
     "//#smoke-upgrade": {
       "cache": false,
       "dependsOn": ["@zitadel/server#build"],

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,34 +46,83 @@ func TestOgenTracerProvider_RecordError(t *testing.T) {
 	}
 }
 
-// The server span context goes into the holder when ogen starts the span,
-// before security and decoding run, so a request that fails decoding is still
-// linked to its server span. Only a Server span is stored, sampled or not.
-func TestOgenTracerProvider_storesServerSpanContext(t *testing.T) {
-	for _, tt := range []struct {
-		name      string
-		kind      trace.SpanKind
-		sampler   sdktrace.Sampler
-		wantStore bool
-	}{
-		{name: "sampled server span", kind: trace.SpanKindServer, sampler: sdktrace.AlwaysSample(), wantStore: true},
-		{name: "unsampled server span", kind: trace.SpanKindServer, sampler: sdktrace.NeverSample(), wantStore: true},
-		{name: "client span", kind: trace.SpanKindClient, sampler: sdktrace.AlwaysSample()},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			provider := NewOgenTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(tt.sampler)))
-			ctx := middleware.WithOperationIDContext(t.Context(), "")
+// Behind WithServerSpan an operation gets the request's server span instead
+// of one of its own, so the request has one. The span takes the operation's
+// name and the attributes ogen starts a span with, keeps of an error its type
+// alone, and stays open when ogen's handler ends it: the middleware ends it.
+func TestOgenTracerProvider_usesTheRequestsServerSpan(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	sdk := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	ogen := NewOgenTracerProvider(sdk).Tracer("ogen")
+	notFound := domain.ErrUserNotFound()
 
-			_, span := provider.Tracer("ogen").Start(ctx, "PatchUserByID", trace.WithSpanKind(tt.kind))
-			defer span.End()
+	handler := middleware.WithServerSpan(sdk)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request := trace.SpanContextFromContext(r.Context())
+		ctx, span := ogen.Start(r.Context(), "PatchUserByID",
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(attribute.String("http.route", "/users/{user_id}")),
+		)
+		assert.Equal(t, request, span.SpanContext())
+		assert.Equal(t, request, trace.SpanContextFromContext(ctx))
 
-			want := trace.SpanContext{}
-			if tt.wantStore {
-				want = span.SpanContext()
-			}
-			assert.Equal(t, want, middleware.GetServerSpanContext(ctx))
-		})
-	}
+		span.RecordError(fmt.Errorf("x@y: %w", notFound))
+		span.SetStatus(codes.Error, http.StatusText(http.StatusNotFound))
+		w.WriteHeader(http.StatusNotFound)
+		span.End()
+		assert.Empty(t, exporter.GetSpans(), "the operation's End must leave the request's span open")
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPatch, "/users/user_1", nil))
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 1)
+	assert.Equal(t, "PatchUserByID", spans[0].Name)
+	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
+	assert.Empty(t, spans[0].Events, "the message would carry user values")
+	assert.Equal(t, sdktrace.Status{}, spans[0].Status, "a 4xx leaves the status unset")
+	assert.Equal(t, []attribute.KeyValue{
+		attribute.String("http.request.method", "PATCH"),
+		attribute.String("http.route", "/users/{user_id}"),
+		attribute.String("error.type", notFound.Code),
+		attribute.Int("http.response.status_code", http.StatusNotFound),
+	}, spans[0].Attributes)
+}
+
+// Only a Server span is the request's: what ogen starts with another kind is
+// a span of its own, below it.
+func TestOgenTracerProvider_startsASpanOfAnotherKind(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	sdk := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	ogen := NewOgenTracerProvider(sdk).Tracer("ogen")
+
+	handler := middleware.WithServerSpan(sdk)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		_, span := ogen.Start(r.Context(), "call", trace.WithSpanKind(trace.SpanKindClient))
+		span.End()
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 2)
+	assert.Equal(t, "call", spans[0].Name)
+	assert.Equal(t, "GET", spans[1].Name)
+	assert.Equal(t, spans[1].SpanContext, spans[0].Parent)
+}
+
+// A request the sampler dropped stays one span that records nothing: the
+// operation gets it back and starts none.
+func TestOgenTracerProvider_unsampledRequest(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	sdk := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter), sdktrace.WithSampler(sdktrace.NeverSample()))
+	ogen := NewOgenTracerProvider(sdk).Tracer("ogen")
+
+	handler := middleware.WithServerSpan(sdk)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		_, span := ogen.Start(r.Context(), "PatchUserByID", trace.WithSpanKind(trace.SpanKindServer))
+		assert.False(t, span.IsRecording())
+		assert.Equal(t, trace.SpanContextFromContext(r.Context()), span.SpanContext(), "no second span")
+		span.End()
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPatch, "/users/user_1", nil))
+
+	assert.Empty(t, exporter.GetSpans())
 }
 
 // ogen's response encoders set Error with the status text on a typed 4xx

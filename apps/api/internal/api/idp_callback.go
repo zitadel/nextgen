@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
@@ -47,11 +45,10 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The route is not an ogen operation, so it sets its own operation id for
 	// the request log and the request.api event: one key for both mounts.
 	ctx := middleware.WithOperationIDContext(r.Context(), "idpCallback")
-	// For the same reason it starts its own server span, which the request
-	// line reads its IDs from.
-	ctx, span := tracer.Start(ctx, "idpCallback", trace.WithSpanKind(trace.SpanKindServer))
-	defer span.End()
-	middleware.SetServerSpanContext(ctx, span.SpanContext())
+	// For the same reason it names the request's server span itself.
+	if span, ok := middleware.ServerSpan(ctx); ok {
+		span.SetName("idpCallback")
+	}
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
 		errlog.Log(ctx, domain.ErrRequestMethodNotAllowed())
