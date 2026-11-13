@@ -14,6 +14,8 @@ the one-database rule `stmttest` runs under.
   DSNs).
 - List a new package whose `spanner_integration` tests open a database in
   the `test:spanner` script of `apps/server/package.json`.
+- List a new package with `postgres_integration` or `sqlite_integration` tests
+  in `test:postgres` or `test:sqlite`; `TestDatabaseLanesListEveryTaggedPackage` fails otherwise.
 
 ## Identifier minting
 

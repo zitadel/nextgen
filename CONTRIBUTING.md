@@ -321,8 +321,12 @@ SQLite integration tests use a local file database and need no Docker:
 
 ```sh
 turbo run test:sqlite --filter=@zitadel/server
-# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
+
+Each database lane runs only the packages that hold tests of its tag, listed
+in its script in [`apps/server/package.json`](apps/server/package.json); the
+untagged tests run once, in `test:unit`. `go -C apps/api test -tags … ./...`
+runs a tag's tests and every untagged one.
 
 Postgres and Spanner integration tests use
 [testcontainers](https://golang.testcontainers.org/) to start their databases
@@ -335,7 +339,6 @@ Docker.
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 turbo run test:postgres --filter=@zitadel/server
-# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the turbo task — see emulator-testcontainer note below)
 turbo run test:spanner --filter=@zitadel/server
