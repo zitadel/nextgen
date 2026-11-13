@@ -64,7 +64,8 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.NotEmpty(t, created.JourneyID)
 		// A project secret names no user.
 		assert.True(t, created.CreatedBy.IsNull())
-		assert.True(t, created.RejectedAt.IsNull())
+		assert.True(t, created.RespondedBy.IsNull())
+		assert.True(t, created.RespondedAt.IsNull())
 		link, err := url.Parse(created.Link)
 		require.NoError(t, err)
 		assert.Equal(t, "/ui/console/invitations/accept", link.Path)

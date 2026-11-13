@@ -54,9 +54,8 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 		CreatedAt:     inv.CreatedAt,
 		ExpiresAt:     inv.ExpiresAt,
 		JourneyID:     inv.JourneyID,
-		AcceptedBy:    inv.AcceptedBy,
-		AcceptedAt:    inv.AcceptedAt,
-		RejectedAt:    inv.RejectedAt,
+		RespondedBy:   inv.RespondedBy,
+		RespondedAt:   inv.RespondedAt,
 		Type:          api.CreateInvitationProjectMemberResponseTypeProjectMember,
 		ProjectMember: inv.ProjectMember,
 		Link:          created.Link,
@@ -165,16 +164,15 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 		resp.CreatedByType.SetToNull()
 	}
 	if inv.AcceptedBy != nil {
-		resp.AcceptedBy.SetTo(*inv.AcceptedBy)
+		resp.RespondedBy.SetTo(*inv.AcceptedBy)
 	} else {
-		resp.AcceptedBy.SetToNull()
+		resp.RespondedBy.SetToNull()
 	}
 	if inv.AcceptedAt != nil {
-		resp.AcceptedAt.SetTo(*inv.AcceptedAt)
+		resp.RespondedAt.SetTo(*inv.AcceptedAt)
 	} else {
-		resp.AcceptedAt.SetToNull()
+		resp.RespondedAt.SetToNull()
 	}
-	resp.RejectedAt.SetToNull()
 	return resp
 }
 

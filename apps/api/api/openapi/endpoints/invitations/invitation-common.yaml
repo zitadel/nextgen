@@ -51,20 +51,18 @@ properties:
       Correlates this invitation with its replacements. A replacement keeps the
       original's `journey_id`. It is a random correlation id, not a resource id.
     example: q7Z0bX2rT1aM4cV8nL5wYg
-  accepted_by:
-    description: The user who redeemed the link. Null until accepted.
+  responded_by:
+    description: |
+      The user who accepted or declined the link; `status` says which. Null
+      while the invitation is pending or expired.
     oneOf:
       - type: string
         example: user_01JD4F2H6K8M0P2R4T6V8X0Z2B
       - type: 'null'
-  accepted_at:
-    description: When the invitation was accepted. Null until accepted.
-    oneOf:
-      - type: string
-        format: date-time
-      - type: 'null'
-  rejected_at:
-    description: When the invitation was declined. Null until declined.
+  responded_at:
+    description: |
+      When the invitation was accepted or declined. Null while it is pending or
+      expired.
     oneOf:
       - type: string
         format: date-time
