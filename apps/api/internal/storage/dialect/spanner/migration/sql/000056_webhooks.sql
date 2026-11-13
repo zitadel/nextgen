@@ -1,7 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
--- A project's webhook (ADR 089); see the postgres migration. The key, the
+-- A project's webhook (ADR 090); see the postgres migration. The key, the
 -- cascade from projects and the absence of interleaving are those of policies
 -- (000038).
 CREATE TABLE webhooks (

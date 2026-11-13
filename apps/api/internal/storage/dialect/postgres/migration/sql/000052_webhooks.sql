@@ -1,5 +1,5 @@
 -- +goose Up
--- A project's webhook (ADR 089): a URL the project's events are sent to. The
+-- A project's webhook (ADR 090): a URL the project's events are sent to. The
 -- key and the cascade from projects are those of policies (000035).
 CREATE TABLE zitadel_nextgen.webhooks (
     project_id TEXT COLLATE "C" NOT NULL

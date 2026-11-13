@@ -1090,7 +1090,7 @@ type EventStatements interface {
 	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
 }
 
-// WebhookStatements persists a project's webhooks (ADR 089). A method that
+// WebhookStatements persists a project's webhooks (ADR 090). A method that
 // names a webhook returns *database.NoRowFoundError for an unknown id and for
 // another project's.
 //

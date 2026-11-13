@@ -1,6 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
--- A project's webhook (ADR 089); see the postgres migration. The key and the
+-- A project's webhook (ADR 090); see the postgres migration. The key and the
 -- cascade from projects are those of policies (000022). Times are unix nanos,
 -- created_at stamped in Go, as everywhere else in this dialect.
 CREATE TABLE webhooks (

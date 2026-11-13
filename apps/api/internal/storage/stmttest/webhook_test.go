@@ -271,7 +271,7 @@ func TestWebhookStatements_ProjectDeleteCascades(t *testing.T) {
 }
 
 // A new webhook gets no history, and an enabled one nothing of what happened
-// while it was disabled (ADR 089 §4): its cursor is past every event stored
+// while it was disabled (ADR 090 §4): its cursor is past every event stored
 // before, and before every event stored after.
 func TestWebhookStatements_CursorStartsAtNow(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

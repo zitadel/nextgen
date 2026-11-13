@@ -33,7 +33,7 @@ func ErrWebhookLimitReached() Error {
 	return newError("webhook.limit_reached", "the project has reached its limit of 10 webhooks", nil, nil)
 }
 
-// Webhook is a project's webhook (ADR 089 §1). The shipper's configured sinks
+// Webhook is a project's webhook (ADR 090 §1). The shipper's configured sinks
 // stay [EventSink].
 type Webhook struct {
 	ID          string
@@ -45,7 +45,7 @@ type Webhook struct {
 	EventTypes []string
 	Enabled    bool
 	// Secret and PreviousSecret are the signing secrets as the service layer
-	// encrypted them (ADR 089 §3). Storage keeps them as given.
+	// encrypted them (ADR 090 §3). Storage keeps them as given.
 	Secret         string
 	PreviousSecret *string
 	// PreviousSecretExpiresAt is until when PreviousSecret also signs.
