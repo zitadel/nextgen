@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { setupServer } from "msw/node";
 import { tmpdir } from "node:os";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -100,7 +101,7 @@ describe("deployment list at a terminal", () => {
   const deployment = (id: string) => ({
     id,
     release_id: "rel_1",
-    targets: [{ origin: "https://app.acme.com", expires_at: null }],
+    targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
     metadata: { reason: "deploy" },
     deployed_at: "2026-01-01T00:00:00.000Z",
   });

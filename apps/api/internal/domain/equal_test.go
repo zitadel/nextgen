@@ -16,7 +16,6 @@ func TestFlowDefinition_Equal(t *testing.T) {
 		ProjectID:  "prj_a",
 		ID:         "flowdef_1",
 		Name:       "default-login",
-		Status:     domain.FlowDefinitionStatusActive,
 		UserSchema: "human-user",
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "credentials",

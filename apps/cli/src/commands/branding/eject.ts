@@ -38,32 +38,32 @@ import {
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
 
 /** How a directory that `setup` has not made a project is refused. */
-const NOT_A_PROJECT_REFUSAL: Refusal = {
+const NOT_A_PROJECT_REFUSAL = {
   message: "This directory is not a Zitadel project",
   hint: "Run setup first; branding files live under .zitadel/.",
   next: [{ id: "setup" }],
-};
+} as const satisfies Refusal;
 
 /**
  * How a retired `--design` is refused, by name, with a pointer to where page
  * layout lives, so scripts and agents that name `--design split` get an
  * actionable error instead of oclif's generic one.
  */
-const RETIRED_DESIGN_REFUSAL: Refusal = {
+const RETIRED_DESIGN_REFUSAL = {
   message: "The {design} design was retired: it was page layout, not widget structure",
   hint: `${PAGE_LAYOUT_HINT} To own the widget's structure, eject one of: ${DESIGN_CATALOG}.`,
   next: [{ id: "branding:eject", flags: { design: "centered" } }],
-};
+} as const satisfies Refusal;
 
 /**
  * How a `--design` that names no design, retired or shipped, is refused. The
  * value is quoted as it was typed: the envelope carries it raw, and the
  * terminal spells out an escape sequence in it rather than obeying it.
  */
-const UNKNOWN_DESIGN_REFUSAL: Refusal = {
+const UNKNOWN_DESIGN_REFUSAL = {
   message: "Unknown design {design}",
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
-};
+} as const satisfies Refusal;
 
 /**
  * The `parse` of `--design`: a design the CLI ships or one that was retired,
@@ -76,7 +76,7 @@ async function readsDesign(
   command: unknown,
   definition: { name: string },
 ): Promise<string> {
-  const design = await reads<string>({
+  const design = await reads({
     schema: filled,
     refusal: {
       message: "{input} was given an empty value",

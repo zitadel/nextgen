@@ -5,7 +5,7 @@
  *
  * Runs against a console you already have up, so it shows your working tree:
  *
- *   moon run console:dev-real                                   # terminal 1
+ *   turbo run dev:real --filter=@zitadel/console                # terminal 1
  *   corepack pnpm --filter @zitadel/e2e exec tsx \
  *     console/scripts/screenshot-grid.mts                        # terminal 2
  *

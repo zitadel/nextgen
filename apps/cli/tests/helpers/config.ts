@@ -152,13 +152,14 @@ export function aStoreHolding(
  *   not a JSON object.
  */
 export function bodyAt(store: MemoryStore, path: string): JsonObject | undefined {
-  let body: unknown;
   try {
-    body = JSON.parse(store.volume.readFileSync(join(MemoryStore.ROOT, path), "utf8").toString());
+    const body: unknown = JSON.parse(
+      store.volume.readFileSync(join(MemoryStore.ROOT, path), "utf8").toString(),
+    );
+    return isJsonValue(body) && isJsonObject(body) ? body : undefined;
   } catch {
     return undefined;
   }
-  return isJsonValue(body) && isJsonObject(body) ? body : undefined;
 }
 
 /**
@@ -264,31 +265,21 @@ export type LoginFlowOptions = Readonly<{
    * The fields its identifier step collects.
    */
   collects?: readonly string[];
-  /**
-   * Whether the flow is `active` or a `draft`.
-   */
-  status?: string;
 }>;
 
 /**
  * The default login flow the CLI scaffolds: an identifier step collecting the
  * email, then a password.
  *
- * @param options - The name, the schema, the identifier step's fields and the status to set.
+ * @param options - The name, the schema and the identifier step's fields to set.
  * @returns The flow document.
  */
 export function aLoginFlow(options: LoginFlowOptions = {}): JsonObject {
-  const {
-    name = defaultLogin.name,
-    userSchema = defaultLogin.user_schema,
-    collects,
-    status = defaultLogin.status,
-  } = options;
+  const { name = defaultLogin.name, userSchema = defaultLogin.user_schema, collects } = options;
   return {
     ...defaultLogin,
     name,
     user_schema: userSchema,
-    status,
     steps: defaultLogin.steps.map((step) => {
       if (step.name === "identifier" && collects !== undefined) {
         return { ...step, fields: collects };

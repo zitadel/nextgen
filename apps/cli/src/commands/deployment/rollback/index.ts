@@ -19,17 +19,17 @@ import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
-const NOTHING_DEPLOYED_REFUSAL: Refusal = {
+const NOTHING_DEPLOYED_REFUSAL = {
   message: "There is no deployment to roll back",
   hint: "Nothing has been deployed yet; list the deployments to check.",
   next: [{ id: "deployment:list" }],
-};
+} as const satisfies Refusal;
 
-const NOTHING_EARLIER_REFUSAL: Refusal = {
+const NOTHING_EARLIER_REFUSAL = {
   message: "There is no earlier deployment to roll back to",
   hint: "Name a deployment to roll back to, or list the deployments to see which there are.",
   next: [{ id: "deployment:list" }],
-};
+} as const satisfies Refusal;
 
 /**
  * The deployment `deployment rollback` re-applies. The schema is the API spec's own, so a value that is not one is
@@ -53,7 +53,7 @@ const DEPLOYMENT_ID: Refused<string> = {
  * reject. `messageTooLong` counts code points, as the server does, so the
  * length is its call and not the schema's. The message is trimmed.
  */
-const MESSAGE: Refused<string> = {
+const MESSAGE = {
   schema: z
     .string()
     .trim()
@@ -68,7 +68,7 @@ const MESSAGE: Refused<string> = {
       argument: "--message",
     },
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * `zitadel deployment rollback [<deployment_id>]` — roll back to an earlier
@@ -149,10 +149,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             restored_origins: changes.restored,
             unserved_origins: changes.unserved,
           };
-    let consequence = "";
-    if (effects.length > 0) {
-      consequence = `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`;
-    }
+    const consequence =
+      effects.length > 0
+        ? `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`
+        : "";
 
     return this.emit(
       await this.confirmed({

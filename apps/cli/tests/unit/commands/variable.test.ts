@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import VariableRm from "@/commands/variable/rm";
 import VariableSet from "@/commands/variable/set";
@@ -14,6 +14,7 @@ import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { runCommand } from "@tests/helpers/run-cli";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const { server } = usePlatformServer();
 
@@ -999,8 +1000,12 @@ const lastLine = (shown: string): string | undefined => shown.trimEnd().split("\
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  let extraFlags: string[] = [];
-  const removingOn = async (serverUrl: string, cwd: string, ...answers: Answer[]) => {
+  const removingWith = async (
+    extraFlags: readonly string[],
+    serverUrl: string,
+    cwd: string,
+    ...answers: Answer[]
+  ) => {
     const talk = answering(...answers);
     const result = await asPerson(() =>
       runCommand(VariableRm, "variable:rm", [
@@ -1014,6 +1019,8 @@ describe("variable rm asked on a terminal", () => {
     );
     return { result, shown: talk.shown(), talk };
   };
+  const removingOn = (serverUrl: string, cwd: string, ...answers: Answer[]) =>
+    removingWith([], serverUrl, cwd, ...answers);
   const removing = (cwd: string, ...answers: Answer[]) =>
     removingOn(DEFAULT_SERVER, cwd, ...answers);
   const watchingDeletes = () => {
@@ -1026,10 +1033,6 @@ describe("variable rm asked on a terminal", () => {
     );
     return seen;
   };
-
-  afterEach(() => {
-    extraFlags = [];
-  });
 
   it("asks whether to remove the variable, naming the project and a remote server", async () => {
     const cwd = await makeProject();
@@ -1045,9 +1048,8 @@ describe("variable rm asked on a terminal", () => {
   it("says only the preview value goes when asked with --preview", async () => {
     const cwd = await makeProject();
     watchingDeletes();
-    extraFlags = ["--preview"];
 
-    const { talk } = await removing(cwd, true);
+    const { talk } = await removingWith(["--preview"], DEFAULT_SERVER, cwd, true);
 
     expect(talk.asked()).toEqual([
       "Remove the preview value of SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
@@ -1405,7 +1407,7 @@ describe("variable resolve", () => {
   it("reads the frozen map of the newest live deployment", async () => {
     const cwd = await makeProject();
     server.use(
-      live([{ id: "dep_1", targets: [{ origin: "https://app.acme.com" }] }]),
+      live([{ id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN }] }]),
       http.get("*/deployments/:id/variables", ({ params }) => {
         expect(String(params.id)).toBe("dep_1");
         return HttpResponse.json({ API_URL: "https://api.acme.com", TOKEN: { secret: true } });
@@ -1421,7 +1423,7 @@ describe("variable resolve", () => {
     expect(json.data.deployment_id).toBe("dep_1");
     // The chosen origin is named in the output, so a bare resolve says which
     // target the frozen map runs on (#1617).
-    expect(json.data.origins).toEqual(["https://app.acme.com"]);
+    expect(json.data.origins).toEqual([PRIMARY_ORIGIN]);
     expect(json.data.items).toEqual([
       { name: "API_URL", secret: false, value: "https://api.acme.com" },
       { name: "TOKEN", secret: true },
@@ -1436,7 +1438,7 @@ describe("variable resolve", () => {
     const variablesRequested = vi.fn();
     server.use(
       live([
-        { id: "dep_a", targets: [{ origin: "https://app.acme.com" }] },
+        { id: "dep_a", targets: [{ origin: PRIMARY_ORIGIN }] },
         { id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] },
       ]),
       http.get("*/deployments/:id/variables", () => {
@@ -1451,7 +1453,7 @@ describe("variable resolve", () => {
     expect(variablesRequested).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { code: string; hint: string };
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("https://app.acme.com");
+    expect(json.hint).toContain(PRIMARY_ORIGIN);
     expect(json.hint).toContain("https://admin.acme.com");
   });
 
@@ -1466,7 +1468,7 @@ describe("variable resolve", () => {
                 next_page_token: null,
               }
             : {
-                deployments: [{ id: "dep_a", targets: [{ origin: "https://app.acme.com" }] }],
+                deployments: [{ id: "dep_a", targets: [{ origin: PRIMARY_ORIGIN }] }],
                 next_page_token: "p2",
               },
         ),
@@ -1477,7 +1479,7 @@ describe("variable resolve", () => {
 
     expect(parseJson(res.stdout)).toMatchObject({
       code: "E_VALIDATION",
-      hint: "Live origins: https://admin.acme.com, https://app.acme.com.",
+      hint: `Live origins: https://admin.acme.com, ${PRIMARY_ORIGIN}.`,
     });
   });
 
@@ -1496,12 +1498,12 @@ describe("variable resolve", () => {
       "variable",
       "resolve",
       "--origin",
-      "https://app.acme.com",
+      PRIMARY_ORIGIN,
       ...base(cwd),
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(origins.at(-1)).toBe("https://app.acme.com");
+    expect(origins.at(-1)).toBe(PRIMARY_ORIGIN);
   });
 });
 

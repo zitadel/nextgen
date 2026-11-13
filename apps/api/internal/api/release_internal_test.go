@@ -91,6 +91,7 @@ func TestBuildReleaseRequestShape(t *testing.T) {
 		// bundle as a whole is the server's to refuse, not the decoder's.
 		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
 		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
+		"oauth only":  `{"bundle":{"oauth":{"enabled":true}}}`,
 	}
 	for name, body := range accepted {
 		t.Run(name, func(t *testing.T) {
@@ -107,6 +108,11 @@ func TestBuildReleaseRequestShape(t *testing.T) {
 		// A project has one branding: an array of them is refused at
 		// decoding, before it can be materialised element by element.
 		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
+		// OAuth settings have one required field and no default for it, so an
+		// empty object says nothing and is refused; so is a second key.
+		"oauth without enabled":     `{"bundle":{"oauth":{}}}`,
+		"oauth with an unknown key": `{"bundle":{"oauth":{"enabled":true,"issuer":"https://acme.example"}}}`,
+		"oauth as an array":         `{"bundle":{"oauth":[{"enabled":true}]}}`,
 	}
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
@@ -209,6 +215,19 @@ func TestRequireBuildKindScopes(t *testing.T) {
 		require.Error(t, err)
 		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
 		assert.Contains(t, err.Error(), "policy.write")
+	})
+
+	t.Run("missing oauth_settings.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		err := requireBuildKindScopes(ctx, api.ConfigurationBundle{
+			OAuth: api.NewOptOAuthSettings(api.OAuthSettings{Enabled: true}),
+		})
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "oauth_settings.write")
 	})
 
 	t.Run("empty kinds need no extra scope", func(t *testing.T) {

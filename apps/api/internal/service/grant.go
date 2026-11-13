@@ -475,6 +475,9 @@ func emitManagedGrant(ctx context.Context, stmts EventStatements, typ domain.Eve
 	ev := audit.WithEntity(audit.FromContext(ctx, typ, domain.EventCategoryAdmin), "authz_assignment", a.ID)
 	ev.ProjectID = a.ProjectID
 	ev.TeamID = nil
+	if userID := a.PrincipalUserID(); userID != "" {
+		ev.UserID = &userID
+	}
 	ev, err := audit.WithPayload(ev, payload)
 	if err != nil {
 		return err

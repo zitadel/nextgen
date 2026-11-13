@@ -19,6 +19,13 @@ predicate's cost grows with the rows in its tables.
 - A project created over HTTP goes through the cached handler's unwrapped
   service; remove it with `Harness.CleanupProject`.
 
+## Integration tests check the wire against the spec
+
+- Every answer of the harness's test server is checked against the OpenAPI
+  spec; fix the server or the spec for a mismatch, never the check.
+- A test that mounts the API on a server of its own puts
+  `Harness.SpecChecked` in the chain it passes to `MountAPI`.
+
 ## Errors
 
 Services and storage return `domain.Error` values, which match by `Code`
@@ -49,13 +56,23 @@ through any wrapping.
   cookie on a 401: an outage would sign every user out.
 - A handler a browser lands on, outside the API, answers a failure with
   `internal/errorpage`, never HTML of its own; an API path answers the
-  envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
+  envelope even to a browser ([ADR 076](../../../docs/adrs/076-error-pages-and-unmatched-routes.md)).
+
+## The platform project's configuration
+
+- A resource a project deploys or registers (what a release ships, a
+  deployment serves, an origin admits, an application) sets `configuration`
+  on its `resourceAccess`: on the reserved platform project its writes ask
+  for the admin role
+  ([Console ADR 0004 §1](../../console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
+- `TestEveryGatedResourceIsClassedForThePlatformProject` fails until a new
+  resource is classed as configuration or as the platform project's own.
 
 ## Format before push
 
-Run `moon run server:format` before pushing Go changes. It only checks
-(`gofmt -l` on tracked `*.go`); on failure run `gofmt -w` on the listed paths
-and re-run it. `server:format` is part of `ci / full-pr`.
+Run `turbo run format --filter=@zitadel/server` before pushing Go changes. It
+only checks (`gofmt -l` on tracked `*.go`); on failure run `gofmt -w` on the
+listed paths and re-run it. `ci / full-pr` runs it under the server's `lint`.
 
 ## Redirect targets
 

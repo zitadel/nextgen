@@ -89,7 +89,15 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import {
+  type Declaration,
+  filled,
+  type ParseRefusal,
+  type ReadAlone,
+  type Refused,
+  reads,
+  whole,
+} from "@/lib/oclif/flags";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
@@ -125,7 +133,8 @@ import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import {
-  inShell,
+  andTheRest,
+  pipedFrom,
   type NextOf,
   type Scope,
   type Suggest,
@@ -134,6 +143,7 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Step, Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -338,14 +348,12 @@ export function retryOptionsFromFlags(flags: {
   // A custom connection is restated as typed, minus the credentials. One the
   // checks refuse is left out: it was refused, and a retry carrying it would be
   // refused again.
-  let selection: ProviderSelection | undefined;
-  if (flags.sso !== undefined) {
-    try {
-      selection = selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
-    } catch {
-      selection = undefined;
+  const [, selection] = tryCatch(() => {
+    if (flags.sso === undefined) {
+      return undefined;
     }
-  }
+    return selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
+  });
   // What was typed for a provider this run knows, kept when it cannot become a
   // selection yet, so a retry reproduces it.
   const typed: SsoFlags | undefined =
@@ -444,79 +452,63 @@ export function customSettingsOf(flags: {
 }
 
 /** How `--server local` with nothing running is refused. */
-const NO_LOCAL_SERVER_REFUSAL: Refusal = {
+const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint:
-    "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
-    "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: [{ id: "start" }, "{setup}"],
-};
+} as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
-const NOT_A_DIRECTORY_REFUSAL: Refusal = {
+const NOT_A_DIRECTORY_REFUSAL = {
   message: "{cwd} is not a directory",
   hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
-};
+} as const satisfies Refusal;
 
 /** How a directory holding a project secret with no configuration is refused. */
-const SECRET_WITHOUT_CONFIG_REFUSAL: Refusal = {
+const SECRET_WITHOUT_CONFIG_REFUSAL = {
   code: "E_CONFLICT",
   message: ".zitadel/secret exists without zitadel.json",
   hint: "Move the secret aside or restore zitadel.json before running setup.",
-};
+} as const satisfies Refusal;
 
 /** How a repository git cannot answer about is refused. */
-const WORKTREE_UNKNOWN_REFUSAL: Refusal = {
+const WORKTREE_UNKNOWN_REFUSAL = {
   code: "E_CONFLICT",
   message: "Could not tell whether the git working tree is clean: {reason}",
-  hint:
-    "Setup commits the files it writes, and will not do that without knowing the tree " +
-    "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
-    "set up without touching version control.",
-};
+  hint: "Setup commits the files it writes, and will not do that without knowing the tree started clean. Fix what git is reporting, then run setup again, or pass --no-git to set up without touching version control.",
+} as const satisfies Refusal;
 
 /** How a repository where a commit would land in the wrong place is refused. */
-const WORKTREE_BLOCKED_REFUSAL: Refusal = {
+const WORKTREE_BLOCKED_REFUSAL = {
   code: "E_CONFLICT",
   message: "Setup cannot commit here: {blocked}",
-  hint:
-    "Setup commits the project so the first release records a commit. Finish or abort what " +
-    "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
-    "without touching version control.",
-};
+  hint: "Setup commits the project so the first release records a commit. Finish or abort what is under way, or check out a branch, then run setup again, or pass --no-git to set up without touching version control.",
+} as const satisfies Refusal;
 
 /** How a repository holding work the CLI did not write is refused. */
-const WORKTREE_DIRTY_REFUSAL: Refusal = {
+const WORKTREE_DIRTY_REFUSAL = {
   code: "E_CONFLICT",
   message: "The git working tree has {parts}",
-  hint:
-    "Setup commits the project directory so the first release records a commit, and it will not " +
-    "do that while there is work it did not write, which would be committed under setup's name. " +
-    "See them with git status, commit or stash them, then run setup again. If you have just scaffolded " +
-    "the app yourself, committing it first is the expected step. To set up without touching " +
-    "version control at all, pass --no-git.",
+  hint: "Setup commits the project directory so the first release records a commit, and it will not do that while there is work it did not write, which would be committed under setup's name. See them with git status, commit or stash them, then run setup again. If you have just scaffolded the app yourself, committing it first is the expected step. To set up without touching version control at all, pass --no-git.",
   details: {
     modified: "{modified}",
     untracked: "{untracked}",
   },
-};
+} as const satisfies Refusal;
 
 /** How a local server another CLI release started is refused. */
-const SERVER_VERSION_REFUSAL: Refusal = {
+const SERVER_VERSION_REFUSAL = {
   code: "E_CONFLICT",
   message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
-  hint:
-    "A server another CLI release started serves that release's API, so setup would stop " +
-    "halfway. Run start to restart it on {expected}; its data stays. {where}" +
-    "Then rerun setup.",
+  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
   next: ["{start}", "{setup}"],
   details: {
     server_url: "{serverUrl}",
     server_version: "{running}",
     cli_server_version: "{expected}",
   },
-};
+} as const satisfies Refusal;
 
 /** What setup needs to know about the run before it detects or writes anything. */
 export type SetupPreflight = Readonly<{
@@ -737,42 +729,42 @@ export type SetupFlagsToCheck = Readonly<{
   ssoScopes?: string;
 }>;
 
-const DESIGN_REMOVED_REFUSAL: Refusal = {
+const DESIGN_REMOVED_REFUSAL = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
   next: [{ id: "branding:eject" }],
-};
+} as const satisfies Refusal;
 
-const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
+const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
-};
+} as const satisfies Refusal;
 
-const SETTING_NEEDS_SSO_REFUSAL: Refusal = {
+const SETTING_NEEDS_SSO_REFUSAL = {
   message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
   hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
-};
+} as const satisfies Refusal;
 
-const SETTINGS_NEED_CUSTOM_REFUSAL: Refusal = {
+const SETTINGS_NEED_CUSTOM_REFUSAL = {
   message: "{names} only applies to a custom connection",
   hint: `Add --sso ${CUSTOM_PROVIDER}, or remove {them}.`,
   details: {
     flags: "{flags}",
   },
-};
+} as const satisfies Refusal;
 
-const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL: Refusal = {
+const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   message: "A custom connection needs {list}",
   hint: `Describe the connection, e.g. ${customExample(SETUP_FLAG_NAMES)}`,
   details: {
     missing: "{missing}",
   },
-};
+} as const satisfies Refusal;
 
-const SSO_NEEDS_CLIENT_ID_REFUSAL: Refusal = {
+const SSO_NEEDS_CLIENT_ID_REFUSAL = {
   message: "--sso {sso} needs --sso-client-id",
   hint: "Register {registration} and pass its client id.",
-};
+} as const satisfies Refusal;
 
 /** Where an application for `provider` is registered, for the hint to name. */
 function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
@@ -856,10 +848,10 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
  * is to pass one or leave the flag out, which is not what to do about a value
  * the provider would reject, so the two are worded apart.
  */
-const EMPTY_SETTING: Refusal = {
+const EMPTY_SETTING = {
   message: "the value is empty",
   hint: "Pass a value for {input}, or omit it entirely.",
-};
+} as const satisfies Refusal;
 
 /**
  * A trimmed value one of the platform's own parsers accepts, kept as it was
@@ -897,14 +889,33 @@ function made<T>(parse: (value: string) => Parsed<T>) {
 
 /**
  * The `parse` of a flag that refuses an empty value as any flag does, and
- * everything else as `refused` words it.
+ * everything else as `refused` words it. It takes the declaration as
+ * {@link reads} does, so the wording is checked where the flag is declared.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
+ * @typeParam Empty - The refusal for an empty value, as it is written. It
+ *   has no `values`, so it may ask only for what the parse fills
+ *   ({@link ReadAlone}).
+ * @param refused - What a value that is not empty is refused for.
+ * @param empty - What an empty value is refused with; {@link EMPTY_SETTING}
+ *   when it is left out.
+ * @returns The `parse`.
  */
-function readsFilled<T>(refused: Refused<T>, empty: Refusal = EMPTY_SETTING) {
-  const blank = reads<string>({
+function readsFilled<
+  T,
+  const R extends ParseRefusal,
+  const Declared extends Refused<T>,
+  const Empty extends ParseRefusal = typeof EMPTY_SETTING,
+>(refused: Declaration<T, R, Declared>, empty?: Empty & ReadAlone<Empty>) {
+  const emptied: ParseRefusal = empty ?? EMPTY_SETTING;
+  const blank = reads({
     schema: filled,
-    refusal: empty,
+    refusal: emptied,
   });
-  const value = reads(refused);
+  const declared: Refused<T> = refused;
+  const value = reads(declared);
   return async (given: string, command: unknown, definition: { name: string }): Promise<T> => {
     await blank(given, command, definition);
     return value(given, command, definition);
@@ -998,7 +1009,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -1008,7 +1019,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * The port a value names, for the dev-port prompt, so a port typed at the
@@ -1254,22 +1265,32 @@ export default class Setup extends Destructive(BaseCommand) {
     // it patches it, so cancelling a question leaves the directory as it was,
     // and a dry run never creates one. Until then only its framework and dev
     // port are known.
-    let app: Readonly<{ framework: string; devPort: number }>;
-    let detected: FrameworkFacts | undefined;
-    // Whether `--force` scaffolds beside entries the directory already held,
-    // other than the local runtime `start` leaves, which counts as empty.
-    let scaffoldedBesideFiles = false;
-    try {
-      detected = await orca.detect(this.cwd, flags.framework);
-      app = {
-        framework: detected.id,
-        devPort: detected.devPort,
-      };
-      detecting.done(
-        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
+    const found: Readonly<{
+      app: Readonly<{ framework: string; devPort: number }>;
+      detected: FrameworkFacts | undefined;
+      // Whether `--force` scaffolds beside entries the directory already held,
+      // other than the local runtime `start` leaves, which counts as empty.
+      scaffoldedBesideFiles: boolean;
+    }> = await orca
+      .detect(this.cwd, flags.framework)
+      .then((facts) => {
+        detecting.done(
+          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
+        );
+        return {
+          app: {
+            framework: facts.id,
+            devPort: facts.devPort,
+          },
+          detected: facts,
+          scaffoldedBesideFiles: false,
+        };
+      })
+      .catch(async (error) => {
+        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+          detecting.fail();
+          throw error;
+        }
         const target = await inspectScaffoldTarget(this.cwd);
         if (!target.scaffoldable && !this.force) {
           detecting.fail();
@@ -1280,24 +1301,24 @@ export default class Setup extends Destructive(BaseCommand) {
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        app = await orca.planScaffold(
-          this.cwd,
-          await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
-            retry: retryOptionsOf(flags),
-            serverFlag: this.meta.serverFlag,
-            ask: wizardQuestions,
-          }),
-        );
-        scaffoldedBesideFiles = !target.scaffoldable;
-      } else {
-        detecting.fail();
-        throw error;
-      }
-    }
+        return {
+          app: await orca.planScaffold(
+            this.cwd,
+            await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
+              retry: retryOptionsOf(flags),
+              serverFlag: this.meta.serverFlag,
+              ask: wizardQuestions,
+            }),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
+      });
+    const { detected, scaffoldedBesideFiles } = found;
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
     this.recordTelemetry({
-      framework: app.framework,
+      framework: found.app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags.skipInstall),
@@ -1314,12 +1335,13 @@ export default class Setup extends Destructive(BaseCommand) {
     // dev-server port only when it is unset, so a project that already pins a
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
-    if (flags.devPort !== undefined) {
-      app = {
-        ...app,
-        devPort: flags.devPort,
-      };
-    }
+    const app =
+      flags.devPort === undefined
+        ? found.app
+        : {
+            ...found.app,
+            devPort: flags.devPort,
+          };
 
     const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
@@ -1382,12 +1404,12 @@ export default class Setup extends Destructive(BaseCommand) {
     // value space has to stay enumerable: comma-joining n providers makes it
     // combinatorial, and the question telemetry answers here is whether a
     // project enabled a provider at all, not which combination.
-    let ssoDimension = "multiple";
-    if (answers.sso.length === 0) {
-      ssoDimension = "none";
-    } else if (answers.sso.length === 1) {
-      ssoDimension = answers.sso[0] ? selectionName(answers.sso[0].selection) : "none";
-    }
+    const ssoDimension =
+      answers.sso.length > 1
+        ? "multiple"
+        : answers.sso[0]
+          ? selectionName(answers.sso[0].selection)
+          : "none";
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
@@ -1429,6 +1451,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
     const scaffolding = detected === undefined && !this.dryRun;
+    // biome-ignore lint/plugin: the active step, reassigned across scaffold, create and patch, and failed by the outer catch
     let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
       this.ui
@@ -1438,15 +1461,12 @@ export default class Setup extends Destructive(BaseCommand) {
     if (scaffolding) {
       current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
     }
-    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
-    if (scaffolding) {
-      try {
-        newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
-      } catch (error) {
-        current?.fail();
-        throw error;
-      }
-    }
+    const newApp = scaffolding
+      ? await orca.scaffoldUndoably(this.cwd, app.framework, this.force).catch((error) => {
+          current?.fail();
+          throw error;
+        })
+      : undefined;
     if (newApp !== undefined) {
       current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
@@ -1468,8 +1488,11 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let project: CreatedProject;
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let result: Awaited<ReturnType<typeof patcher.patch>>;
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let scaffolded: ScaffoldedConfiguration;
     try {
       if (framework !== undefined && !this.dryRun) {
@@ -1797,7 +1820,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
 
     const writtenRel = allFilesWritten.map((file) => {
@@ -1828,6 +1851,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // admin, so the project is attached to their team right away and
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
+    // biome-ignore lint/plugin: assigned inside a best-effort try
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
@@ -1905,7 +1929,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
@@ -1928,7 +1952,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
@@ -1951,7 +1975,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
     // This run again without `--dry-run`, with every other flag as typed, which
     // is what a preview's one follow-up is.
@@ -1960,10 +1984,12 @@ export default class Setup extends Destructive(BaseCommand) {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     const title = this.dryRun ? WOULD_SET_UP_TITLE : SET_UP_TITLE;
+    // biome-ignore lint/plugin: assigned only for a person's output, after the project facts are read
     let summary: Summary = {
       title,
       sections: [],
     };
+    // biome-ignore lint/plugin: assigned only when nothing is drawn live, from the summary
     let report = "";
     if (!this.dryRun) {
       this.ui.ranAgainst(project.id, answers.server);
@@ -1998,33 +2024,31 @@ export default class Setup extends Destructive(BaseCommand) {
         const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
           planned.change.after.connections.summarize(connection);
         const verifiedBy = new Map(
-          verifications.map(({ property, claim }) => {
-            return [property, claim];
+          verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+            if (claim === true) {
+              return [[property, "always counts as verified"]];
+            }
+            if (typeof claim === "string") {
+              return [[property, `counts as verified when ${text(claim)} is true`]];
+            }
+            return [];
           }),
         );
-        let mappingSection: string[] = [];
-        if (mappings.length > 0) {
-          mappingSection = [
-            createsUsers
-              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-            ...mappings.map(({ property, claim }) => {
-              const how = verifiedBy.get(property);
-              let verified = "is not treated as verified";
-              if (how === true) {
-                verified = "always counts as verified";
-              } else if (typeof how === "string") {
-                verified = `counts as verified when ${text(how)} is true`;
-              }
-              return [
-                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                `  It ${verified}.`,
-              ].join("\n");
-            }),
-          ];
-        }
         const sections = [
-          mappingSection,
+          mappings.length === 0
+            ? []
+            : [
+                createsUsers
+                  ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                  : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+                ...mappings.map(({ property, claim }) => {
+                  const verified = verifiedBy.get(property) ?? "is not treated as verified";
+                  return [
+                    `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                    `  It ${verified}.`,
+                  ].join("\n");
+                }),
+              ],
           scopes.length === 0
             ? []
             : [
@@ -2505,7 +2529,6 @@ export default class Setup extends Destructive(BaseCommand) {
     const moving = this.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
     );
-    let ended = false;
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -2531,12 +2554,10 @@ export default class Setup extends Destructive(BaseCommand) {
             `${dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
           );
         }
-        ended = true;
       },
     }).catch((error: unknown) => {
-      if (!ended) {
-        moving.fail();
-      }
+      // A step ends once, so this says nothing more when `filesMoved` ended it.
+      moving.fail();
       throw error;
     });
     // Pinned to the project just moved, as the other recoveries are: its env
@@ -2744,11 +2765,11 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 const README = "README.md";
 
 /**
- * The client id a suggested `setup` leaves for the reader to fill in. It is a
- * placeholder for a client id, so it stands as the type the flag parses to
- * though it is not one a provider issued.
+ * The client id a suggested `setup` leaves for the reader to fill in. It is no
+ * client id a provider issued, but a `FillIn` (`src/lib/suggestion`), which a
+ * suggestion takes for any flag's value.
  */
-const ID_TO_FILL_IN = "<id>" as ClientId;
+const ID_TO_FILL_IN = "<id>";
 
 /**
  * What setup's default configuration left behind.
@@ -3053,12 +3074,9 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: inShell(
-      suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }),
-      {
-        before: `printf '%s' "$CLIENT_SECRET" | `,
-        after: " ...",
-      },
+    retry: pipedFrom(
+      "CLIENT_SECRET",
+      andTheRest(suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } })),
     ),
   });
   return {

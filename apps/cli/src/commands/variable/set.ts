@@ -8,7 +8,7 @@ import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { inShell, type SuggestedCommand, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
+import { readingFrom, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
@@ -17,22 +17,22 @@ import { reportWarning } from "@/lib/warnings";
 import { variableNameArg } from "./name";
 
 /** How a secret asked to be stored as another type is refused. */
-const SECRET_AS_STRING_REFUSAL: Refusal = {
+const SECRET_AS_STRING_REFUSAL = {
   message: "A secret is stored as a string.",
   hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
-};
+} as const satisfies Refusal;
 
 /** How a secret given on the command line, where it would reach shell history, is refused. */
-const SECRET_VALUE_REFUSAL: Refusal = {
+const SECRET_VALUE_REFUSAL = {
   message: "A secret value is not given on the command line.",
   hint: "Drop the value and pipe it in, or let the prompt ask for it.",
-};
+} as const satisfies Refusal;
 
 /** How a value that does not parse as the type `--as` names is refused. */
-const VALUE_TYPE_REFUSAL: Refusal = {
+const VALUE_TYPE_REFUSAL = {
   message: '"{value}" is not a valid {as} value.',
   hint: "A boolean variable is exactly true or false, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -132,9 +132,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         ].join(" "),
         next:
           args.value === undefined
-            ? inShell(this.suggest({ id: "variable:set", ...real }), {
-                after: " < value.txt",
-              })
+            ? readingFrom(this.suggest({ id: "variable:set", ...real }), "value.txt")
             : this.suggest({ id: "variable:set", ...real }),
       });
 
@@ -163,25 +161,20 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       message: `What should the value of ${args.name} be?`,
       stdin: true,
       // The scope this.suggest appends must precede the stdin redirection.
-      retry: inShell(
+      retry: readingFrom(
         this.suggest({ id: "variable:set", ...pipeInput(args.name, write, flags.as) }),
-        {
-          after: " < value.txt",
-        },
+        "value.txt",
       ),
       parse: (raw: string) => {
         return parseVariableValue(raw, flags.as);
       },
     };
-    let value: string | number | boolean;
-    if (write.secret) {
-      value = await this.ask.secret(question);
-    } else {
-      value = await this.ask.text({
-        ...question,
-        ...(args.value === undefined ? {} : { given: args.value }),
-      });
-    }
+    const value = write.secret
+      ? await this.ask.secret(question)
+      : await this.ask.text({
+          ...question,
+          ...(args.value === undefined ? {} : { given: args.value }),
+        });
 
     const written = await variableService.set(args.name, value, write);
     this.recordTelemetry({
@@ -196,15 +189,13 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           {
             hint: "Set the preview value with --secret, piped in or prompted for.",
             nextCommands: [
-              inShell(
+              readingFrom(
                 this.suggest({
                   id: "variable:set",
                   args: { name: args.name },
                   flags: { secret: true, preview: true },
                 }),
-                {
-                  after: " < value.txt",
-                },
+                "value.txt",
               ),
             ],
           },
@@ -235,36 +226,30 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           credentialSet: true,
           strict: false,
         });
-        let next: { actions: string[]; commands: SuggestedCommand[] } = {
-          actions: [
-            "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
-          ],
-          commands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
-        };
-        if (write.preview) {
-          next = {
-            actions: [
-              "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
-            ],
-            commands: [],
-          };
-          if (verdict === "preview") {
-            next.commands = [
-              this.suggest({
-                id: "preview",
-                flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
-              }),
+        const applies =
+          "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.";
+        const hint =
+          verdict === "unnamed-ci-build"
+            ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
+            : "Run it in the preview or development environment: preview skips any other.";
+        const previewActions = verdict === "preview" ? [applies] : [applies, hint];
+        const actions = write.preview
+          ? previewActions
+          : [
+              "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
             ];
-          } else if (verdict === "unnamed-ci-build") {
-            next.actions.push(
-              "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it.",
-            );
-          } else {
-            next.actions.push(
-              "Run it in the preview or development environment: preview skips any other.",
-            );
-          }
-        }
+        const previewCommands =
+          verdict === "preview"
+            ? [
+                this.suggest({
+                  id: "preview",
+                  flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
+                }),
+              ]
+            : [];
+        const commands = write.preview
+          ? previewCommands
+          : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })];
 
         return this.emit({
           status: "ok",
@@ -283,7 +268,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }).split("\n"),
           },
-          next,
+          next: { actions, commands },
         });
       }
     }

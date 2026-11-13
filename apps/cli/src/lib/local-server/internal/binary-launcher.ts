@@ -11,7 +11,9 @@ import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
 import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
-import { shellCommand } from "@/lib/suggestion";
+import { addCommandFor } from "@/lib/package-manager";
+import { CLI_PACKAGE_NAME } from "@/lib/public-cli";
+import { suggestedCommandOf } from "@/lib/suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
 import type { LogSink } from "@/lib/local-server/server-log";
@@ -28,6 +30,13 @@ const LOG_POLL_MS = 1_000;
 const MIGRATE_FLAG = "--migrate";
 /** What the server binary is called, whatever launched it. */
 const SERVER_PROGRAM = "nextgen";
+
+/**
+ * The reinstall both failures suggest. It is npm whatever the project uses,
+ * since the hints that go with it say npm installs @zitadel/server and its
+ * platform package.
+ */
+const REINSTALL = suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]));
 
 const require = createRequire(import.meta.url);
 
@@ -242,7 +251,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
+        nextCommands: [REINSTALL],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -422,7 +431,7 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   }
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-  // such as pnpm and moon export), and the server's long path is cut before its name.
+  // such as pnpm export), and the server's long path is cut before its name.
   const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
     return undefined;
   });
@@ -499,7 +508,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
+      nextCommands: [REINSTALL],
       details: { command, message: errorMessage(error) },
     });
   }

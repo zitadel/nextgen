@@ -50,7 +50,7 @@ POST /flow
 
 The server resolves which flow definition to use:
 
-1. Filter active definitions whose `purposes` map has an entry for the requested purpose.
+1. Filter the definitions the release pins whose `purposes` map has an entry for the requested purpose.
 2. If `hint.user_schema_id` is set, discard definitions for other schemas.
 3. Score the remaining definitions: matching app > matching team > project-wide > a definition scoped to a different app or team.
 4. Pick the highest score; ties go to the newest `created_at`, then the highest ID.
@@ -187,7 +187,6 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 ```json
 {
   "name": "default-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -269,7 +268,6 @@ says to do so.
 ```json
 {
   "name": "default-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [
@@ -383,7 +381,6 @@ A single flow that handles both login and registration using implicit outcomes f
 ```json
 {
   "name": "combined-auth",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "identify", "register": "profile" },
   "steps": [
@@ -456,7 +453,6 @@ an identifier. Login routes a missing user through `user_not_found` to
 ```json
 {
   "name": "sso-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -587,7 +583,6 @@ GET /flow/flow_2
 ```json
 {
   "name": "protected-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [

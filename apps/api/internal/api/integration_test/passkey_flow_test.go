@@ -5,6 +5,7 @@ package integration_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/url"
 	"testing"
@@ -41,12 +42,11 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	// --- Virtual authenticator ------------------------------------------------
-	// The RP origin / id are derived from the test-server URL exactly as the
+	// The RP origin / id are derived from the Origin header exactly as the
 	// handler does: RPID = Hostname(), RPOrigins = [Origin.String()].
-	rpOriginStr := testServer.URL // e.g. "http://127.0.0.1:PORT"
-	rpOriginURL, err := url.Parse(rpOriginStr)
-	require.NoError(t, err)
-	rpIDStr := rpOriginURL.Hostname() // "127.0.0.1"
+	rpOriginURL := passkeyOrigin(t, testServer.URL) // "http://localhost:PORT"
+	rpOriginStr := rpOriginURL.String()
+	rpIDStr := rpOriginURL.Hostname() // "localhost"
 
 	// Suffix user and credential IDs per run so the test stays re-runnable
 	// against a persistent database (ZITADEL_TEST_POSTGRES_URL): earlier runs
@@ -138,7 +138,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-login",
-			Status:     "active",
 			UserSchema: userSchemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "passkey-step"},
 			Steps: []api.FlowDefinitionStep{
@@ -184,8 +183,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
-	issueOK := issueResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.FlowResponseHeaders)
 	zflow = mustExtractZflow(t, issueOK.SetCookie)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected step.challenge after passkey issue")
@@ -219,8 +218,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
-	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.FlowResponseHeaders)
 
 	handoffToken, hasToken := verifyOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful passkey login")
@@ -240,4 +239,15 @@ func mustExtractZflow(t *testing.T, setCookie []string) string {
 	}
 	t.Fatalf("_zflow cookie not found in Set-Cookie header: %q", setCookie)
 	return ""
+}
+
+// passkeyOrigin is the Origin a browser sends for the test server when it is
+// opened at localhost. WebAuthn takes no IP address as a relying-party id, so
+// a passkey test sends this rather than the server's 127.0.0.1 address.
+func passkeyOrigin(t *testing.T, serverURL string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(serverURL)
+	require.NoError(t, err)
+	u.Host = net.JoinHostPort("localhost", u.Port())
+	return u
 }

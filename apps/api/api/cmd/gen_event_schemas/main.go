@@ -78,6 +78,9 @@ var payloadByEventType = map[string]string{
 	"release.created": "release-created-payload.yaml",
 	"release.revoked": "release-revoked-payload.yaml",
 
+	"application.created": "application-payload.yaml",
+	"application.updated": "application-payload.yaml",
+
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",
 
@@ -195,6 +198,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"release.created": {description: "A release was created. A [release](/docs/concepts/repo-config) is an immutable " +
 		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
+
+	"application.created": {description: "A registered application was created."},
+	"application.updated": {description: "A registered application was revised. The payload holds the new " +
+		"revision, the name when it changed, and the clients the revision added."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
 	"idp.updated": {description: "An IdP connection was revised. The payload holds the new " +

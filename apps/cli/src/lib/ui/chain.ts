@@ -108,10 +108,7 @@ export class Chain implements Drawing, Narratable {
   narrate(symbol: string, text: string): void {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
-      let line = "\n";
-      if (body !== "") {
-        line = `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
-      }
+      const line = body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`;
       (symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout).write(
         line,
       );
@@ -244,31 +241,30 @@ export class Chain implements Drawing, Narratable {
       force: audience.force,
     };
 
-    let resume: (() => void) | undefined;
-    const pause = (): void => {
-      resume = DrawnSpinner.pause();
-    };
-    const resumeSpinners = (): void => {
-      resume?.();
-      resume = undefined;
-    };
-
     return this.presentation === "plain"
       ? asker({
           ...session,
           guide: false,
-          before: pause,
-          after: resumeSpinners,
+          around: async (draw) => {
+            const resume = DrawnSpinner.pause();
+            try {
+              return await draw();
+            } finally {
+              resume();
+            }
+          },
         })
       : asker({
           ...session,
-          before: () => {
-            pause();
-            return this.open();
-          },
-          after: () => {
-            this.answered();
-            return resumeSpinners();
+          around: async (draw) => {
+            const resume = DrawnSpinner.pause();
+            this.open();
+            try {
+              return await draw();
+            } finally {
+              this.answered();
+              resume();
+            }
           },
         });
   }
