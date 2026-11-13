@@ -73,6 +73,8 @@ packages/testing/
 packages/sdk-core/
 packages/sdk-next/
 packages/sdk-*/
+packages/client-sdk-contract/
+packages/server-sdk-contract/
 patches/
 ```
 
