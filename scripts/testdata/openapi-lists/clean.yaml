@@ -1,0 +1,246 @@
+### Fixture for scripts/openapi-list-conventions.test.mjs, shaped like the
+### bundled spec (every $ref local). Nothing here may trip a list check:
+### compliant lists and queries, and the singletons, actions and endpoints
+### that are not collections at all.
+openapi: 3.1.0
+info:
+  title: list clean
+  version: 1.0.0
+paths:
+  /livez:
+    get:
+      operationId: getLive
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema: { type: string }
+  /readyz:
+    get:
+      operationId: getReady
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema: { type: string }
+  /search:
+    post:
+      # Pages each result type on its own, by design: not a list.
+      operationId: search
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query: { type: string }
+                limit_per_type: { type: integer }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  things: { type: array, items: { type: object } }
+                  categories: { type: array, items: { type: object } }
+  /things:
+    get:
+      operationId: listThings
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/page-token"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/list-things-response" }
+    post:
+      operationId: createThing
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { type: object }
+  /things/query:
+    post:
+      operationId: queryThings
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/query-things-request" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/list-things-response" }
+  /things/me:
+    get:
+      operationId: getMyThing
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /things/me/parts:
+    # Paging inputs on the path item count as the operation's.
+    parameters:
+      - $ref: "#/components/parameters/limit"
+      - $ref: "#/components/parameters/page-token"
+    get:
+      operationId: listMyParts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  parts: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /things/{thing_id}:
+    get:
+      operationId: getThing
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /things/{thing_id}/password:
+    get:
+      operationId: getThingPasswordState
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  set_at: { type: string }
+  /things/{thing_id}/claim/init:
+    post:
+      operationId: createThingClaim
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /things/{thing_id}/claim/status:
+    get:
+      operationId: getThingClaimStatus
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statuses: { type: array, items: { type: string } }
+  /things/{thing_id}/submit:
+    post:
+      operationId: submitThing
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /things/{thing_id}/revisions:
+    get:
+      operationId: listThingRevisions
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/page-token"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revisions: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /things/revisions/{revision_id}:
+    get:
+      operationId: getThingRevision
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /categories/query:
+    post:
+      # `categories` sorts by `category-sort-field`.
+      operationId: queryCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token:
+                  oneOf:
+                    - $ref: "#/components/schemas/page-token"
+                    - type: "null"
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/category-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /oauth_settings/{oauth_settings_id}:
+    get:
+      operationId: getOAuthSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema: { $ref: "#/components/schemas/limit" }
+    page-token:
+      name: page_token
+      in: query
+      schema: { $ref: "#/components/schemas/page-token" }
+  schemas:
+    limit: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    page-token: { type: string }
+    next-page-token:
+      oneOf:
+        - $ref: "#/components/schemas/page-token"
+        - type: "null"
+    thing-sort-field: { type: string, enum: [created_at, name] }
+    thing-filter-field: { type: string, enum: [created_at, name] }
+    category-sort-field: { type: string, enum: [created_at] }
+    list-things-response:
+      type: object
+      properties:
+        things: { type: array, items: { type: object } }
+        next_page_token: { $ref: "#/components/schemas/next-page-token" }
+    query-things-request:
+      type: object
+      properties:
+        limit: { $ref: "#/components/schemas/limit" }
+        page_token: { $ref: "#/components/schemas/page-token" }
+        sorting:
+          type: object
+          properties:
+            field: { $ref: "#/components/schemas/thing-sort-field" }
+            direction: { type: string, enum: [asc, desc] }
+        filter:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { $ref: "#/components/schemas/thing-filter-field" }
