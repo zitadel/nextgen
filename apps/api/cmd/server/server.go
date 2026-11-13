@@ -549,7 +549,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
+		Handler:           withTracing(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), telemetry.TracerProvider(), mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -1110,6 +1110,14 @@ func buildHTTPMux(
 	// 1.0.0 (ADR 077).
 	api.MountAPI(mux, chain, observe, apiServers)
 	return securityheaders.Middleware(mux), nil
+}
+
+// withTracing is the edge of the server's handler chain: what an incoming
+// trace context means (withIncomingTraceContext), then the server span of the
+// request (middleware.WithServerSpan), in front of every mount of next and
+// all their middleware.
+func withTracing(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, provider trace.TracerProvider, next http.Handler) http.Handler {
+	return withIncomingTraceContext(cfg, propagator, middleware.WithServerSpan(provider)(next))
 }
 
 // withIncomingTraceContext decides what an incoming trace context means for

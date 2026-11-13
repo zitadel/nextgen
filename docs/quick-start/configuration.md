@@ -231,9 +231,12 @@ instrumentation:
   `COMMIT`) as `db.operation.name`, and a wait of a millisecond or more for a
   pooled connection has a `pgx.acquire` span. No span carries SQL text,
   arguments or error messages.
-- A request that matches no API operation, a `404` or a `405`, has a server
-  span named after its method, with `http.response.status_code` and no
-  `http.route`.
+- Every request has one server span, with `http.request.method` and
+  `http.response.status_code`. It starts before any middleware runs and ends
+  when the response is written. The span of an API operation is named after
+  the operation (`GetMyUser`) and carries `http.route`. The span of any other
+  request, such as a `404`, a `405`, the OpenAPI document or a console file,
+  is named after its method and has no `http.route`.
 
 With `trust_remote_spans` off (the default), an incoming `traceparent`,
 `tracestate` or `baggage` header is ignored and every request starts a new

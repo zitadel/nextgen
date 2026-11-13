@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
@@ -16,14 +14,22 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-var tracer = otel.Tracer("github.com/zitadel/nextgen/internal/api")
-
-// NewOgenTracerProvider wraps the provider of the ogen server. ogen records
-// every failed request with RecordError, which stores the error message as a
-// span event, and messages can carry user values (a database error quoting
-// the duplicate value, for one). On the spans it starts, RecordError keeps
-// only the error type: the domain code, or else the Go type. Everything else
-// passes through.
+// NewOgenTracerProvider wraps the provider of the ogen server, which asks it
+// for a server span in every operation's handler.
+//
+// Behind [middleware.WithServerSpan] the request has its server span already,
+// started before any middleware ran, so the operation gets that span instead
+// of a second one: it takes the operation's name and the attributes ogen
+// starts a span with (oas.operation, http.route), and the End of ogen's
+// handler leaves it open, for the middleware to end with the request. A
+// server built without the middleware in front, as tests build one, gets a
+// span started here.
+//
+// ogen records every failed request with RecordError, which stores the error
+// message as a span event, and messages can carry user values (a database
+// error quoting the duplicate value, for one). On the span of an operation,
+// RecordError keeps only the error type: the domain code, or else the Go
+// type. Everything else passes through.
 func NewOgenTracerProvider(provider trace.TracerProvider) trace.TracerProvider {
 	return ogenTracerProvider{provider}
 }
@@ -37,15 +43,31 @@ func (p ogenTracerProvider) Tracer(name string, opts ...trace.TracerOption) trac
 type ogenTracer struct{ trace.Tracer }
 
 func (t ogenTracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	ctx, span := t.Tracer.Start(ctx, name, opts...)
-	if cfg := trace.NewSpanStartConfig(opts...); cfg.SpanKind() == trace.SpanKindServer {
-		middleware.SetServerSpanContext(ctx, span.SpanContext())
+	if server, ok := middleware.ServerSpan(ctx); ok {
+		if cfg := trace.NewSpanStartConfig(opts...); cfg.SpanKind() == trace.SpanKindServer {
+			// End on a span that records nothing does nothing.
+			if !server.IsRecording() {
+				return ctx, server
+			}
+			server.SetName(name)
+			server.SetAttributes(cfg.Attributes()...)
+			return ctx, requestSpan{ogenSpan{server}}
+		}
 	}
+	ctx, span := t.Tracer.Start(ctx, name, opts...)
 	if !span.IsRecording() {
 		return ctx, span
 	}
 	return ctx, ogenSpan{span}
 }
+
+// requestSpan is the request's server span in the hands of an operation's
+// handler, which does not own it.
+type requestSpan struct{ ogenSpan }
+
+// End does nothing: [middleware.WithServerSpan] ends the span, after the
+// middleware behind the operation has run and the status is known.
+func (requestSpan) End(...trace.SpanEndOption) {}
 
 type ogenSpan struct{ trace.Span }
 
@@ -81,35 +103,4 @@ func (s ogenSpan) RecordError(err error, _ ...trace.EventOption) {
 		errType = de.Code
 	}
 	s.SetAttributes(semconv.ErrorTypeKey.String(errType))
-}
-
-// startUnmatchedSpan starts the server span of a request that names no
-// operation, a path the API lacks or a method its path does not take, and
-// returns the request that carries it. ogen starts the server span in an
-// operation's handler, so without this one such a request leaves no trace and
-// its log lines no trace ID. status is what the caller answers with.
-//
-// The span has no http.route and is named after the method alone, as the HTTP
-// conventions ask of a request without a route: the path matched no template,
-// so it is the caller's text, of any cardinality.
-func startUnmatchedSpan(r *http.Request, status int) (*http.Request, trace.Span) {
-	method, name := requestMethod(r.Method)
-	ctx, span := tracer.Start(r.Context(), name,
-		trace.WithSpanKind(trace.SpanKindServer),
-		trace.WithAttributes(method, semconv.HTTPResponseStatusCode(status)),
-	)
-	middleware.SetServerSpanContext(ctx, span.SpanContext())
-	return r.WithContext(ctx), span
-}
-
-// requestMethod returns the http.request.method of method, and the name of a
-// span that has no route to put after it. net/http takes any token for a
-// method, so one the conventions do not list is _OTHER, and its span "HTTP".
-func requestMethod(method string) (attribute.KeyValue, string) {
-	switch method {
-	case http.MethodConnect, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodOptions,
-		http.MethodPatch, http.MethodPost, http.MethodPut, http.MethodTrace, "QUERY":
-		return semconv.HTTPRequestMethodKey.String(method), method
-	}
-	return semconv.HTTPRequestMethodOther, "HTTP"
 }
