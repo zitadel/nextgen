@@ -819,8 +819,11 @@ project and imports the root admin.
   `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD=1`, so a preview restores production's
   archive and skips creating and uploading its own. That step runs after
   `Deployment completed` and took longer than the build itself, and Vercel
-  bills it as build time. Never set `VERCEL_FORCE_NO_BUILD_CACHE`: it skips
-  the restore, not the upload.
+  bills it as build time. A preview's log ends with
+  `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD is set so skipping build cache upload step`.
+  Never set `VERCEL_FORCE_NO_BUILD_CACHE`: it skips the restore, not the
+  upload. A CLI `vercel redeploy` also builds without the build cache and
+  turbo's remote cache.
 
   The compressed archive must stay below the Standard build machine's
   1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
