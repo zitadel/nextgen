@@ -49,7 +49,7 @@ export async function checkCliVersion(input: {
     details: {
       current: cliVersion,
       latest,
-      remedy_command: suggest({ id: "upgrade" }),
     },
+    remedy: suggest({ id: "upgrade" }),
   };
 }

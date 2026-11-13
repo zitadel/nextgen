@@ -4,19 +4,32 @@
 //
 // This is the only check that covers the whole container contract at once: the
 // Dockerfile's data dir default, the declared non-root USER, and the server's
-// own directory handling. CI has no Docker, so it is opt-in; the CI-enforced
+// own directory handling. The `ci` script has no Docker, so the nightly
+// artifacts workflow (.github/workflows/artifacts.yml) runs it; the CI-enforced
 // halves are TestDefaultServerDataDirHasNoSideEffects (cmd/server) and the
 // Dockerfile parity assertion in the CLI's docker unit tests.
+//
+//   node scripts/smoke-container.mjs [image]
+//   node scripts/smoke-container.mjs --version <published version>
+//
+// The default image is the local runtime image (//#build-local-image). With
+// --version it pulls the image that release pushed to the registry; an empty
+// --version is the same as none.
+// Imports only Node built-ins: the artifacts workflow runs it without an install.
 import { setTimeout as delay } from "node:timers/promises";
+import { parseArgs } from "node:util";
 
 import { isDirectRun, run, runCapture } from "./dev-process.mjs";
-import { LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
+import { SERVER_IMAGE } from "./release-manifest.mjs";
 
 const READY_LOG = "structured logger configured";
 const CONTAINER_NAME = "zitadel-nextgen-smoke";
 
 export async function smokeContainer(options = {}) {
-  const image = options.image ?? LOCAL_RUNTIME_IMAGE;
+  // Loaded only for the local image: its build's modules need the
+  // workspace's dependencies, which a published image's smoke goes without.
+  const image =
+    options.image ?? (await import("./build-local-runtime-image.mjs")).LOCAL_RUNTIME_IMAGE;
   const name = options.containerName ?? CONTAINER_NAME;
   const port = options.port ?? 28080;
   const timeoutMs = options.timeoutMs ?? 90_000;
@@ -79,7 +92,12 @@ export async function smokeContainer(options = {}) {
 
 if (isDirectRun(import.meta.url)) {
   try {
-    const result = await smokeContainer({ image: process.argv[2] });
+    const { values, positionals } = parseArgs({
+      allowPositionals: true,
+      options: { version: { type: "string" } },
+    });
+    const image = values.version ? `${SERVER_IMAGE}:${values.version}` : positionals[0];
+    const result = await smokeContainer({ image });
     process.stderr.write(`[smoke-container] ${result.image} started as its default user\n`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

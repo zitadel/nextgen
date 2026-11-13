@@ -183,8 +183,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
-	issueOK := issueResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.FlowResponseHeaders)
 	zflow = mustExtractZflow(t, issueOK.SetCookie)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected step.challenge after passkey issue")
@@ -218,8 +218,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
-	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.FlowResponseHeaders)
 
 	handoffToken, hasToken := verifyOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful passkey login")

@@ -360,7 +360,6 @@ github.com/go-openapi/errors v0.22.8/go.mod h1:BuUoHcYrU6E7V9gfj1I5wLQqgtIHnup/a
 github.com/go-openapi/errors v0.22.9/go.mod h1:R73q66sXP2smzAGgFOI4nqtusRK2xN5pYCjsij+KX58=
 github.com/go-openapi/jsonpointer v1.0.0 h1:kR9tHqY0CtZaOPVFm622dPVNhrvYpwr4uCxgL3h1H8s=
 github.com/go-openapi/jsonpointer v1.0.0/go.mod h1:Z3rw7dWu1p9IgitXCFamSlA5lmDiklEB6vkaxcNZW5Y=
-github.com/go-openapi/jsonpointer v1.0.1/go.mod h1:wI7ZYsFmbIi9nBXOZqgDaS/bqOchRGZjqxFli7FBYxY=
 github.com/go-openapi/jsonreference v1.0.0 h1:jlmTr6torcd1YgDQvSfNmRtKzYDO4FGBkrAdlAVWnpY=
 github.com/go-openapi/jsonreference v1.0.0/go.mod h1:jtwdyGbJk0Xhe5Y+rwtglQP6Sb1WZST4rT32LWB+sv0=
 github.com/go-openapi/jsonreference v1.0.1/go.mod h1:dYplQXa6p5lXprLcJ8LE2iU7vNpXsAHDQ5ZAgL+Qx3A=
@@ -391,6 +390,7 @@ github.com/go-openapi/swag/conv v0.29.2/go.mod h1:AZS0YigTNf8qNtD6WqJz/N4RUNmpr7
 github.com/go-openapi/swag/fileutils v0.28.0 h1:Z04XWQD7R8Eq+7GnOrjovBxPPmZzsS4gt2H2GPGIViU=
 github.com/go-openapi/swag/fileutils v0.28.0/go.mod h1:VvJFZLTZS0AI854gEQz5tk7dBESdLjiNUMSZ/th2ry8=
 github.com/go-openapi/swag/fileutils v0.29.2/go.mod h1:7QKmmodjAebaq61lGVJa8ldLdGeMF4DSgYv8tXOGGo0=
+github.com/go-openapi/swag/jsonname v0.25.5/go.mod h1:jNqqikyiAK56uS7n8sLkdaNY/uq6+D2m2LANat09pKU=
 github.com/go-openapi/swag/jsonutils v0.28.0 h1:YIch6FwO7RXzeAnbO8Tu7dWBZeUEH+4nA0HXltVTnv4=
 github.com/go-openapi/swag/jsonutils v0.28.0/go.mod h1:CYM3WlTUcagR2ZoHdz54di/cbBqt82tuxuXgAjxw+mg=
 github.com/go-openapi/swag/jsonutils v0.29.2/go.mod h1:ONTdNvj3Y+IXRzfa17E+Rgt2ns/qiSOYjIo2K7v2yDs=

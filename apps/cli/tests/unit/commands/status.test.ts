@@ -416,6 +416,85 @@ describe("status command", () => {
     );
   });
 
+  describe("with tests add", () => {
+    /** A configured project whose zitadel.json records `framework`. */
+    async function aProjectOf(framework: string): Promise<string> {
+      const cwd = await configuredProject();
+      await writeFile(
+        join(cwd, "zitadel.json"),
+        JSON.stringify({
+          project: "proj-001",
+          server: "https://api.zitadel.cloud",
+          framework: { id: framework },
+        }),
+      );
+      return cwd;
+    }
+
+    /** Answers the user-presence probe with `count` users. */
+    function withUsers(count: number): void {
+      server.use(
+        http.post("*/users/query", () => {
+          return HttpResponse.json({
+            users: Array.from({ length: count }, (_, at) => {
+              return { id: `usr_${at}` };
+            }),
+          });
+        }),
+      );
+    }
+
+    /** The run's envelope, as far as these tests read it. */
+    type Next = { data: { next_actions: string[]; next_commands: string[] } };
+
+    it("offers it once a sign-in has worked in a Next.js app", async () => {
+      const cwd = await aProjectOf("next");
+      withUsers(1);
+
+      const res = await status(cwd);
+
+      expect((parseJson(res.stdout) as Next).data.next_actions).toContain(
+        `Keep the sign-in working with an end-to-end test whenever you want one: ${expectedPublicCliCommand(`tests add --cwd ${cwd}`)} adds Playwright tests on @zitadel/testing and installs them as dev dependencies.`,
+      );
+    });
+
+    it("never names it in next_commands, where an agent would run it unasked", async () => {
+      const cwd = await aProjectOf("next");
+      withUsers(1);
+
+      const res = await status(cwd);
+
+      expect((parseJson(res.stdout) as Next).data.next_commands.join("\n")).not.toContain(
+        "tests add",
+      );
+    });
+
+    it.each([
+      ["before the first sign-in", "next", 0],
+      ["for a framework it writes no suite for", "nuxt", 1],
+    ])("does not offer it %s", async (_, framework, users) => {
+      const cwd = await aProjectOf(framework);
+      withUsers(users);
+
+      const res = await status(cwd);
+
+      expect((parseJson(res.stdout) as Next).data.next_actions.join("\n")).not.toContain(
+        "tests add",
+      );
+    });
+
+    it("answers with its next steps in the cases it does not offer it", async () => {
+      const cwd = await aProjectOf("nuxt");
+      withUsers(1);
+
+      const res = await status(cwd);
+
+      expect((parseJson(res.stdout) as Next).data.next_actions.join("\n")).toContain(
+        "Customize what you ask for",
+      );
+    });
+  });
+
   it("keeps lifecycle-only output when the platform is unreachable", async () => {
     const cwd = await configuredProject();
 

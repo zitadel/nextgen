@@ -9098,7 +9098,7 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 
 func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *SubmitFlowStepOK:
+	case *FlowResponseHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -9162,7 +9162,7 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 
 		return nil
 
-	case *SubmitFlowStepBadRequest:
+	case *SubmitFlowStepBadRequestHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

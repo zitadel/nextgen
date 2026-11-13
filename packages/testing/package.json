@@ -34,6 +34,12 @@
       "require": "./dist/playwright.cjs",
       "default": "./dist/playwright.mjs"
     },
+    "./vitest": {
+      "@zitadel/source": "./src/vitest.ts",
+      "types": "./dist/vitest.d.mts",
+      "import": "./dist/vitest.mjs",
+      "default": "./dist/vitest.mjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -51,10 +57,14 @@
     "@zitadel/config": "workspace:*"
   },
   "peerDependencies": {
-    "@playwright/test": ">=1.60"
+    "@playwright/test": ">=1.60",
+    "vitest": ">=4.0"
   },
   "peerDependenciesMeta": {
     "@playwright/test": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

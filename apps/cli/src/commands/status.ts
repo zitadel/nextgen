@@ -12,6 +12,7 @@ import { isCancellation } from "@/lib/errors";
 import {
   customizeAndPublishActions,
   exploreAllCommands,
+  testsAction,
   verifyLoginAction,
 } from "@/lib/journey-guidance";
 import {
@@ -32,12 +33,14 @@ import { resolveCwd } from "@/lib/paths";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
+  readFrameworkId,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
 } from "@/lib/project";
 import { type Suggest, type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { supportsTestSuite } from "@/lib/test-kit";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -154,10 +157,21 @@ export default class Status extends EnvironmentCommand {
         overview: exploreAllCommands(this.cliVersion),
       },
       next: {
-        actions: nextActionsFor(project, users, this.suggest),
+        actions: nextActionsFor(
+          project,
+          users,
+          project.lifecycle === "configured" && (await this.offersTests()),
+          this.suggest,
+        ),
         commands: nextCommandsFor(serverLifecycle, project, users, this.suggest),
       },
     });
+  }
+
+  /** Whether `tests add` writes a suite for the framework `zitadel.json` records. */
+  private async offersTests(): Promise<boolean> {
+    const framework = readFrameworkId(await readZitadelConfig(this.cwd).catch(() => ({})));
+    return framework !== undefined && supportsTestSuite(framework);
   }
 }
 
@@ -315,6 +329,9 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
 function nextActionsFor(
   project: ProjectStatus,
   users: UserPresence,
+  // Whether `tests add` writes a suite for the project's framework, offered
+  // with the customize/publish stage, once a sign-in has worked.
+  offersTests: boolean,
   // Renders the `claim` the prose nudge quotes: the action text is a
   // pasteable command, so it must carry the same scope the machine
   // `next_commands` do, or a reader copying it retargets the project.
@@ -352,7 +369,11 @@ function nextActionsFor(
     return [verifyLoginAction(project.issuer), ...claim];
   }
   if (users === "some") {
-    return [...customizeAndPublishActions(suggest), ...claim];
+    return [
+      ...customizeAndPublishActions(suggest),
+      ...(offersTests ? [testsAction(suggest)] : []),
+      ...claim,
+    ];
   }
   return claim;
 }

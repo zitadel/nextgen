@@ -570,11 +570,11 @@ async function startLaneOidcMock(context, prefix) {
 
 /**
  * The customer-configuration proof for @zitadel/testing: scaffold a fresh app
- * exactly like the framework journey, then use the kit the way its README
- * tells a customer to — install it from the registry, drop in a Playwright
- * config built on withZitadel(), and run the suite. No ZITADEL_SERVER_BINARY,
- * no NEXTGEN_* env: the CLI resolves the published binary and its embedded
- * login UI on its own.
+ * exactly like the framework journey, let `zitadel tests add` write and
+ * install the starter suite, and run it with the script it adds. The suite is
+ * the CLI's own output, so this lane is where a framework's suite is proven.
+ * No ZITADEL_SERVER_BINARY, no NEXTGEN_* env: the CLI resolves the published
+ * binary and its embedded login UI on its own.
  */
 async function runTestkitJourney(context) {
   const { framework } = context;
@@ -611,36 +611,42 @@ async function runTestkitJourney(context) {
       }),
     );
 
+    // Pinned before `tests add`, which leaves a declared Playwright alone, so
+    // the suite reuses the Chromium ensurePlaywrightBrowsers installed.
     const playwrightVersion = workspacePlaywrightVersion();
-    log(
-      `[${prefix}] installing @zitadel/testing and @playwright/test@${playwrightVersion} from the journey registry`,
-    );
+    log(`[${prefix}] pinning @playwright/test@${playwrightVersion}`);
     await timed("install", () =>
       run(
         "npm",
         [
           "install",
           "--save-dev",
+          "--save-exact",
           "--no-audit",
           "--no-fund",
-          "@zitadel/testing@latest",
           `@playwright/test@${playwrightVersion}`,
         ],
         { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
       ),
     );
 
-    log(`[${prefix}] copying the checked-in consumer suite into the app`);
-    await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
+    log(`[${prefix}] adding the starter suite with tests add`);
+    const added = await timed("tests-add", () =>
+      runCapture("npx", cliArgs(context, ["tests", "add"]), {
+        cwd: context.appDir,
+        env: scrubRepoOverrides(npxEnv(context)),
+      }),
+    );
+    await writeFile(join(context.diagnosticsDir, "tests-add.json"), added.stdout);
 
-    log(`[${prefix}] running the app's @zitadel/testing suite`);
+    log(`[${prefix}] running the suite tests add wrote`);
     await timed("playwright", () =>
-      run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mts"], {
+      run("npm", ["run", "test:e2e"], {
         cwd: context.appDir,
         env: {
           ...scrubRepoOverrides(npxEnv(context)),
-          TESTKIT_APP_PORT: String(context.appPort),
-          TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
+          ZITADEL_TEST_APP_PORT: String(context.appPort),
+          ZITADEL_TEST_SERVER_PORT: String(context.zitadelPort),
         },
       }),
     );

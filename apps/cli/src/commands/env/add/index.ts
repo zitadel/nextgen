@@ -30,11 +30,11 @@ import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
-const FILE_EXISTS_REFUSAL: Refusal = {
+const FILE_EXISTS_REFUSAL = {
   code: "E_CONFLICT",
   message: "{file} already exists",
   hint: "Pass --force to overwrite it.",
-};
+} as const satisfies Refusal;
 
 /**
  * The `.env.<name>.local` file this run writes. One that already exists is a
@@ -76,28 +76,28 @@ const SERVER_RENDERED = ["next", "nuxt"];
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from env add";
 
 /** What an app URL is refused for: it must be an http(s) URL. */
-const APP_URL_REFUSAL: Refusal = {
+const APP_URL_REFUSAL = {
   message: 'Invalid app URL "{value}"',
   hint: "Use a URL like https://app.acme.com.",
-};
+} as const satisfies Refusal;
 
 /** The environment name the argument holds: one that can name a `.env.<name>.local` file. */
-const ENVIRONMENT_NAME: Refused<string> = {
+const ENVIRONMENT_NAME = {
   schema: z.string().trim().refine(isEnvironmentName),
   refusal: {
     message: '"{value}" is not a usable environment name',
     hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
   },
-};
+} as const satisfies Refused<string>;
 
 /** The URL the app is served from, which must be an http(s) one. */
-const APP_URL: Refused<string> = {
+const APP_URL = {
   schema: z
     .string()
     .trim()
     .pipe(z.url({ protocol: /^https?$/ })),
   refusal: APP_URL_REFUSAL,
-};
+} as const satisfies Refused<string>;
 
 /**
  * What a person typed as the URL their app is served from, for a prompt's
