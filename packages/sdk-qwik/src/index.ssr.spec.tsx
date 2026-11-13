@@ -7,7 +7,7 @@ import { type WidgetName, widgetTags } from "@zitadel/sdk-core/types";
 import {
   describeServerRenderCases,
   describeServerStandardAttributes,
-} from "@zitadel/framework-contract/server-render";
+} from "@zitadel/client-sdk-contract/server-render";
 
 const project = {
   projectId: "proj-test",

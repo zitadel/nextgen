@@ -37,12 +37,12 @@ import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 
-import { describeServerRenderCases } from "@zitadel/framework-contract/server-render";
+import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
 import {
   type Attributes,
   cssProperties,
   describeStandardAttributes,
-} from "@zitadel/framework-contract/standard-attributes";
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 

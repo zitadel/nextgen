@@ -1,6 +1,6 @@
 import type { Component } from "svelte";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/sdk-svelte";
 import { render as renderComponent } from "svelte/server";

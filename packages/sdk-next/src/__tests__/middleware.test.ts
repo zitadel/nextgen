@@ -1,5 +1,5 @@
 /**
- * The server middleware contract (`@zitadel/framework-contract/middleware`)
+ * The server middleware contract (`@zitadel/server-sdk-contract/middleware`)
  * for Next.js: this file is the glue between its cases and this SDK's handler.
  */
 
@@ -8,9 +8,9 @@ import { NextRequest } from "next/server";
 import { expectTypeOf, vi } from "vitest";
 
 import type { AuthResult } from "@zitadel/sdk-core/middleware";
-import type { Served, ServeInit, ServeOptions } from "@zitadel/framework-contract/middleware";
+import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
 
-import { describeServerMiddleware } from "@zitadel/framework-contract/middleware";
+import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
 
 import { nextgenMiddleware } from "../middleware";
 

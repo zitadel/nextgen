@@ -1,6 +1,6 @@
 import type { Component } from "solid-js";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/sdk-solid";
 import { createComponent } from "solid-js";

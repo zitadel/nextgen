@@ -39,12 +39,12 @@ import {
 import {
   describeServerRenderCases,
   describeServerStandardAttributes,
-} from "@zitadel/framework-contract/server-render";
+} from "@zitadel/client-sdk-contract/server-render";
 import {
   type Attributes,
   cssProperties,
   describeStandardAttributes,
-} from "@zitadel/framework-contract/standard-attributes";
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time

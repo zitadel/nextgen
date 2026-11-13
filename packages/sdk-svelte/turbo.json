@@ -3,17 +3,17 @@
   "extends": ["//"],
   "tasks": {
     // The edge spec imports this package's built dist.
-    // The specs run the cases of @zitadel/framework-contract; its typecheck edge
+    // The specs run the cases of @zitadel/client-sdk-contract; its typecheck edge
     // puts their source in the typecheck and test hashes.
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "build", "@zitadel/framework-contract#typecheck"]
+      "dependsOn": ["@zitadel/api-mock#build", "build", "@zitadel/client-sdk-contract#typecheck"]
     },
     "build": {
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     // api-mock serves the Flow API to the specs (test-setup.ts).
     "test": {
-      "dependsOn": ["@zitadel/api-mock#build", "build", "@zitadel/framework-contract#typecheck"]
+      "dependsOn": ["@zitadel/api-mock#build", "build", "@zitadel/client-sdk-contract#typecheck"]
     }
   }
 }

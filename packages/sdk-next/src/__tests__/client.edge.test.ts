@@ -1,7 +1,7 @@
 import * as client from "@zitadel/sdk-next/client";
 import { describe, expect, it } from "vitest";
 
-import { describeEdgeEntry } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry } from "@zitadel/client-sdk-contract/client-edge";
 
 const { businessLocales } = client;
 

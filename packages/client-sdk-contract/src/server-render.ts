@@ -315,11 +315,16 @@ export function describeServerRenderCases(sdk: Sdk, renderAttributes: RenderAttr
   describe("server-rendered widget config", () => {
     const covered = SERVER_RENDER_CASES.filter((c) => !c.gaps?.includes(sdk));
 
-    it.each(covered)("$title", async ({ widget, props, present, absent }) => {
-      const attributes = await renderAttributes(widget, props);
-      expect(attributes).toMatchObject(present);
-      for (const name of absent) expect(attributes).not.toHaveProperty(name);
-    });
+    // `%s` with the title as its own argument: Vitest cuts a `$title` to 40
+    // characters, which hides which row failed.
+    it.each(covered.map((c) => [c.title, c] as const))(
+      "%s",
+      async (_title, { widget, props, present, absent }) => {
+        const attributes = await renderAttributes(widget, props);
+        expect(attributes).toMatchObject(present);
+        for (const name of absent) expect(attributes).not.toHaveProperty(name);
+      },
+    );
   });
 }
 

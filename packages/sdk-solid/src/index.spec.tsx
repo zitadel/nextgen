@@ -37,7 +37,7 @@ import {
   type Attributes,
   cssProperties,
   describeStandardAttributes,
-} from "@zitadel/framework-contract/standard-attributes";
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 

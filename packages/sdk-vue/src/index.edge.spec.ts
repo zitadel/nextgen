@@ -1,6 +1,6 @@
 import type { Component } from "vue";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/sdk-vue";
 import { createSSRApp } from "vue";

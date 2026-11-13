@@ -658,79 +658,122 @@ describe("edge project declarations", () => {
 });
 
 /**
- * Each SDK spec runs the shared cases of `@zitadel/framework-contract`: one that
- * stops calling them, or moves where neither Vitest nor this check looks, would
- * drop them without a failing test.
+ * Each SDK spec runs the shared cases of its contract package: one that stops
+ * calling them, or moves where neither Vitest nor this check looks, would drop
+ * them without a failing test. The SDKs checked are the ones whose manifests
+ * depend on a contract package, so a new one cannot be left out, and each needs
+ * the edge to that package's `typecheck`, without which a contract edit leaves
+ * its cached test results in place.
  */
-describe("SDK specs ↔ @zitadel/framework-contract", () => {
+describe("SDK specs ↔ the contract packages", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-  const CALLS = {
-    "describeServerMiddleware(": [
-      "sdk-next/src/__tests__/middleware.test.ts",
-      "sdk-nuxt/src/__tests__/server/middleware.test.ts",
-      "sdk-sveltekit/src/__tests__/handle.test.ts",
-      "sdk-solid-start/src/__tests__/middleware.test.ts",
-      "sdk-qwik-router/src/__tests__/request-handler.test.ts",
-      "sdk-tanstack-start/src/__tests__/middleware.test.ts",
-    ],
-    "describeEdgeServer(": [
-      "sdk-next/src/__tests__/middleware.edge.test.ts",
-      "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
-      "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
-      "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
-      "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
-      "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
-    ],
-    "describeEdgeEntry(": [
-      "sdk-react/src/index.edge.spec.tsx",
-      "sdk-vue/src/index.edge.spec.ts",
-      "sdk-angular/src/public-api.edge.spec.ts",
-      "sdk-svelte/src/index.edge.spec.ts",
-      "sdk-solid/src/index.edge.spec.tsx",
-      "sdk-qwik/src/index.edge.spec.tsx",
-      "sdk-next/src/__tests__/client.edge.test.ts",
-    ],
-    "describeEdgeRender(": [
-      "sdk-react/src/index.edge.spec.tsx",
-      "sdk-vue/src/index.edge.spec.ts",
-      "sdk-angular/src/public-api.edge.spec.ts",
-      "sdk-svelte/src/index.edge.spec.ts",
-      "sdk-solid/src/index.edge.spec.tsx",
-      "sdk-qwik/src/index.edge.spec.tsx",
-    ],
-    "describeServerRenderCases(": [
-      "sdk-react/src/index.spec.tsx",
-      "sdk-vue/src/components.spec.ts",
-      "sdk-angular/src/lib/components.spec.ts",
-      "sdk-svelte/src/index.spec.ts",
-      "sdk-solid/src/index.ssr.spec.tsx",
-      "sdk-qwik/src/index.ssr.spec.tsx",
-    ],
-    // Angular's component tag already is the element that carries the standard
-    // attributes, so its wrapper forwards none and runs neither of these.
-    "describeServerStandardAttributes(": [
-      "sdk-react/src/index.spec.tsx",
-      "sdk-vue/src/components.spec.ts",
-      "sdk-svelte/src/index.ssr.spec.ts",
-      "sdk-solid/src/index.ssr.spec.tsx",
-      "sdk-qwik/src/index.ssr.spec.tsx",
-    ],
-    "describeStandardAttributes<": [
-      "sdk-react/src/index.spec.tsx",
-      "sdk-vue/src/components.spec.ts",
-      "sdk-svelte/src/index.spec.ts",
-      "sdk-solid/src/index.spec.tsx",
-      "sdk-qwik/src/index.spec.tsx",
-    ],
+  const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
+  type Task = { dependsOn?: string[]; inputs?: string[] };
+  /** A package's turbo tasks: its turbo.json, read as JSON without its comment lines. */
+  const tasksOf = (dir: string): Record<string, Task> =>
+    JSON.parse(read(`${dir}/turbo.json`).replace(/^\s*\/\/.*$/gm, "")).tasks;
+
+  const CALLS: Record<string, Record<string, readonly string[]>> = {
+    "@zitadel/server-sdk-contract": {
+      "describeServerMiddleware(": [
+        "sdk-next/src/__tests__/middleware.test.ts",
+        "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+        "sdk-sveltekit/src/__tests__/handle.test.ts",
+        "sdk-solid-start/src/__tests__/middleware.test.ts",
+        "sdk-qwik-router/src/__tests__/request-handler.test.ts",
+        "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+      ],
+      "describeEdgeServer(": [
+        "sdk-next/src/__tests__/middleware.edge.test.ts",
+        "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+        "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+        "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+        "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+        "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+      ],
+    },
+    "@zitadel/client-sdk-contract": {
+      "describeEdgeEntry(": [
+        "sdk-react/src/index.edge.spec.tsx",
+        "sdk-vue/src/index.edge.spec.ts",
+        "sdk-angular/src/public-api.edge.spec.ts",
+        "sdk-svelte/src/index.edge.spec.ts",
+        "sdk-solid/src/index.edge.spec.tsx",
+        "sdk-qwik/src/index.edge.spec.tsx",
+        "sdk-next/src/__tests__/client.edge.test.ts",
+      ],
+      // `@zitadel/sdk-next/client` renders no widget: Next renders through the
+      // React SDK's components, which sdk-react's own edge spec covers.
+      "describeEdgeRender(": [
+        "sdk-react/src/index.edge.spec.tsx",
+        "sdk-vue/src/index.edge.spec.ts",
+        "sdk-angular/src/public-api.edge.spec.ts",
+        "sdk-svelte/src/index.edge.spec.ts",
+        "sdk-solid/src/index.edge.spec.tsx",
+        "sdk-qwik/src/index.edge.spec.tsx",
+      ],
+      "describeServerRenderCases(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-angular/src/lib/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.ssr.spec.tsx",
+        "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      // Angular's component tag already is the element that carries the standard
+      // attributes, so its wrapper forwards none and runs neither of these.
+      "describeServerStandardAttributes(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-svelte/src/index.ssr.spec.ts",
+        "sdk-solid/src/index.ssr.spec.tsx",
+        "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      "describeStandardAttributes<": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.spec.tsx",
+        "sdk-qwik/src/index.spec.tsx",
+      ],
+    },
   };
-  const specs = Object.entries(CALLS).flatMap(([call, paths]) => paths.map((path) => [path, call]));
+  const specs = Object.values(CALLS).flatMap((calls) =>
+    Object.entries(calls).flatMap(([call, paths]) => paths.map((path) => [path, call] as const)),
+  );
 
   it.each(specs)("%s calls %s", (path, call) => {
-    expect(readFileSync(`${packagesDir}${path}`, "utf8")).toContain(call);
+    expect(read(path)).toContain(call);
   });
 
-  it("turbo.json lists the specs as test inputs", () => {
-    const config = readFileSync(`${packagesDir}sdk-core/turbo.json`, "utf8");
-    for (const [path] of specs) expect(config).toContain(`packages/${path}`);
+  it.each(Object.keys(CALLS))(
+    "%s runs in every SDK that depends on it, with its edge",
+    (contract) => {
+      const dependents = readdirSync(packagesDir).filter(
+        (dir) =>
+          existsSync(`${packagesDir}${dir}/package.json`) &&
+          JSON.parse(read(`${dir}/package.json`)).devDependencies?.[contract] !== undefined,
+      );
+      const callers = new Set(
+        Object.values(CALLS[contract] ?? {})
+          .flat()
+          .map((path) => path.slice(0, path.indexOf("/"))),
+      );
+      expect([...callers].sort()).toEqual(dependents.sort());
+      for (const dir of dependents) {
+        for (const task of ["test", "typecheck"]) {
+          expect(tasksOf(dir)[task]?.dependsOn, `${dir}#${task}`).toContain(
+            `${contract}#typecheck`,
+          );
+        }
+      }
+    },
+  );
+
+  it("turbo.json's test inputs list exactly the specs this check reads", () => {
+    const inputs = (tasksOf("sdk-core").test?.inputs ?? [])
+      .filter((input) => /\.(spec|test)\.tsx?$/.test(input))
+      .map((input) => input.replace("$TURBO_ROOT$/packages/", ""));
+    expect(inputs.sort()).toEqual([...new Set(specs.map(([path]) => path))].sort());
   });
 });

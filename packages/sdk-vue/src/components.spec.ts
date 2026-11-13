@@ -31,12 +31,12 @@ import { businessLocales } from "./index";
 import {
   describeServerRenderCases,
   describeServerStandardAttributes,
-} from "@zitadel/framework-contract/server-render";
+} from "@zitadel/client-sdk-contract/server-render";
 import {
   type Attributes,
   cssProperties,
   describeStandardAttributes,
-} from "@zitadel/framework-contract/standard-attributes";
+} from "@zitadel/client-sdk-contract/standard-attributes";
 
 // A consumer's `ref` on these components resolves to the component instance,
 // whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy

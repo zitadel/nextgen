@@ -47,7 +47,8 @@ const NON_SHIPPING_WORKSPACES = [
   "apps/docs/",
   "apps/storybook/",
   "packages/api-mock/",
-  "packages/framework-contract/",
+  "packages/client-sdk-contract/",
+  "packages/server-sdk-contract/",
   "packages/vitest-config/",
 ];
 

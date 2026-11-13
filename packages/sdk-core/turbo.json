@@ -11,7 +11,7 @@
       "dependsOn": ["@zitadel/api#build"]
     },
     // contract.spec.ts reads these SDK specs to check that each still runs
-    // @zitadel/framework-contract, the client entries, every edge project's
+    // @zitadel/client-sdk-contract, the client entries, every edge project's
     // config, and every SDK's manifest and docs and the demo apps' manifests and sources
     // to check that apps go through their SDK, skipping what that check skips
     // (dependencies, build output and Next's next-env.d.ts).

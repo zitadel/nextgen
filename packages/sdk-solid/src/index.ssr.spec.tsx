@@ -7,7 +7,7 @@ import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/type
 import {
   describeServerRenderCases,
   describeServerStandardAttributes,
-} from "@zitadel/framework-contract/server-render";
+} from "@zitadel/client-sdk-contract/server-render";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(tag: string, html: string): Record<string, string> {

@@ -6,7 +6,7 @@ import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
-import { describeServerStandardAttributes } from "@zitadel/framework-contract/server-render";
+import { describeServerStandardAttributes } from "@zitadel/client-sdk-contract/server-render";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(

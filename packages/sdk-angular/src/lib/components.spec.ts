@@ -26,7 +26,7 @@ import { ZitadelLoginComponent } from "./zitadel-login.component";
 import { ZitadelLogoutComponent } from "./zitadel-logout.component";
 import { ZitadelSessionComponent } from "./zitadel-session.component";
 
-import { describeServerRenderCases } from "@zitadel/framework-contract/server-render";
+import { describeServerRenderCases } from "@zitadel/client-sdk-contract/server-render";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 

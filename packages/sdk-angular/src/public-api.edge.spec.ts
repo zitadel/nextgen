@@ -1,6 +1,6 @@
 import type { ComponentRef, Type } from "@angular/core";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { DOCUMENT } from "@angular/common";
 import { createComponent } from "@angular/core";

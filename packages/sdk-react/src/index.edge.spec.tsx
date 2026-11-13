@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/sdk-react";
 import { createElement } from "react";

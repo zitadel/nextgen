@@ -2,7 +2,7 @@ import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/serv
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/framework-contract/server-edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 /** Sends a request through the built middleware, the way TanStack Start would, and returns the answer. */
 async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {

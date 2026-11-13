@@ -15,12 +15,34 @@ export interface MountedWidget {
   update(next: Attributes): Promise<void> | void;
 }
 
-/** What each widget's props accept of the standard attributes: the type they give each one. */
-type StandardProps<Forwarded, Props extends Record<WidgetName, object>> = {
+/**
+ * Per widget, the forwarded attributes its props do not accept as the SDK's
+ * attribute type spells them: a key the props lack, or one they type otherwise.
+ */
+type Unaccepted<Forwarded, Props extends Record<WidgetName, object>> = {
   [W in WidgetName]: {
-    [K in keyof Forwarded]?: K extends keyof Props[W] ? Props[W][K] : never;
-  };
+    [K in keyof Forwarded]-?: [Forwarded[K]] extends [
+      K extends keyof Props[W] ? Props[W][K] : never,
+    ]
+      ? never
+      : K;
+  }[keyof Forwarded];
 };
+
+/** Per widget, the props it takes that no wrapper forwards as a standard attribute. */
+type Unforwarded<Props extends Record<WidgetName, object>> = {
+  [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof Props[W]>;
+};
+
+/**
+ * `true` when no widget has an offending key; otherwise the widgets that do,
+ * each with its keys, so the SDK's type error names both.
+ */
+type NoneOf<Offending extends Record<WidgetName, PropertyKey>> = [Offending[WidgetName]] extends [
+  never,
+]
+  ? true
+  : { readonly [W in WidgetName as [Offending[W]] extends [never] ? never : W]: Offending[W] };
 
 /**
  * `T` once the caller named the types, `never` when it left them to inference
@@ -38,19 +60,9 @@ export interface StandardAttributeGlue<Forwarded, Props extends Record<WidgetNam
    */
   readonly staleOnRemoval: readonly string[];
   /** `true`: type-checks only when every widget's props accept `Partial<Forwarded>`. */
-  readonly accepted: Named<
-    Forwarded,
-    { [W in WidgetName]: Partial<Forwarded> } extends StandardProps<Forwarded, Props> ? true : false
-  >;
+  readonly accepted: Named<Forwarded, NoneOf<Unaccepted<Forwarded, Props>>>;
   /** `true`: type-checks only when no widget's props take `dir`, `classList` or `onClick`. */
-  readonly rejected: Named<
-    Forwarded,
-    [
-      { [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof Props[W]> }[WidgetName],
-    ] extends [never]
-      ? true
-      : false
-  >;
+  readonly rejected: Named<Forwarded, NoneOf<Unforwarded<Props>>>;
 }
 
 export function cssProperties(style: string): Record<string, string> {

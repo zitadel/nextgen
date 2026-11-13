@@ -1,6 +1,6 @@
 import type { Component } from "@qwik.dev/core";
 
-import { describeEdgeEntry, describeEdgeRender } from "@zitadel/framework-contract/client-edge";
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
 
 import { jsx } from "@qwik.dev/core";
 import { renderToString } from "@qwik.dev/core/server";

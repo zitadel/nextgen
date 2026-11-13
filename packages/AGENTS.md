@@ -49,8 +49,8 @@ change needs a changeset, and the whole train versions together.
   `build` before it typechecks or runs.
   Every edge project declaration reads the same; the contract spec in
   `sdk-core` checks it.
-- **SDKs run one test contract**: write a case every framework shares once in
-  `@zitadel/framework-contract`; an SDK's spec is its glue, plus its own cases.
+- **Write shared cases once**, in `@zitadel/server-sdk-contract` or
+  `@zitadel/client-sdk-contract`; an SDK's spec holds its glue and own cases.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

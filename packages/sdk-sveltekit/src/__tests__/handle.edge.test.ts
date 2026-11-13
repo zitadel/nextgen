@@ -4,7 +4,7 @@ import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/framework-contract/server-edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
 
 /** A span that records nothing, which is all `event.tracing` needs while tracing is off. */
 const span: RequestEvent["tracing"]["root"] = {
