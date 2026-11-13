@@ -407,9 +407,10 @@
     "//#check-adrs": {
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
     },
-    // Every module in go.work compiles with what its own go.mod selects
-    // (scripts/check-go-work.mjs). Not cached: the answer depends on every
-    // module's imports, tests included, which these inputs do not hold.
+    // Every module in go.work compiles with what its own go.mod selects, and
+    // the staged go.work.sum holds every checksum turbo's module-graph listing
+    // needs (scripts/check-go-work.mjs). Not cached: the answer depends on
+    // every module's imports, tests included, which these inputs do not hold.
     "//#check-go-work": {
       "cache": false,
       "env": ["GOFLAGS"],
