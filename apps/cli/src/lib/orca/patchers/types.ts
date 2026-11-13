@@ -57,19 +57,19 @@ export type PatchContext = PatchView &
      */
     posture?: ScaffoldPosture;
     /**
-     * The `ZITADEL_URL` the app's development env files set, read by
-     * `doctor` in Vite's order ({@link DevelopmentServerUrl}), so a repair
-     * never moves an app onto a server those files name. Setup leaves it out.
+     * `ZITADEL_URL` as `.env.development.local` holds it, which `doctor`
+     * reads so a repair never moves an app onto a server the file names
+     * (`AbstractRulePatcher.developmentServerUrl`). Setup leaves it out.
      */
-    developmentServerUrl?: DevelopmentServerUrl;
+    developmentServerUrl?: string;
   }>;
 
 /**
- * `ZITADEL_URL` as the first development env file that assigns it sets it,
- * in Vite's order: `.env.development.local`, `.env.development`,
- * `.env.local`, `.env`. `value` may be empty.
+ * `ZITADEL_URL` as a Vite app's development env files give it once setup's
+ * base ops ran: the value `file` holds when `held`, or the one the ops are
+ * about to write there. `value` may be empty.
  */
-export type DevelopmentServerUrl = Readonly<{ value: string; file: string }>;
+export type DevelopmentServerUrl = Readonly<{ value: string; file: string; held: boolean }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
 export type PatchExecOptions = Readonly<{

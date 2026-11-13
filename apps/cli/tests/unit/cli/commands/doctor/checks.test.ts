@@ -1688,6 +1688,23 @@ describe("ManagedFilesCheck", () => {
       });
     });
 
+    it("warns, naming the server zitadel.json names, while .env.development.local does not set one yet", async ({
+      dir,
+    }) => {
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), OTHER_SERVER), {
+        ".env.development.local": "ZITADEL_PROJECT_ID=proj-001\n",
+      });
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining(
+          `fixes ${OTHER_SERVER}, but zitadel.json names ${CLOUD}, which doctor --fix writes to .env.development.local as ZITADEL_URL`,
+        ),
+      });
+    });
+
     it("warns, not fails, on a proxy whose bearer hook was changed by hand", async ({ dir }) => {
       await aReactProject(
         dir,

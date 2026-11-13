@@ -4,7 +4,7 @@ import { parseEnv } from "node:util";
 import { resolveEnvironment } from "@/lib/environment";
 import { readIfReadable } from "@/lib/fs";
 import { type FrameworkFacts, issuerFromPort, type Orca } from "@/lib/orca";
-import type { DevelopmentServerUrl, PatchContext } from "@/lib/orca/patchers/types";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
   readPreset,
   readRendererId,
@@ -105,27 +105,12 @@ async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string
   return facts.url;
 }
 
-/** The development env files a Vite app loads, the one whose values win first. */
-const VITE_DEVELOPMENT_ENV_FILES = [
-  ".env.development.local",
-  ".env.development",
-  ".env.local",
-  ".env",
-] as const;
-
 /**
- * `ZITADEL_URL` as the first of {@link VITE_DEVELOPMENT_ENV_FILES} that
- * assigns it sets it, which is what a Vite app's dev proxy reads when the
- * process environment leaves it out; `undefined` when none does. A file the
- * repair cannot read counts as one that does not assign it.
+ * `ZITADEL_URL` as `.env.development.local` sets it, which the base ops keep
+ * and Vite ranks above the other env files; `undefined` when the file does
+ * not set it or cannot be read.
  */
-async function developmentServerUrl(cwd: string): Promise<DevelopmentServerUrl | undefined> {
-  for (const file of VITE_DEVELOPMENT_ENV_FILES) {
-    const text = await readIfReadable(join(cwd, file));
-    const value = text === undefined ? undefined : parseEnv(text).ZITADEL_URL;
-    if (value !== undefined) {
-      return { value, file };
-    }
-  }
-  return undefined;
+async function developmentServerUrl(cwd: string): Promise<string | undefined> {
+  const text = await readIfReadable(join(cwd, ".env.development.local"));
+  return text === undefined ? undefined : parseEnv(text).ZITADEL_URL;
 }

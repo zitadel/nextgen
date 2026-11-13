@@ -75,15 +75,20 @@ ${indented(viteSessionCookieStatements(), "    ")}
 
 /**
  * The generated proxy's `target`: `ZITADEL_URL` as Vite loads it, or
- * `fallback`, the address setup wrote, when it is unset or empty. The address
- * is reduced to its origin, as the CLI reads one everywhere else, since the
+ * `fallback`, the address setup wrote. An empty value counts as none, and it
+ * hides the sources below it: an empty `ZITADEL_URL` in the process
+ * environment skips the env files and lands on the fallback. The address is
+ * reduced to its origin, as the CLI reads one everywhere else, since the
  * proxy forwards under a path and the bearer hook matches the bare exchange.
- * An address without an http(s) scheme fails, naming the variable, rather
- * than starting a proxy that answers 502. It runs when the config loads.
+ * One that is no http(s) URL fails, naming the variable, rather than starting
+ * a proxy that answers 502. It runs when the config loads.
+ *
+ * Its text is how {@link viteServerAddressVerdict} knows the proxy as setup's:
+ * a change to it must keep recognising the text released before.
  */
 function serverAddress(fallback: string): string {
   return `((url) => {
-  if (!/^https?:\\/\\/[^/]/.test(url)) {
+  if (!URL.canParse(url) || !["http:", "https:"].includes(new URL(url).protocol)) {
     throw new Error(\`ZITADEL_URL is not an http(s) URL: \${url}\`);
   }
   return new URL(url).origin;
@@ -675,9 +680,12 @@ export function viteServerAddressVerdict(
     }
     const address = fixedAddress(text, found.node);
     const fixes = address === undefined ? "sets a target of its own" : `fixes ${address}`;
-    if (text.slice(found.entry.start, found.entry.end).includes(PROXY_ADDRESS_MARKER)) {
+    const entry = text.slice(found.entry.start, found.entry.end);
+    if (entry.includes(PROXY_ADDRESS_MARKER)) {
       return {
-        unknown: `its /__nextgen proxy ${fixes} instead of reading ZITADEL_URL; if that is not on purpose, set its target back to read ZITADEL_URL`,
+        unknown: /\bZITADEL_URL\b/.test(text.slice(found.node?.start, found.node?.end))
+          ? "its /__nextgen proxy reads ZITADEL_URL in a target of its own, so the doctor cannot tell which server it reaches; leave it if that is on purpose"
+          : `its /__nextgen proxy ${fixes} instead of reading ZITADEL_URL; leave it if that is on purpose, or set its target back to read ZITADEL_URL`,
       };
     }
     if (!found.cli || address === undefined) {
@@ -685,9 +693,12 @@ export function viteServerAddressVerdict(
         unknown: `its /__nextgen proxy ${fixes} and was changed since zitadel setup wrote it, so only a change by hand lets ZITADEL_URL point it at another server`,
       };
     }
-    if (movesAway(address, override)) {
+    if (override !== undefined && movesAway(address, override)) {
+      const names = override.held
+        ? `${override.file} sets ZITADEL_URL to ${override.value}`
+        : `zitadel.json names ${override.value}, which doctor --fix writes to ${override.file} as ZITADEL_URL`;
       return {
-        unknown: `its /__nextgen proxy fixes ${address}, but ${override?.file} sets ZITADEL_URL to ${override?.value}, which the proxy would follow once it reads the variable; set ZITADEL_URL to the server the app should use, then run doctor --fix again`,
+        unknown: `its /__nextgen proxy fixes ${address}, but ${names}, and the proxy would follow that once it reads the variable, so doctor --fix leaves it: to stay on ${address}, set ZITADEL_URL to it in ${override.file} and run doctor --fix again; to move to ${override.value}, change the target by hand`,
       };
     }
     return "detached";

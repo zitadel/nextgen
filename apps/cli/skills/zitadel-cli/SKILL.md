@@ -1043,13 +1043,16 @@ then `.env.development.local` (which `setup` writes it to, beside
 `.env.local`), `.env.development`, `.env.local` and `.env`, then the address
 `setup` ran against, which `vite.config.*` carries as the fallback. So a test
 run points the app at its own server through the environment, and an app
-without the variable keeps working. A `ZITADEL_URL` without an http(s) scheme
-stops the config from loading, naming the variable; one with a path is reduced
-to its origin. A proxy an older CLI wrote fixes the address in
+without the variable keeps working. An empty value counts as unset and hides
+the sources below it: an empty `ZITADEL_URL` in the process environment skips
+the env files and lands on the fallback. A value that is no http(s) URL stops
+the config from loading, `vite build` included, naming the variable; one with a
+path is reduced to its origin. A proxy an older CLI wrote fixes the address in
 `vite.config.*`: it still works, and `doctor` warns (`managed-files`,
 `unapplied managed config edit(s)`). `doctor --fix`, which `upgrade` runs,
 turns it into the current target with that address as the fallback, moving
-nothing between files. It leaves the proxy alone, with a warning naming both
+nothing between files, so with the env files as they are the app reaches the
+same server; a `ZITADEL_URL` the shell or CI exports now takes effect. It leaves the proxy alone, with a warning naming both
 addresses and the file, while the env files set `ZITADEL_URL` to another
 server, and it warns about a proxy changed by hand or a target set on purpose
 without touching either. Angular's `proxy.conf.cjs` reads the process

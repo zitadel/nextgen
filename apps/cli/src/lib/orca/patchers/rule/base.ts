@@ -397,16 +397,17 @@ export abstract class AbstractRulePatcher implements Patcher {
 
   /**
    * The `ZITADEL_URL` a Vite app's dev proxy reads from its env files once
-   * {@link baseOps} ran: they write it to `.env.development.local`, which Vite
-   * ranks first, replacing a value on setup and adding a missing one on
-   * repair. So it is the value that file already holds when `doctor` read
-   * one there, and `ctx.server` otherwise.
+   * {@link baseOps} ran. They write it to `.env.development.local`, replacing a
+   * value on setup and adding a missing one on repair, and Vite ranks that
+   * file above the others, so the rest of the chain never decides it. It is
+   * the value the file holds when `doctor` read one there, and `ctx.server`,
+   * the server `zitadel.json` names, otherwise.
    */
   protected developmentServerUrl(ctx: PatchContext): DevelopmentServerUrl {
     const held = ctx.developmentServerUrl;
-    return held?.file === DEVELOPMENT_ENV_FILE
-      ? held
-      : { value: ctx.server, file: DEVELOPMENT_ENV_FILE };
+    return held === undefined
+      ? { value: ctx.server, file: DEVELOPMENT_ENV_FILE, held: false }
+      : { value: held, file: DEVELOPMENT_ENV_FILE, held: true };
   }
 
   /**

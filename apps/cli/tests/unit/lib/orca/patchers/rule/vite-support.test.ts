@@ -682,7 +682,7 @@ describe("viteServerAddressEdit", () => {
     ["the same server", `${SERVER}/`],
     ["nothing", ""],
   ])("moves it while the env files set ZITADEL_URL to %s", (_, value) => {
-    const out = viteServerAddressEdit({ value, file: CLI_ENV_FILE })(fixed);
+    const out = viteServerAddressEdit({ value, file: CLI_ENV_FILE, held: true })(fixed);
 
     expect(withoutBlankLines(out)).toBe(withoutBlankLines(edit(BARE_CONFIG)));
   });
@@ -712,7 +712,7 @@ describe("viteServerAddressEdit", () => {
       SERVER,
     ],
   ])("leaves the entry as it is when %s", (_, config, value) => {
-    expect(viteServerAddressEdit({ value, file: CLI_ENV_FILE })(config)).toBe(config);
+    expect(viteServerAddressEdit({ value, file: CLI_ENV_FILE, held: true })(config)).toBe(config);
   });
 
   it("leaves an entry whose bearer hook was changed alone", () => {
@@ -770,12 +770,57 @@ describe("viteServerAddressVerdict", () => {
   });
 
   it("reads the entry it wrote as unknown while the env files name another server, naming both and the file", () => {
-    const verdict = viteServerAddressVerdict({ value: OTHER_SERVER, file: CLI_ENV_FILE })(fixed);
+    const verdict = viteServerAddressVerdict({
+      value: OTHER_SERVER,
+      file: CLI_ENV_FILE,
+      held: true,
+    })(fixed);
 
     expect(verdict).toEqual({
       unknown: expect.stringContaining(
         `fixes ${SERVER}, but ${CLI_ENV_FILE} sets ZITADEL_URL to ${OTHER_SERVER}`,
       ),
+    });
+  });
+
+  it("reads the entry it wrote as unknown while zitadel.json names another server doctor --fix is about to write", () => {
+    const verdict = viteServerAddressVerdict({
+      value: OTHER_SERVER,
+      file: CLI_ENV_FILE,
+      held: false,
+    })(fixed);
+
+    expect(verdict).toEqual({
+      unknown: expect.stringContaining(
+        `zitadel.json names ${OTHER_SERVER}, which doctor --fix writes to ${CLI_ENV_FILE} as ZITADEL_URL`,
+      ),
+    });
+  });
+
+  it("says how to leave the address it fixes, by the env file or by hand", () => {
+    const verdict = viteServerAddressVerdict({
+      value: OTHER_SERVER,
+      file: CLI_ENV_FILE,
+      held: true,
+    })(fixed);
+
+    expect(verdict).toEqual({
+      unknown: expect.stringContaining(
+        `to stay on ${SERVER}, set ZITADEL_URL to it in ${CLI_ENV_FILE} and run doctor --fix again; to move to ${OTHER_SERVER}, change the target by hand`,
+      ),
+    });
+  });
+
+  it("reads a v4 entry that reads ZITADEL_URL its own way as unknown, saying so", () => {
+    const own = fixed
+      .replace(
+        `target: "${SERVER}",`,
+        `target: loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_URL || "${SERVER}",`,
+      )
+      .replace("zitadel:proxy:v3", "zitadel:proxy:v4");
+
+    expect(addressVerdict(own)).toEqual({
+      unknown: expect.stringContaining("reads ZITADEL_URL in a target of its own"),
     });
   });
 
@@ -1016,15 +1061,27 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     });
   });
 
-  it("refuses a ZITADEL_URL without a scheme, naming the variable", async () => {
-    const refusal = await rejectionOf(() =>
-      serve(setUp(), { ...env, ZITADEL_URL: "zitadel.example.com" }),
-    );
+  it.each([
+    ["without a scheme", "zitadel.example.com"],
+    ["with a space in its host", "http://exa mple"],
+  ])("refuses a ZITADEL_URL %s, naming the variable", async (_, value) => {
+    const refusal = await rejectionOf(() => serve(setUp(), { ...env, ZITADEL_URL: value }));
 
     expect(refusal).toBeInstanceOf(Error);
     expect(refusal).toMatchObject({
-      message: expect.stringContaining("ZITADEL_URL is not an http(s) URL: zitadel.example.com"),
+      message: expect.stringContaining(`ZITADEL_URL is not an http(s) URL: ${value}`),
     });
+  });
+
+  it("follows a ZITADEL_URL whose scheme is upper case", async () => {
+    const { origin } = await serve(setUp(UNREACHABLE), {
+      ...env,
+      ZITADEL_URL: remote.url.replace(/^https:/, "HTTPS:"),
+    });
+
+    const response = await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(response.status).toBe(200);
   });
 
   it("leaves vite build free to load the config without ZITADEL_URL", async () => {
