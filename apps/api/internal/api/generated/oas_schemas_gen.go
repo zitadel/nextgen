@@ -26,7 +26,9 @@ type AcceptInvitationErrorResponse struct {
 	Type                AcceptInvitationErrorResponseType
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
+	InvInviterNotAdmin  InvInviterNotAdmin
 	InvNotFound         InvNotFound
 	InvPlatformRequired InvPlatformRequired
 	InvProjectUnclaimed InvProjectUnclaimed
@@ -43,7 +45,9 @@ type AcceptInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidAcceptInvitationErrorResponse     AcceptInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidAcceptInvitationErrorResponse          AcceptInvitationErrorResponseType = "evt.invalid"
 	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
+	InvInviterNotAdminAcceptInvitationErrorResponse  AcceptInvitationErrorResponseType = "inv.inviter_not_admin"
 	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
 	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
 	InvProjectUnclaimedAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.project_unclaimed"
@@ -63,9 +67,19 @@ func (s AcceptInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedAcceptInvitationErrorResponse
 }
 
+// IsEvtInvalid reports whether AcceptInvitationErrorResponse is EvtInvalid.
+func (s AcceptInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidAcceptInvitationErrorResponse
+}
+
 // IsInternal reports whether AcceptInvitationErrorResponse is Internal.
 func (s AcceptInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalAcceptInvitationErrorResponse
+}
+
+// IsInvInviterNotAdmin reports whether AcceptInvitationErrorResponse is InvInviterNotAdmin.
+func (s AcceptInvitationErrorResponse) IsInvInviterNotAdmin() bool {
+	return s.Type == InvInviterNotAdminAcceptInvitationErrorResponse
 }
 
 // IsInvNotFound reports whether AcceptInvitationErrorResponse is InvNotFound.
@@ -145,6 +159,27 @@ func NewAuthUnauthorizedAcceptInvitationErrorResponse(v AuthUnauthorized) Accept
 	return s
 }
 
+// SetEvtInvalid sets AcceptInvitationErrorResponse to EvtInvalid.
+func (s *AcceptInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidAcceptInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if AcceptInvitationErrorResponse is EvtInvalid.
+func (s AcceptInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidAcceptInvitationErrorResponse(v EvtInvalid) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets AcceptInvitationErrorResponse to Internal.
 func (s *AcceptInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalAcceptInvitationErrorResponse
@@ -163,6 +198,27 @@ func (s AcceptInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAcceptInvitationErrorResponse(v Internal) AcceptInvitationErrorResponse {
 	var s AcceptInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvInviterNotAdmin sets AcceptInvitationErrorResponse to InvInviterNotAdmin.
+func (s *AcceptInvitationErrorResponse) SetInvInviterNotAdmin(v InvInviterNotAdmin) {
+	s.Type = InvInviterNotAdminAcceptInvitationErrorResponse
+	s.InvInviterNotAdmin = v
+}
+
+// GetInvInviterNotAdmin returns InvInviterNotAdmin and true boolean if AcceptInvitationErrorResponse is InvInviterNotAdmin.
+func (s AcceptInvitationErrorResponse) GetInvInviterNotAdmin() (v InvInviterNotAdmin, ok bool) {
+	if !s.IsInvInviterNotAdmin() {
+		return v, false
+	}
+	return s.InvInviterNotAdmin, true
+}
+
+// NewInvInviterNotAdminAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvInviterNotAdmin.
+func NewInvInviterNotAdminAcceptInvitationErrorResponse(v InvInviterNotAdmin) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvInviterNotAdmin(v)
 	return s
 }
 
@@ -348,10 +404,6 @@ func (*AcceptInvitationForbidden) acceptInvitationRes() {}
 type AcceptInvitationNotFound ErrorDetails
 
 func (*AcceptInvitationNotFound) acceptInvitationRes() {}
-
-type AcceptInvitationTooManyRequests ErrorDetails
-
-func (*AcceptInvitationTooManyRequests) acceptInvitationRes() {}
 
 type AcceptInvitationUnauthorized ErrorDetails
 
@@ -20042,8 +20094,8 @@ func (s *CreateInvitationProjectMemberRequestType) UnmarshalText(data []byte) er
 type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline. Cancel and replace delete
-	// the row.
+	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
+	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created it (`created_by_type` is
@@ -20057,10 +20109,15 @@ type CreateInvitationProjectMemberResponse struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt    OptNilDateTime                            `json:"accepted_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
+	// The user who created the invitation, resolved for display: render `display`, falling back to
+	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
+	// null when a project secret created the invitation.
+	Inviter       OptNilUserRef                             `json:"inviter"`
 	Type          CreateInvitationProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment. Only this create or replace
@@ -20113,14 +20170,19 @@ func (s *CreateInvitationProjectMemberResponse) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *CreateInvitationProjectMemberResponse) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *CreateInvitationProjectMemberResponse) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *CreateInvitationProjectMemberResponse) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *CreateInvitationProjectMemberResponse) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *CreateInvitationProjectMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -20183,14 +20245,19 @@ func (s *CreateInvitationProjectMemberResponse) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *CreateInvitationProjectMemberResponse) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *CreateInvitationProjectMemberResponse) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *CreateInvitationProjectMemberResponse) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *CreateInvitationProjectMemberResponse) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *CreateInvitationProjectMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -20535,8 +20602,8 @@ func (s *CreateInvitationTeamMemberRequestType) UnmarshalText(data []byte) error
 type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline. Cancel and replace delete
-	// the row.
+	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
+	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created it (`created_by_type` is
@@ -20550,10 +20617,15 @@ type CreateInvitationTeamMemberResponse struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime                         `json:"accepted_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
+	// The user who created the invitation, resolved for display: render `display`, falling back to
+	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
+	// null when a project secret created the invitation.
+	Inviter    OptNilUserRef                          `json:"inviter"`
 	Type       CreateInvitationTeamMemberResponseType `json:"type"`
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment. Only this create or replace
@@ -20606,14 +20678,19 @@ func (s *CreateInvitationTeamMemberResponse) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *CreateInvitationTeamMemberResponse) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *CreateInvitationTeamMemberResponse) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *CreateInvitationTeamMemberResponse) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *CreateInvitationTeamMemberResponse) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *CreateInvitationTeamMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -20676,14 +20753,19 @@ func (s *CreateInvitationTeamMemberResponse) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *CreateInvitationTeamMemberResponse) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *CreateInvitationTeamMemberResponse) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *CreateInvitationTeamMemberResponse) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *CreateInvitationTeamMemberResponse) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *CreateInvitationTeamMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -49289,6 +49371,59 @@ func (s *InvInvalidDetails) init() InvInvalidDetails {
 
 // Merged schema.
 // Ref: #
+type InvInviterNotAdmin struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvInviterNotAdminDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvInviterNotAdmin) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvInviterNotAdmin) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvInviterNotAdmin) GetDetails() OptInvInviterNotAdminDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvInviterNotAdmin) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvInviterNotAdmin) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvInviterNotAdmin) SetDetails(val OptInvInviterNotAdminDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvInviterNotAdminDetails map[string]jx.Raw
+
+func (s *InvInviterNotAdminDetails) init() InvInviterNotAdminDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type InvNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -49597,6 +49732,59 @@ func (s *InvSelfAccept) SetDetails(val OptInvSelfAcceptDetails) {
 type InvSelfAcceptDetails map[string]jx.Raw
 
 func (s *InvSelfAcceptDetails) init() InvSelfAcceptDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type InvSelfReject struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvSelfRejectDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvSelfReject) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvSelfReject) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvSelfReject) GetDetails() OptInvSelfRejectDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvSelfReject) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvSelfReject) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvSelfReject) SetDetails(val OptInvSelfRejectDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvSelfRejectDetails map[string]jx.Raw
+
+func (s *InvSelfRejectDetails) init() InvSelfRejectDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -51775,6 +51963,48 @@ func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalText(data []byte) erro
 	}
 }
 
+// A related object to embed on each returned invitation.
+//
+//   - `inviter`: the user who created the invitation, as `inviter`, a user reference. It is null when a
+//     project secret created the invitation. The property is omitted when not requested.
+//     It needs no permission beyond listing: like the user on a grant, the reference carries only
+//     `user_id`, `identifier` and `display`, never the user's record.
+//
+// Ref: #
+type InvitationExpand string
+
+const (
+	InvitationExpandInviter InvitationExpand = "inviter"
+)
+
+// AllValues returns all InvitationExpand values.
+func (InvitationExpand) AllValues() []InvitationExpand {
+	return []InvitationExpand{
+		InvitationExpandInviter,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationExpandInviter:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationExpand) UnmarshalText(data []byte) error {
+	switch InvitationExpand(data) {
+	case InvitationExpandInviter:
+		*s = InvitationExpandInviter
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type InvitationID string
 
 // Merged schema.
@@ -51786,6 +52016,9 @@ type InvitationLookupProjectMemberResponse struct {
 	// The user who created the invitation. Null when a project secret created it.
 	CreatedBy     OptNilString                                             `json:"created_by"`
 	CreatedByType OptNilInvitationLookupProjectMemberResponseCreatedByType `json:"created_by_type"`
+	// The user who created the invitation, resolved so the accept page can name them: render `display`,
+	// falling back to `identifier`, then `user_id`. Null when a project secret created it.
+	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
 	ExpiresAt     time.Time                                 `json:"expires_at"`
 	Status        InvitationStatus                          `json:"status"`
@@ -51811,6 +52044,11 @@ func (s *InvitationLookupProjectMemberResponse) GetCreatedBy() OptNilString {
 // GetCreatedByType returns the value of CreatedByType.
 func (s *InvitationLookupProjectMemberResponse) GetCreatedByType() OptNilInvitationLookupProjectMemberResponseCreatedByType {
 	return s.CreatedByType
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationLookupProjectMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
@@ -51851,6 +52089,11 @@ func (s *InvitationLookupProjectMemberResponse) SetCreatedBy(val OptNilString) {
 // SetCreatedByType sets the value of CreatedByType.
 func (s *InvitationLookupProjectMemberResponse) SetCreatedByType(val OptNilInvitationLookupProjectMemberResponseCreatedByType) {
 	s.CreatedByType = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationLookupProjectMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
@@ -52045,6 +52288,9 @@ type InvitationLookupTeamMemberResponse struct {
 	// The user who created the invitation. Null when a project secret created it.
 	CreatedBy     OptNilString                                          `json:"created_by"`
 	CreatedByType OptNilInvitationLookupTeamMemberResponseCreatedByType `json:"created_by_type"`
+	// The user who created the invitation, resolved so the accept page can name them: render `display`,
+	// falling back to `identifier`, then `user_id`. Null when a project secret created it.
+	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
 	ExpiresAt  time.Time                              `json:"expires_at"`
 	Status     InvitationStatus                       `json:"status"`
@@ -52070,6 +52316,11 @@ func (s *InvitationLookupTeamMemberResponse) GetCreatedBy() OptNilString {
 // GetCreatedByType returns the value of CreatedByType.
 func (s *InvitationLookupTeamMemberResponse) GetCreatedByType() OptNilInvitationLookupTeamMemberResponseCreatedByType {
 	return s.CreatedByType
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationLookupTeamMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
@@ -52110,6 +52361,11 @@ func (s *InvitationLookupTeamMemberResponse) SetCreatedBy(val OptNilString) {
 // SetCreatedByType sets the value of CreatedByType.
 func (s *InvitationLookupTeamMemberResponse) SetCreatedByType(val OptNilInvitationLookupTeamMemberResponseCreatedByType) {
 	s.CreatedByType = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationLookupTeamMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
@@ -52222,8 +52478,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 }
 
 // What the administrator entered at creation, so other administrators know who the link is for. It is
-// only displayed, never matched. Null once the invitation is accepted or declined. Cancel deletes the
-// row with it; replace moves it to the new invitation unless that sends its own.
+// only displayed, never matched. Null once the invitation is accepted; a declined one keeps it. Cancel
+// deletes the row with it; replace moves it to the new invitation unless that sends its own.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -52245,8 +52501,8 @@ func (s *InvitationMetadata) SetName(val string) {
 type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline. Cancel and replace delete
-	// the row.
+	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
+	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created it (`created_by_type` is
@@ -52260,10 +52516,15 @@ type InvitationProjectMember struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt    OptNilDateTime                 `json:"accepted_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
+	// The user who created the invitation, resolved for display: render `display`, falling back to
+	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
+	// null when a project secret created the invitation.
+	Inviter       OptNilUserRef                  `json:"inviter"`
 	Type          InvitationProjectMemberType    `json:"type"`
 	ProjectMember InvitationProjectMemberPayload `json:"project_member"`
 }
@@ -52313,14 +52574,19 @@ func (s *InvitationProjectMember) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *InvitationProjectMember) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *InvitationProjectMember) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *InvitationProjectMember) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *InvitationProjectMember) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationProjectMember) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -52378,14 +52644,19 @@ func (s *InvitationProjectMember) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *InvitationProjectMember) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *InvitationProjectMember) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *InvitationProjectMember) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *InvitationProjectMember) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationProjectMember) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -53105,8 +53376,8 @@ func (s *InvitationStatus) UnmarshalText(data []byte) error {
 type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline. Cancel and replace delete
-	// the row.
+	// Who the administrator said the link is for. Null after accept; a decline keeps it. Cancel and
+	// replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created it (`created_by_type` is
@@ -53120,10 +53391,15 @@ type InvitationTeamMember struct {
 	// Correlates this invitation with its replacements. A replacement keeps the original's `journey_id`.
 	// It is a random correlation id, not a resource id.
 	JourneyID string `json:"journey_id"`
-	// The user who redeemed the link. Null until accepted.
-	AcceptedBy OptNilString `json:"accepted_by"`
-	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime              `json:"accepted_at"`
+	// The user who accepted or declined the link; `status` says which. Null while the invitation is
+	// pending or expired.
+	RespondedBy OptNilString `json:"responded_by"`
+	// When the invitation was accepted or declined. Null while it is pending or expired.
+	RespondedAt OptNilDateTime `json:"responded_at"`
+	// The user who created the invitation, resolved for display: render `display`, falling back to
+	// `identifier`, then `user_id`. Present only when `listInvitations` is called with `expand=inviter`;
+	// null when a project secret created the invitation.
+	Inviter    OptNilUserRef               `json:"inviter"`
 	Type       InvitationTeamMemberType    `json:"type"`
 	TeamMember InvitationTeamMemberPayload `json:"team_member"`
 }
@@ -53173,14 +53449,19 @@ func (s *InvitationTeamMember) GetJourneyID() string {
 	return s.JourneyID
 }
 
-// GetAcceptedBy returns the value of AcceptedBy.
-func (s *InvitationTeamMember) GetAcceptedBy() OptNilString {
-	return s.AcceptedBy
+// GetRespondedBy returns the value of RespondedBy.
+func (s *InvitationTeamMember) GetRespondedBy() OptNilString {
+	return s.RespondedBy
 }
 
-// GetAcceptedAt returns the value of AcceptedAt.
-func (s *InvitationTeamMember) GetAcceptedAt() OptNilDateTime {
-	return s.AcceptedAt
+// GetRespondedAt returns the value of RespondedAt.
+func (s *InvitationTeamMember) GetRespondedAt() OptNilDateTime {
+	return s.RespondedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationTeamMember) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -53238,14 +53519,19 @@ func (s *InvitationTeamMember) SetJourneyID(val string) {
 	s.JourneyID = val
 }
 
-// SetAcceptedBy sets the value of AcceptedBy.
-func (s *InvitationTeamMember) SetAcceptedBy(val OptNilString) {
-	s.AcceptedBy = val
+// SetRespondedBy sets the value of RespondedBy.
+func (s *InvitationTeamMember) SetRespondedBy(val OptNilString) {
+	s.RespondedBy = val
 }
 
-// SetAcceptedAt sets the value of AcceptedAt.
-func (s *InvitationTeamMember) SetAcceptedAt(val OptNilDateTime) {
-	s.AcceptedAt = val
+// SetRespondedAt sets the value of RespondedAt.
+func (s *InvitationTeamMember) SetRespondedAt(val OptNilDateTime) {
+	s.RespondedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationTeamMember) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -59872,10 +60158,6 @@ func (*LookupInvitationErrorResponseStatusCode) lookupInvitationRes() {}
 type LookupInvitationNotFound ErrorDetails
 
 func (*LookupInvitationNotFound) lookupInvitationRes() {}
-
-type LookupInvitationTooManyRequests ErrorDetails
-
-func (*LookupInvitationTooManyRequests) lookupInvitationRes() {}
 
 type LookupInvitationUnauthorized ErrorDetails
 
@@ -67492,6 +67774,52 @@ func (o OptInvInvalidDetails) Or(d InvInvalidDetails) InvInvalidDetails {
 	return d
 }
 
+// NewOptInvInviterNotAdminDetails returns new OptInvInviterNotAdminDetails with value set to v.
+func NewOptInvInviterNotAdminDetails(v InvInviterNotAdminDetails) OptInvInviterNotAdminDetails {
+	return OptInvInviterNotAdminDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvInviterNotAdminDetails is optional InvInviterNotAdminDetails.
+type OptInvInviterNotAdminDetails struct {
+	Value InvInviterNotAdminDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvInviterNotAdminDetails was set.
+func (o OptInvInviterNotAdminDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvInviterNotAdminDetails) Reset() {
+	var v InvInviterNotAdminDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvInviterNotAdminDetails) SetTo(v InvInviterNotAdminDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvInviterNotAdminDetails) Get() (v InvInviterNotAdminDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvInviterNotAdminDetails) Or(d InvInviterNotAdminDetails) InvInviterNotAdminDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvNotFoundDetails returns new OptInvNotFoundDetails with value set to v.
 func NewOptInvNotFoundDetails(v InvNotFoundDetails) OptInvNotFoundDetails {
 	return OptInvNotFoundDetails{
@@ -67768,6 +68096,52 @@ func (o OptInvSelfAcceptDetails) Or(d InvSelfAcceptDetails) InvSelfAcceptDetails
 	return d
 }
 
+// NewOptInvSelfRejectDetails returns new OptInvSelfRejectDetails with value set to v.
+func NewOptInvSelfRejectDetails(v InvSelfRejectDetails) OptInvSelfRejectDetails {
+	return OptInvSelfRejectDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvSelfRejectDetails is optional InvSelfRejectDetails.
+type OptInvSelfRejectDetails struct {
+	Value InvSelfRejectDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvSelfRejectDetails was set.
+func (o OptInvSelfRejectDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvSelfRejectDetails) Reset() {
+	var v InvSelfRejectDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvSelfRejectDetails) SetTo(v InvSelfRejectDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvSelfRejectDetails) Get() (v InvSelfRejectDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvSelfRejectDetails) Or(d InvSelfRejectDetails) InvSelfRejectDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvitationAcceptedEventDelegationType returns new OptInvitationAcceptedEventDelegationType with value set to v.
 func NewOptInvitationAcceptedEventDelegationType(v InvitationAcceptedEventDelegationType) OptInvitationAcceptedEventDelegationType {
 	return OptInvitationAcceptedEventDelegationType{
@@ -68038,52 +68412,6 @@ func (o OptInvitationRejectedEventDelegationType) Get() (v InvitationRejectedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvitationRejectedEventDelegationType) Or(d InvitationRejectedEventDelegationType) InvitationRejectedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInvitationStatus returns new OptInvitationStatus with value set to v.
-func NewOptInvitationStatus(v InvitationStatus) OptInvitationStatus {
-	return OptInvitationStatus{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInvitationStatus is optional InvitationStatus.
-type OptInvitationStatus struct {
-	Value InvitationStatus
-	Set   bool
-}
-
-// IsSet returns true if OptInvitationStatus was set.
-func (o OptInvitationStatus) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInvitationStatus) Reset() {
-	var v InvitationStatus
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInvitationStatus) SetTo(v InvitationStatus) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInvitationStatus) Get() (v InvitationStatus, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInvitationStatus) Or(d InvitationStatus) InvitationStatus {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -73394,6 +73722,74 @@ func (o OptNilUserPropertyXMinusUnique) Get() (v UserPropertyXMinusUnique, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPropertyXMinusUnique {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilUserRef returns new OptNilUserRef with value set to v.
+func NewOptNilUserRef(v UserRef) OptNilUserRef {
+	return OptNilUserRef{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserRef is optional nullable UserRef.
+type OptNilUserRef struct {
+	Value UserRef
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserRef was set.
+func (o OptNilUserRef) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserRef) Reset() {
+	var v UserRef
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserRef) SetTo(v UserRef) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserRef) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserRef) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserRef
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilUserRef) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserRef) Get() (v UserRef, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserRef) Or(d UserRef) UserRef {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -91620,8 +92016,10 @@ type RejectInvitationErrorResponse struct {
 	Type             RejectInvitationErrorResponseType
 	AuthCsrfInvalid  AuthCsrfInvalid
 	AuthUnauthorized AuthUnauthorized
+	EvtInvalid       EvtInvalid
 	Internal         Internal
 	InvNotFound      InvNotFound
+	InvSelfReject    InvSelfReject
 	NotImplemented   NotImplemented
 	ReqInvalid       ReqInvalid
 	Unavailable      Unavailable
@@ -91634,8 +92032,10 @@ type RejectInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidRejectInvitationErrorResponse  RejectInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "evt.invalid"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
+	InvSelfRejectRejectInvitationErrorResponse    RejectInvitationErrorResponseType = "inv.self_reject"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
 	ReqInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "req.invalid"
 	UnavailableRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "unavailable"
@@ -91651,6 +92051,11 @@ func (s RejectInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRejectInvitationErrorResponse
 }
 
+// IsEvtInvalid reports whether RejectInvitationErrorResponse is EvtInvalid.
+func (s RejectInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRejectInvitationErrorResponse
+}
+
 // IsInternal reports whether RejectInvitationErrorResponse is Internal.
 func (s RejectInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalRejectInvitationErrorResponse
@@ -91659,6 +92064,11 @@ func (s RejectInvitationErrorResponse) IsInternal() bool {
 // IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
 func (s RejectInvitationErrorResponse) IsInvNotFound() bool {
 	return s.Type == InvNotFoundRejectInvitationErrorResponse
+}
+
+// IsInvSelfReject reports whether RejectInvitationErrorResponse is InvSelfReject.
+func (s RejectInvitationErrorResponse) IsInvSelfReject() bool {
+	return s.Type == InvSelfRejectRejectInvitationErrorResponse
 }
 
 // IsNotImplemented reports whether RejectInvitationErrorResponse is NotImplemented.
@@ -91718,6 +92128,27 @@ func NewAuthUnauthorizedRejectInvitationErrorResponse(v AuthUnauthorized) Reject
 	return s
 }
 
+// SetEvtInvalid sets RejectInvitationErrorResponse to EvtInvalid.
+func (s *RejectInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRejectInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RejectInvitationErrorResponse is EvtInvalid.
+func (s RejectInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidRejectInvitationErrorResponse(v EvtInvalid) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RejectInvitationErrorResponse to Internal.
 func (s *RejectInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRejectInvitationErrorResponse
@@ -91757,6 +92188,27 @@ func (s RejectInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool)
 func NewInvNotFoundRejectInvitationErrorResponse(v InvNotFound) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvSelfReject sets RejectInvitationErrorResponse to InvSelfReject.
+func (s *RejectInvitationErrorResponse) SetInvSelfReject(v InvSelfReject) {
+	s.Type = InvSelfRejectRejectInvitationErrorResponse
+	s.InvSelfReject = v
+}
+
+// GetInvSelfReject returns InvSelfReject and true boolean if RejectInvitationErrorResponse is InvSelfReject.
+func (s RejectInvitationErrorResponse) GetInvSelfReject() (v InvSelfReject, ok bool) {
+	if !s.IsInvSelfReject() {
+		return v, false
+	}
+	return s.InvSelfReject, true
+}
+
+// NewInvSelfRejectRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvSelfReject.
+func NewInvSelfRejectRejectInvitationErrorResponse(v InvSelfReject) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInvSelfReject(v)
 	return s
 }
 
@@ -91858,10 +92310,6 @@ func (*RejectInvitationForbidden) rejectInvitationRes() {}
 type RejectInvitationNotFound ErrorDetails
 
 func (*RejectInvitationNotFound) rejectInvitationRes() {}
-
-type RejectInvitationTooManyRequests ErrorDetails
-
-func (*RejectInvitationTooManyRequests) rejectInvitationRes() {}
 
 type RejectInvitationUnauthorized ErrorDetails
 

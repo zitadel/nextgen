@@ -39,7 +39,7 @@ type Invoker interface {
 	// cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 	//
 	// Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-	// that scheme's CSRF rules. The call is rate-limited.
+	// that scheme's CSRF rules.
 	//
 	// POST /invitations/accept
 	AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error)
@@ -114,9 +114,9 @@ type Invoker interface {
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CancelInvitation invokes cancelInvitation operation.
 	//
-	// Deletes a pending invitation. Its link can no longer be redeemed. Only a `pending` invitation can be
-	// cancelled; a finished invitation answers the same opaque `404` as a miss. Expired invitations keep
-	// their row until a later cleanup job removes them.
+	// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
+	// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
+	// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
 	//
 	// Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 	// Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -1170,9 +1170,11 @@ type Invoker interface {
 	//
 	// Lists a project's invitations, newest first, in any status, paginated with `limit` and `page_token`.
 	//
-	// Optional `status` and `type` filters narrow the page. `expired` is derived on read from
-	// `expires_at`. Authenticate with a project secret (`oauth2`) or a console session cookie
-	// (`sessionCookie`). Listing needs the same project `admin` check as `createGrant` (`POST /grants`).
+	// Optional `status` and `type` filters narrow the page. Repeat `status` to match any of several
+	// statuses, for example `status=pending&status=expired&status=rejected`. `expired` is derived on read
+	// from `expires_at`. `expand=inviter` adds `inviter` to each invitation. Authenticate with a project
+	// secret (`oauth2`) or a console session cookie (`sessionCookie`). Listing needs the same project
+	// `admin` check as `createGrant` (`POST /grants`).
 	//
 	// GET /invitations
 	ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error)
@@ -1351,7 +1353,7 @@ type Invoker interface {
 	// Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 	// the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-	// still do). The call is rate-limited.
+	// still do).
 	//
 	// POST /invitations/lookup
 	LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error)
@@ -1494,9 +1496,11 @@ type Invoker interface {
 	// Declines a pending invitation for the signed-in user and returns the updated invitation with status
 	// `rejected`.
 	//
-	// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
-	// finished token answers the same opaque `404`. Authenticate with a platform-project user session
-	// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	// Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
+	// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
+	// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
+	// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
+	// requests follow that scheme's CSRF rules.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error)
@@ -1852,7 +1856,7 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-// that scheme's CSRF rules. The call is rate-limited.
+// that scheme's CSRF rules.
 //
 // POST /invitations/accept
 func (c *Client) AcceptInvitation(ctx context.Context, request *InvitationTokenRequest) (AcceptInvitationRes, error) {
@@ -2480,9 +2484,9 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 
 // CancelInvitation invokes cancelInvitation operation.
 //
-// Deletes a pending invitation. Its link can no longer be redeemed. Only a `pending` invitation can be
-// cancelled; a finished invitation answers the same opaque `404` as a miss. Expired invitations keep
-// their row until a later cleanup job removes them.
+// Deletes a pending or rejected invitation. A pending invitation's link can no longer be redeemed; a
+// rejected one's row and metadata are removed. An accepted or expired invitation answers the same
+// opaque `404` as a miss. Expired invitations keep their row until a later cleanup job removes them.
 //
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`).
 // Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
@@ -13396,9 +13400,11 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 //
 // Lists a project's invitations, newest first, in any status, paginated with `limit` and `page_token`.
 //
-// Optional `status` and `type` filters narrow the page. `expired` is derived on read from
-// `expires_at`. Authenticate with a project secret (`oauth2`) or a console session cookie
-// (`sessionCookie`). Listing needs the same project `admin` check as `createGrant` (`POST /grants`).
+// Optional `status` and `type` filters narrow the page. Repeat `status` to match any of several
+// statuses, for example `status=pending&status=expired&status=rejected`. `expired` is derived on read
+// from `expires_at`. `expand=inviter` adds `inviter` to each invitation. Authenticate with a project
+// secret (`oauth2`) or a console session cookie (`sessionCookie`). Listing needs the same project
+// `admin` check as `createGrant` (`POST /grants`).
 //
 // GET /invitations
 func (c *Client) ListInvitations(ctx context.Context, params ListInvitationsParams) (ListInvitationsRes, error) {
@@ -13515,8 +13521,17 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Status.Get(); ok {
-				return e.EncodeValue(conv.StringToString(string(val)))
+			if params.Status != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Status {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {
@@ -13534,6 +13549,32 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Type.Get(); ok {
 				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {
@@ -16295,7 +16336,7 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 // Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-// still do). The call is rate-limited.
+// still do).
 //
 // POST /invitations/lookup
 func (c *Client) LookupInvitation(ctx context.Context, request *InvitationTokenRequest) (LookupInvitationRes, error) {
@@ -18017,9 +18058,11 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // Declines a pending invitation for the signed-in user and returns the updated invitation with status
 // `rejected`.
 //
-// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
-// finished token answers the same opaque `404`. Authenticate with a platform-project user session
-// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+// Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
+// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
+// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
+// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules.
 //
 // POST /invitations/reject
 func (c *Client) RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error) {

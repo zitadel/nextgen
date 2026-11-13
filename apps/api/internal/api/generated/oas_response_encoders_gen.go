@@ -97,18 +97,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 
 		return nil
 
-	case *AcceptInvitationTooManyRequests:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(429)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
 	case *AcceptInvitationErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
@@ -6988,18 +6976,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 
 		return nil
 
-	case *LookupInvitationTooManyRequests:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(429)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
 	case *LookupInvitationErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
@@ -8009,18 +7985,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *RejectInvitationTooManyRequests:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(429)
 
 		e := new(jx.Encoder)
 		response.Encode(e)

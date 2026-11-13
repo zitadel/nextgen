@@ -9048,7 +9048,7 @@
         "operationId": "listInvitations",
         "x-zitadel-cli": "invitation list",
         "summary": "List invitations",
-        "description": "Lists a project's invitations, newest first, in any status, paginated with\n`limit` and `page_token`.\n\nOptional `status` and `type` filters narrow the page. `expired` is derived\non read from `expires_at`. Authenticate with a project secret (`oauth2`) or\na console session cookie (`sessionCookie`). Listing needs the same project\n`admin` check as `createGrant` (`POST /grants`).\n",
+        "description": "Lists a project's invitations, newest first, in any status, paginated with\n`limit` and `page_token`.\n\nOptional `status` and `type` filters narrow the page. Repeat `status` to\nmatch any of several statuses, for example\n`status=pending&status=expired&status=rejected`. `expired` is derived on\nread from `expires_at`. `expand=inviter` adds `inviter` to each\ninvitation. Authenticate with a project secret (`oauth2`) or\na console session cookie (`sessionCookie`). Listing needs the same project\n`admin` check as `createGrant` (`POST /grants`).\n",
         "tags": [
           "Invitations"
         ],
@@ -9076,9 +9076,15 @@
             "name": "status",
             "in": "query",
             "required": false,
-            "description": "Only invitations with this status.",
+            "description": "Only invitations with this status. Repeat the parameter to match any\nof several statuses.\n",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "$ref": "#/components/schemas/invitation-status"
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/components/schemas/invitation-status"
+              }
             }
           },
           {
@@ -9092,6 +9098,21 @@
                 "project_member",
                 "team_member"
               ]
+            }
+          },
+          {
+            "name": "expand",
+            "in": "query",
+            "required": false,
+            "description": "Related objects to embed on each returned invitation.",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/components/schemas/invitation-expand"
+              }
             }
           }
         ],
@@ -9156,7 +9177,7 @@
       "post": {
         "operationId": "lookupInvitation",
         "summary": "Look up an invitation by token",
-        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do). The call is rate-limited.\n",
+        "description": "Returns a lean view of the invitation for the signed-in accept page:\nproject, role, inviter and expiry.\n\nSend the plaintext token from the invitation link fragment. Every unknown\nor finished token answers the same opaque `404`. Authenticate with a\nplatform-project user session cookie (`sessionCookie`). Lookup is a read:\nsame-origin cookie requests need no `X-Zitadel-CSRF` token (accept and\nreject still do).\n",
         "tags": [
           "Invitations"
         ],
@@ -9216,16 +9237,6 @@
               }
             }
           },
-          "429": {
-            "description": "Too many requests. Lookup is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
           "default": {
             "$ref": "#/components/responses/lookupInvitation-error-response"
           }
@@ -9236,7 +9247,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9316,16 +9327,6 @@
               }
             }
           },
-          "429": {
-            "description": "Too many requests. Accept is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
           "default": {
             "$ref": "#/components/responses/acceptInvitation-error-response"
           }
@@ -9336,7 +9337,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. Every unknown or finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9387,7 +9388,7 @@
             }
           },
           "403": {
-            "description": "CSRF failed (`auth.csrf_invalid`).",
+            "description": "The inviter cannot decline their own invitation, or CSRF failed\n(`auth.csrf_invalid`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9398,16 +9399,6 @@
           },
           "404": {
             "description": "Unknown or finished invitation token.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests. Decline is rate-limited so a guessed token cannot be\nbrute-forced. Wait and retry.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9499,7 +9490,7 @@
         "operationId": "cancelInvitation",
         "x-zitadel-cli": "invitation cancel",
         "summary": "Cancel an invitation",
-        "description": "Deletes a pending invitation. Its link can no longer be redeemed. Only a\n`pending` invitation can be cancelled; a finished invitation answers the\nsame opaque `404` as a miss. Expired invitations keep their row until a\nlater cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Deletes a pending or rejected invitation. A pending invitation's link can\nno longer be redeemed; a rejected one's row and metadata are removed. An\naccepted or expired invitation answers the same opaque `404` as a miss.\nExpired invitations keep their row until a later cleanup job removes them.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cancelling needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -22019,6 +22010,13 @@
         ],
         "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace delete\nthe row rather than leaving a cancelled status.\n"
       },
+      "invitation-expand": {
+        "type": "string",
+        "description": "A related object to embed on each returned invitation.\n\n- `inviter`: the user who created the invitation, as `inviter`, a user\n  reference. It is null when a project secret created the invitation. The\n  property is omitted when not requested.\n\n  It needs no permission beyond listing: like the user on a grant, the\n  reference carries only `user_id`, `identifier` and `display`, never the\n  user's record.\n",
+        "enum": [
+          "inviter"
+        ]
+      },
       "inv-not_found": {
         "description": "Invitation not found\n\nError code: inv.not_found\n",
         "allOf": [
@@ -22068,7 +22066,7 @@
       },
       "invitation-metadata": {
         "title": "InvitationMetadata",
-        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel deletes the row with it; replace\nmoves it to the new invitation unless that sends its own.\n",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted; a declined one keeps it. Cancel deletes the row with\nit; replace moves it to the new invitation unless that sends its own.\n",
         "type": "object",
         "required": [
           "name"
@@ -22122,7 +22120,7 @@
             "$ref": "#/components/schemas/project-id"
           },
           "metadata": {
-            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace delete the row.\n",
+            "description": "Who the administrator said the link is for. Null after accept; a\ndecline keeps it. Cancel and replace delete the row.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/invitation-metadata"
@@ -22168,8 +22166,8 @@
             "description": "Correlates this invitation with its replacements. A replacement keeps the\noriginal's `journey_id`. It is a random correlation id, not a resource id.\n",
             "example": "q7Z0bX2rT1aM4cV8nL5wYg"
           },
-          "accepted_by": {
-            "description": "The user who redeemed the link. Null until accepted.",
+          "responded_by": {
+            "description": "The user who accepted or declined the link; `status` says which. Null\nwhile the invitation is pending or expired.\n",
             "oneOf": [
               {
                 "type": "string",
@@ -22180,12 +22178,23 @@
               }
             ]
           },
-          "accepted_at": {
-            "description": "When the invitation was accepted. Null until accepted.",
+          "responded_at": {
+            "description": "When the invitation was accepted or declined. Null while it is pending or\nexpired.\n",
             "oneOf": [
               {
                 "type": "string",
                 "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inviter": {
+            "description": "The user who created the invitation, resolved for display: render\n`display`, falling back to `identifier`, then `user_id`. Present only\nwhen `listInvitations` is called with `expand=inviter`; null when a\nproject secret created the invitation.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/user-ref"
               },
               {
                 "type": "null"
@@ -22612,6 +22621,17 @@
           "created_by_type": {
             "$ref": "#/components/schemas/invitation-created-by-type"
           },
+          "inviter": {
+            "description": "The user who created the invitation, resolved so the accept page can\nname them: render `display`, falling back to `identifier`, then\n`user_id`. Null when a project secret created it.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/user-ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "type": "string",
             "format": "date-time",
@@ -22695,6 +22715,26 @@
           }
         }
       },
+      "inv-inviter_not_admin": {
+        "description": "The inviter no longer administers the project\n\nError code: inv.inviter_not_admin\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.inviter_not_admin"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "inv-self_accept": {
         "description": "The inviter cannot accept their own invitation\n\nError code: inv.self_accept\n",
         "allOf": [
@@ -22707,6 +22747,26 @@
               "code": {
                 "type": "string",
                 "const": "inv.self_accept"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-self_reject": {
+        "description": "The inviter cannot decline their own invitation\n\nError code: inv.self_reject\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.self_reject"
               }
             },
             "required": [
@@ -27139,11 +27199,25 @@
           "message": "claim the project before inviting into it"
         }
       },
+      "inv-inviter_not_admin": {
+        "summary": "inv.inviter_not_admin",
+        "value": {
+          "code": "inv.inviter_not_admin",
+          "message": "the inviter no longer administers the project"
+        }
+      },
       "inv-self_accept": {
         "summary": "inv.self_accept",
         "value": {
           "code": "inv.self_accept",
           "message": "the inviter cannot accept their own invitation"
+        }
+      },
+      "inv-self_reject": {
+        "summary": "inv.self_reject",
+        "value": {
+          "code": "inv.self_reject",
+          "message": "the inviter cannot decline their own invitation"
         }
       },
       "evt-not_found": {
@@ -35663,7 +35737,13 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-inviter_not_admin"
                 },
                 {
                   "$ref": "#/components/schemas/inv-not_found"
@@ -35692,7 +35772,9 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "inv.inviter_not_admin": "#/components/schemas/inv-inviter_not_admin",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.platform_required": "#/components/schemas/inv-platform_required",
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
@@ -35710,8 +35792,14 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "inv.inviter_not_admin": {
+                "$ref": "#/components/examples/inv-inviter_not_admin"
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
@@ -35751,10 +35839,16 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
                   "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-self_reject"
                 },
                 {
                   "$ref": "#/components/schemas/not_implemented"
@@ -35771,8 +35865,10 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.self_reject": "#/components/schemas/inv-self_reject",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
@@ -35786,11 +35882,17 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.self_reject": {
+                "$ref": "#/components/examples/inv-self_reject"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
