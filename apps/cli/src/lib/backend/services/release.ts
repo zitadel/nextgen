@@ -5,6 +5,7 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
+  RevokeRelease409,
   RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
 import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
@@ -69,14 +70,14 @@ const InUseBody = z.object({
     origins: z
       .array(
         z.object({
-          origin: z.string(),
-          deployment_id: z.string(),
+          origin: z.string().min(1),
+          deployment_id: z.string().min(1),
           kind: z.enum(RevokeRelease409DetailsOriginsItemKind),
         }),
       )
       .min(1),
   }),
-});
+}) satisfies z.ZodType<Pick<RevokeRelease409, "details">>;
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;

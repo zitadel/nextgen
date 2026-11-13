@@ -326,6 +326,25 @@ expect.extend({
     };
   },
 
+  toSuggestOnly(received: CliResult, ...commands: string[]) {
+    // The commands after the runner, in the order they were suggested.
+    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
+      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
+    );
+    const pass =
+      suggested.length === commands.length &&
+      suggested.every((command, index) => command === commands[index]);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected the suggestions not to be exactly: ${commands.join(", ")}`
+          : `expected the suggestions to be exactly: ${commands.join(", ") || "(none)"}, but next_commands were: ${
+              suggested.join(", ") || "(none)"
+            }`,
+    };
+  },
+
   toPrint(received: CliResult, text: string) {
     const pass = flows(shown(received), text);
     return {
@@ -475,6 +494,11 @@ declare module "vitest" {
      * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated.
      */
     toSuggestExactly(command: string): T;
+    /**
+     * The suggested `next_commands` are exactly these, in this order, after the
+     * runner (`npx @zitadel/cli@<version>`): none missing and none extra.
+     */
+    toSuggestOnly(...commands: string[]): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
     /** stdout contains this text byte for byte, line breaks included, where `toPrint` lets them fold. */

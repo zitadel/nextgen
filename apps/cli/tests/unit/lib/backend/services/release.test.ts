@@ -125,6 +125,22 @@ describe("ReleaseService.revoke", () => {
           details: { origins: [{ ...PRIMARY, kind: "other" }] },
         },
       ],
+      [
+        "an origin that is empty",
+        {
+          code: "rel.in_use",
+          message: "in use",
+          details: { origins: [{ ...PRIMARY, origin: "" }] },
+        },
+      ],
+      [
+        "a deployment that is empty",
+        {
+          code: "rel.in_use",
+          message: "in use",
+          details: { origins: [{ ...PRIMARY, deployment_id: "" }] },
+        },
+      ],
       ["no details", { code: "rel.in_use", message: "in use" }],
     ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
       const releaseService = refusedWith(body);

@@ -1544,11 +1544,17 @@ function newestDeploymentForOrigin(
     .sort((a, b) => b.seq - a.seq)[0];
 }
 
-/** An origin a deployment serves now, and whether it serves it as a primary origin or a preview. */
+/**
+ * An origin a deployment serves now.
+ */
 type ServedOrigin = {
+  /** The origin's URL. */
   origin: string;
+  /** The deployment that serves it. */
   deployment: DeploymentRecord;
+  /** Whether the deployment serves it as a primary origin or as a preview. */
   kind: "primary" | "preview";
+  /** The expiry of the preview the deployment serves it as, null for a primary origin. */
   expiresAt: string | null;
 };
 
@@ -1566,16 +1572,25 @@ type ServedOrigin = {
  * now runs on. One origin can be served by a primary row and a preview row at
  * once, as on the server. The live deployment list, the check that refuses to
  * revoke a served release and a deployment's status all read this.
+ *
+ * @param projectId - The project.
+ * @returns Every deployment row of the project that serves its origin.
  */
 function servedOrigins(projectId: string): ServedOrigin[] {
   const project = store.projects.get(projectId);
   const primaries = project === undefined ? [] : primaryOrigins(project);
-  const newestPrimary = newestPrimaryDeployment(projectId);
   const previewed = new Set<string>();
   const served: ServedOrigin[] = [];
   const deployments = [...store.deployments.values()]
-    .filter((deployment) => deployment.projectId === projectId)
-    .sort((a, b) => b.seq - a.seq);
+    .filter((deployment) => {
+      return deployment.projectId === projectId;
+    })
+    .sort((a, b) => {
+      return b.seq - a.seq;
+    });
+  const newestPrimary = deployments.find((deployment) => {
+    return deploymentKind(deployment) === "primary";
+  });
   for (const deployment of deployments) {
     for (const { origin, expiresAt } of deployment.targets) {
       if (expiresAt === null) {
@@ -1595,6 +1610,35 @@ function servedOrigins(projectId: string): ServedOrigin[] {
     }
   }
   return served;
+}
+
+/**
+ * What serves one origin of a project, as the server answers a live list for
+ * an origin. It decides that with `OriginRowServes` rather than `RowServes`: a
+ * primary row counts only while the project still lists the origin as a
+ * primary origin, and a preview row only while it does not, so at most one row
+ * serves an origin.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin asked about.
+ * @param served - What serves in the project now, read from the store when not given.
+ * @returns The entry that serves the origin, if one does.
+ */
+function servedOn(
+  projectId: string,
+  origin: string,
+  served: readonly ServedOrigin[] = servedOrigins(projectId),
+): ServedOrigin[] {
+  const project = store.projects.get(projectId);
+  const listed = project === undefined ? [] : primaryOrigins(project);
+
+  return served.filter((entry) => {
+    if (entry.origin !== origin) {
+      return false;
+    }
+
+    return entry.kind === "preview" || listed.includes(origin);
+  });
 }
 
 /** The release metadata block, nulls written explicitly as the server does. */
@@ -1640,16 +1684,27 @@ function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefine
 }
 
 /**
- * Whether the deployment still serves its release: the newest primary deployment
- * always does, and a preview deployment while a target is served by it. A later
- * deployment, or its previews expiring or being removed, makes it `inactive`.
+ * Whether the deployment still serves its release: while some origin of its
+ * project is served by it. A later deployment, or its previews expiring or
+ * being removed, makes it `inactive`.
+ *
+ * @param deployment - The deployment.
+ * @param served - What serves in its project now, read from the store when not
+ * given, so a caller that describes many deployments reads it once.
+ * @returns `live` while the deployment serves an origin, else `inactive`.
  */
-function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
-  return servedOrigins(deployment.projectId).some(
-    (served) => served.deployment.id === deployment.id,
-  )
-    ? "live"
-    : "inactive";
+function deploymentStatus(
+  deployment: DeploymentRecord,
+  served: readonly ServedOrigin[] = servedOrigins(deployment.projectId),
+): "live" | "inactive" {
+  const serving = served.some((entry) => {
+    return entry.deployment.id === deployment.id;
+  });
+  if (serving) {
+    return "live";
+  }
+
+  return "inactive";
 }
 
 /** Whether a deployment has this release and exactly these origins. */
@@ -1663,11 +1718,19 @@ function repeats(deployment: DeploymentRecord, releaseId: string, origins: strin
   );
 }
 
-/** The wire shape of a deployment, optionally over a restricted target set. */
+/**
+ * The wire shape of a deployment, optionally over a restricted target set.
+ *
+ * @param deployment - The deployment.
+ * @param targets - The targets to report, all of them when not given.
+ * @param options - Whether to expand its release, and what serves in its
+ * project now when the caller already holds it.
+ * @returns The deployment as the API answers it.
+ */
 function deploymentResponse(
   deployment: DeploymentRecord,
   targets: DeploymentTargetRow[] = deployment.targets,
-  expand?: { release: boolean },
+  options?: { release: boolean; served?: readonly ServedOrigin[] },
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     id: deployment.id,
@@ -1679,7 +1742,7 @@ function deploymentResponse(
         : { origin: target.origin, expires_at: target.expiresAt },
     ),
     kind: deploymentKind(deployment),
-    status: deploymentStatus(deployment),
+    status: deploymentStatus(deployment, options?.served),
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,
@@ -1689,7 +1752,7 @@ function deploymentResponse(
       deployed_by_type: "service",
     },
   };
-  if (expand?.release) {
+  if (options?.release) {
     const release = store.releases.get(deployment.releaseId);
     if (release) {
       body.release = releaseResponse(release);
@@ -2287,38 +2350,42 @@ export function setupPlatformHandlers() {
         );
       }
 
+      const served = servedOrigins(query.data.project_id);
       let items: Record<string, unknown>[];
       if (live) {
-        // What each target serves now: the newest deployment per origin, each
-        // carrying only the targets it still serves.
+        // What each target serves now: each deployment carrying only the
+        // targets it still serves.
         const serving = new Map<string, DeploymentTargetRow[]>();
-        for (const { origin: target, deployment, expiresAt } of servedOrigins(
-          query.data.project_id,
-        )) {
-          if (origin !== undefined && target !== origin) {
-            continue;
-          }
+        const rows =
+          origin === undefined ? served : servedOn(query.data.project_id, origin, served);
+        for (const { origin: target, deployment, expiresAt } of rows) {
           serving.set(deployment.id, [
             ...(serving.get(deployment.id) ?? []),
             { origin: target, expiresAt },
           ]);
         }
         items = [...serving.entries()]
-          .map(([id, rows]) => {
+          .map(([id, targets]) => {
             const deployment = store.deployments.get(id);
-            return deployment ? { deployment, rows } : undefined;
+            return deployment ? { deployment, targets } : undefined;
           })
           .filter(
-            (entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
+            (entry): entry is { deployment: DeploymentRecord; targets: DeploymentTargetRow[] } =>
               entry !== undefined,
           )
           .sort((a, b) => b.deployment.seq - a.deployment.seq)
           .map((entry) =>
-            deploymentResponse(entry.deployment, entry.rows, { release: expandRelease }),
+            deploymentResponse(entry.deployment, entry.targets, {
+              release: expandRelease,
+              served,
+            }),
           );
       } else {
         items = deployments.map((deployment) =>
-          deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
+          deploymentResponse(deployment, deployment.targets, {
+            release: expandRelease,
+            served,
+          }),
         );
       }
       // The real cursor is opaque; the mock's is the next start index, like the

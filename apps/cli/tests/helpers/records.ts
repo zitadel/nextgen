@@ -11,6 +11,11 @@ import type { Answer, ClientStubs } from "@tests/helpers/fake-client";
 export const PROJECT_ID = "proj_1";
 
 /**
+ * The primary origin the deployment and project fixtures serve from.
+ */
+export const PRIMARY_ORIGIN = "https://app.acme.com";
+
+/**
  * A deployment as the API answers one: `dep_1`, serving `rel_1` live on the
  * primary origin `https://app.acme.com`.
  *
@@ -27,7 +32,7 @@ export function aDeployment(
     kind: "primary",
     status: "live",
     deployed_at: "2026-01-01T00:00:00Z",
-    targets: [{ origin: "https://app.acme.com" }],
+    targets: [{ origin: PRIMARY_ORIGIN }],
     metadata: { reason: "deploy" },
     ...overrides,
   };

@@ -56,3 +56,36 @@ describe("toPrintPlainRow", () => {
     expect(printed("c\td\te")).not.toPrintPlainRow("c", "d");
   });
 });
+
+describe("toSuggestOnly", () => {
+  const suggesting = (...commands: string[]) => {
+    return printed(
+      JSON.stringify({
+        status: "error",
+        next_commands: commands.map((command) => {
+          return `npx @zitadel/cli@0.6.0 ${command}`;
+        }),
+      }),
+    );
+  };
+
+  it("matches exactly these suggestions, in this order, after the runner", () => {
+    expect(suggesting("deploy --cwd a", "preview rm u --cwd a")).toSuggestOnly(
+      "deploy --cwd a",
+      "preview rm u --cwd a",
+    );
+  });
+
+  it("does not match a missing, an extra or a reordered suggestion", () => {
+    expect(suggesting("deploy --cwd a")).not.toSuggestOnly("deploy --cwd a", "preview rm u");
+    expect(suggesting("deploy --cwd a", "preview rm u")).not.toSuggestOnly("deploy --cwd a");
+    expect(suggesting("deploy --cwd a", "preview rm u")).not.toSuggestOnly(
+      "preview rm u",
+      "deploy --cwd a",
+    );
+  });
+
+  it("matches no suggestions when the envelope has none", () => {
+    expect(printed(JSON.stringify({ status: "error" }))).toSuggestOnly();
+  });
+});

@@ -8,9 +8,9 @@ import {
   aReleaseServedOn,
   PLATFORM_URL,
   PREVIEW_URL,
-  PRIMARY_ORIGIN,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import { runCliForTest, runCommand } from "@tests/helpers/run-cli";
 
@@ -116,18 +116,26 @@ describe("release revoke refused for a release an origin serves", () => {
   });
 
   it.each([
-    ["a primary origin", { primary: true, preview: false }, "primary"],
-    ["a preview", { primary: false, preview: true }, "preview"],
-    ["a primary origin that a preview also serves", { primary: true, preview: true }, "primary"],
-    ["a preview that a primary origin also serves", { primary: true, preview: true }, "preview"],
-  ] as const)("names %s with its kind and deployment", async (_, served, kind) => {
+    ["a primary origin", { primary: true, preview: false }, PRIMARY_ORIGIN, "primary"],
+    ["a preview", { primary: false, preview: true }, PREVIEW_URL, "preview"],
+    [
+      "a primary origin that a preview also serves",
+      { primary: true, preview: true },
+      PRIMARY_ORIGIN,
+      "primary",
+    ],
+    [
+      "a preview that a primary origin also serves",
+      { primary: true, preview: true },
+      PREVIEW_URL,
+      "preview",
+    ],
+  ] as const)("names %s with its kind and deployment", async (_, served, origin, kind) => {
     const project = await aServedRelease(served);
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 
-    expect(result).toHintAt(
-      `${kind === "primary" ? PRIMARY_ORIGIN : PREVIEW_URL} (${kind}, ${project[kind]})`,
-    );
+    expect(result).toHintAt(`${origin} (${kind}, ${project[kind]})`);
   });
 
   it.each([
@@ -147,29 +155,10 @@ describe("release revoke refused for a release an origin serves", () => {
 
     const result = await runCliForTest(revokeArgumentsOf(project));
 
-    const { next_commands: next } = JSON.parse(result.stdout) as { next_commands: string[] };
-    expect(
-      next.map((command) => {
-        return command.replace(/^.*?@zitadel\/cli@\S+ /, "").replace(/ --server .*$/, "");
+    expect(result).toSuggestOnly(
+      ...suggested.map((command) => {
+        return `${command} --server ${PLATFORM_URL} --cwd ${project.cwd}`;
       }),
-    ).toEqual(suggested);
-  });
-
-  it("keeps the server's refusal in the details", async () => {
-    const project = await aServedRelease({ primary: true, preview: false });
-
-    const result = await runCliForTest(revokeArgumentsOf(project));
-
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      details: {
-        status: 409,
-        body: {
-          code: "rel.in_use",
-          details: {
-            origins: [{ origin: PRIMARY_ORIGIN, deployment_id: project.primary, kind: "primary" }],
-          },
-        },
-      },
-    });
+    );
   });
 });

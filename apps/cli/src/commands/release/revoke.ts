@@ -114,7 +114,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             if (!(error instanceof ReleaseInUseError)) {
               throw error;
             }
-            const primaries = error.origins.filter((origin) => {
+            const hasPrimary = error.origins.some((origin) => {
               return origin.kind === "primary";
             });
             const previews = error.origins.filter((origin) => {
@@ -122,7 +122,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             });
             const steps: string[] = [];
             const next: Suggestion[] = [];
-            if (primaries.length > 0) {
+            if (hasPrimary) {
               steps.push("put another release live on each primary origin");
               next.push(
                 { id: "deploy", flags: { message: WHAT_CHANGED } },
@@ -141,11 +141,11 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             throw refusalError(
               RELEASE_IN_USE_REFUSAL,
               {
-                served: new Intl.ListFormat("en", { type: "conjunction" }).format(
-                  error.origins.map((origin) => {
+                served: error.origins
+                  .map((origin) => {
                     return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
-                  }),
-                ),
+                  })
+                  .join("; "),
                 steps: steps.join(" and "),
                 details: { status: error.status, url: error.url, body: error.body },
               },

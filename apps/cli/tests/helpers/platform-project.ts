@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
 import { DEFAULT_SERVER } from "@/lib/server";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 
@@ -73,11 +74,6 @@ export async function aProjectDirectory(
 }
 
 /**
- * The primary origin the helpers below register on a new project.
- */
-export const PRIMARY_ORIGIN = "https://app.acme.com";
-
-/**
  * The preview pattern {@link aReleaseServedOn} registers, which admits
  * {@link PREVIEW_URL}.
  */
@@ -102,46 +98,51 @@ async function aProjectWithPrimaryOrigin(name: string): Promise<{ id: string; se
     pattern: PRIMARY_ORIGIN,
     kind: "primary",
   });
+
   return { id, secret };
 }
 
 /**
- * A release of the project that pins one schema revision.
+ * Creates a release of the project on the mock that pins one schema revision.
  *
  * @param project - The project's id and secret.
  * @param revision - The schema revision the release pins.
  * @returns The release's id.
  */
-async function aRelease(
+async function createdRelease(
   project: { id: string; secret: string },
   revision: string,
 ): Promise<string> {
-  return Created.parse(
+  const created = Created.parse(
     await callPlatform(`/releases?project_id=${project.id}`, project.secret, {
       pointers: [{ kind: "schema", revision_id: revision }],
     }),
-  ).id;
+  );
+
+  return created.id;
 }
 
 /**
- * A deployment of a release.
+ * Creates a deployment of a release on the mock.
  *
  * @param project - The project's id and secret.
  * @param releaseId - The release to make live.
  * @param body - Where to make it live, as the API takes it: its targets and a preview's ttl.
  * @returns The deployment's id.
  */
-async function aDeployment(
+async function createdDeployment(
   project: { id: string; secret: string },
   releaseId: string,
   body: object,
 ): Promise<string> {
-  return Created.parse(
+  const created = Created.parse(
     await callPlatform(`/deployments?project_id=${project.id}`, project.secret, {
       release_id: releaseId,
       ...body,
     }),
-  ).id;
+  );
+
+  return created.id;
 }
 
 /**
@@ -155,8 +156,8 @@ export async function aProjectWithTwoDeploys(
   prefix: string,
 ): Promise<{ cwd: string; undone: string }> {
   const project = await aProjectWithPrimaryOrigin(prefix);
-  await aDeployment(project, await aRelease(project, "sch_a"), { targets: "primary" });
-  const undone = await aDeployment(project, await aRelease(project, "sch_b"), {
+  await createdDeployment(project, await createdRelease(project, "sch_a"), { targets: "primary" });
+  const undone = await createdDeployment(project, await createdRelease(project, "sch_b"), {
     targets: "primary",
   });
 
@@ -182,20 +183,30 @@ export async function aReleaseServedOn(
     pattern: PREVIEW_PATTERN,
     kind: "preview",
   });
-  const releaseId = await aRelease(project, "sch_a");
-  const primary = served.primary
-    ? await aDeployment(project, releaseId, { targets: "primary" })
-    : undefined;
-  const preview = served.preview
-    ? await aDeployment(project, releaseId, { targets: [PREVIEW_URL], ttl: "PT168H" })
-    : undefined;
-
-  return {
+  const releaseId = await createdRelease(project, "sch_a");
+  let primary: string | undefined;
+  if (served.primary) {
+    primary = await createdDeployment(project, releaseId, { targets: "primary" });
+  }
+  let preview: string | undefined;
+  if (served.preview) {
+    preview = await createdDeployment(project, releaseId, {
+      targets: [PREVIEW_URL],
+      ttl: "PT168H",
+    });
+  }
+  const arranged: { cwd: string; releaseId: string; primary?: string; preview?: string } = {
     cwd: await aProjectDirectory(prefix, project),
     releaseId,
-    ...(primary === undefined ? {} : { primary }),
-    ...(preview === undefined ? {} : { preview }),
   };
+  if (primary !== undefined) {
+    arranged.primary = primary;
+  }
+  if (preview !== undefined) {
+    arranged.preview = preview;
+  }
+
+  return arranged;
 }
 
 /**
