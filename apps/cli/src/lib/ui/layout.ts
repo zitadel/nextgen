@@ -307,21 +307,25 @@ const argumentBreaks = (command: string): number[] => {
  *   command fits or has no space to break at.
  */
 export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
-  if (lead.length + command.length <= width) {
-    return [`${lead}${command}`];
+  const lines: string[] = [];
+  // biome-ignore lint/plugin: the rest of the command, shortened by each line cut off, so wrapping is a loop and cannot overflow the stack
+  let rest = command;
+  // biome-ignore lint/plugin: the lead for the line being filled
+  let indent = lead;
+  while (indent.length + rest.length > width) {
+    const cut = argumentBreaks(rest)
+      .filter((at) => {
+        return at > 0 && at <= Math.max(1, width - indent.length - 2);
+      })
+      .at(-1);
+    if (cut === undefined) {
+      break;
+    }
+    lines.push(`${indent}${rest.slice(0, cut)} \\`);
+    rest = rest.slice(cut + 1);
+    indent = lead;
   }
-  const cut = argumentBreaks(command)
-    .filter((at) => {
-      return at > 0 && at <= Math.max(1, width - lead.length - 2);
-    })
-    .at(-1);
-  if (cut === undefined) {
-    return [`${lead}${command}`];
-  }
-  return [
-    `${lead}${command.slice(0, cut)} \\`,
-    ...wrapCommand(command.slice(cut + 1), width, lead),
-  ];
+  return [...lines, `${indent}${rest}`];
 };
 
 /**
