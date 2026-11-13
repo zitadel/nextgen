@@ -12,6 +12,7 @@ import type {
   Systems,
   Team,
   UsageRecord,
+  WakeQueue,
 } from "./ports";
 
 /**
@@ -236,4 +237,18 @@ function withQuery(url: string, params: Record<string, string>): string {
   const next = new URL(url);
   for (const [key, value] of Object.entries(params)) next.searchParams.set(key, value);
   return next.href;
+}
+
+/**
+ * The wake-up queue outside Vercel: nothing is queued and nothing calls
+ * back. Each wake-up logs one line, which names the project and its delay.
+ */
+export function recordingWakeQueue(): WakeQueue {
+  return {
+    async publish(wake, schedule) {
+      console.info(
+        `webhook wake (mock, not queued): ${wake.project_id} in ${schedule.delay_seconds}s`,
+      );
+    },
+  };
 }

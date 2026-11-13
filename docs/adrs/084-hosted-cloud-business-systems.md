@@ -18,6 +18,11 @@
 > [ADR 075](075-platform-operators.md),
 > [ADR 078](078-abuse-prevention-in-layers.md) (§5 amended here),
 > [ADR 079](079-release-confidence.md)
+>
+> **Amendment (2026-11-11):** §2's "no queue of our own" gets its one
+> exception: a raw topic that carries the wake-ups of project webhooks
+> ([ADR 090](090-project-webhooks.md) §4). See
+> [the amendment](#amendment-2026-11-11-one-raw-topic-for-webhook-wake-ups).
 
 ## Context
 
@@ -479,3 +484,32 @@ verification (§3).
 - **A `vercel.json` rewrite of `/flow` on an `Origin` match.** It would need
   no console change, but no pattern tells this deployment's preview origins
   from a customer's relay on `vercel.app`.
+
+## Amendment (2026-11-11): one raw topic for webhook wake-ups
+
+§2 kept raw topics (`@vercel/queue`) for "something that needs a buffer a
+workflow run is not", and found nothing that did. Delivery to project
+webhooks ([ADR 090](090-project-webhooks.md) §4) does: the server keeps no
+timer here, so something outside it must call its delivery path when a
+project has events to send, and again when a failed delivery is due.
+
+- **What it is.** The server calls `/cloud/hooks/webhook-wake` (its generic
+  `events.webhooks.wake` hook), the function publishes `{ project_id }` to the
+  topic `webhook-wake`, and the queue calls a consumer that calls the server's
+  `/cron/events-webhooks?project_id=…`. A retry is the same message, delayed.
+- **Why not a workflow run.** A run per wake-up costs several steps to make
+  one HTTP call, and has no key that makes a burst one message.
+- **Why this is not the alternative rejected below.** That one put a message
+  per event on a queue, with the event in it and an outbox in the server.
+  This is at most one message per project and second, it carries no event,
+  and losing it loses nothing: the events table and each webhook's cursor
+  decide what is sent, and an hourly cron job delivers what a lost message
+  left.
+- **Where the code is.** §8 holds: the server gains a generic hook and knows
+  no queue. Vercel's client is in `apps/cloud-functions` alone.
+- **`vercel dev`** still runs no queue consumer declared inside a service.
+  Off Vercel the functions queue nothing, and the local server delivers on
+  its own timer.
+- **Production** does not answer this route `503 cloud.not_live` by §9's
+  rule, since the queue is no third party's mock: `WEBHOOK_WAKE_SECRET` turns
+  it on, and without it the route answers `cloud.not_live`.

@@ -478,6 +478,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		Keys:              keyService,
 		PlatformProjectID: cfg.Platform.ResolvedProjectID(),
 	}, webhookClient, cfg.Events.Webhooks)
+	// Delivery starts with the commit of an event, not with the next tick
+	// (ADR 090 §4).
+	serviceDBPool.NotifyEventsStored(webhookShipper.Wake)
 	webhookShipper.Start()
 	defer webhookShipper.Close()
 
@@ -861,6 +864,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.webhooks.interval", 5*time.Second)
 	// Empty: the server delivers on its own timer, not when a scheduler calls.
 	v.SetDefault("events.webhooks.trigger_secret", "")
+	// Empty: nothing outside the server is told that a project has events to
+	// deliver. A server with a timer needs no one to be.
+	v.SetDefault("events.webhooks.wake.url", "")
+	v.SetDefault("events.webhooks.wake.secret", "")
 	v.SetDefault("service_ping.enabled", false)
 	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
 	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)

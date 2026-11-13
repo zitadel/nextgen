@@ -314,6 +314,9 @@ catalogs:
     '@vercel/analytics':
       specifier: ^2.0.1
       version: 2.0.1
+    '@vercel/queue':
+      specifier: ^0.11.0
+      version: 0.11.0
     '@vercel/speed-insights':
       specifier: ^2.0.0
       version: 2.0.0
@@ -553,7 +556,7 @@ catalogs:
       version: 5.31.1
     yaml:
       specifier: ^2.9.0
-      version: 2.9.0
+      version: 2.9.1
     zod:
       specifier: ^4.6.6
       version: 4.6.7
@@ -902,6 +905,9 @@ importers:
 
   apps/cloud-functions:
     dependencies:
+      '@vercel/queue':
+        specifier: 'catalog:'
+        version: 0.11.0(@opentelemetry/api@1.9.1)
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -9247,6 +9253,15 @@ packages:
   '@vercel/oidc@4.0.4':
     resolution: {integrity: sha512-cWw+jlAXo7vFHU338hbmPdKOsU0SZflRr1+yfPkar8COC9VEm1qyBWxmfxpbuyhAytp0P2OIa5qUzeWGQ4PvkA==}
     engines: {node: '>= 20'}
+
+  '@vercel/queue@0.11.0':
+    resolution: {integrity: sha512-kdf7oOrVphPW2+eNk7KdwkjNnnWPR0/N/Ih4OvUG3/ocDWp7OwpraaW6uFhitVEQehpSt+iJsjOaZ2pH3DqbqQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
 
   '@vercel/queue@0.8.0':
     resolution: {integrity: sha512-Rwaoq8DbSN2/qVPMdHzBdBXqpoD2h2s7+gOSaE3Gff9XI1NjNh281uMesP30k1kbsnjgeaibLTSiuYDlNPlw+g==}
@@ -25138,6 +25153,15 @@ snapshots:
       '@vercel/cli-config': 0.3.4
       '@vercel/cli-exec': 1.0.1
       jose: 5.10.0
+
+  '@vercel/queue@0.11.0(@opentelemetry/api@1.9.1)':
+    dependencies:
+      '@vercel/oidc': 3.8.10
+      minimatch: 11.0.4
+      mixpart: 0.0.6
+      picocolors: 1.1.1
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
 
   '@vercel/queue@0.8.0(@opentelemetry/api@1.9.1)':
     dependencies:

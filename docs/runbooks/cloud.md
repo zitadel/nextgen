@@ -27,11 +27,11 @@ One Vercel deployment, seven [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | a Node.js function, `apps/cloud/server/index.mjs`, rooted at `apps/cloud`: it runs the launcher and hands the server's spans to Vercel Tracing and its metrics to Vercel custom metrics, which only a Node.js function can. The build command enters the repo root, puts Go on `PATH` (`apps/cloud/install-go.sh`, as the Node.js build image has none), and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` checks the binary is in `dist/`, where the function's `includeFiles` ships it from, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `server` | a Node.js function, `apps/cloud/server/index.mjs`, rooted at `apps/cloud`: it runs the launcher and hands the server's spans to Vercel Tracing and its metrics to Vercel custom metrics, which only a Node.js function can. The build command enters the repo root, puts Go on `PATH` (`apps/cloud/install-go.sh`, as the Node.js build image has none), and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` checks the binary is in `dist/`, where the function's `includeFiles` ships it from, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention`, `/cron/events-webhooks` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
-| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
+| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`), the server's webhook wake hook (`/cloud/hooks/webhook-wake`, see [Operating](#operating)) and its cron routes (`/cloud/cron/*`, none scheduled yet). The wake-up queue's consumer (`/queues/webhook-wake` in the service) has no public path: only the queue calls it |
 | `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no framework dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 | `go-import` | Static: one page, [`apps/cloud/go-import/public/index.html`](../../apps/cloud/go-import/public/index.html), no install or build | every path on the host `go.zitadel.com`: Go's vanity-import metadata for the client module, see [Go import path](#go-import-path) |
 
@@ -258,7 +258,8 @@ the server grants and revokes to match at its next start.
 Settings: no Root Directory (the repository root holds `vercel.json`),
 Node.js 24, production branch `main`, preview deployments on, Web Analytics
 and Speed Insights enabled (their tabs in the project), Cron Jobs enabled
-(the [event retention](#operating) purge runs from one). Deployment
+(the [event retention](#operating) purge and the hourly round of
+[webhook delivery](#operating) run from them). Deployment
 Protection stays on Vercel Authentication.
 
 Environment variables (add secrets with
@@ -276,8 +277,10 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
-| `CRON_SECRET` | Production; sensitive | `openssl rand -hex 32`, kept in 1Password: the token the [event retention](#operating) cron job sends the server; the build fails without it |
+| `CRON_SECRET` | Production; sensitive | `openssl rand -hex 32`, kept in 1Password: the token the [event retention](#operating) and [webhook delivery](#operating) cron jobs send the server, and the wake-up queue's consumer with them; the build fails without it |
 | `CRON_SECRET` | Preview; sensitive | another one: a preview's build fails without it too, although no cron job runs there; it starts a run on a preview by hand |
+| `WEBHOOK_WAKE_SECRET` | Production or Preview; sensitive; optional | `openssl rand -hex 32`, kept in 1Password: turns on the [wake-up for webhook delivery](#operating). The server sends it to `/cloud/hooks/webhook-wake`, and the functions check it. Unset, webhooks are delivered by the hourly cron job alone |
+| `WEBHOOK_WAKE_URL` | Preview; sensitive; optional, with the secret | where the server calls the wake hook instead of the deployment's own `/cloud/hooks/webhook-wake`. A preview needs it: its URL sits behind Vercel Authentication, which refuses the server's call unless the URL carries the bypass secret as Vercel's `x-vercel-protection-bypass` query parameter |
 | `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
 | `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
@@ -762,6 +765,53 @@ project and imports the root admin.
       SELECT project_id, id FROM zitadel_nextgen.events
       WHERE created_at < now() - interval '30 days' LIMIT 50000);
     ```
+- **Webhook delivery:** for the same reason the server's delivery loop is
+  off here (`events.webhooks.trigger_secret` is `CRON_SECRET`), and two things
+  call `/cron/events-webhooks` in its place
+  ([ADR 090](../adrs/090-project-webhooks.md) §4,
+  [configuration](../quick-start/configuration.md#webhook-delivery)).
+  - **The hourly round.** A second Vercel Cron Job calls the path at 47
+    minutes past every hour, for every project. It delivers whatever a
+    wake-up missed, and without `WEBHOOK_WAKE_SECRET` it is all that
+    delivers. Each run logs `webhook shipper: round done` with the number of
+    webhooks it looked at. Previews get no cron job; start a round by hand as
+    for the purge above, on `/cron/events-webhooks`.
+  - **The wake-up.** With `WEBHOOK_WAKE_SECRET` set, the server calls
+    `/cloud/hooks/webhook-wake` when a request stored an event one of the
+    project's enabled webhooks takes, and after a failed delivery with the
+    time of the next attempt. The function publishes one message to the
+    Vercel queue topic `webhook-wake`; the queue calls the consumer
+    (`apps/cloud-functions/app/queues/webhook-wake/route.ts`, subscribed in
+    `vercel.json`), which calls `/cron/events-webhooks?project_id=…` with
+    `CRON_SECRET`.
+    - A message is delivered when the second it arrived in is over, so an
+      event reaches its webhook a second or two after it happened, and a
+      burst in one project is one message a second: the queue drops a second
+      message with the same key (`<project id>:<second>`).
+    - The consumer acknowledges on the server's `200`. Anything else, or no
+      answer, has the queue deliver the message again every 30 seconds, up
+      to 20 times and for at most an hour past its delay. Then the hourly
+      round is left to it.
+    - Observability → Queues shows the topic, its backlog and its failed
+      deliveries; the consumer's log names the server's status.
+  - **Turning the wake-up on.** Add `WEBHOOK_WAKE_SECRET` to the environment
+    and redeploy. No queue or topic is created by hand: the deployment
+    declares the consumer, and the first message creates the topic. To turn
+    it off, remove the variable and redeploy; messages still queued are
+    delivered and do no harm.
+  - **A lost wake-up** shows as a webhook whose event arrives late, at the
+    project's next event or at 47 past the hour, never as a lost event: the
+    events and each webhook's position are in the database. Look for
+    `webhook shipper: wake hook failed` in the server's log (the function
+    refused or did not answer within 2 seconds; the server then makes no
+    call for 10 seconds), for `webhook wake: publishing … failed` in the
+    function's (the queue refused), and for `cloud.not_live` in the
+    function's answer (the functions' build has no `WEBHOOK_WAKE_SECRET`).
+    A `401` there means the two services were built with different secrets:
+    redeploy.
+  - A webhook that keeps failing is the customer's endpoint, not the queue:
+    its page in the console shows the last error, and the server disables it
+    after 3 days.
 
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,

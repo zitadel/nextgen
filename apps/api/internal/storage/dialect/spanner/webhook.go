@@ -65,6 +65,7 @@ THEN RETURN ` + webhook.Columns
 	// webhook that was never attempted comes before the longest due.
 	dueWebhooksStmt = webhookQuery + `
 WHERE enabled
+  AND (@p4 = '' OR project_id = @p4)
   AND (next_attempt_at IS NULL OR next_attempt_at <= @p1)
   AND (lease_expires_at IS NULL OR lease_expires_at <= @p2)
 ORDER BY next_attempt_at, project_id, id
@@ -289,13 +290,13 @@ func (s webhookStatements) RotateWebhookSecret(ctx context.Context, projectID, i
 }
 
 // LeaseDueWebhooks implements [service.WebhookStatements].
-func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
+func (s webhookStatements) LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit uint32) ([]*domain.Webhook, error) {
 	leaseUntil = leaseUntil.UTC()
 	// A retry replays the callback, so the result stays local to an attempt.
 	var leased []*domain.Webhook
 	err := withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
 		var due []*domain.Webhook
-		stmt := buildStatement(dueWebhooksStmt, dueBy.UTC(), now.UTC(), int64(limit)).statement()
+		stmt := buildStatement(dueWebhooksStmt, dueBy.UTC(), now.UTC(), int64(limit), projectID).statement()
 		if err := tx.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 			var err error
 			due, err = collectRows(iter, scanWebhook)

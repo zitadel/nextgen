@@ -39,6 +39,9 @@ type WebhookConfig struct {
 	// its own and delivers once per request to WebhookTriggerPath that
 	// carries it as a bearer token.
 	TriggerSecret string `mapstructure:"trigger_secret"`
+	// Wake names where a server that keeps no timer says that a project has
+	// something to deliver (webhook_wake.go).
+	Wake WebhookWakeConfig `mapstructure:"wake"`
 }
 
 // WebhookTriggerPath is where a scheduler starts one round of delivery when
@@ -50,15 +53,16 @@ func DefaultWebhookConfig() WebhookConfig {
 	return WebhookConfig{Enabled: true, Interval: 5 * time.Second}
 }
 
-// Validate applies RetentionConfig.Validate's rule to the trigger secret.
+// Validate applies RetentionConfig.Validate's rule to the trigger secret,
+// and checks the wake hook, which only a server with a trigger can use: what
+// the hook wakes calls the trigger.
 func (c WebhookConfig) Validate() error {
-	if c.TriggerSecret == "" {
-		return nil
+	if c.TriggerSecret != "" {
+		if err := CheckTriggerSecret(c.TriggerSecret); err != nil {
+			return fmt.Errorf("events.webhooks.trigger_secret %w", err)
+		}
 	}
-	if err := CheckTriggerSecret(c.TriggerSecret); err != nil {
-		return fmt.Errorf("events.webhooks.trigger_secret %w", err)
-	}
-	return nil
+	return c.Wake.validate(c.TriggerSecret != "")
 }
 
 const (
@@ -107,7 +111,11 @@ func WebhookClientConfig(egress httputil.ClientConfig) httputil.ClientConfig {
 // *database.NoRowFoundError once the holder has lost the lease.
 type WebhookSource interface {
 	// LeaseDueWebhooks is service.WebhookStatements.LeaseDueWebhooks.
-	LeaseDueWebhooks(ctx context.Context, holder string, dueBy, now, leaseUntil time.Time, limit int) ([]*domain.Webhook, error)
+	LeaseDueWebhooks(ctx context.Context, projectID, holder string, dueBy, now, leaseUntil time.Time, limit int) ([]*domain.Webhook, error)
+	// WebhookEventTypes returns the filters of the project's enabled
+	// webhooks together, empty when it has none: what a wake-up is weighed
+	// against before it costs anything.
+	WebhookEventTypes(ctx context.Context, projectID string) ([]string, error)
 	// WebhookEventsVisible is the pre-claim gate of ADR 049 §4 for a
 	// project's own readers: true once the project is claimed, and always
 	// for the platform project.
@@ -127,8 +135,9 @@ type WebhookSource interface {
 }
 
 // WebhookShipper delivers the projects' events to their webhooks, signed
-// (ADR 090 §2 to §4): on its own timer, or once per request to its trigger
-// when the config names a trigger secret.
+// (ADR 090 §2 to §4): on its own timer and as soon as Wake says a project
+// has new events, or once per request to its trigger when the config names a
+// trigger secret.
 //
 // It stands beside Shipper rather than inside it. The two share the event
 // listing and nothing else: a webhook gets its own body (webhookEvent), it is
@@ -148,6 +157,10 @@ type WebhookShipper struct {
 	done  chan struct{}
 	// running are the deliveries the loop started.
 	running sync.WaitGroup
+
+	// wake is what Wake does with a project that has something to deliver:
+	// see webhook_wake.go.
+	wake *webhookWake
 }
 
 // NewWebhookShipper builds the shipper. client must be the hardened egress
@@ -159,6 +172,10 @@ func NewWebhookShipper(src WebhookSource, client *http.Client, cfg WebhookConfig
 	holder := make([]byte, 16)
 	// crypto/rand.Read does not fail (it aborts the process instead).
 	_, _ = rand.Read(holder)
+	wake := newWebhookWake(cfg.Wake)
+	// As Start decides it: the loop takes the wake-ups, a trigger's hook
+	// gets them otherwise.
+	wake.loops = cfg.Enabled && cfg.TriggerSecret == ""
 	return &WebhookShipper{
 		cfg:    cfg,
 		src:    src,
@@ -168,6 +185,7 @@ func NewWebhookShipper(src WebhookSource, client *http.Client, cfg WebhookConfig
 		slots:  make(chan struct{}, webhookWorkers),
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
+		wake:   wake,
 	}
 }
 
@@ -195,6 +213,14 @@ func (s *WebhookShipper) loop() {
 	}()
 	ticker := time.NewTicker(s.cfg.Interval)
 	defer ticker.Stop()
+	// woken fires when the projects Wake named get their round: a moment
+	// after the first of them, so that what a request writes in several
+	// transactions, and a burst of requests, share it.
+	woken := time.NewTimer(0)
+	<-woken.C
+	defer woken.Stop()
+	var armed bool
+	var lastWoken time.Time
 	for {
 		select {
 		case <-s.stop:
@@ -202,29 +228,44 @@ func (s *WebhookShipper) loop() {
 		case <-ticker.C:
 			// The loop does not wait for the deliveries it starts, so a slow
 			// endpoint holds one worker and nobody else's next round.
-			if _, err := s.dispatch(ctx, &s.running); err != nil && ctx.Err() == nil {
+			if _, err := s.dispatch(ctx, "", &s.running); err != nil && ctx.Err() == nil {
 				slog.Error("webhook shipper: lease due webhooks failed", slog.String("error", err.Error()))
+			}
+		case <-s.wake.signal:
+			if armed {
+				continue
+			}
+			armed = true
+			woken.Reset(max(s.wake.delay, time.Until(lastWoken.Add(s.wake.every))))
+		case <-woken.C:
+			armed, lastWoken = false, time.Now()
+			for _, projectID := range s.wantedOf(ctx, s.wake.take()) {
+				if _, err := s.dispatch(ctx, projectID, &s.running); err != nil && ctx.Err() == nil {
+					slog.Error("webhook shipper: lease woken webhooks failed", slog.String("project_id", projectID), slog.String("error", err.Error()))
+				}
 			}
 		}
 	}
 }
 
 // runOnce is one round: it delivers to every webhook that is due as it
-// starts, and returns when those deliveries have ended.
-func (s *WebhookShipper) runOnce(ctx context.Context) (int, error) {
+// starts, of projectID or with it empty of every project, and returns when
+// those deliveries have ended.
+func (s *WebhookShipper) runOnce(ctx context.Context, projectID string) (int, error) {
 	var running sync.WaitGroup
 	defer running.Wait()
-	return s.dispatch(ctx, &running)
+	return s.dispatch(ctx, projectID, &running)
 }
 
-// dispatch leases the due webhooks, as many at a time as there are free
-// workers, and starts a delivery for each on running. It returns how many it
-// started, once a lease finds no more.
+// dispatch leases the due webhooks, of projectID or with it empty of every
+// project, as many at a time as there are free workers, and starts a
+// delivery for each on running. It returns how many it started, once a lease
+// finds no more.
 //
 // A webhook counts as due against the time the round started. A delivery
 // that ends gives its webhook back due from then, which is later, so the
 // round does not take the same webhook twice.
-func (s *WebhookShipper) dispatch(ctx context.Context, running *sync.WaitGroup) (int, error) {
+func (s *WebhookShipper) dispatch(ctx context.Context, projectID string, running *sync.WaitGroup) (int, error) {
 	dueBy := s.now()
 	started := 0
 	for {
@@ -244,7 +285,7 @@ func (s *WebhookShipper) dispatch(ctx context.Context, running *sync.WaitGroup) 
 			}
 			break
 		}
-		hooks, err := s.leaseDue(ctx, dueBy, free)
+		hooks, err := s.leaseDue(ctx, projectID, dueBy, free)
 		for range free - len(hooks) {
 			<-s.slots
 		}
@@ -266,13 +307,13 @@ func (s *WebhookShipper) dispatch(ctx context.Context, running *sync.WaitGroup) 
 
 // leaseDue leases up to limit due webhooks under a job span of its own, ended
 // before any is delivered to.
-func (s *WebhookShipper) leaseDue(ctx context.Context, dueBy time.Time, limit int) ([]*domain.Webhook, error) {
+func (s *WebhookShipper) leaseDue(ctx context.Context, projectID string, dueBy time.Time, limit int) ([]*domain.Webhook, error) {
 	ctx, span := startJobSpan(ctx, "audit.LeaseDueWebhooks")
 	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
 	defer cancel()
 	now := s.now()
-	hooks, err := s.src.LeaseDueWebhooks(ctx, s.holder, dueBy, now, now.Add(webhookLeaseTTL), limit)
+	hooks, err := s.src.LeaseDueWebhooks(ctx, projectID, s.holder, dueBy, now, now.Add(webhookLeaseTTL), limit)
 	if err != nil {
 		failJobSpan(ctx, err)
 	}
@@ -290,7 +331,7 @@ func (s *WebhookShipper) ship(parent context.Context, hook *domain.Webhook) {
 	ctx, cancel := context.WithTimeout(parent, webhookBudget)
 	defer cancel()
 
-	held, err := s.deliverPending(ctx, hook)
+	held, reached, err := s.deliverPending(ctx, hook)
 	if err != nil {
 		failJobSpan(ctx, err)
 		// The round's context, not the webhook's: a webhook that ran out of
@@ -307,23 +348,28 @@ func (s *WebhookShipper) ship(parent context.Context, hook *domain.Webhook) {
 		failJobSpan(ctx, err)
 		s.logFault(parent, "webhook shipper: release lease failed", hook, err)
 	}
+	if err == nil && reached {
+		s.wakeForTheRest(parent, hook)
+	}
 }
 
 // deliverPending sends the webhook the project's settled events after its
 // cursor, oldest first, until none is left, one fails or the budget runs
 // low. held says whether the lease is still to give back: a failed delivery
 // gives it back with what it records, and a lease that was lost is nobody's
-// to give. err is a fault of the server's own, never a failed delivery.
-func (s *WebhookShipper) deliverPending(ctx context.Context, hook *domain.Webhook) (held bool, err error) {
+// to give. reached says that the round ended at the cursor it stored, with
+// nothing in its way but its budget or the end of what it listed. err is a
+// fault of the server's own, never a failed delivery.
+func (s *WebhookShipper) deliverPending(ctx context.Context, hook *domain.Webhook) (held, reached bool, err error) {
 	visible, err := s.src.WebhookEventsVisible(ctx, hook.ProjectID)
 	if err != nil || !visible {
-		return true, err
+		return true, false, err
 	}
 	var secrets []string
 	for {
 		batch, err := s.src.ListEventsAfterCursor(ctx, hook.ProjectID, hook.CursorCreatedAt, hook.CursorEventID, webhookPageSize)
 		if err != nil || len(batch) == 0 {
-			return true, err
+			return true, err == nil, err
 		}
 		var (
 			moved       bool
@@ -361,19 +407,19 @@ func (s *WebhookShipper) deliverPending(ctx context.Context, hook *domain.Webhoo
 				return s.src.RecordWebhookProgress(ctx, hook, s.holder, deliveredAt)
 			})
 			if err != nil {
-				return !leaseLost(err), ignoreLeaseLost(err)
+				return !leaseLost(err), false, ignoreLeaseLost(err)
 			}
 		}
 		if failure != nil {
 			if ctx.Err() != nil {
 				// The server is stopping or the round was cancelled: the
 				// request did not fail, it was given up.
-				return true, nil
+				return true, false, nil
 			}
-			return false, ignoreLeaseLost(s.fail(ctx, hook, failure))
+			return false, false, ignoreLeaseLost(s.fail(ctx, hook, failure))
 		}
 		if outOfBudget || len(batch) < webhookPageSize {
-			return true, nil
+			return true, true, nil
 		}
 	}
 }
@@ -508,9 +554,15 @@ func (s *WebhookShipper) fail(ctx context.Context, hook *domain.Webhook, failure
 		reason = domain.WebhookDisabledReasonFailing
 	default:
 		zlog.Info(ctx, "webhook shipper: delivery failed", attrs...)
-		return s.write(ctx, func(ctx context.Context) error {
-			return s.src.RecordWebhookFailure(ctx, hook, s.holder, failure.at, failure.status, failure.at.Add(webhookBackoff(failingFor)))
+		nextAttemptAt := failure.at.Add(webhookBackoff(failingFor))
+		err := s.write(ctx, func(ctx context.Context) error {
+			return s.src.RecordWebhookFailure(ctx, hook, s.holder, failure.at, failure.status, nextAttemptAt)
 		})
+		if err == nil {
+			// No timer of this server's will make that attempt.
+			s.callWakeHook(ctx, hook.ProjectID, nextAttemptAt)
+		}
+		return err
 	}
 	zlog.Info(ctx, "webhook shipper: delivery failed, webhook disabled", append(attrs, slog.String("disabled_reason", string(reason)))...)
 	return s.write(ctx, func(ctx context.Context) error {
@@ -545,10 +597,15 @@ func (s *WebhookShipper) logFault(ctx context.Context, msg string, hook *domain.
 	errlog.LogFault(ctx, fmt.Errorf("%s: webhook %s of project %s: %w", msg, hook.ID, hook.ProjectID, err))
 }
 
+// WebhookTriggerProjectParam is the query parameter that keeps a triggered
+// round to one project's webhooks: what a wake-up for that project calls.
+const WebhookTriggerProjectParam = "project_id"
+
 // Trigger is the handler that runs one round per GET or POST that carries
 // the trigger secret as a bearer token, and answers how many webhooks the
-// round delivered to. It is nil unless delivery is on and the config names a
-// trigger secret.
+// round delivered to. With WebhookTriggerProjectParam the round is that
+// project's, otherwise every project's. It is nil unless delivery is on and
+// the config names a trigger secret.
 func (s *WebhookShipper) Trigger() http.Handler {
 	if !s.cfg.Enabled || s.cfg.TriggerSecret == "" {
 		return nil
@@ -563,7 +620,7 @@ func (s *WebhookShipper) Trigger() http.Handler {
 
 		ctx, cancel := context.WithTimeout(r.Context(), webhookTriggerTimeout)
 		defer cancel()
-		n, err := s.runOnce(ctx)
+		n, err := s.runOnce(ctx, r.URL.Query().Get(WebhookTriggerProjectParam))
 		if err != nil {
 			errlog.LogFault(r.Context(), err)
 			http.Error(w, "webhook delivery: round failed", http.StatusInternalServerError)

@@ -139,6 +139,8 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"VERCEL_GIT_COMMIT_REF",
 		"VERCEL_PROJECT_PRODUCTION_URL",
 		"VERCEL_URL",
+		"WEBHOOK_WAKE_SECRET",
+		"WEBHOOK_WAKE_URL",
 	} {
 		t.Setenv(key, "")
 	}
@@ -302,6 +304,121 @@ func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(raw, &config))
 	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
 	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
+}
+
+// webhookConfig reads events.webhooks from the config file prepareServer
+// wrote, as the server will.
+func webhookConfig(t *testing.T, dataDir string) audit.WebhookConfig {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	var config struct {
+		Events struct {
+			Webhooks struct {
+				TriggerSecret string `yaml:"trigger_secret"`
+				Wake          struct {
+					URL    string `yaml:"url"`
+					Secret string `yaml:"secret"`
+				} `yaml:"wake"`
+			} `yaml:"webhooks"`
+		} `yaml:"events"`
+	}
+	require.NoError(t, yaml.Unmarshal(raw, &config))
+	return audit.WebhookConfig{
+		TriggerSecret: config.Events.Webhooks.TriggerSecret,
+		Wake:          audit.WebhookWakeConfig{URL: config.Events.Webhooks.Wake.URL, Secret: config.Events.Webhooks.Wake.Secret},
+	}
+}
+
+const testWakeSecret = "0123456789abcdef-wake"
+
+// The delivery loop cannot run in a function either: the cron job's secret
+// is the webhook trigger's too. Without WEBHOOK_WAKE_SECRET the hourly cron
+// job is all that delivers.
+func TestPrepareServerLeavesWebhookDeliveryToTheTrigger(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	webhooks := webhookConfig(t, dataDir)
+	assert.Equal(t, testCronSecret, webhooks.TriggerSecret)
+	assert.Empty(t, webhooks.Wake)
+	require.NoError(t, webhooks.Validate())
+}
+
+// WEBHOOK_WAKE_SECRET turns the wake hook on: the server calls the
+// deployment's own functions, which queue the call to the trigger.
+func TestPrepareServerRendersTheWakeHook(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env     map[string]string
+		wantURL string
+	}{
+		"production calls its domain": {
+			env:     map[string]string{"VERCEL_ENV": "production", "VERCEL_PROJECT_PRODUCTION_URL": "zitadel.example", "VERCEL_URL": "cloud-abc.vercel.app"},
+			wantURL: "https://zitadel.example/cloud/hooks/webhook-wake",
+		},
+		"a preview calls its branch URL": {
+			env:     map[string]string{"VERCEL_ENV": "preview", "VERCEL_GIT_COMMIT_REF": branch, "VERCEL_BRANCH_URL": "cloud-git-feature.vercel.app", "VERCEL_URL": "cloud-abc.vercel.app"},
+			wantURL: "https://cloud-git-feature.vercel.app/cloud/hooks/webhook-wake",
+		},
+		"the operator's URL wins": {
+			env:     map[string]string{"VERCEL_ENV": "production", "VERCEL_PROJECT_PRODUCTION_URL": "zitadel.example", "WEBHOOK_WAKE_URL": "https://functions.example/wake?key=1"},
+			wantURL: "https://functions.example/wake?key=1",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			setLauncherEnv(t, dataDir)
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv("WEBHOOK_WAKE_URL", "")
+			t.Setenv("WEBHOOK_WAKE_SECRET", testWakeSecret)
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+
+			_, err := prepareServer(nil)
+			require.NoError(t, err)
+
+			webhooks := webhookConfig(t, dataDir)
+			assert.Equal(t, testCronSecret, webhooks.TriggerSecret)
+			assert.Equal(t, audit.WebhookWakeConfig{URL: tc.wantURL, Secret: testWakeSecret}, webhooks.Wake)
+			require.NoError(t, webhooks.Validate(), "what the launcher renders, the server accepts")
+			assert.Empty(t, os.Getenv("WEBHOOK_WAKE_SECRET"), "the secret leaves the environment once it is on disk")
+			assert.Empty(t, os.Getenv("WEBHOOK_WAKE_URL"))
+		})
+	}
+}
+
+func TestPrepareServerRefusesAWakeHookItCannotRender(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env    map[string]string
+		reason string
+	}{
+		"a short secret":       {map[string]string{"WEBHOOK_WAKE_SECRET": "short"}, "WEBHOOK_WAKE_SECRET must be at least 16 printable ASCII characters"},
+		"an http URL":          {map[string]string{"WEBHOOK_WAKE_URL": "http://functions.example/wake"}, "WEBHOOK_WAKE_URL: events.webhooks.wake.url must be an https URL"},
+		"no URL to call":       {map[string]string{"VERCEL_PROJECT_PRODUCTION_URL": "", "VERCEL_URL": ""}, "set WEBHOOK_WAKE_URL"},
+		"a local run, no cron": {map[string]string{"VERCEL_ENV": "", "CRON_SECRET": "", "CLOUD_DATABASE_URL": ""}, "WEBHOOK_WAKE_SECRET needs CRON_SECRET"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", "production")
+			t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv("WEBHOOK_WAKE_URL", "")
+			t.Setenv("WEBHOOK_WAKE_SECRET", testWakeSecret)
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+
+			_, err := prepareServer(nil)
+			require.ErrorContains(t, err, tc.reason)
+		})
+	}
 }
 
 func TestPrepareServerServesAPreviewFromItsOwnDatabase(t *testing.T) {
@@ -593,8 +710,9 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 // The cron job is the only caller of the audit event purge in the cloud, so
 // its path is the server's trigger, and nothing routes it anywhere but the
 // server: a redirect would end the run, which a cron job does not follow, and
-// another service would answer 404.
-func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
+// another service would answer 404. The same holds for the hourly round of
+// webhook delivery, which makes up for a wake-up that was lost (ADR 090 §4).
+func TestVercelJSONSchedulesTheServersTriggers(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "vercel.json"))
 	require.NoError(t, err)
 	var config struct {
@@ -613,28 +731,32 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 
-	require.Len(t, config.Crons, 1)
+	require.Len(t, config.Crons, 2)
 	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
 	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
+	assert.Equal(t, audit.WebhookTriggerPath, config.Crons[1].Path, "no query: the round is every project's")
+	assert.Equal(t, "47 * * * *", config.Crons[1].Schedule, "hourly, away from the purge")
 
-	for _, redirect := range config.Redirects {
-		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
-	}
-	var service string
-	for _, rewrite := range config.Rewrites {
-		// The cron job calls the cloud's own host, so go.zitadel.com's rule
-		// does not apply; every other rule still does.
-		if forGoImportHost(rewrite.Has) {
-			continue
+	for _, trigger := range []string{audit.RetentionTriggerPath, audit.WebhookTriggerPath} {
+		for _, redirect := range config.Redirects {
+			assert.False(t, routeMatches(redirect.Source, trigger), "%s is redirected by %s", trigger, redirect.Source)
 		}
-		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
-			var destination struct{ Service string }
-			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
-			service = destination.Service
-			break
+		var service string
+		for _, rewrite := range config.Rewrites {
+			// The cron job calls the cloud's own host, so go.zitadel.com's
+			// rule does not apply; every other rule still does.
+			if forGoImportHost(rewrite.Has) {
+				continue
+			}
+			if routeMatches(rewrite.Source, trigger) {
+				var destination struct{ Service string }
+				require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
+				service = destination.Service
+				break
+			}
 		}
+		assert.Equal(t, "server", service, "the first rewrite that matches %s", trigger)
 	}
-	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
 }
 
 // The cloud gives the server its own paths and nothing else: the API under
@@ -679,6 +801,7 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/readyz",
 		securityheaders.ReportPath,
 		audit.RetentionTriggerPath,
+		audit.WebhookTriggerPath,
 		api.IDPCallbackUpstreamPath("github"),
 		api.IDPCallbackPath("github"),
 	}
@@ -707,7 +830,10 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/console/users":               "console",
 		"/docs/reference/api":          "docs",
 		"/cloud/zitadel/flow":          "cloud-functions",
-		"/telemetry/mixpanel/track":    "(external)",
+		webhookWakePath:                "cloud-functions",
+		// The queue's consumer is the queue's alone: no path leads to it.
+		"/queues/webhook-wake":      "website",
+		"/telemetry/mixpanel/track": "(external)",
 	}
 	for path, want := range others {
 		assert.Equal(t, want, serviceFor(path), path)

@@ -19,9 +19,11 @@
       "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"]
     },
     // The specs import @zitadel/api's dist/, as Next does.
+    // src/vercel/queue.spec.ts holds the queue trigger in the repo-root
+    // vercel.json against its topic.
     "test": {
       "dependsOn": ["@zitadel/api#build"],
-      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**"]
+      "inputs": ["$TURBO_EXTENDS$", "!app/.well-known/workflow/**", "$TURBO_ROOT$/vercel.json"]
     },
     // `next dev` resolves @zitadel/api to its dist/, as the build does. The
     // script points the sign-in calls at the console's `dev:real` instance
