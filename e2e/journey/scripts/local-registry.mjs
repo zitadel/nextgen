@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { copyFile, cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
@@ -9,25 +10,15 @@ import { runCapture } from "../../../scripts/dev-process.mjs";
 import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
-// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
-import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
 // Verdaccio serves a proxied packument from its storage until it is `maxage`
-// old, then asks npmjs again; the default is 2m. CI restores the storage of an
-// earlier run (JOURNEY_REGISTRY_STORAGE), so with the default every packument
-// is stale from the start, and the scaffolds' installs wait on thousands of
-// npmjs round trips that almost all come back 304 Not Modified. With an hour,
-// most CI runs restore packuments another run refreshed within the hour and
-// ask npmjs nothing; a fresh local store only skips repeat checks within a run.
-//
-// Longer is not better: npmjs releases reach the journey up to `maxage` late
-// (`nuxi@latest` and `@angular/cli@latest` resolve `latest` here), and `nuxi init` downloads its starter template from GitHub,
-// which has adopted a new nuxt release as soon as two hours after it was
-// published. A packument cached past that point lacks the version the
-// template asks for, and the nuxt install fails until the entry expires.
+// old, then asks npmjs again; the default is 2m, which makes a long journey
+// run ask npmjs again for packuments it fetched minutes earlier. An hour skips
+// those repeat checks within a run, and a store that a later run reuses
+// (`resetStorage: false`) still sees an npmjs release within the hour.
 export const UPLINK_MAXAGE = "1h";
 
 export function localRegistryPaths(workDir) {
@@ -67,6 +58,26 @@ export async function prepareLocalRegistry(input) {
     await buildAppPackages(input.repoRoot, input.run, env, log);
     await packAppPackages(input.repoRoot, paths.tarballsDir, env, log, input.runCapture);
     await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
+  } else if (input.packageDirs) {
+    // A CI journey's own set (journey-packages.mjs), packed from the builds
+    // its turbo task depends on. The ones every journey installs come packed
+    // once from the `journey-packages` task (`shared`), the rest are packed
+    // here.
+    const shared = input.shared ?? { dirs: [], tarballsDir: "" };
+    await packPackageDirs(
+      input.repoRoot,
+      paths.tarballsDir,
+      input.packageDirs.filter((dir) => !shared.dirs.includes(dir)),
+      env,
+      log,
+      input.runCapture,
+    );
+    if (shared.dirs.length > 0) {
+      await copySharedTarballs(input.repoRoot, shared, paths.tarballsDir, log);
+    }
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, [
+      `--packages=${input.packageDirs.join(",")}`,
+    ]);
   } else {
     await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
     await packPackages(
@@ -114,8 +125,7 @@ export async function buildPackages(
   }
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
   log(`building release npm tarballs for ${projectNames.join(", ")}`);
-  const pack = runnerCommand(["release:pack"], env);
-  await run(pack.command, pack.args, { cwd: repoRoot, env });
+  await run("turbo", ["run", "@zitadel/release#pack"], { cwd: repoRoot, env });
 }
 
 export async function packPackages(
@@ -139,16 +149,15 @@ export async function packPackages(
 }
 
 // The `app` package set: what a generated app installs, packed from the
-// packages' cached dev builds. `release:pack` rebuilds every public package
-// after cli:test and cross-compiles the server for every platform, none of
-// which a generated app installs.
+// packages' cached dev builds. `@zitadel/release#pack` builds every public
+// package and cross-compiles the server for every platform, none of which a
+// generated app installs.
 export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
   log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
-  const build = runnerCommand(
-    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`),
+  await run("turbo", ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.name}#build`)], {
+    cwd: repoRoot,
     env,
-  );
-  await run(build.command, build.args, { cwd: repoRoot, env });
+  });
 }
 
 // Each pack runs on pipes of its own (runReplayed in scripts/dev-process.mjs
@@ -160,13 +169,46 @@ export async function packAppPackages(
   log = () => undefined,
   runCaptureFn = runCapture,
 ) {
+  const dirs = APP_RELEASE_PACKAGES.map((pkg) => pkg.dir);
+  await packPackageDirs(repoRoot, tarballsDir, dirs, env, log, runCaptureFn);
+}
+
+export async function packPackageDirs(
+  repoRoot,
+  tarballsDir,
+  dirs,
+  env,
+  log = () => undefined,
+  runCaptureFn = runCapture,
+) {
   log(`packing npm tarballs into ${tarballsDir}`);
   await packPublicPackages({
     repoRoot,
-    dirs: APP_RELEASE_PACKAGES.map((pkg) => pkg.dir),
+    dirs,
     tarballsDir,
     run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
   });
+}
+
+// The tarballs of `shared.dirs`, named as `pnpm pack` names them; the
+// verification that follows checks that with the journey's own packs they make
+// up exactly its set.
+async function copySharedTarballs(repoRoot, shared, tarballsDir, log) {
+  log(`copying the shared npm tarballs from ${shared.tarballsDir}`);
+  for (const dir of shared.dirs) {
+    const name = await packageName(repoRoot, dir);
+    const file = `${name.replace(/^@/, "").replaceAll("/", "-")}-${await packageVersion(repoRoot, dir)}.tgz`;
+    await copyFile(
+      join(shared.tarballsDir, file),
+      join(tarballsDir, file),
+      constants.COPYFILE_FICLONE,
+    ).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+      throw new Error(
+        `no ${file} in ${shared.tarballsDir}; run turbo run journey-packages --filter=@zitadel/e2e`,
+      );
+    });
+  }
 }
 
 export async function verifyTarballs(repoRoot, tarballsDir, run, env, flags = []) {
@@ -337,6 +379,9 @@ uplinks:
   npmjs:
     url: https://registry.npmjs.org/
     maxage: ${UPLINK_MAXAGE}
+    timeout: 60s
+    max_fails: 10
+    fail_timeout: 10s
 packages:
   '@zitadel/*':
     access: $all

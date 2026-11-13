@@ -101,6 +101,16 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"CLOUD_DATABASE_URL",
 		"CLOUD_MIGRATOR_DATABASE_URL",
 		"CLOUD_PRODUCTION_BRANCH",
+		otlpCollectorEnv,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE",
+		"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE",
 		"MASTER_KEY_PREVIOUS_ID",
 		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
@@ -496,6 +506,68 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
 }
 
+// Behind the Node.js wrapper the server listens on loopback only and sends
+// its spans and metrics to the wrapper, which hands them to Vercel; it trusts
+// traceparent because only the wrapper can reach it and the wrapper sets it.
+// An OTLP backend named on the environment does not move either.
+func TestPrepareServerExportsToTheWrapper(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+	t.Setenv(otlpCollectorEnv, "127.0.0.1:45678")
+	// Leftovers must not move these.
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION", "1")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE", "grpc")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example.com/otlp")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1:34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "reachable only through the wrapper")
+	assert.Equal(t, "http", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+	assert.Equal(t, "127.0.0.1:45678", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT"))
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE"))
+	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION"))
+	assert.Equal(t, "delta", os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"))
+	assert.Equal(t, "http", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Equal(t, "127.0.0.1:45678", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT"))
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE"))
+	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION"))
+	assert.Equal(t, "0", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION"), "Vercel's sampling decides")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+}
+
+func TestPrepareServerWithoutTheWrapperLeavesTelemetryAlone(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, ":34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+	assert.Empty(t, os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"))
+}
+
+func TestPrepareServerRefusesACollectorOffLoopback(t *testing.T) {
+	for _, collector := range []string{"10.0.0.1:4318", "localhost:4318", "collector.example.com:4318", "4318"} {
+		t.Run(collector, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", "production")
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv(otlpCollectorEnv, collector)
+
+			_, err := prepareServer(nil)
+			require.ErrorContains(t, err, otlpCollectorEnv)
+		})
+	}
+}
+
 // vercel.json mounts the console service, and builds it, at the path the
 // server's console links point to; JSON has no comments to say so.
 func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
@@ -639,7 +711,7 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 // its path is the server's trigger, and nothing routes it anywhere but the
 // server: a redirect would end the run, which a cron job does not follow, and
 // another service would answer 404. The same holds for the hourly round of
-// webhook delivery, which makes up for a wake-up that was lost (ADR 089 §4).
+// webhook delivery, which makes up for a wake-up that was lost (ADR 090 §4).
 func TestVercelJSONSchedulesTheServersTriggers(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "vercel.json"))
 	require.NoError(t, err)

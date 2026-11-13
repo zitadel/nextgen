@@ -19,7 +19,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
  * them in real Chromium (Playwright). Each story gets a render smoke test, its
  * `play` function (interaction), and the `a11y: { test: "error" }` checks from
  * `.storybook/preview.ts`. This is the parity/behaviour gate that replaced the
- * old `console-e2e` visual sweep, and it runs in CI via `moon ci :test`.
+ * old `console-e2e` visual sweep, and it runs in CI via `turbo run test`.
  *
  * Orchestrator stories are tagged `no-test` (they drive real network + the MSW
  * worker; their behaviour is covered by the `@zitadel/components` specs).
@@ -31,7 +31,7 @@ export default defineConfig({
     // Run story files one at a time. main's `optimizeDeps.noDiscovery` (below)
     // fixes the re-optimization cause of the CI "Failed to fetch dynamically
     // imported module" flake, but parallel Chromium contexts still overwhelm
-    // the Vitest Vite server under the full `moon ci` load (vitest-dev/vitest#9509).
+    // the Vitest Vite server under the full CI load (vitest-dev/vitest#9509).
     // Serializing the files keeps the server serving one importer at a time;
     // per-file isolation stays on (this is not `isolate: false`).
     fileParallelism: false,
@@ -41,8 +41,7 @@ export default defineConfig({
         // NOTE: unlike the other packages we do NOT pin cacheDir to `.vitest`
         // here — the Storybook Vitest addon (`storybookTest`) manages its own
         // Vite instance and keeps its cache under `node_modules/.vite`
-        // regardless of this setting, so `storybook:test` has no `.vitest`
-        // output in moon.yml.
+        // regardless of this setting.
         plugins: [
           storybookTest({
             configDir: join(dir, ".storybook"),

@@ -14,9 +14,9 @@ const repoRoot = join(import.meta.dirname, "..", "..", "..");
 /**
  * Installs this commit's CLI the way a developer gets it: `@zitadel/cli` and
  * the workspace packages it depends on, packed by the release's own code
- * (`packPublicPackages`, which `moon run release:pack` runs, prepack
- * included), installed with npm into `dir` from those tarballs and the public
- * registry. The server's platform binaries are optional dependencies and left
+ * (`packPublicPackages`, which `turbo run pack --filter=@zitadel/release`
+ * runs, prepack included), installed with npm into `dir` from those tarballs
+ * and the public registry. The server's platform binaries are optional dependencies and left
  * out: against a hosted server the CLI starts none. Returns the installed
  * `zitadel` binary.
  */

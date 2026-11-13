@@ -4,6 +4,7 @@ import {
   Check,
   ChevronsUpDown,
   Logs,
+  LogIn,
   type LucideIcon,
   ScrollText,
 } from "lucide-react";
@@ -55,6 +56,9 @@ import {
   type EventsSearch,
   type EventView,
   parseEventsSearch,
+  SIGNIN_OUTCOME_LABEL,
+  SIGNIN_OUTCOMES,
+  type SigninOutcome,
   TIME_RANGE_LABEL,
   TIME_RANGES,
   type TimeRange,
@@ -62,6 +66,7 @@ import {
   VIEW_LABEL,
   withCategory,
   withCustomRange,
+  withOutcome,
   withStatus,
   withTimeRange,
   withTypes,
@@ -72,7 +77,8 @@ import {
  * The Events list of the sidebar (D30): what the shell shows in place of the
  * project's screens on `/events` and under an event's drawer, as Vercel's Logs
  * does. A picker chooses the list's view, and under it sit the filters chosen
- * from a list: the time, the category, the type or the status. Values that
+ * from a list: the time, the category, the type, the status or how a sign-in
+ * ended. Values that
  * are pasted, the ids and the operation, go in the search above the table
  * (`EventSearchField`).
  *
@@ -93,6 +99,7 @@ const NO_FILTERS = parseEventsSearch({});
 /** A glyph per view, which is all the icon rail shows of it. */
 const VIEW_ICON: Record<EventView, LucideIcon> = {
   audit: ScrollText,
+  signins: LogIn,
   requests: ArrowLeftRight,
   all: Logs,
 };
@@ -192,8 +199,33 @@ export function EventFilters() {
       <SidebarGroupContent className="flex flex-col gap-4 px-2 pb-2">
         <TimeFilter current={current} go={go} />
 
-        {/* The requests are one category themselves. */}
-        {current.view !== "requests" && (
+        {/* The requests are one category themselves, and the sign-ins their
+            own types. */}
+        {current.view === "signins" && (
+          <Field label="Outcome">
+            {(labelId) => (
+              <Select
+                value={current.outcome ?? ANY}
+                onValueChange={(outcome) =>
+                  go(withOutcome(current, outcome === ANY ? undefined : (outcome as SigninOutcome)))
+                }
+              >
+                <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any outcome</SelectItem>
+                  {SIGNIN_OUTCOMES.map((outcome) => (
+                    <SelectItem key={outcome} value={outcome}>
+                      {SIGNIN_OUTCOME_LABEL[outcome]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+        )}
+        {current.view !== "requests" && current.view !== "signins" && (
           <Field label="Category">
             {(labelId) => (
               <Select
@@ -228,7 +260,7 @@ export function EventFilters() {
         {current.view === "requests" ? (
           <StatusFilter current={current} go={go} />
         ) : (
-          <TypeFilter current={current} go={go} />
+          current.view !== "signins" && <TypeFilter current={current} go={go} />
         )}
       </SidebarGroupContent>
     </SidebarGroup>

@@ -25,7 +25,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// WebhookConfig controls delivery to the projects' webhooks (ADR 089 §4). It
+// WebhookConfig controls delivery to the projects' webhooks (ADR 090 §4). It
 // is apart from ExportConfig: that one is the operator's export to the sinks
 // the configuration names, off unless asked for; a webhook is a customer's,
 // who expects delivery once it exists.
@@ -66,7 +66,7 @@ func (c WebhookConfig) Validate() error {
 }
 
 const (
-	// webhookRequestTimeout is the deadline of one delivery (ADR 089 §4).
+	// webhookRequestTimeout is the deadline of one delivery (ADR 090 §4).
 	webhookRequestTimeout = 10 * time.Second
 	// webhookBudget is how long one round works on one webhook. A webhook
 	// with more to deliver than fits continues in the next round.
@@ -94,7 +94,7 @@ const (
 )
 
 // WebhookClientConfig is the hardened egress client's configuration for
-// deliveries (ADR 061, ADR 089 §4): the deployment's deny and allow lists,
+// deliveries (ADR 061, ADR 090 §4): the deployment's deny and allow lists,
 // with no redirect followed and the delivery deadline. The response size is
 // not capped here, which would fail a delivery the endpoint acknowledged at
 // length; the shipper reads a bounded part and drops the rest.
@@ -135,7 +135,7 @@ type WebhookSource interface {
 }
 
 // WebhookShipper delivers the projects' events to their webhooks, signed
-// (ADR 089 §2 to §4): on its own timer and as soon as Wake says a project
+// (ADR 090 §2 to §4): on its own timer and as soon as Wake says a project
 // has new events, or once per request to its trigger when the config names a
 // trigger secret.
 //
@@ -425,7 +425,7 @@ func (s *WebhookShipper) deliverPending(ctx context.Context, hook *domain.Webhoo
 }
 
 // webhookWants reports whether a webhook's filter takes an event type: a type
-// it lists, or every type but request.api when it lists "*" (ADR 089 §1).
+// it lists, or every type but request.api when it lists "*" (ADR 090 §1).
 func webhookWants(eventTypes []string, eventType domain.EventType) bool {
 	for _, want := range eventTypes {
 		if want == domain.WebhookAllEventTypes {
@@ -441,7 +441,7 @@ func webhookWants(eventTypes []string, eventType domain.EventType) bool {
 // webhookBackoff is how long the next attempt waits after a failure, given
 // for how long the webhook has been failing (zero at its first failure):
 // that long again and 5 seconds, at most 1 hour. With attempts made on time
-// the waits are 5, 10, 20, 40 seconds and so on (ADR 089 §4), and nothing
+// the waits are 5, 10, 20, 40 seconds and so on (ADR 090 §4), and nothing
 // but the time of the first failure has to be stored.
 func webhookBackoff(failingFor time.Duration) time.Duration {
 	return min(max(failingFor, 0)+webhookBackoffMin, webhookBackoffMax)
@@ -470,7 +470,7 @@ func (f *webhookFailure) reason() string {
 	return f.cause.Error()
 }
 
-// send makes one delivery attempt (ADR 089 §2) and returns nil when the
+// send makes one delivery attempt (ADR 090 §2) and returns nil when the
 // endpoint acknowledged it with a 2xx.
 func (s *WebhookShipper) send(ctx context.Context, hook *domain.Webhook, ev *domain.Event, secrets []string, at time.Time) (failure *webhookFailure) {
 	failure = &webhookFailure{at: at, eventID: ev.ID}
@@ -531,7 +531,7 @@ func (s *WebhookShipper) send(ctx context.Context, hook *domain.Webhook, ev *dom
 }
 
 // fail records a failed delivery, which ends the round for the webhook: the
-// events after it wait (ADR 089 §4). It sets the next attempt, or disables
+// events after it wait (ADR 090 §4). It sets the next attempt, or disables
 // the webhook when the endpoint is gone or has failed for too long.
 func (s *WebhookShipper) fail(ctx context.Context, hook *domain.Webhook, failure *webhookFailure) error {
 	failingSince := failure.at

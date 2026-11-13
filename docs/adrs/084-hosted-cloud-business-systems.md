@@ -21,7 +21,7 @@
 >
 > **Amendment (2026-11-11):** §2's "no queue of our own" gets its one
 > exception: a raw topic that carries the wake-ups of project webhooks
-> ([ADR 089](089-project-webhooks.md) §4). See
+> ([ADR 090](090-project-webhooks.md) §4). See
 > [the amendment](#amendment-2026-11-11-one-raw-topic-for-webhook-wake-ups).
 
 ## Context
@@ -489,7 +489,7 @@ verification (§3).
 
 §2 kept raw topics (`@vercel/queue`) for "something that needs a buffer a
 workflow run is not", and found nothing that did. Delivery to project
-webhooks ([ADR 089](089-project-webhooks.md) §4) does: the server keeps no
+webhooks ([ADR 090](090-project-webhooks.md) §4) does: the server keeps no
 timer here, so something outside it must call its delivery path when a
 project has events to send, and again when a failed delivery is due.
 

@@ -27,7 +27,7 @@ export function vercelWakeQueue(): WakeQueue {
 }
 
 /**
- * The queue of the webhook wake-ups (root ADR 089 §4). On Vercel it is
+ * The queue of the webhook wake-ups (root ADR 090 §4). On Vercel it is
  * Vercel Queues, in production too: the queue is ours, not a third party's,
  * and `WEBHOOK_WAKE_SECRET` is what turns its route on. Anywhere else
  * nothing would call a consumer back, so the recorder of `src/mock.ts` takes

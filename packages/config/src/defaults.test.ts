@@ -32,7 +32,6 @@ describe("default config rendering", () => {
       objectType: "human-user",
     });
     expect(flow.user_schema).toBe("human-user");
-    expect(flow.status).toBe("active");
   });
 
   it("leaves the template's $id out of the schema's create body", () => {

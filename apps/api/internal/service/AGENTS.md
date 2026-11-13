@@ -32,7 +32,7 @@ Authority (do not duplicate payload rules or the catalog table here):
 - OpenAPI: payload YAML under `api/openapi/endpoints/events/payloads/` and the
   type's entries in `payloadByEventType` and `webhookByEventType`
   ([`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go)).
-  Regenerate with `moon run server:generate`.
+  Regenerate with `turbo run generate --filter=@zitadel/server`.
 - Write a `webhookByEventType` sentence to be true of the webhook's body
   (`api/openapi/endpoints/events/webhook-event-base.yaml`): say `data`, not
   "the payload", and name no other event field.

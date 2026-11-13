@@ -18,7 +18,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
-// WebhookWakeConfig names the wake hook (ADR 089 §4): where a server that
+// WebhookWakeConfig names the wake hook (ADR 090 §4): where a server that
 // delivers only on its trigger, and so keeps no timer, says that a project
 // has events to deliver, and when a failed delivery is due again. What
 // answers there calls WebhookTriggerPath for that project, at once or at the

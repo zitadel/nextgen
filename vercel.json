@@ -2,13 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "server": {
-      "root": "apps/api",
-      "framework": "go",
-      "entrypoint": "cmd/cloud-launcher/main.go",
-      "buildCommand": "cd ../.. && pnpm -w run install:cloud && GOCACHE=\"$PWD/.vercel/cache/cloud-go/build\" GOMODCACHE=\"$PWD/.vercel/cache/cloud-go/modules\" node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
+      "root": "apps/cloud",
+      "framework": "node",
+      "entrypoint": "server/index.mjs",
+      "installCommand": "pnpm -w run install:cloud",
+      "buildCommand": "cd ../.. && . apps/cloud/install-go.sh && GOCACHE=\"$PWD/.vercel/cache/cloud-go/build\" GOMODCACHE=\"$PWD/.vercel/cache/cloud-go/modules\" node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
       "functions": {
-        "cmd/cloud-launcher/main.go": {
-          "regions": ["fra1"]
+        "server/index.mjs": {
+          "regions": ["fra1"],
+          "includeFiles": "dist/nextgen-launcher"
         }
       }
     },
@@ -307,6 +309,7 @@
   "git": {
     "deploymentEnabled": {
       "changeset-release/*": false,
+      "dependabot/**": false,
       "gh-readonly-queue/**": false
     }
   }

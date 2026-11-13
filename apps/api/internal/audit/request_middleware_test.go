@@ -294,7 +294,7 @@ func TestRequestEventMiddleware_IndexesTheOperationAndStatusClass(t *testing.T) 
 
 // A request event records the operation, the method, the status and the
 // duration, and nothing the handler wrote: the two webhook responses that
-// carry a signing secret leave none of it in the event (ADR 089 §3).
+// carry a signing secret leave none of it in the event (ADR 090 §3).
 func TestRequestEventMiddleware_RecordsNoResponseBody(t *testing.T) {
 	const secret = "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oDZJQk1o3DdH8="
 	for _, operationID := range []string{"createWebhook", "rotateWebhookSecret"} {

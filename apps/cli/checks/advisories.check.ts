@@ -6,7 +6,7 @@ import { scaffolders } from "@/lib/orca/scaffolders";
 /**
  * Asks the npm advisory database about every package a scaffolder pins
  * (`pinnedPackages`): the versions a fresh app gets until someone bumps the
- * pin. `cli:check-advisories` runs it apart from `cli:test`, because it needs
+ * pin. `@zitadel/cli#check-advisories` runs it apart from `@zitadel/cli#test`, because it needs
  * the network and its answer changes when an advisory is published, with no
  * file in this repository changing.
  */

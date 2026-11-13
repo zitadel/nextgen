@@ -35,6 +35,9 @@ func MarshalWire(e *domain.Event) ([]byte, error) {
 	if e.EntityID != nil {
 		m["entity_id"] = *e.EntityID
 	}
+	if e.UserID != nil {
+		m["user_id"] = *e.UserID
+	}
 	if e.TokenID != "" {
 		m["token_id"] = e.TokenID
 	}

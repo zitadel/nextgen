@@ -11,12 +11,11 @@
     "./contract": "./src/contract.ts"
   },
   "scripts": {
-    "dev": "next dev --port 5180",
+    "dev": "CLOUD_ZITADEL_URL=${CLOUD_ZITADEL_URL-http://localhost:8094} next dev --port 5180",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test": "vitest run"
   },
   "dependencies": {
     "@vercel/queue": "catalog:",

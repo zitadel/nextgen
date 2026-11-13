@@ -46,7 +46,7 @@ func TestSignWebhook_StandardWebhooksVector(t *testing.T) {
 }
 
 // During a rotation a delivery carries one signature per secret, separated
-// by a space, each the one that secret alone would give (ADR 089 §3).
+// by a space, each the one that secret alone would give (ADR 090 §3).
 func TestSignWebhook_OneSignaturePerSecret(t *testing.T) {
 	at := time.Unix(1794391200, 0)
 	body := []byte(`{"id":"evt_1"}`)
@@ -62,7 +62,7 @@ func TestSignWebhook_OneSignaturePerSecret(t *testing.T) {
 }
 
 // Nothing is signed with a key that is not the secret's: a delivery fails
-// instead (ADR 089 §3).
+// instead (ADR 090 §3).
 func TestSignWebhook_RefusesWhatIsNotASecret(t *testing.T) {
 	for name, secrets := range map[string][]string{
 		"no secret":         nil,
@@ -102,7 +102,7 @@ func TestWebhookWants(t *testing.T) {
 	}
 }
 
-// From 5 seconds, doubling, to at most 1 hour (ADR 089 §4), when every
+// From 5 seconds, doubling, to at most 1 hour (ADR 090 §4), when every
 // attempt is made as it falls due.
 func TestWebhookBackoff_Schedule(t *testing.T) {
 	var got []time.Duration
@@ -464,7 +464,7 @@ func verifyStandardWebhook(secret string, d receivedDelivery) bool {
 
 // A delivery is the event in the webhook body (webhookEvent), with the
 // Standard Webhooks headers; the timestamp is the attempt's, not the event's
-// (ADR 089 §2).
+// (ADR 090 §2).
 func TestWebhookShipper_DeliversTheEventSigned(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	hook := testWebhook("hook_1", "proj_a", endpoint.URL+"/hooks/zitadel")
@@ -500,7 +500,7 @@ func TestWebhookShipper_DeliversTheEventSigned(t *testing.T) {
 }
 
 // While a rotation's previous secret is valid a delivery verifies under
-// either secret (ADR 089 §3).
+// either secret (ADR 090 §3).
 func TestWebhookShipper_SignsWithBothSecretsDuringARotation(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	src := newFakeWebhookSource(testWebhook("hook_1", "proj_a", endpoint.URL))
@@ -518,7 +518,7 @@ func TestWebhookShipper_SignsWithBothSecretsDuringARotation(t *testing.T) {
 }
 
 // A secret that cannot be read, or that is not a secret, fails the delivery.
-// Nothing is sent unsigned (ADR 089 §3).
+// Nothing is sent unsigned (ADR 090 §3).
 func TestWebhookShipper_SendsNothingWithoutASecret(t *testing.T) {
 	for name, set := range map[string]func(*fakeWebhookSource){
 		"cannot be decrypted": func(f *fakeWebhookSource) {
@@ -547,7 +547,7 @@ func TestWebhookShipper_SendsNothingWithoutASecret(t *testing.T) {
 }
 
 // The filter skips an event, and the cursor moves past it, also when nothing
-// after it is delivered (ADR 089 §4).
+// after it is delivered (ADR 090 §4).
 func TestWebhookShipper_FilterSkipsAndTheCursorMovesOn(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	listed := testWebhook("hook_listed", "proj_a", endpoint.URL+"/listed", "user.created", "user.deleted")
@@ -581,7 +581,7 @@ func TestWebhookShipper_FilterSkipsAndTheCursorMovesOn(t *testing.T) {
 }
 
 // Delivery is in order, and a failure holds back the events after it: the
-// cursor stays on the last one delivered (ADR 089 §4).
+// cursor stays on the last one delivered (ADR 090 §4).
 func TestWebhookShipper_HeadOfLineStopsAtAFailure(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	endpoint.answer(func(eventID string) int {
@@ -629,7 +629,7 @@ func TestWebhookShipper_HeadOfLineStopsAtAFailure(t *testing.T) {
 
 // An endpoint that keeps failing is retried after 5 seconds, then twice as
 // long each time, up to an hour; a success starts the schedule over
-// (ADR 089 §4).
+// (ADR 090 §4).
 func TestWebhookShipper_BacksOffAndASuccessResets(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	endpoint.answer(func(string) int { return http.StatusInternalServerError })
@@ -670,7 +670,7 @@ func TestWebhookShipper_BacksOffAndASuccessResets(t *testing.T) {
 }
 
 // A webhook that answers 410, or that has failed for 3 days without a
-// success, is disabled with its webhook.disabled event (ADR 089 §4).
+// success, is disabled with its webhook.disabled event (ADR 090 §4).
 func TestWebhookShipper_GivesUp(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -721,7 +721,7 @@ func TestWebhookShipper_GivesUp(t *testing.T) {
 	}
 }
 
-// One sender (ADR 089 §4): servers that run at the same time deliver each
+// One sender (ADR 090 §4): servers that run at the same time deliver each
 // event once between them.
 func TestWebhookShipper_TwoServersDeliverEachEventOnce(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
@@ -768,7 +768,7 @@ func TestWebhookShipper_StopsWhenTheLeaseIsLost(t *testing.T) {
 }
 
 // Before the claim a project's webhook delivers nothing, and keeps what is
-// pending for after it (ADR 049 §4, ADR 089 §4).
+// pending for after it (ADR 049 §4, ADR 090 §4).
 func TestWebhookShipper_SkipsAProjectThePreClaimGateHides(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
 	src := newFakeWebhookSource(testWebhook("hook_1", "proj_unclaimed", endpoint.URL))
@@ -855,7 +855,7 @@ func TestWebhookEgressClient_FollowsNoRedirect(t *testing.T) {
 }
 
 // A redirect is a failed delivery with the status the endpoint answered,
-// not followed (ADR 089 §4). The endpoint is https, so the test server's
+// not followed (ADR 090 §4). The endpoint is https, so the test server's
 // client makes the request, under the egress client's own redirect policy.
 func TestWebhookShipper_ARedirectIsAFailure(t *testing.T) {
 	var followed int
@@ -942,7 +942,7 @@ func TestWebhookShipper_TheEgressPolicyDeniesAnInternalAddress(t *testing.T) {
 }
 
 // A slow endpoint delays only itself: the loop starts a round without
-// waiting for the deliveries of the one before (ADR 089 §4).
+// waiting for the deliveries of the one before (ADR 090 §4).
 func TestWebhookShipper_ASlowEndpointDelaysOnlyItself(t *testing.T) {
 	unblock := make(chan struct{})
 	slow := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-unblock }))

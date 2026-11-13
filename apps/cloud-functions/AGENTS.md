@@ -6,7 +6,7 @@ cloud's origin (repo-root [`vercel.json`](../../vercel.json)). It answers the
 console add-on's RPC, checks BotID in front of the sign-in widget's calls,
 takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
 It also carries the server's webhook wake-ups over a Vercel queue
-([root ADR 089](../../docs/adrs/089-project-webhooks.md) §4, `src/webhook-wake.ts`).
+([root ADR 090](../../docs/adrs/090-project-webhooks.md) §4, `src/webhook-wake.ts`).
 
 - Keep vendor SDKs behind the ports in `src/ports.ts`; a route or a workflow
   names a port, never Stripe or HubSpot.
@@ -26,13 +26,14 @@ It also carries the server's webhook wake-ups over a Vercel queue
 - Local loop:
 
   ```sh
-  moon run cloud-functions:dev      # http://localhost:5180, runs kept in .next/workflow-data
-  npx workflow inspect runs --web   # in apps/cloud-functions: runs, steps, payloads
-  moon run cloud-functions:typecheck cloud-functions:test cloud-functions:build
+  turbo run dev --filter=@zitadel/cloud-functions   # http://localhost:5180, runs kept in .next/workflow-data
+  npx workflow inspect runs --web                   # in apps/cloud-functions: runs, steps, payloads
+  turbo run typecheck test build --filter=@zitadel/cloud-functions
   ```
 
-- Start the dev server through moon, whose task points the sign-in calls at
-  `console:dev-real`'s instance; bare `next dev` sends them back to itself.
+- Start the dev server with the `dev` script, which points the sign-in calls
+  (`CLOUD_ZITADEL_URL`) at the console's `dev:real` instance unless the shell
+  sets it; bare `next dev` sends them back to itself.
 
 - Keep a queue message a hint that names a project, never an event: the
   server's tables decide what is sent, so a lost or doubled message is safe.

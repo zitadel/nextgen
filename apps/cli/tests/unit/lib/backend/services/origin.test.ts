@@ -8,6 +8,7 @@ import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { fakeClient } from "@tests/helpers/fake-client";
+import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";
@@ -68,19 +69,17 @@ describe("Origin.matches", () => {
 
   it("matches a pattern with no wildcard only exactly", () => {
     expect(
-      Origin.of({ pattern: "https://app.acme.com", kind: "primary" }).matches(
-        "https://app.acme.com:8443",
-      ),
+      Origin.of({ pattern: PRIMARY_ORIGIN, kind: "primary" }).matches(`${PRIMARY_ORIGIN}:8443`),
     ).toBe(false);
   });
 });
 
 describe("Origin.toJSON", () => {
   it("carries the pattern and the kind, and not the form it compares in", () => {
-    const origin = Origin.of({ pattern: "https://app.acme.com", kind: "primary" });
+    const origin = Origin.of({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     expect(JSON.parse(JSON.stringify(origin))).toEqual({
-      pattern: "https://app.acme.com",
+      pattern: PRIMARY_ORIGIN,
       kind: "primary",
     });
   });
@@ -90,10 +89,10 @@ describe("Origins.primary", () => {
   it("names the patterns a deploy lands on", () => {
     expect(
       Origins.wrap([
-        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: PRIMARY_ORIGIN, kind: "primary" },
         { pattern: "https://*.preview.acme.com", kind: "preview" },
       ]).primary,
-    ).toEqual(["https://app.acme.com"]);
+    ).toEqual([PRIMARY_ORIGIN]);
   });
 });
 
@@ -101,7 +100,7 @@ describe("Origins.preview", () => {
   it("names the patterns only a pull-request build may match", () => {
     expect(
       Origins.wrap([
-        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: PRIMARY_ORIGIN, kind: "primary" },
         { pattern: "https://*.preview.acme.com", kind: "preview" },
       ]).preview,
     ).toEqual(["https://*.preview.acme.com"]);
@@ -120,12 +119,12 @@ describe("Origins.isEmpty", () => {
 
 describe("Origins.kindOf", () => {
   const origins = Origins.wrap([
-    { pattern: "https://app.acme.com", kind: "primary" },
+    { pattern: PRIMARY_ORIGIN, kind: "primary" },
     { pattern: "https://*.preview.acme.com", kind: "preview" },
   ]);
 
   it("calls an exact primary pattern primary", () => {
-    expect(origins.kindOf("https://app.acme.com")).toBe("primary");
+    expect(origins.kindOf(PRIMARY_ORIGIN)).toBe("primary");
   });
 
   it("calls a URL a preview pattern covers preview", () => {
@@ -137,7 +136,7 @@ describe("Origins.kindOf", () => {
   });
 
   it("names the same origin however the URL was written, so a trailing slash is not a miss", () => {
-    expect(origins.kindOf("https://app.acme.com/")).toBe("primary");
+    expect(origins.kindOf(`${PRIMARY_ORIGIN}/`)).toBe("primary");
     expect(origins.kindOf("https://pr-7.preview.acme.com/")).toBe("preview");
   });
 });
@@ -145,7 +144,7 @@ describe("Origins.kindOf", () => {
 describe("Origins.all", () => {
   it("answers the origins in the order the project stores them, for a caller that lists them", () => {
     const origins = Origins.wrap([
-      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: PRIMARY_ORIGIN, kind: "primary" },
       { pattern: "https://*.preview.acme.com", kind: "preview" },
     ]);
 
@@ -153,7 +152,7 @@ describe("Origins.all", () => {
       origins.all.map((origin) => {
         return origin.pattern;
       }),
-    ).toEqual(["https://app.acme.com", "https://*.preview.acme.com"]);
+    ).toEqual([PRIMARY_ORIGIN, "https://*.preview.acme.com"]);
   });
 });
 
@@ -166,16 +165,14 @@ describe("Origins.heldAsPreview", () => {
     expect(
       Origins.wrap([
         { pattern: ISSUER, kind: "preview" },
-        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: PRIMARY_ORIGIN, kind: "primary" },
       ]).heldAsPreview(ISSUER),
     ).toBeUndefined();
   });
 
   it("returns nothing when the project does not hold the issuer", () => {
     expect(
-      Origins.wrap([{ pattern: "https://*-acme.vercel.app", kind: "preview" }]).heldAsPreview(
-        ISSUER,
-      ),
+      Origins.wrap([{ pattern: PREVIEW_PATTERN, kind: "preview" }]).heldAsPreview(ISSUER),
     ).toBeUndefined();
   });
 
@@ -367,7 +364,7 @@ describe("Origins.toJSON", () => {
   it("serialises as the list of patterns, not as the field they are kept in", () => {
     const origins = Origins.wrap([
       {
-        pattern: "https://app.acme.com",
+        pattern: PRIMARY_ORIGIN,
         kind: "primary",
       },
       {
@@ -381,7 +378,7 @@ describe("Origins.toJSON", () => {
     expect(JSON.parse(JSON.stringify({ origins }))).toEqual({
       origins: [
         {
-          pattern: "https://app.acme.com",
+          pattern: PRIMARY_ORIGIN,
           kind: "primary",
         },
         {
@@ -421,6 +418,6 @@ describe("OriginService.remove when the run is cancelled", () => {
       "proj_1",
     );
 
-    await expect(originService.remove("https://app.acme.com")).rejects.toBeDefined();
+    await expect(originService.remove(PRIMARY_ORIGIN)).rejects.toBeDefined();
   });
 });

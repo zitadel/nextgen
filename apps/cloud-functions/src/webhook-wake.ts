@@ -5,7 +5,7 @@ import { failure, json } from "./request";
 import { passProtection } from "./zitadel";
 
 /**
- * The hosted cloud's wake-up for project webhooks (root ADR 089 §4). The
+ * The hosted cloud's wake-up for project webhooks (root ADR 090 §4). The
  * server runs only while it serves a request, so it keeps no timer: when a
  * project has events to deliver it calls `receiveWake` (its
  * `events.webhooks.wake` hook), which puts a message on a queue, and the

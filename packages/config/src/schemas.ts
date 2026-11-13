@@ -71,8 +71,18 @@ export const schemaConfigSchema = z.discriminatedUnion("kind", [
   schemaUrlBody,
 ]);
 
-export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
-export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
+/**
+ * A `.zitadel/flows/*.json` body, strict about its top-level keys as the
+ * server is: the generated Zod drops an unknown key, so one the server refuses
+ * would pass `deploy --dry-run` and fail the deploy.
+ */
+export const flowConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  ...CreateFlowDefinitionBody.shape.flow_definition.shape,
+});
+export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody.extend({
+  flow_definition: flowConfigSchema,
+});
 
 /**
  * One `.zitadel/idps/<slug>.json` body: the connection document `POST /idps`

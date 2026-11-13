@@ -171,7 +171,7 @@ func TestWebhookShipper_AWakeUpNobodyWantsStartsNoRound(t *testing.T) {
 		shipper.Wake(t.Context(), "proj_none", []domain.EventType{domain.EventTypeUserCreated})
 		shipper.Wake(t.Context(), "proj_off", []domain.EventType{domain.EventTypeUserCreated})
 		shipper.Wake(t.Context(), "proj_users", []domain.EventType{domain.EventTypeUserDeleted})
-		// "*" stands for every type but request.api (ADR 089 §1).
+		// "*" stands for every type but request.api (ADR 090 §1).
 		shipper.Wake(t.Context(), "proj_all", []domain.EventType{domain.EventTypeRequestAPI})
 	}
 	time.Sleep(5 * webhookWakeDelay)
@@ -324,7 +324,7 @@ func TestWebhookShipper_AWakeUpSurvivesAFailedRead(t *testing.T) {
 }
 
 // After a failed delivery no timer of this server's makes the next attempt,
-// so the hook is told when it is due (ADR 089 §4: a retry is a delayed
+// so the hook is told when it is due (ADR 090 §4: a retry is a delayed
 // message).
 func TestWebhookShipper_AFailedDeliveryAsksTheHookForItsRetry(t *testing.T) {
 	endpoint := newWebhookEndpoint(t)
