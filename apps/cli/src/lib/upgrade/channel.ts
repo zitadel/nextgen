@@ -72,7 +72,9 @@ export class ReleaseChannel {
    * edited) would otherwise keep its answer fresh for however long it says, so
    * it counts as stale. A version the cache held is held to the same standard as
    * one the registry sent, because a file is as much an answer from outside, so
-   * junk in it is neither returned nor written back.
+   * junk in it is neither returned nor written back. A fresh lookup that fails
+   * leaves the cache as it was, so it neither hides the failure nor makes an
+   * old answer look current.
    *
    * The registry is asked for the package's dist-tags alone, which is far less
    * than its full document.
@@ -110,6 +112,10 @@ export class ReleaseChannel {
         return undefined;
       });
 
+    if (fresh && answered === undefined) {
+      return undefined;
+    }
+
     const known = answered ?? Release.from(cached?.version);
     const entry: CacheEntry = {
       checked_at: Date.now(),
@@ -117,9 +123,6 @@ export class ReleaseChannel {
     };
     await cache.set(key, entry);
 
-    if (fresh) {
-      return answered;
-    }
     return known;
   }
 }

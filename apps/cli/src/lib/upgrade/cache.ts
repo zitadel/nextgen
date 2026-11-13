@@ -49,6 +49,17 @@ export class Cache {
   private readonly file: string | undefined;
 
   /**
+   * What the file held when it was first read, and every key kept since, so one
+   * run reads the file once and concurrent keeps in it build on each other.
+   */
+  private entries: Promise<Record<string, CacheEntry>> | undefined;
+
+  /**
+   * The write in flight, so the next one waits for it.
+   */
+  private writing: Promise<void> = Promise.resolve();
+
+  /**
    * @param file - Where entries are kept. Without one the cache remembers nothing.
    */
   constructor(file: string | undefined) {
@@ -63,7 +74,7 @@ export class Cache {
    * @returns The entry, or `undefined` when there is none or it cannot be trusted.
    */
   async get(key: string): Promise<CacheEntry | undefined> {
-    const entries = await this.read();
+    const entries = await this.load();
     return entries[key];
   }
 
@@ -74,10 +85,12 @@ export class Cache {
    *
    * The file is written to a temporary name and renamed over the real one, so a
    * run that reads while another writes sees the old file or the new one and
-   * never half of either. Two runs that write at the same moment can still lose
-   * one entry, which only costs that lookup being asked again. Entries that are
-   * not valid are left out of the rewrite, so keys from an older format
-   * disappear the first time anything is kept.
+   * never half of either. Writes from one cache happen one after another, each
+   * of the whole remembered state, so none of them loses another's key or lands
+   * out of order. Two runs that write at the same moment can still lose one
+   * entry, which only costs that lookup being asked again. Entries that are not
+   * valid are left out of the rewrite, so keys from an older format disappear
+   * the first time anything is kept.
    *
    * @param key - What the answer is for.
    * @param entry - The answer.
@@ -86,15 +99,43 @@ export class Cache {
     if (this.file === undefined) {
       return;
     }
+    this.entries = this.load().then((entries) => {
+      return { ...entries, [key]: entry };
+    });
+    this.writing = this.writing.then(() => {
+      return this.persist(this.file);
+    });
+    await this.writing;
+  }
+
+  /**
+   * Writes the remembered state to the file, and never throws.
+   *
+   * @param file - Where entries are kept.
+   */
+  private async persist(file: string | undefined): Promise<void> {
+    if (file === undefined) {
+      return;
+    }
     try {
-      const entries = await this.read();
-      const temporary = `${this.file}.${process.pid}.tmp`;
-      await mkdir(dirname(this.file), { recursive: true });
-      await writeFile(temporary, `${JSON.stringify({ ...entries, [key]: entry })}\n`);
-      await rename(temporary, this.file);
+      const entries = await this.load();
+      const temporary = `${file}.${process.pid}.tmp`;
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(temporary, `${JSON.stringify(entries)}\n`);
+      await rename(temporary, file);
     } catch {
       return;
     }
+  }
+
+  /**
+   * The entries, read from the file the first time and remembered after.
+   *
+   * @returns The entries by key, or none.
+   */
+  private load(): Promise<Record<string, CacheEntry>> {
+    this.entries ??= this.read();
+    return this.entries;
   }
 
   /**

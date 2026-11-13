@@ -142,6 +142,16 @@ describe("ReleaseChannel.latest", () => {
     await expect(channel().latest({ fresh: true })).resolves.toBeUndefined();
   });
 
+  it("leaves the cache as it was when a fresh lookup fails", async () => {
+    const held = { [KEY]: { checked_at: DAY, version: "1.5.0" } };
+    await cacheHolds(held);
+    down();
+
+    await channel().latest({ fresh: true });
+
+    expect(JSON.parse(await readFile(join(home, "cache.json"), "utf8"))).toEqual(held);
+  });
+
   it("does not take a value that is not a version", async () => {
     publishes({ latest: "not-a-version" });
 

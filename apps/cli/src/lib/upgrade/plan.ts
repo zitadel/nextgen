@@ -106,8 +106,12 @@ export class UpgradePlan {
    * @returns The version.
    */
   get oldest(): string {
-    const versions = [this.cliVersion, ...this.packages.map((pkg) => pkg.from)];
-    return [...versions].sort(semver.compare)[0] ?? "0.0.0";
+    const versions = [this.cliVersion, ...this.packages.map((pkg) => pkg.from)].filter(
+      (version) => {
+        return semver.valid(version) !== null;
+      },
+    );
+    return versions.sort(semver.compare)[0] ?? "0.0.0";
   }
 
   /**

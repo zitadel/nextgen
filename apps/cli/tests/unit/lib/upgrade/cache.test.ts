@@ -33,6 +33,19 @@ describe("Cache", () => {
     await expect(cache.get("a")).resolves.toEqual({ checked_at: 1 });
   });
 
+  it("keeps both keys when two are set at once, and leaves no temporary file", async () => {
+    const file = join(home, "cache.json");
+    const cache = new Cache(file);
+
+    await Promise.all([cache.set("a", { checked_at: 1 }), cache.set("b", { checked_at: 2 })]);
+
+    expect([
+      await new Cache(file).get("a"),
+      await new Cache(file).get("b"),
+      await readdir(home),
+    ]).toEqual([{ checked_at: 1 }, { checked_at: 2 }, ["cache.json"]]);
+  });
+
   it("has nothing for a key it was never given", async () => {
     await expect(new Cache(join(home, "cache.json")).get("a")).resolves.toBeUndefined();
   });

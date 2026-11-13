@@ -69,6 +69,12 @@ describe("UpgradePlan.create", () => {
     expect(result.oldest).toBe("1.0.0");
   });
 
+  it("names a starting version, without throwing, when the CLI's version is not semver", async () => {
+    const result = await plan("dev", "2.0.0", { "@zitadel/api": "1.0.0" });
+
+    expect(result.oldest).toBe("0.0.0");
+  });
+
   it("hands the package manager name@version specs", async () => {
     const result = await plan("2.0.0", "2.0.0", { "@zitadel/api": "1.0.0" });
 
