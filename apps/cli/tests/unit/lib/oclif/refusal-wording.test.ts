@@ -33,27 +33,30 @@ type Weighed = Readonly<{
   name: string;
   /** Its declaration, as parsed. */
   literal: ts.ObjectLiteralExpression;
-  /** Each name a value is given for wherever it is raised. */
-  filled: readonly string[];
+  /**
+   * Each way it is raised, as the names that way fills: `read` filling its
+   * own, or one throw. Every way must fill every name its wording asks for.
+   */
+  raised: readonly (readonly string[])[];
 }>;
 
 /**
- * The keys each throw of `name` in `source` gives values for: its wording's
- * values and the values its whole-placeholder `next` entries are filled from.
- * A throw counts when its first argument names `name` as an identifier, a
- * refusal chosen by a condition included, so `LIMIT` is not credited with what
- * a throw of `MAX_LIMIT` passes.
+ * The keys each throw of `name` in `source` gives values for, one list per
+ * throw: its wording's values and the values its whole-placeholder `next`
+ * entries are filled from. A throw counts when its first argument names
+ * `name` as an identifier, a refusal chosen by a condition included, so
+ * `LIMIT` is not credited with what a throw of `MAX_LIMIT` passes.
  *
  * @param source - The parsed module.
  * @param name - The refusal's const.
- * @returns The keys.
+ * @returns The keys, per throw.
  */
-function thrownWith(source: ts.SourceFile, name: string): string[] {
+function thrownWith(source: ts.SourceFile, name: string): string[][] {
   return callsOf(source, ["refusalError"])
     .filter((call) => {
       return identifiersIn(call.arguments[0]).includes(name);
     })
-    .flatMap((call) => {
+    .map((call) => {
       return [...keysOf(call.arguments[1]), ...keysOf(call.arguments[2])];
     });
 }
@@ -89,11 +92,23 @@ function readWith(source: ts.SourceFile, name: string): boolean {
 }
 
 /**
- * Every refusal declared in `src`, each with what fills it. A `Refused` is
- * filled by `read` and its own `values`, nothing else. A `Refusal` or a
- * `ParseRefusal` is filled wherever it is thrown in its module, and by `read`
- * where a flag raises it ({@link readWith}) — a name nothing passes reaches the
- * person as braces.
+ * `ways`, or one way that fills nothing when there are none, so a refusal
+ * nothing raises is still weighed.
+ *
+ * @param ways - The ways a refusal is raised.
+ * @returns The ways to weigh.
+ */
+function raisedAny(ways: readonly (readonly string[])[]): readonly (readonly string[])[] {
+  return ways.length === 0 ? [[]] : ways;
+}
+
+/**
+ * Every refusal declared in `src`, each with the ways it is raised. A
+ * `Refused` is raised by `read`, which fills its own names and the
+ * declaration's `values`. A `Refusal` or a `ParseRefusal` is raised by each
+ * throw of it in its module, and by `read` where a flag raises it
+ * ({@link readWith}); one raised no way at all fills nothing. A name one way
+ * leaves out reaches the person as braces.
  *
  * @returns The refusals.
  */
@@ -106,7 +121,7 @@ async function weighed(): Promise<Weighed[]> {
         file,
         name,
         literal,
-        filled: [...ALWAYS, ...keysOf(propertyValue(literal, "values"))],
+        raised: [[...ALWAYS, ...keysOf(propertyValue(literal, "values"))]],
       });
     }
     for (const { name, literal } of [
@@ -117,7 +132,10 @@ async function weighed(): Promise<Weighed[]> {
         file,
         name,
         literal,
-        filled: [...(readWith(source, name) ? ALWAYS : []), ...thrownWith(source, name)],
+        raised: raisedAny([
+          ...(readWith(source, name) ? [ALWAYS] : []),
+          ...thrownWith(source, name),
+        ]),
       });
     }
   }
@@ -143,7 +161,9 @@ describe("what a flag or argument is refused for", () => {
         });
       });
       const unfilled = [...new Set(asked)].filter((name) => {
-        return !refusal.filled.includes(name);
+        return refusal.raised.some((way) => {
+          return !way.includes(name);
+        });
       });
       return unfilled.length === 0
         ? []
