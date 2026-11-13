@@ -47,13 +47,14 @@ type FilledBy<Values> = {
 }[keyof Values];
 
 /**
- * The names a declaration's refusal asks for that neither {@link read} nor the
- * declaration's own `values` is sure to fill ({@link FilledBy}).
+ * The names `R` asks for that neither {@link read} nor the declaration's own
+ * `values` is sure to fill ({@link FilledBy}).
  *
- * @typeParam Declared - A flag's or argument's declaration, as it is written.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
  */
-type Unfilled<Declared> = Exclude<
-  ValueNames<Declared extends { readonly refusal: infer R } ? R : never>,
+type Unfilled<R, Declared> = Exclude<
+  ValueNames<R>,
   Parsed | (Declared extends { readonly values: infer Values } ? FilledBy<Values> : never)
 >;
 
@@ -63,27 +64,49 @@ type Unfilled<Declared> = Exclude<
  * asks for, and otherwise a value in `values` for each name left
  * ({@link Unfilled}), so leaving one out does not compile.
  *
- * @typeParam Declared - A flag's or argument's declaration, as it is written.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
  */
-type Filled<Declared> =
-  IsNever<Unfilled<Declared>> extends true
+type Filled<R, Declared> =
+  IsNever<Unfilled<R, Declared>> extends true
     ? unknown
     : {
         readonly values: {
-          readonly [Name in Unfilled<Declared>]: NonNullable<unknown> | null;
+          readonly [Name in Unfilled<R, Declared>]: NonNullable<unknown> | null;
         };
       };
 
 /**
- * A declaration as {@link reads} and {@link taken} take it: refused as `T`,
- * and filling everything its refusal asks for. `Declared` stands on its own so
- * the compiler infers it from the declaration as written, an inline object
- * included, and reads its wording.
+ * Nothing but the keys a declaration and its refusal may have: any other key,
+ * such as a misspelt `hint` or `values`, must be `never`, so it does not
+ * compile rather than being dropped without a word.
  *
- * @typeParam T - What the value parses to.
+ * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
  */
-type Declaration<T, Declared> = Declared & Refused<T> & Filled<Declared>;
+type Known<R, Declared> = {
+  readonly [Key in Exclude<keyof Declared, keyof Refused<unknown>>]: never;
+} & {
+  readonly refusal: { readonly [Key in Exclude<keyof R, keyof ParseRefusal>]: never };
+};
+
+/**
+ * A declaration as {@link reads} and {@link taken} take it: refused as `T`,
+ * with only the keys a declaration has ({@link Known}), and filling everything
+ * its refusal asks for ({@link Filled}).
+ *
+ * `R` and `Declared` stand on their own so the compiler infers each from the
+ * declaration as written, an inline object included. The refusal is inferred
+ * apart from the rest so that one chosen by a condition keeps the wording of
+ * both, which a single inference would widen to `string`.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
+ */
+type Declaration<T, R, Declared> = Declared &
+  Refused<T> & { readonly refusal: R } & Known<R, Declared> &
+  Filled<R, Declared>;
 
 /**
  * The `parse` oclif calls with the value a flag or an argument was given.
@@ -130,13 +153,14 @@ function read<T>(refused: Refused<T>, value: string, input: string): T {
  * same way, and the value the command is handed is already the parsed type.
  *
  * @typeParam T - What the value parses to.
- * @typeParam Declared - The declaration, as it is written. It is always
- *   inferred, so its wording is checked against what fills it.
+ * @typeParam R - The declaration's refusal. Inferred, as the other two are:
+ *   naming them by hand can widen the wording and skip its check.
+ * @typeParam Declared - The declaration, as it is written.
  * @param refused - What the flag is refused for.
  * @returns The `parse`, which names the value `--<flag>` in the refusal.
  */
-export function reads<T, const Declared extends Refused<T>>(
-  refused: Declaration<T, Declared>,
+export function reads<T, const R extends ParseRefusal, const Declared extends Refused<T>>(
+  refused: Declaration<T, R, Declared>,
 ): Parse<T> {
   return async (value, _command, definition) => {
     return read(refused, value, `--${definition.name}`);
@@ -148,13 +172,14 @@ export function reads<T, const Declared extends Refused<T>>(
  * named by the argument's own name in the refusal.
  *
  * @typeParam T - What the value parses to.
- * @typeParam Declared - The declaration, as it is written. It is always
- *   inferred, so its wording is checked against what fills it.
+ * @typeParam R - The declaration's refusal. Inferred, as the other two are:
+ *   naming them by hand can widen the wording and skip its check.
+ * @typeParam Declared - The declaration, as it is written.
  * @param refused - What the argument is refused for.
  * @returns The `parse`.
  */
-export function taken<T, const Declared extends Refused<T>>(
-  refused: Declaration<T, Declared>,
+export function taken<T, const R extends ParseRefusal, const Declared extends Refused<T>>(
+  refused: Declaration<T, R, Declared>,
 ): Parse<T> {
   return async (value, _command, definition) => {
     return read(refused, value, definition.name);

@@ -6,6 +6,24 @@ import { filled, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
+/** A refusal's wording that asks for a bound only its declaration can give. */
+const LIMITED_WORDING = "{input} takes at most {max} characters";
+
+/** A refusal's wording that asks for nothing the parse does not fill. */
+const WRONG_WORDING = "{input} is wrong";
+
+/** A hint for {@link WRONG_WORDING}. */
+const HINT = "Pass another one.";
+
+/** Which of two refusals a declaration picks, known only when it runs. */
+const CHOOSE: boolean = HINT.length > 0;
+
+/** One of two wordings a condition picks between, asking for `{a}`. */
+const NEEDS_A = "{input} needs {a}";
+
+/** The other, asking for `{b}`. */
+const NEEDS_B = "{input} needs {b}";
+
 /**
  * `required: true` asks only whether a token reached argv, and an empty one
  * satisfies it — `--flag "$VAR"` with `VAR` unset sends exactly that. These
@@ -172,10 +190,7 @@ describe("a flag built with reads", () => {
 });
 
 describe("a refusal a flag or argument is built with", () => {
-  const LIMITED = {
-    schema: z.string(),
-    refusal: { message: "{input} takes at most {max} characters" },
-  } as const;
+  const LIMITED = { schema: z.string(), refusal: { message: LIMITED_WORDING } } as const;
   const LIMITED_FILLED = { ...LIMITED, values: { max: 3 } } as const;
   const OPTIONAL_MAX: { readonly max?: number } = {};
 
@@ -185,21 +200,17 @@ describe("a refusal a flag or argument is built with", () => {
     // @ts-expect-error nothing fills {max}
     taken(LIMITED);
 
-    expect(reads({ ...LIMITED, values: { max: 3 } })).toBeTypeOf("function");
+    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
   it("does not compile without that value when the declaration is written inline", () => {
     // @ts-expect-error nothing fills {max}
-    reads({ schema: z.string(), refusal: { message: "{input} takes at most {max} characters" } });
+    reads({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
     // @ts-expect-error nothing fills {max}
-    taken({ schema: z.string(), refusal: { message: "{input} takes at most {max} characters" } });
+    taken({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
 
     expect(
-      taken({
-        schema: z.string(),
-        refusal: { message: "{input} takes at most {max} characters" },
-        values: { max: 3 },
-      }),
+      taken({ schema: z.string(), refusal: { message: LIMITED_WORDING }, values: { max: 3 } }),
     ).toBeTypeOf("function");
   });
 
@@ -212,22 +223,40 @@ describe("a refusal a flag or argument is built with", () => {
     expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
-  it("does not compile with a type argument that would leave the wording unread", () => {
-    // @ts-expect-error the declaration is always inferred, so its wording is read
-    reads<string>(LIMITED);
+  it("does not compile with a key a declaration does not have", () => {
+    // @ts-expect-error a refusal has no hnt, so the hint would be lost
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hnt: HINT } });
+    // @ts-expect-error a declaration has no vaules, so the values would be lost
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, vaules: { max: 3 } });
 
-    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
+    expect(
+      reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hint: HINT } }),
+    ).toBeTypeOf("function");
   });
 
-  it("does not compile with a next entry the parse has nothing to fill", () => {
-    // @ts-expect-error a flag's refusal has no next values to fill {fix} with
-    reads({ schema: z.string(), refusal: { message: "{input} is wrong", next: ["{fix}"] } });
+  it("does not compile without what either of two refusals chosen by a condition asks for", () => {
+    reads({
+      schema: z.string(),
+      refusal: CHOOSE ? { message: NEEDS_A } : { message: NEEDS_B },
+      // @ts-expect-error the second refusal asks for {b}
+      values: { a: 1 },
+    });
 
     expect(
       reads({
         schema: z.string(),
-        refusal: { message: "{input} is wrong", next: [{ id: "start" }] },
+        refusal: CHOOSE ? { message: NEEDS_A } : { message: NEEDS_B },
+        values: { a: 1, b: 2 },
       }),
+    ).toBeTypeOf("function");
+  });
+
+  it("does not compile with a next entry the parse has nothing to fill", () => {
+    // @ts-expect-error a flag's refusal has no next values to fill {fix} with
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: ["{fix}"] } });
+
+    expect(
+      reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: [{ id: "start" }] } }),
     ).toBeTypeOf("function");
   });
 });
