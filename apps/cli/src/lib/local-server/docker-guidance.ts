@@ -31,7 +31,7 @@ export function dockerRuntimeGuidance(retry: SuggestedCommand): DockerRuntimeGui
       `Run \`docker version\`, then rerun ${retry}.`,
       "If you are not using the managed local runtime, run setup with `--server <url>` instead.",
     ],
-    check: shellCommand("docker version"),
+    check: shellCommand("docker", "version"),
     retry,
   };
 }

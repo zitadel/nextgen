@@ -107,14 +107,14 @@ export type ResourceBodySource = Readonly<{
  * on the command line, for the fields it must carry, and against the request
  * schema, so a command is handed a body that is ready to send.
  */
-const MISSING_FIELDS_REFUSAL: Refusal = {
+const MISSING_FIELDS_REFUSAL = {
   message: "{command} is missing required {noun}: {spellings}",
   hint: "Pass {alternatives}, or include {pronoun} in --data / --file. The help below lists every field.",
   next: ["{help}"],
   details: {
     missing: "{names}",
   },
-};
+} as const satisfies Refusal;
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
   const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);

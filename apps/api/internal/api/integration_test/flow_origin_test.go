@@ -212,7 +212,9 @@ func TestOriginlessFlowContinues(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	internalapi.MountAPI(mux, internalapi.WithRequestHostMiddleware, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
+	internalapi.MountAPI(mux, func(next http.Handler) http.Handler {
+		return harness.SpecChecked(t, internalapi.WithRequestHostMiddleware(next))
+	}, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	base := server.URL + client.PathPrefix
