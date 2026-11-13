@@ -178,10 +178,15 @@ function start() {
     // The collector's address tells the launcher that Vercel is the sink.
     delete env.CLOUD_OTLP_COLLECTOR;
     if (toVercel) {
-      const collectorPort = await listen(
-        http.createServer(collectorHandler(collectors, { maxBytes: maxExportBytes })),
+      const collector = http.createServer(
+        collectorHandler(collectors, { maxBytes: maxExportBytes }),
       );
-      env.CLOUD_OTLP_COLLECTOR = `127.0.0.1:${collectorPort}`;
+      // The server's exporters reuse their connections, so the collector
+      // never closes an idle one: an instance wakes from a pause with the
+      // idle timer long expired, and the export the server then sent on the
+      // closed connection failed (EOF, connection reset) and was lost.
+      collector.keepAliveTimeout = 0;
+      env.CLOUD_OTLP_COLLECTOR = `127.0.0.1:${await listen(collector)}`;
     }
     const child = spawn(launcherPath, [], { env, stdio: ["ignore", "pipe", "pipe"] });
     logs.read(child.stdout);
@@ -231,6 +236,11 @@ function responseHeaders(rawHeaders) {
 }
 
 export default async function handler(req, res) {
+  // The server's log lines for this request are printed in its context, and
+  // the lines of the server starting in the context of the request that
+  // started it.
+  const requestId = vercelRequestId(req.headers["x-vercel-id"]);
+  logs.open(requestId, AsyncLocalStorage.snapshot());
   let port;
   try {
     port = await start();
@@ -247,9 +257,6 @@ export default async function handler(req, res) {
   const closed = new Promise((resolve) => res.once("close", resolve)).then(() => {
     inFlight--;
   });
-  // The server's log lines for this request are printed in its context.
-  const requestId = vercelRequestId(req.headers["x-vercel-id"]);
-  logs.open(requestId, AsyncLocalStorage.snapshot());
 
   const context = globalThis[requestContext]?.get?.();
   const telemetry = context?.telemetry;

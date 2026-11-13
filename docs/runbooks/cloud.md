@@ -656,8 +656,10 @@ project and imports the root admin.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   wrapper prints each line of the server's output at the line's own `level`
   and under the request its `request_id` names
-  ([`logs.mjs`](../../apps/cloud/server/logs.mjs)); a line from startup or
-  background work belongs to no request. The
+  ([`logs.mjs`](../../apps/cloud/server/logs.mjs)). A line that names no
+  request in flight (startup, background work) is filed under the newest
+  one, which for the server's startup lines is the request that started the
+  instance: Vercel keeps a level only for what a request prints. The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's
   Request ID for the request (the launcher sets `server.request_id_header`
@@ -683,8 +685,8 @@ project and imports the root admin.
   ```
 
   A server that fails to start ends the instance: the request that started
-  it answers 500, and the launcher's error is the line before
-  `server wrapper: the launcher exited`, outside any request.
+  it answers 500, and its lines end with the launcher's error and
+  `server wrapper: the launcher exited`.
 
 - **Traces and metrics:** Vercel is the telemetry sink unless
   `OTEL_EXPORTER_OTLP_ENDPOINT` names an OTLP backend, which then takes the

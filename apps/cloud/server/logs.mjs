@@ -12,8 +12,12 @@
 //   and console.log for the rest, a line that is not JSON included;
 // - in the context of the request the line names ("request_id": Vercel's
 //   request ID, which the server takes from x-vercel-id) while the wrapper
-//   holds that request open, and outside any request otherwise: startup,
-//   background work, a line that arrives after its request was closed.
+//   holds that request open. Any other line (startup, background work, a
+//   line that arrives after its request was closed) is printed in the
+//   context of the newest request in flight, which for the server's startup
+//   is the request that started the instance: Vercel keeps the level only of
+//   what a request prints, and files what none prints under every request in
+//   flight at level info. Outside any request only when none is in flight.
 
 import { createInterface } from "node:readline";
 
@@ -83,9 +87,18 @@ export class LogRelay {
     }
     const { level = "", requestId } = describe(text);
     const method = printers.find(([prefix]) => level.startsWith(prefix))?.[1] ?? "log";
-    const run = this.#requests.get(requestId) ?? this.#outside;
+    const run = this.#requests.get(requestId) ?? this.#newest() ?? this.#outside;
     // One argument: the line is never a format string.
     run(() => this.#console[method](text));
+  }
+
+  // The request opened last, of those still open.
+  #newest() {
+    let newest;
+    for (const run of this.#requests.values()) {
+      newest = run;
+    }
+    return newest;
   }
 
   /** Relays every line a stream of the server's output carries. */

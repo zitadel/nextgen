@@ -37,23 +37,41 @@ test("a line is printed in the context of the request it names", () => {
   request.run("second", () => {
     relay.line(served("req-1"));
     relay.line(served("req-2"));
-    relay.line(JSON.stringify({ level: "INFO", msg: "server listening for requests" }));
-    relay.line(served("req-unknown"));
   });
 
   assert.deepEqual(
     printed.map(([, context]) => context),
-    ["first", "second", null, null],
+    ["first", "second"],
   );
   assert.equal(printed[0][2], served("req-1"), "unchanged");
 });
 
-test("a line whose request was closed is printed outside any request", () => {
+test("a line that names no open request is printed under the newest in flight", () => {
   const { relay, printed } = relayWithRecorder();
+  const background = JSON.stringify({ level: "ERROR", msg: "flushing audit events failed" });
+
+  // The server starts during the request that started the instance.
   request.run("first", () => relay.open("req-1", AsyncLocalStorage.snapshot()));
+  relay.line(JSON.stringify({ level: "WARN", msg: "the Go memory limit could not be set" }));
+  request.run("second", () => relay.open("req-2", AsyncLocalStorage.snapshot()));
+  relay.line(background);
+  relay.line(served("req-closed-long-ago"));
+  relay.close("req-2");
+  relay.line(background);
   relay.close("req-1");
-  request.run("second", () => relay.line(served("req-1")));
-  assert.deepEqual(printed, [["log", null, served("req-1")]]);
+  // Nothing in flight: outside any request.
+  request.run("third", () => relay.line(background));
+
+  assert.deepEqual(
+    printed.map(([method, context]) => [method, context]),
+    [
+      ["warn", "first"],
+      ["error", "second"],
+      ["log", "second"],
+      ["error", "first"],
+      ["error", null],
+    ],
+  );
   assert.equal(relay.openCount, 0);
 });
 
