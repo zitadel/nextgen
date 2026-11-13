@@ -415,8 +415,9 @@ Each invocation prints one JSON object:
   there, and `next_commands` lists what frees them: `deploy` and
   `deployment rollback` for primary origins (each only helps if the release it
   puts live is a different one), `preview rm <url>` for each preview, which
-  cannot be rolled back. Without them the conflict has no `hint` and no
-  `next_commands`. Revoke again once none serves it.
+  cannot be rolled back and also stops serving when it expires. Without them
+  the conflict has no `hint` and no `next_commands`. Revoke again once none
+  serves it.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
