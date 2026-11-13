@@ -1125,25 +1125,21 @@ describe("the sign-ins", () => {
     expect(flowSummary([], { complete: true, now })).toBeUndefined();
   });
 
-  it("marks an attempt abandoned when nothing of its flow followed before it expired", () => {
+  it("marks an attempt abandoned when its flow never finished before it expired", () => {
     const loadedAt = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1000);
     const left = step("evt_left", "auth.attempt.created", 0, { flow_id: "flow_left" });
-    const typed = step("evt_typed", "request.api", 5, {
-      flow_id: "flow_left",
-      category: "request",
-      payload: { status: 200 },
-    });
+    // A step taken and then left: the flow still never finished.
+    const checked = step("evt_checked", "auth.check.succeeded", 5, { flow_id: "flow_left" });
     const went = step("evt_went", "auth.attempt.created", 0, { flow_id: "flow_went" });
-    const check = step("evt_check", "auth.check.succeeded", 4, { flow_id: "flow_went" });
+    const handedOff = step("evt_handed", "auth.attempt.handed_off", 4, { flow_id: "flow_went" });
     const fresh = step("evt_fresh", "auth.attempt.created", 950, { flow_id: "flow_fresh" });
-    const rows = [fresh, check, typed, went, left];
+    const rows = [fresh, handedOff, checked, went, left];
 
-    // An API request of the flow is not a step it went on to.
     expect(abandonedAttempts(rows, { view: "all" }, loadedAt)).toEqual(new Set(["evt_left"]));
     expect(abandonedAttempts(rows, { view: "audit", since: "24h" }, loadedAt)).toEqual(
       new Set(["evt_left"]),
     );
-    // A filter beyond the view and the time could hide what followed.
+    // A filter beyond the view and the time could hide what finished it.
     expect(abandonedAttempts(rows, { view: "audit", category: "auth" }, loadedAt).size).toBe(0);
     expect(
       abandonedAttempts(rows, { view: "audit", type: ["auth.attempt.created"] }, loadedAt).size,

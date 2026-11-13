@@ -429,14 +429,17 @@ function hidesSteps(search: EventsSearch): boolean {
   return filterCount(search) - time > 0;
 }
 
+/** The steps that finish a login flow: the attempt handed off, and the session it gave its user. */
+const FINISHING_TYPES: readonly string[] = ["auth.attempt.handed_off", "session.established"];
+
 /**
  * The authentication attempts among the rows that were abandoned: started
- * longer ago than an attempt lives, before the list loaded, with nothing of
- * their login flow after them. The list is newest first, so whatever a flow
- * wrote after its attempt is among the rows already; only API requests are
- * not counted, since typing an address into a form is not finishing it.
- * Under a filter that could hide the rest of a flow, or in a view without the
- * attempts, none is marked.
+ * longer ago than an attempt lives, before the list loaded, in a login flow
+ * that never finished, neither handed off nor given a session. The list is
+ * newest first, so whatever finished a flow is among the rows already. A flow
+ * the visitor left after a step (an address entered, a password rejected) is
+ * abandoned too. Under a filter that could hide the rest of a flow, or in a
+ * view without the attempts, none is marked.
  */
 export function abandonedAttempts(
   rows: readonly ProjectEvent[],
@@ -447,25 +450,16 @@ export function abandonedAttempts(
   if (search.view === "requests" || search.view === "signins" || hidesSteps(search)) {
     return abandoned;
   }
-  const continued = new Map<string, string>();
-  for (const row of rows) {
-    if (!row.flow_id || row.event_type === "request.api") continue;
-    const latest = continued.get(row.flow_id);
-    if (!latest || row.created_at > latest) continued.set(row.flow_id, row.created_at);
-  }
+  const finished = new Set(
+    rows
+      .filter((row) => row.flow_id && FINISHING_TYPES.includes(row.event_type))
+      .map((row) => row.flow_id),
+  );
   for (const row of rows) {
     if (row.event_type !== "auth.attempt.created" || !row.flow_id) continue;
-    if ((continued.get(row.flow_id) ?? "") > row.created_at) continue;
+    if (finished.has(row.flow_id)) continue;
     if (loadedAt.getTime() - Date.parse(row.occurred_at) <= ATTEMPT_LIFETIME_MS) continue;
-    // Another event of the flow at the same moment continued it as well.
-    const others = rows.some(
-      (other) =>
-        other.id !== row.id &&
-        other.flow_id === row.flow_id &&
-        other.event_type !== "request.api" &&
-        other.event_type !== "auth.attempt.created",
-    );
-    if (!others) abandoned.add(row.id);
+    abandoned.add(row.id);
   }
   return abandoned;
 }

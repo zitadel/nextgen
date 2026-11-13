@@ -103,7 +103,7 @@ import { cn } from "@/lib/utils";
  * whose account, its session. In the other views the rows stay one per event;
  * while one is open, the loaded rows of its login flow (or else its request)
  * are marked, and the drawer tells the whole flow. An authentication attempt
- * nothing of its flow followed reads Abandoned. Users are named, not IDs.
+ * whose flow never finished reads Abandoned. Users are named, not IDs.
  *
  * The search, on a row of its own under the title, holds the filters set by a pasted value, as
  * chips: an id, an event type, an operation, or a filter named before its
@@ -374,7 +374,7 @@ function EventRow({
   signins: boolean;
   /** Of the open event's login flow or request: marked, and named for a screen reader. */
   together?: "login flow" | "request";
-  /** An authentication attempt nothing followed: marked so. */
+  /** An authentication attempt whose flow never finished: marked so. */
   abandoned: boolean;
 }) {
   const navigate = useNavigate();
@@ -426,7 +426,10 @@ function EventRow({
             )}
           </Link>
           {abandoned && (
-            <Badge variant="outline" title="Nothing of its login flow followed before it expired">
+            <Badge
+              variant="outline"
+              title="Its login flow never finished before the attempt expired"
+            >
               Abandoned
             </Badge>
           )}

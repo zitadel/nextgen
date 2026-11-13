@@ -1638,12 +1638,12 @@ describe("events sign-ins", () => {
     expect(reads).toEqual(["user_admin"]);
   });
 
-  it("marks an authentication attempt nothing followed as abandoned, under no filter but the view", async () => {
+  it("marks an authentication attempt whose flow never finished as abandoned, under no filter but the view", async () => {
     const rows = [
-      // Its flow went on to a check: not abandoned.
-      step("evt_check", { event_type: "auth.check.succeeded", entity_type: "check" }),
+      // Its flow was handed off: not abandoned.
+      step("evt_handed", { event_type: "auth.attempt.handed_off", entity_type: "auth_attempt" }),
       step("evt_started", { event_type: "auth.attempt.created", entity_type: "auth_attempt" }),
-      // Nothing of its flow followed, and it is far older than an attempt lives.
+      // Its flow never finished, and it is far older than an attempt lives.
       step("evt_left", {
         event_type: "auth.attempt.created",
         entity_type: "auth_attempt",
