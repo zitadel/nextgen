@@ -2003,7 +2003,9 @@ type passkeyPhaseResult struct {
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → use the collected user id (or let the registration
-//     service mint a provisional one), then issue a creation challenge.
+//     service mint a provisional one), then issue a creation challenge. When
+//     that mints a new user and a collected unique value is taken, route
+//     user_already_exists instead and send no challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	ctx, state, step, in := pc.ctx, pc.state, pc.currentStep, pc.in
 	switch {
