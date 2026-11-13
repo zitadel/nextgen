@@ -1,6 +1,6 @@
 // Command analyzers bundles this repository's custom go/analysis analyzers
-// into one binary. It runs standalone (moon run server:lint) or as a go vet
-// tool:
+// into one binary. It runs standalone
+// (turbo run lint --filter=@zitadel/server) or as a go vet tool:
 //
 //	go run ./tools/analyzers/cmd/analyzers ./...
 //	go build -o "$TMPDIR/analyzers" ./tools/analyzers/cmd/analyzers && go vet -vettool="$TMPDIR/analyzers" ./...

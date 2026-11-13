@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli, frameworkCliVersion } from "@/lib/orca/scaffolders/framework-clis";
 import { ReactScaffolder } from "@/lib/orca/scaffolders/react";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -30,7 +31,14 @@ describe("ReactScaffolder", () => {
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "react-ts"]);
+    expect(args).toEqual([
+      "create",
+      `vite@${frameworkCliVersion("create-vite")}`,
+      ".",
+      "--",
+      "--template",
+      "react-ts",
+    ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.tsx"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.css"), { force: true });
@@ -40,7 +48,7 @@ describe("ReactScaffolder", () => {
     make: (node, platform) => new ReactScaffolder(node, platform),
     framework: "react",
     label: "create-vite",
-    spec: "create-vite@9.3.1",
+    spec: frameworkCli("create-vite"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

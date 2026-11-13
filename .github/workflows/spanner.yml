@@ -26,23 +26,16 @@ concurrency:
 jobs:
   spanner-omni:
     # A plain GitHub-hosted runner: its 4 vCPUs and 16 GB are Spanner Omni's
-    # documented minimum for a VM, and it keeps fork PRs off Depot (see ci.yml).
+    # documented minimum for a VM.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
     env:
-      # See ci.yml: names failed tasks in plain text and replays their output.
-      MOON_SUMMARY: detailed
       # See ci.yml: Ryuk would be the lane's only image from Docker Hub.
       TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
-      # Full history, same as ci.yml: in CI, `moon run` loads changed files
-      # against `main` before running anything, and fails outright on a shallow
-      # clone where that ref does not exist.
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
@@ -50,7 +43,7 @@ jobs:
           cache: true
           cache-dependency-path: apps/api/go.sum
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
 
@@ -59,14 +52,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # server:test-spanner depends on console:build, which the Go //go:embed
+      # test:spanner depends on the console's build, which the Go //go:embed
       # needs.
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
-
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       # Host networking, because Omni hands clients its own addresses and they
       # must be reachable from the runner. Pinned by digest: an Omni upgrade
@@ -86,14 +75,11 @@ jobs:
       # emulator: it is the Go client library's own variable, the only one that
       # points it at a plaintext endpoint without credentials, which Omni's
       # Developer edition serves.
-      # The task is `runInCI: "skip"` so that ci.yml's `moon ci` leaves it out;
-      # in CI `moon run` refuses such a task, `moon exec --ignore-ci-checks`
-      # runs it (and its UI build deps).
       - name: Run Go integration tests (Spanner Omni)
         env:
           ZITADEL_TEST_SPANNER_INSTANCE: projects/default/instances/default
           SPANNER_EMULATOR_HOST: localhost:15000
-        run: moon exec server:test-spanner --ignore-ci-checks
+        run: corepack pnpm exec turbo run @zitadel/server#test:spanner
 
       - name: Spanner Omni log tail
         if: ${{ always() }}
