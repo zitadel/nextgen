@@ -73,6 +73,78 @@ export async function aProjectDirectory(
 }
 
 /**
+ * The primary origin the helpers below register on a new project.
+ */
+export const PRIMARY_ORIGIN = "https://app.acme.com";
+
+/**
+ * The preview pattern {@link aReleaseServedOn} registers, which admits
+ * {@link PREVIEW_URL}.
+ */
+export const PREVIEW_PATTERN = "https://*-acme.vercel.app";
+
+/**
+ * A preview URL that {@link PREVIEW_PATTERN} admits.
+ */
+export const PREVIEW_URL = "https://x-acme.vercel.app";
+
+/**
+ * A new project on the mock with {@link PRIMARY_ORIGIN} as its primary origin.
+ *
+ * @param name - The project's name.
+ * @returns The project's id and secret.
+ */
+async function aProjectWithPrimaryOrigin(name: string): Promise<{ id: string; secret: string }> {
+  const { id, project_secret: secret } = CreatedProject.parse(
+    await callPlatform("/projects", "", { name }),
+  );
+  await callPlatform(`/projects/${id}/origins`, secret, {
+    pattern: PRIMARY_ORIGIN,
+    kind: "primary",
+  });
+  return { id, secret };
+}
+
+/**
+ * A release of the project that pins one schema revision.
+ *
+ * @param project - The project's id and secret.
+ * @param revision - The schema revision the release pins.
+ * @returns The release's id.
+ */
+async function aRelease(
+  project: { id: string; secret: string },
+  revision: string,
+): Promise<string> {
+  return Created.parse(
+    await callPlatform(`/releases?project_id=${project.id}`, project.secret, {
+      pointers: [{ kind: "schema", revision_id: revision }],
+    }),
+  ).id;
+}
+
+/**
+ * A deployment of a release.
+ *
+ * @param project - The project's id and secret.
+ * @param releaseId - The release to make live.
+ * @param body - Where to make it live, as the API takes it: its targets and a preview's ttl.
+ * @returns The deployment's id.
+ */
+async function aDeployment(
+  project: { id: string; secret: string },
+  releaseId: string,
+  body: object,
+): Promise<string> {
+  return Created.parse(
+    await callPlatform(`/deployments?project_id=${project.id}`, project.secret, {
+      release_id: releaseId,
+      ...body,
+    }),
+  ).id;
+}
+
+/**
  * A project on the mock with two deploys to one primary origin, its
  * directory, and the second deployment's id. The caller removes the directory.
  *
@@ -82,45 +154,19 @@ export async function aProjectDirectory(
 export async function aProjectWithTwoDeploys(
   prefix: string,
 ): Promise<{ cwd: string; undone: string }> {
-  const { id, project_secret: secret } = CreatedProject.parse(
-    await callPlatform("/projects", "", { name: prefix }),
-  );
-  await callPlatform(`/projects/${id}/origins`, secret, {
-    pattern: "https://app.acme.com",
-    kind: "primary",
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await aDeployment(project, await aRelease(project, "sch_a"), { targets: "primary" });
+  const undone = await aDeployment(project, await aRelease(project, "sch_b"), {
+    targets: "primary",
   });
-  const deploy = async (revision: string): Promise<string> => {
-    const release = Created.parse(
-      await callPlatform(`/releases?project_id=${id}`, secret, {
-        pointers: [{ kind: "schema", revision_id: revision }],
-      }),
-    );
-    const deployment = Created.parse(
-      await callPlatform(`/deployments?project_id=${id}`, secret, {
-        release_id: release.id,
-        targets: "primary",
-      }),
-    );
-    return deployment.id;
-  };
-  await deploy("sch_a");
-  const undone = await deploy("sch_b");
-  return {
-    cwd: await aProjectDirectory(prefix, { id, secret }),
-    undone,
-  };
+
+  return { cwd: await aProjectDirectory(prefix, project), undone };
 }
-
-/** A preview pattern and a URL it admits, for a project that serves a release on a preview. */
-export const PREVIEW_PATTERN = "https://*-acme.vercel.app";
-export const PREVIEW_URL = "https://x-acme.vercel.app";
-
-/** The primary origin {@link aReleaseServedOn} registers. */
-export const PRIMARY_ORIGIN = "https://app.acme.com";
 
 /**
  * A project on the mock with one release live on a primary origin, on a
  * preview URL, or on both, its directory, and the deployments that serve it.
+ * The directory is made last, so a failure while arranging leaves none behind.
  *
  * @param prefix - The project's name, and the prefix of its directory.
  * @param served - Where the release is live.
@@ -131,36 +177,24 @@ export async function aReleaseServedOn(
   prefix: string,
   served: { primary: boolean; preview: boolean },
 ): Promise<{ cwd: string; releaseId: string; primary?: string; preview?: string }> {
-  const { id, project_secret: secret } = CreatedProject.parse(
-    await callPlatform("/projects", "", { name: prefix }),
-  );
-  await callPlatform(`/projects/${id}/origins`, secret, {
-    pattern: PRIMARY_ORIGIN,
-    kind: "primary",
-  });
-  await callPlatform(`/projects/${id}/origins`, secret, {
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await callPlatform(`/projects/${project.id}/origins`, project.secret, {
     pattern: PREVIEW_PATTERN,
     kind: "preview",
   });
-  const release = Created.parse(
-    await callPlatform(`/releases?project_id=${id}`, secret, {
-      pointers: [{ kind: "schema", revision_id: "sch_a" }],
-    }),
-  );
-  const deploy = async (body: object): Promise<string> => {
-    return Created.parse(
-      await callPlatform(`/deployments?project_id=${id}`, secret, {
-        release_id: release.id,
-        ...body,
-      }),
-    ).id;
-  };
+  const releaseId = await aRelease(project, "sch_a");
+  const primary = served.primary
+    ? await aDeployment(project, releaseId, { targets: "primary" })
+    : undefined;
+  const preview = served.preview
+    ? await aDeployment(project, releaseId, { targets: [PREVIEW_URL], ttl: "PT168H" })
+    : undefined;
 
   return {
-    cwd: await aProjectDirectory(prefix, { id, secret }),
-    releaseId: release.id,
-    ...(served.primary ? { primary: await deploy({ targets: "primary" }) } : {}),
-    ...(served.preview ? { preview: await deploy({ targets: [PREVIEW_URL], ttl: "PT168H" }) } : {}),
+    cwd: await aProjectDirectory(prefix, project),
+    releaseId,
+    ...(primary === undefined ? {} : { primary }),
+    ...(preview === undefined ? {} : { preview }),
   };
 }
 
@@ -180,7 +214,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
-                targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },

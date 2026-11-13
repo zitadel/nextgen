@@ -73,17 +73,27 @@ describe("release revoke asked on a terminal", () => {
 });
 
 describe("release revoke refused for a release an origin serves", () => {
-  const SERVED_ON = [
-    ["a primary origin", { primary: true, preview: false }],
-    ["a preview", { primary: false, preview: true }],
-    ["a primary origin and a preview", { primary: true, preview: true }],
-  ] as const;
-
-  /** Revokes the release the project serves, as a script would. */
-  async function revokingServedOn(served: { primary: boolean; preview: boolean }) {
+  /**
+   * Arranges a project whose release the given origin kinds serve.
+   *
+   * @param served - Which origin kinds serve the release.
+   * @returns The project's directory, its release and the deployments serving it.
+   */
+  async function aServedRelease(served: { primary: boolean; preview: boolean }) {
     const project = await aReleaseServedOn("zitadel-release-revoke-served-", served);
     dirs.push(project.cwd);
-    const result = await runCliForTest([
+
+    return project;
+  }
+
+  /**
+   * The command line that revokes a project's release, as a script would.
+   *
+   * @param project - A project from {@link aServedRelease}.
+   * @returns The arguments to run the CLI with.
+   */
+  function revokeArgumentsOf(project: { cwd: string; releaseId: string }): string[] {
+    return [
       "release",
       "revoke",
       project.releaseId,
@@ -94,73 +104,61 @@ describe("release revoke refused for a release an origin serves", () => {
       project.cwd,
       "--server",
       PLATFORM_URL,
-    ]);
-
-    return { result, project };
+    ];
   }
 
-  it.each(SERVED_ON)("fails as a conflict when %s serves it", async (_, served) => {
-    const { result } = await revokingServedOn(served);
+  it("fails as a conflict", async () => {
+    const project = await aServedRelease({ primary: true, preview: false });
+
+    const result = await runCliForTest(revokeArgumentsOf(project));
 
     expect(result).toFailWith("E_CONFLICT");
   });
 
-  it("names a primary origin with its kind and the deployment that pins the release", async () => {
-    const { result, project } = await revokingServedOn({ primary: true, preview: false });
-
-    expect(result).toHintAt(`${PRIMARY_ORIGIN} (primary, ${project.primary})`);
-  });
-
-  it("names a preview with its kind and the deployment that pins the release", async () => {
-    const { result, project } = await revokingServedOn({ primary: false, preview: true });
-
-    expect(result).toHintAt(`${PREVIEW_URL} (preview, ${project.preview})`);
-  });
-
   it.each([
-    ["a primary origin", PRIMARY_ORIGIN, "primary"],
-    ["a preview", PREVIEW_URL, "preview"],
-  ] as const)(
-    "names %s with its kind and deployment when a primary origin and a preview both serve it",
-    async (_, origin, kind) => {
-      const { result, project } = await revokingServedOn({ primary: true, preview: true });
+    ["a primary origin", { primary: true, preview: false }, "primary"],
+    ["a preview", { primary: false, preview: true }, "preview"],
+    ["a primary origin that a preview also serves", { primary: true, preview: true }, "primary"],
+    ["a preview that a primary origin also serves", { primary: true, preview: true }, "preview"],
+  ] as const)("names %s with its kind and deployment", async (_, served, kind) => {
+    const project = await aServedRelease(served);
 
-      expect(result).toHintAt(`${origin} (${kind}, ${project[kind]})`);
-    },
-  );
+    const result = await runCliForTest(revokeArgumentsOf(project));
+
+    expect(result).toHintAt(
+      `${kind === "primary" ? PRIMARY_ORIGIN : PREVIEW_URL} (${kind}, ${project[kind]})`,
+    );
+  });
 
   it.each([
     [
       "a primary origin",
       { primary: true, preview: false },
-      ["deploy --message", "deployment rollback"],
+      ["deploy --message '<what changed>'", "deployment rollback"],
     ],
     ["a preview", { primary: false, preview: true }, [`preview rm ${PREVIEW_URL}`]],
     [
       "a primary origin and a preview",
       { primary: true, preview: true },
-      ["deploy --message", "deployment rollback", `preview rm ${PREVIEW_URL}`],
+      ["deploy --message '<what changed>'", "deployment rollback", `preview rm ${PREVIEW_URL}`],
     ],
-  ] as const)("suggests what frees %s", async (_, served, suggested) => {
-    const { result } = await revokingServedOn(served);
+  ] as const)("suggests exactly what frees %s", async (_, served, suggested) => {
+    const project = await aServedRelease(served);
 
-    for (const command of suggested) {
-      expect(result).toSuggest(command);
-    }
-  });
+    const result = await runCliForTest(revokeArgumentsOf(project));
 
-  it.each([
-    ["a primary origin", { primary: true, preview: false }, `preview rm`],
-    ["a preview", { primary: false, preview: true }, "deployment rollback"],
-    ["a preview", { primary: false, preview: true }, "deploy --message"],
-  ] as const)("does not suggest what cannot free %s: %s", async (_, served, unsuggested) => {
-    const { result } = await revokingServedOn(served);
-
-    expect(result).not.toSuggest(unsuggested);
+    const { next_commands: next } = JSON.parse(result.stdout) as { next_commands: string[] };
+    expect(
+      next.map((command) => {
+        return command.replace(/^.*?@zitadel\/cli@\S+ /, "").replace(/ --server .*$/, "");
+      }),
+    ).toEqual(suggested);
   });
 
   it("keeps the server's refusal in the details", async () => {
-    const { result, project } = await revokingServedOn({ primary: true, preview: false });
+    const project = await aServedRelease({ primary: true, preview: false });
+
+    const result = await runCliForTest(revokeArgumentsOf(project));
 
     expect(JSON.parse(result.stdout)).toMatchObject({
       details: {

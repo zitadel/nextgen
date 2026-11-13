@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConflictError } from "@/lib/backend/errors";
 import { ReleaseInUseError, ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const INPUT = {
   bundle: { schemas: [], flow_definitions: [], idps: [] },
@@ -94,10 +95,10 @@ describe("ReleaseService.revoke", () => {
         details: { origins: [PRIMARY, PREVIEW] },
       });
 
-      await expect(releaseService.revoke("rel_1")).rejects.toMatchObject({
-        name: "ReleaseInUseError",
-        origins: [PRIMARY, PREVIEW],
-      });
+      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+
+      expect(refusal).toBeInstanceOf(ReleaseInUseError);
+      expect(refusal).toMatchObject({ origins: [PRIMARY, PREVIEW] });
     });
 
     it("fails as a conflict that keeps the server's answer", async () => {
@@ -107,9 +108,7 @@ describe("ReleaseService.revoke", () => {
         details: { origins: [PRIMARY] },
       });
 
-      const refusal = await releaseService.revoke("rel_1").catch((cause: unknown) => {
-        return cause;
-      });
+      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
 
       expect(refusal).toBeInstanceOf(ConflictError);
       expect(refusal).toMatchObject({ status: 409, serverCode: "rel.in_use" });
@@ -130,7 +129,10 @@ describe("ReleaseService.revoke", () => {
     ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
       const releaseService = refusedWith(body);
 
-      await expect(releaseService.revoke("rel_1")).rejects.not.toBeInstanceOf(ReleaseInUseError);
+      const refusal = await rejectionOf(() => releaseService.revoke("rel_1"));
+
+      expect(refusal).toBeInstanceOf(ConflictError);
+      expect(refusal).not.toBeInstanceOf(ReleaseInUseError);
     });
   });
 });

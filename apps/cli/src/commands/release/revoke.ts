@@ -114,27 +114,29 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             if (!(error instanceof ReleaseInUseError)) {
               throw error;
             }
-            const previews = error.origins.filter((origin) => {
-              return origin.kind === "preview";
-            });
             const primaries = error.origins.filter((origin) => {
               return origin.kind === "primary";
             });
-            const steps = [
-              ...(primaries.length > 0 ? ["put another release live on each primary origin"] : []),
-              ...(previews.length > 0 ? ["remove each preview"] : []),
-            ];
-            const next: Suggestion[] = [
-              ...(primaries.length > 0
-                ? [
-                    { id: "deploy", flags: { message: WHAT_CHANGED } } satisfies Suggestion,
-                    { id: "deployment:rollback" } satisfies Suggestion,
-                  ]
-                : []),
-              ...previews.map((preview) => {
-                return { id: "preview:rm", args: { url: preview.origin } } satisfies Suggestion;
-              }),
-            ];
+            const previews = error.origins.filter((origin) => {
+              return origin.kind === "preview";
+            });
+            const steps: string[] = [];
+            const next: Suggestion[] = [];
+            if (primaries.length > 0) {
+              steps.push("put another release live on each primary origin");
+              next.push(
+                { id: "deploy", flags: { message: WHAT_CHANGED } },
+                { id: "deployment:rollback" },
+              );
+            }
+            if (previews.length > 0) {
+              steps.push("remove each preview");
+              next.push(
+                ...previews.map((preview) => {
+                  return { id: "preview:rm", args: { url: preview.origin } } satisfies Suggestion;
+                }),
+              );
+            }
 
             throw refusalError(
               RELEASE_IN_USE_REFUSAL,
