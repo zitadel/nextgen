@@ -149,14 +149,11 @@ describe("project members tabs", () => {
     expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("region", { name: "Invitations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Invitations" }));
     expect(await screen.findByRole("region", { name: "Invitations" })).toBeInTheDocument();
     expect(router.state.location.search).toMatchObject({ tab: "invitations", project: PROJECT_ID });
     expect(screen.queryByRole("region", { name: "Admins" })).not.toBeInTheDocument();
-    // Add admin is the Members tab's; Invite member is on both.
-    expect(screen.queryByRole("button", { name: "Add admin" })).not.toBeInTheDocument();
     expect(inviteButton()).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Members" }));

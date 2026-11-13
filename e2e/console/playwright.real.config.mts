@@ -52,7 +52,17 @@ export default defineConfig({
     appOrigin: consoleOrigin,
     zitadel: inRepoZitadel,
     app: {
-      command: ["corepack", "pnpm", "--filter", "@zitadel/console", "dev"],
+      // The port follows `REAL_CONSOLE_ORIGIN`, so the lane can run beside a
+      // dev server that holds the default one.
+      command: [
+        "corepack",
+        "pnpm",
+        "--filter",
+        "@zitadel/console",
+        "dev",
+        "--port",
+        new URL(consoleOrigin).port,
+      ],
       cwd: workspaceRoot,
       readyPath: "/projects",
       env: consoleAppEnv,

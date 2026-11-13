@@ -1,7 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
-import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../support/copy";
+import { grantProjectAdmin, withErrorBody } from "../support/api";
+import { ERROR_BOUNDARY_TITLE } from "../support/copy";
 import { expectNoErrorBoundary, openAddTeam, uniqueName } from "../support/screens";
 import { completeLogin, signIn } from "../support/sign-in";
 
@@ -159,25 +159,25 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
   await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });
 
-test("gives a colleague admin access to the project, and takes it away", async ({
+test("lists a colleague's admin grant, lets them in, and takes it away", async ({
   browser,
   baseURL,
   page,
   zitadel,
   seed,
 }) => {
-  // The whole journey of #769 against a live backend: the grant is created for
-  // somebody who already exists, shows up in the list with their resolved
-  // identity, and is revoked again. Asserted here rather than only over stubs
-  // because both writes and the `expand: ["principal"]` read are server
-  // behaviour, and the unit specs prove only what the console does with them.
+  // A colleague's grant against a live backend: it shows up in the list with
+  // their resolved identity, opens the project to them, and is revoked again
+  // from their row. Asserted here rather than only over stubs because the
+  // revoke and the read that resolves the person are server behaviour, and the
+  // unit specs prove only what the console does with them.
   //
   // The list alone would pass with a grant that opens nothing, so the
   // colleague's own session is what decides: refused before the grant, able to
-  // change the project with it, refused again once it is revoked. The journey's
-  // claim suite proves the hand-off with the platform project bootstrapped;
-  // this lane runs without it, where "Add admin" resolves the colleague in the
-  // project the console signs into (#1295).
+  // change the project with it, refused again once it is revoked. The console
+  // gives access by invitation (ADR 086), which needs a platform project; this
+  // lane runs without one, so the grant is written through the API, and the
+  // journey's claim suite proves the invitation itself.
   //
   // Admins live on the project's page (#1238). The operator needs access to the
   // project to open it — a seeded user can sign in but holds no grant.
@@ -209,15 +209,10 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await expect(own.getByText("(you)", { exact: true })).toBeVisible();
     await expect(own.getByText("Admin grant", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "Add admin", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Add admin" });
-    await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
-    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-    await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
+    await grantProjectAdmin(zitadel, colleague.id);
+    await page.reload();
 
-    // The row is what proves the write landed: it comes back from the list read,
-    // not from the form's own state. The message above says the same thing
-    // whether or not anything was created, which is the point of it.
+    // The grant comes back from the list read as the colleague's own row.
     const row = page.getByRole("row").filter({ hasText: colleague.email });
     await expect(row).toBeVisible();
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
@@ -310,46 +305,4 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
       await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
     await zitadel.api.deleteTeam(team.id).catch(() => undefined);
   }
-});
-
-test("answers the same way for an address that belongs to nobody", async ({
-  page,
-  zitadel,
-  seed,
-}) => {
-  // The neutrality of `POST /grants` by identifier (#1229) as the operator
-  // experiences it: an address nobody has registered gets the same sentence as
-  // one that worked, and the only honest difference — no row — is a fact about
-  // the project, not an answer about the address. Asserted against a real
-  // instance because it is the server that decides to say nothing, and a stub
-  // would be asserting the stub.
-  const operator = await seed.user();
-  const unknown = seed.identity().email;
-  await signIn(page, zitadel, operator);
-
-  await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await page
-    .getByRole("navigation", { name: "Project settings" })
-    .getByRole("link", { name: "Members" })
-    .click();
-  await page.getByRole("button", { name: "Add admin", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Add admin" });
-  await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);
-
-  // The list read the dialog triggers on its way out. Without waiting for it,
-  // "no row for this address" would be asserted against the list as it was
-  // before the submit, where there was no such row either — an assertion that
-  // cannot fail.
-  const refreshed = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === `/api/v1/projects/${zitadel.handle.projectId}/admins` &&
-      response.ok(),
-  );
-  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-
-  await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
-  await expect(dialog).toHaveCount(0);
-  await refreshed;
-  await expect(page.getByRole("row").filter({ hasText: unknown })).toHaveCount(0);
-  await expectNoErrorBoundary(page);
 });
