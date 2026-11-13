@@ -49991,6 +49991,9 @@ func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalText(data []byte) erro
 // - `inviter`: the user who created the invitation, as `inviter`, a user
 // reference. It is null when a project secret created the invitation. The
 // property is omitted when not requested.
+// It needs no permission beyond listing: like the user on a grant, the
+// reference carries only `user_id`, `identifier` and `display`, never the
+// user's record.
 // Ref: #
 type InvitationExpand string
 
