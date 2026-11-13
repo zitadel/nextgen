@@ -5,6 +5,7 @@ package helpers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -47,12 +48,26 @@ type SpecValidator struct {
 }
 
 // KnownSpecMismatch is an operation whose answer with Status does not match
-// the spec, and why. The validator skips it; CheckSpecConformance fails once
-// the run sees it answer to the spec, so the list only shrinks.
+// the spec, and why. Codes, when set, narrows it to the answers whose body
+// carries one of these error codes, so the operation's other answers with
+// Status are still checked. The validator skips it; CheckSpecConformance
+// fails once the run sees it answer to the spec, so the list only shrinks.
 type KnownSpecMismatch struct {
 	Operation string
 	Status    int
+	Codes     []string
 	Reason    string
+}
+
+// covers reports whether the entry applies to an answer with body.
+func (k KnownSpecMismatch) covers(body []byte) bool {
+	if len(k.Codes) == 0 {
+		return true
+	}
+	var envelope struct {
+		Code string `json:"code"`
+	}
+	return json.Unmarshal(body, &envelope) == nil && slices.Contains(k.Codes, envelope.Code)
 }
 
 type knownKey struct {
@@ -142,7 +157,7 @@ func (v *SpecValidator) Record(r *http.Request, status int, header http.Header, 
 		return
 	}
 	key := knownKey{operation, status}
-	if _, ok := v.known[key]; ok {
+	if entry, ok := v.known[key]; ok && entry.covers(body) {
 		v.seen[key]++
 		if err != nil {
 			v.mismatched[key]++

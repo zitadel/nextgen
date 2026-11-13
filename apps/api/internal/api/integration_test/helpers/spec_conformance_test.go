@@ -88,6 +88,15 @@ func TestSpecValidatorKnownMismatchesOnlyShrink(t *testing.T) {
 		assert.Contains(t, err.Error(), "remove it from the known spec mismatches")
 	})
 
+	t.Run("an entry narrowed to codes still checks the operation's other answers", func(t *testing.T) {
+		v, err := NewSpecValidator([]KnownSpecMismatch{{Operation: "getTeam", Status: http.StatusOK, Codes: []string{"team.team_not_found"}, Reason: "test"}})
+		require.NoError(t, err)
+		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", teamNotFound)
+		require.NoError(t, v.CheckSpecConformance())
+		answer(v, http.MethodGet, "/api/v1/teams/team_1", http.StatusOK, "application/json", `{"bogus":true}`)
+		assert.ErrorContains(t, v.CheckSpecConformance(), "getTeam 200")
+	})
+
 	t.Run("an entry no exchange reaches is left alone", func(t *testing.T) {
 		v, err := NewSpecValidator(known)
 		require.NoError(t, err)
