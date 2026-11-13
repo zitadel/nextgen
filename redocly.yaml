@@ -84,6 +84,28 @@ rules:
       notPattern: /^id$/
     severity: error
 
+  # A path parameter that carries an ID (`{user_id}`) has a schema with a
+  # `pattern`, usually a $ref to the resource's ID schema
+  # (`components/schemas/user-id.yaml`), so a malformed ID is refused before
+  # any lookup. A `where` level takes one Parameter condition, so one regex
+  # tests both `in` and `name`: `in` matches it only as `path`, `name` only as
+  # `…_id`.
+  rule/path-id-parameter-pattern:
+    subject:
+      type: Schema
+      property: pattern
+    where:
+      - subject:
+          type: Parameter
+          property:
+            - in
+            - name
+        assertions:
+          pattern: /^(path|[a-z][a-z0-9_]*_id)$/
+    assertions:
+      defined: true
+    severity: error
+
   # The first sentence of an operation's or a webhook's description is its API
   # reference page's description (apps/api/api/openapi/AGENTS.md), so the description
   # opens with a sentence: not a heading, a quote, a list, a table, a code

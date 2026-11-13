@@ -131,6 +131,35 @@ export async function commitSubjects(cwd: string): Promise<string[]> {
   return lines(await git(cwd, "log", "--format=%s"), "\n");
 }
 
+/**
+ * The paths git ignores in the repository at `cwd`, by `git check-ignore`,
+ * which reads every ignore source the way `git add` does. Paths need not exist.
+ *
+ * @param cwd - A directory in the repository.
+ * @param paths - The paths to ask about, relative to `cwd`.
+ * @returns Those of `paths` git ignores, in their order.
+ */
+export async function ignoredByGit(cwd: string, paths: readonly string[]): Promise<string[]> {
+  const answers = await Promise.all(
+    paths.map((path) => {
+      return exec("git", ["check-ignore", "--quiet", "--", path], { cwd }).then(
+        () => {
+          return true;
+        },
+        (error: { code?: unknown }) => {
+          if (error.code === 1) {
+            return false;
+          }
+          throw error;
+        },
+      );
+    }),
+  );
+  return paths.filter((_, index) => {
+    return answers[index];
+  });
+}
+
 function lines(stdout: string, separator: string): string[] {
   return stdout.split(separator).filter((line) => line.trim() !== "");
 }

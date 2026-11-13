@@ -397,10 +397,15 @@
         "packages/vitest-config/vitest.shared.mjs",
         "packages/vitest-config/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
+        "scripts/openapi-list-conventions.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",
+        "scripts/testdata/openapi-lists/**",
         // The verb allow-list test reads the spec's operationIds.
         "apps/api/api/openapi/endpoints/**/methods.yaml",
+        // The list conventions are checked on the committed bundle;
+        // @zitadel/server#check-generate keeps it in step with the YAML.
+        "apps/api/api/openapi/bundled/openapi.json",
         "redocly.yaml",
         ".redocly.lint-ignore.yaml",
         "vitest.config.ts"

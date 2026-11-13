@@ -155,6 +155,7 @@
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
     "fastest-levenshtein": "catalog:",
+    "ignore": "^7.0.14",
     "is-wsl": "catalog:",
     "jsonc-parser": "catalog:",
     "magicast": "^0.5.3",

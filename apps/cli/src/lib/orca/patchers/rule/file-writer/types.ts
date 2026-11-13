@@ -1,3 +1,4 @@
+import type { GitignoreRule } from "@/lib/gitignore";
 import type { PatchedFile } from "@/lib/orca/patchers/types";
 
 /**
@@ -51,7 +52,7 @@ export type FileOp =
       readonly path: string;
       readonly patch: Readonly<Record<string, unknown>>;
     }
-  | { readonly kind: "append-gitignore"; readonly entries: ReadonlyArray<string> }
+  | { readonly kind: "append-gitignore"; readonly rules: ReadonlyArray<GitignoreRule> }
   | {
       readonly kind: "add-dep";
       readonly name: string;

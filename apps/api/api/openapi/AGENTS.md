@@ -14,6 +14,8 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
 - Lint the spec with `turbo run lint --filter=@zitadel/server`: the server's
   static checks include Redocly with the repo's
   [`redocly.yaml`](../../../../redocly.yaml).
+- Pin a known Redocly finding in `.redocly.lint-ignore.yaml` with its reason;
+  `scripts/lint-openapi.mjs` fails on an entry that suppresses nothing.
 
 ## Wire casing: snake_case
 
@@ -37,6 +39,8 @@ method names, the API reference page URLs.
   already uses and no `By…` suffix; `rule/operation-id-verb-camel-case` gates it.
 - Name a path parameter after its resource (`{schema_id}`), never `{id}`;
   `rule/path-parameter-not-id` gates it.
+- Give a `{…_id}` path parameter a schema with a `pattern`, a $ref to its
+  resource's ID schema; `rule/path-id-parameter-pattern` gates it.
 
 ## Patterns say what a valid value looks like
 
@@ -80,6 +84,22 @@ structured `filter` / `sorting` bodies
 [ADR 031](../../../../docs/adrs/031-openapi-querying.md)). `POST /sessions/query` is
 the reference implementation; the how-to is in
 [`readme.md`](readme.md#api-design-conventions).
+
+A list is the `GET` on a collection or the `POST` on its `/query`; a collection
+is a path an ID follows (`/users` in `/users/{user_id}`), one that is queried,
+or one a `list…` operation reads. `check-openapi-rules` checks these on the
+bundle in [`openapi-list-conventions.test.mjs`](../../../../scripts/openapi-list-conventions.test.mjs).
+
+- Return `{ <resource>: [...], next_page_token }` from a list and nothing else,
+  the array named after the collection's segment; `list-response-shape` gates it.
+- Page a list by `page_token` and a `limit` of 1 to 100, default 20 (the shared
+  `limit` schema); `list-pagination` gates it.
+- Sort a query by its own `<resource>-sort-field` enum, not its filter's enum;
+  `query-sort-field` gates it.
+- Name a collection's segment as a plural snake_case noun (`/flow_definitions`);
+  `collection-plural` gates it.
+- Name a departure in that test's `KNOWN_VIOLATIONS` (to fix) or `EXEMPT` (by
+  design), with its reason; an entry that finds nothing fails the test.
 
 ## Identifiers on the wire
 
