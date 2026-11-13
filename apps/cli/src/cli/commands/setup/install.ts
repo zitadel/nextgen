@@ -2,15 +2,18 @@ import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { type DependencyInstall, installDependencies } from "@/lib/install";
 import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
+import { log } from "@/lib/log";
 import {
   detectPackageManager,
   devCommandFor,
   inDirectory,
   installCommandFor,
   type PackageCommand,
-  type runPackageCommand,
+  runPackageCommand,
+  runScriptCommandFor,
 } from "@/lib/package-manager";
 import { type Suggest, type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
+import { reportWarning } from "@/lib/warnings";
 
 export type SetupInstall = DependencyInstall;
 
@@ -54,6 +57,11 @@ export type SetupInstallInput = {
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   /**
+   * The scaffolder's `afterInstallScript`, for an app setup scaffolded: run
+   * once the install completes, and not at all when there was none.
+   */
+  afterInstallScript?: string | undefined;
+  /**
    * How the install is drawn: the command's `this.ui.task`, so the step sits
    * in the same chain as every other one setup reports. Passed in rather than
    * reached for, because this module draws nothing itself.
@@ -66,7 +74,8 @@ export type SetupInstallInput = {
  * Installs what setup added, with the package manager the project already
  * uses, and reports what a reader runs next. A run that scaffolded nothing and
  * added no dependency installs nothing, and `--skip-install` leaves the
- * install to the reader while still naming the command.
+ * install to the reader while still naming the command. After an install it
+ * runs the new app's {@link SetupInstallInput.afterInstallScript}.
  */
 export async function installDependenciesForSetup(
   input: SetupInstallInput,
@@ -92,6 +101,12 @@ export async function installDependenciesForSetup(
     },
     ...(input.run === undefined ? {} : { run: input.run }),
   });
+  if (install.status === "completed" && input.afterInstallScript !== undefined) {
+    await runAfterInstallScript(
+      runScriptCommandFor(packageManager, input.afterInstallScript),
+      input,
+    );
+  }
 
   return outcome({
     install,
@@ -101,6 +116,41 @@ export async function installDependenciesForSetup(
     suggest: input.suggest,
     includeInstallCommand: install.status === "would-run" || install.status === "skipped",
   });
+}
+
+/**
+ * Runs the new app's after-install script. A failure is a warning: the app
+ * works without what it writes, and the framework writes that on its first
+ * dev run, only after setup's commit.
+ */
+async function runAfterInstallScript(
+  command: PackageCommand,
+  input: SetupInstallInput,
+): Promise<void> {
+  const label = `Running ${command.display}`;
+  const work = async (): Promise<void> => {
+    await (input.run ?? runPackageCommand)(command, {
+      cwd: input.cwd,
+      env: input.env,
+      redirectStdoutToStderr: input.json,
+    });
+  };
+  try {
+    if (input.json) {
+      await input.task(label, work, () => {
+        return `Ran ${command.display}`;
+      });
+    } else {
+      // The script writes to the terminal itself, as the install does.
+      log.start(label);
+      await work();
+      log.done(`Ran ${command.display}`);
+    }
+  } catch (error) {
+    reportWarning(
+      `${command.display} failed after the install, so setup's commit leaves out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 function outcome(input: {

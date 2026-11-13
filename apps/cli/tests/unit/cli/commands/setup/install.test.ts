@@ -9,6 +9,7 @@ import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 /**
  * The selector the follow-up commands carry, pinning the project setup created.
@@ -79,6 +80,20 @@ function aRunner() {
 function aFailingRunner() {
   return vi.fn<typeof runPackageCommand>(async () => {
     throw Object.assign(new Error("boom"), { code: 1 });
+  });
+}
+
+/**
+ * A package-command runner whose install succeeds and whose next command exits
+ * with code 1.
+ *
+ * @returns The runner, recording each call.
+ */
+function aRunnerFailingAfterInstall() {
+  return vi.fn<typeof runPackageCommand>(async (command) => {
+    if (command.verb === "run") {
+      throw new Error(`${command.display} failed with exit 1`);
+    }
   });
 }
 
@@ -468,6 +483,77 @@ describe("installDependenciesForSetup", () => {
       expect(said).toEqual([
         "start Installing dependencies with npm install",
         "done Installed dependencies",
+      ]);
+    });
+  });
+
+  describe("when the new app has an after-install script", () => {
+    /** The input for a new app whose scaffolder names `generate-routes`. */
+    function aNewAppInput(dir: string, overrides: Partial<SetupInstallInput> = {}) {
+      return anInstallInput({
+        cwd: dir,
+        scaffoldedFramework: true,
+        afterInstallScript: "generate-routes",
+        ...overrides,
+      });
+    }
+
+    it("runs it after the install, with the project's package manager", async ({ dir }) => {
+      await aProject(dir, { packageManager: "pnpm@10.33.2" });
+      const run = aRunner();
+
+      await installDependenciesForSetup(aNewAppInput(dir, { run }));
+
+      expect(
+        run.mock.calls.map(([command]) => {
+          return command.display;
+        }),
+      ).toEqual(["pnpm install", "pnpm run generate-routes"]);
+    });
+
+    it("runs it in the project directory with its output on stderr", async ({ dir }) => {
+      await aProject(dir);
+      const run = aRunner();
+
+      await installDependenciesForSetup(aNewAppInput(dir, { run }));
+
+      expect(run.mock.calls[1]?.[1]).toMatchObject({ cwd: dir, redirectStdoutToStderr: true });
+    });
+
+    it("reports it as a step of the command's own chain", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+
+      await installDependenciesForSetup(
+        aNewAppInput(dir, { run: aRunner(), task: recordingTask(steps) }),
+      );
+
+      expect(steps.slice(2)).toEqual([
+        "Running npm run generate-routes",
+        "Ran npm run generate-routes",
+      ]);
+    });
+
+    it.for(SKIPS)("does not run it with %s", async ([, skip], { dir }) => {
+      await aProject(dir);
+      const run = aRunner();
+
+      await installDependenciesForSetup(aNewAppInput(dir, { run, ...skip }));
+
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it("warns, naming the script to rerun, when it fails", async ({ dir }) => {
+      await aProject(dir);
+      takeReportedWarnings();
+
+      const result = await installDependenciesForSetup(
+        aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }),
+      );
+
+      expect(result.install).toMatchObject({ status: "completed" });
+      expect(takeReportedWarnings()).toEqual([
+        "npm run generate-routes failed after the install, so setup's commit leaves out the files it writes; run it, then commit them: npm run generate-routes failed with exit 1",
       ]);
     });
   });

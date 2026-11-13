@@ -1778,6 +1778,9 @@ export default class Setup extends Destructive(BaseCommand) {
       suggest: this.suggest,
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
+      afterInstallScript: scaffoldedFramework
+        ? orca.scaffolderFor(app.framework).afterInstallScript
+        : undefined,
       task: (label, work, done) => {
         return this.ui.task(label, work, done);
       },

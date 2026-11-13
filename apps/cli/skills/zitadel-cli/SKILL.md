@@ -680,6 +680,11 @@ Zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
+A TanStack Start app's commit includes `src/routeTree.gen.ts`, which setup
+generates after installing (the app's `generate-routes` script), so the first
+dev run changes nothing. With `--skip-install` it is missing until your
+install and first dev run write it: commit it then, with the lockfile.
+
 Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
 to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
