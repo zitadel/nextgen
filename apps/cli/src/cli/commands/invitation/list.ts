@@ -17,27 +17,23 @@ import {
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
+import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
 
-/** The statuses `--status` narrows to, as the API reports them. */
-const STATUSES = [
-  "pending",
-  "accepted",
-  "rejected",
-  "expired",
-] as const satisfies readonly InvitationStatus[];
+/** The statuses `--status` narrows to, as the API declares them. */
+const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().options;
 
 /** The types `--type` narrows to, as the API declares them. */
-const TYPES = ["project_member", "team_member"] as const satisfies readonly InvitationType[];
+const TYPES = ListInvitationsQueryParams.shape.type.unwrap().options;
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
 const LIMIT_MAX = 100;
 
 /** The page size `--limit` asks for, as the server bounds it. */
-const LIMIT: Refused<number> = {
+const LIMIT = {
   schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
   refusal: {
     message: "{value} is not a valid {input}",
@@ -47,7 +43,7 @@ const LIMIT: Refused<number> = {
     min: LIMIT_MIN,
     max: LIMIT_MAX,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * `zitadel invitation list` — show the project's invitations, newest first,

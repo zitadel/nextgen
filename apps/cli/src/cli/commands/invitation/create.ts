@@ -7,7 +7,7 @@ import {
   InvitationService,
   invitationRole,
 } from "@/lib/backend";
-import { GetInvitationParams } from "@/lib/backend/schemas";
+import { createInvitationBodyOneOneMetadataNameMax } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
@@ -15,6 +15,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Parsed } from "@zitadel/config/idp";
+import { invitationIdSchema } from "./id";
 
 /** The project roles an invitation can grant, least first. */
 const RELATIONS = ["viewer", "editor", "admin"] as const satisfies readonly InvitationRelation[];
@@ -27,7 +28,7 @@ const RELATION_HINTS: Readonly<Record<InvitationRelation, string>> = {
 };
 
 /** The longest name the API stores for who an invitation is for. */
-const NAME_MAX = 200;
+const NAME_MAX = createInvitationBodyOneOneMetadataNameMax;
 
 /** A name for who an invitation is for, as the API bounds it. */
 const NAME_SCHEMA = filled.pipe(
@@ -38,7 +39,7 @@ const NAME_SCHEMA = filled.pipe(
 );
 
 /** Who `--name` says the invitation is for. */
-const NAME: Refused<string> = {
+const NAME = {
   schema: NAME_SCHEMA,
   refusal: {
     message: "Invalid {input}: {problem}",
@@ -47,11 +48,12 @@ const NAME: Refused<string> = {
   values: {
     max: NAME_MAX,
   },
-};
+} as const satisfies Refused<string>;
 
 /** The invitation `--replaces` names, as the API spells an invitation id. */
+// Annotated: its `next` names this topic's list, which would make the type circular.
 const REPLACES: Refused<string> = {
-  schema: z.string().trim().pipe(GetInvitationParams.shape.id),
+  schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list`.",
@@ -60,11 +62,11 @@ const REPLACES: Refused<string> = {
 };
 
 /** How a `--replaces` naming an accepted invitation is refused. */
-const REPLACES_ACCEPTED_REFUSAL: Refusal = {
+const REPLACES_ACCEPTED_REFUSAL = {
   message: "{id} was already accepted, so there is nothing to replace",
   hint: "Create a new invitation instead.",
   next: [{ id: "invitation:create" }],
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel invitation create` — invite someone into the project with a link.
@@ -97,10 +99,14 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof InvitationCreate>): Promise<JsonEnvelope> {
+    // The original is read before anything is asked, a dry run included, so an
+    // accepted one is refused first and a dry run predicts what the run does.
+    const replaced =
+      flags.replaces === undefined ? undefined : await this.readReplaced(flags.replaces);
     // A replacement without a name keeps the original's, so it is not asked.
-    const name = flags.name ?? (flags.replaces === undefined ? await this.askName() : undefined);
+    const name = flags.name ?? (replaced === undefined ? await this.askName() : undefined);
     const relation = flags.relation ?? (await this.askRelation());
-    // A dry run makes no request, so it answers before the connection.
+    // Without --replaces a dry run makes no request, so it needs no connection.
     if (this.dryRun) {
       return this.emit(
         dryRunResult({
@@ -110,7 +116,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
             type: "project_member",
             project_member: { relation },
             ...(name === undefined ? {} : { metadata: { name } }),
-            ...(flags.replaces === undefined ? {} : { replaces_invitation_id: flags.replaces }),
+            ...(replaced === undefined ? {} : { replaces_invitation_id: replaced.id }),
           },
           next: await this.realRun(),
         }),
@@ -119,10 +125,6 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
 
     const { client, projectId } = await this.connect();
     const invitationService = new InvitationService(client, projectId);
-    const replaced =
-      flags.replaces === undefined
-        ? undefined
-        : await this.readReplaced(invitationService, flags.replaces);
     if (!(await this.askToCreate(name ?? replaced?.metadata?.name, relation, replaced?.id))) {
       return this.emit({
         status: "skipped",
@@ -185,11 +187,9 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
    * The invitation `--replaces` names, read before anything is asked: the
    * server refuses to replace one that was accepted.
    */
-  private async readReplaced(
-    invitationService: InvitationService,
-    invitationId: string,
-  ): Promise<Invitation> {
-    const invitation = await invitationService.get(invitationId);
+  private async readReplaced(invitationId: string): Promise<Invitation> {
+    const { client, projectId } = await this.connect();
+    const invitation = await new InvitationService(client, projectId).get(invitationId);
     if (invitation.status === "accepted") {
       throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: invitation.id });
     }
@@ -204,11 +204,13 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
       flag: "--relation",
       retry: this.suggest({ id: "invitation:create", flags: { relation: "viewer" } }),
       initialValue: "viewer",
-      options: RELATIONS.map((relation) => ({
-        value: relation,
-        label: relation,
-        hint: RELATION_HINTS[relation],
-      })),
+      options: RELATIONS.map((relation) => {
+        return {
+          value: relation,
+          label: relation,
+          hint: RELATION_HINTS[relation],
+        };
+      }),
     });
   }
 
