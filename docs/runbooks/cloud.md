@@ -796,9 +796,12 @@ project and imports the root admin.
   1Password (production and preview have different passwords). Anyone else
   registers through the console's sign-in page.
 - **Turbo's remote cache:** the JavaScript services build through turbo and read and
-  write the team's remote cache, production and previews in separate
-  entries: the console, the schemas and the packages the docs and the
-  website render. The docs' and the website's own builds never come from it:
+  write the team's remote cache: the console, the schemas and the packages
+  the docs and the website render. A preview restores main's entries and its
+  own branch's, never another branch's, and writes only its own
+  ([Vercel's cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)),
+  so a branch's first build restores from main's build every package it does
+  not change. The docs' and the website's own builds never come from it:
   their keys hold the deployment's ID. The launcher build is `cache: false`
   everywhere; see [its task definition](../../apps/cloud/turbo.json) for the
   security and deployment-ordering reasons. Migration and deployment remain
