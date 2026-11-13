@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Cmd } from "@/lib/cmd";
+import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
@@ -620,6 +621,41 @@ describe("doctor", () => {
         const result = await app.doctor(["--fix"]);
 
         expect(app.envelopeOf(result)).toMatchObject(MANAGED_FILES_PASSING);
+      });
+
+      describe("in an app an older setup left with .env.example ignored", () => {
+        it("passes with a warning", async () => {
+          const app = await aSetUpApp();
+          await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+          const result = await app.doctor();
+
+          expect(app.envelopeOf(result)).toMatchObject({
+            status: "ok",
+            data: { ok: true, title: "Checks passed with warnings" },
+          });
+        });
+
+        it("lets git commit .env.example once --fix has run", async () => {
+          const app = await aSetUpApp();
+          await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.committableFiles()).toContain(".env.example");
+        });
+
+        it.each([".zitadel/secret", ".env.local", ".env.development.local"])(
+          "keeps git from committing %s once --fix has run",
+          async (name) => {
+            const app = await aSetUpApp();
+            await app.leftByAnOlderSetup(asAnOlderSetupLeft(SVELTEKIT_GITIGNORE));
+
+            await app.doctor(["--fix"]);
+
+            expect(await app.committableFiles()).not.toContain(name);
+          },
+        );
       });
 
       it("removes nothing while repairing", async () => {

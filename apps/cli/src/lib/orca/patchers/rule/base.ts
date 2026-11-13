@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { Origins } from "@/lib/backend";
+import { ZITADEL_GITIGNORE } from "@/lib/gitignore";
 import { stableStringify } from "@/lib/json";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { DEFAULT_SERVER } from "@/lib/server";
@@ -327,7 +328,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
-      { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
+      { kind: "append-gitignore", rules: ZITADEL_GITIGNORE },
       {
         kind: "write",
         path: ".zitadel/secret",

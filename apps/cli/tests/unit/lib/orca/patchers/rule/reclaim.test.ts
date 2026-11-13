@@ -10,7 +10,7 @@ const plan: ScaffoldPlan = {
     { kind: "write", path: ".zitadel/secret", contents: "{}" },
     { kind: "write", path: "zitadel.json", contents: "{}" },
     { kind: "write", path: "app/login/page.tsx", contents: `${MANAGED_MARKER}\nexport {}` },
-    { kind: "append-gitignore", entries: [".env*"] },
+    { kind: "append-gitignore", rules: [{ path: ".env", ignored: true, entry: ".env*" }] },
     { kind: "merge-env", path: ".env.local", entries: { A: "1" } },
     { kind: "add-dep", name: "pkg", version: "1.0.0" },
     { kind: "edit", path: "vite.config.ts", edit: (source) => source ?? "" },
