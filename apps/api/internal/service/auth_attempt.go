@@ -272,10 +272,16 @@ type Proof interface {
 // nothing, resolves the login name against the designated identifier of every
 // user schema in the project instead, and must match exactly one user. A
 // direct-API caller never chooses the property. See resolveIdentifier.
+//
+// Register marks the lookup of a sign-up, which asks whether the login name is
+// free: matching no user is the answer a sign-up expects, so it counts against
+// the challenge's failures but writes no auth.check.failed. A sign-in with an
+// unknown login name still writes one.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
 	UserSchemaURL string
+	Register      bool
 }
 
 func (UserProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
@@ -562,7 +568,8 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		s.recordProofFailure(ctx, attempt, challenge)
+		userProof, ok := input.Proof.(UserProof)
+		s.recordProofFailure(ctx, attempt, challenge, !ok || !userProof.Register)
 		return nil, err
 	}
 
@@ -1067,15 +1074,18 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 }
 
 // recordProofFailure records a failed proof for rate limiting — best effort,
-// never shadowing the original error. Skipped when verify could not identify
-// a challenge row.
-func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge) {
+// never shadowing the original error — and, when emit is set, its
+// auth.check.failed. Skipped when verify could not identify a challenge row.
+func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, emit bool) {
 	if challenge == nil {
 		return
 	}
 	_ = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
 			return err
+		}
+		if !emit {
+			return nil
 		}
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, nil)
 	})
@@ -1161,7 +1171,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 	proof := PasskeyRegistrationProof{AttestationResponse: input.Attestation, Name: input.Name}
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, proof, check.GetID())
 	if err != nil {
-		s.recordProofFailure(ctx, attempt, challenge)
+		s.recordProofFailure(ctx, attempt, challenge, true)
 		return nil, err
 	}
 	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
