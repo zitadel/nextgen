@@ -157,6 +157,11 @@ func (s *GrantService) commitGrant(ctx context.Context, input CreateGrantInput, 
 }
 
 func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, input CreateGrantInput, principalType domain.AuthzPrincipalType, principalID string) (*domain.AuthzAssignment, error) {
+	// Waits out an accept's read-then-write in EnsureUserGrant, which holds
+	// this lock, so the two never race on the unique binding.
+	if err := stmts.LockProject(ctx, input.ProjectID); err != nil {
+		return nil, err
+	}
 	asgn := &domain.AuthzAssignment{
 		ProjectID:     input.ProjectID,
 		CatalogID:     domain.SystemCatalogID,

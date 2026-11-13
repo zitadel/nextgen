@@ -386,6 +386,8 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 			return err
 		}
+		// The lock can wait; the guarded change rechecks expiry at this time.
+		now = time.Now().UTC()
 		claimed, err := projectIsClaimedOrExempt(ctx, stmts, s.platformProjectID, entity.ProjectID)
 		if err != nil {
 			return err

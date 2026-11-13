@@ -688,7 +688,8 @@ func TestInvitationService_Accept(t *testing.T) {
 			svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
 			entity := pendingInvitation(new("user_admin"))
 			expectInvitationByToken(s, entity)
-			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
+			// Accept locks first; a grant write locks again.
+			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil).MinTimes(1)
 			expectClaimedProject(s, invitationProjectID)
 			expectActiveUserPrincipal(s, accepter)
 			s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(tc.held, nil)
@@ -810,7 +811,7 @@ func TestInvitationService_Accept(t *testing.T) {
 		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 		entity := pendingInvitation(nil)
 		expectInvitationByToken(s, entity)
-		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
+		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil).Times(2)
 		expectClaimedProject(s, invitationProjectID)
 		expectActiveUserPrincipal(s, accepter)
 		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)

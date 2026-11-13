@@ -701,6 +701,36 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Len(t, grants(t, colleagueID)["editor"], 1)
 	})
 
+	t.Run("an accept racing an administrator's grant", func(t *testing.T) {
+		t.Parallel()
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+		colleagueID, colleague := newColleague(t)
+
+		var acceptResp api.AcceptInvitationRes
+		var grantResp api.CreateGrantRes
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			resp, err := colleague.AcceptInvitation(t.Context(), &api.InvitationTokenRequest{Token: token})
+			assert.NoError(t, err)
+			acceptResp = resp
+		})
+		wg.Go(func() {
+			resp, err := owner.CreateGrant(t.Context(), userIDGrant(colleagueID, api.CreateGrantRequestRelationEditor), api.CreateGrantParams{ProjectID: projectID})
+			assert.NoError(t, err)
+			grantResp = resp
+		})
+		wg.Wait()
+
+		// The accept keeps whichever grant came first; a second create conflicts.
+		accepted(t, acceptResp)
+		switch grantResp.(type) {
+		case *api.Grant, *api.CreateGrantConflict:
+		default:
+			t.Errorf("unexpected grant answer: %s", helpers.MustMarshal(t, grantResp))
+		}
+		assert.Len(t, grants(t, colleagueID)["editor"], 1)
+	})
+
 	t.Run("an expired invitation answers as unknown", func(t *testing.T) {
 		t.Parallel()
 		token, tokenHash, err := domain.NewInvitationToken()

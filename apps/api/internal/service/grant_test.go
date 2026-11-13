@@ -1114,6 +1114,8 @@ func newMockedGrantServiceWithRefs(t *testing.T, platformProjectID string, refs 
 			}).
 			AnyTimes()
 		statementer.EXPECT().Statements().Return(statements).AnyTimes()
+		// Every grant write takes the project lock.
+		statements.EXPECT().LockProject(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		setupStmt(statements)
 	}
 
