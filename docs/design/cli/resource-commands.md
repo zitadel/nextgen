@@ -122,8 +122,9 @@ environment, the `.env` files, then `.zitadel/secret`. Endpoints that take
 ## Listing and pagination
 
 - `list` returns **one page**. The server's default page size applies unless
-  `--limit N` (1–100) is given. `branding` declares otherwise: it has no paging
-  flags at all, because its endpoint has no cursor.
+  `--limit N` (1–100) is given. A list whose endpoint has no cursor declares
+  itself unpaged and has no paging flags at all; every list pages today,
+  `branding` included.
 - A filter field may declare the value sent when the caller does not name it.
   `schema` uses this for `revisions`, defaulting to `latest`; naming the field
   always wins, so `--filter revisions=all` still returns the history.
