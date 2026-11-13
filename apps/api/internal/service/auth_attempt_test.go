@@ -764,29 +764,51 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	})
 
 	t.Run("user lookup rejection returns proof rejected and records failure", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		users := mocks.NewMockUserLookup(ctrl)
+		for _, tt := range []struct {
+			name       string
+			register   bool
+			wantEvents []domain.EventType
+		}{
+			// A sign-in with an unknown login name is a failed sign-in.
+			{name: "sign-in", wantEvents: []domain.EventType{domain.EventTypeAuthCheckFailed}},
+			// A sign-up asks whether the login name is free: no match is its
+			// answer, so the failure counts for rate limiting and writes no event.
+			{name: "sign-up", register: true},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				ctrl := gomock.NewController(t)
+				users := mocks.NewMockUserLookup(ctrl)
 
-		var failedChallenge domain.AuthChallenge
-		stmts := mocks.NewMockAllStatements(ctrl)
-		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
-			return newUserChallengeAttempt(), nil
-		})
-		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
-			failedChallenge = c
-			return nil
-		})
-		expectLineage(stmts)
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, rejectErr)
+				var failedChallenge domain.AuthChallenge
+				stmts := mocks.NewMockAllStatements(ctrl)
+				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+					return newUserChallengeAttempt(), nil
+				})
+				stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+					failedChallenge = c
+					return nil
+				})
+				var events []domain.EventType
+				stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+					events = append(events, ev.EventType)
+					return nil
+				}).AnyTimes()
+				expectLineage(stmts)
+				users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, rejectErr)
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
-		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
-		})
+				proof := userProof
+				proof.Register = tt.register
+				svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+				got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+					ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: proof,
+				})
 
-		assert.Nil(t, got)
-		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(rejectErr))
-		assert.IsType(t, &domain.AuthChallengeUser{}, failedChallenge)
+				assert.Nil(t, got)
+				assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(rejectErr))
+				assert.IsType(t, &domain.AuthChallengeUser{}, failedChallenge)
+				assert.Equal(t, tt.wantEvents, events)
+			})
+		}
 	})
 
 	t.Run("propagates challenge succeeded persistence error", func(t *testing.T) {

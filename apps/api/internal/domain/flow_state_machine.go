@@ -1877,6 +1877,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttributeName: name,
 				Value:         value,
 				UserSchemaURL: state.UserSchemaURL,
+				Register:      state.CurrentPurpose == FlowDefinitionPurposeRegister,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {

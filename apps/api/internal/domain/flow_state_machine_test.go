@@ -284,7 +284,9 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		Times(1)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.Value == email
+			// Register marks the lookup as a sign-up's, which records no
+			// failed check when the email is free.
+			return in.Value == email && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
@@ -340,7 +342,8 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, attemptID, in.AttemptID) &&
 				assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value)
+				assert.Equal(t, email, in.Value) &&
+				assert.False(t, in.Register, "a sign-in's lookup is not a sign-up's")
 		})).
 		Return(userID, nil).
 		Times(1)
