@@ -1,0 +1,58 @@
+{{define "home"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --stale:#6b7280; --border:#2a3542; --warn:#e6b450; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    header a:hover { color:var(--accent); }
+    main { padding:1.25rem; max-width:1100px; margin:0 auto; }
+    h1 { font-size:1.25rem; margin:0 0 1rem; }
+    h2 { font-size:1rem; margin:0 0 0.5rem; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media (max-width:800px) { .grid { grid-template-columns:1fr; } }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
+    .badge.parent { color:var(--accent); border-color:var(--accent); }
+    .badge.lookup { color:var(--ok); border-color:var(--ok); }
+    .dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.35rem; background:var(--ok); }
+    .dot.stale { background:var(--stale); }
+    .dot.down { background:var(--bad); }
+    ul.tree { list-style:none; padding-left:1.1rem; margin:0.25rem 0; }
+    ul.tree.root { padding-left:0; }
+    li.node { margin:0.35rem 0; }
+    code { font-size:0.8rem; color:var(--muted); }
+    table.trace { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    table.trace th, table.trace td { text-align:left; padding:0.35rem 0.4rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>Cell &amp; project trees</h1>
+    <p class="muted">Cell tree = membership. Project tree = separate attach graph. Platform PROJECT is the customer lookup zone.</p>
+    <div id="tree" hx-get="/tree" hx-trigger="every 5s" hx-swap="innerHTML">
+      {{template "tree" .}}
+    </div>
+    <div class="panel">
+      <h2>Global Trace</h2>
+      <p class="muted">Hops from scenario create-user float and lookup walks. Open <a href="/scenarios">Scenarios</a> to append.</p>
+      <div id="trace" hx-get="/trace" hx-trigger="every 5s" hx-swap="innerHTML">
+        {{template "trace" .}}
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+{{end}}
