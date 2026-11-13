@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
 
-const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+const commands = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
 
 /** A `const NAME: Refused<T>` — what one flag or argument is refused for. */
 const REFUSED = /const (\w+): Refused<[^>]*> = \{/g;
@@ -34,7 +34,7 @@ function code(source: string): string {
     .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""');
 }
 
-/** Every `.ts` file under `src/commands`, as a path relative to it. */
+/** Every `.ts` file under `src/cli/commands`, as a path relative to it. */
 async function files(): Promise<string[]> {
   const found = await readdir(commands, { recursive: true });
   return found.filter((file) => file.endsWith(".ts")).map((file) => file.split(sep).join("/"));

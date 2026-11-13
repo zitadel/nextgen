@@ -62,7 +62,7 @@
 - Name the CLI one way in anything a person reads — a hint, a warning, a box
   line, a description: the public `npx @zitadel/cli@<version> …` form, from
   `this.suggest`, never bare `zitadel …` and never in
-  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/cli/commands` for both,
   and exempts only a `hint:` line (see the rule on quoting a command below).
   - Say it once: when the run's own step already prints the command, the
     prose says what to do and leaves the spelling to the step.
@@ -148,7 +148,7 @@
   off (`spellOutCommands`). Only a `hint:` line may do this: a message, a
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
-  `src/commands`.
+  `src/cli/commands`.
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
