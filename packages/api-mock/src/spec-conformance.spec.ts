@@ -3155,6 +3155,15 @@ describe("api-mock releases and deployments", () => {
       expect(live).toEqual([[preview.id, release.id, [reused]]]);
     });
 
+    test("shows nothing for that URL in the live view when asked about the origin once the preview ended", async () => {
+      const { project, reused } = await aPrimaryUrlReusedByAPreview("revoke-live-origin-ended");
+      await removePreview(project, reused);
+
+      const live = await liveView(project.id, reused);
+
+      expect(live).toEqual([]);
+    });
+
     test("shows the primary deployment for a listed primary origin in the live view when asked about the origin", async () => {
       const { project, release, primary } = await aReleaseServedTwice("revoke-live-listed");
 
