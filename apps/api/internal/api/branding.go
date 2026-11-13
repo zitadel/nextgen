@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params api.CreateBrandingParams) (api.CreateBrandingRes, error) {
+func (h *Handler) PublishBranding(ctx context.Context, req *api.Branding, params api.PublishBrandingParams) (api.PublishBrandingRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -31,12 +31,12 @@ func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params 
 	return brandingRevisionResponse(branding), nil
 }
 
-func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByIdParams) (api.GetBrandingByIdRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, brandingAccess, opRead)
+func (h *Handler) GetBranding(ctx context.Context, params api.GetBrandingParams) (api.GetBrandingRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, params.BrandingID, brandingAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	branding, err := h.brandingService.Get(ctx, projectID, params.ID)
+	branding, err := h.brandingService.Get(ctx, projectID, params.BrandingID)
 	if err != nil {
 		return nil, err
 	}

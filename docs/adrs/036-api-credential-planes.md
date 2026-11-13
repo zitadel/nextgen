@@ -80,7 +80,7 @@ public-plane.
 | Plane | Principal | Credential | Operations (today) |
 |---|---|---|---|
 | **Public** (browser) | The human / their session | Publishable key (+ session cookie for me-ops) | flow ops, `exchangeHandoff` (see below), me-ops, OIDC authorize/jwks/well-known, health probes |
-| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createHandoff`, `createSession`, `exchangeHandoff`, introspection |
+| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createAuthAttemptHandoff`, `createSession`, `exchangeHandoff`, introspection |
 | **Operator** (CLI/CI/console) | The operator or automation | Project secret today; PATs/service users with the specced resource scopes later (token lifecycle ADR, PR #450) | schemas, flow definitions, project patch/query, users, teams, releases/deployments (ADR 035) |
 
 App and operator planes share the project secret today; they are named

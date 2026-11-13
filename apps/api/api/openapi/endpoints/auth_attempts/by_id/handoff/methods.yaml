@@ -1,5 +1,5 @@
 post:
-  operationId: createHandoff
+  operationId: createAuthAttemptHandoff
   summary: Complete an authentication attempt and create a handoff token
   description: |
     Completes an authentication attempt and mints a `handoff_token`.
@@ -54,4 +54,4 @@ post:
                 code: att.not_completed
                 message: 'authentication attempt is not completed'
     default:
-      $ref: createHandoff-error-response.yaml
+      $ref: createAuthAttemptHandoff-error-response.yaml

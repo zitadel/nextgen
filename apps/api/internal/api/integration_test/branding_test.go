@@ -32,12 +32,12 @@ func TestBranding(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	params := api.CreateBrandingParams{ProjectID: api.ProjectID(project.ID)}
+	params := api.PublishBrandingParams{ProjectID: api.ProjectID(project.ID)}
 
 	const templateRev1 = `<zl-page-shell data-rev="1">{% mandatory_gates %}</zl-page-shell>`
 	const templateRev2 = `<zl-page-shell data-rev="2">{% mandatory_gates %}</zl-page-shell>`
 
-	createResp, err := client.CreateBranding(t.Context(), &api.Branding{
+	createResp, err := client.PublishBranding(t.Context(), &api.Branding{
 		Layout:         api.NewOptBrandingLayout(api.BrandingLayoutSplit),
 		LiquidTemplate: api.NewOptString(templateRev1),
 	}, params)
@@ -49,8 +49,8 @@ func TestBranding(t *testing.T) {
 	assert.Equal(t, templateRev1, rev1.Branding.LiquidTemplate.Value)
 
 	t.Run("get by id round-trips the stored configuration", func(t *testing.T) {
-		getResp, err := client.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID: rev1.ID,
+		getResp, err := client.GetBranding(t.Context(), api.GetBrandingParams{
+			BrandingID: rev1.ID,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
@@ -60,8 +60,8 @@ func TestBranding(t *testing.T) {
 	})
 
 	t.Run("unknown revision id is a 404", func(t *testing.T) {
-		getResp, err := client.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID: "brnd_does_not_exist",
+		getResp, err := client.GetBranding(t.Context(), api.GetBrandingParams{
+			BrandingID: "brnd_does_not_exist",
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
@@ -70,7 +70,7 @@ func TestBranding(t *testing.T) {
 	})
 
 	t.Run("lexical gate rejects a hostile template", func(t *testing.T) {
-		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+		resp, err := client.PublishBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(`<img src=x onerror="alert(1)">`),
 		}, params)
 		require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestBranding(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, foreign, other)
 
-		createResp, err := foreign.CreateBranding(t.Context(), &api.Branding{
+		createResp, err := foreign.PublishBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, params)
 		require.NoError(t, err)
@@ -99,8 +99,8 @@ func TestBranding(t *testing.T) {
 		createErr := createResp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), createErr.Code)
 
-		getResp, err := foreign.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID: "brnd_irrelevant",
+		getResp, err := foreign.GetBranding(t.Context(), api.GetBrandingParams{
+			BrandingID: "brnd_irrelevant",
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, getResp, "cross-project get: %s", helpers.MustMarshal(t, getResp))
@@ -125,12 +125,12 @@ func TestBranding(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetPreviewSecretOnApiClient(t, preview, project)
 
-		createResp, err := preview.CreateBranding(t.Context(), &api.Branding{
+		createResp, err := preview.PublishBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, params)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateBrandingErrorResponseStatusCode{}, createResp, "preview create: %s", helpers.MustMarshal(t, createResp))
-		createErr := createResp.(*api.CreateBrandingErrorResponseStatusCode)
+		require.IsType(t, &api.PublishBrandingErrorResponseStatusCode{}, createResp, "preview create: %s", helpers.MustMarshal(t, createResp))
+		createErr := createResp.(*api.PublishBrandingErrorResponseStatusCode)
 		assert.Equal(t, 403, createErr.StatusCode)
 		assert.True(t, createErr.Response.IsBrndPermissionDenied(), helpers.MustMarshal(t, createResp))
 
@@ -144,9 +144,9 @@ func TestBranding(t *testing.T) {
 	})
 
 	t.Run("unknown project is a 400, not a 500", func(t *testing.T) {
-		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+		resp, err := client.PublishBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
-		}, api.CreateBrandingParams{ProjectID: api.ProjectID("proj_does_not_exist")})
+		}, api.PublishBrandingParams{ProjectID: api.ProjectID("proj_does_not_exist")})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
 		errResp := resp.(*api.ErrorDetails)
@@ -156,7 +156,7 @@ func TestBranding(t *testing.T) {
 	t.Run("font_url without a font family is rejected", func(t *testing.T) {
 		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Arimo")
 		require.NoError(t, err)
-		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+		resp, err := client.PublishBranding(t.Context(), &api.Branding{
 			Typography: api.NewOptBrandingTypography(api.BrandingTypography{
 				FontURL: api.NewOptURI(*fontURL),
 			}),
@@ -240,7 +240,7 @@ func TestBranding(t *testing.T) {
 		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, ownClient, ownProject)
-		ownParams := api.CreateBrandingParams{ProjectID: api.ProjectID(ownProject.ID)}
+		ownParams := api.PublishBrandingParams{ProjectID: api.ProjectID(ownProject.ID)}
 
 		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Inter")
 		require.NoError(t, err)
@@ -277,12 +277,12 @@ func TestBranding(t *testing.T) {
 			}),
 		}
 
-		resp, err := ownClient.CreateBranding(t.Context(), published, ownParams)
+		resp, err := ownClient.PublishBranding(t.Context(), published, ownParams)
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
 		created := resp.(*api.BrandingRevisionResponse)
 
-		getResp, err := ownClient.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: created.ID})
+		getResp, err := ownClient.GetBranding(t.Context(), api.GetBrandingParams{BrandingID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
 		got := getResp.(*api.BrandingRevisionResponse).Branding
@@ -300,7 +300,7 @@ func TestBranding(t *testing.T) {
 
 	t.Run("flow responses carry the latest revision", func(t *testing.T) {
 		schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-		defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID:      api.ProjectID(project.ID),
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})
@@ -313,7 +313,7 @@ func TestBranding(t *testing.T) {
 
 		// Publish a second revision: the next flow response resolves it
 		// without any flow-side changes (live latest-revision resolution).
-		rev2Resp, err := client.CreateBranding(t.Context(), &api.Branding{
+		rev2Resp, err := client.PublishBranding(t.Context(), &api.Branding{
 			Layout:         api.NewOptBrandingLayout(api.BrandingLayoutCentered),
 			LiquidTemplate: api.NewOptString(templateRev2),
 		}, params)
@@ -349,7 +349,7 @@ func TestBranding(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, bareClient, bare)
 
 		schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-		defResp, err := bareClient.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		defResp, err := bareClient.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID:      api.ProjectID(bare.ID),
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})

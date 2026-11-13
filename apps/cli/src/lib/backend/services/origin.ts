@@ -1,11 +1,11 @@
-import type { AddOriginBody } from "@zitadel/api/generated/model";
+import type { AddProjectOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 
 /** The two kinds an origin pattern can be. */
-export type OriginKind = AddOriginBody["kind"];
+export type OriginKind = AddProjectOriginBody["kind"];
 
 /**
  * What removing a pattern left the project admitting.
@@ -346,7 +346,7 @@ export class OriginService extends ApiService {
    * @returns What the server stored.
    */
   async add(pattern: string, kind: OriginKind): Promise<Origin> {
-    const record = await this.client.addOrigin(this.projectId, {
+    const record = await this.client.addProjectOrigin(this.projectId, {
       pattern,
       kind,
     });
@@ -362,7 +362,7 @@ export class OriginService extends ApiService {
    * @throws BackendError the add's failure, after the pattern was restored.
    */
   async promote(pattern: string): Promise<void> {
-    await this.client.removeOrigin(this.projectId, {
+    await this.client.removeProjectOrigin(this.projectId, {
       pattern,
     });
     try {
@@ -384,7 +384,7 @@ export class OriginService extends ApiService {
    * @returns Whether the project still holds origins, now holds none, or could not be checked.
    */
   async remove(pattern: string): Promise<OriginRemoval> {
-    await this.client.removeOrigin(this.projectId, {
+    await this.client.removeProjectOrigin(this.projectId, {
       pattern,
     });
     try {

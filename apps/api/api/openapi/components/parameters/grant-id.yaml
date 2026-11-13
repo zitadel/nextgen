@@ -1,4 +1,4 @@
-name: id
+name: grant_id
 in: path
 required: true
 description: |

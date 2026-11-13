@@ -1,7 +1,7 @@
 import type {
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
+  GetRelease200,
+  GetRelease200PointersItem,
+  GetRelease200PointersItemKind,
   ListReleases200ReleasesItem,
 } from "@zitadel/api/generated/model";
 
@@ -19,12 +19,12 @@ import { type UserSchema, schemaDisplayName } from "@/features/schemas/model";
  */
 
 /** `GET /releases/{release_id}`. */
-export type Release = GetReleaseById200;
+export type Release = GetRelease200;
 
 /** One pinned revision. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /** The two states a release has: `revoked_at` is set or it is not. */
 export type ReleaseStatus = "active" | "revoked";
@@ -81,7 +81,7 @@ export async function resolvePointer(
   try {
     switch (pointer.kind) {
       case "schema": {
-        const body = await api.getSchemaById(pointer.revision_id, { project_id: projectId });
+        const body = await api.getSchema(pointer.revision_id, { project_id: projectId });
         const schema = body.schema as UserSchema;
         return { ...base, name: schemaDisplayName(schema, pointer.handle), document: schema };
       }
@@ -94,11 +94,11 @@ export async function resolvePointer(
         };
       }
       case "branding": {
-        const body = await api.getBrandingById(pointer.revision_id);
+        const body = await api.getBranding(pointer.revision_id);
         return { ...base, name: handleName(pointer), document: body.branding };
       }
       case "idp": {
-        const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
+        const body = await api.getIdpRevision(pointer.revision_id, { project_id: projectId });
         return { ...base, name: handleName(pointer), document: body.definition };
       }
       case "policy": {

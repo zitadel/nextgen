@@ -46,10 +46,10 @@ func TestListSchemasPagination(t *testing.T) {
 		}`, i, objectType, helpers.BuiltinSchemaBaseURL, i)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -142,10 +142,10 @@ func TestListSchemasRevisions(t *testing.T) {
 		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -308,10 +308,10 @@ func TestListSchemasInUse(t *testing.T) {
 		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))

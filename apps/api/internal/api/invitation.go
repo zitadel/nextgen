@@ -106,7 +106,7 @@ func (h *Handler) GetInvitation(ctx context.Context, params api.GetInvitationPar
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), invitationAccess, opDelete); err != nil {
 		return nil, err
 	}
-	inv, err := h.invitationService.Get(ctx, string(params.ProjectID), string(params.ID))
+	inv, err := h.invitationService.Get(ctx, string(params.ProjectID), string(params.InvitationID))
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (h *Handler) CancelInvitation(ctx context.Context, params api.CancelInvitat
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), invitationAccess, opDelete); err != nil {
 		return nil, err
 	}
-	if err := h.invitationService.Cancel(ctx, string(params.ProjectID), string(params.ID)); err != nil {
+	if err := h.invitationService.Cancel(ctx, string(params.ProjectID), string(params.InvitationID)); err != nil {
 		return nil, err
 	}
 	return &api.CancelInvitationNoContent{}, nil

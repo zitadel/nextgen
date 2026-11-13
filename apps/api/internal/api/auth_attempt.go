@@ -58,7 +58,7 @@ func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptPa
 	return authAttemptToAPI(attempt), nil
 }
 
-func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
+func (h Handler) CreateAuthAttemptChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.CreateAuthAttemptChallengeParams) (api.CreateAuthAttemptChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
 	challenge, err := challengeRequestToChallenge(req)
@@ -82,7 +82,7 @@ func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequ
 	return challengeToAPI(check), nil
 }
 
-func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
+func (h Handler) VerifyAuthAttemptChallenge(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyAuthAttemptChallengeParams) (api.VerifyAuthAttemptChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
 	proof, err := verifyRequestToProof(req)
@@ -101,7 +101,7 @@ func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChalle
 	return authAttemptToAPI(attempt), nil
 }
 
-func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffParams) (api.CreateHandoffRes, error) {
+func (h Handler) CreateAuthAttemptHandoff(ctx context.Context, params api.CreateAuthAttemptHandoffParams) (api.CreateAuthAttemptHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	input := service.HandoffInput{
 		ProjectID: scopeCtx.ProjectID,

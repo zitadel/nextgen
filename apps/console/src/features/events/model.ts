@@ -1,7 +1,7 @@
 import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/generated/model";
 
 /**
- * One event, as `GET /events` and `GET /events/{id}` return it: an
+ * One event, as `GET /events` and `GET /events/{event_id}` return it: an
  * append-only record of something that happened in a project, a sign-in
  * step, a change to a record or an API request. The API, the CLI and
  * the console's Events screen all call them events.

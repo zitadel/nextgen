@@ -1,5 +1,5 @@
 get:
-  operationId: listPreviews
+  operationId: listProjectPreviews
   x-zitadel-cli: preview list
   summary: List a project's previews
   description: |
@@ -39,4 +39,4 @@ get:
                     created_at: '2026-10-02T14:10:00Z'
                 next_page_token: null
     default:
-      $ref: listPreviews-error-response.yaml
+      $ref: listProjectPreviews-error-response.yaml

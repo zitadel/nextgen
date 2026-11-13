@@ -43,7 +43,7 @@ export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promi
   const { baseUrl, projectId } = zitadel.handle;
   const origin = new URL(baseUrl).origin;
   const { challenge_id } = await withErrorBody(
-    zitadel.api.initClaim(projectId, { headers: { origin } }),
+    zitadel.api.createProjectClaim(projectId, { headers: { origin } }),
   );
 
   // `__Host-zitadel_session` on https, `zitadel_session` on loopback http (ADR 083).
@@ -58,7 +58,7 @@ export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promi
   const headers = { origin, cookie: `${session.name}=${session.value}` };
   const { csrf_token } = await withErrorBody(browser.getMySessionCsrfToken(undefined, { headers }));
   await withErrorBody(
-    browser.completeClaim(
+    browser.completeProjectClaim(
       projectId,
       { challenge_id },
       { headers: { ...headers, [CSRF_HEADER]: csrf_token } },
@@ -77,7 +77,7 @@ export async function createIdpConnection(
   idp: { slug: string; display_name: string; template?: string },
 ): Promise<{ id: string }> {
   return withErrorBody(
-    zitadel.api.createIdp(
+    zitadel.api.publishIdp(
       {
         idp: {
           ...idp,
@@ -95,7 +95,7 @@ export async function createIdpConnection(
   );
 }
 
-type SchemaDocument = Awaited<ReturnType<ConnectedZitadel["api"]["getSchemaById"]>>["schema"];
+type SchemaDocument = Awaited<ReturnType<ConnectedZitadel["api"]["getSchema"]>>["schema"];
 
 /**
  * Writes a schema cloned from the seeded one under its own `objectType`.
@@ -109,10 +109,10 @@ export async function createSchemaFromSeed(
   overrides: Record<string, unknown> | ((template: SchemaDocument) => Record<string, unknown>) = {},
 ): Promise<{ id: string }> {
   const { projectId, schemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(schemaId);
+  const { schema: template } = await zitadel.api.getSchema(schemaId);
   const extra = typeof overrides === "function" ? overrides(template) : overrides;
   return withErrorBody(
-    zitadel.api.createSchema(
+    zitadel.api.publishSchema(
       { ...template, objectType: `e2e-${randomUUID()}`, ...extra },
       { project_id: projectId },
     ),
@@ -198,7 +198,7 @@ export async function deployToPrimary(
  */
 export async function addPrimaryOrigin(zitadel: ConnectedZitadel, origin: string): Promise<void> {
   await withErrorBody(
-    zitadel.api.addOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
+    zitadel.api.addProjectOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
   );
 }
 
@@ -217,7 +217,7 @@ export async function createDistinctRelease(
     withErrorBody(zitadel.api.listSchemas({ project_id: projectId, revisions: "latest" })),
     withErrorBody(zitadel.api.listFlowDefinitions({ project_id: projectId, revisions: "latest" })),
     withErrorBody(
-      zitadel.api.createBranding(
+      zitadel.api.publishBranding(
         { liquid_template: `<zl-page-shell>${message} {% mandatory_gates %}</zl-page-shell>` },
         { project_id: projectId },
       ),

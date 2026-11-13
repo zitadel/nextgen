@@ -24,7 +24,7 @@ import (
 
 // These tests park the provider's result on the attempt through the same
 // statements the callback route uses, then drive the resolution through
-// GET /flow/{id}. The route itself is covered in sso_callback_flow_test.go.
+// GET /flow/{flow_id}. The route itself is covered in sso_callback_flow_test.go.
 
 // ssoResolutionFixture is a project with the sso login flow definition, one
 // connection, and a team users can be created in.
@@ -41,7 +41,7 @@ func newSSOResolutionFixture(t *testing.T, connection api.IdpConnection) *ssoRes
 	t.Helper()
 	f := newIdpFixture(t)
 	created := f.create(t, connection)
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: ssoLoginFlowDefinition(defaultSchemaURL()),
 	})
@@ -90,7 +90,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, session *domain.Session) 
 
 func (f *ssoResolutionFixture) getStep(t *testing.T, flow ssoFlow) api.GetFlowStepRes {
 	t.Helper()
-	resp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	resp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	return resp
 }
@@ -158,7 +158,7 @@ func (f *ssoResolutionFixture) useRevisionedSchema(t *testing.T) string {
 	first := f.publishRevisionedSchema(t, 1)
 	definition := ssoLoginFlowDefinition(ssoRevisionedObjectType)
 	definition.Name = "sso-revisioned-login"
-	resp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: definition,
 	})
@@ -303,7 +303,7 @@ func TestSSOResolutionSubmitAfterHandoffReturns409(t *testing.T) {
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"email": jx.Raw(`"alice@example.com"`),
 		}),
-	}, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	}, api.SubmitFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
 	assert.Equal(t, "flow.restart_required", string(resp.(*api.ErrorDetails).Code))

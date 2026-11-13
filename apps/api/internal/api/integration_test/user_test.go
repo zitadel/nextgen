@@ -312,36 +312,36 @@ func TestDeleteUser(t *testing.T) {
 			require.NoError(t, err)
 
 			// ACT
-			deleteParams := api.DeleteUserByIDParams{
+			deleteParams := api.DeleteUserParams{
 				UserID: api.UserID(user.ID),
 			}
-			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			deleteResp, err := client.DeleteUser(t.Context(), deleteParams)
 			require.NoError(t, err)
 
 			// ASSERT
-			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+			assert.IsType(t, &api.DeleteUserNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 
-			getUserParams := api.GetUserByIDParams{
+			getUserParams := api.GetUserParams{
 				UserID: api.UserID(user.ID),
 			}
-			getResp, err := client.GetUserByID(t.Context(), getUserParams)
+			getResp, err := client.GetUser(t.Context(), getUserParams)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
+			assert.IsType(t, &api.GetUserNotFound{}, getResp, helpers.MustMarshal(t, getResp))
 		})
 
 		t.Run("unknown user should not return 404", func(t *testing.T) {
 			t.Parallel()
 
 			// ACT
-			deleteParams := api.DeleteUserByIDParams{
+			deleteParams := api.DeleteUserParams{
 				UserID: api.UserID("user_idwhichdoesnotexist"),
 			}
-			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			deleteResp, err := client.DeleteUser(t.Context(), deleteParams)
 			require.NoError(t, err)
 
 			// ASSERT
-			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+			assert.IsType(t, &api.DeleteUserNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 		})
 
 		t.Run("delete user with active session", func(t *testing.T) {
@@ -375,22 +375,22 @@ func TestDeleteUser(t *testing.T) {
 			require.NoError(t, err)
 
 			// ACT
-			deleteParams := api.DeleteUserByIDParams{
+			deleteParams := api.DeleteUserParams{
 				UserID: api.UserID(userID),
 			}
-			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			deleteResp, err := client.DeleteUser(t.Context(), deleteParams)
 			require.NoError(t, err)
 
 			// ASSERT
-			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+			assert.IsType(t, &api.DeleteUserNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 
-			getUserParams := api.GetUserByIDParams{
+			getUserParams := api.GetUserParams{
 				UserID: api.UserID(userID),
 			}
-			getResp, err := client.GetUserByID(t.Context(), getUserParams)
+			getResp, err := client.GetUser(t.Context(), getUserParams)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
+			assert.IsType(t, &api.GetUserNotFound{}, getResp, helpers.MustMarshal(t, getResp))
 		})
 	})
 }
@@ -657,11 +657,11 @@ func TestGetUser(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	params := api.GetUserByIDParams{
+	params := api.GetUserParams{
 		UserID: api.UserID(user.ID),
 	}
 
-	resp, err := client.GetUserByID(t.Context(), params)
+	resp, err := client.GetUser(t.Context(), params)
 	assert.NoError(t, err)
 
 	require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
@@ -695,12 +695,12 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.ok@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{
 				"email":    "testpatchuser.ok.patched@example.com",
 				"nickname": "Patched",
 			},
-		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		}), api.UpdateUserParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
@@ -712,15 +712,15 @@ func TestPatchUser(t *testing.T) {
 	t.Run("null deletes an attribute", func(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.null@example.com")
-		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+		params := api.UpdateUserParams{UserID: api.UserID(user.ID)}
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Ephemeral"},
 		}), params)
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
-		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err = client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": nil},
 		}), params)
 		require.NoError(t, err)
@@ -733,13 +733,13 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.invalid@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": 5},
-		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		}), api.UpdateUserParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.UpdateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
 		// Answered like request validation: the field is named, its value is not.
-		invalid := resp.(*api.PatchUserByIDBadRequest)
+		invalid := resp.(*api.UpdateUserBadRequest)
 		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
 		assert.Equal(t, domain.ErrRequestInvalid().Message, invalid.Message)
 		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(invalid.Details.Value["details"]))
@@ -749,11 +749,11 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.unknownschema@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": "https://example.com/schemas/does-not-exist",
-		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		}), api.UpdateUserParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.UpdateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	// Two revisions of one logical schema: v2 drops nickname and requires
@@ -794,15 +794,15 @@ func TestPatchUser(t *testing.T) {
 	}
 	getUser := func(t *testing.T, userID string) *api.User {
 		t.Helper()
-		resp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		resp, err := client.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.User)
 	}
-	requireAttributesInvalid := func(t *testing.T, resp api.PatchUserByIDRes, wantFields string) {
+	requireAttributesInvalid := func(t *testing.T, resp api.UpdateUserRes, wantFields string) {
 		t.Helper()
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		invalid := resp.(*api.PatchUserByIDBadRequest)
+		require.IsType(t, &api.UpdateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		invalid := resp.(*api.UpdateUserBadRequest)
 		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
 		assert.JSONEq(t, wantFields, string(invalid.Details.Value["details"]))
 	}
@@ -810,10 +810,10 @@ func TestPatchUser(t *testing.T) {
 	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
 		t.Parallel()
 		user := createRevisionUser(t, "testpatchuser.olderrevision@example.com")
-		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+		params := api.UpdateUserParams{UserID: api.UserID(user.ID)}
 
 		// Forward: v2 requires country and does not declare nickname.
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": revisionV2,
 		}), params)
 		require.NoError(t, err)
@@ -822,7 +822,7 @@ func TestPatchUser(t *testing.T) {
 		assert.Equal(t, revisionV1, unchanged.Schema)
 		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
 
-		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err = client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"schema":     revisionV2,
 			"attributes": map[string]any{"country": "CH", "nickname": nil},
 		}), params)
@@ -832,7 +832,7 @@ func TestPatchUser(t *testing.T) {
 
 		// Backward: v1 does not declare country, so the same validation
 		// refuses keeping it, and the user is left unchanged.
-		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err = client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": revisionV1,
 		}), params)
 		require.NoError(t, err)
@@ -841,7 +841,7 @@ func TestPatchUser(t *testing.T) {
 		assert.Equal(t, revisionV2, unchanged.Schema)
 		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
 
-		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err = client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"schema":     revisionV1,
 			"attributes": map[string]any{"country": nil},
 		}), params)
@@ -860,13 +860,13 @@ func TestPatchUser(t *testing.T) {
 		createUser(t, "testpatchuser.taken@example.com")
 		userB := createUser(t, "testpatchuser.claimant@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
-		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
+		}), api.UpdateUserParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.UpdateUserConflict{}, resp, helpers.MustMarshal(t, resp))
 		// The taken attribute is named, the user holding it is not.
-		conflict := resp.(*api.PatchUserByIDConflict)
+		conflict := resp.(*api.UpdateUserConflict)
 		assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
 		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 	})
@@ -874,11 +874,11 @@ func TestPatchUser(t *testing.T) {
 	t.Run("unknown user", func(t *testing.T) {
 		t.Parallel()
 
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Nobody"},
-		}), api.PatchUserByIDParams{UserID: api.UserID("user_does-not-exist")})
+		}), api.UpdateUserParams{UserID: api.UserID("user_does-not-exist")})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.UpdateUserNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("empty patch is refused", func(t *testing.T) {
@@ -1006,14 +1006,14 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		{
 			name:         "a required attribute of the target revision is missing",
 			targetSchema: requiresGivenName,
-			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantStatus:   &api.UpdateUserBadRequest{},
 			wantCode:     domain.ErrRequestInvalid().Code,
 			wantFields:   `{"fields":["attributes.givenName"]}`,
 		},
 		{
 			name:         "a value violates a tightened rule",
 			targetSchema: restrictsColor,
-			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantStatus:   &api.UpdateUserBadRequest{},
 			wantCode:     domain.ErrRequestInvalid().Code,
 			wantFields:   `{"fields":["attributes.color"]}`,
 		},
@@ -1021,13 +1021,13 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			name:         "a value collides with another user's unique attribute",
 			targetSchema: addsLanguage,
 			collide:      true,
-			wantStatus:   &api.PatchUserByIDConflict{},
+			wantStatus:   &api.UpdateUserConflict{},
 			wantCode:     domain.ErrUserAlreadyExists().Code,
 		},
 		{
 			name:         "the target schema reference does not exist",
 			targetSchema: "https://example.com/schemas/migration-user-does-not-exist",
-			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantStatus:   &api.UpdateUserBadRequest{},
 			wantCode:     domain.ErrUserInvalid().Code,
 		},
 	} {
@@ -1052,12 +1052,12 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			if tc.collide {
 				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
 			}
-			resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			resp, err := client.UpdateUser(t.Context(), patchUserRequest(t, body), api.UpdateUserParams{UserID: api.UserID(user.ID)})
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)
 			if tc.wantFields != "" {
-				assert.JSONEq(t, tc.wantFields, string(resp.(*api.PatchUserByIDBadRequest).Details.Value["details"]))
+				assert.JSONEq(t, tc.wantFields, string(resp.(*api.UpdateUserBadRequest).Details.Value["details"]))
 			}
 
 			after := readStored(t, user.ID)
@@ -1118,7 +1118,7 @@ func TestPatchMyUser(t *testing.T) {
 			"attributes": map[string]any{"nickname": "Myself"},
 		}))))
 
-		resp, err := client.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
+		resp, err := client.UpdateMyUser(t.Context(), patch, api.UpdateMyUserParams{})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "Myself", userProp(t, *resp.(*api.User), "nickname"))
@@ -1237,7 +1237,7 @@ func TestListUserTeams(t *testing.T) {
 	assert.Equal(t, beta.ID, page.Teams[0].ID)
 
 	// The user endpoint answers the other question, and answers it differently.
-	userResp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{
+	userResp, err := client.GetUser(t.Context(), api.GetUserParams{
 		UserID: rosterParams.UserID,
 	})
 	require.NoError(t, err)
@@ -1401,10 +1401,10 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.IsType(t, &api.SessProjectMismatch{}, read, helpers.MustMarshal(t, read))
 	assert.Equal(t, "sess.project_mismatch", read.(*api.SessProjectMismatch).Code)
 
-	patched, err := client.PatchMyUser(t.Context(), nickname("Intruder"), api.PatchMyUserParams{ProjectID: other})
+	patched, err := client.UpdateMyUser(t.Context(), nickname("Intruder"), api.UpdateMyUserParams{ProjectID: other})
 	require.NoError(t, err)
-	require.IsType(t, &api.PatchMyUserForbidden{}, patched, helpers.MustMarshal(t, patched))
-	assert.Equal(t, api.ErrorCode("sess.project_mismatch"), patched.(*api.PatchMyUserForbidden).Code)
+	require.IsType(t, &api.UpdateMyUserForbidden{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, api.ErrorCode("sess.project_mismatch"), patched.(*api.UpdateMyUserForbidden).Code)
 
 	listed, err := client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: other})
 	require.NoError(t, err)
@@ -1442,7 +1442,7 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	assert.Equal(t, api.UserID(user.ID), read.(*api.User).ID)
 	assert.NotContains(t, read.(*api.User).Attributes, "nickname", "the refused patch changed nothing")
 
-	patched, err = client.PatchMyUser(t.Context(), nickname("Myself"), api.PatchMyUserParams{ProjectID: own})
+	patched, err = client.UpdateMyUser(t.Context(), nickname("Myself"), api.UpdateMyUserParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
 	assert.Equal(t, "Myself", userProp(t, *patched.(*api.User), "nickname"))

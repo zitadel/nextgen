@@ -1,10 +1,10 @@
 post:
-  operationId: finishUserPasskeyRegistration
+  operationId: completeUserPasskeyRegistration
   summary: Finish a passkey registration
   description: |
     Verifies the attestation against the registration ceremony and stores
     the new passkey for the user. `registration_id` is the one that
-    `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+    `createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
     returned when it started the ceremony. The attestation is
     the browser's answer from `navigator.credentials.create()`.
 
@@ -75,4 +75,4 @@ post:
           schema:
             $ref: ../../../../../../components/error-details.yaml
     default:
-      $ref: finishUserPasskeyRegistration-error-response.yaml
+      $ref: completeUserPasskeyRegistration-error-response.yaml

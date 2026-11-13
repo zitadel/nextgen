@@ -739,7 +739,7 @@ describe("setupMockHandlers — the provider round trip", () => {
 
   /**
    * Return through the callback with a code, follow its 303 the way the
-   * orchestrator does (`GET /flow/{id}` from `?flow=`), and answer that step.
+   * orchestrator does (`GET /flow/{flow_id}` from `?flow=`), and answer that step.
    */
   async function viaCallback(id: string, claims: { email: string }) {
     const res = await callback({ state: "s", code: "c", ...claims });

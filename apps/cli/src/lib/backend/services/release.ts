@@ -2,9 +2,9 @@ import {
   type BuildRelease200,
   type BuildRelease201,
   type BuildReleaseBody,
-  type GetReleaseById200,
-  type GetReleaseById200PointersItem,
-  type GetReleaseById200PointersItemKind,
+  type GetRelease200,
+  type GetRelease200PointersItem,
+  type GetRelease200PointersItemKind,
   type RevokeRelease409,
   type RevokeRelease409DetailsOriginsItem,
   RevokeRelease409DetailsOriginsItemKind,
@@ -124,13 +124,13 @@ export type ReleaseInput = Readonly<BuildReleaseBody>;
 export type Release = BuildRelease200 | BuildRelease201;
 
 /** A release with the revisions it points at, as a read returns it. */
-export type ReleaseRecord = GetReleaseById200;
+export type ReleaseRecord = GetRelease200;
 
 /** One revision a release pins. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -163,7 +163,7 @@ export class ReleaseService extends ApiService {
    * @returns The release, with the revisions it points at.
    */
   async get(releaseId: string): Promise<ReleaseRecord> {
-    return this.client.getReleaseById(releaseId, {
+    return this.client.getRelease(releaseId, {
       project_id: this.projectId,
     });
   }

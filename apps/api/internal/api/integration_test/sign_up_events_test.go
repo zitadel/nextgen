@@ -40,7 +40,7 @@ func TestUnknownIdentifierEvents(t *testing.T) {
 			passwordRegisterFlowDefinition(schemaURL),
 			passwordLoginFlowWithNotFoundFlowDefinition(schemaURL),
 		} {
-			defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+			defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 				ProjectID:      api.ProjectID(project.ID),
 				FlowDefinition: definition,
 			})
@@ -61,7 +61,7 @@ func TestUnknownIdentifierEvents(t *testing.T) {
 		if purpose == api.CreateFlowRequestPurposeRegister {
 			request.GateProofs = currentSignupProofs(t, client, flow.Response.ID, zflow)
 		}
-		resp, err := client.SubmitFlowStep(t.Context(), request, api.SubmitFlowStepParams{ID: flow.Response.ID, Zflow: zflow})
+		resp, err := client.SubmitFlowStep(t.Context(), request, api.SubmitFlowStepParams{FlowID: flow.Response.ID, Zflow: zflow})
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 		step = resp.(*api.FlowResponseHeaders).Response.Step.Name

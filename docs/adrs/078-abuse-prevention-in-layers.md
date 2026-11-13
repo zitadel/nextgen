@@ -24,7 +24,7 @@
 |---|---|
 | Edge, hosted cloud | Vercel's automatic DDoS mitigation and nothing else: the Vercel API has no firewall configuration for the `cloud` project, so no WAF rule and no rate limit. #472's Cloud Armor rule (3000 requests per address per 60 s, a ban at 9000 per 180 s) belonged to the legacy cloud on GCP; this cloud runs on Vercel and PlanetScale ([runbook](../runbooks/cloud.md)). |
 | Edge, self-hosted | Whatever the operator runs. The docs suggest nothing. |
-| Server | Enforces no limit. Eight operations declare `429` (`createProject`, `completeClaim`, `getClaimStatus`, `getClaimWindow`, `createGrant`, `createTeam`, `queryProjects`, `queryTeams`) and the API reference lists them as rate-limited; no handler returns it ([#1266](https://github.com/zitadel/nextgen/issues/1266)). |
+| Server | Enforces no limit. Eight operations declare `429` (`createProject`, `completeProjectClaim`, `getProjectClaimStatus`, `getProjectClaimWindow`, `createGrant`, `createTeam`, `queryProjects`, `queryTeams`) and the API reference lists them as rate-limited; no handler returns it ([#1266](https://github.com/zitadel/nextgen/issues/1266)). |
 | Failed proofs | `recordProofFailure` stores the failure and emits a failed `auth.check` event; nothing reads either. [#1434](https://github.com/zitadel/nextgen/pull/1434) (open) adds a per-user password backoff that counts those events. |
 | Policies | The ADR 066 engine ([#1878](https://github.com/zitadel/nextgen/pull/1878) to [#2279](https://github.com/zitadel/nextgen/pull/2279)) guards `auth.factor.password.set` only. A policy has no server default: a project without an instance has no policy. |
 | Challenges | ADR 019's contract (built-in Altcha, a project's own captcha provider, `X-Zitadel-Risk-Signal`) is not wired: the runtime step carries no gates and the state machine refuses `gate_proofs` as unsupported. |
@@ -90,7 +90,7 @@ On the hosted cloud, Vercel WAF rules on the `cloud` project:
 - One limit per address on every path the server answers, at the legacy
   cloud's 3000 requests per 60 s, answered with `429`.
 - One tighter limit per address on the two operations that take no
-  credential, `createProject` and `getClaimWindow`. The CLI and the console
+  credential, `createProject` and `getProjectClaimWindow`. The CLI and the console
   call them directly rather than through a relay, so the address is the right
   key.
 - Each rule starts with Vercel's `Log` action and enforces once a week of
@@ -120,7 +120,7 @@ records ([ADR 048](048-wide-events-internal-audit-primitive.md)):
 | Guarded | Counted event | Key | Over the limit | Today |
 |---|---|---|---|---|
 | A knowledge-factor check: password now; OTP, email and SMS codes, recovery codes as they land | `auth.check.failed` since the last `auth.check.succeeded` | (project, user, factor) | challenge, then refuse | #1434 counts it for passwords |
-| `completeClaim` | a failed completion | the project being claimed | refuse | no event on failure yet; declares `429`; [ADR 046](046-claim-lifecycle-v2.md) requires the limit |
+| `completeProjectClaim` | a failed completion | the project being claimed | refuse | no event on failure yet; declares `429`; [ADR 046](046-claim-lifecycle-v2.md) requires the limit |
 | `createGrant` by identifier | a request, hit or miss | (project, principal) | refuse | only a hit writes an event; declares `429`; #1266 |
 | Sending a code or link by email or SMS | a send | (project, destination) | refuse | nothing sends yet; the first sender ships with its guard |
 
@@ -279,9 +279,9 @@ What a guard does not count:
   refuses with `Retry-After` or prices the next attempt (§5).
 - An operation declares `429` only when a guard in the server answers it, with
   the envelope. The edge answers any path with its own `429`, which the API
-  reference describes once for all operations. `completeClaim` and
+  reference describes once for all operations. `completeProjectClaim` and
   `createGrant` keep their declarations with their guards; the six others
-  (`createProject`, `getClaimStatus`, `getClaimWindow`, `createTeam`,
+  (`createProject`, `getProjectClaimStatus`, `getProjectClaimWindow`, `createTeam`,
   `queryTeams`, `queryProjects`) lose theirs.
 
 ### 8. Seeing and stopping an attack
@@ -307,7 +307,7 @@ What a guard does not count:
 1. The cloud's edge: the two Vercel rules in `Log`, then enforced, and the
    runbook. Independent of everything else.
 2. The first guards: #1434 with §7's answer, the retention floor and the
-   sampled `throttled` event; then `completeClaim` and `createGrant` by
+   sampled `throttled` event; then `completeProjectClaim` and `createGrant` by
    identifier, each with the event it is missing (#1266).
 3. The `429` contract: `req.rate_limited` with `Retry-After`, and the
    declarations no guard answers removed.

@@ -1,10 +1,10 @@
 get:
-  operationId: getIdpById
+  operationId: getIdp
   x-zitadel-cli: idps get
   summary: Get an identity provider by ID
   description: |
     Returns an identity provider, an external sign-in such as Google, by ID at
-    its newest revision. `listIdpRevisions` (`GET /idps/{id}/revisions`) lists
+    its newest revision. `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists
     every revision of it.
 
     The lookup is scoped to the project in `project_id`.
@@ -80,4 +80,4 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: getIdpById-error-response.yaml
+      $ref: getIdp-error-response.yaml

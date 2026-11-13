@@ -52,11 +52,8 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
-	AddOriginOperation: []string{
+	AddProjectOriginOperation: []string{
 		"origin.write",
-	},
-	BeginUserPasskeyRegistrationOperation: []string{
-		"user.write",
 	},
 	BuildReleaseOperation: []string{
 		"release.write",
@@ -64,38 +61,32 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CancelInvitationOperation: []string{
 		"project.write",
 	},
-	CreateApplicationOperation: []string{
-		"application.write",
+	CompleteUserPasskeyRegistrationOperation: []string{
+		"user.write",
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
 	},
-	CreateBrandingOperation: []string{
-		"branding.write",
+	CreateAuthAttemptChallengeOperation: []string{
+		"auth_attempt.write",
+	},
+	CreateAuthAttemptHandoffOperation: []string{
+		"auth_attempt.write",
 	},
 	CreateDeploymentOperation: []string{
 		"deployment.write",
 	},
-	CreateFlowDefinitionOperation: []string{
-		"flow_definition.write",
-	},
 	CreateGrantOperation: []string{
 		"project.write",
-	},
-	CreateHandoffOperation: []string{
-		"auth_attempt.write",
-	},
-	CreateIdpOperation: []string{
-		"idp.write",
 	},
 	CreateInvitationOperation: []string{
 		"project.write",
 	},
+	CreateProjectClaimOperation: []string{
+		"project.write",
+	},
 	CreateReleaseOperation: []string{
 		"release.write",
-	},
-	CreateSchemaOperation: []string{
-		"schema.write",
 	},
 	CreateSessionOperation: []string{
 		"session.write",
@@ -106,13 +97,16 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserOperation: []string{
 		"user.write",
 	},
+	CreateUserPasskeyRegistrationOperation: []string{
+		"user.write",
+	},
+	DeactivateTeamOperation: []string{
+		"team.delete",
+	},
 	DeleteGrantOperation: []string{
 		"project.write",
 	},
-	DeleteTeamOperation: []string{
-		"team.delete",
-	},
-	DeleteUserByIDOperation: []string{
+	DeleteUserOperation: []string{
 		"user.delete",
 	},
 	DeleteVariableOperation: []string{
@@ -124,27 +118,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ExchangeHandoffOperation: []string{
 		"session.write",
 	},
-	FinishUserPasskeyRegistrationOperation: []string{
-		"user.write",
-	},
-	GetApplicationByIdOperation: []string{
+	GetApplicationOperation: []string{
 		"application.read",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempt.read",
 	},
-	GetBrandingByIdOperation: []string{
+	GetBrandingOperation: []string{
 		"branding.read",
 	},
-	GetClaimStatusOperation: []string{
-		"project.write",
-	},
-	GetDeploymentByIdOperation: []string{
+	GetDeploymentOperation: []string{
 		"deployment.read",
-	},
-	GetDeploymentVariablesOperation: []string{
-		"deployment.read",
-		"variable.read",
 	},
 	GetEventOperation: []string{
 		"events.read",
@@ -155,16 +139,16 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetGrantOperation: []string{
 		"project.read",
 	},
-	GetIdpByIdOperation: []string{
+	GetIdpOperation: []string{
 		"idp.read",
 	},
-	GetIdpRevisionByIdOperation: []string{
+	GetIdpRevisionOperation: []string{
 		"idp.read",
 	},
 	GetInvitationOperation: []string{
 		"project.write",
 	},
-	GetOAuthSettingsByIdOperation: []string{
+	GetOAuthSettingsOperation: []string{
 		"oauth_settings.read",
 	},
 	GetPolicyOperation: []string{
@@ -176,10 +160,13 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetProjectOperation: []string{
 		"project.write",
 	},
-	GetReleaseByIdOperation: []string{
+	GetProjectClaimStatusOperation: []string{
+		"project.write",
+	},
+	GetReleaseOperation: []string{
 		"release.read",
 	},
-	GetSchemaByIdOperation: []string{
+	GetSchemaOperation: []string{
 		"schema.read",
 	},
 	GetSessionOperation: []string{
@@ -188,7 +175,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetTeamOperation: []string{
 		"team.read",
 	},
-	GetUserByIDOperation: []string{
+	GetUserOperation: []string{
 		"user.read",
 	},
 	GetUserPasswordStateOperation: []string{
@@ -197,17 +184,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetVariableOperation: []string{
 		"variable.read",
 	},
-	GetVariablesOperation: []string{
-		"variable.read",
-	},
-	InitClaimOperation: []string{
-		"project.write",
-	},
-	IssueChallengeOperation: []string{
-		"auth_attempt.write",
-	},
 	ListBrandingOperation: []string{
 		"branding.read",
+	},
+	ListDeploymentVariablesOperation: []string{
+		"deployment.read",
+		"variable.read",
 	},
 	ListDeploymentsOperation: []string{
 		"deployment.read",
@@ -230,11 +212,11 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListPolicyRevisionsOperation: []string{
 		"policy.read",
 	},
-	ListPreviewsOperation: []string{
-		"deployment.read",
-	},
 	ListProjectAdminsOperation: []string{
 		"project.write",
+	},
+	ListProjectPreviewsOperation: []string{
+		"deployment.read",
 	},
 	ListReleasesOperation: []string{
 		"release.read",
@@ -252,14 +234,26 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"user.read",
 		"team_membership.read",
 	},
-	PatchProjectOperation: []string{
-		"project.write",
+	ListVariablesOperation: []string{
+		"variable.read",
 	},
-	PatchUserByIDOperation: []string{
-		"user.write",
+	PublishApplicationOperation: []string{
+		"application.write",
+	},
+	PublishBrandingOperation: []string{
+		"branding.write",
+	},
+	PublishFlowDefinitionOperation: []string{
+		"flow_definition.write",
+	},
+	PublishIdpOperation: []string{
+		"idp.write",
 	},
 	PublishPolicyOperation: []string{
 		"policy.write",
+	},
+	PublishSchemaOperation: []string{
+		"schema.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",
@@ -279,10 +273,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
-	RemoveOriginOperation: []string{
+	RemoveProjectOriginOperation: []string{
 		"origin.delete",
 	},
-	RemovePreviewOperation: []string{
+	RemoveProjectPreviewOperation: []string{
 		"deployment.write",
 	},
 	RevokeReleaseOperation: []string{
@@ -300,13 +294,19 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},
+	SetVariablesOperation: []string{
+		"variable.write",
+	},
+	UpdateProjectOperation: []string{
+		"project.write",
+	},
 	UpdateTeamOperation: []string{
 		"team.write",
 	},
-	UpdateVariablesOperation: []string{
-		"variable.write",
+	UpdateUserOperation: []string{
+		"user.write",
 	},
-	VerifyChallengeProofOperation: []string{
+	VerifyAuthAttemptChallengeOperation: []string{
 		"auth_attempt.write",
 	},
 }
@@ -336,41 +336,40 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 // operationRolesSessionCookie is a private map storing roles per operation.
 var operationRolesSessionCookie = map[string][]string{
 	AcceptInvitationOperation:      []string{},
-	AddOriginOperation:             []string{},
+	AddProjectOriginOperation:      []string{},
 	CancelInvitationOperation:      []string{},
-	CompleteClaimOperation:         []string{},
+	CompleteProjectClaimOperation:  []string{},
 	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
 	CreateInvitationOperation:      []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
-	DeleteUserByIDOperation:        []string{},
+	DeleteUserOperation:            []string{},
 	EvaluatePolicyOperation:        []string{},
-	GetBrandingByIdOperation:       []string{},
-	GetDeploymentByIdOperation:     []string{},
+	GetBrandingOperation:           []string{},
+	GetDeploymentOperation:         []string{},
 	GetEventOperation:              []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
-	GetIdpByIdOperation:            []string{},
-	GetIdpRevisionByIdOperation:    []string{},
+	GetIdpOperation:                []string{},
+	GetIdpRevisionOperation:        []string{},
 	GetInvitationOperation:         []string{},
 	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
 	GetMyUserSchemaOperation:       []string{},
-	GetOAuthSettingsByIdOperation:  []string{},
+	GetOAuthSettingsOperation:      []string{},
 	GetPolicyOperation:             []string{},
 	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
-	GetReleaseByIdOperation:        []string{},
-	GetSchemaByIdOperation:         []string{},
+	GetReleaseOperation:            []string{},
+	GetSchemaOperation:             []string{},
 	GetTeamOperation:               []string{},
-	GetUserByIDOperation:           []string{},
+	GetUserOperation:               []string{},
 	GetUserPasswordStateOperation:  []string{},
 	GetVariableOperation:           []string{},
-	GetVariablesOperation:          []string{},
 	ListBrandingOperation:          []string{},
 	ListDeploymentsOperation:       []string{},
 	ListEventsOperation:            []string{},
@@ -388,21 +387,22 @@ var operationRolesSessionCookie = map[string][]string{
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
 	ListUserTeamsOperation:         []string{},
+	ListVariablesOperation:         []string{},
 	LookupInvitationOperation:      []string{},
-	PatchMyUserOperation:           []string{},
-	PatchProjectOperation:          []string{},
-	PatchUserByIDOperation:         []string{},
 	QueryGrantsOperation:           []string{},
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RejectInvitationOperation:      []string{},
-	RemoveOriginOperation:          []string{},
+	RemoveProjectOriginOperation:   []string{},
 	RevokeMySessionOperation:       []string{},
 	RevokeReleaseOperation:         []string{},
 	RollbackDeploymentOperation:    []string{},
 	SearchOperation:                []string{},
+	UpdateMyUserOperation:          []string{},
+	UpdateProjectOperation:         []string{},
 	UpdateTeamOperation:            []string{},
+	UpdateUserOperation:            []string{},
 }
 
 // GetRolesForSessionCookie returns the required roles for the given operation.

@@ -173,7 +173,7 @@ kind migrates, its pointers carry no `id`:
 
 - **Flow definitions.** `id` becomes fixed per `name` and each write allocates
   a `revision_id`. The list filtered by `name` returns the newest revision of
-  one flow, and `GET /flow_definitions/{id}/revisions` returns its history.
+  one flow, and `GET /flow_definitions/{flow_definition_id}/revisions` returns its history.
 - **Schemas.** All revisions of one `objectType` share a fixed `id`, and each
   write allocates a `revision_id`. A document's `$id` URI stays a property of
   the document and is no longer used as the resource id. Rows that are
@@ -185,7 +185,7 @@ kind migrates, its pointers carry no `id`:
   drops its `revisions` mode and returns each schema once. The CLI
   `schemas list` command shows the history of one `objectType` and relies on
   the `all` default today; the ticket moves it to
-  `GET /schemas/{id}/revisions`, with the id resolved through the list
+  `GET /schemas/{schema_id}/revisions`, with the id resolved through the list
   filtered by `objectType`.
 - **Branding.** `id` becomes fixed per project and each publish allocates a
   `revision_id`.

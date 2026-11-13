@@ -1,8 +1,8 @@
 post:
-  operationId: createSchema
-  summary: Create a schema
+  operationId: publishSchema
+  summary: Publish a schema
   description: |
-    Creates a user schema, the JSON Schema that says which attributes a user
+    Publishes a user schema, the JSON Schema that says which attributes a user
     has and which attribute identifies the user.
 
     The request is either a user schema (`kind: user-schema`) or a schema URL
@@ -62,7 +62,7 @@ post:
                 An example of the response to creating a user schema.
               externalValue: examples/create-user-schema-response-example.yaml
     default:
-      $ref: createSchema-error-response.yaml
+      $ref: publishSchema-error-response.yaml
 
 get:
   operationId: listSchemas

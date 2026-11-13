@@ -41,7 +41,7 @@ Whatever no other service claims goes to the server, so the API answers at
   take a name the API uses (`/events`, `/policies`, `/releases`, `/teams`,
   `/branding`, …), today or later;
 - the built-in schema documents at `/schemas/v1/*` and the API's `/schemas`
-  and `/schemas/{id}` share one path tree, kept apart only by the order of the
+  and `/schemas/{schema_id}` share one path tree, kept apart only by the order of the
   rewrites;
 - the planned protocol surfaces
   ([resource map](../design/api/resource-map.md#hosted-protocol-surfaces):

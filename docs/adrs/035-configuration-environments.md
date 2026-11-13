@@ -143,7 +143,7 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 |---                             |---                                                                                                                                                                          |
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
-| `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
+| `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{schema_id}`, `GET /flow_definitions/{flow_definition_id}`, …). |
 
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
 

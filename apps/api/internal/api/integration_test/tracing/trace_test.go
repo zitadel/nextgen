@@ -63,7 +63,7 @@ func (f fixture) patchUser(tb testing.TB, nickname string) {
 	tb.Helper()
 	req := &api.PatchUserRequest{}
 	require.NoError(tb, req.UnmarshalJSON([]byte(`{"attributes":{"nickname":"`+nickname+`"}}`)))
-	resp, err := f.client.PatchUserByID(tb.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(f.userID)})
+	resp, err := f.client.UpdateUser(tb.Context(), req, api.UpdateUserParams{UserID: api.UserID(f.userID)})
 	require.NoError(tb, err)
 	require.IsType(tb, &api.User{}, resp)
 }
@@ -139,7 +139,7 @@ func TestAuthenticatedRequestTrace(t *testing.T) {
 	}
 	require.Len(t, roots, 1)
 	server := roots[0]
-	assert.Equal(t, "PatchUserByID", server.Name)
+	assert.Equal(t, "UpdateUser", server.Name)
 	assert.Equal(t, trace.SpanKindServer, server.SpanKind)
 
 	// Authentication: the token key resolves cold through the project KEK and
@@ -190,13 +190,13 @@ func TestAuthenticatedRequestTrace(t *testing.T) {
 	spanExporter.Reset()
 	req := &api.PatchUserRequest{}
 	require.NoError(t, req.UnmarshalJSON([]byte(`{"attributes":{"nickname":"`+nickname+`"}}`)))
-	resp, err := f.client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: "user_does-not-exist"})
+	resp, err := f.client.UpdateUser(t.Context(), req, api.UpdateUserParams{UserID: "user_does-not-exist"})
 	require.NoError(t, err)
-	require.IsType(t, &api.PatchUserByIDNotFound{}, resp)
-	notFound := resp.(*api.PatchUserByIDNotFound)
+	require.IsType(t, &api.UpdateUserNotFound{}, resp)
+	notFound := resp.(*api.UpdateUserNotFound)
 	require.NotEmpty(t, notFound.Message)
 	spans = spanExporter.GetSpans()
-	server = child(t, spans, tracetest.SpanStub{}, "PatchUserByID")
+	server = child(t, spans, tracetest.SpanStub{}, "UpdateUser")
 	assert.Contains(t, server.Attributes, attribute.String("error.type", string(notFound.Code)))
 	assertNoSecrets(t, spans, f.secret, nickname, notFound.Message)
 }
