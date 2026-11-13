@@ -1494,6 +1494,18 @@ function primaryOrigins(project: ProjectRecord): string[] {
 }
 
 /**
+ * The primary origins a project lists now, none for a project that is gone.
+ *
+ * @param projectId - The project.
+ * @returns Its primary origins, as exact URLs, sorted.
+ */
+function listedPrimaries(projectId: string): string[] {
+  const project = store.projects.get(projectId);
+
+  return project === undefined ? [] : primaryOrigins(project);
+}
+
+/**
  * Whether a concrete origin matches one of the project's preview patterns. A
  * `*` in a pattern matches one or more characters that are not a dot, as the
  * origin rule (#1582) defines it.
@@ -1524,27 +1536,26 @@ function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRe
 }
 
 /**
- * The newest deployment to an origin, treating a preview that is gone as gone.
- * It answers the `expected_deployment_id` guard, which the contract words as
- * "the newest deployment to any of the preview URLs", not what serves the
- * origin now: that is {@link servedOrigins}.
- * A preview's liveness is its preview row, not the expiry frozen onto the
- * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
- * every endpoint has to agree on which previews are live.
+ * The newest deployment to an origin, whatever it went there as and whether or
+ * not it still serves it. The server's newest-per-origin read answers the
+ * `expected_deployment_id` guard this way, which the contract words as "the
+ * newest deployment to any of the preview URLs": a preview that was removed or
+ * has expired is still the deployment a new one replaces. What serves the
+ * origin now is a different question, which {@link servedOrigins} answers.
+ *
+ * @param projectId - The project.
+ * @param origin - The origin.
+ * @returns The newest deployment of the project that names the origin, if any.
  */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
-  return [...store.deployments.values()]
-    .filter((deployment) => deployment.projectId === projectId)
-    .filter((deployment) =>
-      deployment.targets.some(
-        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
-      ),
-    )
-    .sort((a, b) => b.seq - a.seq)[0];
+  return projectDeployments(projectId).find((deployment) => {
+    return deployment.targets.some((target) => {
+      return target.origin === origin;
+    });
+  });
 }
 
 /**
@@ -1585,8 +1596,7 @@ function servedOrigins(
   projectId: string,
   deployments: readonly DeploymentRecord[],
 ): ServedOrigin[] {
-  const project = store.projects.get(projectId);
-  const primaries = project === undefined ? [] : primaryOrigins(project);
+  const primaries = listedPrimaries(projectId);
   const previewed = new Set<string>();
   const served: ServedOrigin[] = [];
   const newestPrimary = firstPrimary(deployments);
@@ -1628,8 +1638,7 @@ function servedOn(
   origin: string,
   served: readonly ServedOrigin[],
 ): ServedOrigin[] {
-  const project = store.projects.get(projectId);
-  const listed = project === undefined ? [] : primaryOrigins(project);
+  const listed = listedPrimaries(projectId);
 
   return served.filter((entry) => {
     if (entry.origin !== origin) {
@@ -1759,6 +1768,18 @@ function servingIds(served: readonly ServedOrigin[]): ReadonlySet<string> {
 }
 
 /**
+ * The ids of the deployments that serve an origin of a project right now. It
+ * reads every deployment of the project, so a handler that describes many
+ * deployments reads it once and passes it on.
+ *
+ * @param projectId - The project.
+ * @returns The ids of the project's deployments that serve an origin.
+ */
+function servingNow(projectId: string): ReadonlySet<string> {
+  return servingIds(servedOrigins(projectId, projectDeployments(projectId)));
+}
+
+/**
  * Whether the deployment still serves its release: while some origin of its
  * project is served by it. A later deployment, or its previews expiring or
  * being removed, makes it `inactive`.
@@ -1793,21 +1814,18 @@ function repeats(deployment: DeploymentRecord, releaseId: string, origins: strin
  * The wire shape of a deployment, optionally over a restricted target set.
  *
  * @param deployment - The deployment.
+ * @param serving - The ids of the deployments serving in its project now, as
+ * {@link servingNow} reads them after the write the answer describes.
  * @param targets - The targets to report, all of them when not given.
- * @param options - Whether to expand its release, and the ids of the
- * deployments serving in its project now when the caller already holds them.
+ * @param expand - Whether to expand its release.
  * @returns The deployment as the API answers it.
  */
 function deploymentResponse(
   deployment: DeploymentRecord,
+  serving: ReadonlySet<string>,
   targets: DeploymentTargetRow[] = deployment.targets,
-  options?: { release: boolean; serving?: ReadonlySet<string> },
+  expand?: { release: boolean },
 ): Record<string, unknown> {
-  // A caller that describes many deployments reads what serves once and passes
-  // it in; a single read costs one scan.
-  const serving =
-    options?.serving ??
-    servingIds(servedOrigins(deployment.projectId, projectDeployments(deployment.projectId)));
   const body: Record<string, unknown> = {
     id: deployment.id,
     project_id: deployment.projectId,
@@ -1828,7 +1846,7 @@ function deploymentResponse(
       deployed_by_type: "service",
     },
   };
-  if (options?.release) {
+  if (expand?.release) {
     const release = store.releases.get(deployment.releaseId);
     if (release) {
       body.release = releaseResponse(release);
@@ -2328,7 +2346,8 @@ export function setupPlatformHandlers() {
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
       // The contract's guard: the newest primary deployment, or the newest
-      // deployment to any of the preview URLs.
+      // deployment to any of the preview URLs. An id given where there is no
+      // such deployment does not match either, and the answer names none.
       if (expectedId !== undefined) {
         const newest = sawPreview
           ? targets
@@ -2336,12 +2355,15 @@ export function setupPlatformHandlers() {
               .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
               .sort((a, b) => b.seq - a.seq)[0]
           : newestPrimaryDeployment(project.id);
-        if (newest && newest.id !== expectedId) {
+        if (newest?.id !== expectedId) {
           return HttpResponse.json(
             errorBody(
               "dep.conflict",
               "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newest) },
+              {
+                deployment:
+                  newest === undefined ? null : deploymentResponse(newest, servingNow(project.id)),
+              },
             ),
             { status: 409 },
           );
@@ -2377,7 +2399,9 @@ export function setupPlatformHandlers() {
       // deployment (201), which is how its expiry is renewed.
       const newestPrimary = newestPrimaryDeployment(project.id);
       if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
+        return HttpResponse.json(deploymentResponse(newestPrimary, servingNow(project.id)), {
+          status: 200,
+        });
       }
 
       const id = `dep_${shortId()}`;
@@ -2395,7 +2419,9 @@ export function setupPlatformHandlers() {
         variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(deploymentResponse(record, servingNow(project.id)), {
+        status: 201,
+      });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2431,9 +2457,8 @@ export function setupPlatformHandlers() {
           asked = servedOn(query.data.project_id, origin, served);
         }
         items = liveGroups(served, asked).map((group) => {
-          return deploymentResponse(group.deployment, group.targets, {
+          return deploymentResponse(group.deployment, serving, group.targets, {
             release: expandRelease,
-            serving,
           });
         });
       } else {
@@ -2446,9 +2471,8 @@ export function setupPlatformHandlers() {
           });
         }
         items = named.map((deployment) => {
-          return deploymentResponse(deployment, deployment.targets, {
+          return deploymentResponse(deployment, serving, deployment.targets, {
             release: expandRelease,
-            serving,
           });
         });
       }
@@ -2481,7 +2505,7 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
-      return HttpResponse.json(deploymentResponse(deployment));
+      return HttpResponse.json(deploymentResponse(deployment, servingNow(deployment.projectId)));
     }),
 
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
@@ -2545,13 +2569,15 @@ export function setupPlatformHandlers() {
           errorBody(
             "dep.conflict",
             "deployment: the newest deployment to the targets does not match expected_deployment_id",
-            { deployment: deploymentResponse(newestPrimary) },
+            { deployment: deploymentResponse(newestPrimary, servingNow(project.id)) },
           ),
           { status: 409 },
         );
       }
       if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
-        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
+        return HttpResponse.json(deploymentResponse(newestPrimary, servingNow(project.id)), {
+          status: 200,
+        });
       }
 
       const id = `dep_${shortId()}`;
@@ -2571,7 +2597,9 @@ export function setupPlatformHandlers() {
         variables: target.variables,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json(deploymentResponse(record, servingNow(project.id)), {
+        status: 201,
+      });
     }),
 
     // --- previews --------------------------------------------------------
