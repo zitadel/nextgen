@@ -279,7 +279,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		combined, ok := resp.(*api.ListEventsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Empty(t, combined.Data)
+		assert.Empty(t, combined.Events)
 
 		got, err := session.GetEvent(t.Context(), api.GetEventParams{EventID: "evt_missing", ProjectID: projectID})
 		require.NoError(t, err)

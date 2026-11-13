@@ -52494,16 +52494,16 @@ func (s *ListEventsOrder) UnmarshalText(data []byte) error {
 type ListEventsResponse struct {
 	// The events of this page. A filter the server matches event by event can leave it shorter than
 	// `limit`, or empty, while more events remain: `next_page_token` says whether they do.
-	Data []Event `json:"data"`
+	Events []Event `json:"events"`
 	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
 	// no more results. A short or empty page still carries one while the server has not read every event
 	// the filter could match.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
-// GetData returns the value of Data.
-func (s *ListEventsResponse) GetData() []Event {
-	return s.Data
+// GetEvents returns the value of Events.
+func (s *ListEventsResponse) GetEvents() []Event {
+	return s.Events
 }
 
 // GetNextPageToken returns the value of NextPageToken.
@@ -52511,9 +52511,9 @@ func (s *ListEventsResponse) GetNextPageToken() OptNilPageToken {
 	return s.NextPageToken
 }
 
-// SetData sets the value of Data.
-func (s *ListEventsResponse) SetData(val []Event) {
-	s.Data = val
+// SetEvents sets the value of Events.
+func (s *ListEventsResponse) SetEvents(val []Event) {
+	s.Events = val
 }
 
 // SetNextPageToken sets the value of NextPageToken.

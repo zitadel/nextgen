@@ -11704,11 +11704,11 @@ func (s *ListEventsResponse) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if s.Data == nil {
+		if s.Events == nil {
 			return errors.New("nil is invalid value")
 		}
 		var failures []validate.FieldError
-		for i, elem := range s.Data {
+		for i, elem := range s.Events {
 			if err := func() error {
 				if err := elem.Validate(); err != nil {
 					return err
@@ -11727,7 +11727,7 @@ func (s *ListEventsResponse) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "data",
+			Name:  "events",
 			Error: err,
 		})
 	}

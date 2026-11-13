@@ -596,7 +596,7 @@ export const RESOURCES = {
       "occurred_at",
     ],
     list: list({
-      item: ListEventsResponse.shape.data.element,
+      item: ListEventsResponse.shape.events.element,
       // `GET /events` spells its filters as flat query parameters, and a range
       // as two of them. Declaring the parameter each operation travels as lets
       // the caller write the same `field=operation:value` they write for every

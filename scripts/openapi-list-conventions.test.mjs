@@ -34,7 +34,6 @@ const bundled = JSON.parse(
 const KNOWN_VIOLATIONS = {
   "list-response-shape": {
     listBranding: "returns the newest 100 revisions as a bare array, so it cannot page",
-    listEvents: "names its array `data`, not `events`",
   },
   "list-pagination": {
     listBranding: "takes no `limit` or `page_token`: it returns the newest 100 revisions",

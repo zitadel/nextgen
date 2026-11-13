@@ -87340,9 +87340,9 @@ func (s *ListEventsResponse) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *ListEventsResponse) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("data")
+		e.FieldStart("events")
 		e.ArrStart()
-		for _, elem := range s.Data {
+		for _, elem := range s.Events {
 			elem.Encode(e)
 		}
 		e.ArrEnd()
@@ -87356,7 +87356,7 @@ func (s *ListEventsResponse) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfListEventsResponse = [2]string{
-	0: "data",
+	0: "events",
 	1: "next_page_token",
 }
 
@@ -87369,23 +87369,23 @@ func (s *ListEventsResponse) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "data":
+		case "events":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Data = make([]Event, 0)
+				s.Events = make([]Event, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
 					var elem Event
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
-					s.Data = append(s.Data, elem)
+					s.Events = append(s.Events, elem)
 					return nil
 				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"data\"")
+				return errors.Wrap(err, "decode field \"events\"")
 			}
 		case "next_page_token":
 			if err := func() error {
