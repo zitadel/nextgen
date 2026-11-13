@@ -1240,6 +1240,46 @@ export class ScaffoldedApp {
     expect(result, "origin add should have succeeded").toSucceed();
   }
 
+  /**
+   * Invite someone into the project with `invitation create`.
+   *
+   * @returns The invitation's id.
+   */
+  async invite(): Promise<string> {
+    const result = await this.cli(["invitation", "create", "--relation", "viewer", "--json"]);
+    expect(result, "invitation create should have succeeded").toSucceed();
+    return this.envelopeOf<{ id: string }>(result).data.id;
+  }
+
+  /** The ids of the project's invitations in every status, newest first, as `invitation list` reports them. */
+  async invitationIds(): Promise<string[]> {
+    const result = await this.cli([
+      "invitation",
+      "list",
+      "--all",
+      ...["pending", "accepted", "rejected", "expired"].flatMap((status) => ["--status", status]),
+      "--json",
+    ]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: { id: string }[] }>(result).data.items.map((invitation) => {
+      return invitation.id;
+    });
+  }
+
+  /** Everything `invitation list --all --json` prints, for a value that must not be in it. */
+  async invitationListing(): Promise<string> {
+    const result = await this.cli(["invitation", "list", "--all", "--json"]);
+    expect(result, "invitation list should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
+  }
+
+  /** Everything `invitation get --json` prints for one invitation, for a value that must not be in it. */
+  async invitationReading(invitationId: string): Promise<string> {
+    const result = await this.cli(["invitation", "get", invitationId, "--json"]);
+    expect(result, "invitation get should have succeeded").toSucceed();
+    return result.stdout + result.stderr;
+  }
+
   /** How many deployments the project serves, as `deployment list` reports them. */
   async liveDeploymentCount(): Promise<number> {
     const result = await this.cli(["deployment", "list", "--json"]);

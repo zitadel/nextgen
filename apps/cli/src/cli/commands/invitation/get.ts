@@ -1,20 +1,20 @@
 import { Args } from "@oclif/core";
-import { z } from "zod";
 
 import { InvitationService, invitationRole } from "@/lib/backend";
-import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { json } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { invitationIdSchema } from "./id";
 
 /**
  * The invitation `invitation get` reads. The schema is the API spec's own, so
  * a value that is not one is refused before anything is called.
  */
+// Annotated: its `next` names this topic's list, which would make the type circular.
 const INVITATION_ID: Refused<string> = {
-  schema: z.string().trim().pipe(GetInvitationParams.shape.id),
+  schema: invitationIdSchema,
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list`.",
