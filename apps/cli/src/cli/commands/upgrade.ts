@@ -107,9 +107,10 @@ export default class Upgrade extends BaseCommand {
       });
     });
 
-    let breaking: readonly BreakingChange[] = [];
+    const breaking: readonly BreakingChange[] = plan.upToDate
+      ? []
+      : await breakingChanges(plan.oldest, plan.target);
     if (!plan.upToDate) {
-      breaking = await breakingChanges(plan.oldest, plan.target);
       const banner: string[] = [];
       if (breaking.length > 0) {
         banner.push(strong("Breaking changes on the way:"));
@@ -134,10 +135,7 @@ export default class Upgrade extends BaseCommand {
 
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
-    let done = mark.pass;
-    if (this.dryRun) {
-      done = arrow;
-    }
+    const done = this.dryRun ? arrow : mark.pass;
     const rows: string[] = [];
     for (const pkg of plan.packages) {
       const said = escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`);
@@ -158,15 +156,11 @@ export default class Upgrade extends BaseCommand {
       rows.push(`  ${dim(escapeControlCharacters(said))}`);
     }
 
-    let title = `Zitadel upgraded to ${plan.target}`;
-    if (plan.upToDate) {
-      title = `Zitadel is up to date at ${plan.target}`;
-    } else if (this.dryRun) {
-      title = `Zitadel can be upgraded to ${plan.target}`;
-    }
-    if (this.dryRun) {
-      title = `${title} (dry run)`;
-    }
+    const upgrade = this.dryRun
+      ? `Zitadel can be upgraded to ${plan.target}`
+      : `Zitadel upgraded to ${plan.target}`;
+    const verdict = plan.upToDate ? `Zitadel is up to date at ${plan.target}` : upgrade;
+    const title = `${verdict}${this.dryRun ? " (dry run)" : ""}`;
 
     const atTarget = this.suggestWith(this.scope(), plan.target);
     const commands: SuggestedCommand[] = [];

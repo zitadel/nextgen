@@ -1,4 +1,5 @@
 import { Config } from "@oclif/core";
+import { EventEmitter, once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
@@ -427,8 +428,8 @@ async function aCapturingPlatform(
   const createBodies: unknown[] = [];
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
-  const failing = { releases: false, signupPolicy: false };
-  let signupPolicyAsked: (() => void) | undefined;
+  const failing = { releases: false, signupPolicy: false, signupPolicyHangs: false };
+  const signupPolicyAsked = new EventEmitter();
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -449,8 +450,12 @@ async function aCapturingPlatform(
       );
       return;
     }
-    if (req.method === "POST" && path === "/api/v1/policies/evaluate" && signupPolicyAsked) {
-      signupPolicyAsked();
+    if (
+      req.method === "POST" &&
+      path === "/api/v1/policies/evaluate" &&
+      failing.signupPolicyHangs
+    ) {
+      signupPolicyAsked.emit("asked");
       return;
     }
     if (req.method === "POST" && path === "/api/v1/policies/evaluate" && failing.signupPolicy) {
@@ -503,10 +508,9 @@ async function aCapturingPlatform(
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
     },
-    hangsOnTheSignupPolicy() {
-      return new Promise<void>((asked) => {
-        signupPolicyAsked = asked;
-      });
+    async hangsOnTheSignupPolicy() {
+      failing.signupPolicyHangs = true;
+      await once(signupPolicyAsked, "asked");
     },
   };
 }

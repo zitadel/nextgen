@@ -40,6 +40,7 @@ import SkillsAdd from "./cli/commands/skills/add";
 import Start from "./cli/commands/start";
 import Status from "./cli/commands/status";
 import Stop from "./cli/commands/stop";
+import TestsAdd from "./cli/commands/tests/add";
 import Upgrade from "./cli/commands/upgrade";
 import VariableGet from "./cli/commands/variable/get";
 import VariableList from "./cli/commands/variable/list";
@@ -96,6 +97,7 @@ export const WORKFLOW_COMMANDS = {
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
   "skills:add": SkillsAdd,
+  "tests:add": TestsAdd,
   "variable:set": VariableSet,
   "variable:get": VariableGet,
   "variable:list": VariableList,

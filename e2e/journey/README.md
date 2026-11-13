@@ -55,8 +55,8 @@ One CI journey alone, on the release's npm tarballs as CI runs it:
   `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
   the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
-  the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
-  lane.
+  the scaffold journey matrix; `testkit` runs the suite `zitadel tests add`
+  writes, on `@zitadel/testing`.
 - `--preexisting-app` seeds the minimal host app from
   `fixtures/preexisting/<framework>` before running setup, so the scaffolded
   pages take the `variant="widget"` posture inside the host app's own shell
@@ -107,7 +107,7 @@ Every runner line starts with the time since the runner started
 runner prints a task's output only when it ends. Once the lanes have finished,
 passed or failed, the runner prints a table: a row per lane with when it began,
 the seconds each phase took (the mock OIDC provider's start, doctor, start,
-setup, the drift probe, the testkit's stop and install, app start, Playwright,
+setup, the drift probe, the testkit's stop, install and `tests add`, app start, Playwright,
 teardown) and the phase a failed lane failed in, and a line with the shared
 steps before the lanes (Playwright browsers, the registry). In GitHub Actions
 the table also goes to the job summary. `scripts/timings.mjs` defines the

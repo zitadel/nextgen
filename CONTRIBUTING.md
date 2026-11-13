@@ -296,6 +296,13 @@ Omni, weekly on `main` and on demand, and is not a required check. To run it
 against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
 the task locally, where it still starts the Spanner emulator.
 
+The released artifacts (the server on macOS and Linux, the container, an
+upgrade from an older release) run in the separate `artifacts` workflow,
+which is not a required check; its header says when and what
+([`artifacts.yml`](.github/workflows/artifacts.yml)). To run it on a branch,
+use `gh workflow run artifacts.yml --ref <branch>`; to test a published
+release, `gh workflow run artifacts.yml -f version=<version>`.
+
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).

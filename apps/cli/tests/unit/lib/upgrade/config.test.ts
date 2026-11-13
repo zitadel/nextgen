@@ -1,36 +1,22 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { releaseChannel, updateCheckDisabled } from "@/lib/upgrade/config";
+import { test } from "@tests/helpers/fixtures";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
-const server = setupServer();
-let home: string;
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "zitadel-release-channel-"));
-});
-afterEach(async () => {
-  server.resetHandlers();
-  await rm(home, { recursive: true, force: true });
-});
-
 describe("releaseChannel", () => {
-  it("reads the version on the dist-tag of the CLI's own channel", async () => {
+  test("reads the version on the dist-tag of the CLI's own channel", async ({ dir, server }) => {
     server.use(
       http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0", alpha: "3.0.0-alpha.1" })),
     );
 
-    const stable = await releaseChannel("1.0.0", { XDG_CONFIG_HOME: home }).latest({ fresh: true });
-    const alpha = await releaseChannel("3.0.0-alpha.0", { XDG_CONFIG_HOME: home }).latest({
+    const stable = await releaseChannel("1.0.0", { XDG_CONFIG_HOME: dir }).latest({ fresh: true });
+    const alpha = await releaseChannel("3.0.0-alpha.0", { XDG_CONFIG_HOME: dir }).latest({
       fresh: true,
     });
 
@@ -39,13 +25,16 @@ describe("releaseChannel", () => {
 });
 
 describe("releaseChannel cache", () => {
-  it("keeps the answer in the CLI's config directory, where the next run reads it", async () => {
+  test("keeps the answer in the CLI's config directory, where the next run reads it", async ({
+    dir,
+    server,
+  }) => {
     server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
 
-    await releaseChannel("1.0.0", { XDG_CONFIG_HOME: home }).latest({ fresh: true });
+    await releaseChannel("1.0.0", { XDG_CONFIG_HOME: dir }).latest({ fresh: true });
 
     const cached = JSON.parse(
-      await readFile(join(home, "zitadel", "cli", "update-check.json"), "utf8"),
+      await readFile(join(dir, "zitadel", "cli", "update-check.json"), "utf8"),
     ) as Record<string, unknown>;
     expect(Object.values(cached)).toMatchObject([{ version: "2.0.0" }]);
   });

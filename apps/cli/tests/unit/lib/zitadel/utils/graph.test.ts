@@ -74,7 +74,7 @@ describe("walk", () => {
     const start = Array.from({ length: 200 }, (_unused, index) => {
       return `n${index}`;
     });
-    let asked = 0;
+    const asked: string[] = [];
 
     walk(
       start,
@@ -82,11 +82,11 @@ describe("walk", () => {
         return [];
       },
       (node) => {
-        asked += 1;
+        asked.push(node);
         return node;
       },
     );
 
-    expect(asked).toBe(200);
+    expect(asked).toHaveLength(200);
   });
 });

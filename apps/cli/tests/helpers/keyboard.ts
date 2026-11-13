@@ -59,26 +59,34 @@ function read(frame: string): Drawn {
     .filter((line) => {
       return line !== "";
     });
-  const choices: string[] = [];
-  let active = 0;
-  let question = lines.at(0) ?? "";
   const first = lines.findIndex((line) => {
     return CHOICE.test(line);
   });
-  if (first > 0) {
-    question = lines.slice(0, first).join(" ");
-    for (const line of lines.slice(first)) {
-      const match = CHOICE.exec(line);
-      if (match?.groups === undefined) {
-        continue;
-      }
-      if (match.groups.marker === "●") {
-        active = choices.length;
-      }
-      choices.push(match.groups.label ?? "");
-    }
+  if (first <= 0) {
+    return { question: lines.at(0) ?? "", choices: [], active: 0 };
   }
-  return { question, choices, active };
+  const matches = lines
+    .slice(first)
+    .map((line) => {
+      return CHOICE.exec(line);
+    })
+    .filter((match) => {
+      return match?.groups !== undefined;
+    });
+  return {
+    question: lines.slice(0, first).join(" "),
+    choices: matches.map((match) => {
+      return match?.groups?.label ?? "";
+    }),
+    active: Math.max(
+      0,
+      matches
+        .map((match) => {
+          return match?.groups?.marker === "●";
+        })
+        .lastIndexOf(true),
+    ),
+  };
 }
 
 /**
@@ -113,17 +121,17 @@ function keysFor(drawn: Drawn, answer: Answer | undefined): string {
     const at = ofLabel(answer);
     return at < 0 ? CTRL_C : DOWN.repeat((at - active + choices.length) % choices.length) + ENTER;
   }
-  let keys = "";
-  let cursor = active;
-  for (const wanted of answer) {
-    const at = ofLabel(wanted);
-    if (at < 0) {
-      return CTRL_C;
-    }
-    keys += DOWN.repeat((at - cursor + choices.length) % choices.length) + SPACE;
-    cursor = at;
+  const stops = answer.map((wanted) => {
+    return ofLabel(wanted);
+  });
+  if (stops.some((at) => at < 0)) {
+    return CTRL_C;
   }
-  return keys + ENTER;
+  const keys = stops.map((at, index) => {
+    const cursor = index === 0 ? active : (stops[index - 1] ?? active);
+    return DOWN.repeat((at - cursor + choices.length) % choices.length) + SPACE;
+  });
+  return keys.join("") + ENTER;
 }
 
 /** The terminal a test's run is at: its keyboard, and what has been drawn on its screen. */
@@ -250,7 +258,9 @@ export function answering(...answers: ReadonlyArray<Answer | undefined>): Person
   const queue = [...answers];
   const seen: Seen[] = [];
   const closings: boolean[] = [];
+  // biome-ignore lint/plugin: the fake keyboard's state across newListener ticks
   let frame = "";
+  // biome-ignore lint/plugin: the fake keyboard's state across newListener ticks
   let waiting = false;
   const terminal = atTerminal((text) => {
     frame += text;

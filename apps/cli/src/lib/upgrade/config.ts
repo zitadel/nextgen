@@ -39,17 +39,9 @@ export function updateCheckDisabled(env: NodeJS.ProcessEnv): boolean {
  * @returns The channel.
  */
 export function releaseChannel(cliVersion: string, env: NodeJS.ProcessEnv): ReleaseChannel {
-  let registry = DEFAULT_REGISTRY;
-  const configured = env.npm_config_registry?.trim();
-  if (configured !== undefined && configured !== "") {
-    registry = configured.replace(/\/+$/, "");
-  }
-
-  let file: string | undefined;
+  const registry = env.npm_config_registry?.trim().replace(/\/+$/, "") || DEFAULT_REGISTRY;
   const directory = telemetryConfigDir(env);
-  if (directory !== undefined) {
-    file = join(directory, "update-check.json");
-  }
+  const file = directory === undefined ? undefined : join(directory, "update-check.json");
 
   return new ReleaseChannel({
     packageName: CLI_PACKAGE_NAME,

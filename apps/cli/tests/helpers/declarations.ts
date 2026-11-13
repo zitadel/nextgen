@@ -93,15 +93,12 @@ export function declaredAs(source: ts.SourceFile, type: string): Declaration[] {
     if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) {
       return [];
     }
-    let held = declaration.initializer;
-    let declared = names(declaration.type, type);
-    if (ts.isSatisfiesExpression(held)) {
-      declared = declared || names(held.type, type);
-      held = held.expression;
-    }
-    if (ts.isAsExpression(held)) {
-      held = held.expression;
-    }
+    const initializer = declaration.initializer;
+    const declared =
+      names(declaration.type, type) ||
+      (ts.isSatisfiesExpression(initializer) && names(initializer.type, type));
+    const satisfied = ts.isSatisfiesExpression(initializer) ? initializer.expression : initializer;
+    const held = ts.isAsExpression(satisfied) ? satisfied.expression : satisfied;
 
     return declared && ts.isObjectLiteralExpression(held)
       ? [{ name: declaration.name.text, literal: held }]

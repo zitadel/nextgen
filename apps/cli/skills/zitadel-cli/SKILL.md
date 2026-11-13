@@ -1045,12 +1045,19 @@ project per test run, seeds users and sessions through the API, and ships
 Playwright fixtures and login helpers. It never uses the project `setup`
 created or the runtime `start` runs.
 
-- Install it only when asked: `npm install --save-dev @zitadel/testing@latest @playwright/test`.
+- Add it only when the developer asks: it installs Playwright. `setup`
+  installs no test tooling; `status` mentions `tests add` in `next_actions`
+  once a sign-in has worked, never in `next_commands`.
+- In a Next.js app `setup` wired up, run `tests add --non-interactive --json`,
+  then its `next_actions` (Chromium, once) and `next_commands`: it writes a
+  sign-in test and a signed-in test, adds the dev dependencies and a
+  `test:e2e` script. `tests add --help` lists what it writes and refuses.
+  Another framework: wire the kit by hand.
 - Seed a user per test (`seed.user()`) and drive the real login
   (`loginWithPassword`) to test the sign-in itself.
-- Start other tests signed in (`authenticatedPage`, or `seed.session()` for a
-  backend call) instead of driving the login again. Headless sessions cover
-  password flows only.
+- Start other tests signed in (`authenticatedPage`, or `seed.session()` for
+  session APIs without a browser) instead of driving the login again.
+  Headless sessions cover password flows only.
 - Passkey tests need Chromium and the kit's virtual authenticator.
 - Preview, macOS and Linux only.
 

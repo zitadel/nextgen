@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import VariableRm from "@/cli/commands/variable/rm";
 import VariableSet from "@/cli/commands/variable/set";
@@ -1000,8 +1000,12 @@ const lastLine = (shown: string): string | undefined => shown.trimEnd().split("\
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  let extraFlags: string[] = [];
-  const removingOn = async (serverUrl: string, cwd: string, ...answers: Answer[]) => {
+  const removingWith = async (
+    extraFlags: readonly string[],
+    serverUrl: string,
+    cwd: string,
+    ...answers: Answer[]
+  ) => {
     const talk = answering(...answers);
     const result = await asPerson(() =>
       runCommand(VariableRm, "variable:rm", [
@@ -1015,6 +1019,8 @@ describe("variable rm asked on a terminal", () => {
     );
     return { result, shown: talk.shown(), talk };
   };
+  const removingOn = (serverUrl: string, cwd: string, ...answers: Answer[]) =>
+    removingWith([], serverUrl, cwd, ...answers);
   const removing = (cwd: string, ...answers: Answer[]) =>
     removingOn(DEFAULT_SERVER, cwd, ...answers);
   const watchingDeletes = () => {
@@ -1027,10 +1033,6 @@ describe("variable rm asked on a terminal", () => {
     );
     return seen;
   };
-
-  afterEach(() => {
-    extraFlags = [];
-  });
 
   it("asks whether to remove the variable, naming the project and a remote server", async () => {
     const cwd = await makeProject();
@@ -1046,9 +1048,8 @@ describe("variable rm asked on a terminal", () => {
   it("says only the preview value goes when asked with --preview", async () => {
     const cwd = await makeProject();
     watchingDeletes();
-    extraFlags = ["--preview"];
 
-    const { talk } = await removing(cwd, true);
+    const { talk } = await removingWith(["--preview"], DEFAULT_SERVER, cwd, true);
 
     expect(talk.asked()).toEqual([
       "Remove the preview value of SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",

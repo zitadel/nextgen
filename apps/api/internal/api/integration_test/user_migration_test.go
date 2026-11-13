@@ -488,8 +488,8 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 		issued, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{Action: "passkey"},
 			api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow, Origin: api.NewOptURI(*rpOrigin)})
 		require.NoError(t, err)
-		require.IsType(t, &api.SubmitFlowStepOK{}, issued, helpers.MustMarshal(t, issued))
-		issuedOK := issued.(*api.SubmitFlowStepOK)
+		require.IsType(t, &api.FlowResponseHeaders{}, issued, helpers.MustMarshal(t, issued))
+		issuedOK := issued.(*api.FlowResponseHeaders)
 		challenge, ok := issuedOK.Response.Step.Challenge.Get()
 		require.True(t, ok, "the passkey action issues a challenge")
 		challengeID, ok := challenge.ChallengeID.Get()
@@ -511,8 +511,8 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 			}),
 		}, api.SubmitFlowStepParams{ID: flow.id, Zflow: mustExtractZflow(t, issuedOK.SetCookie)})
 		require.NoError(t, err)
-		require.IsType(t, &api.SubmitFlowStepOK{}, verified, helpers.MustMarshal(t, verified))
-		assert.True(t, verified.(*api.SubmitFlowStepOK).Response.HandoffToken.Set, "a passkey sign-in hands off")
+		require.IsType(t, &api.FlowResponseHeaders{}, verified, helpers.MustMarshal(t, verified))
+		assert.True(t, verified.(*api.FlowResponseHeaders).Response.HandoffToken.Set, "a passkey sign-in hands off")
 		userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
 		require.True(t, ok)
 		assert.Equal(t, userID, userFactor.UserID)

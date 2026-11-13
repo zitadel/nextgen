@@ -1,61 +1,55 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { log } from "@/lib/log";
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { Ui } from "@/lib/ui/ui";
-import { answering, atTerminal, type Terminal } from "@tests/helpers/keyboard";
+import { atScreen as it } from "@tests/helpers/fixtures";
+import { answering, type Terminal } from "@tests/helpers/keyboard";
 
 const watched = () => new Ui({ interactive: true, force: false });
 const normally = () => new Ui({ interactive: true, force: false }, "plain");
 const forced = () => new Ui({ interactive: true, force: true });
 const scripted = () => new Ui({ interactive: false, force: false });
 
-let screen: Terminal;
-
-beforeEach(() => {
-  screen = atTerminal();
-});
-
 afterEach(() => {
   DrawnSpinner.active.clear();
 });
 
-const printed = () => stripAnsi(screen.plain());
-const errors = () => stripAnsi(screen.errors());
+const printed = (screen: Terminal) => stripAnsi(screen.plain());
+const errors = (screen: Terminal) => stripAnsi(screen.errors());
 
 describe("Ui", () => {
   describe("the questions a command may ask", () => {
     it("opens the chain the question is drawn in", async () => {
-      screen = answering(true);
+      const person = answering(true);
       const ui = watched();
       ui.describe("Removing an origin");
 
       await ui.questions().yesNo({ name: "remove the origin", message: "Remove it?" });
 
-      expect(printed()).toContain("┌  Removing an origin");
+      expect(printed(person)).toContain("┌  Removing an origin");
     });
 
-    it("is never asked when nobody is watching", async () => {
+    it("is never asked when nobody is watching", async ({ screen }) => {
       await expect(
         scripted().questions().yesNo({ name: "remove the origin", message: "Remove it?" }),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
-      expect(printed()).toBe("");
+      expect(printed(screen)).toBe("");
     });
 
-    it("lets the command's --force answer a destructive confirmation", async () => {
+    it("lets the command's --force answer a destructive confirmation", async ({ screen }) => {
       const answer = await forced()
         .confirmer()
         .confirm({ name: "remove the origin", message: "Remove it?" });
 
       expect(answer).toBe(true);
-      expect(printed()).toBe("");
+      expect(printed(screen)).toBe("");
     });
 
     it("asks a plain yes or no anyway, whatever the command's --force means", async () => {
       const person = answering(false);
-      screen = person;
 
       const answer = await forced()
         .questions()
@@ -67,24 +61,26 @@ describe("Ui", () => {
   });
 
   describe("a run that never finished", () => {
-    it("stays quiet when the person cancelled, because the prompt already said so", () => {
+    it("stays quiet when the person cancelled, because the prompt already said so", ({
+      screen,
+    }) => {
       const ui = watched();
       ui.describe("Listing origins");
       ui.say("something happened");
 
       ui.stop(new PromptCancelled());
 
-      expect(printed()).not.toContain("└");
+      expect(printed(screen)).not.toContain("└");
     });
 
-    it("closes the chain when the person interrupted the work", () => {
+    it("closes the chain when the person interrupted the work", ({ screen }) => {
       const ui = watched();
       ui.describe("Listing origins");
       ui.say("something happened");
 
       ui.stop(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-      expect(printed()).toMatch(/└ +Cancelled/);
+      expect(printed(screen)).toMatch(/└ +Cancelled/);
     });
   });
 
@@ -106,15 +102,15 @@ describe("Ui", () => {
   });
 
   describe("drawing outside a question", () => {
-    it("names the chain by what the command is doing", () => {
+    it("names the chain by what the command is doing", ({ screen }) => {
       const ui = watched();
       ui.describe("Listing origins");
       ui.say("something happened");
 
-      expect(printed()).toContain("┌  Listing origins");
+      expect(printed(screen)).toContain("┌  Listing origins");
     });
 
-    it("says where the command ran, as the last line of its summary", () => {
+    it("says where the command ran, as the last line of its summary", ({ screen }) => {
       const ui = watched();
       ui.ranAgainst("proj-1", "api.zitadel.cloud");
       ui.finish({
@@ -124,7 +120,7 @@ describe("Ui", () => {
         boxed: true,
       });
 
-      expect(printed()).toContain(
+      expect(printed(screen)).toContain(
         "Using project proj-1 on your Zitadel server at api.zitadel.cloud.",
       );
     });
@@ -132,12 +128,12 @@ describe("Ui", () => {
     // A normal command says the same fact in the footer's own words. Grepping
     // for the box's wording here asserts nothing: only the boxed renderer
     // ever writes "Using".
-    it("says it in the footer's words for a normal command", () => {
+    it("says it in the footer's words for a normal command", ({ screen }) => {
       const ui = normally();
       ui.ranAgainst("proj-1", "api.zitadel.cloud");
       ui.finish({ title: "Removed the origin", sections: [] });
 
-      expect(printed()).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
+      expect(printed(screen)).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
     });
 
     // `setup` is the one command whose report is the whole point of the run,
@@ -157,16 +153,16 @@ describe("Ui", () => {
       expect(stripAnsi(text)).toContain("npm run dev");
     });
 
-    it("writes nothing of its own when it hands the ending back", () => {
+    it("writes nothing of its own when it hands the ending back", ({ screen }) => {
       scripted().ending({ title: "Zitadel is ready", sections: [], boxed: true });
 
-      expect(printed()).toBe("");
+      expect(printed(screen)).toBe("");
     });
 
-    it("hands out a spinner that draws nothing when nobody is watching", () => {
+    it("hands out a spinner that draws nothing when nobody is watching", ({ screen }) => {
       scripted().spinner("Fetching users").stop("Fetched 3 users");
 
-      expect(printed()).toBe("");
+      expect(printed(screen)).toBe("");
     });
 
     it("hands out a spinner that draws when somebody is", () => {
@@ -177,7 +173,7 @@ describe("Ui", () => {
   });
 
   describe("the narration", () => {
-    it("draws what a command says inside the chain", () => {
+    it("draws what a command says inside the chain", ({ screen }) => {
       const ui = watched();
       ui.describe("Listing origins");
       ui.bridgeNarration();
@@ -185,23 +181,23 @@ describe("Ui", () => {
       log.info("Looking for a project");
       ui.releaseNarration();
 
-      expect(printed()).toContain("┌  Listing origins");
+      expect(printed(screen)).toContain("┌  Listing origins");
     });
 
     // What a line of narration says belongs to the command, so a wizard's
     // goes through the chain whether or not it can be drawn: written, it
     // carries the chain's mark.
-    it("takes a wizard's lines even when nobody is watching", () => {
+    it("takes a wizard's lines even when nobody is watching", ({ screen }) => {
       const ui = scripted();
 
       ui.bridgeNarration();
       log.info("the flow was edited by hand");
       ui.releaseNarration();
 
-      expect(printed()).toContain("the flow was edited by hand");
+      expect(printed(screen)).toContain("the flow was edited by hand");
     });
 
-    it("says a normal command's lines plainly, with no mark and no chain", () => {
+    it("says a normal command's lines plainly, with no mark and no chain", ({ screen }) => {
       const ui = normally();
 
       ui.bridgeNarration();
@@ -209,40 +205,47 @@ describe("Ui", () => {
       log.info("Callback URI   https://example.com/callback");
       ui.releaseNarration();
 
-      expect(printed()).toBe(
+      expect(printed(screen)).toBe(
         "Wrote .zitadel/idps/google.json\nCallback URI   https://example.com/callback\n",
       );
-      expect(printed()).not.toContain("┌");
+      expect(printed(screen)).not.toContain("┌");
     });
 
-    it("says a normal command's warning on stderr, named, so it is not taken for the answer", () => {
+    it("says a normal command's warning on stderr, named, so it is not taken for the answer", ({
+      screen,
+    }) => {
       const ui = normally();
 
       ui.bridgeNarration();
       log.warn("the flow was edited by hand");
       ui.releaseNarration();
 
-      expect([errors(), printed()]).toEqual(["Warning: the flow was edited by hand\n", ""]);
+      expect([errors(screen), printed(screen)]).toEqual([
+        "Warning: the flow was edited by hand\n",
+        "",
+      ]);
     });
 
-    it("keeps debug detail back unless it was asked for", () => {
+    it("keeps debug detail back unless it was asked for", ({ screen }) => {
       const ui = normally();
 
       ui.bridgeNarration();
       log.debug("an internal detail");
       ui.releaseNarration();
 
-      expect(printed()).toBe("");
+      expect(printed(screen)).toBe("");
     });
 
-    it("stops drawing into its chain once released, and writes a later line plainly", () => {
+    it("stops drawing into its chain once released, and writes a later line plainly", ({
+      screen,
+    }) => {
       const ui = watched();
 
       ui.bridgeNarration();
       ui.releaseNarration();
       log.info("after the command ended");
 
-      expect(printed()).toBe("after the command ended\n");
+      expect(printed(screen)).toBe("after the command ended\n");
     });
   });
 

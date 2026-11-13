@@ -82,10 +82,7 @@ export class UpgradePlan {
     dependencies: Dependencies | undefined;
   }): UpgradePlan {
     const { cliVersion, latest, dependencies } = input;
-    let target = cliVersion;
-    if (latest.isNewerThan(cliVersion)) {
-      target = latest.version;
-    }
+    const target = latest.isNewerThan(cliVersion) ? latest.version : cliVersion;
     const behind = (dependencies?.exact() ?? []).filter((dependency) => {
       return dependency.isBehind(target);
     });

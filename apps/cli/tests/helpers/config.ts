@@ -152,13 +152,14 @@ export function aStoreHolding(
  *   not a JSON object.
  */
 export function bodyAt(store: MemoryStore, path: string): JsonObject | undefined {
-  let body: unknown;
   try {
-    body = JSON.parse(store.volume.readFileSync(join(MemoryStore.ROOT, path), "utf8").toString());
+    const body: unknown = JSON.parse(
+      store.volume.readFileSync(join(MemoryStore.ROOT, path), "utf8").toString(),
+    );
+    return isJsonValue(body) && isJsonObject(body) ? body : undefined;
   } catch {
     return undefined;
   }
-  return isJsonValue(body) && isJsonObject(body) ? body : undefined;
 }
 
 /**

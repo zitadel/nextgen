@@ -1,56 +1,47 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { Cache } from "@/lib/upgrade/cache";
 import { ReleaseChannel } from "@/lib/upgrade/channel";
 import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
 import { PackageInstaller } from "@/lib/upgrade/installer";
 import { Upgrader } from "@/lib/upgrade/upgrader";
+import { test } from "@tests/helpers/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
-const server = setupServer();
-let dir: string;
-
-function upgrader(dryRun: boolean): Upgrader {
-  return new Upgrader({
-    cliVersion: "1.0.0",
-    cwd: dir,
-    scope: "@zitadel/",
-    dryRun,
-    channel: new ReleaseChannel({
-      packageName: "@zitadel/cli",
-      distTag: "latest",
-      registry: "https://registry.npmjs.org",
-      cache: new Cache(join(dir, "update-check.json")),
-    }),
-    installer: new PackageInstaller({
-      cwd: dir,
-      typedCwd: undefined,
-      redirectStdoutToStderr: true,
-    }),
-  });
-}
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-upgrader-"));
-  server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
-});
-afterEach(async () => {
-  server.resetHandlers();
-  await rm(dir, { recursive: true, force: true });
+/** `it` with an upgrader whose registry answers 2.0.0, in a project directory of its own. */
+const it = test.extend<{ upgrader: (dryRun: boolean) => Upgrader }>({
+  upgrader: ({ dir, server }, use) => {
+    server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
+    return use((dryRun) => {
+      return new Upgrader({
+        cliVersion: "1.0.0",
+        cwd: dir,
+        scope: "@zitadel/",
+        dryRun,
+        channel: new ReleaseChannel({
+          packageName: "@zitadel/cli",
+          distTag: "latest",
+          registry: "https://registry.npmjs.org",
+          cache: new Cache(join(dir, "update-check.json")),
+        }),
+        installer: new PackageInstaller({
+          cwd: dir,
+          typedCwd: undefined,
+          redirectStdoutToStderr: true,
+        }),
+      });
+    });
+  },
 });
 
 describe("Upgrader.plan", () => {
-  it("moves the exact pins that are behind the latest release", async () => {
+  it("moves the exact pins that are behind the latest release", async ({ upgrader, dir }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({ dependencies: { "@zitadel/sdk-next": "1.0.0" } }),
@@ -61,7 +52,10 @@ describe("Upgrader.plan", () => {
     expect(plan.packages).toEqual([{ name: "@zitadel/sdk-next", from: "1.0.0", to: "2.0.0" }]);
   });
 
-  it("fails with a ReleaseLookupError when the latest release cannot be looked up", async () => {
+  it("fails with a ReleaseLookupError when the latest release cannot be looked up", async ({
+    upgrader,
+    server,
+  }) => {
     server.use(http.get(REGISTRY, () => HttpResponse.error()));
 
     const error = await rejectionOf(() => {
@@ -73,7 +67,7 @@ describe("Upgrader.plan", () => {
 });
 
 describe("Upgrader.apply", () => {
-  it("installs nothing on a dry run and says what would move", async () => {
+  it("installs nothing on a dry run and says what would move", async ({ upgrader, dir }) => {
     const manifest = JSON.stringify({ dependencies: { "@zitadel/sdk-next": "1.0.0" } });
     await writeFile(join(dir, "package.json"), manifest);
     const upgrade = upgrader(true);
@@ -87,7 +81,10 @@ describe("Upgrader.apply", () => {
     expect(result.installCommand).toContain("@zitadel/sdk-next@2.0.0");
   });
 
-  it("installs nothing when no package is behind, though this CLI is", async () => {
+  it("installs nothing when no package is behind, though this CLI is", async ({
+    upgrader,
+    dir,
+  }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({ dependencies: { "@zitadel/sdk-next": "2.0.0" } }),
@@ -106,7 +103,10 @@ describe("Upgrader.apply", () => {
 });
 
 describe("Upgrader.apply when the install fails", () => {
-  it("fails with an InstallError that names the install and keeps the cause", async () => {
+  it("fails with an InstallError that names the install and keeps the cause", async ({
+    upgrader,
+    dir,
+  }) => {
     await writeFile(
       join(dir, "package.json"),
       JSON.stringify({ dependencies: { "@zitadel/sdk-next": "1.0.0" } }),
