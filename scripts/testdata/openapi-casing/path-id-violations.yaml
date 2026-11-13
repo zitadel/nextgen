@@ -1,0 +1,87 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Every `…_id` path
+### parameter here has a schema without a `pattern` and must be rejected by
+### rule/path-id-parameter-pattern in redocly.yaml, each in its own place.
+openapi: 3.1.0
+info:
+  title: path id violations
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /things:
+    get:
+      operationId: listThings
+      summary: List things
+      description: Lists things.
+      tags:
+        - Fixture
+      parameters:
+        # A query parameter reaches the shared schema first: the path
+        # parameter below must still be checked when the walk meets it again.
+        - name: owner_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/plain-string"
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}:
+    parameters:
+      # Inline on the path item.
+      - name: thing_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getThing
+      summary: Get a thing
+      description: Gets a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}/parts/{part_id}:
+    get:
+      operationId: getThingPart
+      summary: Get a part
+      description: Gets a part.
+      tags:
+        - Fixture
+      parameters:
+        # A parameter component, as the spec declares most of them.
+        - $ref: "#/components/parameters/thing-id"
+        # Declared on the operation, through a shared schema without a pattern.
+        - name: part_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/plain-string"
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+components:
+  parameters:
+    thing-id:
+      name: thing_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    plain-string:
+      type: string

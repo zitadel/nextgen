@@ -37,3 +37,50 @@ apps/api/api/openapi/components/flows/flow-definition-step.yaml:
     - '#/not/anyOf/1/required/0'
     - '#/not/anyOf/2/not/required/0'
     - '#/not/anyOf/2/properties/transitions/not/required/0'
+# rule/path-id-parameter-pattern: ID path parameters that predate the rule and
+# take any string. Each entry goes when its resource gets an ID schema with a
+# pattern (components/schemas/<resource>-id.yaml) and the parameter $refs it.
+apps/api/api/openapi/components/parameters/application-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No application-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/branding-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No branding-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/event-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No event-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/flow-definition-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No flow-definition-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/flow-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No flow-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/grant-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No grant-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/idp-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No idp-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/idp-revision-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No idp-revision-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/oauth-settings-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No oauth-settings-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/passkey-registration-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No passkey-registration-id schema yet.
+    - '#/schema/pattern'
+apps/api/api/openapi/components/parameters/schema-id.yaml:
+  rule/path-id-parameter-pattern:
+    # No schema-id schema yet.
+    - '#/schema/pattern'
