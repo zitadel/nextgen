@@ -13,7 +13,8 @@ application, not in this template.
    patterns, the required `{% mandatory_gates %}` tag) and shows the diff
    against what is live, without publishing anything.
 3. `zitadel deploy` — builds `.zitadel/` into an immutable release and makes it
-   live. The login UI picks up the newest release on the next step response.
+   live. A login that starts after the deploy uses the new release. A login
+   already open keeps the release it started with.
 
 A deploy of changed content publishes a new immutable release; there is no
 in-place update. Unchanged content is deduplicated and reuses the existing
@@ -32,7 +33,10 @@ release rather than publishing another. Roll back a deployment with
 
 ## Make it yours
 
-- Brand asset URLs go in `branding.json` and must use `https://`. Each template
+- Brand asset URLs go in `branding.json` and must use `https://`. While you
+  develop, image URLs may also use `http://` on `localhost`, a `127.x.x.x`
+  address or `[::1]`. The login shows them only when its own page is served
+  over `http://` on one of those hosts. `typography.font_url` always needs `https://`. Each template
   decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
   none until you add it to `login.liquid`. Set the typeface with
   `typography.font_family`. `typography.font_url` is loaded when the component
@@ -71,7 +75,8 @@ release rather than publishing another. Roll back a deployment with
   shows no logo, and the top-level `logo_url` applies only when neither side
   sets one. `theme.mode` (`light`, `dark` or `auto`) picks the side, but the
   component's `theme` attribute wins over it. A branding that sets only one
-  side always shows that side.
+  side always shows that side. Neither `theme.mode` nor the `theme` attribute
+  can change it.
 
   Guide: https://preview.zitadel.com/docs/guides/customize-design
 
