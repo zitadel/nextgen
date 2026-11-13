@@ -3099,15 +3099,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
 		Return(domain.ErrUserAlreadyExists())
 	// Re-resolution walks the identifier-class candidates in field order:
-	// the username is fresh (rejected), the email resolves the owner.
+	// the username is fresh (rejected), the email resolves the owner. Both
+	// are a sign-up's lookups, so the fresh one writes no failed check.
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "username" && in.Value == username
+			return in.AttributeName == "username" && in.Value == username && in.Register
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "email" && in.Value == email
+			return in.AttributeName == "email" && in.Value == email && in.Register
 		})).
 		Return(existingUserID, nil)
 

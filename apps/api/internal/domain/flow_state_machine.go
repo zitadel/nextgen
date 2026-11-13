@@ -2076,12 +2076,16 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 				}
 				for _, candidate := range candidates {
+					// Only a sign-up's create loses this race, so a free
+					// candidate is the sign-up's own value, not a failed
+					// sign-in: Register keeps it from writing one.
 					userID, rerr := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 						ProjectID:     state.ProjectID,
 						AttemptID:     state.AuthAttemptID,
 						AttributeName: candidate[0],
 						Value:         candidate[1],
 						UserSchemaURL: state.UserSchemaURL,
+						Register:      true,
 					})
 					if rerr == nil {
 						recordResolvedUser(state, userID)
