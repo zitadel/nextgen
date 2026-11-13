@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
-import PoliciesTest, {
+import PolicyTestCommand, {
   type PolicySuiteResult,
   type PolicyUnderTest,
-} from "@/cli/commands/policies/test";
+} from "@/cli/commands/policy/test";
 import { PolicyService } from "@/lib/backend";
 import { PolicyTest, SignupPolicy } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
@@ -51,10 +51,10 @@ const FAILED = {
 };
 
 /**
- * `policies test` with its runner and its rendering reachable, to drive them
+ * `policy test` with its runner and its rendering reachable, to drive them
  * without a run.
  */
-class ReachablePoliciesTest extends PoliciesTest {
+class ReachablePolicyTest extends PolicyTestCommand {
   /**
    * Evaluates every case of every test file against its operation's policy.
    *
@@ -89,8 +89,8 @@ class ReachablePoliciesTest extends PoliciesTest {
  *
  * @returns The command, its runner and rendering reachable.
  */
-function aCommand(): ReachablePoliciesTest {
-  return new ReachablePoliciesTest([], CONFIG);
+function aCommand(): ReachablePolicyTest {
+  return new ReachablePolicyTest([], CONFIG);
 }
 
 /**
@@ -185,7 +185,7 @@ const POLICY_FILE = { file: `.zitadel/policies/${PASSWORD_POLICY}.json` };
  */
 const POLICIES = new Map([[PASSWORD_POLICY, { config: { min_length: 12 }, source: POLICY_FILE }]]);
 
-describe("PoliciesTest.runPolicyTests", () => {
+describe("PolicyTestCommand.runPolicyTests", () => {
   describe("when the answers arrive out of order", () => {
     it("keeps the files in order", async () => {
       const results = await aCommand().runCases(answeringBackwards(5), TWO_FILES, new Map());
@@ -290,7 +290,7 @@ describe("PoliciesTest.runPolicyTests", () => {
   });
 });
 
-describe("PoliciesTest.renderPolicyTestResults", () => {
+describe("PolicyTestCommand.renderPolicyTestResults", () => {
   it("names the policy file and each case, and the totals", () => {
     const suite = {
       operation: PASSWORD_POLICY,
@@ -365,12 +365,12 @@ describe("PoliciesTest.renderPolicyTestResults", () => {
   });
 });
 
-describe("PoliciesTest.execute", () => {
+describe("PolicyTestCommand.execute", () => {
   describe("when a file of a kind that holds no policy cannot be read", () => {
     withDir("still looks for the policy tests", async ({ dir }) => {
       await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
 
-      const envelope = await PoliciesTest.run(["--cwd", dir, "--json"]);
+      const envelope = await PolicyTestCommand.run(["--cwd", dir, "--json"]);
 
       expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({ status: "skipped" });
     });

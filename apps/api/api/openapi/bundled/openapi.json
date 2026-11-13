@@ -205,7 +205,7 @@
     "/users": {
       "post": {
         "operationId": "createUser",
-        "x-zitadel-cli": "users create",
+        "x-zitadel-cli": "user create",
         "summary": "Create a user",
         "description": "Creates a user whose attributes satisfy the user schema named in the request.\n\nThe server assigns the user's ID and returns it. `schema` is the `id` of a\nschema, as `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With\n`team_id`, the user also becomes an active member of that team. A value the\nschema marks unique that another user already holds is refused with `409`;\nsend a different value.\n",
         "tags": [
@@ -314,7 +314,7 @@
     "/users/query": {
       "post": {
         "operationId": "queryUsers",
-        "x-zitadel-cli": "users list",
+        "x-zitadel-cli": "user list",
         "summary": "Query users",
         "description": "Returns the users of a project, paginated with a cursor.\n\n`project_id` names the project to list; without it, the credential's own\nproject is listed.\n\nAccepts either a project secret (`oauth2`) or a user-bound console\nsession cookie (`sessionCookie`). Cookie-authenticated requests\nfollow the scheme's CSRF rules (`sessionCookie`).\n\nWith a project secret, embedding `teams` with `expand`, or filtering by\n`team_id`, also needs `team_membership.read`. Embedding\n`lifecycle_owner_team` needs `team.read`. A console session carries no\nscopes: it may do both when it may read the whole project, and gets\n`403 user.permission_denied` otherwise.\n",
         "tags": [
@@ -396,7 +396,7 @@
     "/users/{user_id}": {
       "get": {
         "operationId": "getUser",
-        "x-zitadel-cli": "users get",
+        "x-zitadel-cli": "user get",
         "summary": "Get a user by ID",
         "description": "Returns a user by ID, with the attributes its schema defines.\n\nWith `team_id`, the user is returned only while they are an active member\nof that team.\n",
         "tags": [
@@ -463,7 +463,7 @@
       },
       "patch": {
         "operationId": "updateUser",
-        "x-zitadel-cli": "users update",
+        "x-zitadel-cli": "user update",
         "summary": "Update a user by ID",
         "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
         "tags": [
@@ -563,7 +563,7 @@
       },
       "delete": {
         "operationId": "deleteUser",
-        "x-zitadel-cli": "users delete",
+        "x-zitadel-cli": "user delete",
         "summary": "Delete a user by ID",
         "description": "Deletes a user, removes them from every team they belong to, and revokes\nevery grant they hold, on any project.\n\nThe user is removed, not deactivated, and the deletion emits `user.deleted`,\nplus `authz.revoked` for each grant on that grant's project.\nWith a project secret the request is idempotent: deleting a user that exists\nin no project succeeds without changing anything. Deleting the last active\nmember of a project's owning team returns 409 `proj.last_owner` and changes\nnothing.\n",
         "tags": [
@@ -2623,7 +2623,7 @@
     "/projects/query": {
       "post": {
         "operationId": "queryProjects",
-        "x-zitadel-cli": "projects list",
+        "x-zitadel-cli": "project list",
         "summary": "Query projects",
         "description": "Returns the project the project secret belongs to, as a page of at most one\nproject.\n\nA credential is scoped to one project today, so the filters and sorting\napply to that project alone. A signed-in person lists the projects they can\nact on with `GET /users/me/projects`.\n",
         "tags": [
@@ -2707,7 +2707,7 @@
     "/projects/{project_id}": {
       "get": {
         "operationId": "getProject",
-        "x-zitadel-cli": "projects get",
+        "x-zitadel-cli": "project get",
         "summary": "Get a project by ID",
         "description": "Returns a project's current state: its name, origins, password hashing\nmethod and owning team.\n\nAuthenticate with the project secret, or with the session of a signed-in\nperson who holds a grant on the project.\n",
         "tags": [
@@ -2766,7 +2766,7 @@
       },
       "patch": {
         "operationId": "updateProject",
-        "x-zitadel-cli": "projects update",
+        "x-zitadel-cli": "project update",
         "summary": "Update a project",
         "description": "Updates a project's name or password hashing method.\n\nFields you leave out keep their value. Sending `password_hash: null` drops\nthe project's own method and returns to the server default. A change of\nmethod rewrites no stored password: each moves to the new method when its\nowner next signs in or sets a new password.\n\nAuthenticate with the project secret, or with the session of a signed-in\nperson who can act on the project.\n",
         "tags": [
@@ -3599,7 +3599,7 @@
     "/sessions/query": {
       "post": {
         "operationId": "querySessions",
-        "x-zitadel-cli": "sessions list",
+        "x-zitadel-cli": "session list",
         "summary": "Query sessions",
         "description": "Returns a page of a project's sessions.\n\nSessions of every lifecycle state are returned; each carries its `state`.\nRequires the `session.read` scope.\n",
         "tags": [
@@ -3799,7 +3799,7 @@
     "/sessions/{session_id}": {
       "get": {
         "operationId": "getSession",
-        "x-zitadel-cli": "sessions get",
+        "x-zitadel-cli": "session get",
         "summary": "Get a session by ID",
         "description": "Returns the current state of a session, including its factors and all currently satisfied assurance levels.\n\nAn assurance level is a profile, such as `urn:nist:aal:2`, that the\nsession's verified factors satisfy. `assurance_levels[]` may shrink over time\nas factor freshness windows expire, without the session itself expiring.\nTo restore a dropped level, use step-up authentication: create an\nauthentication attempt with the same `session_id`.\n",
         "tags": [
@@ -3865,7 +3865,7 @@
       },
       "delete": {
         "operationId": "revokeSession",
-        "x-zitadel-cli": "sessions revoke",
+        "x-zitadel-cli": "session revoke",
         "summary": "Revoke a session",
         "description": "Revokes a session by deleting it, immediately and for good. A later\n`getSession` (`GET /sessions/{session_id}`) for it answers `404`.\n\nThis is the operator revoke path. It requires the `session.delete` scope on a\nproject-bound credential. End-user sign-out with the session cookie is\n`DELETE /sessions/me` (`sessionCookie` scheme).\n\nIdempotent: revoking a session that does not exist, or was already revoked,\nstill returns `204`. After revocation, any tokens derived from the session are\ninvalidated.\n",
         "tags": [
@@ -4353,7 +4353,7 @@
       },
       "get": {
         "operationId": "listSchemas",
-        "x-zitadel-cli": "schemas list",
+        "x-zitadel-cli": "schema list",
         "summary": "List schemas",
         "description": "Lists the schemas of a project, newest first, paginated with a cursor.\nFilter by `object_type` or `kind`, and choose which revisions to return\nwith `revisions`.\n\nA schema's `id` is what `createUser` (`POST /users`) takes as `schema`.\n",
         "tags": [
@@ -4448,7 +4448,7 @@
     "/schemas/{schema_id}": {
       "get": {
         "operationId": "getSchema",
-        "x-zitadel-cli": "schemas get",
+        "x-zitadel-cli": "schema get",
         "summary": "Get a schema by ID",
         "description": "Returns a schema by ID. A schema ID identifies one immutable revision, so\nthis returns exactly that revision. To find the current revision of an\nobject type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.\n\nSchema IDs are unique within a project, not across projects (the seeded\ndefault schema carries the same `$id` in every project). A console\nsession that manages more than one project names the project with\n`project_id`; without it, the ID is resolved in the credential's own\nproject when it is ambiguous. A project secret always resolves in its\nown project and ignores `project_id`.\n",
         "tags": [
@@ -5131,7 +5131,7 @@
       },
       "get": {
         "operationId": "listFlowDefinitions",
-        "x-zitadel-cli": "flow-definitions list",
+        "x-zitadel-cli": "flow-definition list",
         "summary": "List flow definitions",
         "description": "Lists the project's flow definitions with their configurations, newest by\ncreation time first. A flow definition sets which step of a sign-in\nrenders when, and which fields each step collects.\n\nThe `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{flow_definition_id}`)\ntakes. Filter by `name` to list the revisions of one flow.\n",
         "tags": [
@@ -5241,7 +5241,7 @@
     "/flow_definitions/{flow_definition_id}": {
       "get": {
         "operationId": "getFlowDefinition",
-        "x-zitadel-cli": "flow-definitions get",
+        "x-zitadel-cli": "flow-definition get",
         "summary": "Get a flow definition by ID",
         "description": "Returns one flow definition revision. Pass the `id` that\n`publishFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.\n",
         "tags": [
@@ -5282,7 +5282,7 @@
     "/teams": {
       "post": {
         "operationId": "createTeam",
-        "x-zitadel-cli": "teams create",
+        "x-zitadel-cli": "team create",
         "summary": "Create a team",
         "description": "Creates a team in the project, with a name no other team in the project has.\n\nA team groups users inside a project and can represent a customer. A taken\nname is refused with `409 team.already_exists`: choose another name. The\nnew team has no members yet.\n",
         "tags": [
@@ -5393,7 +5393,7 @@
     "/teams/query": {
       "post": {
         "operationId": "queryTeams",
-        "x-zitadel-cli": "teams list",
+        "x-zitadel-cli": "team list",
         "summary": "Query teams",
         "description": "Returns a page of a project's teams.\n\nPass the response's `next_page_token` as `page_token` to fetch the next\npage. `project_id` names the project to list; without it, the credential's\nown project is listed.\n",
         "tags": [
@@ -5495,7 +5495,7 @@
     "/teams/{team_id}": {
       "get": {
         "operationId": "getTeam",
-        "x-zitadel-cli": "teams get",
+        "x-zitadel-cli": "team get",
         "summary": "Get a team by ID",
         "description": "Returns a team, a group of users inside a project, by ID.\n\nA deactivated team is still returned, with status `deactivated`.\n",
         "tags": [
@@ -5554,7 +5554,7 @@
       },
       "delete": {
         "operationId": "deactivateTeam",
-        "x-zitadel-cli": "teams deactivate",
+        "x-zitadel-cli": "team deactivate",
         "summary": "Deactivate a team",
         "description": "Deactivates a team and removes its memberships.\n\nThe team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with\nstatus `deactivated`. The users whose lifecycle the team owns are\ndeactivated with it.\n\nThe request is idempotent. Deleting a team that is already deactivated\nor does not exist succeeds without changing anything.\n\nA team that still owns a project is refused with `409 team.owns_project`.\nDeactivating it would leave the project owned by a deactivated team and so\nunmanageable. No endpoint ends a team's ownership of a project yet, so for\nnow such a team cannot be deactivated through the API.\n",
         "tags": [
@@ -5623,7 +5623,7 @@
       },
       "patch": {
         "operationId": "updateTeam",
-        "x-zitadel-cli": "teams update",
+        "x-zitadel-cli": "team update",
         "summary": "Update a team",
         "description": "Renames an active team.\n\nOnly active teams can be updated. A deactivated team answers `404`. The new\nname must be unique within the project, and a taken name answers `409`:\nchoose another name.\n",
         "tags": [
@@ -6055,7 +6055,7 @@
     "/idps": {
       "post": {
         "operationId": "publishIdp",
-        "x-zitadel-cli": "idps create",
+        "x-zitadel-cli": "idp create",
         "summary": "Create or revise an identity provider",
         "description": "Creates or revises an identity provider, an external sign-in such as\nGoogle, from its connection document. If the slug does not already exist,\na new identity provider is created. If one with that slug already exists,\na revision is created.\n\nA revision gets a new `revision_id` and does not modify the identity\nprovider's `id`. Identity links, which tie a user to an account at the\nprovider, keep resolving. Releases and authentication attempts stay pinned\nto the revision they captured.\n\nIdentity fields are fixed for the life of the identity provider and a\nrevision that changes one is rejected: `protocol`, `subject_claim`, and\n`issuer`, the field that names the authority. Their values decide which provider\naccount a stored subject belongs to, so changing one would silently\nrepoint existing identities at a different provider.\n\n`subject_claim` is optional, and `sub` is used as the default value. If a\nrevision updates `subject_claim` to a different value than the one set\nduring creation, the request is rejected.\n\nOIDC is the only protocol.\n\nThe document is validated against the `idp-connection.json` schema before\nanything is stored. The rules the server applies when it starts a sign-in\nthen run on the document, so a document that could never start one is\nrefused here with `idp.endpoints_partial`: the OIDC block sets an endpoint\nwithout the others. Set no endpoint, and discovery fills them, or set\n`authorization_endpoint`, `token_endpoint`, `jwks_uri`, and\n`userinfo_endpoint`. `userinfo_endpoint` may be left out when\n`id_token_mapping` is on, but setting it alone still counts as setting an\nendpoint. The details list the missing endpoints.\n\nA refused document stores nothing, and on a revise the current revision\nstays unchanged.\n",
         "tags": [
@@ -6323,7 +6323,7 @@
     "/idps/query": {
       "post": {
         "operationId": "queryIdps",
-        "x-zitadel-cli": "idps list",
+        "x-zitadel-cli": "idp list",
         "summary": "Query identity providers",
         "description": "Returns the identity providers of a project, external sign-ins such as\nGoogle, paginated with a cursor. Each identity provider appears once, with\nits newest revision.\n",
         "tags": [
@@ -6569,7 +6569,7 @@
     "/idps/{idp_id}": {
       "get": {
         "operationId": "getIdp",
-        "x-zitadel-cli": "idps get",
+        "x-zitadel-cli": "idp get",
         "summary": "Get an identity provider by ID",
         "description": "Returns an identity provider, an external sign-in such as Google, by ID at\nits newest revision. `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists\nevery revision of it.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
@@ -7326,7 +7326,7 @@
     "/policies": {
       "get": {
         "operationId": "listPolicies",
-        "x-zitadel-cli": "policies list",
+        "x-zitadel-cli": "policy list",
         "summary": "List policies",
         "description": "Lists the project's policies, one per operation, each as its newest\nrevision.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. The list is ordered by `created_at` (first publish) and then\n`id`. Filter by `operation` to read the policy of one operation; a project\nthat never published one gets an empty list.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
@@ -7606,7 +7606,7 @@
     "/policies/{policy_id}": {
       "get": {
         "operationId": "getPolicy",
-        "x-zitadel-cli": "policies get",
+        "x-zitadel-cli": "policy get",
         "summary": "Get a policy by ID",
         "description": "Returns a policy as its newest revision. A revision applies once a deployed\nrelease pins it.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.\n\nThe lookup is scoped to the project in `project_id`: a policy of another\nproject answers not found exactly as an unknown ID does.\n",
         "tags": [
@@ -8615,7 +8615,7 @@
     "/grants": {
       "post": {
         "operationId": "createGrant",
-        "x-zitadel-cli": "grants create",
+        "x-zitadel-cli": "grant create",
         "summary": "Create a grant",
         "description": "Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.\n\nThe project is the one named by the `project_id` query parameter. Name the\nprincipal with `user` (`user_id` or `identifier`) or `team` (`team_id` or\n`name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that\n`getGrant` (`GET /grants/{grant_id}`) and `deleteGrant` (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not\ncreated here: a claim, which attaches a project to a team, creates them.\n\nAn unrevoked grant with the same principal and relation holds that binding\neven after `expires_at`. Revoke it with `deleteGrant` before you create it\nagain.\n\nCreate does not accept `expand`. The `user_id` and team locators return `201`,\nwhose `user` and `team` carry only `user_id` and `team_id`. They still answer\n`404` or `409` when the principal is missing or the grant already exists.\nCreating by `user.identifier` answers `202` with no body on every outcome.\nGranting the session caller's own user is `grant.invalid` on either user\nlocator. A `201` grant names its user or team by ID only: read it back\nwith `getGrant` for the identifier and display name. A `202` returns no\ngrant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A session caller is authorized as the signed-in person\nagainst the target project, even when the session belongs to another project.\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
@@ -8729,7 +8729,7 @@
     "/grants/query": {
       "post": {
         "operationId": "queryGrants",
-        "x-zitadel-cli": "grants list",
+        "x-zitadel-cli": "grant list",
         "summary": "Query grants",
         "description": "Returns a page of a project's grants.\n\nOnly unrevoked grants this API manages are listed, which bind a user or team\nto the viewer, editor or admin role. Expired grants are included, so a client\ncan revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding again.\nProject-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are\nnot returned. Requires `project.read`.\n\n`expand: [\"principal\"]` adds envelope fields on `user` and `team`. For project\nsecrets it additionally requires `user.read` and `team.read`. A user-bound\nconsole session that already passed the project check may expand without those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
@@ -8811,7 +8811,7 @@
     "/grants/{grant_id}": {
       "get": {
         "operationId": "getGrant",
-        "x-zitadel-cli": "grants get",
+        "x-zitadel-cli": "grant get",
         "summary": "Get a grant by ID",
         "description": "Returns a grant by ID, when this API manages it and it has not been revoked.\n\nThis API manages grants that bind a user or team to the viewer, editor or\nadmin role. An expired grant is still returned, so you can revoke it with\n`deleteGrant` (`DELETE /grants/{grant_id}`) before you grant the same binding again. Authorization still\nignores expired grants. Send `project_id` as well as the grant ID.\nMisses, revoked grants, project-secret setup rows (`sk_proj`), owning-team\n(`relation=team`) rows and grants of another project all return `404`.\n\n`expand=principal` adds envelope fields on `user` or `team`. For project\nsecrets it requires `user.read` and `team.read` in addition to `project.read`.\nA user-bound console session that already passed the project check may expand\nwithout those scopes.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
@@ -8896,7 +8896,7 @@
       },
       "delete": {
         "operationId": "deleteGrant",
-        "x-zitadel-cli": "grants delete",
+        "x-zitadel-cli": "grant delete",
         "summary": "Revoke a grant",
         "description": "Revokes a grant this API manages and emits `authz.revoked`.\n\nA revoked grant cannot be restored: create a new one. Already-revoked, missing,\nproject-secret setup and owning-team grants return `404`. Expired grants can\nstill be revoked, so the binding can be reused.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Cookie requests follow that scheme's CSRF rules.\n",
         "tags": [
@@ -9623,7 +9623,7 @@
     "/events": {
       "get": {
         "operationId": "listEvents",
-        "x-zitadel-cli": "events list",
+        "x-zitadel-cli": "event list",
         "summary": "List events",
         "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `user_id`, `actor_id` or `entity_type` with or without\n`category`, each with or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
@@ -9879,7 +9879,7 @@
     "/events/{event_id}": {
       "get": {
         "operationId": "getEvent",
-        "x-zitadel-cli": "events get",
+        "x-zitadel-cli": "event get",
         "summary": "Get an event by ID",
         "description": "Returns one event of a project by its ID. Requires `events.read`.\n\nPass the `id` of an event that `listEvents` (`GET /events`) returns, with its\n`project_id`. An unknown ID and the ID of another project's event both\nanswer `404`.\n\nA project that is not claimed yet also answers `404`: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n",
         "tags": [

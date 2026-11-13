@@ -1208,7 +1208,7 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
  * store the way the server allocates revisions from a bundle: a schema or flow
  * whose content matches the project's newest revision of the same handle reuses
  * it, anything else allocates a new one. This is what makes a deployed schema or
- * flow observable through `schemas list` / `flow-definitions list`. Branding has
+ * flow observable through `schema list` / `flow-definition list`. Branding has
  * no store here, so it keeps a synthesised revision id.
  */
 function materializeBundle(
@@ -3263,7 +3263,7 @@ export function setupPlatformHandlers() {
     // --- operation policies ---------------------------------------------------
     // `setup` publishes the password policy here, a release build publishes
     // `.zitadel/policies/*.json` through the same revision helper, and
-    // `policies list|get` read them back. They mirror the server's answers: an
+    // `policy list|get` read them back. They mirror the server's answers: an
     // unknown setting is malformed (`req.invalid` there), and a minimum above
     // the maximum fails the template's config rule (`pol.invalid`).
 

@@ -432,7 +432,7 @@ browser. The CLI's packs this commit's
 CLI, as `@zitadel/release#pack` does, and drives it with `--non-interactive --json`
 from an empty directory: `setup --server <deployment>` creates a project,
 then `deploy`, `variable set` and `list`, `origin add` and `list`,
-`deployment list` and `rollback` run on it, and a browser signs up on the
+`deployment list` and `deployment rollback` run on it, and a browser signs up on the
 console to finish the `claim` the CLI starts. Each run leaves that project in
 the deployment's database, so only previews run it, and it skips the
 production domain. The CLI never holds the bypass secret: it reaches the

@@ -1,0 +1,38 @@
+{
+  "name": "@zitadel/conformance-qwik-router",
+  "private": true,
+  "license": "MIT",
+  "description": "Blank project with routing included",
+  "engines": {
+    "node": "^18.17.0 || ^20.3.0 || >=21.0.0"
+  },
+  "engines-annotation": "Mostly required by sharp which needs a Node-API v9 compatible runtime",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode ssr --port 3219 --strictPort",
+    "typecheck": "tsc --incremental --noEmit",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@qwik.dev/core": "catalog:",
+    "@qwik.dev/router": "catalog:",
+    "@types/node": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/sdk-qwik": "workspace:*",
+    "@zitadel/sdk-qwik-router": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-tsconfig-paths": "^4.2.1"
+  },
+  "conformance": {
+    "framework": "qwik-router",
+    "appPort": 3219,
+    "zitadelPort": 8219,
+    "generatePort": 8319
+  }
+}
