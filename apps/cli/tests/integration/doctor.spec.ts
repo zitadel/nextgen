@@ -5,6 +5,7 @@ import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aSetUpApp,
+  aSetUpReactApp,
   MOCK_SERVER_URL,
   SETUP_ORIGIN,
   type ScaffoldedApp,
@@ -188,6 +189,15 @@ const CHECK = {
     message: "Project is not on a server where teams apply",
     path: ".zitadel/secret",
     category: "project",
+  },
+};
+
+/** A passing doctor run whose managed-files check passed. */
+const MANAGED_FILES_PASSING = {
+  data: {
+    checks: expect.arrayContaining([
+      expect.objectContaining({ name: "managed-files", status: "pass" }),
+    ]),
   },
 };
 
@@ -601,6 +611,15 @@ describe("doctor", () => {
           warnings: [],
         });
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("moves a Vite app's dev proxy that fixes the server's address onto ZITADEL_URL", async () => {
+        const app = await aSetUpReactApp();
+        await app.fixesItsServerAddress();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(app.envelopeOf(result)).toMatchObject(MANAGED_FILES_PASSING);
       });
 
       it("removes nothing while repairing", async () => {

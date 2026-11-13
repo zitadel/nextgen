@@ -1037,6 +1037,27 @@ reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
 wrote them; ones changed by hand must be updated by hand, which the failure
 says. Browsers signed in before the change sign in again.
 
+A Vite app's dev proxy (React, Vue, Solid, Svelte, Qwik) reaches the server
+at `ZITADEL_URL`, read with Vite's `loadEnv`: the process environment first,
+then `.env.development.local` (which `setup` writes it to, beside
+`.env.local`), `.env.development`, `.env.local` and `.env`, then the address
+`setup` ran against, which `vite.config.*` carries as the fallback. So a test
+run points the app at its own server through the environment, and an app
+without the variable keeps working. An empty value counts as unset and hides
+the sources below it: an empty `ZITADEL_URL` in the process environment skips
+the env files and lands on the fallback. A value that is no http(s) URL stops
+the config from loading, `vite build` included, naming the variable; one with a
+path is reduced to its origin. A proxy an older CLI wrote fixes the address in
+`vite.config.*`: it still works, and `doctor` warns (`managed-files`,
+`unapplied managed config edit(s)`). `doctor --fix`, which `upgrade` runs,
+turns it into the current target with that address as the fallback, moving
+nothing between files, so with the env files as they are the app reaches the
+same server; a `ZITADEL_URL` the shell or CI exports now takes effect. It leaves the proxy alone, with a warning naming both
+addresses and the file, while the env files set `ZITADEL_URL` to another
+server, and it warns about a proxy changed by hand or a target set on purpose
+without touching either. Angular's `proxy.conf.cjs` reads the process
+environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
+
 ## Testing the app
 
 When the developer wants automated tests of the sign-in, or of pages behind
@@ -1052,7 +1073,8 @@ created or the runtime `start` runs.
   then its `next_actions` (Chromium, once) and `next_commands`: it writes a
   sign-in test and a signed-in test, adds the dev dependencies and a
   `test:e2e` script. `tests add --help` lists what it writes and refuses.
-  Another framework: wire the kit by hand.
+  Another framework: wire the kit by hand. A React, Vue, Solid, Svelte or
+  Qwik app `setup` wired takes the kit's `viteAppEnv` as `app.env`.
 - Seed a user per test (`seed.user()`) and drive the real login
   (`loginWithPassword`) to test the sign-in itself.
 - Start other tests signed in (`authenticatedPage`, or `seed.session()` for

@@ -155,11 +155,14 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (unverifiable.length > 0) {
       warnings.push(
-        `unverifiable managed config wiring (manual review required): ${unverifiable
-          .map((s) => {
-            return s.reason ? `${s.path} (${s.reason})` : s.path;
-          })
-          .join(", ")}`,
+        // Wirings in one file share its parse error: say each reason once.
+        `unverifiable managed config wiring (manual review required): ${[
+          ...new Set(
+            unverifiable.map((s) => {
+              return s.reason ? `${s.path} (${s.reason})` : s.path;
+            }),
+          ),
+        ].join(", ")}`,
       );
     }
     for (const leftover of removable) {

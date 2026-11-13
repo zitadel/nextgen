@@ -45,6 +45,7 @@ export type InterruptedRun = Readonly<{
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -1904,6 +1905,15 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /**
+   * Gives the Vite app's dev proxy the target setup fixed in it, the server it
+   * ran against, before the proxy read `ZITADEL_URL`.
+   */
+  async fixesItsServerAddress(): Promise<void> {
+    const config = await this.readProjectFile(VITE_CONFIG);
+    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, MOCK_SERVER_URL));
+  }
+
   /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
   async hasInstalled(name: string, version: string): Promise<void> {
     await mkdir(join(this.path, "node_modules", name), { recursive: true });
@@ -2758,6 +2768,51 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
+}
+
+/** A Vite app's config, into which setup merges the dev proxy. */
+const VITE_CONFIG = "vite.config.ts";
+
+/** A React app as create-vite's react-ts template leaves it, before setup. */
+export async function aReactApp(): Promise<ScaffoldedApp> {
+  const path = await mkdtemp(join(tmpdir(), "zitadel-react-"));
+  await mkdir(join(path, "src"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-react-app",
+        private: true,
+        type: "module",
+        scripts: { dev: "vite" },
+        dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" },
+        devDependencies: { vite: "^8.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "index.html":
+      '<!doctype html>\n<html>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
+    "src/main.tsx":
+      'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\n\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
+    "src/App.tsx": "export default function App() {\n  return null;\n}\n",
+    [VITE_CONFIG]: BARE_VITE_CONFIG,
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * A React app already through `setup`, for specs about its dev proxy. Setup
+ * replaces create-vite's own `src/App.tsx` only when forced.
+ */
+export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
+  const app = await aReactApp();
+  const result = await app.setup(["--no-git", "--force", "--framework", "react"]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
 }
 
 /**

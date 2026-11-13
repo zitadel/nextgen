@@ -1,4 +1,8 @@
+import { join } from "node:path";
+import { parseEnv } from "node:util";
+
 import { resolveEnvironment } from "@/lib/environment";
+import { readIfReadable } from "@/lib/fs";
 import { type FrameworkFacts, issuerFromPort, type Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
@@ -42,6 +46,7 @@ export async function loadPatchContext(
     posture: scaffold?.posture ?? "page",
     preset: readPreset(config),
     useCase: readUseCase(config),
+    developmentServerUrl: await developmentServerUrl(cwd),
     project: {
       id: secret.project_id,
       project_secret: secret.project_secret,
@@ -98,4 +103,14 @@ async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string
     return issuerFromPort(scaffold.dev_port);
   }
   return facts.url;
+}
+
+/**
+ * `ZITADEL_URL` as `.env.development.local` sets it, which the base ops keep
+ * and Vite ranks above the other env files; `undefined` when the file does
+ * not set it or cannot be read.
+ */
+async function developmentServerUrl(cwd: string): Promise<string | undefined> {
+  const text = await readIfReadable(join(cwd, ".env.development.local"));
+  return text === undefined ? undefined : parseEnv(text).ZITADEL_URL;
 }
