@@ -1,0 +1,38 @@
+{
+  "name": "@zitadel/conformance-next",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev --port 3216",
+    "install-browsers": "playwright install chromium",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@zitadel/sdk-next": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  },
+  "conformance": {
+    "framework": "next",
+    "appPort": 3216,
+    "zitadelPort": 8216,
+    "generatePort": 8316
+  }
+}

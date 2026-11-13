@@ -342,13 +342,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
         .map(({ taskId }) => taskId);
       expect(changedJourneys).toEqual(["@zitadel/e2e#journey:svelte"]);
       // The conformance fixtures reach their SDKs through `^build`
-      // (conformance/suite/turbo.json), so only the one that installs it moves.
+      // (conformance/suite/turbo.json), so only the ones that install it move:
+      // the Svelte and the SvelteKit app.
       const changedFixtures = [...next.values()]
         .filter(({ taskId }) => /^@zitadel\/conformance-[^#]+#/.test(taskId))
         .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
         .map(({ taskId }) => taskId)
         .sort();
       expect(changedFixtures).toEqual([
+        "@zitadel/conformance-svelte#conformance",
+        "@zitadel/conformance-svelte#typecheck",
         "@zitadel/conformance-sveltekit#conformance",
         "@zitadel/conformance-sveltekit#typecheck",
       ]);

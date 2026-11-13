@@ -9,10 +9,10 @@
 // at the version the CLI pins) in an empty temp directory, against a server
 // booted on the fixture's `generatePort`, then normalize the result (below).
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 
 import { bootLocalServer } from "@zitadel/testing";
 import semver from "semver";
@@ -26,12 +26,13 @@ const HARNESS_FILES = new Set(["playwright.config.mts", "conformance.spec.ts", "
 
 /**
  * What setup leaves in the app that the fixture does not commit, for every
- * framework: install output; the secret and the env files that hold it;
- * the CLI's own state, which the app never reads (`zitadel.json`,
- * `.zitadel/`); the docs setup writes for a person; and editor and
- * package-manager settings, which pnpm and the workspace own.
+ * framework, beyond what the app's own `.gitignore` leaves out (`appFiles`):
+ * install output; the secret and the env files that hold it, whether or not
+ * the app ignores them; the CLI's own state, which the app never reads
+ * (`zitadel.json`, `.zitadel/`); the docs setup writes for a person; and
+ * editor and package-manager settings, which pnpm and the workspace own.
  */
-const DROPPED_DIRS = ["node_modules", ".svelte-kit", ".zitadel", ".vscode"];
+const DROPPED_DIRS = ["node_modules", ".zitadel", ".vscode"];
 const DROPPED_FILES = new Set([
   "package-lock.json",
   ".npmrc",
@@ -51,16 +52,18 @@ function isDropped(path) {
  * The generated scripts the fixture keeps: `dev`, which the lane runs, and
  * the generator's own type-check as `typecheck`, which compiles the pages
  * setup wrote against the SDK's types. That is a `check` script where the
- * generator writes one (sv), else the `tsc -b` its `build` starts with
- * (create-vite).
+ * generator writes one (sv), else the build-mode type-check its `build`
+ * starts with (create-vite's `tsc -b`, or `vue-tsc -b` for a template with
+ * single-file components).
  */
 function keptScripts(scripts) {
   const kept = {};
   if (scripts.dev) kept.dev = scripts.dev;
+  const buildCheck = (scripts.build ?? "").match(/^(\S*tsc) -b(?=\s|$)/);
   if (scripts.check) {
     kept.typecheck = scripts.check;
-  } else if (/^tsc -b(?:\s|$)/.test(scripts.build ?? "")) {
-    kept.typecheck = "tsc -b";
+  } else if (buildCheck) {
+    kept.typecheck = `${buildCheck[1]} -b`;
   }
   return kept;
 }
@@ -142,7 +145,7 @@ async function generate(work, settings, name) {
   }
 
   const files = new Map();
-  for (const path of await listFiles(app)) {
+  for (const path of appFiles(app)) {
     if (isDropped(path)) continue;
     files.set(path, await readFile(join(app, path)));
   }
@@ -216,17 +219,19 @@ async function normalizeManifest(text, settings, name) {
 }
 
 /**
- * `workspace:*` for a Zitadel package, `catalog:` for one the catalog holds
- * at a floor the generated range accepts, and the generated range for one it
- * does not hold. A catalog entry whose floor the range rejects is recorded in
- * `behind`.
+ * `workspace:*` for a Zitadel package, `catalog:` for one the catalog holds,
+ * and the generated range for one it does not hold. A catalog entry whose
+ * floor is below every version the generated range allows is recorded in
+ * `behind`. One above it (a generator that pins an exact release or an older
+ * major, as create-next-app does) stays `catalog:`: the fixture then runs a
+ * newer release than a customer gets, never an older one.
  */
 function workspaceRange(dep, range, catalog, behind) {
   if (dep.startsWith("@zitadel/")) return "workspace:*";
   const pinned = catalog.get(dep);
   if (pinned === undefined) return range;
   const floor = semver.minVersion(pinned);
-  if (!floor || !semver.satisfies(floor, range)) {
+  if (!floor || semver.ltr(floor, range)) {
     behind.push(`  ${dep}: the catalog has ${pinned}, setup writes ${range}`);
   }
   return "catalog:";
@@ -315,19 +320,25 @@ async function committedFiles(fixtureDir) {
     .sort();
 }
 
-/** Every file under `root`, by its `/`-separated path, skipping the dropped directories. */
-async function listFiles(root, dir = root) {
-  const paths = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (dir === root && DROPPED_DIRS.includes(entry.name)) continue;
-      paths.push(...(await listFiles(root, path)));
-    } else if (entry.isFile()) {
-      paths.push(relative(root, path).split(sep).join("/"));
-    }
-  }
-  return paths.sort();
+/**
+ * The files a commit of the generated app would hold, by `/`-separated path:
+ * what its own `.gitignore` files leave in. That leaves out what setup and the
+ * framework's generator write for the machine rather than the repository
+ * (install output, generated types such as `.svelte-kit/`, `.nuxt/` and
+ * `next-env.d.ts`, which the dev server rewrites). The user's global excludes
+ * are left out, so every machine gets the same answer.
+ */
+function appFiles(app) {
+  execFileSync("git", ["init", "--quiet"], { cwd: app });
+  const out = execFileSync(
+    "git",
+    ["-c", "core.excludesFile=/dev/null", "ls-files", "--others", "--exclude-standard", "-z"],
+    { cwd: app, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  return out
+    .split("\0")
+    .filter((path) => path !== "")
+    .sort();
 }
 
 /** The caller's environment without any Zitadel setting that could steer setup. */
