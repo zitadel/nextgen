@@ -165,7 +165,7 @@ export class CredentialPrompt {
    * catalog provider: a custom connection needs its settings repeated too.
    *
    * @param clientId - The client id, or a placeholder for it.
-   * @param pipe - What feeds the secret on stdin, if anything.
+   * @param piped - Whether the command reads the secret from `$CLIENT_SECRET` on stdin.
    * @returns The command, or `undefined` for a custom provider.
    */
   private retryFor(clientId: ClientId | FillIn, piped: boolean): SuggestedCommand | undefined {
