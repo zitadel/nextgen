@@ -31,6 +31,19 @@ export const nextAppEnv: AppEnvTemplate = {
   ZITADEL_PROJECT_SECRET: "projectSecret",
 };
 
+/**
+ * The env shape a Vite app reads — React, Vue, Solid, Svelte and Qwik — as
+ * `zitadel setup` writes it: its dev proxy reaches the server at `ZITADEL_URL`
+ * with the secret and names the session cookie after `ZITADEL_PROJECT_ID`,
+ * and the widgets read the public copy Vite exposes to the browser.
+ */
+export const viteAppEnv: AppEnvTemplate = {
+  ZITADEL_URL: "baseUrl",
+  ZITADEL_PROJECT_ID: "projectId",
+  VITE_ZITADEL_PROJECT_ID: "projectId",
+  ZITADEL_PROJECT_SECRET: "projectSecret",
+};
+
 export function applyAppEnvTemplate(
   template: AppEnvTemplate,
   handle: InstanceHandle,

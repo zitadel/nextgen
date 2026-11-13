@@ -15,7 +15,7 @@ import * as server from "./server.js";
  * build under them.
  *
  * The load checks read the built `dist/` (the `test` task depends on `build`
- * in moon.yml, as `standalone-artifact.spec.ts` does).
+ * in turbo.json, as `standalone-artifact.spec.ts` does).
  */
 
 // Resolved from the package cwd, not `import.meta.url` — vite rewrites module

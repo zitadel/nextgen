@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05, 2026-11-12)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -225,17 +225,97 @@ the sidebar.
 > anything beneath it shows Settings' (`view: "settings"`), under a heading
 > row that leads back to Projects.
 
+> **Amendment (2026-11-10, design decision D34):** the account list draws
+> Projects, then the portal's entries, then the account's other entries; a
+> portal entry named like an account one is left out. Its project-scoped rows
+> link with `project: undefined`, so `_authed` does not retain the selection
+> and the guard asks for a project as D22 has it.
+
+> **Amendment (2026-11-11, design decision D38):** a selected project stays
+> selected above every project. This replaces D34's `project: undefined` links
+> and D27's pill: on Projects and `/settings` the account list's rows open in
+> the selected project, and the pill names it. With none selected the pill
+> says `All projects` and a project's row asks for one (D22, D31).
+
+> **Amendment (2026-11-11, design decision D42):** the account list is the
+> root's: Projects, then the reserved platform project's screens for someone
+> who may act on it, then Settings. Those screens are the portal's own
+> routes: a row of the root's selects the platform project (`?project=`), and
+> while it is the selection the shell shows the account list on them, as on
+> `/account`, and the pill says `All projects`. This replaces D34's amendment
+> above, whose rows asked for a project. The list leaves out Overview, and the
+> project's Settings row, whose pages head the root's Settings list before
+> what an add-on adds; `/project` shows that list while the platform project
+> is selected. `/events` leads back to Projects then. The `_authed` guard
+> drops the selection for someone who may not act on that project.
+
+> **Amendment (2026-11-12, design decision D44):** the top bar is a path from
+> the root down, as Vercel's runs from the team to the project. On every
+> screen that shows the account or root Settings list, and on any drawn for
+> the platform project, it is the root's pill alone: `Platform` for someone
+> who may act on the platform project, `All projects` for anyone else. Those
+> screens (`/projects`, `/settings` with anything beneath it, `/account`)
+> hold the root as the selection: the `_authed` guard sets `?project=` to the
+> platform project for someone who may act on it and drops it for anyone
+> else, and gives them no default, so no project stays selected there
+> unnamed. Links up carry it already (`useRootSearch`). Inside a project the bar reads the root, a link to Projects, then the
+> project's pill (`Platform / fabis-app ▾`), then the team on a team's page.
+> The pill's list offers the platform in a section of its own above the
+> projects and checks the row the pill stands for; choosing the platform keeps
+> a list screen the root has and otherwise opens Projects. This replaces
+> D36's kept selection, D38's pill on Projects and `/settings` and D42's
+> `All projects` for the root.
+
+> **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
+> project's Overview, declaring `scope: "project"` and the portal list's first
+> entry. The `_authed` guard sends it to Projects without `?next=` when no
+> project can be chosen for the person, since arriving asked for no screen.
+> The account list leaves the portal entry at `/` out.
+
 > **Amendment (2026-11-10, design decision D30):** `/events` with anything
-> beneath it shows a list of its own too, Logs' (`NavView` `"logs"`), under a
+> beneath it shows a list of its own too, Events' (`NavView` `"events"`), under a
 > heading row that leads back to the project's landing route, `/`. The route
 > still picks the list, and it is the first whose rows are not
-> `staticData.nav` entries: no route declares `view: "logs"`. Its rows are the
-> views of the one Logs screen and its filters, which live in that route's
+> `staticData.nav` entries: no route declares `view: "events"`. Its rows are the
+> views of the one Events screen and its filters, which live in that route's
 > search params (`validateSearch`) and which the events feature draws
-> (`src/features/events/components/logs-nav.tsx`). A Logs URL therefore
+> (`src/features/events/components/events-nav.tsx`). An Events URL therefore
 > restores the list, the view and the filters on a refresh. A screen gets such
-> a list only when its views and filters are navigation the way Logs' are;
+> a list only when its views and filters are navigation the way Events' are;
 > every other entry stays a route with `staticData.nav`.
+
+> **Amendment (2026-11-10, D30):** the Events list is the layout route
+> `/events` (`routes/_authed/events/route.tsx`), which owns the filters
+> (`validateSearch`) and the list's loader; `/events/` only carries the
+> sidebar entry. An event, `/events/$eventId`, is its child and opens in a
+> drawer over the list, as Vercel's Logs opens a request: the list's match
+> stays, so opening or stepping through events never reads the list again, and
+> the drawer's URL carries the list's filters. A loader that must not rerun
+> when a child changes belongs to the layout route, keyed on the search it
+> reads.
+
+> **Amendment (2026-11-11, D30):** Events' list chooses the view from a picker
+> (each view's glyph, name and what it holds), as Vercel's Logs chooses its
+> kind of log, rather than one row per view, and keeps only the filters chosen
+> from a list (time, category, type or status). The values a person pastes
+> (the ids, the operation, the resource type, My activity) are set in the
+> search above the table and shown there as chips. The URL keeps every filter
+> as before.
+
+> **Amendment (2026-11-11, design decision D38):** the screen and its list are
+> named Events, as the route, the API and the CLI are, and the list's
+> `NavView` is `"events"`.
+
+> **Amendment (2026-11-11, design decision D40):** a project's Settings row
+> opens a list of its own, as the root Settings row on Projects does (D29) and
+> as Vercel's project Settings does: both Settings rows carry the arrow and
+> swap the list. `/project` is a layout route (`routes/_authed/project/route.tsx`)
+> that reads the project and draws its header; its pages are routes beneath it
+> with `nav.view: "project-settings"` (General, Admins), and `/project/` only
+> carries the portal entry and forwards to General. `/project` with anything
+> beneath it shows that list under a heading row that leads back to the
+> project's landing, `/`. The root Settings are the platform project's and may
+> list other pages than a project's; only the way they open is shared.
 
 ## Consequences
 

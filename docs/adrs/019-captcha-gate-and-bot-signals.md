@@ -4,6 +4,53 @@
 > **Date:** 2026-05-26
 > **Context:** Flow engine gates, bot detection, captcha providers, edge/platform risk signals
 
+> **Implemented slice (2026-11-03):** Password and passkey signup use ZITADEL-owned PBKDF2
+> proof of work, a native browser solver, database-backed single-use proofs and
+> fixed per-flow retry limits. See the [implementation](../design/flowengine/bot-protection-implementation.md).
+> The broader provider/CEL/signal design below remains proposed.
+
+## Minimal signup decision
+
+The turnkey implementation is internal PBKDF2, with no ALTCHA server or library.
+This supersedes the proposed built-in ALTCHA choice below. The runtime injects
+`gates.signup_pow` with `kind: captcha`, `provider: zitadel_pow` and a typed public
+`challenge`. The existing `gate_proofs` submission channel carries its solution.
+Enforcement lives in the shared `create_user` handler before password hashing,
+and in the passkey registration before an attestation creates its user;
+proofs are not authentication factors and do not go through `auth_attempts`.
+
+Why PBKDF2 of our own rather than ALTCHA:
+
+- The gate needs what a puzzle format does not give: a proof bound to one
+  project and flow, stored and consumed once in the database, with budgets per
+  flow. That is the larger part of the work with either puzzle.
+- The browser solves it with its own Web Crypto (`deriveBits`), so the widget
+  ships no third-party script, WASM or worker, and the server verifies with one
+  HMAC and no KDF.
+- There is no library or hosted service to depend on and keep current, for the
+  server or for a headless client that implements the exchange.
+
+A proof permits one signup attempt scoped to its project and flow.
+Storage atomically consumes it, including when the subsequent mutation fails.
+Pending challenges are reused across renders and expire after five minutes.
+The only active profile is PBKDF2-SHA256, 5,000 iterations and up to 512 trials.
+Database budgets allow 10 issuance attempts and 20 proof submissions per flow per
+minute across replicas. Only that flow's row is locked; there is no project-wide
+signup quota. These limits isolate retries but do not prevent creating new flows,
+which requires ingress rate limits. There is no CEL or client IP trust.
+
+Start and Submit announce the required gate; GET issues or refreshes the puzzle
+before solving. Issuance failure cannot discard a successful transition. GET
+refreshes challenges with less than a minute remaining. Password policy rejection
+leaves the proof usable. Public puzzle data is separate from the encrypted
+verifier; JWE authenticates stored parameters and a single HMAC checks solutions.
+
+The browser uses native asynchronous Web Crypto, with bounded trials, server-enforced expiry,
+a monotonic deadline and disconnect cancellation. Future algorithms require versioned
+supported profiles; arbitrary client cost parameters remain forbidden. Customer
+providers, Cloud BotID, adaptive cost and CEL remain follow-up design work. A
+customer's own provider is still a product goal, not an implemented capability.
+
 ## Decision
 
 Captcha is the single gate kind ([ADR 013][adr013] fixed gates as captcha-only). This
@@ -119,7 +166,7 @@ sequenceDiagram
     E->>B: step.gates[bot_check] = { kind, provider, config }
     Note over E,A: Altcha challenge minted server-side at render
     B->>B: solve PoW (Altcha) OR vendor widget token
-    B->>E: POST /flow/{id}/submit { gate_proofs: { bot_check: "<proof>" } }
+    B->>E: POST /flow/{flow_id}/submit { gate_proofs: { bot_check: "<proof>" } }
     E->>A: issue+verify challenge (method: captcha)
     A->>P: verify (Altcha recompute / vendor siteverify + secret)
     P-->>A: ok / fail
@@ -245,7 +292,7 @@ This list doubles as the implementation checklist for the follow-up PRs.
 
 - **Risk-based difficulty and dynamic injection** depend on the policy engine; this ADR
   fixes the contract so they can land without a contract change.
-- **Fingerprint / behavioral telemetry** continue to flow through `/flow/{id}/event`
+- **Fingerprint / behavioral telemetry** continue to flow through `/flow/{flow_id}/event`
   (observation-only); only the synchronous edge verdict uses the inline header.
 
 [adr005]: 005-public-runtime-private-credentials.md

@@ -25,11 +25,10 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 
-	resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: "proj_1234",
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -67,7 +66,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	existingResp, err := client.CreateFlowDefinition(
+	existingResp, err := client.PublishFlowDefinition(
 		t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
 	)
@@ -78,7 +77,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 	tests := []struct {
 		name     string
 		req      *api.CreateFlowDefinitionRequest
-		wantResp api.CreateFlowDefinitionRes
+		wantResp api.PublishFlowDefinitionRes
 	}{
 		{
 			name: "flow definition created successfully",
@@ -96,8 +95,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 						},
 						Set: true,
 					},
-					Steps:  validSteps(),
-					Status: api.FlowDefinitionStatusActive,
+					Steps: validSteps(),
 				},
 			},
 		},
@@ -151,7 +149,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
-					Status:     "active",
 					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "collect_identifier"},
 					Audience: api.OptFlowAudience{
@@ -199,7 +196,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
-					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -246,7 +242,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
-					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -290,7 +285,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			resp, err := client.CreateFlowDefinition(t.Context(), tt.req)
+			resp, err := client.PublishFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
 			assertFlowDefinitionResponse(t, tt.wantResp, resp)
 			if created, ok := resp.(*api.FlowDefinitionResponse); ok {
@@ -310,7 +305,6 @@ func newCreateFlowDefinitionRequest(projectID api.ProjectID, definition api.Flow
 func newFlowDefinitionFixture(name string, userSchemaURI string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       name,
-		Status:     "active",
 		UserSchema: userSchemaURI,
 		Purposes:   map[string]string{"login": "step_1"},
 		Audience: api.OptFlowAudience{
@@ -413,7 +407,7 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 	require.NoError(t, err)
 
 	getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
-		ID: "flowDef_1234",
+		FlowDefinitionID: "flowDef_1234",
 	})
 
 	require.NoError(t, err)
@@ -439,11 +433,10 @@ func TestGetFlowDefinition(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	createResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	createResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -463,7 +456,7 @@ func TestGetFlowDefinition(t *testing.T) {
 	emptyCollections.Audience.Value.AppIds = []string{}
 	emptyCollections.Steps[1].Actions = []api.StepAction{}
 	emptyCollections.Steps[1].Fields = []string{}
-	createResp, err = client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(api.ProjectID(project.ID), emptyCollections))
+	createResp, err = client.PublishFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(api.ProjectID(project.ID), emptyCollections))
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, createResp, helpers.MustMarshal(t, createResp))
 	emptyCollectionsDef := createResp.(*api.FlowDefinitionResponse)
@@ -476,21 +469,21 @@ func TestGetFlowDefinition(t *testing.T) {
 		{
 			name: "get flow definition by id succeeds",
 			req: api.GetFlowDefinitionParams{
-				ID: flowDef.ID,
+				FlowDefinitionID: flowDef.ID,
 			},
 			wantResp: flowDef,
 		},
 		{
 			name: "create response matches get for empty collections",
 			req: api.GetFlowDefinitionParams{
-				ID: emptyCollectionsDef.ID,
+				FlowDefinitionID: emptyCollectionsDef.ID,
 			},
 			wantResp: emptyCollectionsDef,
 		},
 		{
 			name: "non-existing flow definition",
 			req: api.GetFlowDefinitionParams{
-				ID: "non-existing-id",
+				FlowDefinitionID: "non-existing-id",
 			},
 			wantResp: &api.GetFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusNotFound,
@@ -554,11 +547,10 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 
 	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 	for i := range createdFlowDefinitions {
-		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		resp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
 				Name:       fmt.Sprintf("paged-flow-%d", i),
-				Status:     "active",
 				UserSchema: userSchemaURI,
 				Purposes:   map[string]string{"login": "step_1"},
 				Steps:      validSteps(),
@@ -654,11 +646,10 @@ func TestListFlowDefinitionsRevisions(t *testing.T) {
 	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 	createRevision := func(t *testing.T, name string) string {
 		t.Helper()
-		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		resp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
 				Name:       name,
-				Status:     "active",
 				UserSchema: userSchemaURI,
 				Purposes:   map[string]string{"login": "step_1"},
 				Steps:      validSteps(),
@@ -781,11 +772,10 @@ func TestListFlowDefinitions(t *testing.T) {
 	require.NoError(t, err)
 
 	harness.SetProjectSecretOnApiClient(t, client, project1)
-	resp1, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp1, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -802,12 +792,11 @@ func TestListFlowDefinitions(t *testing.T) {
 	flowDef1 := resp1.(*api.FlowDefinitionResponse)
 
 	//harness.SetProjectSecretOnApiClient(t, client, project2) // TODO CHECK
-	resp2, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp2, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-2",
 			UserSchema: userSchemaURI,
-			Status:     "active",
 			Purposes:   map[string]string{"profiling": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -823,11 +812,10 @@ func TestListFlowDefinitions(t *testing.T) {
 	flowDef2 := resp2.(*api.FlowDefinitionResponse)
 
 	// A second revision of flow-1: same name, new id, created last.
-	resp1b, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp1b, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Steps:      validSteps(),
@@ -838,12 +826,11 @@ func TestListFlowDefinitions(t *testing.T) {
 	require.NotEqual(t, flowDef1.ID, flowDef1b.ID)
 
 	harness.SetProjectSecretOnApiClient(t, client, project2)
-	resp3, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp3, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project2.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-3",
 			UserSchema: userSchemaURI,
-			Status:     "active",
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -1001,7 +988,7 @@ func TestListFlowDefinitions(t *testing.T) {
 
 // TestListFlowDefinitionsExpandUserSchema covers `expand=user_schema`
 // (ADR 059 applied to a one-to-one relation): opt-in embedding of the flow's
-// user schema as the same object GET /schemas/{id} returns, off the wire
+// user schema as the same object GET /schemas/{schema_id} returns, off the wire
 // entirely when not requested, and orthogonal to pagination.
 func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
 	t.Parallel()
@@ -1014,13 +1001,13 @@ func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	created, err := client.CreateFlowDefinition(t.Context(),
+	created, err := client.PublishFlowDefinition(t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("expand-flow", schemaURI)))
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))
 	flowID := created.(*api.FlowDefinitionResponse).ID
 
-	schemaRes, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: schemaURI})
+	schemaRes, err := client.GetSchema(t.Context(), api.GetSchemaParams{SchemaID: schemaURI})
 	require.NoError(t, err)
 	require.IsType(t, &api.Schema{}, schemaRes, helpers.MustMarshal(t, schemaRes))
 	wantSchema := *schemaRes.(*api.Schema)
@@ -1129,7 +1116,7 @@ func TestFlowDefinitionFollowsSchemaRevisions(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	created, err := client.CreateFlowDefinition(t.Context(),
+	created, err := client.PublishFlowDefinition(t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("revision-flow", "example-user")))
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))

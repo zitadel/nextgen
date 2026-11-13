@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -20,9 +20,7 @@
     "build": "tsdown && attw --pack . --profile=esm-only",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
     "prepack": "publint --strict"
   },
   "exports": {

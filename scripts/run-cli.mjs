@@ -13,7 +13,6 @@ import {
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture, withWorkspaceTools } from "./dev-process.mjs";
 import { readServerBuildMetadata } from "./server-build.mjs";
-import { runnerCommand, runnerLabel } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
@@ -62,7 +61,7 @@ export async function main(options = {}) {
           registryProcess = registry;
         },
         // What a generated app installs, from cached dev builds; the release
-        // tarballs are release:pack's.
+        // tarballs are @zitadel/release#pack's.
         packageSet: "app",
         paths: localRegistryPaths(registryWorkDir),
         // Keep what Verdaccio proxied from npmjs for the next setup; it drops
@@ -254,21 +253,22 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
 }
 
 export function buildCli({ env = process.env } = {}) {
-  return runTargetsToStderr(["cli:build"], env);
+  return runTasksToStderr(["@zitadel/cli#build"], env);
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  // server:build depends on console:build, so one invocation produces the
-  // fully embedded binary in graph order.
-  await runTargetsToStderr(["server:build"], env);
+  // The server's build depends on the console's, so one invocation produces
+  // the fully embedded binary in graph order.
+  await runTasksToStderr(["@zitadel/server#build"], env);
   const metadata = await readServerBuildMetadata(localServerMetadata);
   return { path: localServerBinary, version: metadata.version };
 }
 
-// The task runner's own output goes to stderr: stdout is the CLI's JSON envelope.
-function runTargetsToStderr(targets, env = process.env) {
-  const { command, args } = runnerCommand(targets, env);
-  const label = runnerLabel(targets, env);
+// Turbo's own output goes to stderr: stdout is the CLI's JSON envelope.
+function runTasksToStderr(tasks, env = process.env) {
+  const command = "turbo";
+  const args = ["run", ...tasks];
+  const label = [command, ...args].join(" ");
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: repoRoot,

@@ -14,6 +14,14 @@
 > **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
 > settled events, so no cursor skips an event whose transaction commits late.
 > See [the amendment](#amendment-2026-10-30-no-cursor-skips-a-late-commit).
+>
+> **Amendment (2026-11-10):** §4's gate lets the deployment's platform project
+> through without a claim, for reads and export alike. See
+> [the amendment](#amendment-2026-11-10-the-platform-project-needs-no-claim).
+>
+> **Amendment (2026-11-10):** §4's gate lets platform operators read every
+> project, and §3's deployment sinks ship every project, claimed or not. See
+> [the amendment](#amendment-2026-11-10-platform-operators-see-every-project).
 
 ## Context
 
@@ -53,7 +61,7 @@ GET /events?project_id=…
          &order=desc
          &page_token=…
 
-GET /events/{id}?project_id=…   # project scope required (see below)
+GET /events/{event_id}?project_id=…   # project scope required (see below)
 ```
 
 **Filter semantics:**
@@ -113,7 +121,7 @@ extension** (predicate filters only — keyset pagination stays on
 }
 ```
 
-`GET /events/{id}` may additionally include delivery status (RECOMMENDED):
+`GET /events/{event_id}` may additionally include delivery status (RECOMMENDED):
 
 ```json
 {
@@ -126,7 +134,7 @@ extension** (predicate filters only — keyset pagination stays on
 
 - `payload` and `metadata` are returned **as stored** — already redacted at emit
   time per [ADR 048 §8](048-wide-events-internal-audit-primitive.md).
-- List response wraps items in `{ "data": [...], "next_page_token": "..." }` per
+- List response wraps items in `{ "events": [...], "next_page_token": "..." }` per
   [ADR 027](027-cursor-based-pagination.md). No total count. List omits
   `deliveries` to keep payloads small.
 
@@ -157,7 +165,7 @@ options. Index: `(project_id, created_at, id)`.
   users and resources can move teams; that must not leak or hide historical
   events.
 
-**`GET /events/{id}` — project-scoped (no `resource_scope_index`):**
+**`GET /events/{event_id}` — project-scoped (no `resource_scope_index`):**
 
 Events are **not** registered in `resource_scope_index` ([ADR 048](048-wide-events-internal-audit-primitive.md)).
 That index stays for durable resources only.
@@ -337,13 +345,18 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 
 - Events are **emitted and stored** for unclaimed projects (including
   `project.created` and pre-claim admin activity).
-- Until claim succeeds, `GET /events`, `GET /events/{id}`, and the shipper
+- Until claim succeeds, `GET /events`, `GET /events/{event_id}`, and the shipper
   treat the project as **not visible** (empty list / 404 / skip ship) — same
   gate for operators and export.
 - After claim, stored history becomes readable and exportable; **no backfill
   job**.
 - Retention remains **time-only** for unclaimed projects (same window); disk
   does not grow forever waiting for claim or sinks.
+- The deployment's platform project is never claimed and is visible from the
+  start ([amendment 2026-11-10](#amendment-2026-11-10-the-platform-project-needs-no-claim)).
+- Platform operators read every project's events, and deployment sinks ship
+  them, before the claim too
+  ([amendment 2026-11-10](#amendment-2026-11-10-platform-operators-see-every-project)).
 
 ## Non-goals
 
@@ -351,7 +364,7 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 - Real-time push subscriptions (webhook shipper is pull-based batching; SSE
   is a future extension).
 - Cross-project event search (always scoped to `project_id`).
-- Flat-by-ID `GET /events/{id}` without project scope / `resource_scope_index`
+- Flat-by-ID `GET /events/{event_id}` without project scope / `resource_scope_index`
   for events.
 - Unbounded multi-webhook lists or additional sink types in v1.
 - Blocking retention on sink delivery.
@@ -501,3 +514,65 @@ ascending list apply it.
   the database's oldest open transaction, a retention purge or a dump
   included. It also sees only the sessions of the reader's role, and only
   while `track_activities` is on.
+
+## Amendment (2026-11-10): the platform project needs no claim
+
+§4 hides a project's events until it is claimed, so that nobody reads its
+history before an accountable owner exists
+([ADR 046](046-claim-lifecycle-v2.md)). The platform project is never
+claimed: it is the deployment's own, with its operators from the start. Its
+events were stored but shown to no one, so the console's Events screen for it stayed
+empty.
+
+**Decision.** The platform project's events are visible as a claimed
+project's are.
+
+- `GET /events` and `GET /events/{event_id}` read them, and the shipper exports
+  them: one gate for reads and export, as §4 says.
+- The platform project is the one the server already names for claims and
+  grants: `platform.project_id`, or the built-in project under
+  `platform.bootstrap_project`. Without one, every project waits for its
+  claim, as before.
+- Unclaimed customer projects stay hidden, except from platform operators
+  ([next amendment](#amendment-2026-11-10-platform-operators-see-every-project)).
+  The gate's reason, no history before an owner, does not apply to a project
+  that has its admins from the start.
+- Who may read is unchanged: `events.read` on the platform project decides,
+  so only those who already administer it gain anything.
+- An export without a cursor for the platform project ships its retained
+  history from the start (§3), once.
+
+## Amendment (2026-11-10): platform operators see every project
+
+§4 hides an unclaimed project from everyone who holds `events.read` on it,
+the deployment's platform operators
+([ADR 075](075-platform-operators.md)) included. Its reason is the project's
+own secret: a bearer with no identity behind it should not read history
+before an accountable owner exists ([ADR 046](046-claim-lifecycle-v2.md)).
+Operators are not anonymous. The server's configuration names them, they
+administer every project, and they can already read and change everything an
+unclaimed project holds. Hiding its events from them hid only what happens on
+their own platform.
+
+**Decision.** A platform operator reads every project's events, claimed or
+not, and the deployment's sinks ship them.
+
+- `GET /events` and `GET /events/{event_id}` show an operator an unclaimed
+  project's events as they show a claimed project's. Everyone else, the
+  project's own secret and a platform user who is not an operator included,
+  still gets an empty list or a 404 until the claim.
+- The gate asks whether the caller is an operator (ADR 075 §3) only about a
+  project that exists and is unclaimed. Only a session homed in the platform
+  project costs a read. If the lookup fails, the request fails; it never
+  answers with an empty page.
+- An operator's read of an unclaimed project is marked on the request's events
+  the way ADR 075 §5 marks an operator's writes.
+- A project that is gone shows nothing, to an operator too.
+- Deployment-scoped sinks ship every live project. They are set in the
+  server's configuration, which ADR 075 §4 makes the root of operator trust,
+  so they belong to the operators. When project-scoped sinks exist, a
+  project's sink will ship only what its own readers see, and nothing before
+  the claim.
+- Each shipper tick now reads a cursor and a page for every project and sink,
+  unclaimed projects included. A project's retained history ships from the
+  start (§3), without waiting for the claim.

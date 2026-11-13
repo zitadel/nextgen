@@ -2,8 +2,8 @@ import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
-import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import { reportWarning } from "@/lib/warnings";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -268,7 +268,7 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
+  // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
     listed ??= objectTypes(ctx).catch(() => {
@@ -384,9 +384,8 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
  *
  * @remarks
  * A flow's `user_schema` is an object type, or a schema id or `$id` URL that
- * the server resolves to one; a draft flow is never selected. A schema the
- * release carries is resolved the way the configuration resolves it, and any
- * other through the project's listing.
+ * the server resolves to one. A schema the release carries is resolved the way
+ * the configuration resolves it, and any other through the project's listing.
  *
  * Only the schema's designated identifier performs a lookup, and only when a
  * step on the login path ({@link Flow.loginFields}) collects it. The release
@@ -405,7 +404,7 @@ async function servedFlows(ctx: StepContext, names: Names): Promise<ServedFlows>
   // One flow at a time: the first to need the listing reads it for the rest.
   const lookups = await mapBounded(ctx.config.flows.all, 1, async (flow): Promise<FlowLookup> => {
     const reference = flow.userSchema;
-    if (reference === undefined || flow.body.status === "draft") {
+    if (reference === undefined) {
       return { kind: "ignored" };
     }
     const carried = ctx.config.flows.findSchemaOf(flow)?.objectType;
@@ -489,13 +488,14 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const verb = missing.length === 1 ? "has" : "have";
-      const fix = ctx.suggest(
-        `users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
-      );
+      const fix = ctx.suggest({
+        id: "users:update",
+        args: { id: "<user_id>" },
+        flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
+      });
       return {
         warnings: [
-          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${verb} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
+          `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,
         ],
         partial: [],
         failed: false,
@@ -593,13 +593,11 @@ function strandedWarning(entry: Stranded, truncated: boolean, linksUnsure: boole
   const label =
     typeof entry.name === "string" ? quote(entry.name) : "schemas whose names could not be read";
   const users = `${count(entry.users, truncated)} existing ${plural(entry.users, "user")}`;
-  const verb = entry.users === 1 ? "is" : "are";
-  const linkedVerb = entry.linked === 1 ? "has" : "have";
   const sso =
     entry.linked > 0
-      ? ` (${count(entry.linked, linksUnsure)} of them ${linkedVerb} an SSO link)`
+      ? ` (${count(entry.linked, linksUnsure)} of them ${new Intl.PluralRules("en").select(entry.linked) === "one" ? "has" : "have"} an SSO link)`
       : "";
-  return `${users} of ${label} ${verb} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+  return `${users} of ${label} ${new Intl.PluralRules("en").select(entry.users) === "one" ? "is" : "are"} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
 }
 
 /**
@@ -813,10 +811,9 @@ async function credentialWarnings(
       const strandedCount = count(stranded, partial || failed);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const keep = disabled.length === 1 ? methods : "them";
       return {
         warnings: [
-          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${keep} enabled until they have another way in.`,
+          `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${new Intl.PluralRules("en").select(disabled.length) === "one" ? methods : "them"} enabled until they have another way in.`,
         ],
         partial: [],
         failed,

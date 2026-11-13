@@ -1,86 +1,126 @@
 # Turborepo configuration
 
 How the turbo task graph is laid out and the rules for changing it. Read this
-before editing a `turbo.json`. While both runners are configured (the dual-run
-phase of [turborepo-migration.md](turborepo-migration.md)), every task exists
-twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
-`turbo.json` — and a change goes into both (where the two differ on purpose
-is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
-turbo version runs in CI as the non-required `ci-turbo` workflow (on pull
-requests, in the merge queue, on pushes to main and nightly), on Vercel for
-the hosted cloud's builds, and locally with `turbo run`. Run directly, the
-contributor scripts build through moon, or through turbo with
-`NEXTGEN_TASK_RUNNER=turbo`.
+before editing a `turbo.json` or a workspace dependency. Turborepo is the only
+task runner ([ADR 089](../../adrs/089-turborepo-task-runner.md)): CI runs it
+(ci.yml's `full-pr`, see [Commands](#commands)), Vercel builds the hosted
+cloud with it, and contributors run it with `turbo run` or through the root
+scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 
 ## Layout
 
-- The root `turbo.json` holds the task shapes every package shares (what
-  `.moon/tasks/*.yml` holds for moon), the root project's tasks (`//#test`,
-  `//#check-adrs`, …: moon's `workspace` project) and `globalDependencies`
-  (moon's `implicitInputs`: a change to one re-runs every task).
+- The root `turbo.json` holds the task shapes every package shares, the root
+  package's tasks (`//#test`, `//#check-adrs`, …) and `globalDependencies`
+  (the root files that fix the toolchain and the installed dependencies: a
+  change to one re-runs every task).
 - A package's `turbo.json` starts with `"extends": ["//"]` and lists only what
   differs from the root shape. Turbo merges field by field: a package that
   sets `dependsOn` keeps the root's `outputs`, `inputs` and `env`.
 - A task runs the `package.json` script of its name, in the package. No script
-  means no task for that package (moon's `inheritedTasks.exclude`), so do not
-  add an empty script to fill a gap. Moon's `server` and `release` projects
-  are the packages `@zitadel/server` and `@zitadel/release` (`tools/release`);
-  their scripts `cd` to the directory the command needs. `@zitadel/cloud`
-  (`apps/cloud`, the hosted cloud's launcher and schemas) has no moon
-  project: its `dev` is moon's `workspace:cloud`.
+  means no task for that package, so do not add an empty script to fill a
+  gap. The scripts of `@zitadel/server` (`apps/server`, the server's Go tasks)
+  and `@zitadel/release` (`tools/release`) `cd` to the directory the command
+  needs; a root script finds the server's module through `SERVER_MODULE_DIR`
+  (`scripts/server-build.mjs`). `@zitadel/cloud` (`apps/cloud`) holds the
+  hosted cloud's launcher and schemas; its `dev` is `pnpm run cloud`.
 - The Go modules in `go.work` are packages too
   (`experimentalGoWorkspaces`), named after the last element of their module
-  path, a major-version suffix keeping the element before it: `nextgen` (`apps/api`), `zitadel/v5` (`packages/go`), `bench`,
-  `oidc-mock`, `defaults` and `design-tokens`. Moon's `go`, `bench` and
-  `oidc-mock` projects are the packages `zitadel/v5`, `bench` and
-  `oidc-mock`. A module has no scripts: its `turbo.json` gives each task
-  moon's command as a `command` array (`experimentalTaskCommand`, no shell,
-  run in the module). Turbo adds `build`, `test`, `lint` (go vet), `format`
-  (go fmt, which rewrites) and `dev` to every module; a module replaces the
-  ones moon has and drops the rest with `"extends": false`. `defaults` and
+  path, a major-version suffix keeping the element before it: `nextgen`
+  (`apps/api`), `zitadel/v5` (`packages/go`), `bench` (`tools/bench`),
+  `oidc-mock` (`tools/oidc-mock`), `defaults` and `design-tokens`. A module
+  has no scripts: its `turbo.json` gives each task its command as a `command`
+  array (`experimentalTaskCommand`, no shell, run in the module). Turbo adds
+  `build`, `test`, `lint` (go vet), `format` (go fmt, which rewrites) and
+  `dev` to every module; a module replaces the ones it uses and drops the
+  rest with `"extends": false`. `defaults` and
   `design-tokens` have no `turbo.json` of their own (the design tokens share
   `@zitadel/design-tokens`'s, and `packages/config/defaults` ships to npm), so
   they keep the cheap built-ins and the root replaces their `format` by name.
 - A script does its own task's work only. A step that is a task of its own,
   such as the package's `generate` or another package's `build`, is a
-  `dependsOn` edge here and a `deps` entry in `moon.yml`, never `a && b` in
-  the script: chained, it reruns on every run, and neither runner can cache,
-  order or skip it. So the docs' `build` and `dev` are plain `next build` and
-  `next dev`. A release build that cleans and rebuilds its own `dist`
-  (`build-release`) is still one task's work.
+  `dependsOn` edge, never `a && b` in the script: chained, it reruns on every
+  run, and turbo can neither cache, order nor skip it. So the docs' `build`
+  and `dev` are plain `next build` and `next dev`.
+- A task the published manifest has no use for is a `command` in the
+  package's `turbo.json` (futureFlags.experimentalTaskCommand), not a
+  script: the server platform packages' `build-binary`.
 - Task names are script names: `dev:real`, `test:integration` and
-  `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
+  `sync:export` keep their colons.
+- A package's checks run under its `lint` and its tests under its `test`, so
+  the gate names only `lint typecheck build test`. A `lint` waits for the
+  package's other checks (in the Go modules vet, format and the server's
+  openapi; the server's and the design tokens' `check-generate`; at the root
+  `check-adrs`, `check-go-work` and `check-typecheck`);
+  a `test` runs the tests that need no service (the server's runs
+  `test:unit` and `test:sqlite`), and Go tests wait for no check. The
+  server's `test:postgres` (Docker), `test:spanner` (the emulator) and
+  `test:pow` (the proof-of-work race run) stay apart; the gate names the
+  first and the last.
+- The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
-  `journey`, `journey-local` and `e2e-local` (the journey runner with its
-  options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
-  moon there is no `all` aggregate: ci-turbo.yml runs `journey-local` in a
-  job of its own and names every other lane in one `turbo run --affected`,
-  which runs the affected ones side by side.
+  `journey` (the journey runner with the caller's options), `journey-local`
+  (the umbrella over one `journey:<id>` task per CI journey), plus the docs'
+  `e2e` and `e2e-deployment`, and `conformance`, one task per SDK fixture
+  ([conformance/README.md](../../../conformance/README.md)). There is no
+  aggregate: a `turbo run` names the lanes it runs.
+
+## Tasks that write files
+
+- A task writes only its own output, which git ignores, and may empty it
+  first (`orval --clean`, Vite's `emptyOutDir`, `build-binary`'s `bin/`). A
+  task that reads that output depends on its task.
+- No task writes a committed file during a run. Committed generated files
+  (the server's Go and OpenAPI output, the design tokens) are source to every
+  task, which lists them as `inputs`. Their `generate` is the tool a person
+  runs after changing a source: never cached, no task depends on it, and it
+  writes only the files whose content changed, each in one rename (the
+  server's generates in a copy of the tree first, `scripts/go-generate.mjs`).
+  Their `check-generate`, in `lint`, compares without writing.
+- A package's lifecycle script (`pre*`, `post*`) never repeats a task: turbo
+  runs `pnpm run <task>`, so a `pretest` that builds rebuilds the dist other
+  tasks are reading.
+- When a task would delete or rewrite what another reads mid-run, fix the
+  task; never add a lock, an ordering edge or a run of its own around it.
+- `turbo run clean` (one package: `--filter=<package>`) deletes the ignored
+  output under the paths the root `turbo.json` lists, with `git clean -X`, so
+  a committed file always survives; the console, `@zitadel/e2e`, the server
+  and the release name their own paths, and the repository root keeps
+  `dist/`, which holds the local servers' data. Run it on its own: beside another task it deletes what that task
+  writes.
 
 ## Dependencies
 
-- Edges are explicit (`dependsOn: ["@zitadel/components#build"]`) and mirror
-  the moon task's `deps`. `^build` is not used: it follows devDependencies,
+- A task that uses another package depends on that package's task, and the
+  package declares it in `package.json` (`devDependencies` when only tests or
+  tooling use it). An edge on what another package builds (embedded UIs,
+  built apps and binaries, the release tasks) needs no `package.json` entry.
+- Edges are explicit (`dependsOn: ["@zitadel/components#build"]`). `^build`
+  is not used: it follows devDependencies,
   and the console's `@zitadel/testing` would pull the CLI and the server build
-  into every console build (and close a cycle). The one `^` edge is the Go
-  modules' `^go-sources`, which follows their go.mod requires.
+  into every console build (and close a cycle). The `^` edges are the Go
+  modules' `^go-sources`, which follows their go.mod requires, and the
+  conformance fixtures' `^build` (`conformance/suite/turbo.json`): a fixture
+  installs and runs exactly what its manifest lists, so it follows its
+  devDependencies on purpose.
 - Every dependency's result is part of a task's hash, whether or not it has
-  outputs, so there is no "unhashed edge" to work around and no duplicate to
-  remove.
+  outputs. Give a task that writes files its real `outputs` all the same: a
+  cache hit restores only those, and a dependent finds anything else
+  missing.
 - A task cannot depend on a persistent task (`dev`, `start`, `preview`,
   `//#server`).
-- A script that builds part of the workspace (`scripts/task-runner.mjs`)
-  builds through turbo when a turbo task runs it (turbo sets `TURBO_HASH`).
-  The task lists the same targets as `dependsOn`, so the script's own build
-  can reuse cached package builds and the graph shows what the task needs: `//#server`,
+- A script that builds part of the workspace runs
+  `turbo run @zitadel/<package>#<task>`. A task that runs one lists the same targets as
+  `dependsOn`, so the script's own build can reuse cached package builds and
+  the graph shows what the task needs: `//#server`,
   `@zitadel/console#dev:real`, `@zitadel/cloud#dev`.
 - A task that opens Chromium depends on its package's `install-browsers`
   (`playwright install chromium`, never cached), so a run installs it only
   when such a task runs: the browser test suites, the e2e lanes,
   `@zitadel/testing#test:integration`.
 - A package imports only its own files and the workspace packages its
-  `package.json` declares; `turbo boundaries` checks it in CI. Shared config
+  `package.json` declares, each through its exports, never a relative path
+  into its folder; `turbo boundaries` checks it in CI. Shared config
   is a package of its own (`@zitadel/vitest-config`). An import that cannot
   go through a package, such as a root `scripts/` module (no package can
   depend on the workspace root) or a module the runtime provides (k6's),
@@ -88,21 +128,14 @@ contributor scripts build through moon, or through turbo with
   lists the file in its inputs.
   The root Vitest config uses that waiver for a direct shared-config import:
   Turbo otherwise hashes a root workspace dependency into every task.
-- Each release build cleans and rewrites the `dist/` that dev builds and
-  tests of the same graph read, so the release builds start after
-  `cli#test` (`api#build-release` depends on it, and every other release
-  build reaches `api`'s through its package edges). From there they run in
-  parallel on the same package edges as their dev builds: a release build
-  depends on the release build of every package its dev build depends on.
-  The console and login UI release builds follow the same rule (never a dev
-  build: its output would replace the release output they bundle) and wait
-  for `@zitadel/release#build-public-packages`. Give a new public package
-  those edges and add it to `release-manifest.mjs`.
-- `api#build-release` also depends on `@zitadel/server#test`, which the other
-  release builds reach. This finishes the normal console build and its Go
-  readers before any release dist is cleaned. Turbo has no order-only edge,
-  so `pack` and `publish` run the Go tests as well; moon orders them only in
-  `snapshot`, its one release entry point with Go tasks.
+- A release packs what the graph built. `@zitadel/release`'s `pack`,
+  `snapshot` and `publish` depend on `build-public-packages`: every public
+  package's `build` and each server platform package's `build-binary`, which
+  cross-compiles the server into the `bin/` its npm package ships. There is
+  no second build of anything, so no task rewrites a `dist/` another reads
+  and the entry points wait for no test. A run that must not restore from the
+  cache takes `--force`. Give a new public package its edge there and add it
+  to `release-manifest.mjs`; `scripts/task-graph.test.mjs` checks both.
 
 ## Inputs and outputs
 
@@ -112,17 +145,20 @@ contributor scripts build through moon, or through turbo with
   (the package's files) and leave out its docs (`README.md`, `AGENTS.md`,
   `CHANGELOG.md`, `docs/`, `skills/**/*.md`, …), and `build` and `generate`
   also its tests. A task that reads more lists it after `$TURBO_EXTENDS$`:
-  `["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`.
+  `["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`. Never list a
+  package's own files: the default covers a new file without a list to
+  maintain. The root's tasks (`//#test`, `//#check-*`) list theirs, because
+  the root's folder is the whole repository.
 - A negation wins over every inclusion, wherever it stands. Anchor excludes
   outside the package with `$TURBO_ROOT$`. A task that reads an excluded class
   replaces `inputs` instead of extending them (`cli#test` reads its
   `README.md`). Release tasks keep every file: the tarballs ship the docs.
-- Turbo has no file groups. A Go module's production files (no tests, no
-  docs) are the inputs of its `go-sources`, a task in the root `turbo.json`
-  with no command: turbo hashes it but runs nothing. It depends on the
-  `go-sources` of every module the module requires, so the graph, not an
-  input list, says which modules a build compiles (moon lists them:
-  `serverInputs`, `benchInputs`). Each Go task depends on its module's;
+- A Go module's production files (no tests, no docs) are the inputs of its
+  `go-sources`, a task in the root `turbo.json` with no command: turbo hashes
+  it but runs nothing. It depends on the `go-sources` of every module the
+  module requires, so the graph, not an input list, says which modules a
+  build compiles. Keep `//go:generate` out of test files: generation does not
+  hash them. Each Go task depends on its module's;
   `@zitadel/server#go-sources` depends on `nextgen#go-sources` and adds what
   generation reads outside the modules. The server's `go-tests` adds
   `_test.go`, `testdata` and test-only files for format, vet, lint and tests.
@@ -151,41 +187,67 @@ contributor scripts build through moon, or through turbo with
   hash on the next run, which then misses the cache.
 - A file a task reads is one of its inputs or a dependency's: `--affected`
   and the cache key see nothing else, so an edit to an unlisted file neither
-  selects the task nor misses its cache. Nothing checks that before a merge;
-  the nightly `ci-turbo` run executes every task without the cache and fails
-  on what such an edit broke.
+  selects the task nor misses its cache. CI runs through the cache, so it
+  fails on what such an edit broke only once another change misses that
+  task's cache; a run with `--force` finds it at once.
 - An ignored file a task reads is not a default input either, so the task
   lists it. Console, docs and website builds list `.env*`; without them, a
-  changed `.env.local` would restore a build made without it. Moon lists each
-  supported dotenv path explicitly as `file://.env.local?optional` (and its
-  peers): its glob inputs skip ignored files.
+  changed `.env.local` would restore a build made without it.
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
-  e2e lanes, the database lanes, `install-browsers`, the release builds, dev
-  servers, and native Go commands. Their inputs still decide when they count
-  as affected, which gates the CI lanes.
-- Go owns its compiler and ordinary test-result caches. Both runners always
-  invoke native Go commands when selected: their task keys do not capture
-  the effective host/target/compiler when Go variables are unset, and the
-  local server binary stamps Git HEAD, commit date and branch metadata.
-  Database tests additionally use `-count=1` to disable Go's result cache.
-  Generation stays cached: go.mod pins its toolchain, and nothing it writes
-  depends on the host or the commit.
-- `moon run workspace:test` probes both real graphs in an isolated fixture:
-  source/test invalidation, shared config scope, release ordering, ignored
-  dotenv changes and the ignored files builds write. CI runs these tests
-  through each runner's `test` task.
+  journey run by hand (`journey`), the
+  deployment lanes, the database lanes, `install-browsers`, `pack`, the
+  server binaries (the local one stamps Git HEAD and branch, the platform
+  ones the release version and the commit), generation, `//#check-go-work`
+  (its answer depends on every module's imports), and dev servers. Their
+  inputs still decide when they count as affected, which gates the CI lanes.
+- The console and demo lanes, the CI journeys (`journey:<id>`) and
+  `@zitadel/testing#test:integration` are cached: they boot servers and
+  browsers, but only on the repo's own builds, so a later push that leaves
+  their inputs alone restores their pass instead of rerunning them. A journey
+  runs each framework CLI at the CLI's pin
+  (`apps/cli/src/lib/orca/scaffolders/framework-clis/package.json`, bumped by
+  Dependabot); only the npm ranges those releases write resolve at run time,
+  so the nightly run sets `TURBO_FORCE` and reruns them.
+- The conformance lane (`conformance`) and its drift check
+  (`check-generate`) are cached on the same grounds: the check runs the
+  framework CLI at its pin and installs nothing, so its answer is a function
+  of the CLI and server builds, the suite and the fixture. A fixture whose
+  generator its pin does not fix (`generatorPinned: false`) gives up that
+  promise; its check runs only in the nightly run (`CONFORMANCE_UNPINNED`).
+- Each journey depends on the builds of exactly what it installs
+  (`journey-packages`, which packs what every journey installs once per run,
+  plus its framework's SDK, which it packs itself); so an SDK change selects
+  only the journeys that install it.
+  `@zitadel/release#pack` packs and checks the full release set.
+- A cached lane's pass is the hashed tree's: its key holds the switches that
+  change what it tests (`env`, below), and as a turbo task it never uses a
+  server already on its port (`e2e/playwright.shared.ts`).
+- Go tasks are cached. Turbo keys every task of a Go module, and every task
+  that depends on a module's `go-sources`, on `go version` and the effective
+  `go env` (GOOS, GOARCH, CGO_ENABLED, GOFLAGS, …), so a result never
+  restores on another host, target or toolchain. Turbo itself leaves a Go
+  module's `format` (its own is go fmt, which rewrites) and a library
+  module's `build` uncached; the format checks here say `cache: true`. Tests
+  that read files outside their module keep
+  `-count=1`, because Go's result cache does not see those files; turbo's key does.
+- The root's `test` (`pnpm run test`, `scripts/task-graph.test.mjs` among
+  its suites) probes the real graph in an isolated fixture: source/test
+  invalidation, shared config scope, release ordering, ignored dotenv changes
+  and the ignored files builds write. CI runs it as `//#test`.
 
 ## Environment
 
 - Strict mode: a task sees `PATH`, `HOME`, `SHELL`, `CI`, `TERM`, `LANG`,
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
-  framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
-  and what the task lists. `env` names variables that change the output and
-  are hashed (`CONSOLE_ADDON`, `GOFLAGS`); `passThroughEnv`
+  framework inference adds (`VITE_*` for Vite packages; `NEXT_PUBLIC_*`,
+  `NEXT_DEPLOYMENT_ID` and, when `VERCEL_SKEW_PROTECTION_ENABLED` is set,
+  `VERCEL_DEPLOYMENT_ID` for Next.js) and what the task lists. `env` names variables that change the output and
+  are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
+  and `NEXTGEN_*`, the journeys' `JOURNEY_*` but `JOURNEY_WORK_DIR`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
-  (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
+  (`PLAYWRIGHT_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
 - A dev server or preview that reads a variable the task does not list never
   sees it and quietly runs with its default. The console's `dev`, `dev:real`,
@@ -200,43 +262,55 @@ contributor scripts build through moon, or through turbo with
   cache keys in that one build than everywhere else. The package lists it in
   its `env` and its config reads it (the console's `CONSOLE_*` variables and
   `vite.config.ts`).
-- On Vercel, turbo puts `VERCEL_TARGET_ENV` (`production` or `preview`)
-  into every task's hash, its default, so production and preview builds
-  keep separate cache entries. The `VITE_VERCEL_*` variables Vercel sets
+- On Vercel, turbo's default puts `VERCEL_TARGET_ENV` (`production` or
+  `preview`) into every task's hash, and a preview then never restores what
+  main's production build stored. The root `turbo.json` drops it
+  (`globalEnv`), so both environments compute the same keys; which artifacts
+  a build may restore is Vercel's to enforce, by branch
+  ([Commands](#commands)). `VERCEL` is hashed in its place, which keeps the
+  keys of Vercel's builds apart from CI's and a checkout's. A build whose
+  output depends on the environment lists it (the console's `VERCEL_ENV`).
+  The `VITE_VERCEL_*` variables Vercel sets
   are kept out of every hash (`globalEnv` in the root `turbo.json`): turbo
   leaves them out only in the Vite service's build, and the same packages
   would get other keys in the storybook's and the server's builds.
   `VERCEL_*` still reaches every task unhashed (turbo's built-in list): a
   build whose output depends on one lists it in its `env` (the Next.js
   builds `VERCEL_DEPLOYMENT_ID`).
-- A task cannot set a variable's value. Values a lane needs (moon's task
-  `env:` blocks) are set in the `package.json` script as defaults that a
-  caller's own value overrides, as it overrides moon's task `env`:
+- A task cannot set a variable's value. Values a lane needs are set in the
+  `package.json` script as defaults that a caller's own value overrides:
   `NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test …`.
 
 ## Mutex and retry
 
 Turbo has neither. `scripts/task-guard.mjs` wraps a command:
-`node ../../scripts/task-guard.mjs --mutex generated-sources -- orval …` holds a
-lock while the command runs, and the four browser-test packages run
+`node ../scripts/task-guard.mjs --mutex demo-next-app -- playwright test …`
+holds a lock while the command runs, and the four browser-test packages run
 `node ../../scripts/task-guard.mjs --retries 3 -- vitest run`. The lock is a
 directory in the OS temp dir keyed by the repository root, so checkouts do not
 block each other and a dead holder is reclaimed. The guard acts only when turbo
-runs the task (turbo sets `TURBO_HASH` for every task); under moon and when run
-by hand it runs the command once, unchanged. Names in use: `generated-sources`
-(the generation tasks and the tasks that read what they rewrite) and
-`demo-next-app` (the two demo-next e2e lanes, which both serve the demo on
-:3002; moon has a mutex of the same name on them).
+runs the task (turbo sets `TURBO_HASH` for every task); run by hand it runs the
+command once, unchanged. The one name in use is `demo-next-app`: the two
+demo-next e2e lanes both run `next dev` in the demo's folder on :3002.
 
-Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
-task runs each package's `test:all` script, which in the four browser-test
-packages calls Vitest without the guard, so no suite retries under both.
+## Check the graph
+
+Run these after changing a `turbo.json`, a script a task runs or a workspace
+dependency; CI runs both:
+
+```sh
+turbo boundaries   # imports against package.json (Dependencies, above)
+pnpm run test      # the real graph in a fixture (Inputs and outputs, above)
+```
+
+Then run the gate twice: the second run must hit every cached task.
 
 ## Commands
 
 | | |
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
+| everything CI runs (below) | `pnpm run ci` |
 | an agent's or a script's run | add `--output-logs=errors-only` |
 | only what a branch changed | `TURBO_SCM_BASE=origin/main turbo run lint typecheck build test --affected` |
 | one task | `turbo run test --filter=@zitadel/cli` |
@@ -244,7 +318,8 @@ packages calls Vitest without the guard, so no suite retries under both.
 | what would run | `turbo run build --dry` |
 | package boundaries | `turbo boundaries` |
 | affected tasks, task-level | `turbo query affected --base origin/main --tasks test` (its prerequisites carry the reason "required by an affected task") |
-| every task without the cache (CI's nightly run) | `turbo run lint typecheck build test --force` |
+| every task without the cache | `turbo run lint typecheck build test --force` |
+| delete build output | `turbo run clean`, alone (Tasks that write files, above) |
 | a run summary (per-task exit codes) | `--summarize` → `.turbo/runs/<id>.json` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
@@ -258,31 +333,27 @@ cache key of every task in the run
 ([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
-environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-and `RELEASE_HOST_ONLY=1` for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
-runner (`e2e/journey/README.md`).
+environment: `RELEASE_SKIP_CONTAINER=1` for the release snapshot
+(`passThroughEnv`), `JOURNEY_RUNTIME`, `JOURNEY_MATRIX`, … for the journey
+runner (`e2e/journey/README.md`; `env` on the cached journeys).
 
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci-turbo.yml runs one job per role, side by side, each on a runner of its
-own: `checks` (lint, typecheck and the repository checks), `build-test`,
-`go-db` (the Go database lanes), `generated` (`check-generate-pruned`),
-`e2e` (the e2e lanes but the journey's) and `journey` (the release snapshot,
-then its lane); a version PR runs `release` instead. A role is a task list,
-`turbo run $TASKS --affected`, so the graph stays in `turbo.json`: add a
-task to a role's list, never a step or a condition to the workflow. The
-journey is the one role with steps of its own, because its snapshot
-rewrites the `dist/` its lane's dependencies write. Roles share results
-through the remote cache: a cached task two roles need runs in the one that
-reaches it first and is restored in the other, unless both start it at
-once. Native Go tasks run in each role, using Go's own cache, one entry per
-role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull
-request's base, the merge group's or the commit a push to main replaced
-picks the tasks the change reaches; a change no task reads, such as a
-workflow edit, runs nothing there. `full-pr-turbo` needs every role: it is
-the one check name to require. Nightly every role runs every task and lane
-with `TURBO_FORCE` instead.
+ci.yml's required `full-pr` job runs the root `ci` script (`pnpm run ci`:
+`turbo boundaries`, then one `turbo run --affected` of the checks and the
+lanes, so a lane starts once its own dependencies are done) on GitHub's
+32-core arm64 runner, with `--concurrency=100%` (a task per core; the script
+keeps turbo's default of 10, which a laptop can take), measured from the pull request's or the merge group's base; a
+dispatch and the nightly run on `main` measure from the repository's first
+commit, so they run every task, and the nightly reads no cache. It keeps setup-go's and setup-node's caches
+and reads and writes Vercel's remote cache over OIDC; a fork's pull request
+gets no token and runs with the local cache only. A Changesets version PR
+runs like any other: the release checks are tasks of the graph
+(`@zitadel/release#check-npm` and `#check-changesets` under `test`, `pack`
+under the journeys). The
+task list is the script and ci.yml is a global dependency, so editing either
+reruns every task. Add a task to the script, never a step to the workflow.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task
 itself (`::error::`), so no script reads the run summary.
@@ -307,21 +378,29 @@ The launcher build, migrations and deployment always run; Go's compiler cache
 persists in Vercel's branch build cache. See [apps/cloud/turbo.json](../../../apps/cloud/turbo.json)
 for the cache boundary and deployment ordering, and the
 [cloud runbook](../../runbooks/cloud.md#operating) for cache diagnostics.
-The server's build command installs the cloud
-services and their dependencies before running Turbo: Vercel's Go builder runs
-no `installCommand`, and Turbo comes with the install. `migrate` passes the whole environment through
+The server's service installs the cloud services and their dependencies
+(`installCommand`) and puts Go on PATH (`apps/cloud/install-go.sh`) before
+its build command runs Turbo: it is a Node.js function, and Vercel's Node.js
+build image has no Go. `migrate` passes the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function
 needs, and strict mode would hide one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The other services use the cache as Vercel sets it up:
-their builds read and write the team's remote cache, production and
-previews in separate entries, and keep no local cache. Writing takes the
+their builds read and write the team's remote cache and keep no local
+cache. Vercel sorts the artifacts by branch
+([cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)):
+a build of `main` reads and writes main's; a preview reads main's and its
+own branch's, never another branch's, and writes only its own. Production
+and previews compute the same keys ([Environment](#environment)), so a
+branch's first preview restores from main's build every package it does not
+change, and no branch can put an artifact before production. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
-metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers every
-`NEXT_*` variable into every task of a Next.js package, and each deployment
-brings its own (`NEXT_DEPLOYMENT_ID`, and Vercel's `NEXT_PUBLIC_VERCEL_*`,
-which these services' builds hash too), so the docs' `generate` and
-`typecheck`, which read none, drop them (`!NEXT_*`) and still hit.
+metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. The project has Skew
+Protection on, so Vercel sets `VERCEL_SKEW_PROTECTION_ENABLED` and turbo's
+Next.js inference hashes that new-per-deployment ID into every other task of
+a Next.js package too ([Environment](#environment)). The docs' `generate` and
+`typecheck`, which read none of what it adds, drop it all
+(`!NEXT_*`, `!VERCEL_DEPLOYMENT_ID`) and hit across deployments.

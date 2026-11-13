@@ -107,7 +107,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /flow/{id}/submit → receives next step
+    ZL->>ZL: POST /flow/{flow_id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -222,7 +222,7 @@ loop:
 
   { action, fields } = waitForCustomEvent()
 
-  response = POST /flow/{id}/submit {
+  response = POST /flow/{flow_id}/submit {
     action: action,
     fields: fields
   }
@@ -257,7 +257,6 @@ As a definition:
 ```json
 {
   "name": "simple-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -385,7 +384,6 @@ A single flow definition can serve **multiple purposes** by declaring different 
 ```json
 {
   "name": "combined-auth",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": {
     "login": "identify",
@@ -406,7 +404,7 @@ When a flow starts, the server resolves which definition to use:
 ```mermaid
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
-    filter["Filter: active definitions<br>whose purposes has an entry for 'login'"]
+    filter["Filter: pinned definitions<br>whose purposes has an entry for 'login'"]
     schema["If set, hard-filter by<br>user_schema_id"]
     match["Score audience:<br>app match > team match > project-wide > other scoped"]
     pick["Pick highest score<br>tie-break by created_at, then id"]
@@ -647,16 +645,9 @@ policy evaluation.
 
 ## Definition Lifecycle
 
-The shipped schema defines two statuses:
-
-| Status | Can be resolved? | How to change |
-|---|---|---|
-| `draft` | No — never selected for new flows | Publish a new revision with `POST /flow_definitions` |
-| `active` | Yes | Publish a new revision with `POST /flow_definitions` |
-
-A revision is immutable and its `status` is fixed at creation. There are no
-lifecycle verbs in the shipped spec — you change a flow by publishing a new
-revision under the same `name`, and create already runs the definition
-validator. A standalone `POST .../validate` (dead-end and reachability checks
-on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
-shipped — see [flow-engine.md](flow-engine.md#flow-definitions).
+A revision is immutable and carries no state of its own: it is served when
+the deployed release pins it. There are no lifecycle verbs in the shipped
+spec — you change a flow by publishing a new revision under the same `name`,
+and create already runs the definition validator. A standalone
+`POST .../validate` (dead-end and reachability checks on demand) and
+`POST .../simulate` (dry-run with mock input) are planned, not shipped — see [flow-engine.md](flow-engine.md#flow-definitions).

@@ -19,6 +19,10 @@ import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/hel
 import { forcedConsent } from "@tests/helpers/consent";
 import { it } from "@tests/helpers/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
+import { aSuggest } from "@tests/helpers/suggestions";
+
+/** The start a refused start would offer again. */
+const RETRY = aSuggest()({ id: "start" });
 
 const dirs: string[] = [];
 const children: ChildProcess[] = [];
@@ -44,7 +48,9 @@ async function directory(): Promise<string> {
   return dir;
 }
 
-const at = (cwd: string) => LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
+const at = (cwd: string) => {
+  return LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
+};
 
 /** A record whose process is long gone, in a directory that has data. */
 async function directoryWithAGoneServer(): Promise<string> {
@@ -240,6 +246,7 @@ describe("LocalServer", () => {
         tail: 1,
         level: "warn",
         print: (lines) => printed.push(...lines.map((line) => line.text)),
+        signal: new AbortController().signal,
       });
 
       expect(printed).toEqual([
@@ -248,6 +255,20 @@ describe("LocalServer", () => {
         "level=ERROR msg=unfinished",
       ]);
     });
+
+    it("prints the end of the log and stops when the run was interrupted before it began", async () => {
+      const cwd = await directoryWithAGoneServer();
+      await writeFile(join(cwd, "server.log"), "level=INFO msg=first\nlevel=INFO msg=last\n");
+      const printed: string[] = [];
+
+      await at(cwd).followLogs({
+        tail: 5,
+        print: (lines) => printed.push(...lines.map((line) => line.text)),
+        signal: AbortSignal.abort(),
+      });
+
+      expect(printed).toEqual(["level=INFO msg=first", "level=INFO msg=last"]);
+    }, 5_000);
   });
 
   describe("a free port in place of a taken one", () => {
@@ -411,7 +432,7 @@ describe("LocalServer", () => {
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
-        at(cwd).start({ backend: "binary", env: none }, { port: await holdAPort() }),
+        at(cwd).start({ backend: "binary", env: none }, { port: await holdAPort(), retry: RETRY }),
       ).rejects.toMatchObject({ code: "E_PORT_IN_USE" });
 
       expect(remove).not.toHaveBeenCalled();
@@ -422,7 +443,7 @@ describe("LocalServer", () => {
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));
 
-      const { runtime } = await at(cwd).start({ backend: "binary", env: none });
+      const { runtime } = await at(cwd).start({ backend: "binary", env: none }, { retry: RETRY });
 
       trackLocalServer(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);

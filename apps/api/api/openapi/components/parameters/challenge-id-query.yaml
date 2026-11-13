@@ -2,7 +2,7 @@ name: challenge_id
 in: query
 required: true
 description: |
-  The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this claim. The claim URL
+  The `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns for this claim. The claim URL
   carries it.
 schema:
   $ref: '../schemas/challenge-id.yaml'

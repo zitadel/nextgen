@@ -97,10 +97,15 @@ export class UserService extends ApiService {
    */
   async credentials(userId: string, asked: readonly Credential[]): Promise<Set<Credential>> {
     const reads: Record<Credential, () => Promise<boolean>> = {
-      password: async () => (await this.client.getUserPasswordState(userId)).set_at != null,
-      passkey: async () =>
-        (await this.client.listUserPasskeys(userId, { limit: 1 })).passkeys.length > 0,
-      sso: async () => (await this.identityLinks(userId)).length > 0,
+      password: async () => {
+        return (await this.client.getUserPasswordState(userId)).set_at != null;
+      },
+      passkey: async () => {
+        return (await this.client.listUserPasskeys(userId, { limit: 1 })).passkeys.length > 0;
+      },
+      sso: async () => {
+        return (await this.identityLinks(userId)).length > 0;
+      },
     };
     const held = new Set<Credential>();
     // One read at a time: a caller asks this of many users at once.

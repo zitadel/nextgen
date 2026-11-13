@@ -1,9 +1,9 @@
 import {
   CreateGrantBody,
-  CreateIdpBody,
+  PublishIdpBody,
   CreateTeamBody,
   CreateUserBody,
-  PatchProjectBody,
+  UpdateProjectBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -15,7 +15,7 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "@/lib/oclif/crud";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 
 type Described = Parameters<typeof describeBody>;
 
@@ -48,7 +48,7 @@ describe("describeBody", () => {
   });
 
   it("treats a fully optional body as optional", () => {
-    expect(byName(PatchProjectBody).name?.required).toBe(false);
+    expect(byName(UpdateProjectBody).name?.required).toBe(false);
     expect(byName(CreateTeamBody).name?.required).toBe(true);
   });
 
@@ -86,20 +86,20 @@ describe("describeBody", () => {
   });
 
   it("addresses the document under a root rather than the request around it", () => {
-    const fields = byName(CreateIdpBody, { root: "idp" });
+    const fields = byName(PublishIdpBody, { root: "idp" });
     expect(fields.slug?.flag).toBe("slug");
     expect(fields["oidc.client_id"]?.flag).toBe("oidc-client-id");
     expect(fields["idp.slug"]).toBeUndefined();
   });
 
   it("gives every leaf of a connection a flag of its own", () => {
-    const fields = describeBody(CreateIdpBody, { root: "idp" });
+    const fields = describeBody(PublishIdpBody, { root: "idp" });
     expect(fields.length).toBe(20);
     expect(fields.every((field) => field.flag !== undefined)).toBe(true);
   });
 
   it("makes a field required with its optional object, not with every body", () => {
-    const fields = byName(CreateIdpBody, { root: "idp" });
+    const fields = byName(PublishIdpBody, { root: "idp" });
     expect(fields["oidc.issuer"]).toMatchObject({ required: false, requiredWith: ["oidc"] });
     // Optional within the block too, so nothing makes it required.
     expect(fields["oidc.jwks_uri"]?.requiredWith).toBeUndefined();
@@ -117,19 +117,19 @@ describe("describeBody", () => {
   });
 
   it("reads lists, booleans, integers and defaults from the schema", () => {
-    const connection = byName(CreateIdpBody, { root: "idp" });
+    const connection = byName(PublishIdpBody, { root: "idp" });
     expect(connection["oidc.scopes"]).toMatchObject({ kind: "list", item: "string" });
     expect(connection["oidc.pkce_enabled"]).toMatchObject({
       kind: "boolean",
       default: { value: true },
     });
-    expect(byName(PatchProjectBody)["password_hash.params.cost"]?.kind).toBe("integer");
+    expect(byName(UpdateProjectBody)["password_hash.params.cost"]?.kind).toBe("integer");
   });
 
   it("walks into an object that may also be null", () => {
     // A project's hashing method is an object or `null`, so it has leaves; the
     // string flag the walk used to give it could never make a valid body.
-    const fields = byName(PatchProjectBody);
+    const fields = byName(UpdateProjectBody);
     expect(fields.password_hash).toBeUndefined();
     expect(fields["password_hash.algorithm"]).toMatchObject({
       flag: "password-hash-algorithm",
@@ -199,14 +199,14 @@ describe("bodyFieldFlags", () => {
   });
 
   it("groups nested flags by their object and says what makes them required", () => {
-    const flags = flagsOf(CreateIdpBody, { root: "idp" });
+    const flags = flagsOf(PublishIdpBody, { root: "idp" });
     expect(flags["oidc-issuer"]?.helpGroup).toBe("OIDC FIELD");
     expect(flags["oidc-issuer"]?.description).toMatch(/^\(required with oidc\.\*\) /);
     expect(flags["provisioning-creation"]?.helpGroup).toBe("PROVISIONING FIELD");
   });
 
   it("lets a boolean be turned off, and a list take one value per use", () => {
-    const flags = flagsOf(CreateIdpBody, { root: "idp" });
+    const flags = flagsOf(PublishIdpBody, { root: "idp" });
     expect(flags["oidc-pkce-enabled"]).toMatchObject({ type: "boolean", allowNo: true });
     expect(flags["oidc-scopes"]).toMatchObject({ multiple: true });
   });
@@ -267,7 +267,7 @@ describe("bodyFromFlags", () => {
   it("nests a nested field's value at its path", () => {
     expect(
       bodyFromFlags(
-        describeBody(CreateIdpBody, { root: "idp" }),
+        describeBody(PublishIdpBody, { root: "idp" }),
         asRead({
           slug: "acme",
           "oidc-issuer": "https://sso.acme.example",
@@ -338,7 +338,7 @@ describe("bodyFromFlags", () => {
   it("keeps a string where a record's values may be a string or something else", async () => {
     // `verified_claims` takes a claim name or `true`; `email=true` names a
     // claim called "true", and `email:=true` is the boolean.
-    const fields = describeBody(CreateIdpBody, { root: "idp" });
+    const fields = describeBody(PublishIdpBody, { root: "idp" });
     expect(await read(fields, { "verified-claims": ["email=true", "phone:=true"] })).toEqual({
       verified_claims: { email: "true", phone: true },
     });
@@ -405,7 +405,7 @@ describe("fieldExample", () => {
   });
 
   it("is absent when nothing is required", () => {
-    expect(fieldExample(describeBody(PatchProjectBody))).toBeUndefined();
+    expect(fieldExample(describeBody(UpdateProjectBody))).toBeUndefined();
   });
 
   it("is absent when a required field has no flag", () => {

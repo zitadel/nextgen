@@ -5,7 +5,7 @@
 >
 > **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
 
-The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flow/{id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flow/{flow_id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
 It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip the flow engine entirely and drive the auth_attempt primitives (and the Session API) directly.
 
@@ -13,11 +13,11 @@ It is used by web/frontend clients that want a ready-made login and registration
 
 ```
 POST   /flow              Start a flow (creates a session internally)
-GET    /flow/{id}          Get current step (re-render)
-POST   /flow/{id}/submit   Submit step data, advance state machine
+GET    /flow/{flow_id}          Get current step (re-render)
+POST   /flow/{flow_id}/submit   Submit step data, advance state machine
 ```
 
-The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
+The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{flow_id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
 
 ## Starting a Flow
 
@@ -50,7 +50,7 @@ POST /flow
 
 The server resolves which flow definition to use:
 
-1. Filter active definitions whose `purposes` map has an entry for the requested purpose.
+1. Filter the definitions the release pins whose `purposes` map has an entry for the requested purpose.
 2. If `hint.user_schema_id` is set, discard definitions for other schemas.
 3. Score the remaining definitions: matching app > matching team > project-wide > a definition scoped to a different app or team.
 4. Pick the highest score; ties go to the newest `created_at`, then the highest ID.
@@ -67,11 +67,11 @@ A flow definition is a directed graph of steps, managed as an API resource. Each
 ```
 POST   /flow_definitions             Publish a new revision
 GET    /flow_definitions             List, newest first; `name=` narrows to one flow's revisions
-GET    /flow_definitions/{id}        Get one revision
+GET    /flow_definitions/{flow_definition_id}        Get one revision
 
 # planned (not in the shipped spec):
-POST   /flow_definitions/{id}/validate    Check for dead ends, missing transitions
-POST   /flow_definitions/{id}/simulate    Dry-run with mock input
+POST   /flow_definitions/{flow_definition_id}/validate    Check for dead ends, missing transitions
+POST   /flow_definitions/{flow_definition_id}/simulate    Dry-run with mock input
 ```
 
 A definition is an immutable revision: every `POST` assigns a new id, and a
@@ -187,7 +187,6 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 ```json
 {
   "name": "default-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -269,7 +268,6 @@ says to do so.
 ```json
 {
   "name": "default-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [
@@ -383,7 +381,6 @@ A single flow that handles both login and registration using implicit outcomes f
 ```json
 {
   "name": "combined-auth",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "identify", "register": "profile" },
   "steps": [
@@ -456,7 +453,6 @@ an identifier. Login routes a missing user through `user_not_found` to
 ```json
 {
   "name": "sso-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -587,7 +583,6 @@ GET /flow/flow_2
 ```json
 {
   "name": "protected-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [

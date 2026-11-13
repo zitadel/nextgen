@@ -20,6 +20,8 @@ content:
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/flow-proof_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flow-rate_limited.yaml'
         - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
         - $ref: '../../../components/schemas/errors/flow-sso_user_schema_mismatch.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
@@ -44,6 +46,7 @@ content:
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../../components/schemas/errors/user-password_empty.yaml'
+        - $ref: '../../../components/schemas/errors/user-password_hashing_busy.yaml'
         - $ref: '../../../components/schemas/errors/user-password_policy_violation.yaml'
         - $ref: '../../../components/schemas/errors/user-password_too_long.yaml'
       discriminator:
@@ -65,6 +68,8 @@ content:
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
+          flow.proof_invalid: '../../../components/schemas/errors/flow-proof_invalid.yaml'
+          flow.rate_limited: '../../../components/schemas/errors/flow-rate_limited.yaml'
           flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
           flow.sso_user_schema_mismatch: '../../../components/schemas/errors/flow-sso_user_schema_mismatch.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
@@ -89,6 +94,7 @@ content:
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
           user.password_empty: '../../../components/schemas/errors/user-password_empty.yaml'
+          user.password_hashing_busy: '../../../components/schemas/errors/user-password_hashing_busy.yaml'
           user.password_policy_violation: '../../../components/schemas/errors/user-password_policy_violation.yaml'
           user.password_too_long: '../../../components/schemas/errors/user-password_too_long.yaml'
     examples:
@@ -124,6 +130,10 @@ content:
         $ref: '../../../components/examples/errors/flow-invalid_action.yaml'
       flow.not_found:
         $ref: '../../../components/examples/errors/flow-not_found.yaml'
+      flow.proof_invalid:
+        $ref: '../../../components/examples/errors/flow-proof_invalid.yaml'
+      flow.rate_limited:
+        $ref: '../../../components/examples/errors/flow-rate_limited.yaml'
       flow.restart_required:
         $ref: '../../../components/examples/errors/flow-restart_required.yaml'
       flow.sso_user_schema_mismatch:
@@ -172,6 +182,8 @@ content:
         $ref: '../../../components/examples/errors/user-not_found.yaml'
       user.password_empty:
         $ref: '../../../components/examples/errors/user-password_empty.yaml'
+      user.password_hashing_busy:
+        $ref: '../../../components/examples/errors/user-password_hashing_busy.yaml'
       user.password_policy_violation:
         $ref: '../../../components/examples/errors/user-password_policy_violation.yaml'
       user.password_too_long:

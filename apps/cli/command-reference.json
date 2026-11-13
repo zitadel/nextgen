@@ -364,7 +364,7 @@
     {
       "id": "console",
       "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -385,7 +385,7 @@
     {
       "id": "logs",
       "group": "Local development",
-      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -468,6 +468,33 @@
       "examples": []
     },
     {
+      "id": "tests add",
+      "group": "Local development",
+      "description": "Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to @zitadel/testing. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.",
+      "args": [],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Replace a test file that differs from this CLI's version of it.",
+          "type": "boolean"
+        },
+        {
+          "name": "skip-install",
+          "description": "Do not install the new dev dependencies.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "tests add"
+        },
+        {
+          "command": "tests add --skip-install"
+        }
+      ]
+    },
+    {
       "id": "users create",
       "group": "Users and teams",
       "description": "Create a user.",
@@ -475,7 +502,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `publishSchema` (`POST…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -643,7 +670,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), identifier (starts_with), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
           "multiple": true
         },
@@ -695,7 +722,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `publishSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -1279,7 +1306,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1300,7 +1327,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1327,7 +1354,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1348,7 +1375,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1380,7 +1407,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1446,7 +1473,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -2113,6 +2140,27 @@
       "args": [],
       "flags": [
         {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
           "name": "fields",
           "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
           "type": "option"
@@ -2137,6 +2185,9 @@
       "examples": [
         {
           "command": "branding list --json"
+        },
+        {
+          "command": "branding list --all --json"
         }
       ]
     },
@@ -2282,14 +2333,14 @@
       "args": [
         {
           "name": "deployment_id",
-          "description": "The deployment to re-apply. Omit to undo the last deploy."
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
         }
       ],
       "flags": [
         {
           "name": "force",
           "char": "f",
-          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3471,8 +3522,13 @@
     {
       "id": "variable resolve",
       "group": "Configuration and releases",
-      "description": "Show the variables the live deployment froze for a target.",
-      "args": [],
+      "description": "Show the variables a deployment froze, the live one by default.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read; the live one when omitted."
+        }
+      ],
       "flags": [
         {
           "name": "origin",
@@ -3502,6 +3558,9 @@
         },
         {
           "command": "variable resolve --origin https://app.acme.com"
+        },
+        {
+          "command": "variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         },
         {
           "command": "variable resolve --json"
@@ -3724,6 +3783,17 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -3731,7 +3801,7 @@
           "command": "api queryUsers -F limit=5"
         },
         {
-          "command": "api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
+          "command": "api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
         },
         {
           "command": "api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json"
@@ -3750,7 +3820,7 @@
     {
       "id": "api ls",
       "group": "Diagnostics and utilities",
-      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
           "name": "filter",
@@ -3856,7 +3926,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), created_at (greater_than_or_equal|less_than).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
           "type": "option",
           "multiple": true
         },

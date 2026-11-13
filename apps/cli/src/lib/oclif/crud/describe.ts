@@ -8,8 +8,8 @@ import type { Json, ResourceRegistry, Schema, WriteShape } from "./types";
  * shape an agent can consume in a single call — the role `stripe resources`
  * and `kubectl api-resources` play in those CLIs.
  */
-export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly Json[] =>
-  Object.entries(registry).map(([topic, resource]) => {
+export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly Json[] => {
+  return Object.entries(registry).map(([topic, resource]) => {
     const documentRoot = resource.create?.root ?? resource.update?.root;
     return {
       topic,
@@ -49,13 +49,15 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
       // the resource may not honour everywhere.
       ...(resource.list?.filters?.length
         ? {
-            filters: resource.list.filters.map((field) => ({
-              field: field.field,
-              operations: [...field.operations],
-              ...(field.values ? { values: [...field.values] } : {}),
-              ...(field.default !== undefined ? { default: field.default } : {}),
-              ...(field.combine === "or" ? { combine: "or" } : {}),
-            })),
+            filters: resource.list.filters.map((field) => {
+              return {
+                field: field.field,
+                operations: [...field.operations],
+                ...(field.values ? { values: [...field.values] } : {}),
+                ...(field.default !== undefined ? { default: field.default } : {}),
+                ...(field.combine === "or" ? { combine: "or" } : {}),
+              };
+            }),
           }
         : {}),
       ...(resource.list?.sorts?.length ? { sort_fields: [...resource.list.sorts] } : {}),
@@ -69,6 +71,7 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
       ...(resource.update ? { update_fields: fieldsOf(resource.update) } : {}),
     };
   });
+};
 
 /**
  * A write's fields as an agent needs them, nested ones included: the dot path
@@ -76,15 +79,18 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
  * its kind, and whether a body must carry it. Enough to assemble flags,
  * `--set` assignments or a whole document from one call (ADR 071 §9).
  */
-const fieldsOf = (spec: WriteShape & { schema: Schema }): readonly Json[] =>
-  describeBody(spec.schema, { root: spec.root }).map((field) => ({
-    name: field.name,
-    flag: field.flag ? `--${field.flag}` : null,
-    kind: field.kind,
-    required: field.required,
-    ...(field.requiredWith ? { required_with: field.requiredWith.join(".") } : {}),
-    ...(field.item ? { item: field.item } : {}),
-    ...(field.options ? { options: [...field.options] } : {}),
-    ...(field.default ? { default: field.default.value } : {}),
-    ...(field.summary ? { description: field.summary } : {}),
-  }));
+const fieldsOf = (spec: WriteShape & { schema: Schema }): readonly Json[] => {
+  return describeBody(spec.schema, { root: spec.root }).map((field) => {
+    return {
+      name: field.name,
+      flag: field.flag ? `--${field.flag}` : null,
+      kind: field.kind,
+      required: field.required,
+      ...(field.requiredWith ? { required_with: field.requiredWith.join(".") } : {}),
+      ...(field.item ? { item: field.item } : {}),
+      ...(field.options ? { options: [...field.options] } : {}),
+      ...(field.default ? { default: field.default.value } : {}),
+      ...(field.summary ? { description: field.summary } : {}),
+    };
+  });
+};

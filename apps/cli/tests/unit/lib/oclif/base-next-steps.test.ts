@@ -7,7 +7,8 @@ import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { publicCliCommand } from "@/lib/public-cli";
 import { json, prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints, per stream, instead of writing it. */
@@ -41,7 +42,7 @@ function makeCommand(): NextStepsCommand {
   return new NextStepsCommand([], { version: "0.0.0-test" } as unknown as Config);
 }
 
-const DEPLOY: SuggestedCommand = unscopedCommand("deploy");
+const DEPLOY: SuggestedCommand = aSuggest({}, "0.0.0-test")({ id: "deploy" });
 /** {@link DEPLOY} as the reader runs it. */
 const PUBLIC_DEPLOY = publicCliCommand("deploy", "0.0.0-test");
 
@@ -49,6 +50,7 @@ describe("BaseCommand next steps", () => {
   describe("in the envelope", () => {
     it("writes them into an ok result's data", async () => {
       const envelope = await makeCommand().finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: { id: "1" },
         next: { actions: ["Publish it."], commands: [DEPLOY] },
@@ -65,6 +67,7 @@ describe("BaseCommand next steps", () => {
 
     it("keeps a list the command set empty", async () => {
       const envelope = await makeCommand().finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         next: { commands: [] },
@@ -75,6 +78,7 @@ describe("BaseCommand next steps", () => {
 
     it("leaves out a list the command did not set", async () => {
       const envelope = await makeCommand().finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         next: { commands: [DEPLOY] },
@@ -85,6 +89,7 @@ describe("BaseCommand next steps", () => {
 
     it("leaves data that is not an object as it is", async () => {
       const envelope = await makeCommand().finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: "accepted",
         next: { commands: [DEPLOY] },
@@ -95,6 +100,7 @@ describe("BaseCommand next steps", () => {
 
     it("puts a skip's commands at the top level", async () => {
       const envelope = await makeCommand().finish({
+        summary: { title: "Done", sections: [] },
         status: "skipped",
         reason: "nothing-to-do",
         next: { commands: [DEPLOY] },
@@ -109,6 +115,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: prose("Deployed"),
@@ -122,6 +129,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: prose("Deployed\n"),
@@ -135,6 +143,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: prose("Deployed"),
@@ -149,6 +158,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: { title: "Done." },
         next: { actions: ["Publish it."] },
@@ -157,35 +167,38 @@ describe("BaseCommand next steps", () => {
       expect(cmd.stdout.at(-1)).toMatch(/\n\nNext:\n {2}Publish it\.$/);
     });
 
-    it("follows a skip's own rendering on the next line", async () => {
+    it("follows a skip's own rendering after a blank line", async () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "skipped",
         reason: "not-live",
         pretty: prose("Nothing was removed"),
         next: { commands: [DEPLOY] },
       });
 
-      expect(cmd.stdout).toEqual([`Nothing was removed\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stdout).toEqual([`Nothing was removed\n\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
-    it("follows a skip's reason", async () => {
+    it("follows a skip's own ending after a blank line", async () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Nothing to do", sections: [] },
         status: "skipped",
         reason: "nothing-to-do",
         next: { commands: [DEPLOY] },
       });
 
-      expect(cmd.stdout).toEqual([`Skipped: nothing-to-do\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
+      expect(cmd.stdout).toEqual([`Nothing to do\n\nNext:\n  $ ${PUBLIC_DEPLOY}`]);
     });
 
     it("comes before the footer", async () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: prose("Done"),
@@ -200,6 +213,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: rows("row"),
@@ -209,11 +223,12 @@ describe("BaseCommand next steps", () => {
       expect(cmd.stdout).toEqual(["row"]);
     });
 
-    it("goes to stderr beside output a script reads", async () => {
+    it("goes to stderr beside piped output without a blank line first", async () => {
       const cmd = makeCommand();
 
       await offTerminal(() =>
         cmd.finish({
+          summary: { title: "Done", sections: [] },
           status: "ok",
           data: {},
           pretty: rows("row"),
@@ -229,6 +244,7 @@ describe("BaseCommand next steps", () => {
 
       await asTerminal(() =>
         cmd.finish({
+          summary: { title: "Done", sections: [] },
           status: "ok",
           data: {},
           pretty: json({}),
@@ -243,6 +259,7 @@ describe("BaseCommand next steps", () => {
       const cmd = makeCommand();
 
       await cmd.finish({
+        summary: { title: "Done", sections: [] },
         status: "ok",
         data: {},
         pretty: prose(""),
@@ -256,7 +273,13 @@ describe("BaseCommand next steps", () => {
     it("prints nothing when there is nothing to do next", async () => {
       const cmd = makeCommand();
 
-      await cmd.finish({ status: "ok", data: {}, pretty: prose("Done"), next: { commands: [] } });
+      await cmd.finish({
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: {},
+        pretty: prose("Done"),
+        next: { commands: [] },
+      });
 
       expect(cmd.stdout).toEqual(["Done"]);
     });

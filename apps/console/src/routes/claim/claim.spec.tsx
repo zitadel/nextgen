@@ -151,7 +151,19 @@ describe("claim page", () => {
           projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
         }),
       ),
-      http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
+      // The claimed project's Overview, where the console opens (D35).
+      http.get(`*/api/v1/projects/${PROJECT_ID}`, () =>
+        HttpResponse.json({
+          id: PROJECT_ID,
+          name: "Claimed",
+          origins: [],
+          created_at: "2026-08-24T10:00:00Z",
+          updated_at: "2026-08-24T10:00:00Z",
+          owning_team_id: "team_personal",
+        }),
+      ),
+      http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+      http.get("*/api/v1/events", () => HttpResponse.json({ events: [] })),
     );
     stubComplete(() => {
       claimed = true;
@@ -167,8 +179,10 @@ describe("claim page", () => {
     const { router } = await renderAt(CLAIM_PATH);
     await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
   });
 
   // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.

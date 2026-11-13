@@ -3,7 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-10-03
 > **Context:** [#1095](https://github.com/zitadel/nextgen/issues/1095), the first decision of the benchmark epic [#1094](https://github.com/zitadel/nextgen/issues/1094); the decision and its evidence were posted on the issue on 2026-10-03 and are pinned here
-> **Builds on:** [ADR 002](002-multi-package-release-strategy.md) (Moon owns the task graph), [ADR 028](028-storage-v2-statements-and-dialects.md) (SQLite is the local default and not a production peer)
+> **Builds on:** [ADR 089](089-turborepo-task-runner.md) (Turborepo owns the task graph, after [ADR 002](002-multi-package-release-strategy.md)), [ADR 028](028-storage-v2-statements-and-dialects.md) (SQLite is the local default and not a production peer)
 > **Related:** [#1096](https://github.com/zitadel/nextgen/issues/1096), [#1104](https://github.com/zitadel/nextgen/issues/1104), [#1105](https://github.com/zitadel/nextgen/issues/1105), [#1107](https://github.com/zitadel/nextgen/issues/1107), [LICENSING.md](../../LICENSING.md)
 
 ## Context
@@ -26,7 +26,7 @@ Two shapes were posed:
   to be reachable from JavaScript.
 
 Both were prototyped against the same three operations — `POST /flow`,
-`POST /flow/{id}/submit` (identifier and password) and `GET /users/{id}` —
+`POST /flow/{flow_id}/submit` (identifier and password) and `GET /users/{id}` —
 on a local SQLite server at 1, 5 and 20 VUs, and compared on phase-breakdown
 fidelity, cookie handling, connection reuse, lines of JavaScript, and tag
 cardinality. The prototype is on branch
@@ -115,11 +115,11 @@ provisioned target, with the project secret, reaches a k6 run through the
 child process environment and is read on the Go side; it is never a `-e`
 value, so it appears neither in a process listing nor in the script's
 `__ENV`. There
-is no shell in the path: the local sweep (`moon run bench:sweep`) builds the
-k6 binary through Moon and the `sweep` command provisions, measures and
-summarises. A running, healthy server is a prerequisite of the harness,
-never its job: the provisioning tool of each lane starts it — Moon locally
-(`moon run workspace:server`), a container or a cloud deployment on the
+is no shell in the path: the local sweep (`turbo run sweep --filter=bench`)
+builds the k6 binary through turbo and the `sweep` command provisions,
+measures and summarises. A running, healthy server is a prerequisite of the
+harness, never its job: the provisioning tool of each lane starts it — turbo
+locally (`pnpm run server`), a container or a cloud deployment on the
 other lanes — and the harness is pointed at it, checking `/healthz` before
 anything else.
 

@@ -2,7 +2,7 @@
  * Orval-typed step fixtures for the canonical login flow.
  *
  * Each builder returns a `CreateFlow201` shape. The wire is identical for
- * `POST /flow`, `POST /flow/{id}/submit`, and `GET /flow/{id}` (orval emits
+ * `POST /flow`, `POST /flow/{flow_id}/submit`, and `GET /flow/{flow_id}` (orval emits
  * three structurally identical aliases), so a single fixture set drives all
  * three handlers.
  *
@@ -189,6 +189,46 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
 }
 
 /**
+ * The register step while a passkey registration that creates the account is
+ * pending — what the engine renders after `passkey_register` on the
+ * passkey-first preset's `register` step: the same step, carrying the
+ * creation challenge `<zl-passkey ceremony="register">` runs. The registration
+ * creates the user, so the step announces the sign-up gate its attestation
+ * must solve; as on `register-password`, a GET prepares the puzzle.
+ */
+export function registerPasskeyStep(input: StepFixtureInput): CreateFlow201 {
+  const base = registerStep(input);
+  const userEmail = input.capturedEmail ?? "mock-user@example.com";
+  return {
+    ...base,
+    step: {
+      ...base.step,
+      gates: { signup_pow: { kind: "captcha", provider: "zitadel_pow" } },
+      challenge: {
+        method: "passkey_register",
+        challenge_id: "ch_mock_passkey_register",
+        options: {
+          challenge: "AAAAAAAAAAAAAAAAAAAAAA",
+          rp: { name: "Mock RP", id: "localhost" },
+          user: {
+            id: emailToUserHandle(userEmail),
+            name: userEmail,
+            displayName: userEmail,
+          },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -7 },
+            { type: "public-key", alg: -257 },
+          ],
+          timeout: 60000,
+          attestation: "none",
+          authenticatorSelection: { residentKey: "required", userVerification: "preferred" },
+        },
+      },
+    },
+  };
+}
+
+/**
  * Register-password step — second step in the two-step registration flow.
  * Collects the password after the user has entered their profile fields.
  *
@@ -225,7 +265,8 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
       },
       { name: "back", kind: "back", text_key: "action.back" },
     ],
-    gates: {},
+    // Runtime gate: injected by the server for create_user, absent from the flow definition.
+    gates: { signup_pow: { kind: "captcha", provider: "zitadel_pow" } },
   });
 }
 

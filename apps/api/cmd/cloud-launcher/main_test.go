@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,11 +19,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
@@ -101,18 +106,38 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"CLOUD_DATABASE_URL",
 		"CLOUD_MIGRATOR_DATABASE_URL",
 		"CLOUD_PRODUCTION_BRANCH",
+		otlpCollectorEnv,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE",
+		"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE",
 		"MASTER_KEY_PREVIOUS_ID",
 		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
+		"NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_SERVICE_NAME",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
 		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_ORIGINS",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
+		"NEXTGEN_SERVER_IDLE_TIMEOUT",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
 		"PORT",
 		"VERCEL_BRANCH_URL",
 		"VERCEL_ENV",
@@ -120,6 +145,10 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"VERCEL_PROJECT_PRODUCTION_URL",
 		"VERCEL_URL",
 	} {
+		t.Setenv(key, "")
+	}
+	// The launcher clears these behind the wrapper; t.Setenv restores them.
+	for _, key := range otlpBackendEnv {
 		t.Setenv(key, "")
 	}
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
@@ -353,6 +382,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
 	t.Setenv("NEXTGEN_SERVER_REQUEST_ID_HEADER", "x-request-id")
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "60s")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -360,10 +390,134 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
 	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
 	assert.Equal(t, "x-vercel-id", os.Getenv("NEXTGEN_SERVER_REQUEST_ID_HEADER"), "the ID Vercel's dashboard shows")
+	assert.Equal(t, "0", os.Getenv("NEXTGEN_SERVER_IDLE_TIMEOUT"), "Vercel's proxy reuses its connections across a pause")
+	assert.Equal(t, "2s", os.Getenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"), "a function runs only while it serves a request")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
+}
+
+// Behind the Node.js wrapper's collector the server listens on loopback only
+// and sends its spans and metrics to the wrapper, which hands them to Vercel;
+// it trusts traceparent because only the wrapper can reach it and the wrapper
+// sets it. Vercel is the only sink then: what names an OTLP backend is
+// cleared, so the server exports nothing to it, logs included.
+func TestPrepareServerExportsToTheWrapper(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+	t.Setenv(otlpCollectorEnv, "127.0.0.1:45678")
+	// Leftovers must not move these.
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION", "1")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE", "grpc")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example.com/otlp")
+	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Basic backend")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://otlp.example.com/otlp/v1/traces")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1:34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "reachable only through the wrapper")
+	assert.Equal(t, "http", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+	assert.Equal(t, "127.0.0.1:45678", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT"))
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE"))
+	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION"))
+	assert.Equal(t, "delta", os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"))
+	assert.Equal(t, "http", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Equal(t, "127.0.0.1:45678", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT"))
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE"))
+	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION"))
+	assert.Equal(t, "0", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION"), "Vercel's sampling decides")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+	for _, key := range otlpBackendEnv {
+		assert.Empty(t, os.Getenv(key), key)
+	}
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE"), "the logs are Vercel's too")
+}
+
+// The settings the launcher writes must put the server's exports on the paths
+// the wrapper's collector serves, whatever the environment named before. An
+// exporter given only a host takes its path from OTEL_EXPORTER_OTLP_ENDPOINT:
+// beside Grafana Cloud's https://…/otlp, production sent every export to
+// /otlp/v1/traces and /otlp/v1/metrics, and the collector answered 404.
+func TestPrepareServerExportsReachTheWrappersCollector(t *testing.T) {
+	paths := make(chan string, 16)
+	collector := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		paths <- r.URL.Path
+	}))
+	t.Cleanup(collector.Close)
+
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+	t.Setenv(otlpCollectorEnv, strings.TrimPrefix(collector.URL, "http://"))
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example.com/otlp")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	// The exporters the server builds from the settings the launcher wrote.
+	exporter := func(signal string) zotel.ExporterConfig {
+		prefix := "NEXTGEN_INSTRUMENTATION_" + signal + "_EXPORTER_"
+		return zotel.ExporterConfig{
+			Type:          zotel.ExporterTypeHTTP,
+			Endpoint:      os.Getenv(prefix + "ENDPOINT"),
+			Insecure:      os.Getenv(prefix+"INSECURE") == "true",
+			BatchDuration: time.Hour,
+		}
+	}
+	ctx := t.Context()
+	tracerProvider, err := zotel.NewTracerProvider(ctx, exporter("TRACE"), 1, resource.Empty())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tracerProvider.Shutdown(context.Background()) })
+	_, span := tracerProvider.Tracer("test").Start(ctx, "request", trace.WithSpanKind(trace.SpanKindServer))
+	span.End()
+	require.NoError(t, tracerProvider.ForceFlush(ctx))
+
+	meterProvider, err := zotel.NewMeterProvider(ctx, exporter("METRIC"), resource.Empty())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = meterProvider.Shutdown(context.Background()) })
+	counter, err := meterProvider.Meter("test").Int64Counter("requests")
+	require.NoError(t, err)
+	counter.Add(ctx, 1)
+	require.NoError(t, meterProvider.ForceFlush(ctx))
+
+	// Each flush waited for its answer, so both requests are in.
+	got := []string{<-paths, <-paths}
+	assert.ElementsMatch(t, []string{"/v1/traces", "/v1/metrics"}, got)
+}
+
+func TestPrepareServerWithoutTheWrapperLeavesTelemetryAlone(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, ":34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+	assert.Empty(t, os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"))
+}
+
+func TestPrepareServerRefusesACollectorOffLoopback(t *testing.T) {
+	for _, collector := range []string{"10.0.0.1:4318", "localhost:4318", "collector.example.com:4318", "4318"} {
+		t.Run(collector, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", "production")
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv(otlpCollectorEnv, collector)
+
+			_, err := prepareServer(nil)
+			require.ErrorContains(t, err, otlpCollectorEnv)
+		})
+	}
 }
 
 // vercel.json mounts the console service, and builds it, at the path the
@@ -713,6 +867,36 @@ func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 
 	assert.Equal(t, "https://cloud.example.com", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "text", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+}
+
+func TestPrepareServerExportsTelemetryOnlyWithAnOTLPEndpoint(t *testing.T) {
+	prepare := func(t *testing.T, endpoint string) {
+		t.Helper()
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "production")
+		t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+		t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
+		t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE", "stderr")
+		_, err := prepareServer(nil)
+		require.NoError(t, err)
+	}
+
+	t.Run("without", func(t *testing.T) {
+		prepare(t, "")
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"), "no exporter would retry localhost:4318")
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_SERVICE_NAME"))
+	})
+	t.Run("with", func(t *testing.T) {
+		prepare(t, "https://otlp.example.com/otlp")
+		for _, signal := range []string{"TRACE", "METRIC"} {
+			prefix := "NEXTGEN_INSTRUMENTATION_" + signal + "_EXPORTER_"
+			assert.Equal(t, "http", os.Getenv(prefix+"TYPE"), signal)
+			assert.NotEmpty(t, os.Getenv(prefix+"BATCH_DURATION"), "the cloud names its export cadence")
+		}
+		assert.Equal(t, "stderr", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE"), "a configured exporter wins")
+		assert.Equal(t, "nextgen-cloud", os.Getenv("NEXTGEN_INSTRUMENTATION_SERVICE_NAME"))
+	})
 }
 
 func TestConsoleOrigins(t *testing.T) {

@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
  * is *called*, which is the part that reaches the analytics tools and cannot be
  * renamed later without breaking saved reports.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
+const commandsDir = join(import.meta.dirname, "../../../../src/cli/commands/variable");
 
 /** What a command's own directory holds beside its body, and never a command. */
 /**

@@ -329,3 +329,7 @@ On top of that pipeline, the Next.js middleware adds:
 
 1. A request that carries an `x-nextgen-auth-token` header is refused with a 400 on every route, including ignored routes and the proxy path: the header is an internal channel that only the middleware writes, so a client never sends it
 2. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

@@ -11,14 +11,14 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
+func (h *Handler) PublishSchema(ctx context.Context, req api.PublishSchemaReq, params api.PublishSchemaParams) (api.PublishSchemaRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opWrite); err != nil {
 		return nil, err
 	}
 	var schema *domain.JSONSchema
 
 	switch req.Type {
-	case api.UserSchemaCreateSchemaReq:
+	case api.UserSchemaPublishSchemaReq:
 		schemabs, err := req.UserSchema.MarshalJSON()
 		if err != nil {
 			return nil, err
@@ -32,8 +32,8 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		if err != nil {
 			return nil, err
 		}
-		return &api.CreateSchemaResponse{ID: schema.URL}, nil
-	case api.SchemaURLCreateSchemaReq:
+		return domainSchemaToApiSchema(schema)
+	case api.SchemaURLPublishSchemaReq:
 		schema, err := h.schemaService.CreateSchemaByUrl(ctx,
 			service.CreateSchemaByURLInput{
 				ProjectID: string(params.ProjectID),
@@ -43,18 +43,18 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 		if err != nil {
 			return nil, err
 		}
-		return &api.CreateSchemaResponse{ID: schema.URL}, nil
+		return domainSchemaToApiSchema(schema)
 	default:
 		return nil, unknownSchemaKindError
 	}
 }
 
-func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
-	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID.Value), params.ID, schemaAccess, opRead)
+func (h *Handler) GetSchema(ctx context.Context, params api.GetSchemaParams) (api.GetSchemaRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID.Value), params.SchemaID, schemaAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	schema, err := h.schemaService.GetSchema(ctx, projectID, string(params.TeamID.Value), params.ID)
+	schema, err := h.schemaService.GetSchema(ctx, projectID, string(params.TeamID.Value), params.SchemaID)
 	if err != nil {
 		return nil, err
 	}

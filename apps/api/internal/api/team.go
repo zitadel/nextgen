@@ -55,18 +55,18 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 	return teamResponse(team), nil
 }
 
-func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
+func (h *Handler) DeactivateTeam(ctx context.Context, params api.DeactivateTeamParams) (api.DeactivateTeamRes, error) {
 	projectID, err := h.requireTeamDelete(ctx, string(params.TeamID))
 	if err != nil {
 		if errors.Is(err, errResourceGone) {
-			return &api.DeleteTeamNoContent{}, nil
+			return &api.DeactivateTeamNoContent{}, nil
 		}
 		return nil, err
 	}
 	if err := h.teamService.Delete(ctx, projectID, string(params.TeamID)); err != nil {
 		return nil, err
 	}
-	return &api.DeleteTeamNoContent{}, nil
+	return &api.DeactivateTeamNoContent{}, nil
 }
 
 func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {

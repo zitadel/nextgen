@@ -1,14 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { aSuggest } from "@tests/helpers/suggestions";
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
-import { shellCommand } from "@/lib/suggestion";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { test } from "@tests/helpers/fixtures";
-import { aDeployment, holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
+import {
+  aDeployment,
+  holdingVariables,
+  PRIMARY_ORIGIN,
+  PROJECT_ID,
+  SECRET_VARIABLE,
+} from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -66,9 +72,7 @@ function aDryRunOf(cwd: string): PrepareRequest {
     compare: false,
     json: true,
     color: false,
-    suggest: (args) => {
-      return shellCommand(args);
-    },
+    suggest: aSuggest(),
   };
 }
 
@@ -135,7 +139,7 @@ describe("Publisher.landing", () => {
         getProject: async () => {
           return {
             origins: [
-              { pattern: "https://app.acme.com", kind: "primary" },
+              { pattern: PRIMARY_ORIGIN, kind: "primary" },
               { pattern: "https://*.preview.acme.com", kind: "preview" },
             ],
           };
@@ -146,7 +150,7 @@ describe("Publisher.landing", () => {
 
     const origins = await publisher.fetchLanding();
 
-    expect(origins.primary).toEqual(["https://app.acme.com"]);
+    expect(origins.primary).toEqual([PRIMARY_ORIGIN]);
   });
 });
 

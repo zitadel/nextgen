@@ -19,8 +19,8 @@ properties:
   revision_id:
     type: string
     description: |
-      The ID of the revision this entry holds. `getApplicationById`
-      (`GET /applications/{id}`) returns the newest one.
+      The ID of the revision this entry holds. `getApplication`
+      (`GET /applications/{application_id}`) returns the newest one.
     example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
   slug:
     type: string

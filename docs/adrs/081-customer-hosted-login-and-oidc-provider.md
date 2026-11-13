@@ -379,7 +379,7 @@ to generated files.
 So fixes ship as package releases and reach apps as version bumps, with
 `doctor --fix` migrating a generated file it recognizes. Pins stay exact
 (ADR 074 §4); a fix reaches pinned apps through `doctor`'s
-[`dependency-version`](../../apps/cli/src/commands/doctor/checks/dependency-version.ts)
+[`dependency-version`](../../apps/cli/src/cli/commands/doctor/checks/dependency-version.ts)
 check, security advisories, and the server. The SDK proxy and the widget
 name their package and version on every request (`X-Zitadel-Client`); the
 server records them on the request's event and answers a version below a

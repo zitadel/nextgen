@@ -7,7 +7,7 @@ post:
 
     The flow endpoints are the runtime calls the login component
     (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
-    step it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to
+    step it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{flow_id}/submit`) to
     get the next step. This call creates a new session implicitly, unless
     `session_id` is provided together with that session's `session_token`
     (for step-up or reauthentication on an existing session).
@@ -45,7 +45,7 @@ post:
     unless the project lists it.
 
     The response contains an `id` field, the flow handle. Use it as the path
-    parameter for all subsequent `/flow/{id}/submit` calls.
+    parameter for all subsequent `/flow/{flow_id}/submit` calls.
 
     The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
     the flow's orchestration state (current step, collected data, history).

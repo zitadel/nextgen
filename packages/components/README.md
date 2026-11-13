@@ -67,7 +67,7 @@ language. `<zitadel-login>` reads the global project handle from
 
 What `<zitadel-login>` handles for you:
 
-- `POST /flow` on mount, `POST /flow/{id}/submit` for every step, terminal
+- `POST /flow` on mount, `POST /flow/{flow_id}/submit` for every step, terminal
   `redirect` / `show` honoured automatically.
 - Native `<form>` semantics: Enter submits, password managers see the inputs,
   `<button type="submit">` works, browser autofill works.
@@ -131,19 +131,20 @@ fixtures:
   [`apps/storybook/src/orchestrator.stories.ts`](../../apps/storybook/src/orchestrator.stories.ts)).
   `applyBranding(...)` injects a tenant branding overlay merged into every
   response (presets include `font_url` for Inter).
-- **Framework demos (TCP server)** — `moon run api-mock:start`
-  serves the same handlers on port 8080 (set `PORT` to override) with
+- **Framework demos (TCP server)** — `turbo run start --filter=@zitadel/api-mock`
+  serves the same handlers on port 8080 (`PORT` overrides it when the script
+  runs through pnpm) with
   `defaultDevBranding` (dark theme, no font) applied at boot. See
   [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
 ### Preview surfaces
 
-| Surface | Moon command | What it gives you |
+| Surface | Command | What it gives you |
 | --- | --- | --- |
-| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for the Lit atoms and the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
-| **demo-next** | `moon run api-mock:start` + `moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:8080`, then `moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **Storybook** | `turbo run dev --filter=@zitadel/storybook` ([:6006](http://localhost:6006)) | The workbench for the Lit atoms and the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
+| **demo-next** | `turbo run start --filter=@zitadel/api-mock` + `turbo run dev --filter=@zitadel/demo-next` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:8080`, then `turbo run dev --filter=@zitadel/demo-nuxt` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The Storybook dev server resolves `@zitadel/components` from source, so atom
 edits hot-reload without a rebuild.
@@ -435,10 +436,10 @@ orchestrator) lives in [`apps/storybook`](../../apps/storybook/README.md).
 
 ## Develop
 
-Use **Moon** for tasks in this monorepo (`moon run <project>:<task>`).
-It matches CI caching and dependency order. Direct `pnpm --filter ...` scripts
-still exist on some packages for leaf-package debugging, but Moon is the
-documented path.
+Use **Turborepo** for tasks in this monorepo
+(`turbo run <task> --filter=<package>`). It matches CI caching and dependency
+order. Direct `pnpm --filter ...` scripts still exist on some packages for
+leaf-package debugging, but turbo is the documented path.
 
 ```sh
 # install once at the repo root
@@ -447,23 +448,23 @@ corepack pnpm install
 # --- Workbench ---
 
 # Storybook: the atoms and the <zitadel-login> orchestrator
-moon run storybook:dev
+turbo run dev --filter=@zitadel/storybook
 # → http://localhost:6006
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
-# moon run api-mock:start   # → http://localhost:8080
-# moon run demo-next:dev    # → :3002 (ZITADEL_URL defaults to :8080)
-# moon run demo-nuxt:dev    # → :3001 (ZITADEL_URL defaults to :8080)
+# turbo run start --filter=@zitadel/api-mock   # → http://localhost:8080
+# turbo run dev --filter=@zitadel/demo-next    # → :3002 (ZITADEL_URL defaults to :8080)
+# turbo run dev --filter=@zitadel/demo-nuxt    # → :3001 (ZITADEL_URL defaults to :8080)
 
 # --- Package checks ---
 
-moon run components:test          # unit + browser projects (test:all)
-moon run components:typecheck
-moon run components:build
+turbo run test --filter=@zitadel/components        # unit + browser projects
+turbo run typecheck --filter=@zitadel/components
+turbo run build --filter=@zitadel/components
 ```
 
-The Storybook dev server loads this package from source; `storybook:build` and
-`storybook:test` depend on `components:build`.
+The Storybook dev server loads this package from source; the storybook's
+`build` and `test` depend on `@zitadel/components#build`.
 
 **Framework demos** need the TCP mock plus a rebuild after orchestrator changes —
 see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and

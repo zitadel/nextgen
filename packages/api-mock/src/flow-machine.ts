@@ -30,6 +30,8 @@
  *                                     --SUBMIT(submit, user_already_exists)--> password
  *                                     --SUBMIT(sign_in)--> identifier
  *                                     --SUBMIT(sso)-----> sso-redirect
+ *                                     --SUBMIT(passkey_register)--> register, carrying
+ *                                         the ceremony --SUBMIT(attested)--> done
  *
  *   The `user_*` outcomes are the email lookup the handlers make when
  *   `setupMockHandlers({ accounts })` opts in; without it no submit carries one.
@@ -99,6 +101,12 @@ export type FlowMachineContext = {
    * engine pops its back stack there, restoring that step's purpose too.
    */
   passwordFrom: "identifier" | "register";
+  /**
+   * A passkey registration that creates the account is pending on `register`:
+   * the engine renders the step again with its creation challenge, and the
+   * attestation that answers it creates the user.
+   */
+  passkeyRegistration: boolean;
 };
 
 export type FlowMachineEvent =
@@ -109,6 +117,8 @@ export type FlowMachineEvent =
       fields: Record<string, string>;
       sso_provider_id?: string | null;
       outcome?: "user_not_found" | "user_already_exists";
+      /** The submit answers the step's ceremony (`challenge_response`). */
+      attested?: boolean;
     }
   | {
       // The provider sending the browser back to the callback. It is not a
@@ -128,6 +138,7 @@ const initialContext = {
   ssoProviderId: null,
   ssoOrigin: null,
   passwordFrom: "identifier",
+  passkeyRegistration: false,
 } satisfies FlowMachineContext;
 
 const rotateToken = assign<
@@ -284,9 +295,25 @@ export const flowMachine = createMachine({
       },
     },
     register: {
+      // Leaving the step drops its ceremony, as the engine drops a pending one.
+      exit: assign({ passkeyRegistration: false }),
       on: {
         SUBMIT: [
           chooseProviderOn("register"),
+          {
+            // The attestation: the registration creates the account.
+            guard: ({ event, context }) =>
+              event.action === "passkey_register" &&
+              event.attested === true &&
+              context.passkeyRegistration,
+            target: "done",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            // Asking for the ceremony stays on the step, which now carries it.
+            guard: ({ event }) => event.action === "passkey_register",
+            actions: [captureFields, assign({ passkeyRegistration: true }), rotateToken],
+          },
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",

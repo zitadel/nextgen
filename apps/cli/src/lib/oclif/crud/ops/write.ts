@@ -1,12 +1,6 @@
 import { Flags } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
-import { nonBlankString } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
-
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { resourceBody } from "@/lib/oclif/crud/resource-body";
-import type { CommandResult } from "@/lib/oclif/types";
 import {
   type BodyField,
   bodyFieldFlags,
@@ -15,6 +9,7 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "@/lib/oclif/crud/fields";
+import { resourceBody } from "@/lib/oclif/crud/resource-body";
 import { article, dryRunResult, idArg, idName } from "@/lib/oclif/crud/shared";
 import type {
   CreateSpec,
@@ -26,7 +21,16 @@ import type {
   WriteShape,
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { named } from "@/lib/names";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { helpOf } from "@/lib/suggestion";
 import { json } from "@/lib/oclif/rendering";
+import type { CommandResult } from "@/lib/oclif/types";
+import { resourceSuggestion } from "@/lib/suggestion";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+import type { Summary } from "@/lib/ui";
+
 import {
   type OperationDefinition,
   type OperationInput,
@@ -91,12 +95,15 @@ const fieldsOf = <Ctx>(
   const under = `${spec.root ?? ""}\u0000${reserved.join("\u0000")}`;
   const forSchema = described.get(spec.schema as object) ?? new Map();
   described.set(spec.schema as object, forSchema);
+
   const already = forSchema.get(under);
   if (already !== undefined) {
     return already;
   }
+
   const fields = describeBody(spec.schema, { root: spec.root, reserved });
   forSchema.set(under, fields);
+
   return fields;
 };
 
@@ -105,8 +112,9 @@ const fieldsOf = <Ctx>(
  * `./identity-provider-connection.json`, where the singular itself would be
  * split by a shell into three arguments.
  */
-const exampleFile = (singular: string): string =>
-  `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+const exampleFile = (singular: string): string => {
+  return `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+};
 
 /**
  * `<topic> create` and `<topic> update <id>` share everything but the id
@@ -128,6 +136,7 @@ const describeWrite = <
   const example =
     spec.example ?? (flagsAloneMayBeIncomplete(fields) ? undefined : fieldExample(fields));
   const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
+
   return {
     description:
       verb === "create"
@@ -138,23 +147,30 @@ const describeWrite = <
       `${command} --data '{...}' --json`,
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
-    flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
+    flags: {
+      ...bodyFieldFlags(fields),
+      ...rawBodyFlags(document, fields),
+      ...options.flags,
+    },
     args: verb === "create" ? {} : idArg(resource, topic),
   };
 };
 
 /** What a write without a body to send is refused for. */
-const NEEDS_BODY_REFUSAL: Refusal = {
+const NEEDS_BODY_REFUSAL = {
   message: "{command} needs a body",
-  hint: "Pass the body's fields as flags (see `{command} --help`), --set <path>=<value>, or --data '<json>' / --file <path>.",
-};
+  hint: "Pass the body's fields as flags (the help below lists them), --set <path>=<value>, or --data '<json>' / --file <path>.",
+  next: ["{help}"],
+} as const satisfies Refusal;
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
   return (
     flags.data !== undefined ||
     flags.file !== undefined ||
     (Array.isArray(flags.set) && flags.set.length > 0) ||
-    fields.some((field) => field.flag !== undefined && flags[named(field.flag)] !== undefined)
+    fields.some((field) => {
+      return field.flag !== undefined && flags[named(field.flag)] !== undefined;
+    })
   );
 };
 
@@ -176,9 +192,11 @@ abstract class WriteOperation<
     const { topic, spec, resource, options } = this.definition;
     const fields = fieldsOf(spec, options);
     if (!givesBody(flags, fields)) {
-      throw refusalError(NEEDS_BODY_REFUSAL, {
-        command: `${topic} ${this.verb}`,
-      });
+      throw refusalError(
+        NEEDS_BODY_REFUSAL,
+        { command: `${topic} ${this.verb}` },
+        { help: helpOf(`${topic}:${this.verb}`) },
+      );
     }
     const body = await resourceBody(
       {
@@ -198,6 +216,7 @@ abstract class WriteOperation<
       return dryRunResult({
         verb: this.verb,
         topic,
+        noun: resource.singular,
         id,
         body,
         checked: (await this.check(body, id)) ?? undefined,
@@ -205,26 +224,47 @@ abstract class WriteOperation<
           schema: spec.schema as ZodLike,
           references: options.references,
         },
+        next: await this.realRun(),
       });
     }
 
     // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
+    const summary: Summary =
+      result === undefined
+        ? {
+            title: "Command completed",
+            sections: [],
+          }
+        : {
+            title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
+            sections: [],
+            lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+          };
+
     return {
       status: "ok",
       data: result ?? {},
-      ...(result && resource.get
-        ? {
-            next: {
-              commands: [this.suggest(`${topic} get ${String(resource.idOf(result))} --json`)],
-            },
-          }
-        : {}),
       // A write that answered no body has no record to print, so it keeps the
       // generic rendering that says the command completed. Printing `{}` would
       // be the record the write did not make.
-      ...(result === undefined ? {} : { pretty: json(result) }),
+      ...(result === undefined || this.isOnScreen ? {} : { pretty: json(result) }),
+      summary,
+      ...(result && resource.get
+        ? {
+            next: {
+              commands: [
+                this.suggest(
+                  resourceSuggestion(topic, "get", {
+                    args: { [named(idName(resource))]: String(resource.idOf(result)) },
+                    flags: { json: true },
+                  }),
+                ),
+              ],
+            },
+          }
+        : {}),
     };
   }
 
@@ -263,6 +303,7 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected override async check(body: Json, id: string | undefined): Promise<WriteResult> {
     const { check } = this.definition.spec;
+
     return check === undefined ? undefined : check(await this.context(), id ?? "", body);
   }
 }

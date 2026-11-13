@@ -21,9 +21,10 @@ const (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    operation_status, status_class,
     payload, metadata
 FROM events`
 
@@ -66,9 +67,10 @@ var eventColumns = []string{
 	"project_id", "id", "event_type", "category",
 	"occurred_at", "created_at",
 	"team_id", "actor_id", "actor_type",
-	"entity_type", "entity_id",
+	"entity_type", "entity_id", "user_id",
 	"client_id", "token_id", "delegation_type", "delegation_id", "grantor", "fingerprint",
 	"request_id", "session_id", "flow_id",
+	"operation_status", "status_class",
 	"payload", "metadata",
 }
 
@@ -119,28 +121,31 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	occurredAt := time.Now().UTC().Add(-wait)
 
 	m := spanner.InsertMap(eventsTable, map[string]any{
-		"project_id":      event.ProjectID,
-		"id":              event.ID,
-		"event_type":      string(event.EventType),
-		"category":        string(event.Category),
-		"occurred_at":     occurredAt,
-		"created_at":      spanner.CommitTimestamp,
-		"team_id":         nullString(event.TeamID),
-		"actor_id":        nullString(event.ActorID),
-		"actor_type":      nullActorType(event.ActorType),
-		"entity_type":     nullString(event.EntityType),
-		"entity_id":       nullString(event.EntityID),
-		"client_id":       event.ClientID,
-		"token_id":        event.TokenID,
-		"delegation_type": event.DelegationType,
-		"delegation_id":   event.DelegationID,
-		"grantor":         event.Grantor,
-		"fingerprint":     event.Fingerprint,
-		"request_id":      nullString(event.RequestID),
-		"session_id":      nullString(event.SessionID),
-		"flow_id":         nullString(event.FlowID),
-		"payload":         payload,
-		"metadata":        metadata,
+		"project_id":       event.ProjectID,
+		"id":               event.ID,
+		"event_type":       string(event.EventType),
+		"category":         string(event.Category),
+		"occurred_at":      occurredAt,
+		"created_at":       spanner.CommitTimestamp,
+		"team_id":          nullString(event.TeamID),
+		"actor_id":         nullString(event.ActorID),
+		"actor_type":       nullActorType(event.ActorType),
+		"entity_type":      nullString(event.EntityType),
+		"entity_id":        nullString(event.EntityID),
+		"user_id":          nullString(event.UserID),
+		"client_id":        event.ClientID,
+		"token_id":         event.TokenID,
+		"delegation_type":  event.DelegationType,
+		"delegation_id":    event.DelegationID,
+		"grantor":          event.Grantor,
+		"fingerprint":      event.Fingerprint,
+		"request_id":       nullString(event.RequestID),
+		"session_id":       nullString(event.SessionID),
+		"flow_id":          nullString(event.FlowID),
+		"operation_status": nullString(events.OperationStatusOf(event)),
+		"status_class":     nullStatusClass(event.StatusClass),
+		"payload":          payload,
+		"metadata":         metadata,
 	})
 	createdAt, err := e.db.BufferWrite(ctx, []*spanner.Mutation{m})
 	if err != nil {
@@ -364,16 +369,19 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 		ev                                               domain.Event
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID spanner.NullString
+		userID                                           spanner.NullString
 		requestID, sessionID, flowID                     spanner.NullString
+		operationStatus, statusClass                     spanner.NullString
 		payload, metadata                                spanner.NullJSON
 	)
 	if err := row.Columns(
 		&ev.ProjectID, &ev.ID, &eventType, &category,
 		&ev.OccurredAt, &ev.CreatedAt,
 		&teamID, &actorID, &actorType,
-		&entityType, &entityID,
+		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
+		&operationStatus, &statusClass,
 		&payload, &metadata,
 	); err != nil {
 		return nil, err
@@ -390,9 +398,18 @@ func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 	}
 	ev.EntityType = spannerNullStringPtr(entityType)
 	ev.EntityID = spannerNullStringPtr(entityID)
+	ev.UserID = spannerNullStringPtr(userID)
 	ev.RequestID = spannerNullStringPtr(requestID)
 	ev.SessionID = spannerNullStringPtr(sessionID)
 	ev.FlowID = spannerNullStringPtr(flowID)
+	if statusClass.Valid {
+		c := domain.HTTPStatusClass(statusClass.StringVal)
+		ev.StatusClass = &c
+	}
+	if operationStatus.Valid {
+		operation := events.OperationOf(operationStatus.StringVal)
+		ev.OperationID = &operation
+	}
 	payloadBytes, err := decodeNullJSON(payload)
 	if err != nil {
 		return nil, err
@@ -414,6 +431,13 @@ func nullString(p *string) any {
 }
 
 func nullActorType(p *domain.EventActorType) any {
+	if p == nil {
+		return nil
+	}
+	return string(*p)
+}
+
+func nullStatusClass(p *domain.HTTPStatusClass) any {
 	if p == nil {
 		return nil
 	}

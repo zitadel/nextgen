@@ -29,6 +29,10 @@ export default defineConfig({
   ...local,
   // A deployment answers from cold the first time; one more try.
   retries: 1,
+  // The tests wait on the deployment, not on the runner's 4 cores, whose
+  // half (Playwright's default) left this the longest production check.
+  // Elsewhere the default stands.
+  workers: onGitHub ? 4 : undefined,
   // No HTML report: it keeps every error, and the error of a request that
   // failed lists the request's headers, the bypass secret among them.
   reporter: onGitHub ? [["list"], ["github"]] : "list",

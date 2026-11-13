@@ -1,0 +1,30 @@
+{
+  "name": "@zitadel/conformance-nuxt",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3217",
+    "install-browsers": "playwright install chromium",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@zitadel/sdk-nuxt": "workspace:*",
+    "nuxt": "catalog:",
+    "vue": "catalog:",
+    "vue-router": "^5.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*"
+  },
+  "conformance": {
+    "framework": "nuxt",
+    "appPort": 3217,
+    "zitadelPort": 8217,
+    "generatePort": 8317
+  }
+}

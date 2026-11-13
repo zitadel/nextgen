@@ -1,16 +1,118 @@
-import type {
-  BuildRelease200,
-  BuildRelease201,
-  BuildReleaseBody,
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
+import {
+  type BuildRelease200,
+  type BuildRelease201,
+  type BuildReleaseBody,
+  type GetRelease200,
+  type GetRelease200PointersItem,
+  type GetRelease200PointersItemKind,
+  type RevokeRelease409,
+  type RevokeRelease409DetailsOriginsItem,
+  RevokeRelease409DetailsOriginsItemKind,
 } from "@zitadel/api/generated/model";
 import { z } from "zod";
 
-import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
+import type { ZitadelClient } from "@/lib/backend/client";
 import { ConflictError } from "@/lib/backend/errors";
+
+/**
+ * One origin that serves a release.
+ *
+ * @remarks
+ * Names the deployment that pins the release there, and whether the origin is
+ * a primary origin or a preview, which is freed differently: a primary origin
+ * by putting another release live on it, a preview by removing it.
+ */
+export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+
+/**
+ * The refusal to revoke a release an origin still serves.
+ *
+ * @remarks
+ * Raised only when the server's answer names the origins and every one is a
+ * primary origin or a preview, so a caller that catches it always has at least
+ * one, and {@link ReleaseInUseError.primaries} and
+ * {@link ReleaseInUseError.previews} between them hold all of them. It is a
+ * {@link ConflictError} that carries the server's answer as it came, so a
+ * caller that does not know it handles it as the plain conflict it also is.
+ */
+export class ReleaseInUseError extends ConflictError {
+  /**
+   * The error's name, which a caller that cannot import the class matches on.
+   */
+  override readonly name: string = "ReleaseInUseError";
+
+  /**
+   * Every origin that serves the release, in the order the server named them.
+   */
+  readonly origins: readonly ServingOrigin[];
+
+  /**
+   * @param message - The server's message.
+   * @param origins - Every origin that serves the release.
+   * @param options - What the conflict carried (status, URL, body, request id,
+   * hint and details) and the conflict itself, as the cause.
+   */
+  constructor(
+    message: string,
+    origins: readonly ServingOrigin[],
+    options: ConstructorParameters<typeof ConflictError>[1] = {},
+  ) {
+    super(message, options);
+    this.origins = origins;
+  }
+
+  /**
+   * The origins that serve the release as primary origins, which a different
+   * release put live on them frees.
+   *
+   * @returns Those of {@link ReleaseInUseError.origins} that are primary origins.
+   */
+  get primaries(): readonly ServingOrigin[] {
+    return this.origins.filter((origin) => {
+      return origin.kind === RevokeRelease409DetailsOriginsItemKind.primary;
+    });
+  }
+
+  /**
+   * The origins that serve the release as previews, which removing the preview
+   * frees.
+   *
+   * @returns Those of {@link ReleaseInUseError.origins} that are previews.
+   */
+  get previews(): readonly ServingOrigin[] {
+    return this.origins.filter((origin) => {
+      return origin.kind === RevokeRelease409DetailsOriginsItemKind.preview;
+    });
+  }
+}
+
+/**
+ * The origins a `rel.in_use` answer names, as the API documents them.
+ *
+ * @remarks
+ * The generated client types the 409 body but, as every error body, does not
+ * validate it, so the answer is checked here before it is trusted. The kinds
+ * are the two {@link ReleaseInUseError} explains. A kind the API adds is
+ * therefore not parsed, and the refusal stays the plain conflict rather than
+ * naming an origin it cannot say how to free.
+ */
+const InUseBody = z.object({
+  details: z.object({
+    origins: z
+      .array(
+        z.object({
+          origin: z.string().min(1),
+          deployment_id: z.string().min(1),
+          kind: z.enum([
+            RevokeRelease409DetailsOriginsItemKind.primary,
+            RevokeRelease409DetailsOriginsItemKind.preview,
+          ]),
+        }),
+      )
+      .min(1),
+  }),
+}) satisfies z.ZodType<Pick<RevokeRelease409, "details">>;
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -22,48 +124,13 @@ export type ReleaseInput = Readonly<BuildReleaseBody>;
 export type Release = BuildRelease200 | BuildRelease201;
 
 /** A release with the revisions it points at, as a read returns it. */
-export type ReleaseRecord = GetReleaseById200;
+export type ReleaseRecord = GetRelease200;
 
 /** One revision a release pins. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
-
-/**
- * The origins a `rel.in_use` refusal names, each with the deployment that pins
- * the release there. An empty list is rejected: a refusal naming no origin has
- * nothing to show, so it stays the plain conflict.
- */
-const IN_USE_ORIGINS = z
-  .array(
-    z.object({
-      origin: z.string(),
-      deployment_id: z.string(),
-    }),
-  )
-  .min(1);
-
-/**
- * The body of a `rel.in_use` refusal, parsed rather than trusted: one that does
- * not hold the origins the contract promises is rethrown as the conflict it is.
- * The origins are read at both depths, as the error mapper reads them: the
- * typed answer carries them in `details`, the generic one a level down.
- */
-const RELEASE_IN_USE_BODY = z.object({
-  details: z.union([
-    z.object({ origins: IN_USE_ORIGINS }),
-    z.object({ details: z.object({ origins: IN_USE_ORIGINS }) }),
-  ]),
-});
-
-/**
- * What revoking a release came to: revoked, or refused because origins still
- * serve it, each one named with the deployment that pins the release there.
- */
-export type RevokeOutcome =
-  | Readonly<{ outcome: "revoked"; release: Release }>
-  | Readonly<{ outcome: "in-use"; origins: Readonly<z.infer<typeof IN_USE_ORIGINS>> }>;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -96,7 +163,7 @@ export class ReleaseService extends ApiService {
    * @returns The release, with the revisions it points at.
    */
   async get(releaseId: string): Promise<ReleaseRecord> {
-    return this.client.getReleaseById(releaseId, {
+    return this.client.getRelease(releaseId, {
       project_id: this.projectId,
     });
   }
@@ -136,29 +203,32 @@ export class ReleaseService extends ApiService {
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param releaseId - The release to revoke.
-   * @returns `revoked` with the release, or `in-use` with each origin that still
-   * serves it and the deployment that pins it there.
-   * @throws ConflictError for any other conflict, and any other failure as the
-   * client raised it, including a `rel.in_use` refusal that names no origin.
+   * @returns The release, now revoked.
+   * @throws ReleaseInUseError when an origin still serves the release, naming
+   * each such origin.
    */
-  async revoke(releaseId: string): Promise<RevokeOutcome> {
+  async revoke(releaseId: string): Promise<Release> {
     try {
-      const release = await this.client.revokeRelease(releaseId, {
+      return await this.client.revokeRelease(releaseId, {
         project_id: this.projectId,
       });
-      return { outcome: "revoked", release };
     } catch (error) {
-      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
-        const refusal = RELEASE_IN_USE_BODY.safeParse(error.body);
-        if (refusal.success) {
-          const { details } = refusal.data;
-          return {
-            outcome: "in-use",
-            origins: "origins" in details ? details.origins : details.details.origins,
-          };
-        }
+      if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
+        throw error;
       }
-      throw error;
+      const served = InUseBody.safeParse(error.body);
+      if (!served.success) {
+        throw error;
+      }
+      throw new ReleaseInUseError(error.message, served.data.details.origins, {
+        status: error.status,
+        url: error.url,
+        body: error.body,
+        requestId: error.requestId,
+        hint: error.hint,
+        details: error.details,
+        cause: error,
+      });
     }
   }
 }

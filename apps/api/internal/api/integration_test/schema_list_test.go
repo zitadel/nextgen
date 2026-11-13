@@ -46,13 +46,13 @@ func TestListSchemasPagination(t *testing.T) {
 		}`, i, objectType, helpers.BuiltinSchemaBaseURL, i)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp))
 	}
 
 	listSchemas := func(t *testing.T, params api.ListSchemasParams) *api.ListSchemasResponse {
@@ -142,14 +142,14 @@ func TestListSchemasRevisions(t *testing.T) {
 		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
-		return resp.(*api.CreateSchemaResponse).ID
+		require.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.Schema).ID
 	}
 
 	const (
@@ -308,14 +308,14 @@ func TestListSchemasInUse(t *testing.T) {
 		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
-		resp, err := client.CreateSchema(
+		resp, err := client.PublishSchema(
 			t.Context(),
-			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+			api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+			api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 		)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
-		return resp.(*api.CreateSchemaResponse).ID
+		require.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.Schema).ID
 	}
 	v1 := createSchema(t, "in use v1")
 	v2 := createSchema(t, "in use v2")

@@ -13,12 +13,11 @@ export const FLOW_PATH = ".zitadel/flows/login.json";
 
 /**
  * What the flow contract requires at the top of a flow, as {@link aFlowBody}
- * fills it in: an active `login` flow on a schema no test defines, whose one
- * step is its login entry.
+ * fills it in: a `login` flow on a schema no test defines, whose one step is
+ * its login entry.
  */
 const REQUIRED_FLOW_KEYS: JsonObject = {
   name: "login",
-  status: "active",
   user_schema: "unnamed-user",
   purposes: { login: "identifier" },
   steps: [{ name: "identifier" }],
@@ -85,7 +84,6 @@ export const PASSKEY_ONLY: EnabledMethods = { password: false, passkey: true };
 export function aPasswordFlow(overrides: JsonObject = {}): JsonObject {
   return {
     name: "default-login",
-    status: "active",
     user_schema: "https://schemas.test.invalid/default-human-user.json",
     purposes: { login: "identifier" },
     steps: [

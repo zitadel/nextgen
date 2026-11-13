@@ -303,8 +303,8 @@ describe("NextPatcher.artifacts", () => {
     expect(artifacts.rootConfigFiles).toEqual(["zitadel.json"]);
     expect(artifacts.directories).toEqual([".zitadel"]);
     expect(artifacts.envBackups).toEqual([".env.local", ".env.development.local"]);
-    // The react renderer's SDK package — `eject` surfaces this as
-    // `npm uninstall <name>` in next_commands.
+    // The react renderer's SDK package — `eject` suggests removing it in
+    // next_commands, with the project's own package manager.
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-next"]);
   });
 

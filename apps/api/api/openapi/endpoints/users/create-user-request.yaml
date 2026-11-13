@@ -22,7 +22,7 @@ properties:
     minLength: 1
     description: |
       The ID of the schema that defines the content of `attributes`: the `id`
-      that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default schema is
+      that `publishSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default schema is
       provided.
   attributes:
     type: object

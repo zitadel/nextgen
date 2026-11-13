@@ -1,10 +1,12 @@
 import { isObject } from "@/lib/json";
-import { refusalError, type Refusal } from "@/lib/oclif/refusal";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { helpOf } from "@/lib/suggestion";
+
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
 import { mergeDocuments, setAt, valueAt } from "./document";
 import { type BodyField, bodyFromFlags } from "./fields";
-import { findCredential, refuseSecret, type References } from "./secrets";
+import { findCredential, type References, refuseSecret } from "./secrets";
 import { parseOrThrow } from "./shared";
 import type { Json, Schema } from "./types";
 import { objectOf, type ZodLike } from "./zod";
@@ -17,31 +19,35 @@ const argvParts = (
   fields: readonly BodyField[],
   fromFlags: Json | undefined,
   assignments: readonly Assignment[],
-): ArgvPart[] => [
-  ...(typeof flags.data === "string" && base
-    ? [
-        {
-          value: base,
-          source: "--data",
-        },
-      ]
-    : []),
-  ...fields.flatMap((field) => {
-    const value = valueAt(fromFlags, field.path);
-    return value === undefined || field.flag === undefined
-      ? []
-      : [
+): ArgvPart[] => {
+  return [
+    ...(typeof flags.data === "string" && base
+      ? [
           {
-            value: setAt({}, field.path, value),
-            source: `--${field.flag}`,
+            value: base,
+            source: "--data",
           },
-        ];
-  }),
-  ...assignments.map((assignment) => ({
-    value: fragmentOf(assignment),
-    source: "--set",
-  })),
-];
+        ]
+      : []),
+    ...fields.flatMap((field) => {
+      const value = valueAt(fromFlags, field.path);
+      return value === undefined || field.flag === undefined
+        ? []
+        : [
+            {
+              value: setAt({}, field.path, value),
+              source: `--${field.flag}`,
+            },
+          ];
+    }),
+    ...assignments.map((assignment) => {
+      return {
+        value: fragmentOf(assignment),
+        source: "--set",
+      };
+    }),
+  ];
+};
 
 const refuseArgvCredentials = (
   parts: readonly ArgvPart[],
@@ -72,13 +78,17 @@ const unwrapRoot = (raw: Json, root: string | undefined, document: ZodLike | und
   return isObject(inner) && !declared ? inner : raw;
 };
 
-const isMissing = (field: BodyField, document: unknown): boolean =>
-  valueAt(document, field.path) === undefined &&
-  (field.required ||
-    (field.requiredWith !== undefined && isObject(valueAt(document, field.requiredWith))));
+const isMissing = (field: BodyField, document: unknown): boolean => {
+  return (
+    valueAt(document, field.path) === undefined &&
+    (field.required ||
+      (field.requiredWith !== undefined && isObject(valueAt(document, field.requiredWith))))
+  );
+};
 
-const spelling = (field: BodyField): string =>
-  field.flag ? `--${field.flag}` : `--set ${field.name}=…`;
+const spelling = (field: BodyField): string => {
+  return field.flag ? `--${field.flag}` : `--set ${field.name}=…`;
+};
 
 /** What {@link resourceBody} builds a write's body from. */
 export type ResourceBodySource = Readonly<{
@@ -97,13 +107,14 @@ export type ResourceBodySource = Readonly<{
  * on the command line, for the fields it must carry, and against the request
  * schema, so a command is handed a body that is ready to send.
  */
-const MISSING_FIELDS_REFUSAL: Refusal = {
+const MISSING_FIELDS_REFUSAL = {
   message: "{command} is missing required {noun}: {spellings}",
-  hint: "Pass {alternatives}, or include {pronoun} in --data / --file. See `{command} --help`.",
+  hint: "Pass {alternatives}, or include {pronoun} in --data / --file. The help below lists every field.",
+  next: ["{help}"],
   details: {
     missing: "{names}",
   },
-};
+} as const satisfies Refusal;
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
   const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
@@ -115,21 +126,29 @@ export const resourceBody = async (source: ResourceBodySource, flags: Json): Pro
     source.document,
     source.references,
   );
-  const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
-    (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
-    base ?? {},
-  );
-  const missing = source.fields.filter((field) => isMissing(field, merged));
+  const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>((body, overlay) => {
+    return overlay === undefined ? body : mergeDocuments(body, overlay);
+  }, base ?? {});
+  const missing = source.fields.filter((field) => {
+    return isMissing(field, merged);
+  });
   if (missing.length > 0) {
+    const plural = new Intl.PluralRules("en").select(missing.length) === "one";
     const flagNames = missing.map(spelling);
-    throw refusalError(MISSING_FIELDS_REFUSAL, {
-      command: `${source.topic} ${source.verb}`,
-      noun: missing.length === 1 ? "field" : "fields",
-      pronoun: missing.length === 1 ? "it" : "them",
-      spellings: flagNames.join(", "),
-      alternatives: flagNames.join(" and "),
-      names: missing.map((field) => field.name),
-    });
+    throw refusalError(
+      MISSING_FIELDS_REFUSAL,
+      {
+        command: `${source.topic} ${source.verb}`,
+        noun: plural ? "field" : "fields",
+        pronoun: plural ? "it" : "them",
+        spellings: flagNames.join(", "),
+        alternatives: new Intl.ListFormat("en", { type: "conjunction" }).format(flagNames),
+        names: missing.map((field) => {
+          return field.name;
+        }),
+      },
+      { help: helpOf(`${source.topic}:${source.verb}`) },
+    );
   }
   const wrapped = source.root === undefined ? merged : { [source.root]: merged };
   return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;

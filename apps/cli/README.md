@@ -87,9 +87,10 @@ Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|minimal`); setup never does;
 every edit publishes a new immutable branding revision and the login serves
 the newest one. Flows work the same way: every edit publishes a new immutable
-flow revision. A page that pins `flow-name` gets that flow's newest revision. A
-page without a pin gets the project's newest active unscoped flow, whatever its
-name, so revising a flow can make it the default.
+flow revision, and the deployed release pins it. A page that pins `flow-name`
+gets that flow's pinned revision. A page without a pin gets the newest unscoped
+flow the release pins, whatever its name, so revising a flow can make it the
+default.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals
@@ -117,7 +118,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variable set|get|list|rm`: manage the project's variables and secrets
   (`--preview` for a preview override); `zitadel variable resolve` shows what a
-  target's live deployment runs
+  deployment froze, the live one by default
 - `zitadel origin add|list|rm`: manage the origin patterns the project admits
   (`--kind primary|preview`)
 - `zitadel eject`: remove what setup wrote (alias: `zitadel uninstall`)
@@ -215,7 +216,7 @@ which ships in this package.
 * [`zitadel users update ID`](#zitadel-users-update-id)
 * [`zitadel variable get NAME`](#zitadel-variable-get-name)
 * [`zitadel variable list`](#zitadel-variable-list)
-* [`zitadel variable resolve`](#zitadel-variable-resolve)
+* [`zitadel variable resolve [DEPLOYMENT_ID]`](#zitadel-variable-resolve-deployment_id)
 * [`zitadel variable rm NAME`](#zitadel-variable-rm-name)
 * [`zitadel variable set NAME [VALUE]`](#zitadel-variable-set-name-value)
 * [`zitadel version`](#zitadel-version)
@@ -278,7 +279,7 @@ DESCRIPTION
 EXAMPLES
   $ zitadel api queryUsers -F limit=5
 
-  $ zitadel api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+  $ zitadel api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
 
   $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
 
@@ -4239,14 +4240,14 @@ FLAGS
       created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal
-      |greater_than|greater_than_or_equal), schema_object_type
-      (equals|not_equals|contains), status (equals|not_equals|contains|not_contain
-      s|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id
+      identifier (starts_with), schema (equals|not_equals|contains|not_contains|le
+      ss_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      schema_object_type (equals|not_equals|contains), status
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
-      r_than|greater_than_or_equal), lifecycle_owner_team_id
-      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
-      r_than|greater_than_or_equal).
+      r_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_conta
+      ins|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+      lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|l
+      ess_than_or_equal|greater_than|greater_than_or_equal).
 
   --limit=<value>
       Page size (server default 20, max 100).
@@ -4435,15 +4436,18 @@ EXAMPLES
   $ zitadel variable list --json
 ```
 
-## `zitadel variable resolve`
+## `zitadel variable resolve [DEPLOYMENT_ID]`
 
-Show the variables the live deployment froze for a target.
+Show the variables a deployment froze, the live one by default.
 
 ```
 USAGE
-  $ zitadel variable resolve [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--origin <value>] [--plain]
+  $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [--origin <value>] [--plain]
+
+ARGUMENTS
+  [DEPLOYMENT_ID]  The deployment to read; the live one when omitted.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -4472,12 +4476,14 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Show the variables the live deployment froze for a target.
+  Show the variables a deployment froze, the live one by default.
 
 EXAMPLES
   $ zitadel variable resolve
 
   $ zitadel variable resolve --origin https://app.acme.com
+
+  $ zitadel variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
 
   $ zitadel variable resolve --json
 ```

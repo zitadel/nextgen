@@ -5,7 +5,6 @@
   "type": "object",
   "required": [
     "name",
-    "status",
     "user_schema",
     "purposes",
     "steps"
@@ -27,12 +26,9 @@
       ],
       "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the server runs them. Every\nrevision of a flow shares its `name`; publishing a definition under an\nexisting `name` adds a revision to that flow. Renaming is not\nsupported: the `name` is part of the public contract another\ndefinition may reference. It acts as the human display label as well;\nthere is no separate slug.\n"
     },
-    "status": {
-      "$ref": "#/$defs/FlowDefinitionStatus"
-    },
     "user_schema": {
       "type": "string",
-      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
+      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `publishSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
       "examples": [
         "human-user"
       ]
@@ -125,14 +121,6 @@
     }
   },
   "$defs": {
-    "FlowDefinitionStatus": {
-      "type": "string",
-      "enum": [
-        "active",
-        "draft"
-      ],
-      "description": "The lifecycle state of this flow definition.\n\nactive: The flow definition is ready to be used. The server can select it for new flows.\ndraft: The server will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
-    },
     "FlowAudience": {
       "type": "object",
       "additionalProperties": false,
@@ -619,7 +607,7 @@
         "kind",
         "provider"
       ],
-      "description": "A gate is a security check, such as a captcha, that must be satisfied\nbefore this step's submission is accepted. The server may also inject gates\nat runtime based on policy or risk evaluation.\n",
+      "description": "A reserved gate declaration. Gates declared in a flow definition are not\ncurrently enforced. Required signup gates are attached by the server based\non `on_success: create_user`, independently of this declaration.\n",
       "properties": {
         "kind": {
           "type": "string",
@@ -633,20 +621,12 @@
         },
         "provider": {
           "type": "string",
-          "description": "The provider within the gate kind, for example `altcha`, `turnstile` or\n`hcaptcha`. The server looks up an implementation in its provider\nregistry.\n",
-          "examples": [
-            "altcha"
-          ]
+          "description": "Reserved implementation identifier. Declaring a provider does not enable it.\n"
         },
         "config": {
           "type": "object",
-          "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the server.\n",
-          "additionalProperties": true,
-          "examples": [
-            {
-              "site_key": "0x4AAAAAAA-example-site-key"
-            }
-          ]
+          "description": "Reserved provider-specific configuration. It has no runtime effect.\n",
+          "additionalProperties": true
         }
       }
     }

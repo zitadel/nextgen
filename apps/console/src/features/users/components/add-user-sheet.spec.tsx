@@ -45,7 +45,7 @@ function stubSchemas(schemas: Record<string, Record<string, unknown>>) {
   server.use(
     http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     // The list carries the documents (#921), so the sheet needs no per-schema
-    // stubs — a reintroduced `GET /schemas/{id}` has no handler here.
+    // stubs — a reintroduced `GET /schemas/{schema_id}` has no handler here.
     http.get(SCHEMAS_URL, () =>
       HttpResponse.json({
         schemas: Object.entries(schemas).map(([id, body]) => ({
@@ -63,7 +63,7 @@ async function openSheet() {
     history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
   });
   render(<RouterProvider router={router} />);
-  await userEvent.click(await screen.findByRole("button", { name: /^Add/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "Add user" }));
   return router;
 }
 
@@ -84,7 +84,7 @@ describe("add user sheet", () => {
   });
 
   it("orders fields deterministically despite the API's randomised key order", async () => {
-    // `GET /schemas/{id}` serialises `properties` from a Go map, so the same
+    // `GET /schemas/{schema_id}` serialises `properties` from a Go map, so the same
     // request returns different key orders — observed live. Sorting by key is the
     // minimum needed to stop the form shuffling between openings; the authored
     // order belongs in the API response, not in a curated list here.

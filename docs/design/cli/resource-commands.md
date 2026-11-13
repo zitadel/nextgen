@@ -26,7 +26,7 @@ zitadel <resource> delete  <id> [--force]
 ```
 
 The verbs are generated from one registry
-(`apps/cli/src/commands/resources.ts`)
+(`apps/cli/src/cli/commands/resources.ts`)
 by a platform-agnostic factory
 (`apps/cli/src/lib/oclif/crud/`).
 The registry names the client call per verb, the id field, the table columns,
@@ -40,8 +40,8 @@ Runtime resources:
 | `users`    | list, get, create, update, delete | `POST /users/query`, `/users/{id}`                  |
 | `teams`    | list, get, create, update, deactivate | `POST /teams/query`, `/teams/{id}`              |
 | `sessions` | list, get, revoke                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
-| `events`   | list, get                         | `GET /events`, `GET /events/{id}`                   |
-| `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{id}`                |
+| `events`   | list, get                         | `GET /events`, `GET /events/{event_id}`                   |
+| `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{grant_id}`                |
 | `projects` | list, get, update                 | `POST /projects/query`, `/projects/{id}`            |
 
 Configuration resources, read-only — they are authored as files and shipped
@@ -50,16 +50,15 @@ holds and never writes them here:
 
 | Resource            | Verbs     | Backing endpoints                                    |
 | ------------------- | --------- | ---------------------------------------------------- |
-| `schemas`           | list, get | `GET /schemas`, `GET /schemas/{id}`                  |
+| `schemas`           | list, get | `GET /schemas`, `GET /schemas/{schema_id}`                  |
 | `releases`          | list, get | `GET /releases`, `GET /releases/{id}`                |
-| `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
-| `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
+| `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{flow_definition_id}` |
+| `branding`          | list, get | `GET /branding`, `GET /branding/{branding_id}`                |
 
 Two of these behave differently underneath, and the registry says so rather
 than the caller having to learn it. `schemas list` and `flow-definitions list` send
 `revisions=latest`, so they show the current schemas and flows rather than
-every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
-flags at all, because its endpoint has no cursor and answers with a bare array.
+every revision ever written; `--filter revisions=all` gives the history.
 
 `schemas` and `flow-definitions` are also addressable by the value that groups
 their revisions, so `schemas get human-user` returns the current revision of

@@ -34,7 +34,7 @@ func TestGetReleaseById(t *testing.T) {
 	created := createdRelease(t, fixture, fixture.pointers(), "initial import")
 
 	t.Run("returns the release with its pinned set", func(t *testing.T) {
-		resp, err := fixture.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{
+		resp, err := fixture.client.GetRelease(t.Context(), api.GetReleaseParams{
 			ProjectID: api.ProjectID(fixture.project),
 			ReleaseID: created.ID,
 		})
@@ -47,7 +47,7 @@ func TestGetReleaseById(t *testing.T) {
 	})
 
 	t.Run("an unknown release id is a 404", func(t *testing.T) {
-		resp, err := fixture.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{
+		resp, err := fixture.client.GetRelease(t.Context(), api.GetReleaseParams{
 			ProjectID: api.ProjectID(fixture.project),
 			ReleaseID: "rel_does_not_exist",
 		})
@@ -70,7 +70,7 @@ func TestGetReleaseByIdIsProjectScoped(t *testing.T) {
 
 	release := createdRelease(t, mine, mine.pointers(), "mine")
 
-	resp, err := theirs.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{
+	resp, err := theirs.client.GetRelease(t.Context(), api.GetReleaseParams{
 		ProjectID: api.ProjectID(theirs.project),
 		ReleaseID: release.ID,
 	})

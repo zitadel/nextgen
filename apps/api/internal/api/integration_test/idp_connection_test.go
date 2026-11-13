@@ -42,9 +42,9 @@ func newIdpFixture(t *testing.T) idpFixture {
 
 func (f idpFixture) projectID() api.ProjectID { return api.ProjectID(f.project.ID) }
 
-func (f idpFixture) put(t *testing.T, idp api.IdpConnection) api.CreateIdpRes {
+func (f idpFixture) put(t *testing.T, idp api.IdpConnection) api.PublishIdpRes {
 	t.Helper()
-	resp, err := f.client.CreateIdp(t.Context(), &api.CreateIdpRequest{Idp: idp}, api.CreateIdpParams{ProjectID: f.projectID()})
+	resp, err := f.client.PublishIdp(t.Context(), &api.CreateIdpRequest{Idp: idp}, api.PublishIdpParams{ProjectID: f.projectID()})
 	require.NoError(t, err)
 	return resp
 }
@@ -52,27 +52,27 @@ func (f idpFixture) put(t *testing.T, idp api.IdpConnection) api.CreateIdpRes {
 func (f idpFixture) create(t *testing.T, idp api.IdpConnection) api.IdpResponse {
 	t.Helper()
 	resp := f.put(t, idp)
-	require.IsType(t, &api.CreateIdpCreated{}, resp, helpers.MustMarshal(t, resp))
-	return api.IdpResponse(*resp.(*api.CreateIdpCreated))
+	require.IsType(t, &api.PublishIdpCreated{}, resp, helpers.MustMarshal(t, resp))
+	return api.IdpResponse(*resp.(*api.PublishIdpCreated))
 }
 
 func (f idpFixture) revise(t *testing.T, idp api.IdpConnection) api.IdpResponse {
 	t.Helper()
 	resp := f.put(t, idp)
-	require.IsType(t, &api.CreateIdpOK{}, resp, helpers.MustMarshal(t, resp))
-	return api.IdpResponse(*resp.(*api.CreateIdpOK))
+	require.IsType(t, &api.PublishIdpOK{}, resp, helpers.MustMarshal(t, resp))
+	return api.IdpResponse(*resp.(*api.PublishIdpOK))
 }
 
-func (f idpFixture) get(t *testing.T, id string) api.GetIdpByIdRes {
+func (f idpFixture) get(t *testing.T, id string) api.GetIdpRes {
 	t.Helper()
-	resp, err := f.client.GetIdpById(t.Context(), api.GetIdpByIdParams{ProjectID: f.projectID(), ID: id})
+	resp, err := f.client.GetIdp(t.Context(), api.GetIdpParams{ProjectID: f.projectID(), IdpID: id})
 	require.NoError(t, err)
 	return resp
 }
 
-func (f idpFixture) getRevision(t *testing.T, revisionID string) api.GetIdpRevisionByIdRes {
+func (f idpFixture) getRevision(t *testing.T, revisionID string) api.GetIdpRevisionRes {
 	t.Helper()
-	resp, err := f.client.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: f.projectID(), RevisionID: revisionID})
+	resp, err := f.client.GetIdpRevision(t.Context(), api.GetIdpRevisionParams{ProjectID: f.projectID(), RevisionID: revisionID})
 	require.NoError(t, err)
 	return resp
 }
@@ -181,8 +181,8 @@ func TestCreateIdp(t *testing.T) {
 		changed.SubjectClaim = api.NewOptString("oid")
 
 		resp := f.put(t, changed)
-		require.IsType(t, &api.CreateIdpBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		body := resp.(*api.CreateIdpBadRequest)
+		require.IsType(t, &api.PublishIdpBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		body := resp.(*api.PublishIdpBadRequest)
 		assert.Equal(t, api.ErrorCode(domain.ErrIDPConnectionFieldImmutable(nil).Code), body.Code)
 		assert.JSONEq(t, `{"fields":["subject_claim","oidc.issuer"]}`, string(body.Details.Value["details"]))
 
@@ -270,8 +270,8 @@ func TestCreateIdpRefusesPartialEndpoints(t *testing.T) {
 	for name, slug := range map[string]string{"create": "fresh", "revise": existing.Slug} {
 		t.Run(name, func(t *testing.T) {
 			resp := f.put(t, partial(slug))
-			require.IsType(t, &api.CreateIdpBadRequest{}, resp, helpers.MustMarshal(t, resp))
-			body := resp.(*api.CreateIdpBadRequest)
+			require.IsType(t, &api.PublishIdpBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			body := resp.(*api.PublishIdpBadRequest)
 			assert.Equal(t, api.ErrorCode(domain.ErrIDPEndpointsPartial(nil).Code), body.Code)
 			assert.JSONEq(t, `{"missing":["jwks_uri","userinfo_endpoint"]}`, string(body.Details.Value["details"]))
 		})
@@ -371,14 +371,14 @@ func TestIdpRevisions(t *testing.T) {
 	third := f.revise(t, doc)
 
 	t.Run("revisions list newest first with cursors", func(t *testing.T) {
-		resp := f.listRevisions(t, api.ListIdpRevisionsParams{ID: first.ID, Limit: api.NewOptLimit(2)})
+		resp := f.listRevisions(t, api.ListIdpRevisionsParams{IdpID: first.ID, Limit: api.NewOptLimit(2)})
 		require.IsType(t, &api.ListIdpRevisionsResponse{}, resp, helpers.MustMarshal(t, resp))
 		page := resp.(*api.ListIdpRevisionsResponse)
 		assert.Equal(t, []string{third.RevisionID, second.RevisionID}, revisionIDs(page.Revisions))
 		require.True(t, page.NextPageToken.IsSet())
 
 		resp = f.listRevisions(t, api.ListIdpRevisionsParams{
-			ID: first.ID, Limit: api.NewOptLimit(2), PageToken: api.NewOptPageToken(page.NextPageToken.Value),
+			IdpID: first.ID, Limit: api.NewOptLimit(2), PageToken: api.NewOptPageToken(page.NextPageToken.Value),
 		})
 		require.IsType(t, &api.ListIdpRevisionsResponse{}, resp, helpers.MustMarshal(t, resp))
 		rest := resp.(*api.ListIdpRevisionsResponse)
@@ -408,7 +408,7 @@ func TestIdpRevisions(t *testing.T) {
 		t.Run(name+" is not found", func(t *testing.T) {
 			notFound := domain.ErrIDPConnectionNotFound().Code
 			assertAuthzError(t, f.get(t, ids.id), notFound)
-			assertAuthzError(t, f.listRevisions(t, api.ListIdpRevisionsParams{ID: ids.id}), notFound)
+			assertAuthzError(t, f.listRevisions(t, api.ListIdpRevisionsParams{IdpID: ids.id}), notFound)
 			assertAuthzError(t, f.getRevision(t, ids.revisionID), notFound)
 		})
 	}
@@ -431,7 +431,7 @@ func TestIdpAccess(t *testing.T) {
 		assertAuthzError(t, outsider.put(t, helpers.OIDCConnection("intruder")), notFound)
 		assertAuthzError(t, outsider.get(t, connection.ID), notFound)
 		assertAuthzError(t, outsider.getRevision(t, connection.RevisionID), notFound)
-		assertAuthzError(t, outsider.listRevisions(t, api.ListIdpRevisionsParams{ID: connection.ID}), notFound)
+		assertAuthzError(t, outsider.listRevisions(t, api.ListIdpRevisionsParams{IdpID: connection.ID}), notFound)
 		assertAuthzError(t, outsider.query(t, &api.QueryIdpsRequest{}), notFound)
 	})
 
@@ -443,7 +443,7 @@ func TestIdpAccess(t *testing.T) {
 
 		notFound := domain.ErrIDPConnectionNotFound().Code
 		assertAuthzError(t, named.get(t, connection.ID), notFound)
-		assertAuthzError(t, named.listRevisions(t, api.ListIdpRevisionsParams{ID: connection.ID}), notFound)
+		assertAuthzError(t, named.listRevisions(t, api.ListIdpRevisionsParams{IdpID: connection.ID}), notFound)
 	})
 
 	t.Run("a viewer reads but cannot write", func(t *testing.T) {
@@ -455,8 +455,8 @@ func TestIdpAccess(t *testing.T) {
 		require.IsType(t, &api.IdpResponse{}, resp, helpers.MustMarshal(t, resp))
 
 		denied := viewer.put(t, helpers.OIDCConnection("another"))
-		require.IsType(t, &api.CreateIdpForbidden{}, denied, helpers.MustMarshal(t, denied))
-		assert.Equal(t, api.ErrorCode(domain.ErrIDPConnectionPermissionDenied().Code), denied.(*api.CreateIdpForbidden).Code)
+		require.IsType(t, &api.PublishIdpForbidden{}, denied, helpers.MustMarshal(t, denied))
+		assert.Equal(t, api.ErrorCode(domain.ErrIDPConnectionPermissionDenied().Code), denied.(*api.PublishIdpForbidden).Code)
 	})
 
 	t.Run("unauthenticated calls are rejected", func(t *testing.T) {
@@ -468,7 +468,7 @@ func TestIdpAccess(t *testing.T) {
 		assertAuthzError(t, f.put(t, helpers.OIDCConnection("google")), unauthorized)
 		assertAuthzError(t, f.get(t, connection.ID), unauthorized)
 		assertAuthzError(t, f.getRevision(t, connection.RevisionID), unauthorized)
-		assertAuthzError(t, f.listRevisions(t, api.ListIdpRevisionsParams{ID: connection.ID}), unauthorized)
+		assertAuthzError(t, f.listRevisions(t, api.ListIdpRevisionsParams{IdpID: connection.ID}), unauthorized)
 		assertAuthzError(t, f.query(t, &api.QueryIdpsRequest{}), unauthorized)
 	})
 }
@@ -493,7 +493,7 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	// index, so the grant reaches the granted connection and its history.
 	got := f.get(t, granted.ID)
 	require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
-	revisions := f.listRevisions(t, api.ListIdpRevisionsParams{ID: granted.ID})
+	revisions := f.listRevisions(t, api.ListIdpRevisionsParams{IdpID: granted.ID})
 	require.IsType(t, &api.ListIdpRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
 	assert.Equal(t, []string{granted.RevisionID}, revisionIDs(revisions.(*api.ListIdpRevisionsResponse).Revisions))
 
@@ -501,9 +501,9 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	// it answers like a connection that does not exist (#2112).
 	notFound := domain.ErrIDPConnectionNotFound().Code
 	hiddenGet := f.get(t, hidden.ID)
-	require.IsType(t, &api.GetIdpByIdNotFound{}, hiddenGet, helpers.MustMarshal(t, hiddenGet))
+	require.IsType(t, &api.GetIdpNotFound{}, hiddenGet, helpers.MustMarshal(t, hiddenGet))
 	assertAuthzError(t, hiddenGet, notFound)
-	hiddenRevisions := f.listRevisions(t, api.ListIdpRevisionsParams{ID: hidden.ID})
+	hiddenRevisions := f.listRevisions(t, api.ListIdpRevisionsParams{IdpID: hidden.ID})
 	require.IsType(t, &api.ListIdpRevisionsNotFound{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
 	assertAuthzError(t, hiddenRevisions, notFound)
 
@@ -515,10 +515,10 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	assert.Equal(t, granted.RevisionID, revision.(*api.IdpResponse).RevisionID)
 	hiddenRevision := f.getRevision(t, hidden.RevisionID)
-	require.IsType(t, &api.GetIdpRevisionByIdNotFound{}, hiddenRevision, helpers.MustMarshal(t, hiddenRevision))
+	require.IsType(t, &api.GetIdpRevisionNotFound{}, hiddenRevision, helpers.MustMarshal(t, hiddenRevision))
 	assertAuthzError(t, hiddenRevision, notFound)
 	unknownRevision := f.getRevision(t, "idprev_01KX4SB9C8E1F0N9WD3P2E4YM5")
-	require.IsType(t, &api.GetIdpRevisionByIdNotFound{}, unknownRevision, helpers.MustMarshal(t, unknownRevision))
+	require.IsType(t, &api.GetIdpRevisionNotFound{}, unknownRevision, helpers.MustMarshal(t, unknownRevision))
 	assert.Equal(t, helpers.MustMarshal(t, hiddenRevision), helpers.MustMarshal(t, unknownRevision))
 }
 

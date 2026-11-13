@@ -67,7 +67,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         with:
           run_install: false
@@ -85,7 +85,7 @@ jobs:
       - name: Open or update version PR
         id: version-pr
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
-        uses: changesets/action@v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           version: corepack pnpm exec changeset version
@@ -108,17 +108,23 @@ jobs:
   publish:
     needs: changesets
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
-    runs-on: depot-ubuntu-24.04-16
+    # A GitHub-hosted runner, which npm requires to sign provenance; the
+    # same 32-core arm64 group as CI. The server binaries cross-compile with
+    # cgo off, so the host's architecture does not reach the release.
+    runs-on:
+      group: 32-arm-linux
     timeout-minutes: 90
+    env:
+      # A release builds everything itself: it neither restores nor saves
+      # task results, so nothing a pull request's run wrote can reach it.
+      TURBO_CACHE: "local:,remote:"
+      TURBO_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      # Keyed like ci.yml's setup-go step (see the comment there), so this job
-      # restores the Go cache ci.yml saves: both build through GOCACHEPROG on
-      # Depot and keep the same files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
@@ -130,7 +136,7 @@ jobs:
             tools/oidc-mock/go.sum
             go.work.sum
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
 
@@ -140,13 +146,13 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: pnpm
 
-      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GHCR
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -155,29 +161,21 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
-      # runs the exact version the lockfile resolves — same as local dev.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
       - name: Configure Changesets git tag author
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      # The release graph (tools/release/turbo.json) builds every public
+      # package and the five server binaries, then publishes what it built.
+      # Its options come from the environment (release.mjs): arguments after
+      # `--` would re-key every task in the run.
       - name: Publish dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: |
-          args=(release:publish -- --dry-run)
-          if [ -n "$RECOVER_VERSION" ]; then
-            args+=(--recover-version "$RECOVER_VERSION")
-          fi
-          # Release tasks are excluded from `moon ci`, but this workflow invokes
-          # them explicitly. Unset only CI so Moon keeps the task in the action
-          # pipeline while preserving the GitHub Actions/OIDC environment.
-          env -u CI moon run "${args[@]}"
+        run: corepack pnpm exec turbo run @zitadel/release#publish
         env:
+          RELEASE_DRY_RUN: "1"
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PNPM_CONFIG_PROVENANCE: "false"
@@ -185,20 +183,11 @@ jobs:
 
       - name: Publish release
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
-        run: |
-          args=(release:publish)
-          if [ -n "$RECOVER_VERSION" ]; then
-            args+=(-- --recover-version "$RECOVER_VERSION")
-          fi
-          # Release tasks are excluded from `moon ci`, but this workflow invokes
-          # them explicitly. Unset only CI so Moon keeps the task in the action
-          # pipeline while preserving the GitHub Actions/OIDC environment.
-          env -u CI moon run "${args[@]}"
+        run: corepack pnpm exec turbo run @zitadel/release#publish
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Depot runners are self-hosted from npm's provenance verifier's
-          # perspective. Keep trusted publishing via OIDC, but do not request
-          # npm provenance until the release job runs on GitHub-hosted runners.
-          PNPM_CONFIG_PROVENANCE: "false"
+          # Trusted publishing via OIDC, with a signed provenance statement
+          # linking each npm package to this workflow run.
+          PNPM_CONFIG_PROVENANCE: "true"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

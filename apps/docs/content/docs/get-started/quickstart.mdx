@@ -42,7 +42,7 @@ cd myapp
 npx @zitadel/cli@latest doctor
 ```
 
-Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It prints `Zitadel doctor passed.` or `Zitadel doctor passed with warnings.` first, then each check. When a check fails, it prints `Error <CODE>: Zitadel doctor found issues` and a hint with the fix, and exits non-zero. `doctor --json` names the failed check. Apply the fix and run `doctor` again.
+Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It prints each check, then `All checks passed` or `Checks passed with warnings`. When a check fails, it prints `Error: Zitadel doctor found issues (<CODE>)` and a hint with the fix, and exits non-zero. `doctor --json` names the failed check. Apply the fix and run `doctor` again.
 
 ## Start Zitadel locally
 
@@ -52,7 +52,7 @@ npx @zitadel/cli@latest start
 
 This runs the `@zitadel/server` npm binary that matches the CLI's version, on the first free port from 8080, usually `http://localhost:8080`. It also creates a local admin, `admin@zitadel.localhost`.
 
-`start` prints `Local Zitadel server is ready.`, then the server's host, such as `(server: localhost:8080)`, and names `setup` as the next step. `start --json` lists the API and console URLs. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). When 8080 is taken, `start` takes the next free port, and the host line shows it. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
+`start` prints `Local Zitadel server is ready` and names `setup` as the next step. `start --json` lists the API and console URLs. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). When 8080 is taken, `start` takes the next free port, and the footer names it. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
 
 ## Scaffold the app with sign-in
 
@@ -74,7 +74,7 @@ Setup writes the app files, `.env.example`, `.env.local` (read by your app), `.e
 
 ### What setup prints
 
-Setup prints a box titled `Zitadel is ready`. Its last section lists the project: `Project id`, `Server` (`http://localhost:8080` for the first local runtime) and `App will run`, the URL to open in your browser. The box ends with the next steps, among them starting the dev server. After the box, setup prints `Explore all commands:` with the command that lists them, and on a machine's first run a note about the Agent Skills. Setup does not print the project secret.
+Setup closes on `Set up Zitadel in this app` and a box titled `Summary`. Its last section lists the project: `Project id`, `Server` (`http://localhost:8080` for the first local runtime) and `App will run`, the URL to open in your browser. The box ends with the next steps, among them starting the dev server, then `Explore all commands:` with the command that lists them and, on a machine's first run, an offer to add the Agent Skills. Setup does not print the project secret.
 
 ### Where the project ID and secret are
 
@@ -105,6 +105,8 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 A rendered login form is not proof: the loop must succeed in a real browser.
 
 If the page does not load or the sign-in fails, check the runtime with `npx @zitadel/cli@latest status`, and that the address bar shows the `App will run` URL from setup.
+
+To run this check as an automated test, use the test kit: [Test your app's sign-in](/docs/guides/test-your-app).
 
 ## Open the console
 

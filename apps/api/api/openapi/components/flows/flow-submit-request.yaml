@@ -28,7 +28,10 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The login component collects these from `<zl-captcha>` component events.
+      For sign-up, the login component solves the built-in challenge with Web
+      Crypto and submits its JSON proof under `signup_pow`: with the password
+      for a password sign-up, and with `challenge_response` for a passkey
+      registration that creates the user.
     additionalProperties:
       type: string
   challenge_response:
@@ -64,7 +67,7 @@ properties:
     description: |
       The page hosting the login component, where the flow resumes after an
       external sign-in: the callback sends the browser here unchanged, and
-      the page loads `GET /flow/{id}` to render the next step. The client
+      the page loads `GET /flow/{flow_id}` to render the next step. The client
       puts the flow ID in it; the login component reads `?flow=<id>` on the
       reload. Required when `action` is "sso". An absolute URL; the server
       parses it and keeps a fragment, so a hash-routed page returns to its

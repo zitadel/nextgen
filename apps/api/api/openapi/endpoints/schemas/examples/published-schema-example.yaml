@@ -1,0 +1,21 @@
+id: sch_01H455VB4213EF62K49QF6M73F
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  kind: user-schema
+  type: object
+  description: This is an example of a user schema definition.
+  objectType: human-user
+  x-auth-methods:
+    password:
+      enabled: false
+    passkey:
+      enabled: true
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+      description: The user's email address.
+metadata:
+  created_at: '2026-07-14T09:11:00Z'

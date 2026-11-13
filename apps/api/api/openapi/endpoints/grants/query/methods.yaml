@@ -11,7 +11,7 @@ post:
 
     Only unrevoked grants this API manages are listed, which bind a user or team
     to the viewer, editor or admin role. Expired grants are included, so a client
-    can revoke them with `deleteGrant` (`DELETE /grants/{id}`) before it grants the same binding again.
+    can revoke them with `deleteGrant` (`DELETE /grants/{grant_id}`) before it grants the same binding again.
     Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
     not returned. Requires `project.read`.
 
