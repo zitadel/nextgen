@@ -10,8 +10,8 @@ import type { CommandResult } from "./types";
 /**
  * The flag every destructive command declares, which the retry a refused
  * confirmation suggests sets: the run again with `--force`. The mixin cannot
- * see its host's flags, so it names the one it relies on here, and the run
- * refuses the retry if the host does not declare it.
+ * see its host's flags, so it names the one it relies on here, and every
+ * confirmation refuses a host that does not declare it.
  */
 type ConsentFlags = Readonly<{ force: Interfaces.BooleanFlag<boolean> }>;
 
@@ -79,6 +79,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       message,
       ...gate
     }: DestructiveChange<Ready>): Promise<CommandResult> {
+      this.relyOn<ConsentFlags>("force");
       if (this.dryRun) {
         return preview();
       }

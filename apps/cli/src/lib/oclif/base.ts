@@ -18,6 +18,7 @@ import { statusColor } from "@/lib/style";
 import {
   type Again,
   declaredOf,
+  type FlagNameOf,
   type LooseNext,
   helpOf,
   commandOf,
@@ -26,6 +27,7 @@ import {
   type Suggest,
   type Suggested,
   type SuggestedCommand,
+  spelled,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
@@ -517,6 +519,29 @@ export abstract class BaseCommand extends Interruptible(Command) {
     change: RerunOf<NoInfer<Defs>> = {},
   ): Promise<SuggestedCommand> {
     return this.rebuilt(change);
+  }
+
+  /**
+   * Refuses this run unless its command declares each of `names`: the flags
+   * that code shared by many commands, such as a mixin, sets or leaves out
+   * when it reruns one, and cannot see declared. That code calls this where
+   * it starts, so a command without one fails on every run of it, not only on
+   * the rare one that builds the rerun.
+   *
+   * @typeParam Defs - The flags relied on, as a command declares them.
+   * @param names - The flags, by the names code reads them.
+   * @throws {Error} When the command does not declare one of them.
+   */
+  protected relyOn<Defs extends object>(...names: readonly FlagNameOf<{ flags: Defs }>[]): void {
+    const declared = { ...this.command.baseFlags, ...this.command.flags };
+    const lacking = names.filter((name) => {
+      return !(spelled(name) in declared);
+    });
+    if (lacking.length > 0) {
+      throw new Error(
+        `${this.id ?? ""} declares no --${lacking.map(spelled).join(", --")}, which it reruns with`,
+      );
+    }
   }
 
   /**
