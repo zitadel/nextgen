@@ -9,6 +9,12 @@ import { interpolate, type Refusal, refusalError, unmetBy } from "@/lib/oclif/re
  */
 const WIDE_NEXT: Refusal = { message: "No server", next: ["{next}"] };
 
+/** The same refusal written as a literal, whose `{next}` the compiler reads. */
+const LITERAL_NEXT = { message: "No server", next: ["{next}"] } as const;
+
+/** A command line written by hand, which a `next` placeholder must never take. */
+const BY_HAND = "deploy -m x";
+
 /** A `next` string with two placeholders in it, which is no whole placeholder. */
 const TWO_PLACEHOLDERS = "{a} then {b}";
 
@@ -100,25 +106,25 @@ describe("refusalError", () => {
   });
 
   it("fills a next placeholder only from the next values, never from a string among the others", () => {
-    const error = refusalError(WIDE_NEXT, { next: "deploy -m x" });
+    const error = refusalError(WIDE_NEXT, { next: BY_HAND });
 
     expect(error.nextCommands).toEqual([]);
   });
 
   it("does not compile with a string for a next placeholder", () => {
     const error = refusalError(
-      { message: "No server", next: ["{next}"] },
+      LITERAL_NEXT,
       {},
       // @ts-expect-error a whole `next` placeholder is filled with a follow-up, never a string
-      { next: "deploy -m x" },
+      { next: BY_HAND },
     );
 
-    expect(error.nextCommands).toEqual(["deploy -m x"]);
+    expect(error.nextCommands).toEqual([BY_HAND]);
   });
 
   it("names nothing for a placeholder no value fills", () => {
     // @ts-expect-error the `next` values the placeholder asks for are left out
-    const error = refusalError({ message: "No server", next: ["{next}"] }, {});
+    const error = refusalError(LITERAL_NEXT, {});
 
     expect(error.nextCommands).toEqual([]);
   });

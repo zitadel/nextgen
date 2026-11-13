@@ -40,8 +40,10 @@
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
-- `shellCommand` is for anything that is not the CLI; `inShell` wraps a pipe or
-  redirection around a suggestion.
+- Suggest anything that is not the CLI as `shellCommand(program, ...words)`,
+  quoting a value a person typed with `Cmd.quote`; it refuses the CLI as a program.
+- Chain those with `shellSteps`, and a package manager's with `suggestedCommandOf`;
+  `inShell` wraps a pipe or redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
@@ -101,10 +103,11 @@
   `--port`. Within a topic, share it where duplicating would copy real logic —
   `variable/name.ts` holds one argument three variable commands take.
 - Name a `Refused` for its flag (`PORT`, `TTL`) and a `Refusal` for what it
-  refuses, ending `_REFUSAL`, so the two read apart. A `Refused`'s wording must
-  stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
-  anything else comes from its `values`. A `Refusal` is filled where it is
-  thrown. Either way a name nothing fills reaches the person as braces.
+  refuses, ending `_REFUSAL`, so the two read apart.
+- Fill a `Refused`'s wording from `read` (`{value}`, `{input}`, `{problem}`)
+  and its own `values`; fill a `Refusal` where it is thrown.
+- Write a refusal's wording as one literal, never joined with `+`, so the
+  compiler reads it; `refusal-wording.test.ts` fails on a joined one.
 - Declare a refusal `as const satisfies`, never `: Refusal` or `: Refused<T>`,
   so the compiler refuses a throw or a `reads` that leaves a name unfilled.
   - Annotate one only where its `next` would make the type circular;
