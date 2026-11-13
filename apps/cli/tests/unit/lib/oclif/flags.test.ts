@@ -198,46 +198,58 @@ describe("a refusal a flag or argument is built with", () => {
   const LIMITED_FILLED = { ...LIMITED, values: { max: 3 } } as const;
   const OPTIONAL_MAX: { readonly max?: number } = {};
 
-  it("does not compile without a value only its declaration can fill", () => {
+  it("does not compile in reads without a value only its declaration can fill", () => {
     // @ts-expect-error nothing fills {max}
     reads(LIMITED);
+  });
+
+  it("does not compile in taken without a value only its declaration can fill", () => {
     // @ts-expect-error nothing fills {max}
     taken(LIMITED);
+  });
 
+  it("compiles with the value its declaration gives", () => {
     expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
-  it("does not compile without that value when the declaration is written inline", () => {
+  it("does not compile in reads without that value when the declaration is written inline", () => {
     // @ts-expect-error nothing fills {max}
     reads({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
+  });
+
+  it("does not compile in taken without that value when the declaration is written inline", () => {
     // @ts-expect-error nothing fills {max}
     taken({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
+  });
 
+  it("compiles with that value written inline", () => {
     expect(
       taken({ schema: z.string(), refusal: { message: LIMITED_WORDING }, values: { max: 3 } }),
     ).toBeTypeOf("function");
   });
 
-  it("does not compile with a value that may not be there", () => {
+  it("does not compile with a value that is undefined", () => {
     // @ts-expect-error an undefined {max} leaves the braces in the wording
     reads({ ...LIMITED, values: { max: undefined } });
+  });
+
+  it("does not compile with a value that is optional", () => {
     // @ts-expect-error an optional {max} may leave the braces in the wording
     reads({ ...LIMITED, values: OPTIONAL_MAX });
-
-    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
   it("does not compile with a value the parse would replace", () => {
     // @ts-expect-error the parse fills {value} with what was typed
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: { value: 3 } });
+  });
+
+  it("does not compile with a value the parse would replace, even as undefined", () => {
     reads({
       schema: z.string(),
       refusal: { message: WRONG_WORDING },
       // @ts-expect-error not even as undefined, which would read as a value given
       values: { input: undefined },
     });
-
-    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
   it("does not compile with values whose names it cannot see", () => {
@@ -245,15 +257,14 @@ describe("a refusal a flag or argument is built with", () => {
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: WIDE_VALUES });
   });
 
-  it("does not compile with a key a declaration does not have", () => {
+  it("does not compile with a key a refusal does not have", () => {
     // @ts-expect-error a refusal has no hnt, so the hint would be lost
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hnt: HINT } });
+  });
+
+  it("does not compile with a key a declaration does not have", () => {
     // @ts-expect-error a declaration has no vaules, so the values would be lost
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, vaules: { max: 3 } });
-
-    expect(
-      reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hint: HINT } }),
-    ).toBeTypeOf("function");
   });
 
   it("does not compile without what either of two refusals chosen by a condition asks for", () => {
@@ -263,7 +274,9 @@ describe("a refusal a flag or argument is built with", () => {
       // @ts-expect-error the second refusal asks for {b}
       values: { a: 1 },
     });
+  });
 
+  it("compiles with what both of two refusals chosen by a condition ask for", () => {
     expect(
       reads({
         schema: z.string(),
@@ -276,7 +289,9 @@ describe("a refusal a flag or argument is built with", () => {
   it("does not compile with a next entry the parse has nothing to fill", () => {
     // @ts-expect-error a flag's refusal has no next values to fill {fix} with
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: ["{fix}"] } });
+  });
 
+  it("compiles with a next entry that is a whole suggestion", () => {
     expect(
       reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: [{ id: "start" }] } }),
     ).toBeTypeOf("function");

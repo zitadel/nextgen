@@ -112,21 +112,17 @@ describe("refusalError", () => {
   });
 
   it("does not compile with a string for a next placeholder", () => {
-    const error = refusalError(
-      LITERAL_NEXT,
-      {},
-      // @ts-expect-error a whole `next` placeholder is filled with a follow-up, never a string
-      { next: BY_HAND },
-    );
+    // @ts-expect-error a whole `next` placeholder is filled with a follow-up, never a string
+    refusalError(LITERAL_NEXT, {}, { next: BY_HAND });
+  });
 
-    expect(error.nextCommands).toEqual([BY_HAND]);
+  it("does not compile without the `next` values a placeholder asks for", () => {
+    // @ts-expect-error the `next` values the placeholder asks for are left out
+    refusalError(LITERAL_NEXT, {});
   });
 
   it("names nothing for a placeholder no value fills", () => {
-    // @ts-expect-error the `next` values the placeholder asks for are left out
-    const error = refusalError(LITERAL_NEXT, {});
-
-    expect(error.nextCommands).toEqual([]);
+    expect(refusalError(WIDE_NEXT, {}).nextCommands).toEqual([]);
   });
 
   it("carries no hint and no suggestions when the refusal has none", () => {
@@ -144,19 +140,26 @@ describe("refusalError's values", () => {
     details: { known: "{known}" },
   } as const;
 
-  it("does not compile without a value its message, hint or details asks for", () => {
+  it("does not compile without a value its hint asks for", () => {
     // @ts-expect-error the hint asks for {labels}
     refusalError(ASKS, { requested: "x", known: [] });
+  });
+
+  it("does not compile without a value its details ask for", () => {
     // @ts-expect-error the details ask for {known}
     refusalError(ASKS, { requested: "x", labels: "a" });
+  });
 
+  it("fills its hint with the values given", () => {
     expect(refusalError(ASKS, { requested: "x", labels: "a", known: [] }).hint).toBe("Known: a");
   });
 
   it("does not compile without the follow-up a whole next placeholder asks for", () => {
     // @ts-expect-error the `next` values must give {fix}
     refusalError({ message: "No", next: ["{fix}"] }, {});
+  });
 
+  it("fills a whole next placeholder with the follow-up given", () => {
     expect(
       refusalError({ message: "No", next: ["{fix}"] }, {}, { fix: { id: "start" } }).nextCommands,
     ).toEqual([{ id: "start" }]);
@@ -169,39 +172,47 @@ describe("refusalError's values", () => {
   });
 
   it("still asks for what a literal message names when the hint is only known as text", () => {
-    const named = { message: "No {thing}", hint: WIDE_HINT } as const;
-
     // @ts-expect-error the message asks for {thing}
-    refusalError(named, {});
+    refusalError({ message: "No {thing}", hint: WIDE_HINT } as const, {});
+  });
+
+  it("fills a literal message beside a hint only known as text", () => {
+    const named = { message: "No {thing}", hint: WIDE_HINT } as const;
 
     expect(refusalError(named, { thing: "schema" }).message).toBe("No schema");
   });
 
   it("asks for what either of two refusals chosen by a condition asks for", () => {
-    const chosen = WIDE_HINT.length > 0 ? DETAILED : PLAIN;
-
     // @ts-expect-error the detailed refusal's details ask for {known}
-    refusalError(chosen, {});
+    refusalError(WIDE_HINT.length > 0 ? DETAILED : PLAIN, {});
+  });
+
+  it("raises the refusal a condition chose", () => {
+    const chosen = WIDE_HINT.length > 0 ? DETAILED : PLAIN;
 
     expect(refusalError(chosen, { known: "a" }).message).toBe("No schema");
   });
 
   it("asks for a name inside doubled braces, as the run fills it", () => {
-    const doubled = { message: "{{limit}} reached" } as const;
-
     // @ts-expect-error the message asks for {limit}
-    refusalError(doubled, {});
+    refusalError({ message: "{{limit}} reached" } as const, {});
+  });
 
-    expect(refusalError(doubled, { limit: 3 }).message).toBe("{3} reached");
+  it("fills a name inside doubled braces, keeping the outer pair", () => {
+    expect(refusalError({ message: "{{limit}} reached" } as const, { limit: 3 }).message).toBe(
+      "{3} reached",
+    );
   });
 
   it("asks for the name after a brace that never closes, as the run fills it", () => {
-    const unclosed = { message: "Use {one {other}" } as const;
-
     // @ts-expect-error the message asks for {other}
-    refusalError(unclosed, {});
+    refusalError({ message: "Use {one {other}" } as const, {});
+  });
 
-    expect(refusalError(unclosed, { other: "x" }).message).toBe("Use {one x");
+  it("fills the name after a brace that never closes", () => {
+    expect(refusalError({ message: "Use {one {other}" } as const, { other: "x" }).message).toBe(
+      "Use {one x",
+    );
   });
 
   it("asks for nothing a pair of braces holds that is not a name", () => {
@@ -211,7 +222,7 @@ describe("refusalError's values", () => {
   });
 
   it("does not compile with a next string that holds text around a placeholder", () => {
-    const error = refusalError(
+    refusalError(
       {
         message: "No",
         // @ts-expect-error a next string is a whole placeholder or nothing
@@ -219,12 +230,10 @@ describe("refusalError's values", () => {
       },
       {},
     );
-
-    expect(error.nextCommands).toEqual([]);
   });
 
   it("does not compile with a next string that is not one placeholder", () => {
-    const error = refusalError(
+    refusalError(
       {
         message: "No",
         // @ts-expect-error the run fills only a next string that is one {name}
@@ -232,8 +241,12 @@ describe("refusalError's values", () => {
       },
       {},
     );
+  });
 
-    expect(error.nextCommands).toEqual([]);
+  it("names nothing for a next string that is not one placeholder", () => {
+    const wide: Refusal = { message: "No", next: [TWO_PLACEHOLDERS] };
+
+    expect(refusalError(wide, {}).nextCommands).toEqual([]);
   });
 });
 

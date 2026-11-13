@@ -85,9 +85,15 @@ const RequiredSwitch = {
 };
 
 describe("FlagsOf", () => {
-  it("takes a required switch only given on", () => {
+  it("takes a required switch given on", () => {
     expectTypeOf<{ confirm: true }>().toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch given off", () => {
     expectTypeOf<{ confirm: false }>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch left out", () => {
     expectTypeOf<Record<never, never>>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
   });
 });
@@ -164,12 +170,18 @@ describe("a suggestion", () => {
     expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
 
-  it("takes a value left to fill in for any flag that takes one, but not for a switch", () => {
+  it("takes a value left to fill in for any flag that takes one", () => {
     expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
       "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",
     );
+  });
+
+  it("does not compile with a value left to fill in for a switch", () => {
     // @ts-expect-error a switch takes no value to fill in
     checked({ id: "doctor", flags: { fix: "<fix>" } });
+  });
+
+  it("does not compile with a value to fill in written without angle brackets", () => {
     // @ts-expect-error a value to fill in is written in angle brackets
     checked({ id: "start", flags: { port: "port" } });
   });
@@ -289,21 +301,19 @@ describe("shellCommand", () => {
     );
   });
 
-  it("does not compile for a program a suggestion may not name", () => {
-    const written = [
-      // @ts-expect-error the CLI is suggested as an object the renderer checks
-      shellCommand("zitadel", "deploy"),
-      // @ts-expect-error a runner runs whatever it is given, the CLI included
-      shellCommand("npx", CLI_PACKAGE_NAME),
-      // @ts-expect-error a package manager's command goes through suggestedCommandOf
-      shellCommand("pnpm", "dlx", CLI_PACKAGE_NAME),
-    ];
+  it("does not compile for the CLI", () => {
+    // @ts-expect-error the CLI is suggested as an object the renderer checks
+    shellCommand("zitadel", "deploy");
+  });
 
-    expect(written).toEqual([
-      "zitadel deploy",
-      `npx ${CLI_PACKAGE_NAME}`,
-      `pnpm dlx ${CLI_PACKAGE_NAME}`,
-    ]);
+  it("does not compile for a runner", () => {
+    // @ts-expect-error a runner runs whatever it is given, the CLI included
+    shellCommand("npx", CLI_PACKAGE_NAME);
+  });
+
+  it("does not compile for a package manager", () => {
+    // @ts-expect-error a package manager's command goes through suggestedCommandOf
+    shellCommand("pnpm", "dlx", CLI_PACKAGE_NAME);
   });
 
   it("takes a word that only names the CLI, as a commit message does", () => {
@@ -338,16 +348,7 @@ describe("suggestedCommandOf", () => {
   });
 
   it("is never a command that runs a package", () => {
-    const dlx: PackageCommand = {
-      command: "pnpm",
-      // @ts-expect-error dlx runs a package, which no verb does
-      verb: "dlx",
-      operands: [CLI_PACKAGE_NAME],
-      args: ["dlx", CLI_PACKAGE_NAME],
-      display: "pnpm dlx",
-    };
-
-    expect(dlx.verb).toBe("dlx");
+    expectTypeOf<"dlx">().not.toExtend<PackageCommand["verb"]>();
   });
 });
 

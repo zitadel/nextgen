@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { type CheckOutcome, SANITY_CHECKS } from "@/commands/doctor/checks";
 import {
@@ -12,7 +12,7 @@ import {
   withCategories,
 } from "@/commands/doctor/report";
 import { addExactCommandFor } from "@/lib/package-manager";
-import { suggestedCommandOf } from "@/lib/suggestion";
+import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
@@ -143,10 +143,13 @@ describe("withCategories", () => {
   });
 
   it("does not compile for a remedy beside details that are no object", () => {
-    // @ts-expect-error the envelope writes the remedy into the details
-    const listed: CheckOutcome = { ...BEHIND, details: ["2.0.0"] };
-
-    expect(withCategories([listed])[0]?.details).toMatchObject({ remedy_command: UPGRADE });
+    expectTypeOf<{
+      name: string;
+      status: "warn";
+      message: string;
+      details: string[];
+      remedy: SuggestedCommand;
+    }>().not.toExtend<CheckOutcome>();
   });
 
   it("writes a warning's remedy into its details, after what the check found", () => {
