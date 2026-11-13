@@ -17,7 +17,6 @@ import {
   describeExpiry,
   effectiveStatus,
   type InvitationLookup,
-  type Inviter,
   inviterLabel,
   roleInProse,
 } from "../model";
@@ -190,7 +189,7 @@ function OpenInvitation({
   }, "Could not decline the invitation. Try again.");
 
   const busy = accept.pending || decline.pending;
-  const inviter = inviterLabel(invitation as InvitationLookup & { inviter?: Inviter | null });
+  const inviter = inviterLabel(invitation);
 
   return (
     <div className={`${CARD} gap-5`}>
