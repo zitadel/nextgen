@@ -2,6 +2,7 @@ import { Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
@@ -226,9 +227,12 @@ describe("BaseCommand.suggest with a server named with its credentials", () => {
 
 describe("BaseCommand.rerun", () => {
   it("refuses to leave out a flag the command does not declare", async ({ dir }) => {
-    await expect(new ConsentProbe(["--cwd", dir], config).leavingOutAFlagItLacks()).rejects.toThrow(
-      "variable:rm declares no --ghost to leave out",
-    );
+    const error = await rejectionOf(() => {
+      return new ConsentProbe(["--cwd", dir], config).leavingOutAFlagItLacks();
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "variable:rm declares no --ghost to leave out" });
   });
 
   it("puts an environment-scoped run's server back without its credentials", async ({ dir }) => {

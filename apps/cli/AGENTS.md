@@ -91,10 +91,8 @@
   that disagree as an `if`, a precondition the project or server decides as an
   async function returning what it found. There is no framework for either, and
   none is wanted.
-- Keep it all in the command's own file: a `const NAME = { … } as const
-  satisfies Refused<T>` above the class, named for the flag and nothing else,
-  then the flag declared inline in `static flags` as
-  `Flags.custom<T>({ parse: reads(NAME) })({ … })`.
+- Keep it in the command's file: a `Refused` const above the class, named for
+  the flag, then the flag inline as `Flags.custom<T>({ parse: reads(NAME) })`.
 - Never hold a flag in a const to use it once: the declaration belongs at the
   one place the command declares its flags. Only a flag every command takes
   (`serverFlag`, `plainFlag`, the environment flags) has a const, because it
@@ -107,18 +105,17 @@
   stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
   anything else comes from its `values`. A `Refusal` is filled where it is
   thrown. Either way a name nothing fills reaches the person as braces.
-- Declare a refusal `as const satisfies`, never with a `: Refusal` or
-  `: Refused<T>` type: the compiler then refuses a throw, or a `reads`, that
-  leaves a name unfilled.
-  - Annotate one only where its `next` names a command, which makes its type
-    circular; `tests/unit/lib/oclif/refusal-wording.test.ts` weighs those.
+- Declare a refusal `as const satisfies`, never `: Refusal` or `: Refused<T>`,
+  so the compiler refuses a throw or a `reads` that leaves a name unfilled.
+  - Annotate one only where its `next` would make the type circular;
+    `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
-  third argument, never from its values. A flag's refusal has no third
-  argument, so its `next` holds `{ id, … }` objects only.
+  third argument, never from its values.
+  - A flag's refusal has no third argument: its `next` holds objects only.
   - A `next` entry that is only a placeholder takes its value as it is, so a
     check that found two steps hands over both.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
