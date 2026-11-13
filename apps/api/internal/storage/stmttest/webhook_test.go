@@ -430,7 +430,7 @@ func TestWebhookStatements_LeaseLimit(t *testing.T) {
 // A lease that names a project takes that project's due webhooks and no
 // other's, however many are due elsewhere.
 func TestWebhookStatements_LeaseOfOneProject(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID, otherID := ensureProject(t, d.stmts), ensureProject(t, d.stmts)
 		want := []string{
 			createWebhook(t, d.stmts, projectID, testWebhookURL).ID,
