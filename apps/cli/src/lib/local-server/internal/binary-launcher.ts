@@ -31,6 +31,13 @@ const MIGRATE_FLAG = "--migrate";
 /** What the server binary is called, whatever launched it. */
 const SERVER_PROGRAM = "nextgen";
 
+/**
+ * The reinstall both failures suggest. It is npm whatever the project uses,
+ * since the hints that go with it say npm installs @zitadel/server and its
+ * platform package.
+ */
+const REINSTALL = suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]));
+
 const require = createRequire(import.meta.url);
 
 export type BinaryLaunchSpec = Readonly<{
@@ -244,7 +251,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: [suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]))],
+        nextCommands: [REINSTALL],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -501,7 +508,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: [suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]))],
+      nextCommands: [REINSTALL],
       details: { command, message: errorMessage(error) },
     });
   }
