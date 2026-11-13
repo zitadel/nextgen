@@ -320,7 +320,14 @@ describe("release detail", () => {
         const params = new URL(request.url).searchParams;
         asked.push(params.get("release_id"));
         return params.get("page_token") === "next"
-          ? HttpResponse.json({ deployments: [deployment("dep_1", { status: "inactive" })] })
+          ? HttpResponse.json({
+              deployments: [
+                deployment("dep_1", {
+                  status: "inactive",
+                  targets: [{ origin: "https://old.acme.com" }],
+                }),
+              ],
+            })
           : HttpResponse.json({ deployments: [deployment("dep_2")], next_page_token: "next" });
       }),
     );
@@ -330,6 +337,8 @@ describe("release detail", () => {
       "[data-slot=card]",
     ) as HTMLElement;
     expect(within(card).getAllByRole("list")).toHaveLength(2);
+    // The second page's deployment is on the card too.
+    expect(within(card).getByRole("link", { name: "https://old.acme.com" })).toBeInTheDocument();
     expect(asked).toEqual(["rel_1", "rel_1"]);
   });
 
