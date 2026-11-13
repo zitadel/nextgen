@@ -19,7 +19,7 @@ import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/g
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { removeCommandFor } from "@/lib/package-manager";
+import { detectPackageManager, type PackageManager, removeCommandFor } from "@/lib/package-manager";
 import {
   type SuggestedCommand,
   shellCommand,
@@ -75,6 +75,8 @@ function assembleNextCommands(
   // `--cwd` as typed: the backups and the package.json are in that directory,
   // so a command run from the shell's would miss them or touch another project.
   dir: string | undefined,
+  // The project's own: another one would write a lockfile of its own.
+  packageManager: PackageManager,
 ): ReadonlyArray<SuggestedCommand> {
   const inDir = (command: SuggestedCommand) => {
     return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
@@ -90,7 +92,7 @@ function assembleNextCommands(
     commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
   }
   for (const dep of dependencies) {
-    commands.push(inDir(suggestedCommandOf(removeCommandFor("npm", [dep]))));
+    commands.push(inDir(suggestedCommandOf(removeCommandFor(packageManager, [dep]))));
   }
   return commands;
 }
@@ -101,6 +103,8 @@ type Ejection = {
   removed: string[];
   preserved: string[];
   backedUp: string[];
+  /** The project's own package manager, which removes the SDK packages it added. */
+  packageManager: PackageManager;
 };
 
 /**
@@ -207,13 +211,14 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     removed,
     preserved,
     backedUp,
+    packageManager: await detectPackageManager(cwd),
   };
 }
 
 /** The result of an ejection, or of its plan. */
 function ejected(
   cwd: string,
-  { actions, removed, preserved, backedUp }: Ejection,
+  { actions, removed, preserved, backedUp, packageManager }: Ejection,
   // `--cwd` as typed, for the follow-up commands.
   dir: string | undefined,
   setItUp: SuggestedCommand,
@@ -340,7 +345,7 @@ function ejected(
       sections: [],
       lines,
     },
-    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
+    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir, packageManager) },
   };
 }
 
