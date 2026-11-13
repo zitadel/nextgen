@@ -242,6 +242,29 @@ const EVERY_EVENT_TYPE: [
   : never = true;
 void EVERY_EVENT_TYPE;
 
+/** One caption of the type list, and the types under it as a list offers them. */
+export interface EventTypeGroup {
+  heading: string;
+  options: { value: string; label: string }[];
+}
+
+/**
+ * {@link EVENT_TYPES} under the first word of each, as `auth` in
+ * `auth.check.failed`: the one grouping every list of types draws, Logs' type
+ * filter and a webhook's events alike.
+ */
+export const EVENT_TYPE_GROUPS: EventTypeGroup[] = EVENT_TYPES.reduce<EventTypeGroup[]>(
+  (groups, type) => {
+    const heading = type.split(".")[0] ?? type;
+    const option = { value: type, label: type };
+    const last = groups.at(-1);
+    if (last?.heading === heading) last.options.push(option);
+    else groups.push({ heading, options: [option] });
+    return groups;
+  },
+  [],
+);
+
 /**
  * The types that record something failing: a sign-in check or a single
  * sign-on step that did not pass, a user that could not be created. Each is

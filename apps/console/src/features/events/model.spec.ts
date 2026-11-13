@@ -15,6 +15,7 @@ import {
   AUDIT_CATEGORIES,
   chipFilters,
   around,
+  EVENT_TYPE_GROUPS,
   EVENT_TYPES,
   eventFields,
   eventFilterValues,
@@ -987,6 +988,22 @@ describe("chipFilters", () => {
         ),
       ).toEqual([filter.key]);
     }
+  });
+});
+
+describe("EVENT_TYPE_GROUPS", () => {
+  it("holds every type once, under its first word", () => {
+    expect(
+      EVENT_TYPE_GROUPS.flatMap((group) => group.options.map((option) => option.value)),
+    ).toEqual([...EVENT_TYPES]);
+    for (const group of EVENT_TYPE_GROUPS) {
+      for (const option of group.options) {
+        expect(option.value.split(".")[0]).toBe(group.heading);
+        expect(option.label).toBe(option.value);
+      }
+    }
+    const headings = EVENT_TYPE_GROUPS.map((group) => group.heading);
+    expect(new Set(headings).size).toBe(headings.length);
   });
 });
 
