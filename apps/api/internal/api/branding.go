@@ -48,16 +48,23 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 	if err != nil {
 		return nil, err
 	}
-	brandings, err := h.brandingService.List(ctx, string(params.ProjectID))
+	result, err := h.brandingService.List(ctx, service.ListBrandingInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
 	if err != nil {
 		return nil, err
 	}
-	resp := make(api.ListBrandingResponse, 0, len(brandings))
-	for _, b := range brandings {
-		resp = append(resp, api.ListBrandingResponseItem{
+	resp := api.ListBrandingResponse{Branding: make([]api.BrandingRevisionSummary, len(result.Items))}
+	for i, b := range result.Items {
+		resp.Branding[i] = api.BrandingRevisionSummary{
 			ID:        b.ID,
 			CreatedAt: b.CreatedAt,
-		})
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
 	}
 	return &resp, nil
 }

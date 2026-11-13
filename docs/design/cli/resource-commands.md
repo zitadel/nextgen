@@ -58,8 +58,7 @@ holds and never writes them here:
 Two of these behave differently underneath, and the registry says so rather
 than the caller having to learn it. `schemas list` and `flow-definitions list` send
 `revisions=latest`, so they show the current schemas and flows rather than
-every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
-flags at all, because its endpoint has no cursor and answers with a bare array.
+every revision ever written; `--filter revisions=all` gives the history.
 
 `schemas` and `flow-definitions` are also addressable by the value that groups
 their revisions, so `schemas get human-user` returns the current revision of

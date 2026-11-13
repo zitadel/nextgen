@@ -83,7 +83,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.ListBrandingResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		require.True(t, slices.ContainsFunc(*listed, func(item api.ListBrandingResponseItem) bool {
+		require.True(t, slices.ContainsFunc(listed.Branding, func(item api.BrandingRevisionSummary) bool {
 			return item.ID == revision.ID
 		}), helpers.MustMarshal(t, listed))
 

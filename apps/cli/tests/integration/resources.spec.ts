@@ -249,7 +249,7 @@ describe("resources", () => {
             id_arg: "id",
             verbs: ["list", "get"],
             columns: ["id", "created_at"],
-            paged: false,
+            paged: true,
           },
         ]);
       });

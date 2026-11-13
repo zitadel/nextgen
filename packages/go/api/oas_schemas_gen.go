@@ -10620,6 +10620,36 @@ func (s *BrandingRevisionResponse) SetBranding(val Branding) {
 func (*BrandingRevisionResponse) getBrandingRes()     {}
 func (*BrandingRevisionResponse) publishBrandingRes() {}
 
+// A branding revision without its configuration: the shape `GET /branding` returns. Read the
+// configuration with `GET /branding/{branding_id}`.
+// Ref: #
+type BrandingRevisionSummary struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *BrandingRevisionSummary) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *BrandingRevisionSummary) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *BrandingRevisionSummary) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *BrandingRevisionSummary) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 // Corner rounding, spacing and logo size. Shared across theme sides.
 // Ref: #
 type BrandingShape struct {
@@ -51516,36 +51546,36 @@ func (s *ListBrandingErrorResponseStatusCode) SetResponse(val ListBrandingErrorR
 
 func (*ListBrandingErrorResponseStatusCode) listBrandingRes() {}
 
-type ListBrandingResponse []ListBrandingResponseItem
+// A page of the project's branding revisions, newest first.
+// Ref: #
+type ListBrandingResponse struct {
+	Branding []BrandingRevisionSummary `json:"branding"`
+	// Token to pass as `page_token` in the next request to fetch the following page. Absent when there are
+	// no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetBranding returns the value of Branding.
+func (s *ListBrandingResponse) GetBranding() []BrandingRevisionSummary {
+	return s.Branding
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListBrandingResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetBranding sets the value of Branding.
+func (s *ListBrandingResponse) SetBranding(val []BrandingRevisionSummary) {
+	s.Branding = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListBrandingResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
 
 func (*ListBrandingResponse) listBrandingRes() {}
-
-type ListBrandingResponseItem struct {
-	// The unique identifier of this branding revision.
-	ID string `json:"id"`
-	// When this revision was published.
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// GetID returns the value of ID.
-func (s *ListBrandingResponseItem) GetID() string {
-	return s.ID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *ListBrandingResponseItem) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetID sets the value of ID.
-func (s *ListBrandingResponseItem) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
 
 // ListDeploymentVariablesErrorResponse represents sum type.
 type ListDeploymentVariablesErrorResponse struct {

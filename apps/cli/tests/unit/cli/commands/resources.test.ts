@@ -1881,27 +1881,29 @@ describe("configuration resources are read-only", () => {
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
   });
 
-  it("offers no paging flags for an unpaginated collection and reads the bare array", async ({
-    server,
-  }) => {
+  it("reads a page of branding revisions and the cursor to the next", async ({ server }) => {
     const cwd = await makeProject();
+    const urls: URL[] = [];
     server.use(
-      http.get(`${SERVER}/api/v1/branding`, () =>
-        HttpResponse.json([{ id: "brand_1", created_at: "2026-01-01T00:00:00Z" }]),
-      ),
+      http.get(`${SERVER}/api/v1/branding`, ({ request }) => {
+        urls.push(new URL(request.url));
+        return HttpResponse.json({
+          branding: [{ id: "brand_1", created_at: "2026-01-01T00:00:00Z" }],
+          next_page_token: "t2",
+        });
+      }),
     );
 
-    const res = await run(cwd, ["branding", "list"]);
+    const res = await run(cwd, ["branding", "list", "--limit", "5"]);
 
     expect(res.exitCode).toBe(0);
+    expect(urls.at(-1)?.searchParams.get("project_id")).toBe("proj_test");
+    expect(urls.at(-1)?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as {
-      data: { items: Array<{ id: string }>; count: number; next_page_token: string | null };
+      data: { items: Array<{ id: string }>; next_page_token: string | null };
     };
     expect(json.data.items.map((b) => b.id)).toEqual(["brand_1"]);
-    expect(json.data.next_page_token).toBeNull();
-
-    const rejected = await run(cwd, ["branding", "list", "--limit", "5"]);
-    expect(rejected.exitCode).not.toBe(0);
+    expect(json.data.next_page_token).toBe("t2");
   });
 });
 
@@ -2372,7 +2374,7 @@ describe("the registry builders", () => {
     const branding = list({
       paged: false,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
-      items: (page) => page,
+      items: (page) => page.branding,
     });
 
     expect(branding.paged).toBe(false);

@@ -5852,13 +5852,19 @@
         "operationId": "listBranding",
         "x-zitadel-cli": "branding list",
         "summary": "List branding revisions",
-        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and\nthat a release pins for `kind: branding`.\n",
+        "description": "Lists a project's branding revisions, newest first, paginated with a cursor.\nThe first entry of the first page is the newest revision.\n\nEvery publish adds a revision, so the list grows without bound. Pass\n`next_page_token` back as `page_token` to read the next page.\n\nThe `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and\nthat a release pins for `kind: branding`.\n",
         "tags": [
           "Branding"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
           }
         ],
         "security": [
@@ -5873,11 +5879,40 @@
         ],
         "responses": {
           "200": {
-            "description": "The branding revisions, newest first.",
+            "description": "A page of the project's branding revisions.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/list-branding-response"
+                },
+                "examples": {
+                  "firstPage": {
+                    "summary": "A page with more results behind it",
+                    "value": {
+                      "branding": [
+                        {
+                          "id": "brnd_01KX3RG8A7F0N9WD3P2E4YM5C1",
+                          "created_at": "2026-07-14T09:11:00Z"
+                        },
+                        {
+                          "id": "brnd_01KX2ZJ4B8C7F0N9WD3P2E4YM5",
+                          "created_at": "2026-07-02T15:40:00Z"
+                        }
+                      ],
+                      "next_page_token": "v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw"
+                    }
+                  },
+                  "lastPage": {
+                    "summary": "The last page",
+                    "value": {
+                      "branding": [
+                        {
+                          "id": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                          "created_at": "2026-06-20T08:00:00Z"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -19420,25 +19455,49 @@
           }
         ]
       },
+      "branding-revision-summary": {
+        "title": "BrandingRevisionSummary",
+        "description": "A branding revision without its configuration: the shape `GET /branding`\nreturns. Read the configuration with `GET /branding/{branding_id}`.\n",
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of this branding revision."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was published."
+          }
+        }
+      },
       "list-branding-response": {
-        "type": "array",
-        "description": "Branding revisions, newest first.",
-        "items": {
-          "type": "object",
-          "required": [
-            "id",
-            "created_at"
-          ],
-          "properties": {
-            "id": {
-              "type": "string",
-              "description": "The unique identifier of this branding revision."
-            },
-            "created_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When this revision was published."
+        "type": "object",
+        "description": "A page of the project's branding revisions, newest first.",
+        "required": [
+          "branding"
+        ],
+        "properties": {
+          "branding": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/branding-revision-summary"
             }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },

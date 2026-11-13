@@ -32,12 +32,8 @@ const bundled = JSON.parse(
 
 /** Departures to fix, each in a PR of its own: every fix changes the contract. */
 const KNOWN_VIOLATIONS = {
-  "list-response-shape": {
-    listBranding: "returns the newest 100 revisions as a bare array, so it cannot page",
-  },
-  "list-pagination": {
-    listBranding: "takes no `limit` or `page_token`: it returns the newest 100 revisions",
-  },
+  "list-response-shape": {},
+  "list-pagination": {},
   "query-sort-field": {
     queryProjects: "sorts by the shared `filter-field`",
     queryTeams: "sorts by `team-filter-field`, its filter's enum",

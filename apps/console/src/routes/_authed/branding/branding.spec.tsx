@@ -76,7 +76,7 @@ function serveRevision(branding: unknown = PUBLISHED) {
   server.use(
     http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
     http.get(LIST_URL, () =>
-      HttpResponse.json([{ id: "brnd_1", created_at: "2026-01-01T00:00:00Z" }]),
+      HttpResponse.json({ branding: [{ id: "brnd_1", created_at: "2026-01-01T00:00:00Z" }] }),
     ),
     http.get(REVISION_URL, () =>
       HttpResponse.json({ id: "brnd_1", created_at: "2026-01-01T00:00:00Z", branding }),
@@ -119,7 +119,7 @@ describe("branding screen", () => {
   it("shows the maintained defaults when nothing has been published", async () => {
     server.use(
       http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
-      http.get(LIST_URL, () => HttpResponse.json([])),
+      http.get(LIST_URL, () => HttpResponse.json({ branding: [] })),
     );
     await renderAt("/branding");
 
@@ -195,7 +195,7 @@ describe("branding screen", () => {
         asked = new URL(request.url).searchParams.get("revisions");
         return HttpResponse.json({ flow_definitions: [FLOW, loginOnly] });
       }),
-      http.get(LIST_URL, () => HttpResponse.json([])),
+      http.get(LIST_URL, () => HttpResponse.json({ branding: [] })),
     );
     await renderAt("/branding");
 

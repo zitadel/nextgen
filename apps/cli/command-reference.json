@@ -2140,6 +2140,27 @@
       "args": [],
       "flags": [
         {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
           "name": "fields",
           "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
           "type": "option"
@@ -2164,6 +2185,9 @@
       "examples": [
         {
           "command": "branding list --json"
+        },
+        {
+          "command": "branding list --all --json"
         }
       ]
     },

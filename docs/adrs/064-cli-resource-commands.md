@@ -428,9 +428,6 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
   likely to force attribute search.
 - Grants have no update endpoint, so a grant is changed by deleting and
   recreating it.
-- `GET /branding` is the only list with no cursor at all, and answers with a
-  bare array rather than the `{ items, next_page_token }` envelope every other
-  list uses.
 - Sensitivity is not carried end to end. `writeOnly` is accepted and reserved
   on a user property but unenforced, `format: password` appears in the OpenAPI
   documents, and code generation drops both — so the CLI cannot derive what is
