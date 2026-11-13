@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@zitadel/sdk-solid": "workspace:*",
-    "solid-js": "^1.9.17"
+    "solid-js": "^1.9.18"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
@@ -23,7 +23,7 @@
     "@zitadel/testing": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-solid": "^2.11.14"
+    "vite-plugin-solid": "^2.11.15"
   },
   "conformance": {
     "framework": "solid",
