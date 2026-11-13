@@ -1,8 +1,9 @@
+import { newestCliCommand } from "@/lib/public-cli";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
-import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
+import { aSetUpApp, type ScaffoldedApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { cliVersion } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
@@ -208,7 +209,9 @@ describe("upgrade", () => {
             refresh: "issues",
             install_command: `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
             next_actions: [STILL_THIS_CLI],
-            next_commands: [`npx @zitadel/cli@${NEWEST} doctor --cwd ${app.path}`],
+            next_commands: [
+              `npx @zitadel/cli@${NEWEST} doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ],
           },
           warnings: [],
         });
@@ -237,7 +240,9 @@ describe("upgrade", () => {
             refresh: "failed",
             install_command: `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
             next_actions: [STILL_THIS_CLI],
-            next_commands: [`npx @zitadel/cli@${NEWEST} doctor --fix --cwd ${app.path}`],
+            next_commands: [
+              `npx @zitadel/cli@${NEWEST} doctor --fix --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ],
           },
           warnings: [],
         });
@@ -267,7 +272,7 @@ describe("upgrade", () => {
             refresh: "planned",
             install_command: `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
             next_actions: [STILL_THIS_CLI],
-            next_commands: [expectedPublicCliCommand(`upgrade --cwd ${app.path}`)],
+            next_commands: [newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION)],
           },
           warnings: [],
         });
@@ -426,8 +431,8 @@ describe("upgrade", () => {
           source: "",
           code: "E_NETWORK",
           message: "Could not look up the latest Zitadel release",
-          hint: "Check the connection to the npm registry, then rerun.",
-          next_commands: [expectedPublicCliCommand(`upgrade --cwd ${app.path}`)],
+          hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
+          next_commands: [newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION)],
         });
       });
 
@@ -447,7 +452,7 @@ describe("upgrade", () => {
           hint: `npm install --save-exact @zitadel/sdk-next@${NEWEST} failed with exit 1. Nothing else changed; fix that and rerun.`,
           next_commands: [
             `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
-            expectedPublicCliCommand(`upgrade --cwd ${app.path}`),
+            newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION),
           ],
         });
       });

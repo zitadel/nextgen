@@ -171,7 +171,9 @@ describe("release revoke", () => {
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
           hint: "List the releases to find one.",
-          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(`release list --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+          ],
           details: { argument: "release_id" },
         });
       });
@@ -190,7 +192,9 @@ describe("release revoke", () => {
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
           hint: "List the releases to find one.",
-          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(`release list --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+          ],
           details: { argument: "release_id" },
         });
       });
@@ -292,6 +296,8 @@ describe("release revoke", () => {
           source: MOCK_SERVER_URL,
           code: "E_CONFLICT",
           message: "release: still served by an origin",
+          hint: expect.any(String),
+          next_commands: expect.any(Array),
           details: {
             status: 409,
             url: expect.stringMatching(

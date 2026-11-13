@@ -1,3 +1,5 @@
+import { isCI } from "./ci";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as rosie from "rosie-skills";
@@ -5,7 +7,6 @@ import * as rosie from "rosie-skills";
 import { log } from "@/lib/log";
 
 import type { BoxAction } from "./box";
-import { publicCliCommand } from "./public-cli";
 import { command } from "./style";
 import { telemetryConfigDir } from "./telemetry/identity";
 
@@ -13,9 +14,10 @@ export type SkillsHintInput = {
   env: NodeJS.ProcessEnv;
   /** False for `--json`, `--non-interactive`, or a non-TTY stream. */
   interactive: boolean;
-  /** The running CLI's, whose skills the named command adds. */
-  cliVersion: string;
 };
+
+/** What the hint is shown with: the `skills add` it names, rendered for the run that shows it. */
+export type SkillsHintShown = SkillsHintInput & Readonly<{ skillsAdd: SuggestedCommand }>;
 
 const SHOWN_FILE = "skills-hint.json";
 
@@ -65,7 +67,10 @@ export async function eligibleForSkills(input: SkillsHintInput): Promise<boolean
  * summary, or `undefined` if another run took it first. Written exclusively,
  * so of two concurrent first runs only one shows it.
  */
-export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxAction | undefined {
+export function claimSkills(
+  env: NodeJS.ProcessEnv,
+  skillsAdd: SuggestedCommand,
+): BoxAction | undefined {
   try {
     const shownPath = shownFile(env);
     if (shownPath === undefined) {
@@ -77,7 +82,7 @@ export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxActi
     });
     return {
       text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
-      command: publicCliCommand("skills add", cliVersion),
+      command: skillsAdd,
     };
   } catch {
     return undefined;
@@ -100,7 +105,7 @@ export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxActi
  * fail the command the user actually ran, and losing the race to create the marker
  * (`EEXIST`) just means another run is showing the note.
  */
-export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
+export async function showSkillsHint(input: SkillsHintShown): Promise<void> {
   try {
     const shownPath = await pendingOffer(input);
     if (shownPath === undefined) {
@@ -120,7 +125,7 @@ export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
           "Using an AI coding agent?",
           "Add the Zitadel skills to your project to help your agent work with Zitadel's CLI and authentication integrations:",
           "",
-          `  ${command(publicCliCommand("skills add", input.cliVersion))}`,
+          `  ${command(input.skillsAdd)}`,
           "",
           "Optional. You can continue without installing skills.",
         ].join("\n"),
@@ -133,10 +138,6 @@ export async function showSkillsHint(input: SkillsHintInput): Promise<void> {
   } catch {
     // A hint must never break `setup` or the root help.
   }
-}
-
-export function isCI(env: NodeJS.ProcessEnv): boolean {
-  return Boolean(env.CI) && env.CI !== "0" && env.CI !== "false";
 }
 
 function isOptedOut(env: NodeJS.ProcessEnv): boolean {

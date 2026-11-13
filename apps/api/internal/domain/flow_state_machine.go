@@ -1877,6 +1877,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttributeName: name,
 				Value:         value,
 				UserSchemaURL: state.UserSchemaURL,
+				Register:      state.CurrentPurpose == FlowDefinitionPurposeRegister,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
@@ -2218,12 +2219,15 @@ func (r *FlowStateMachineRuntime) resolveTakenUniqueValue(pc *processCtx, passke
 		candidates = uniqueFieldValues(state.CollectedData.UserData, passkeyResolved, visited)
 	}
 	for _, candidate := range candidates {
+		// Only a sign-up looks here, so a free candidate is the sign-up's own
+		// value, not a failed sign-in: Register keeps it from writing one.
 		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
 			AttributeName: candidate[0],
 			Value:         candidate[1],
 			UserSchemaURL: state.UserSchemaURL,
+			Register:      true,
 		})
 		if err == nil {
 			recordResolvedUser(state, userID)

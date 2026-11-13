@@ -52,6 +52,20 @@ func TestSearchAcrossProjectsStatements(t *testing.T) {
 			assert.Equal(t, domain.AuthzCheckResult{Allowed: true, Foothold: true}, batch[1], "a project-wide grant")
 			assert.Equal(t, domain.AuthzCheckResult{Foothold: true}, batch[2], "a grant on one team")
 			assert.Equal(t, domain.AuthzCheckResult{}, batch[0], "no grant")
+
+			// As many projects as one search reads. A dialect may ask in
+			// several statements (Spanner limits a query's joins), and each
+			// project still gets its own answer, in the order asked.
+			var searched []string
+			for i := range 10 {
+				searched = append(searched, projects[i%len(projects)])
+			}
+			many, err := d.stmts.CheckAuthzProjects(t.Context(), params, searched)
+			require.NoError(t, err)
+			require.Len(t, many, len(searched))
+			for i := range searched {
+				assert.Equal(t, batch[i%len(projects)], many[i], "project %d of %d", i+1, len(searched))
+			}
 		})
 
 		t.Run("one read of the entries holds each project and kind, each to its limit", func(t *testing.T) {

@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  * they read the source: consent gates the transport, so running the command
  * proves nothing about what a dimension is *called*.
  */
-const setupCommand = join(import.meta.dirname, "../../../../src/commands/setup/index.ts");
+const setupCommand = join(import.meta.dirname, "../../../../src/cli/commands/setup/index.ts");
 
 /** The dimension names `setup` passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<string[]> {

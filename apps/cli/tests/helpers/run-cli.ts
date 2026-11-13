@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { format } from "node:util";
 
-import { run } from "@oclif/core";
+import { Command, type Config, run } from "@oclif/core";
 
 import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
 import { publicCliCommand } from "@/lib/public-cli";
@@ -69,29 +69,29 @@ export function captureStreams(): {
   read(): { stdout: string; stderr: string };
   restore(): void;
 } {
-  let stdout = "";
-  let stderr = "";
+  const stdout: string[] = [];
+  const stderr: string[] = [];
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stdout.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stdout.write;
   process.stderr.write = ((chunk: string | Uint8Array): boolean => {
-    stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stderr.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stderr.write;
   console.log = (...args: unknown[]): void => {
-    stdout += `${format(...args)}\n`;
+    stdout.push(`${format(...args)}\n`);
   };
   console.error = (...args: unknown[]): void => {
-    stderr += `${format(...args)}\n`;
+    stderr.push(`${format(...args)}\n`);
   };
   return {
     read: () => {
-      return { stdout, stderr };
+      return { stdout: stdout.join(""), stderr: stderr.join("") };
     },
     restore: () => {
       process.stdout.write = originalOut;
@@ -155,7 +155,7 @@ async function commandSeeing(
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
   if (name === "doctor") {
-    const { default: Doctor } = await import("@/commands/doctor");
+    const { default: Doctor } = await import("@/cli/commands/doctor");
     return class extends Doctor {
       static override id = "doctor";
 
@@ -165,7 +165,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("@/commands/stop");
+    const { default: Stop } = await import("@/cli/commands/stop");
     return class extends Stop {
       static override id = "stop";
 
@@ -211,4 +211,37 @@ export function expectedPublicCliCommand(args: string): string {
  */
 export function pressCtrlC(): void {
   process.emit("SIGINT", "SIGINT");
+}
+
+/**
+ * Runs one command class on its own, as the command `id` of the CLI's own
+ * package. A run suggests commands by id and renders them from what the loaded
+ * CLI declares for that id, and rebuilds itself by its own id, so it needs that
+ * config and that id; a class run bare would load the config of whatever
+ * started the test runner. The id is set for this run alone and the class is
+ * left as the test imported it.
+ *
+ * @param command - The command class.
+ * @param id - The id oclif names it by (`variable:rm`).
+ * @param argv - The command line after the command.
+ * @returns What the command returned.
+ */
+export async function runCommand(
+  command: new (argv: string[], config: Config) => Command,
+  id: string,
+  argv: string[],
+): Promise<Awaited<ReturnType<typeof Command.run>>> {
+  const before = Object.getOwnPropertyDescriptor(command, "id");
+  Object.defineProperty(command, "id", { value: id, configurable: true, writable: true });
+  try {
+    return await Reflect.apply(Command.run, command, [argv, cliPackageRoot]);
+  } finally {
+    // Put the class back as the test imported it, so a later run of it on its
+    // own does not inherit this one's id.
+    if (before === undefined) {
+      Reflect.deleteProperty(command, "id");
+    } else {
+      Object.defineProperty(command, "id", before);
+    }
+  }
 }

@@ -463,6 +463,15 @@ describe("standard-attribute tests ↔ SDK specs", () => {
       expect(check("nothing here")).toEqual(["two has no x block"]);
       expect(check("// x:begin\nno end")).toEqual(["two has no x block"]);
     });
+
+    it("does not take a longer marker for its own", () => {
+      expect(check(block.replace("// x:end", "// x:end2"))).toEqual(["two has no x block"]);
+      expect(check(block.replace("// x:begin", "// x:begin2"))).toEqual(["two has no x block"]);
+    });
+
+    it("does not take a marker inside other text for its own", () => {
+      expect(check(block.replace("// x:end", "y // x:end"))).toEqual(["two has no x block"]);
+    });
   });
 });
 
@@ -553,31 +562,27 @@ describe("widget loading ↔ SDK packages", () => {
         : [];
     });
 
-  // The checks above read files outside this package, so both runners must list
+  // The checks above read files outside this package, so turbo.json must list
   // them as test inputs; otherwise a change there neither reruns the test nor
   // invalidates its cached result.
-  it.each(["moon.yml", "turbo.json"])(
-    "%s lists the files the checks read as test inputs",
-    (file) => {
-      const config = read(`${packagesDir}sdk-core/${file}`);
-      for (const input of [
-        ...new Set(
-          [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
-            (spec) => spec.replace("../../", "packages/"),
-          ),
+  it("turbo.json lists the files the checks read as test inputs", () => {
+    const config = read(`${packagesDir}sdk-core/turbo.json`);
+    for (const input of [
+      ...new Set(
+        [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
+          (spec) => spec.replace("../../", "packages/"),
         ),
-        "packages/sdk-*/src/__tests__/*.test.ts",
-        "packages/sdk-*/src/__tests__/*/*.test.ts",
-        "packages/sdk-*/package.json",
-        "packages/sdk-*/README.md",
-        "packages/sdk-*/skills/**/SKILL.md",
-        "apps/demo-*/package.json",
-        "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
-      ]) {
-        expect(config, `${file} has no test input ${input}`).toContain(input);
-      }
-    },
-  );
+      ),
+      "packages/sdk-next/src/__tests__/client.edge.test.ts",
+      "packages/sdk-*/package.json",
+      "packages/sdk-*/README.md",
+      "packages/sdk-*/skills/**/SKILL.md",
+      "apps/demo-*/package.json",
+      "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
+    ]) {
+      expect(config, `turbo.json has no test input ${input}`).toContain(input);
+    }
+  });
 
   // Every SDK's agent skill has the same sections in the same order, so an agent
   // finds the same answer under the same heading in whichever skill it loads.
@@ -957,259 +962,38 @@ describe("client SDK edge specs", () => {
 });
 
 /**
- * The server SDK edge specs. Each sends requests through its built package inside
- * the edge VM and carries the same `edge-server` block: the same titles and the
- * same body, byte for byte. Only the glue that hands a request to the framework's
- * handler, above the block, is the framework's.
+ * Each server SDK spec runs the shared cases of `@zitadel/server-sdk-contract`:
+ * one that stops calling them, or moves where neither Vitest nor this check
+ * looks, would drop them without a failing test.
  */
-describe("server SDK edge specs", () => {
+describe("server SDK specs ↔ @zitadel/server-sdk-contract", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-
-  const SERVER_TITLES = [
-    "the server SDK in the edge runtime",
-    "answers a protected route with a redirect to the login path",
-    "forwards the proxy path to the backend",
-    "forwards a GET on the proxy path as a GET",
-    "refuses a request that carries the auth header before forwarding it",
-    "passes an unprotected route through",
-  ];
-
-  const SERVERS = {
-    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
-    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
-    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
-    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
-    "sdk-next": "sdk-next/src/__tests__/middleware.edge.test.ts",
-    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+  const CALLS = {
+    "describeServerMiddleware(": [
+      "sdk-next/src/__tests__/middleware.test.ts",
+      "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+      "sdk-sveltekit/src/__tests__/handle.test.ts",
+      "sdk-solid-start/src/__tests__/middleware.test.ts",
+      "sdk-qwik-router/src/__tests__/request-handler.test.ts",
+      "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+    ],
+    "describeEdgeServer(": [
+      "sdk-next/src/__tests__/middleware.edge.test.ts",
+      "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+      "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+      "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+      "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+      "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+    ],
   };
+  const specs = Object.entries(CALLS).flatMap(([call, paths]) => paths.map((path) => [path, call]));
 
-  it("has the server block in every server SDK", () => {
-    const sources = Object.fromEntries(
-      Object.entries(SERVERS).map(([sdk, path]) => [
-        sdk,
-        readFileSync(`${packagesDir}${path}`, "utf8"),
-      ]),
-    );
-    expect(problems(sources, "edge-server", SERVER_TITLES)).toEqual([]);
+  it.each(specs)("%s calls %s", (path, call) => {
+    expect(readFileSync(`${packagesDir}${path}`, "utf8")).toContain(call);
   });
-});
 
-/**
- * The server SDKs' test titles.
- *
- * The six meta-framework SDKs test the same server behaviours, so their test
- * files carry exactly the same tests: the same titles, in the same order, with
- * none missing and none extra. A behaviour tested under another title, left
- * untested in one SDK, or tested only in one shows up here instead of drifting
- * unnoticed.
- */
-describe("server SDK test titles", () => {
-  const packagesPath = `${resolve(process.cwd(), "..")}/`;
-  const TEST_FILES = {
-    "sdk-next": "sdk-next/src/__tests__/middleware.test.ts",
-    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.test.ts",
-    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
-    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
-    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.test.ts",
-    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.test.ts",
-  } as const;
-
-  const CANONICAL_TITLES = [
-    "public route with no token continues as unauthenticated",
-    "protected route with no token redirects to /login?next=/admin",
-    "protected route with a query string redirects to /login?next=/admin?tab=x",
-    "does not nest a next parameter the request already carries",
-    "protected route requested with a trailing slash redirects to login",
-    "protected route with a valid cookie token authenticates",
-    "protected route with a valid Bearer token authenticates",
-    "Bearer token takes precedence over the session cookie",
-    "token with no sub claim is treated as unauthenticated",
-    "token with no sub claim is rejected on a protected route",
-    "token with no sub claim continues as unauthenticated on a public route",
-    "token with a disallowed typ is rejected",
-    "token with a disallowed algorithm is rejected",
-    'token with alg "none" is rejected without fetching JWKS',
-    "RS256 tokens are accepted by default",
-    "redirect preserves existing query params in loginPath",
-    "invalid token clears the stale session cookie and redirects",
-    "accepts a relative loginPath and redirects correctly",
-    "absolute loginPath throws",
-    "protocol-relative loginPath throws",
-    "refuses a request that carries the auth header on the proxy path",
-    "forwards upstream Set-Cookie headers",
-    "passes cookies through to the backend when no project is configured",
-    "names a proxied session cookie for this app's project",
-    "names a proxied session cookie for this app's project over https",
-    "sends this project's session cookie upstream under the server's name",
-    "keeps other projects' session cookies from the backend",
-    "drops the Set-Cookie of a session cookie from before ADR 083",
-    "sends the shared session cookie only to this project's session probe",
-    "copies this project's session out of the shared cookie on the session probe",
-    "ends and clears a session of this project kept under the shared name on sign-out",
-    "leaves the Console's session of another project under the shared name on sign-out",
-    "ends this app's session over https on sign-out",
-    "forwards an upstream Location %s onto this app as %s",
-    "keeps a caller-supplied credential on the handoff exchange",
-    "appends the client IP to an existing X-Forwarded-For chain",
-    "sets X-Forwarded-For from the client IP when no chain exists",
-    "omits X-Forwarded-For when no client IP is available",
-    "ignores a client-supplied x-real-ip when the runtime provides an address",
-    "ignores a client-supplied x-real-ip when an X-Forwarded-For chain exists",
-    "does not proxy a path that only shares the prefix without a separator",
-    "skips auth handling on an ignored route",
-    "hands the auth result to the next handler when the request continues",
-    "reads a missing session from %j as signed out",
-    "returns the redirect without continuing on a protected route miss",
-    "is assignable to the framework's request handler type",
-    "signs in a live session that names a user",
-    "redirects an anonymous session on a protected route to login",
-    "keeps an anonymous session's cookie, since its sign-in may still complete",
-    "treats a 200 session without a user as anonymous on a public route",
-    "redirects a session whose answer has a null user id to login on a protected route",
-    "reads a dead session cookie as signed out on a public page",
-    "clears a dead session cookie and redirects on a protected route",
-    "clears the cookie of a session that is gone",
-    "when the session check gets %s",
-    "keeps the session cookie and renders a public page signed out",
-    "answers 503 on a protected route and keeps the session cookie",
-    "does not sign in a live session of another project",
-    "reads a live session of another project as signed out on a public page",
-    "keeps the cookie of another project's session",
-    "reads the session from this project's cookie before the shared one",
-    "ignores the session cookie of another project's app",
-    "reads no session from a cookie from before ADR 083",
-    "reads no unprefixed session cookie over https",
-    "copies this project's session out of the shared cookie",
-    "keeps a page that sets a session cookie out of shared caches",
-    "copies with Secure behind a TLS proxy that talks to the app over loopback",
-    "clears a dead session cookie without Secure over plain http to a loopback address",
-    "clears only this project's dead session cookie",
-    "asks the backend for the session in this app's project",
-    "does not sign in a session the backend refuses for this project",
-    "does not sign in a JWT issued for %s",
-    "does not sign in a Bearer JWT issued for another project",
-    "keeps the cookie of a JWT issued for another project",
-    "signs in by the session cookie behind a Bearer JWT of another project",
-    "signs in a JWT whose audience includes this project",
-    "signs in no one when no project is configured",
-    "holds sessions to the project from %s",
-    "does not attach the project secret to %s %s",
-    "attaches the project secret only to POST /sessions/exchange, ignoring the query",
-    "preserves the upstream session cache policy",
-    "keeps the path but never the internal host of an upstream redirect",
-    "ignores a client-injected x-middleware-override-headers",
-    "proxies an exact match of proxyPath",
-    "proxies paths under proxyPath",
-    "refuses a request that carries the auth header",
-    "refuses a request that carries the auth header on an ignored route",
-    "lets a request without the auth header through",
-    "sends the exchange bearer from %s",
-    "proxies to the backend from %s",
-    "proxies to a backend url given with a trailing slash",
-    "verifies a JWT against a backend url given with a trailing slash",
-    "asks the session probe at a backend url given with a trailing slash",
-  ];
-
-  // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.
-  const TITLE = /(?:\bit(?:\.fails)?\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-
-  const sourceOf = (sdk: keyof typeof TEST_FILES): string =>
-    readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8");
-
-  const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
-    [...sourceOf(sdk).matchAll(TITLE)].map((match) => match[2]!);
-
-  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
-    "%s carries exactly the canonical tests, in the canonical order",
-    (sdk) => {
-      const titles = titlesOf(sdk);
-      expect(
-        firstDifference(titles, CANONICAL_TITLES),
-        `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
-      ).toBe("");
-    },
-  );
-
-  /**
-   * The backend-url tests are the one group of cases the server SDKs also
-   * carry byte for byte: the same rows and bodies between the same markers, so
-   * every SDK resolves the url the same way. Only the glue outside the block
-   * (`serve`, `captureFetch`, `signer`) differs.
-   */
-  describe("the backend-url block", () => {
-    const URL_TITLES = [
-      "proxies to a backend url given with a trailing slash",
-      "verifies a JWT against a backend url given with a trailing slash",
-      "asks the session probe at a backend url given with a trailing slash",
-    ];
-
-    it("is canonical in every SDK", () => {
-      const sources = Object.fromEntries(
-        (Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]).map((sdk) => [sdk, sourceOf(sdk)]),
-      );
-      expect(problems(sources, "backend-url", URL_TITLES)).toEqual([]);
-    });
-
-    // The guard's own logic, on a fixture block it is made to reject.
-    describe("the guard", () => {
-      const fixture = [
-        "describe('x', () => {",
-        "  // backend-url:begin",
-        '  it("proxies to a backend url given with a trailing slash", () => {',
-        '    expect(proxied("http://a.test/")).toBe("http://a.test/v1");',
-        "  });",
-        '  it("verifies a JWT against a backend url given with a trailing slash", () => {});',
-        '  it("asks the session probe at a backend url given with a trailing slash", () => {});',
-        "  // backend-url:end",
-        "});",
-      ].join("\n");
-      const check = (other: string): string[] =>
-        problems({ one: fixture, two: other }, "backend-url", URL_TITLES);
-      const CHANGED = ["two: the body differs from the first SDK's"];
-
-      it("accepts blocks that match", () => {
-        expect(check(fixture)).toEqual([]);
-      });
-
-      it("sees a changed body and names the SDK", () => {
-        expect(check(fixture.replace('"http://a.test/"', '"http://a.test"'))).toEqual(CHANGED);
-      });
-
-      it("sees an extra test", () => {
-        expect(
-          check(
-            fixture.replace(
-              "  // backend-url:end",
-              '  it("extra", () => {});\n  // backend-url:end',
-            ),
-          ),
-        ).toHaveLength(2);
-      });
-
-      it("sees a changed assertion", () => {
-        expect(check(fixture.replace(").toBe(", ").not.toBe("))).toEqual(CHANGED);
-      });
-
-      it("sees a missing marker", () => {
-        expect(check(fixture.replace("  // backend-url:end\n", ""))).toEqual([
-          "two has no backend-url block",
-        ]);
-      });
-
-      it("does not take a longer marker for its own", () => {
-        expect(check(fixture.replace("// backend-url:end", "// backend-url:end2"))).toEqual([
-          "two has no backend-url block",
-        ]);
-        expect(check(fixture.replace("// backend-url:begin", "// backend-url:begin2"))).toEqual([
-          "two has no backend-url block",
-        ]);
-      });
-
-      it("does not take a marker inside other text for its own", () => {
-        expect(check(fixture.replace("  // backend-url:end", "  x // backend-url:end"))).toEqual([
-          "two has no backend-url block",
-        ]);
-      });
-    });
+  it("turbo.json lists the specs as test inputs", () => {
+    const config = readFileSync(`${packagesDir}sdk-core/turbo.json`, "utf8");
+    for (const [path] of specs) expect(config).toContain(`packages/${path}`);
   });
 });

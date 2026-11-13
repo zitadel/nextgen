@@ -14,11 +14,14 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 - Go version from [`apps/api/go.mod`](apps/api/go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 12 from [`package.json`](package.json) (`corepack enable`)
-- [Moon](https://moonrepo.dev/moon)
+- `turbo` on `PATH` (`npm install --global turbo`, which hands over to the
+  workspace's pinned [Turborepo](https://turborepo.com); or call
+  `node_modules/.bin/turbo`)
 
 ### Using the devcontainer
 
-The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26. With no
+The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and, on
+create, puts `pnpm` (`corepack enable`) and `turbo` on `PATH`. With no
 database configured, the server uses SQLite under the server data directory
 (same zero-config default as outside the container). After changing
 devcontainer configuration, use **Dev Containers: Rebuild Container** so
@@ -40,45 +43,47 @@ For changes to the Go server, APIs, or database layer.
 
 | I want to...                                          | Run                                        |
 | ----------------------------------------------------- | ------------------------------------------ |
-| Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
-| Verify my toolchain                                   | `moon run workspace:doctor`                |
-| Start the server (builds the console, then Go)        | `moon run workspace:server`                |
-| Debug and attach VSCode                               | `moon run workspace:server-debug`          |
-| Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
-| Verify committed generated output                     | `moon run server:check-generate`           |
-| Run lint, type checks, and tests                      | `moon ci :lint :typecheck :build :test`    |
-| Preview planned Changesets bumps                      | `corepack pnpm exec changeset status --since origin/main` |
+| Put pnpm and turbo on PATH, once per machine          | `corepack enable && npm install --global turbo` |
+| Install dependencies                                  | `pnpm install --frozen-lockfile`          |
+| Verify my toolchain                                   | `pnpm run doctor`                          |
+| Start the server (builds the console, then Go)        | `pnpm run server`                          |
+| Debug and attach VSCode                               | `pnpm run server-debug`                    |
+| Regenerate Go/OpenAPI artifacts                       | `turbo run generate --filter=@zitadel/server` |
+| Verify committed generated output                     | `turbo run check-generate`                 |
+| Run lint, type checks, and tests                      | `turbo run lint typecheck build test`      |
+| Delete build output (alone; one package: `--filter`)  | `turbo run clean`                          |
+| Preview planned Changesets bumps                      | `pnpm exec changeset status --since origin/main` |
 
-Run `corepack pnpm install --frozen-lockfile` first — Moon does not install
-node_modules automatically (`.moon/workspace.yml` sets `installDependencies: false`).
+Run `pnpm install --frozen-lockfile` first: turbo does not install
+dependencies.
 
 ### Starting the server from source
 
 The Go binary embeds a production build of the console: `apps/console` →
 `apps/api/internal/staticui/console/dist/`.
 
-`moon run workspace:server` builds it before starting Go; when no console code
-changed, that build is a cache hit. The wrapper (`scripts/run-server.mjs`)
+`pnpm run server` builds it through turbo before starting Go; when no console
+code changed, that build is a cache hit. The wrapper (`scripts/run-server.mjs`)
 compiles the Go module in `apps/api` and starts the binary from the repository
 root, so the server's config search and a relative `-c` path resolve against
 the checkout. Arguments after `--` go to the server:
 
 ```sh
-moon run workspace:server -- server --migrate -c docs/operations/nextgen.example.yaml
+pnpm run server -- server --migrate -c docs/operations/nextgen.example.yaml
 ```
 
 The dev server keeps its data (the SQLite database and the master key) under
 `dist/server/dev/<branch>/nextgen-data`, one directory per Git branch: it
 survives rebuilds on the same branch, and a branch with other migrations never
-migrates another branch's database. `workspace:server-debug` keeps its own data
+migrates another branch's database. `server-debug` keeps its own data
 beside its binary in `dist/server/`.
 
 With no database configured, the server uses SQLite at
 `<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
 `NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
 path or DSN you manage. Schema migrations run when you pass `--migrate`;
-`moon run workspace:server` adds that flag. To apply schema and exit without
-serving, run `moon run workspace:server -- migrate`.
+`pnpm run server` adds that flag. To apply schema and exit without
+serving, run `pnpm run server -- migrate`.
 
 Open http://localhost:8080/ui/console/
 
@@ -88,7 +93,7 @@ Use `server-debug` to build the binary with debug symbols and disabled inlining,
 then attach VSCode's Go debugger by PID:
 
 ```sh
-moon run workspace:server-debug -- server --migrate --user-file examples/bootstrap-users/demo-admin.json
+pnpm run server-debug -- server --migrate --user-file examples/bootstrap-users/demo-admin.json
 ```
 
 The task prints the `go build` invocation and the PID of the running process. The
@@ -123,7 +128,7 @@ build (semver) and a plain `go run` build (`dev`).
 ### Testing the CLI from source
 
 Contributors testing the published CLI flow against local workspace packages use
-`moon run workspace:cli -- start` and `moon run workspace:cli -- setup --server local`
+`pnpm run cli -- start` and `pnpm run cli -- setup --server local`
 instead of `npx`; from an app directory outside the checkout,
 `node <checkout>/scripts/run-cli.mjs …` does the same. This requires the source
 repository to be checked out, and corepack: without a `pnpm` on `PATH`, the
@@ -135,7 +140,7 @@ app installs (`APP_RELEASE_PACKAGES` in
 [`scripts/release-manifest.mjs`](scripts/release-manifest.mjs)), publishes them
 to a local Verdaccio registry under `tmp/cli-local-registry`, and points the
 generated app install at that registry. Test the release tarballs with
-`moon run release:pack` or the [journey](e2e/journey/AGENTS.md) instead.
+`turbo run pack --filter=@zitadel/release` or the [journey](e2e/journey/AGENTS.md) instead.
 Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` to install public npm packages in the
 generated app instead of local ones. The scaffolded app's lockfile points at the
 wrapper's local registry, so reinstalling it after the wrapper exits fails until
@@ -148,14 +153,14 @@ telemetry project and send no copy to Vercel Web Analytics.
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.
 
-The published `zitadel` commands must not need Docker, Go, Moon or this
-checkout; only the `workspace:*` wrappers may.
+The published `zitadel` commands must not need Docker, Go, Turborepo or this
+checkout; only the root wrappers (`pnpm run cli`, `pnpm run server`) may.
 
 To capture the CLI's JSON through the root wrapper, run
 `corepack pnpm --silent run cli -- … --json`: plain `pnpm run` prints its own
 script prelude to stdout first. Running `apps/cli/bin/run.js` directly uses the
 last-built `dist/`, so after a fresh checkout or a source change run
-`pnpm install` and `moon run cli:build` first.
+`pnpm install` and `turbo run build --filter=@zitadel/cli` first.
 
 ---
 
@@ -166,16 +171,17 @@ the server binary.
 
 | I want to...                                 | Run                                        |
 | -------------------------------------------- | ------------------------------------------ |
-| Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
-| Verify my toolchain                          | `moon run workspace:doctor`                |
-| Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
-| Start the console on a seeded real instance  | `moon run console:dev-real` |
-| Test the built console with the Go server    | `moon run workspace:server`                |
-| Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
+| Put pnpm and turbo on PATH, once per machine | `corepack enable && npm install --global turbo` |
+| Install dependencies                         | `pnpm install --frozen-lockfile`          |
+| Verify my toolchain                          | `pnpm run doctor`                          |
+| Open the component workbench (Storybook)     | `turbo run dev --filter=@zitadel/storybook` → http://localhost:6006 |
+| Start the console on a seeded real instance  | `turbo run dev:real --filter=@zitadel/console` |
+| Test the built console with the Go server    | `pnpm run server`                          |
+| Run lint, type checks, and tests             | `turbo run lint typecheck build test`      |
 
-Run `corepack pnpm install --frozen-lockfile` first.
+Run `pnpm install --frozen-lockfile` first.
 
-`console:dev-real` boots an ephemeral real instance, seeds it, and starts the
+The console's `dev:real` boots an ephemeral real instance, seeds it, and starts the
 console dev server against it; the console's other loops are in its
 [README](apps/console/README.md#local-development).
 
@@ -190,8 +196,8 @@ Run the doctor once to verify your toolchain, then run the standard check suite
 before opening a PR:
 
 ```sh
-moon run workspace:doctor
-moon ci :lint :typecheck :build :test
+pnpm run doctor
+turbo run lint typecheck build test
 ```
 
 Docker is needed for container builds, Docker-fallback journeys, and
@@ -199,134 +205,117 @@ container-backed integration tests; it is not required for the default
 npm-binary local runtime. Playwright browsers remain advisory for opt-in e2e and
 journey workflows.
 
-If you are new to Moon, start by listing the project graph and available tasks:
+If you are new to Turborepo, list the packages and see what a run would do:
 
 ```sh
-moon projects
-moon tasks
-moon project cli
-moon task cli:test
+turbo ls
+turbo ls @zitadel/cli
+turbo run test --filter=@zitadel/cli --dry
 ```
 
-Moon task targets use the `<project>:<task>` form, for example `moon run cli:test`.
+Run one package's task with `turbo run test --filter=@zitadel/cli`; turbo
+names it `@zitadel/cli#test` in its output. The graph's rules are in
+[turborepo.md](docs/design/build/turborepo.md).
 
 Use `corepack pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
-intent. CI runs `node scripts/check-changesets-status.mjs --pending`, which
-refuses a `major` bump before 1.0.0
+intent. CI runs `node scripts/check-changesets-status.mjs --pending`
+(`@zitadel/release#check-changesets`, under `test`), which refuses a `major`
+bump before 1.0.0
 ([preview versions](.changeset/README.md#preview-versions)).
 
-Task runs are accelerated by Moon's remote cache, configured under `remote` in
-[`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
-automatically. Local runs skip the remote cache unless you export a Depot API
-token as `DEPOT_CACHE_TOKEN` — with one set, your machine downloads shared task
-outputs but never uploads (uploads happen only in CI). Pull requests from forks
-run on GitHub-hosted runners without the Depot cache credential.
+CI's task runs are accelerated by turbo's remote cache, Vercel's: every run
+reads and writes it over OIDC (the `TURBO_TEAM` repository variable), and a
+fork's pull request, which gets no token, runs with the local cache only.
+Logged in with the Vercel CLI (`vercel login`), local runs read and write the
+same cache (`remoteCache` in [`turbo.json`](turbo.json)), in every checkout
+and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads. Skip
+`turbo login`: turbo prefers its token to the Vercel CLI's, and it expires
+("Authentication failed"). Then `turbo logout` (it signs the Vercel CLI out
+too) and `vercel login`.
+Without a login they use turbo's local cache
+([turborepo.md](docs/design/build/turborepo.md#commands)).
 
-`moon run workspace:check -- --full` runs the slow phases of
-[`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
-check and tests with the Postgres and Spanner lanes, the workspace gate, the
-release tarballs and snapshot, and the fresh-app journey. That comes close to
-`full-pr` but does not mirror it: CI runs Spanner only weekly, and adds the
-SQLite lane, a few repository checks and every other e2e lane
-(`moon run e2e:all`). Rerun one phase with
-`moon run workspace:check -- --only <phase>`, one task with
-`moon run <project>:<task>`.
+`pnpm run ci` runs what `full-pr` runs, on what your branch changed since
+`main`; rerun one task with `turbo run <task> --filter=<package>`. The
+Postgres lane needs Docker, and the Spanner suite
+(`turbo run test:spanner --filter=@zitadel/server`) runs only weekly in CI.
 
 ### What CI runs
 
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job installs
-dependencies, checks with `turbo boundaries` that each package imports only
-its own files and the packages it declares, then picks one of two modes via
-`scripts/ci-mode.mjs`:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). It runs on GitHub's
+32-core arm64 larger runner (the `32-arm-linux` runner group), installs
+dependencies and runs the root `ci` script (`pnpm run ci`, in
+[`package.json`](package.json)):
 
-**Full mode** (normal PRs) runs, in order:
+- `turbo boundaries` — each package imports only its own files and the
+  packages it declares.
+- then one `turbo run`, as many tasks at once as the runner has cores, each
+  starting once its own dependencies are done:
+  - `lint typecheck build test` — builds, every package's static checks (the
+    root's `check-adrs`, `check-go-work` and `check-typecheck`, and the
+    generated-file drift checks, among them), the tests that need no
+    service, the server's SQLite lane included, and the release's npm and
+    changesets checks.
+  - the e2e lanes, the kit's real-instance suite
+    (`@zitadel/testing#test:integration`), the 13 CI journeys
+    (`@zitadel/e2e#journey:<id>`), the Postgres lane
+    (`@zitadel/server#test:postgres`) and the proof-of-work race run
+    (`@zitadel/server#test:pow`). Each journey packs the npm tarballs
+    it installs from the builds it depends on, so an SDK change runs only
+    the journeys that install that SDK; `@zitadel/release#pack` packs and
+    checks the full release set. The console and demo lanes, the kit's
+    suite and the journeys are cached, so a push that leaves their inputs
+    alone restores them; the Postgres lane runs whenever it is affected.
+    The deployment lanes run [per deployment](#cloud-deployment-checks).
 
-- `moon run server:check-generate-pruned` — Go generated-file drift check.
-- Playwright Chromium install for the e2e lanes. Browser test lanes pull in
-  their own Chromium through a moon `install-browsers` dep on their `:test`
-  task.
-- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
-  builds, lint, typecheck and unit tests, and the Go database lanes
-  (`server:test-postgres`, `server:test-sqlite`) whenever moon finds them
-  affected, as dependents of the UI builds their binary embeds.
-- `moon run server:test-postgres`, then `moon run server:test-sqlite` — only
-  the lanes the graph did not run, which `scripts/ci-mode.mjs` reads from its
-  report: a run forced full for a workflow-only edit, which no lane lists as
-  input, leaves them out of the graph.
-- `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot, built outside any moon graph and handed to the journey via
-  `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
-  pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
-  Actions it refuses to run without the snapshot. The journey's Verdaccio
-  storage comes back from the Actions cache, and goes back only when the
-  journey fetched new tarballs into it or refreshed packuments a later run can
-  still use.
-- `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
-  so its browsers and dev servers do not compete with the unit suites. Its
-  lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
-  `e2e:all` runs as its dependencies every lane that needs no deployment (the
-  journey with ci-mode's framework matrix) and `testing:test-integration`; the
-  deployment lanes run [per deployment](#cloud-deployment-checks). They run
-  side by side; only the two demo-next lanes, which serve the same app on one
-  port, wait for each other.
+The run selects with `--affected`, measured from the pull request's
+base or, in the merge queue, from the commit the group is built on: turbo runs
+the tasks whose inputs the diff touches and every task that depends on them,
+so a docs-only PR runs almost nothing and a frontend-only PR skips the Go
+suites. A change to the `ci` script or to ci.yml reruns everything (both are
+global inputs), and so do a dispatch and the nightly run on `main`; the
+nightly also skips the cache, so a scaffolder release that breaks a journey
+shows there first. How inputs
+and edges decide it:
+[turborepo.md](docs/design/build/turborepo.md#commands). The CI journeys skip
+the frameworks in `ciExcludedFrameworkIds`
+([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)).
 
-Within full mode the `moon ci` graph selects only the tasks the diff affects
-(`--downstream deep --include-relations`), measured from the pull request's
-base or, in the merge queue, from the commit the group is built on: a lane is
-skipped when the diff provably cannot reach it — a docs-only PR runs almost
-nothing, a frontend-only PR skips the Go suites. The e2e lanes run, all together, whenever one of them
-is affected (its folder, a demo app it serves, or something it depends on: the
-server, CLI, console, SDKs, api-mock or testing kit), so most code PRs run
-them.
-`scripts/ci-mode.mjs` picks the mode (full vs version-only) and the gates for
-the steps outside the graph: the Go suites, the e2e step (on when moon finds
-`e2e:all` affected), the release snapshot (on when a journey trigger moved or
-the e2e step runs) and the journey's framework matrix, which collapses to Next
-unless an SDK, the CLI, the test kit or the journey's own files moved; even the
-full matrix skips the frameworks in `ciExcludedFrameworkIds`
-([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)). It asks
-moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
-the lanes out of its affected set when only their own files changed. The
-gates fail open: known repo-wide
-files no moon task claims (workflow definitions, `scripts/`, moon config,
-root manifests and compiler/release inputs such as `tsconfig.base.json`), an
-empty diff, or a failed query all force the
-complete run — and when the query returns an empty affected set, the run is
-only skipped if every changed file is on a narrow explicitly-inert allowlist
-(`docs/`, root agent notes), because unclaimed files are not assumed inert.
+Each run's summary page shows the turbo run's totals, critical path and
+slowest tasks ([`turbo-run-summary.mjs`](scripts/turbo-run-summary.mjs));
+the raw `--summarize` JSON is the run's `turbo-run-summary` artifact.
 
-The Spanner suite (`moon run server:test-spanner`) is not part of `full-pr`.
-It runs in the separate `spanner` workflow against Spanner Omni, weekly on
-`main` and on demand, and is not a required check. To run it against a branch,
-use `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally,
-where it still starts the Spanner emulator.
+The Spanner suite (`turbo run test:spanner --filter=@zitadel/server`) is not
+part of `full-pr`. It runs in the separate `spanner` workflow against Spanner
+Omni, weekly on `main` and on demand, and is not a required check. To run it
+against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
+the task locally, where it still starts the Spanner emulator.
+
+The released artifacts (the server on macOS and Linux, the container, an
+upgrade from an older release) run in the separate `artifacts` workflow,
+which is not a required check; its header says when and what
+([`artifacts.yml`](.github/workflows/artifacts.yml)). To run it on a branch,
+use `gh workflow run artifacts.yml --ref <branch>`; to test a published
+release, `gh workflow run artifacts.yml -f version=<version>`.
 
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).
 
-`ci-turbo / full-pr-turbo` is not required either: it runs the same checks
-under Turborepo, the dual run of the
-[migration plan](docs/design/build/turborepo-migration.md). Turbo selects what
-runs (`--affected`, from the same base as `full-pr`), so a change no task
-reads, such as a workflow edit, runs nothing there; every night it runs every
-task and lane without the cache. Run it by hand with `gh workflow run
-ci-turbo.yml --ref <branch>`, which on a branch runs every task through the
-cache, or add `-f force=true` for the nightly run.
-
-**Version-only mode** (Changesets version PRs) runs `release:version`, the
-publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must
-already know every public package the version publishes), `release:pack`, and
-tarball verification instead.
+A Changesets version PR runs like any other. Its version bumps reach every
+task, so it packs the release with all five server platforms, the journeys
+verify and install those tarballs, and `@zitadel/release#check-npm` (the
+publish preflight's npm check: npm must already know every public package
+the version publishes) runs because public manifests changed.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. The release snapshot the journeys install from stays on the
+blocking gate. The npm tarballs the journeys install from stay on the
 runner; a failed run uploads the journey's diagnostics and every e2e lane's
 results, which expire after 7 days. The Docker-fallback journey does not run in
 CI; it stays an opt-in local check (see below).
@@ -338,8 +327,8 @@ CI; it stays an opt-in local check (see below).
 SQLite integration tests use a local file database and need no Docker:
 
 ```sh
-moon run server:test-sqlite
-# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
+turbo run test:sqlite --filter=@zitadel/server
+# or, with every untagged test too: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
 Postgres and Spanner integration tests use
@@ -352,11 +341,11 @@ Docker.
 
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
-moon run server:test-postgres
-# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
+turbo run test:postgres --filter=@zitadel/server
+# or, with every untagged test too: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
-# Spanner (prefer the Moon task — see emulator-testcontainer note below)
-moon run server:test-spanner
+# Spanner (prefer the turbo task — see emulator-testcontainer note below)
+turbo run test:spanner --filter=@zitadel/server
 ```
 
 To run the Postgres or Spanner suites against a database you manage instead of
@@ -400,7 +389,7 @@ the two apart by timing:
 Before that budget existed the second case surfaced as an opaque 500 with no log
 line, and had to be diagnosed from a test's wall-clock duration (#794).
 
-Locally, `moon run server:test-spanner` still starts the emulator. It serves one
+Locally, `turbo run test:spanner --filter=@zitadel/server` still starts the emulator. It serves one
 read-write transaction at a time process-wide and hands priority to the newest,
 so a local run can starve a transaction past the budget where CI passes. To run
 against Spanner Omni as CI does, start it with host networking (on macOS,
@@ -410,7 +399,7 @@ Docker Desktop has that as an opt-in setting) and point the suite at it:
 docker run -d --name omni --network host \
   us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts start-single-server
 ZITADEL_TEST_SPANNER_INSTANCE=projects/default/instances/default \
-  SPANNER_EMULATOR_HOST=localhost:15000 moon run server:test-spanner
+  SPANNER_EMULATOR_HOST=localhost:15000 turbo run test:spanner --filter=@zitadel/server
 ```
 
 The emulator container is pinned to `linux/amd64`. The arm64 build returns
@@ -435,8 +424,7 @@ locally. The demo suites exercise the checked-in framework demos:
 
 ```sh
 corepack pnpm --filter @zitadel/e2e exec playwright install
-moon run e2e:demo-next-mock
-moon run e2e:demo-nuxt-mock
+turbo run demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e
 ```
 
 ### Docs site suite
@@ -446,7 +434,7 @@ The docs site's contract suite runs against a URL: the local build by default
 
 ```sh
 corepack pnpm --filter @zitadel/docs exec playwright install chromium
-moon run docs:e2e
+turbo run e2e --filter=@zitadel/docs
 ```
 
 ### Cloud deployment checks
@@ -469,18 +457,22 @@ CLOUD_URL=https://preview.zitadel.com pnpm check:cloud
 The journey test creates one fresh app directory per selected framework outside
 the repo, runs the full CLI setup flow against local workspace packages, starts
 each generated app, and runs Playwright to verify the result. By default it runs
-the full framework matrix; use `moon run e2e:journey -- --framework next`
-for a single Next.js run:
+the full framework matrix; use
+`turbo run journey --filter=@zitadel/e2e -- --framework next` for a single
+Next.js run:
 
 ```sh
-moon run e2e:journey
+turbo run journey --filter=@zitadel/e2e
 ```
 
 To exercise the Docker fallback path, provide a local backend image tag:
 
 ```sh
-moon run e2e:journey -- --runtime docker --image nextgen:local
+turbo run journey --filter=@zitadel/e2e -- --runtime docker --image nextgen:local
 ```
+
+One of CI's journeys runs alone as its task, on the release's npm tarballs:
+`turbo run journey:vue --filter=@zitadel/e2e`.
 
 Use `--keep` to preserve the temporary work directory after success. On failure
 the runner keeps diagnostics automatically and prints the path.
@@ -491,33 +483,34 @@ To build the versioned release binary (the same artifact published to GitHub
 Releases):
 
 ```sh
-moon run release:snapshot
+pnpm run release:snapshot
 ```
 
 The release task builds the embedded console automatically.
 
 To cut or recover a release, follow the
-[release runbook](docs/runbooks/manual-release.md). Moon builds the artifacts
-and the draft GitHub Release; Changesets owns versions, npm publishing, and
-release notes — see
-[ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
+[release runbook](docs/runbooks/manual-release.md). Turborepo tasks build the
+artifacts and the draft GitHub Release; Changesets owns versions, npm
+publishing, and release notes — see
+[ADR 002](docs/adrs/002-multi-package-release-strategy.md),
+[ADR 089](docs/adrs/089-turborepo-task-runner.md) and
 [`.changeset/README.md`](.changeset/README.md).
 
 ### Building a Docker image from source
 
-By default, `moon run workspace:cli -- start` uses the npm binary runtime and
+By default, `pnpm run cli -- start` uses the npm binary runtime and
 does not build a Docker image. To build and start a local Docker image instead,
 pass `--runtime docker`:
 
 ```sh
-moon run workspace:cli -- start --runtime docker
+pnpm run cli -- start --runtime docker
 ```
 
 Use an existing image explicitly when you do not want to rebuild:
 
 ```sh
-moon run workspace:cli -- start --runtime docker --image custom:tag
-ZITADEL_LOCAL_IMAGE=custom:tag moon run workspace:cli -- start --runtime docker
+pnpm run cli -- start --runtime docker --image custom:tag
+ZITADEL_LOCAL_IMAGE=custom:tag pnpm run cli -- start --runtime docker
 ```
 
 ## Project documentation and conventions

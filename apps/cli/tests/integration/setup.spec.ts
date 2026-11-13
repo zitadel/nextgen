@@ -161,7 +161,16 @@ const CUSTOMIZE_STEP =
 /**
  * The step that says where the login's look is changed.
  */
-const BRANDING_STEP = `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${expectedPublicCliCommand("branding eject")} scaffolds an editable template in .zitadel/branding/.`;
+/**
+ * The step on changing the login's look, which names `branding eject` in the
+ * directory setup ran in.
+ *
+ * @param app - The app setup ran in.
+ * @returns The step.
+ */
+function brandingStep(app: { readonly path: string }): string {
+  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${expectedPublicCliCommand(`branding eject --cwd ${app.path}`)} scaffolds an editable template in .zitadel/branding/.`;
+}
 
 /**
  * Every file setup writes into an app, in the order it reports them.
@@ -419,11 +428,11 @@ describe("setup", () => {
           source: MOCK_SERVER_URL,
           code: "E_NOT_FOUND",
           message: `POST ${MOCK_SERVER_URL}/api/v1/projects returned 404 — ${MOCK_SERVER_URL}/api/v1/projects has no such endpoint; is this a Zitadel platform API?`,
-          hint: `If you meant to use a local Zitadel server, start it first and retry setup with --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}.`,
+          hint: `If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
           next_commands: [
             expectedPublicCliCommand(`start --cwd ${app.path}`),
             expectedPublicCliCommand(
-              `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}`,
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
             ),
           ],
           details: {
@@ -461,11 +470,11 @@ describe("setup", () => {
           source: MOCK_SERVER_URL,
           code: "E_NETWORK",
           message: "down",
-          hint: `If you meant to use a local Zitadel server, start it first and retry setup with --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}.`,
+          hint: `If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
           next_commands: [
             expectedPublicCliCommand(`start --cwd ${app.path}`),
             expectedPublicCliCommand(
-              `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}`,
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
             ),
           ],
           details: {
@@ -524,11 +533,11 @@ describe("setup", () => {
           source: MOCK_SERVER_URL,
           code: "E_NETWORK",
           message: `POST ${MOCK_SERVER_URL}/api/v1/projects got no response`,
-          hint: `Check your connection and the server URL (ZITADEL_URL or --server). If you meant to use a local Zitadel server, start it first and retry setup with --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}.`,
+          hint: `Check your connection and the server URL (ZITADEL_URL or --server). If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
           next_commands: [
             expectedPublicCliCommand(`start --cwd ${app.path}`),
             expectedPublicCliCommand(
-              `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${app.path}`,
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
             ),
           ],
           details: {
@@ -579,8 +588,8 @@ describe("setup", () => {
               `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
               VERIFY_STEP,
               CUSTOMIZE_STEP,
-              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-              BRANDING_STEP,
+              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+              brandingStep(app),
               `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
             ],
             next_commands: [
@@ -717,8 +726,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -777,8 +786,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -876,8 +885,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -923,8 +932,8 @@ describe("setup", () => {
               `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
               VERIFY_STEP,
               CUSTOMIZE_STEP,
-              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-              BRANDING_STEP,
+              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+              brandingStep(app),
               `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
             ],
             next_commands: [
@@ -992,8 +1001,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1069,8 +1078,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1115,8 +1124,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1161,8 +1170,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1208,8 +1217,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1221,7 +1230,7 @@ describe("setup", () => {
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
                 expectedPublicCliCommand(
-                  `setup --non-interactive --json --skip-install --framework next --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                  `setup --skip-install --framework next --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -1269,8 +1278,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1318,8 +1327,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1331,7 +1340,7 @@ describe("setup", () => {
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
                 expectedPublicCliCommand(
-                  `setup --non-interactive --json --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                  `setup --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -1385,7 +1394,7 @@ describe("setup", () => {
               next_actions: [],
               next_commands: [
                 expectedPublicCliCommand(
-                  `setup --non-interactive --json --skip-install --dev-port 3001 --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                  `setup --skip-install --dev-port 3001 --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -1430,8 +1439,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1659,17 +1668,17 @@ describe("setup", () => {
               sso: [],
               deployment: null,
               next_actions: [
-                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))}`,
+                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}`,
                 `Install dependencies: npm --prefix ${app.path} install`,
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
-                expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'")),
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
                 `npm --prefix ${app.path} install`,
                 `npm --prefix ${app.path} run dev`,
                 expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
@@ -1680,7 +1689,7 @@ describe("setup", () => {
               ],
             },
             warnings: [
-              `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish .zitadel/.`,
+              `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
             ],
           });
         });
@@ -1735,8 +1744,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
@@ -1750,7 +1759,7 @@ describe("setup", () => {
               ],
             },
             warnings: [
-              `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))}.`,
+              `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}.`,
             ],
           });
         });
@@ -1874,8 +1883,8 @@ describe("setup", () => {
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -2061,9 +2070,9 @@ describe("setup", () => {
             source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
             message: "No client secret supplied",
-            hint: `Pipe it in on stdin. It is never a flag: that would put it in shell history, a process listing and CI logs. For example: printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id '<id>' ...")}`,
+            hint: `Pipe it in on stdin. It is never a flag: that would put it in shell history, a process listing and CI logs. For example: printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand(`setup --sso custom --sso-client-id '<id>' --cwd ${app.path} ...`)}`,
             next_commands: [
-              `printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id '<id>' ...")}`,
+              `printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand(`setup --sso custom --sso-client-id '<id>' --cwd ${app.path} ...`)}`,
             ],
           });
         });
@@ -2114,7 +2123,7 @@ describe("setup", () => {
               project: { project_id: "proj-\u001b[2Jwiped", issuer: "http://localhost:3000" },
               framework: "next",
               server: MOCK_SERVER_URL,
-              files_written: FILES_WRITTEN,
+              files_written: FILES_WRITTEN_WITHOUT_SIGNUP_POLICY,
               files: FILES,
               files_skipped: [],
               install: INSTALL_SKIPPED,
@@ -2123,17 +2132,17 @@ describe("setup", () => {
               sso: [],
               deployment: null,
               next_actions: [
-                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))}`,
+                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}`,
                 `Install dependencies: npm --prefix ${app.path} install`,
                 `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
                 VERIFY_STEP,
                 CUSTOMIZE_STEP,
-                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
-                BRANDING_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
               ],
               next_commands: [
-                expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'")),
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
                 `npm --prefix ${app.path} install`,
                 `npm --prefix ${app.path} run dev`,
                 expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
@@ -2143,8 +2152,14 @@ describe("setup", () => {
                 ),
               ],
             },
+            // This pins a misleading warning. The server refuses the minted id
+            // in the probe's query as req.invalid, and the probe
+            // (serverTakesSignupPolicy in src/cli/commands/setup/index.ts) reads any
+            // req.invalid as a server without the sign-up policy, so setup
+            // drops user.create.json for a server that takes it.
             warnings: [
-              `The project was set up but its first deploy failed: request does not conform to spec. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish .zitadel/.`,
+              `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}.`,
+              `The project was set up but its first deploy failed: request does not conform to spec. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
             ],
           });
         });
@@ -2235,7 +2250,7 @@ describe("setup", () => {
 
         expect(result).toSayOnce(
           expectedPublicCliCommand(
-            `setup --non-interactive --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            `setup --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
           ),
         );
       });
@@ -2247,7 +2262,7 @@ describe("setup", () => {
         const result = await app.setupRendered();
 
         expect(result).toSayOnce(
-          `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy -m '<what changed>'"))} to publish .zitadel/.`,
+          `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
         );
       });
 

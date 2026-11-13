@@ -4,6 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -190,7 +191,11 @@ describe("deployment get", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -210,7 +215,11 @@ describe("deployment get", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -270,7 +279,7 @@ describe("deployment get", () => {
     describe("rendered for a terminal", () => {
       it.each(RENDERINGS)("shows the deployment's facts, %s", async (_how, colour) => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const deployed = await app.deployData();
 
         const result = await asTerminal(() =>
@@ -282,14 +291,14 @@ describe("deployment get", () => {
 
       it.each(RENDERINGS)("names every origin it went to, %s", async (_how, colour) => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://app.acme.com");
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
         const deployed = await app.deployData();
 
         const result = await asTerminal(() =>
           app.run(["deployment", "get", deployed.deployment_id ?? ""], colour),
         );
 
-        expect(result).toPrintRow("origins", "http://localhost:3000,", "https://app.acme.com");
+        expect(result).toPrintRow("origins", "http://localhost:3000,", PRIMARY_ORIGIN);
       });
 
       it.each(RENDERINGS)("shows the variables the deployment froze, %s", async (_how, colour) => {

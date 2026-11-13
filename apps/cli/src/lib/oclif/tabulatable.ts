@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { isObject } from "@/lib/json";
@@ -7,8 +7,19 @@ import type { Summary } from "@/lib/ui";
 
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
-import { painted, type Rendering, rows } from "./rendering";
+import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
+
+/**
+ * The flags a paged list declares, which the command for its next page sets:
+ * the run again with the new `--page-token` and without `--all`. The mixin
+ * cannot see its host's flags, so it names the ones it relies on here, and the
+ * run refuses the next page if the host does not declare them.
+ */
+type PagingFlags = Readonly<{
+  "page-token": Interfaces.OptionFlag<string | undefined>;
+  all: Interfaces.BooleanFlag<boolean>;
+}>;
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
@@ -35,13 +46,11 @@ export type ListFlags = { readonly plain: boolean | undefined };
 
 /**
  * The next page of a paged list. A page token only works with the flags that
- * issued it, so `flags` repeats them: `emitList` appends the token, and `--json`
- * when the run was JSON.
+ * issued it, so `emitList` suggests the run again as typed with the token in
+ * place of any it was given, and `--json` when the run was JSON.
  */
 export type ListPage = {
   token: string | null;
-  command: string;
-  flags: readonly string[];
   /** The envelope property the cursor is reported under, when the platform spells it differently. */
   cursorKey?: string;
 };
@@ -220,24 +229,17 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       const token = view.page?.token || null;
       const more =
         token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
-      // A paged list asks for its follow-up command whether or not there is a
-      // next page, so a command that cannot suggest one fails on its first run
-      // and not on the first result that spans two pages.
-      const followUp =
-        view.page === null
+      // The raw cursor: this command reaches the envelope, where a script
+      // reads it to page, and `renderNextSteps` spells it out for the copy a
+      // person sees. The rest is the run again as typed, so the token goes
+      // with the flags that issued it.
+      const nextCommand =
+        token === null
           ? undefined
-          : this.suggestFollowUp(
-              [
-                view.page.command,
-                ...view.page.flags,
-                // The raw cursor: this command reaches the envelope, where a
-                // script reads it to page, and `renderNextSteps` spells it out
-                // for the copy a person sees.
-                Cmd.option("--page-token", token ?? ""),
-                ...(this.jsonEnabled() ? ["--json"] : []),
-              ].join(" "),
-            );
-      const nextCommand = token === null ? undefined : followUp;
+          : await this.rerun<PagingFlags>({
+              without: ["pageToken", "all"],
+              after: { pageToken: token, ...(this.jsonEnabled() ? { json: true } : {}) },
+            });
       // What a script's rows leave out, said beside them on stderr: the empty
       // line and the footer would break `cut`, `awk` and `wc -l` on stdout, but
       // a deployment id or an origin list is not the script's to lose.
@@ -249,16 +251,15 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
             })),
         ...more,
       ];
-      let rendered: { pretty?: Rendering } = {};
-      if (plain) {
-        rendered = { pretty: rows(await this.renderList(plain, view)) };
-      } else if (this.jsonEnabled()) {
-        rendered = { pretty: painted(await this.renderList(plain, view)) };
-      }
+      const pretty = plain
+        ? rows(await this.renderList(plain, view))
+        : this.jsonEnabled()
+          ? painted(await this.renderList(plain, view))
+          : undefined;
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...rendered,
+        ...(pretty === undefined ? {} : { pretty }),
         ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
         summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),

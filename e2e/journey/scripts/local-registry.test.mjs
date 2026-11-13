@@ -49,7 +49,7 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
     repoRoot,
     run: async (command, args, options) => {
       calls.push({ command, args, options });
-      if (command === "moon" && args.join(" ") === "run release:pack") {
+      if (command === "turbo" && args.join(" ") === "run @zitadel/release#pack") {
         await fixtureReleaseTarballs(repoRoot);
       }
     },
@@ -81,8 +81,8 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
 
   const runCalls = calls.filter((call) => "command" in call);
   assert.deepEqual(runCalls[0], {
-    command: "moon",
-    args: ["run", "release:pack"],
+    command: "turbo",
+    args: ["run", "@zitadel/release#pack"],
     options: { cwd: repoRoot, env },
   });
   // The registry carries exactly the release tarball set, verified strictly.
@@ -178,9 +178,7 @@ test("uses prebuilt tarballs without rebuilding release packages", async () => {
     logs.join("\n"),
   );
   const runCalls = calls.filter((call) => "command" in call);
-  assert.ok(
-    !runCalls.some((call) => call.command === "moon" && call.args.join(" ") === "run release:pack"),
-  );
+  assert.ok(!runCalls.some((call) => call.args.includes("@zitadel/release#pack")));
   // Prebuilt release tarballs already carry the full public set (including
   // @zitadel/testing), so no build runs — verification comes first.
   assert.deepEqual(runCalls[0], {
@@ -225,13 +223,13 @@ test("builds and packs only what a generated app installs for the app package se
     workDir,
   });
 
-  // The packages' cached dev builds; no release:pack, no server binaries.
+  // The packages' cached dev builds; no release pack, no server binaries.
   assert.deepEqual(runCalls[0], {
-    command: "moon",
-    args: ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`)],
+    command: "turbo",
+    args: ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.name}#build`)],
     options: { cwd: repoRoot, env },
   });
-  assert.ok(!runCalls.some((call) => call.args.includes("release:pack")));
+  assert.ok(!runCalls.some((call) => call.args.includes("@zitadel/release#pack")));
   assert.deepEqual(
     packs.map((call) => call.args[2]).sort(),
     APP_RELEASE_PACKAGES.map((pkg) => pkg.dir).sort(),
@@ -244,6 +242,105 @@ test("builds and packs only what a generated app installs for the app package se
   assert.deepEqual(
     runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
     ["e2e/journey/scripts/verify-tarballs.mjs", paths.tarballsDir, "--app-packages"],
+  );
+});
+
+test("packs a CI journey's own set from the builds turbo ran, without a turbo run", async () => {
+  const repoRoot = await fixtureRepo();
+  const packageDirs = ["apps/cli", "packages/sdk-svelte"];
+  for (const dir of packageDirs) {
+    await mkdir(join(repoRoot, dir, "dist"), { recursive: true });
+  }
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  const paths = localRegistryPaths(workDir);
+  const env = { PATH: "/bin" };
+  const runCalls = [];
+  const packs = [];
+
+  await prepareLocalRegistry({
+    env,
+    packageDirs,
+    paths,
+    registryPort: 51_235,
+    registryUrl: "http://127.0.0.1:51235",
+    repoRoot,
+    run: async (command, args, options) => {
+      runCalls.push({ command, args, options });
+    },
+    runCapture: async (command, args, options) => {
+      packs.push({ command, args, options });
+      return { stdout: "", stderr: "" };
+    },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  });
+
+  assert.ok(!runCalls.some((call) => call.command === "turbo"));
+  assert.deepEqual(packs.map((call) => call.args[2]).sort(), packageDirs);
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    [
+      "e2e/journey/scripts/verify-tarballs.mjs",
+      paths.tarballsDir,
+      "--packages=apps/cli,packages/sdk-svelte",
+    ],
+  );
+});
+
+test("copies the tarballs every journey shares and packs only the journey's own", async () => {
+  const repoRoot = await fixtureRepo();
+  await mkdir(join(repoRoot, "packages/sdk-svelte", "dist"), { recursive: true });
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const sharedDir = await mkdtemp(join(tmpdir(), "zitadel-shared-tarballs-"));
+  tempDirs.push(workDir, sharedDir);
+  await writeFile(join(sharedDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "cli");
+  const paths = localRegistryPaths(workDir);
+  const runCalls = [];
+  const packs = [];
+  const input = {
+    env: { PATH: "/bin" },
+    packageDirs: ["apps/cli", "packages/sdk-svelte"],
+    paths,
+    registryPort: 51_236,
+    registryUrl: "http://127.0.0.1:51236",
+    repoRoot,
+    run: async (command, args) => {
+      runCalls.push({ command, args });
+    },
+    runCapture: async (_command, args) => {
+      packs.push(args[2]);
+      return { stdout: "", stderr: "" };
+    },
+    shared: { dirs: ["apps/cli"], tarballsDir: sharedDir },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  };
+
+  await prepareLocalRegistry(input);
+
+  assert.deepEqual(packs, ["packages/sdk-svelte"]);
+  assert.equal(
+    await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8"),
+    "cli",
+  );
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    [
+      "e2e/journey/scripts/verify-tarballs.mjs",
+      paths.tarballsDir,
+      "--packages=apps/cli,packages/sdk-svelte",
+    ],
+  );
+
+  await assert.rejects(
+    prepareLocalRegistry({
+      ...input,
+      shared: { ...input.shared, tarballsDir: join(sharedDir, "x") },
+    }),
+    /no zitadel-cli-0.1.0-alpha.5.tgz in .*; run turbo run journey-packages --filter=@zitadel\/e2e/,
   );
 });
 

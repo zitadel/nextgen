@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
 import { TanStackStartScaffolder } from "@/lib/orca/scaffolders/tanstack-start";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -32,7 +33,7 @@ describe("TanStackStartScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "@tanstack/cli@latest",
+      frameworkCli("@tanstack/cli"),
       "create",
       ".",
       "--framework",
@@ -55,7 +56,7 @@ describe("TanStackStartScaffolder", () => {
     make: (node, platform) => new TanStackStartScaffolder(node, platform),
     framework: "tanstack-start",
     label: "@tanstack/cli",
-    spec: "@tanstack/cli@latest",
+    spec: frameworkCli("@tanstack/cli"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

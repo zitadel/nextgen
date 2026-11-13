@@ -1,47 +1,45 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The release graph. Each build-release cleans and rewrites the dist
-  // directory the dev builds and tests of the same graph read, so moon runs
-  // every entry point's dependencies one after the other
-  // (runDepsInParallel: false). Turbo has no serial option, so the order is
-  // written as edges: the public packages' release builds start after cli's
-  // tests (api's release build depends on them, every other one on api's
-  // through its package edges) and then run in parallel on the same package
-  // edges as their dev builds, and the two UI release builds wait for all of
-  // them. api#build-release also waits for server#test (see
-  // packages/api/turbo.json).
+  // The release graph. pack, snapshot and publish pack what the graph built
+  // before them: every public package's build and each server platform
+  // package's binary (`build-binary`, in apps/server-<platform>/turbo.json).
+  // A release builds each package once, as any other run does, so nothing
+  // rewrites a dist that another task reads and the entry points wait for no
+  // test. A run that must not restore anything takes `--force`.
   "tasks": {
     "changesets": {
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"]
     },
-    "check-graph": {
-      "cache": false,
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"]
-    },
+    // What the public packages ship: the npm packages' builds and the five
+    // server binaries. scripts/task-graph.test.mjs checks that it covers
+    // every package in PUBLIC_RELEASE_PACKAGES (scripts/release-manifest.mjs).
     "build-public-packages": {
-      "cache": false,
       "dependsOn": [
-        "check-graph",
-        "@zitadel/cli#build-release",
-        "@zitadel/api#build-release",
-        "@zitadel/config#build-release",
-        "@zitadel/components#build-release",
-        "@zitadel/sdk-core#build-release",
-        "@zitadel/sdk-next#build-release",
-        "@zitadel/sdk-nuxt#build-release",
-        "@zitadel/sdk-react#build-release",
-        "@zitadel/sdk-vue#build-release",
-        "@zitadel/sdk-angular#build-release",
-        "@zitadel/sdk-solid#build-release",
-        "@zitadel/sdk-svelte#build-release",
-        "@zitadel/sdk-qwik#build-release",
-        "@zitadel/sdk-sveltekit#build-release",
-        "@zitadel/sdk-solid-start#build-release",
-        "@zitadel/sdk-qwik-router#build-release",
-        "@zitadel/sdk-tanstack-start#build-release",
-        "@zitadel/testing#build-release"
+        "@zitadel/cli#build",
+        "@zitadel/api#build",
+        "@zitadel/config#build",
+        "@zitadel/components#build",
+        "@zitadel/sdk-core#build",
+        "@zitadel/sdk-next#build",
+        "@zitadel/sdk-nuxt#build",
+        "@zitadel/sdk-react#build",
+        "@zitadel/sdk-vue#build",
+        "@zitadel/sdk-angular#build",
+        "@zitadel/sdk-solid#build",
+        "@zitadel/sdk-svelte#build",
+        "@zitadel/sdk-qwik#build",
+        "@zitadel/sdk-sveltekit#build",
+        "@zitadel/sdk-solid-start#build",
+        "@zitadel/sdk-qwik-router#build",
+        "@zitadel/sdk-tanstack-start#build",
+        "@zitadel/testing#build",
+        "@zitadel/server-linux-x64#build-binary",
+        "@zitadel/server-linux-arm64#build-binary",
+        "@zitadel/server-darwin-x64#build-binary",
+        "@zitadel/server-darwin-arm64#build-binary",
+        "@zitadel/server-win32-x64#build-binary"
       ]
     },
     "version": {
@@ -49,24 +47,88 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
     },
+    // npm knows every public package a release would publish: trusted
+    // publishing cannot create one (scripts/release-npm-preflight.mjs). It
+    // asks the registry, so it is never cached; its inputs are the manifests
+    // a release publishes, so `--affected` selects it when one changes, the
+    // version PR's version bumps among them, and every script release.mjs
+    // loads. `test` stands for it, so `turbo run test` runs it.
+    "check-npm": {
+      "cache": false,
+      "inputs": [
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/scripts/release.mjs",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-automation.mjs",
+        "$TURBO_ROOT$/scripts/release-github.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
+      ],
+      "passThroughEnv": ["NPM_*"]
+    },
+    // The pending changesets name public packages, and none is a `major`
+    // before 1.0.0, which would release every public package as 1.0.0
+    // (scripts/check-changesets-status.mjs --pending). `changeset status`
+    // compares with the local `main`, so it is never cached; its inputs are
+    // the changesets and the manifests whose version it reads, so
+    // `--affected` selects it when one changes. `test` stands for it.
+    "check-changesets": {
+      "cache": false,
+      "inputs": [
+        "$TURBO_ROOT$/.changeset/**",
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
+      ],
+      "passThroughEnv": ["GITHUB_STEP_SUMMARY"]
+    },
+    "test": {
+      "cache": false,
+      "dependsOn": ["check-npm", "check-changesets"]
+    },
+    // What pack, snapshot and publish wrote, in the repository's dist/.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../../dist/release"]
+    },
+    // Packs every public package and checks the set (verify-tarballs.mjs).
+    // CI runs it when a public package or a script release.mjs loads
+    // changes; the journeys pack only what each installs.
     "pack": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
+      "dependsOn": ["build-public-packages"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/release.mjs",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-automation.mjs",
+        "$TURBO_ROOT$/scripts/release-github.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/verify-tarballs.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/lib.mjs"
+      ],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
     },
     "snapshot": {
       "cache": false,
-      "dependsOn": [
-        "@zitadel/server#test",
-        "build-public-packages",
-        "@zitadel/console#build-release"
-      ],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER", "RELEASE_HOST_ONLY"]
+      "dependsOn": ["build-public-packages"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
     },
     "publish": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
+      "dependsOn": ["build-public-packages"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "PNPM_CONFIG_*", "BASE_SHA", "RECOVER_VERSION", "RELEASE_DRY_RUN", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
     }
   }
 }

@@ -1,4 +1,5 @@
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
@@ -181,7 +182,10 @@ describe("readNearestRuntimeMetadata", () => {
     await mkdir(app);
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
+      nextCommands: [
+        { id: "reset", flags: { force: true, cwd } },
+        { id: "start", flags: { cwd } },
+      ],
     });
   });
 
@@ -191,7 +195,7 @@ describe("readNearestRuntimeMetadata", () => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      nextCommands: ["zitadel reset --force", "zitadel start"],
+      nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
     });
   });
 });
@@ -292,23 +296,21 @@ describe("readPlatformRuntime", () => {
 
 /** A response whose body reports, once a reader has read it to the end, that it was read. */
 function aResponseWhoseBodyIsRead(status: number): { response: Response; isRead: () => boolean } {
-  let pulls = 0;
-  let read = false;
+  const pulls: string[] = [];
   const body = new ReadableStream<Uint8Array>(
     {
       pull(controller) {
-        pulls += 1;
-        if (pulls === 1) {
+        pulls.push("pull");
+        if (pulls.length === 1) {
           controller.enqueue(new TextEncoder().encode("ok"));
           return;
         }
-        read = true;
         controller.close();
       },
     },
     { highWaterMark: 0 },
   );
-  return { response: new Response(body, { status }), isRead: () => read };
+  return { response: new Response(body, { status }), isRead: () => pulls.length > 1 };
 }
 
 describe("retargetMalformedRuntime", () => {
@@ -316,36 +318,24 @@ describe("retargetMalformedRuntime", () => {
     details: { x: 1 },
   });
 
-  it.for<[string, string, string]>([
-    ["a Windows path with a space", "C:\\work\\my app", "'C:\\work\\my app'"],
-    ["a Windows path with an apostrophe", "C:\\work\\it's", "'C:\\work\\it'\\''s'"],
-    ["a POSIX path with a space", "/home/dev/my app", "'/home/dev/my app'"],
-  ])(
-    "quotes %s in the commands and hands it over as it is in the arguments",
-    ([_name, dir, quoted]) => {
-      const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
-
-      expect(retargeted.nextCommands).toEqual([
-        `zitadel reset --force --cwd ${quoted}`,
-        `zitadel start --cwd ${quoted}`,
-      ]);
-      expect(retargeted.details).toEqual({
-        x: 1,
-        suggested_args: [
-          ["reset", "--force", "--cwd", dir],
-          ["start", "--cwd", dir],
-        ],
-      });
-    },
-  );
-
-  it("writes the commands out for a path that needs no quoting", () => {
-    const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;
+  it.for<[string, string]>([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("aims the commands at %s and hands it over as it is in the arguments", ([_name, dir]) => {
+    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
 
     expect(retargeted.nextCommands).toEqual([
-      "zitadel reset --force --cwd /home/dev/app",
-      "zitadel start --cwd /home/dev/app",
+      { id: "reset", flags: { force: true, cwd: dir } },
+      { id: "start", flags: { cwd: dir } },
     ]);
+    expect(retargeted.details).toEqual({
+      x: 1,
+      suggested_args: [
+        ["reset", "--force", "--cwd", dir],
+        ["start", "--cwd", dir],
+      ],
+    });
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { anApp, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -51,8 +51,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -78,8 +82,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -105,8 +113,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -141,8 +153,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -165,8 +181,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -198,8 +218,12 @@ describe("branding eject", () => {
             files_written: [".zitadel/branding/branding.json", ".zitadel/branding/login.liquid"],
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -257,7 +281,9 @@ describe("branding eject", () => {
             design: "minimal",
             files_would_write: EJECTED_FILES,
             next_commands: [
-              expectedPublicCliCommand(`branding eject --design minimal --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `branding eject --design minimal --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -280,7 +306,9 @@ describe("branding eject", () => {
             design: "minimal",
             files_would_write: EJECTED_FILES,
             next_commands: [
-              expectedPublicCliCommand(`branding eject --design minimal --force --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `branding eject --design minimal --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -322,7 +350,9 @@ describe("branding eject", () => {
           message: ".zitadel/branding/branding.json already exists",
           hint: "Rerun with --force to replace it, or edit the existing file directly.",
           next_commands: [
-            expectedPublicCliCommand(`branding eject --design minimal --force --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `branding eject --design minimal --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
           ],
           details: { file: ".zitadel/branding/branding.json" },
         });
@@ -485,7 +515,9 @@ describe("branding eject", () => {
         ]);
 
         expect(result).toSay(
-          expectedPublicCliCommand(`branding eject --design minimal --cwd ${app.path}`),
+          expectedPublicCliCommand(
+            `branding eject --design minimal --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
         );
       });
 
@@ -500,7 +532,11 @@ describe("branding eject", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toSayOnce(expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`));
+        expect(result).toSayOnce(
+          expectedPublicCliCommand(
+            `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
+        );
       });
 
       it("spells out an escape sequence in a design it refuses", async () => {
@@ -530,7 +566,9 @@ describe("branding eject", () => {
         ]);
 
         expect(result).toSay(
-          expectedPublicCliCommand(`branding eject --design minimal --force --cwd ${app.path}`),
+          expectedPublicCliCommand(
+            `branding eject --design minimal --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
         );
       });
     });

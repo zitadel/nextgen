@@ -4,7 +4,7 @@ import {
   credentialVariables,
 } from "@zitadel/config/idp";
 
-import type { EnvironmentSelector } from "@/lib/suggestion";
+import type { Suggest } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
 import type { Connection, Credential } from "@/lib/zitadel";
 
@@ -16,10 +16,11 @@ import {
   publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
-  republishArgs,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
+  type Unpublished,
+  unpublished,
 } from "./credentials";
 
 /**
@@ -39,15 +40,10 @@ export type DeliveryRun = {
   readonly reused: boolean;
 
   /**
-   * The run's `--env`/`--env-file`/`--server`, so a recovery command targets
-   * the same project.
+   * Renders a recovery command for the run, scope included, so it targets the
+   * same project.
    */
-  readonly selector: EnvironmentSelector;
-
-  /**
-   * The running CLI's version, for the public spelling of a recovery command.
-   */
-  readonly cliVersion: string;
+  readonly suggest: Suggest;
 };
 
 /**
@@ -125,10 +121,10 @@ export class CredentialDelivery {
     const clientId = await this.publishClientId(given, publish);
     const secret = await this.storeSecret(given, publish);
     if (clientId !== undefined && names.clientId !== undefined) {
-      reportClientIdOutcome(names.clientId, clientId, this.run.cliVersion, this.run.selector);
+      reportClientIdOutcome(names.clientId, clientId, this.run.suggest);
     }
     if (secret !== undefined) {
-      reportSecretOutcome(secret, this.run.cliVersion, this.run.reused, this.run.selector);
+      reportSecretOutcome(secret, this.run.reused, this.run.suggest);
     }
 
     return {
@@ -153,36 +149,28 @@ export class CredentialDelivery {
   }
 
   /**
-   * The `variable set` arguments for each credential that did not reach the
-   * project: the connection references it as `${{ NAME }}`, so a button whose
-   * credential never arrived fails at token exchange.
+   * Each credential that did not reach the project, for the caller to suggest
+   * `variable set` for: the connection references it as `${{ NAME }}`, so a
+   * button whose credential never arrived fails at token exchange.
    *
    * @param published - What became of each credential.
-   * @param extraArgs - Appended to every command, such as the run's `--cwd`
-   *   and environment.
-   * @returns One argument list per credential the project lacks.
+   * @returns One entry per credential the project lacks.
    */
-  recoveryArgs(
-    published: PublishedCredentials,
-    extraArgs: readonly string[],
-  ): readonly (readonly string[])[] {
+  unpublishedOf(published: PublishedCredentials): readonly Unpublished[] {
     const names = this.names;
 
-    return republishArgs(
-      [
-        {
-          name: names.clientId,
-          secret: false,
-          published: published.clientId,
-        },
-        {
-          name: names.clientSecret,
-          secret: true,
-          published: published.secret?.published,
-        },
-      ],
-      extraArgs,
-    );
+    return unpublished([
+      {
+        name: names.clientId,
+        secret: false,
+        published: published.clientId,
+      },
+      {
+        name: names.clientSecret,
+        secret: true,
+        published: published.secret?.published,
+      },
+    ]);
   }
 
   /**

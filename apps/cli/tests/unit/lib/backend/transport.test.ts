@@ -1,47 +1,24 @@
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import type { RequestListener } from "node:http";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { UnavailableError } from "@/lib/backend/errors";
 import { request } from "@/lib/backend/transport";
 import { ZitadelError } from "@/lib/errors";
+import { it } from "@tests/helpers/fixtures";
 
 /** A port nothing listens on, so a connection is refused at once. */
 const CLOSED = "http://127.0.0.1:1/sessions/exchange";
 
 /**
- * A server that answers every request `200`, so a test of the body reader
- * reaches the reader at all: pointed at a closed port the request is refused
- * first, and the failure a reader would have raised is never the one seen.
+ * Answers every request `200`, so a test of the body reader reaches the reader
+ * at all: pointed at a closed port the request is refused first, and the
+ * failure a reader would have raised is never the one seen.
  */
-let answering: Server;
-
-/** Where {@link answering} listens, which is a port the OS picked. */
-let answeringUrl: string;
-
-beforeAll(async () => {
-  answering = createServer((_req, res) => {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end("{}");
-  });
-  await new Promise<void>((resolve) => {
-    answering.listen(0, "127.0.0.1", resolve);
-  });
-  answeringUrl = `http://127.0.0.1:${(answering.address() as AddressInfo).port}/`;
-});
-
-afterAll(async () => {
-  await new Promise<void>((resolve, reject) => {
-    answering.close((error) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    });
-  });
-});
+const answering: RequestListener = (_req, res) => {
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end("{}");
+};
 
 describe("request", () => {
   it("fails with the backend's own error when it gets no response", async () => {
@@ -56,7 +33,8 @@ describe("request", () => {
     });
   });
 
-  it("fails with the backend's own error when the body cannot be read", async () => {
+  it("fails with the backend's own error when the body cannot be read", async ({ serve }) => {
+    const answeringUrl = await serve(answering, "127.0.0.1");
     const read = async (): Promise<never> => {
       throw new Error("the body broke off");
     };
@@ -66,7 +44,10 @@ describe("request", () => {
     );
   });
 
-  it("says the body was the part that failed, so it is not reported as an unreachable server", async () => {
+  it("says the body was the part that failed, so it is not reported as an unreachable server", async ({
+    serve,
+  }) => {
+    const answeringUrl = await serve(answering, "127.0.0.1");
     const read = async (): Promise<never> => {
       throw new Error("the body broke off");
     };

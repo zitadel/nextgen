@@ -88,7 +88,7 @@ describe("status", () => {
               expectedPublicCliCommand(`start --cwd ${app.path}`),
               expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -118,7 +118,7 @@ describe("status", () => {
               expectedPublicCliCommand(`start --cwd ${app.path}`),
               expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -148,7 +148,7 @@ describe("status", () => {
               expectedPublicCliCommand(`start --cwd ${app.path}`),
               expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -183,7 +183,7 @@ describe("status", () => {
               expectedPublicCliCommand(`start --cwd ${app.path}`),
               expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -301,7 +301,7 @@ describe("status", () => {
                 `doctor --env production --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --env production --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `deploy --message '<what changed>' --env production --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -568,7 +568,7 @@ describe("status", () => {
             ),
             expect.stringMatching(
               new RegExp(
-                `^npx @zitadel/cli@\\S+ deploy -m '<what changed>' --server http://127\\.0\\.0\\.1:\\d+ --cwd ${app.path}$`,
+                `^npx @zitadel/cli@\\S+ deploy --message '<what changed>' --server http://127\\.0\\.0\\.1:\\d+ --cwd ${app.path}$`,
               ),
             ),
           ],

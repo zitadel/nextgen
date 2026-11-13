@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import type { ClientId } from "@zitadel/config/idp";
 import { join, relative, sep } from "node:path";
 import { Readable, type Writable } from "node:stream";
 
@@ -24,7 +25,10 @@ import { sourceFiles } from "@tests/helpers/source-files";
 import { flatOutput } from "@/lib/flat-output";
 import { asker, type Session } from "@/lib/input";
 import { PromptCancelled } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { aSuggest } from "@tests/helpers/suggestions";
+
+/** Renders the commands these questions suggest, as a run does. */
+const suggest = aSuggest();
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -222,7 +226,7 @@ describe("asker", () => {
           name: "client secret",
           message: "Secret",
           stdin: true,
-          retry: unscopedCommand("x"),
+          retry: suggest({ id: "start" }),
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
         })
         .catch((caught: ZitadelError) => caught);
@@ -270,10 +274,10 @@ describe("asker", () => {
       await expect(
         asker(scripted).text({
           ...typed(),
-          retry: unscopedCommand("auth-method sso enable --client-id <id>"),
+          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
         }),
       ).rejects.toMatchObject({
-        nextCommands: ["zitadel auth-method sso enable --client-id <id>"],
+        nextCommands: ["npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'"],
       });
     });
 
@@ -281,10 +285,10 @@ describe("asker", () => {
       await expect(
         asker(scripted).text({
           ...typed(),
-          retry: unscopedCommand("auth-method sso enable --client-id <id>"),
+          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
         }),
       ).rejects.toMatchObject({
-        hint: "For example: zitadel auth-method sso enable --client-id <id>",
+        hint: "For example: npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'",
       });
     });
 
@@ -296,10 +300,10 @@ describe("asker", () => {
         asker(scripted)[method]({
           name: "x",
           message: "X",
-          retry: unscopedCommand("x --y"),
+          retry: suggest({ id: "start", flags: { port: 9081 } }),
           options,
         }),
-      ).rejects.toMatchObject({ nextCommands: ["zitadel x --y"] });
+      ).rejects.toMatchObject({ nextCommands: ["npx @zitadel/cli@0.1.0 start --port 9081"] });
     });
 
     it.each([
@@ -434,12 +438,15 @@ describe("asker", () => {
 
     it("requires --force when nobody is there to ask", async () => {
       await expect(
-        asker(scripted).confirm({ ...question, retry: unscopedCommand("x --force") }),
+        asker(scripted).confirm({
+          ...question,
+          retry: suggest({ id: "reset", flags: { force: true } }),
+        }),
       ).rejects.toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
         hint: "Ask a person first: Delete? Pass --force only once they agree.",
-        nextCommands: ["zitadel x --force"],
+        nextCommands: ["npx @zitadel/cli@0.1.0 reset --force"],
         details: { question: "Delete?" },
       });
     });
@@ -503,15 +510,25 @@ describe("asker", () => {
   });
 
   describe("the hooks around a prompt", () => {
-    it("runs the one after it even when the prompt throws", async () => {
+    it("sees the prompt throw", async () => {
       vi.mocked(confirm).mockRejectedValueOnce(new Error("boom"));
-      const after = vi.fn();
+      const thrown: unknown[] = [];
 
-      await asker({ ...ask, after })
+      await asker({
+        ...ask,
+        around: async (draw) => {
+          try {
+            return await draw();
+          } catch (error) {
+            thrown.push(error);
+            throw error;
+          }
+        },
+      })
         .confirm({ name: "x", message: "X?" })
         .catch(() => undefined);
 
-      expect(after).toHaveBeenCalledOnce();
+      expect(thrown).toHaveLength(1);
     });
   });
 
@@ -752,16 +769,17 @@ describe("asker", () => {
           const screen = flatOutput(process.stdout);
           const drawing = prompt(false) as ReturnType<typeof vi.fn>;
           vi.mocked(isCancel).mockReturnValue(true);
-          let onScreen = 0;
-          drawing.mockImplementationOnce((options: { output: Writable }) => {
-            options.output.write("\u001b[?25l\n\n");
-            onScreen = screen.showing;
-            return Promise.resolve(Symbol("cancel"));
+          const onScreen = new Promise<number>((resolve) => {
+            drawing.mockImplementationOnce((options: { output: Writable }) => {
+              options.output.write("\u001b[?25l\n\n");
+              resolve(screen.showing);
+              return Promise.resolve(Symbol("cancel"));
+            });
           });
 
           await act({ ...ask, guide: false }).catch(() => undefined);
 
-          expect([onScreen, screen.showing]).toEqual([2, 0]);
+          expect([await onScreen, screen.showing]).toEqual([2, 0]);
         },
       );
 

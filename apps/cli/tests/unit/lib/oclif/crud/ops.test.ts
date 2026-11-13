@@ -2,17 +2,19 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { Command } from "@oclif/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { answering, atTerminal } from "@tests/helpers/keyboard";
 import { DrawnSpinner } from "@/lib/ui/spinner";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { printing } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
 import {
-  bindOperation,
+  bindOperation as bindOperationOnly,
   definitionOf,
   CreateOperation,
   type CreateSpec,
@@ -29,6 +31,40 @@ import {
   UpdateOperation,
   type UpdateSpec,
 } from "@/lib/oclif/crud";
+
+/**
+ * The generated command each operation stands in for. A run suggests commands
+ * by id and renders them from what the loaded CLI declares for that id, so a
+ * bound operation takes the id of a real command with the same verb.
+ */
+const STAND_IN = new Map<unknown, string>([
+  [ListOperation, "teams:list"],
+  [GetOperation, "teams:get"],
+  [CreateOperation, "teams:create"],
+  [UpdateOperation, "teams:update"],
+]);
+
+/**
+ * Runs `command` against the CLI's own package, whose config knows the commands
+ * a run suggests: a command run on its own would load the config of whatever
+ * started the test runner.
+ */
+function inCli<Bound extends typeof Command>(command: Bound, id: string): Bound {
+  return Object.assign(command, {
+    id,
+    run: (argv: string[]) => {
+      return Reflect.apply(Command.run, command, [argv, cliPackageRoot]);
+    },
+  });
+}
+
+/** {@link bindOperationOnly}, named as the command it stands in for. */
+const bindOperation: typeof bindOperationOnly = (operation, definition) => {
+  return inCli(
+    bindOperationOnly(operation, definition),
+    STAND_IN.get(operation) ?? "teams:deactivate",
+  );
+};
 
 /** How long clack waits between one frame of a spinner and the next. */
 const FRAME = 100;
@@ -520,7 +556,7 @@ describe("write results", () => {
     ]);
 
     expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
-      data: { next_commands: [expect.stringMatching(/ bound team_1 --name a$/)] },
+      data: { next_commands: [expect.stringMatching(/ teams update team_1 --name a$/)] },
     });
   });
 
@@ -644,7 +680,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain"]);
 
-    expect(stderr.join("\n")).toContain("teams list --page-token p2");
+    expect(stderr.join("\n")).toContain("teams list --plain --page-token p2");
   });
 
   it("carries --fields into the next page it suggests", async () => {
@@ -655,7 +691,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain", "--fields", "name"]);
 
-    expect(stderr.join("\n")).toContain("teams list --fields name --page-token p2");
+    expect(stderr.join("\n")).toContain("teams list --plain --fields name --page-token p2");
   });
 
   it("leaves a created resource's JSON body as the only thing on stdout", async () => {
@@ -915,14 +951,22 @@ describe("get sections", () => {
 });
 
 describe("delete confirmation", () => {
+  const DELETING = {
+    delete: "users:delete",
+    revoke: "sessions:revoke",
+    deactivate: "teams:deactivate",
+  } as const;
   const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
     Object.assign(
-      bindOperation(
-        DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-        definition<DeleteSpec<Ctx>>({ verb, call }),
+      inCli(
+        bindOperationOnly(
+          DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+          definition<DeleteSpec<Ctx>>({ verb, call }),
+        ),
+        DELETING[verb],
       ),
       // Drawn, so a question is clack's prompt, which is the one these tests answer.
-      { id: `teams:${verb}`, wizard: true },
+      { wizard: true },
     ) as unknown as { run(argv: string[]): Promise<unknown> };
 
   /** What a failing command prints, which is how an agent or a person reads the failure. */
@@ -949,7 +993,9 @@ describe("delete confirmation", () => {
       expect(failure).toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
-        next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
+        next_commands: [
+          expect.stringContaining(`${DELETING[verb].replace(":", " ")} team_1 --force`),
+        ],
       });
     },
   );

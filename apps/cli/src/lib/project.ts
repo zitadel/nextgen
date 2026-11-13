@@ -6,7 +6,6 @@ import { pathExistsStrict } from "./fs";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
-import { unscopedCommand } from "./suggestion";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -50,6 +49,17 @@ export type ZitadelSecret = {
 };
 
 /**
+ * The framework setup recorded in `zitadel.json`.
+ *
+ * @param config - `zitadel.json`, as {@link readZitadelConfig} reads it.
+ * @returns The framework's id, or undefined when the file names none.
+ */
+export function readFrameworkId(config: Record<string, unknown>): string | undefined {
+  const id = isObject(config.framework) ? config.framework.id : undefined;
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
  * Reads and parses `zitadel.json` into a plain object. Translates a missing
  * file into an actionable `E_VALIDATION` error pointing at `zitadel setup`;
  * other errors (e.g. malformed JSON) propagate unchanged.
@@ -61,7 +71,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
     if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Set the project up first.",
-        nextCommands: [unscopedCommand("setup")],
+        nextCommands: [{ id: "setup" }],
       });
     }
     throw error;
@@ -103,7 +113,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-        nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
+        nextCommands: [{ id: "setup" }, { id: "doctor", flags: { fix: true } }],
       });
     }
     throw error;

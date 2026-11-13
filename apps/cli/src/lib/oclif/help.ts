@@ -2,6 +2,7 @@ import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/
 
 import { exploreAllCommands } from "@/lib/journey-guidance";
 import { showSkillsHint } from "@/lib/skills-hint";
+import { suggesterFor } from "@/lib/suggestion";
 
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
 
@@ -73,7 +74,7 @@ export default class ZitadelHelp extends Help {
       await showSkillsHint({
         env: process.env,
         interactive: Boolean(process.stdout.isTTY && process.stdin.isTTY),
-        cliVersion: this.config.version,
+        skillsAdd: suggesterFor(this.config, {}, this.config.version)({ id: "skills:add" }),
       });
     }
     this.log(sections.join("\n\n"));

@@ -4,14 +4,18 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/api/client"
+	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	"github.com/zitadel/nextgen/internal/api"
 	generated "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -55,16 +59,67 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		)))
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, then the API's
-		// mounts (prefix, OpenAPI document, probes and root alias).
+		// mounts (prefix, OpenAPI document, probes and root alias). Only the
+		// API's chain is checked against the spec: the callback and the
+		// document are no operations.
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
-			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
+			return h.SpecChecked(t, h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next))))
 		}, h.withServerLog, h.EnsureAPIServers(t))
 		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value
+}
+
+// EnsureSpecValidator loads the bundled OpenAPI document every answer of the
+// test server is checked against, once per run.
+func (h *Harness) EnsureSpecValidator(t testing.TB) *SpecValidator {
+	t.Helper()
+	h.specValidator.mutex.Lock()
+	defer h.specValidator.mutex.Unlock()
+
+	if h.specValidator.value == nil {
+		document, err := io.ReadAll(openapibundled.Reader())
+		require.NoError(t, err)
+		validator, err := NewSpecValidator(document)
+		require.NoError(t, err)
+		h.specValidator.value = validator
+	}
+	return h.specValidator.value
+}
+
+// SpecChecked checks every answer next gives against the OpenAPI spec. The
+// test server's API chain goes through it; a test that mounts the API on a
+// server of its own puts it in that chain.
+func (h *Harness) SpecChecked(t testing.TB, next http.Handler) http.Handler {
+	t.Helper()
+	return h.EnsureSpecValidator(t).Wrap(next)
+}
+
+// ReportSpecConformance ends a run: it prints what the spec validator
+// checked and every answer that did not match the spec, and turns a passing
+// run's exit code into a failure when one did not. Call it from TestMain
+// with m.Run's code.
+func (h *Harness) ReportSpecConformance(code int) int {
+	validator := h.specValidator.Get()
+	if validator == nil {
+		return code
+	}
+	// Close waits for the handlers still running, so an answer a client
+	// had in full before its handler returned is checked before the report.
+	if server := h.testServer.Get(); server != nil {
+		server.Close()
+	}
+	fmt.Fprintln(os.Stderr, validator.Summary())
+	if err := validator.CheckSpecConformance(); err != nil {
+		fmt.Fprintln(os.Stderr, "FAIL:", err)
+		if code == 0 {
+			return 1
+		}
+	}
+	return code
 }
 
 // APIBaseURL is where the test server answers the API: its origin, then
@@ -138,6 +193,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			releaseService,
 			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
+			h.EnsureApplicationService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
@@ -146,7 +202,8 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
+			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID))
 	}
 	return h.handler.value
 }

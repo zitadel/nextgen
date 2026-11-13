@@ -459,6 +459,27 @@ export class ScaffoldedApp {
   }
 
   /**
+   * Runs `tests add`, with a fake npm on `PATH` that records the install when
+   * `install` is set, and `--skip-install` otherwise.
+   */
+  async addTests(
+    extraArgs: string[] = [],
+    { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    if (!install) {
+      return this.cli(["tests", "add", "--skip-install", ...extraArgs], env);
+    }
+    const npm = await fakePackageManager();
+    this.installLogPath = npm.logPath;
+    return this.cli(["tests", "add", ...extraArgs], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
+      ...env,
+    });
+  }
+
+  /**
    * Runs setup with a git that does everything but commit, as a full disk or a
    * broken git would: setup creates the repository and then cannot commit.
    */
@@ -911,9 +932,24 @@ export class ScaffoldedApp {
     });
   }
 
-  /** The port a `doctor` run reported it checked. */
+  /**
+   * The port a `doctor` run reported it checked, whether it passed (in `data`)
+   * or found issues (in the error's `details`).
+   *
+   * @param result - The `doctor --json` run.
+   * @returns The port.
+   */
   doctoredPortOf(result: CliResult): number {
-    return this.envelopeOf<{ port: number }>(result).data.port;
+    const envelope = this.envelopeOf(result) as Readonly<{
+      data?: Readonly<{ port: number }>;
+      details?: Readonly<{ port: number }>;
+    }>;
+    const port = envelope.data?.port ?? envelope.details?.port;
+    if (port === undefined) {
+      throw new Error(`expected doctor to report its port, got: ${result.stdout}`);
+    }
+
+    return port;
   }
 
   /**
@@ -2048,6 +2084,19 @@ export class ScaffoldedApp {
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
     return this.editDocument("package.json", PackageJsonSchema, edit);
+  }
+
+  /**
+   * Declares the project's package manager in `package.json`, as a project
+   * set up with pnpm, yarn or bun does, so a command that suggests one picks it.
+   *
+   * @param spec - The manager and its version, as the field holds them: `pnpm@10.0.0`.
+   * @returns When the file is written.
+   */
+  usePackageManager(spec: string): Promise<void> {
+    return this.editDocument("package.json", AnyObjectSchema, (pkg) => {
+      pkg.packageManager = spec;
+    });
   }
 
   /** Adds a second flow definition, for a spec whose input is the flow itself. */

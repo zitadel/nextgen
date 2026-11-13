@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -48,7 +48,7 @@ const WOULD_LEAVE_NONE_WARNING =
  * What the command warns when no login flow offers a method the schema enables.
  */
 const NO_ACTIVE_FLOW_WARNING =
-  "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.";
+  "No login flow for default-human-user offers a method it enables, so nobody can sign in until one does.";
 
 describe("auth-method password disable", () => {
   describe("against an invalid server", () => {
@@ -108,12 +108,24 @@ describe("auth-method password disable", () => {
             notices: [{ severity: "warning", message: LEFT_WITH_NONE_WARNING }],
             title: "Disabled password for default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [LEFT_WITH_NONE_WARNING],
@@ -158,10 +170,10 @@ describe("auth-method password disable", () => {
             hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
-                `auth-method password disable --schema ${SCHEMA} --cwd ${app.path} --force`,
+                `auth-method password disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
-                `auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`,
+                `auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
             details: {
@@ -175,11 +187,23 @@ describe("auth-method password disable", () => {
                   "disable",
                   "--schema",
                   SCHEMA,
+                  "--force",
+                  "--server",
+                  MOCK_SERVER_URL,
                   "--cwd",
                   app.path,
-                  "--force",
                 ],
-                ["auth-method", "passkey", "enable", "--schema", SCHEMA, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "passkey",
+                  "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
             },
           });
@@ -192,7 +216,7 @@ describe("auth-method password disable", () => {
           const result = await app.disableMethod("password", ["--dry-run"]);
 
           expect(result).toSuggest(
-            `auth-method password disable --schema ${SCHEMA} --cwd ${app.path} --force --dry-run`,
+            `auth-method password disable --schema ${SCHEMA} --force --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
           );
         });
 
@@ -212,7 +236,7 @@ describe("auth-method password disable", () => {
           const result = await app.disableMethod("password");
 
           expect(result).toSuggestExactly(
-            `auth-method password disable --schema ${SCHEMA} --cwd ${app.path} --force`,
+            `auth-method password disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
           );
         });
 
@@ -362,9 +386,22 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: WOULD_LEAVE_NONE_WARNING }],
               title: "Would disable password for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "password", "disable", "--cwd", app.path, "--force"]],
+              next_args: [
+                [
+                  "auth-method",
+                  "password",
+                  "disable",
+                  "--force",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method password disable --cwd ${app.path} --force`),
+                expectedPublicCliCommand(
+                  `auth-method password disable --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [WOULD_LEAVE_NONE_WARNING],
@@ -402,9 +439,21 @@ describe("auth-method password disable", () => {
               notices: [{ severity: "warning", message: NO_ACTIVE_FLOW_WARNING }],
               title: "Nothing to disable for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "password", "disable", "--cwd", app.path]],
+              next_args: [
+                [
+                  "auth-method",
+                  "password",
+                  "disable",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method password disable --cwd ${app.path}`),
+                expectedPublicCliCommand(
+                  `auth-method password disable --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [NO_ACTIVE_FLOW_WARNING],
@@ -458,7 +507,7 @@ describe("auth-method password disable", () => {
           "--force",
         ]);
 
-        expect(result).toPrint(`deploy --dry-run --cwd ${app.path}`);
+        expect(result).toPrint(`deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`);
       });
 
       it("warns once when it left no way to sign in", async () => {
@@ -501,7 +550,7 @@ describe("auth-method password disable", () => {
         const result = await app.disableMethodRendered("password");
 
         expect(result).toSay(
-          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method password disable --schema ${SCHEMA} --cwd ${app.path} --force`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
+          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method password disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}`,
         );
       });
 

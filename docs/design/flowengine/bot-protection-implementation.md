@@ -93,7 +93,7 @@ Passwap remains the password-hashing library; it is not needed for these fixed
 protocol KDF parameters. There is no ALTCHA library or hosted service dependency.
 Mobile calibration and attacker economics remain unvalidated.
 
-`moon run server:test-pow` checks the Go core and independent Web Crypto vectors.
+`turbo run test:pow --filter=@zitadel/server` checks the Go core and independent Web Crypto vectors.
 Portable storage tests cover atomic replay rejection, project/flow isolation,
 expiry and flow-isolated quotas. HTTP tests cover signup refusal, acceptance, live-attempt proof replay and completed-cookie rejection. Component tests exercise the signup exchange; Chromium tests check the
 solver against the same [public MIT vectors](testdata/README.md).

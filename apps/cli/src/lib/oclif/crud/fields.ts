@@ -1,7 +1,7 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 
 import { decimalValue, jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { Json, Schema } from "./types";

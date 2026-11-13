@@ -26,6 +26,7 @@ const GENERIC = [
   "lib/input",
   "lib/json",
   "lib/log",
+  "lib/names",
   "lib/paths",
   "lib/public-cli",
   "lib/server",
@@ -135,7 +136,7 @@ describe("the oclif layer", () => {
 
     for (const file of await layerFiles()) {
       for (const target of await reachesOutside(file)) {
-        if (target.startsWith("commands/")) {
+        if (target.startsWith("cli/commands/")) {
           importing.push(`${file} -> ${target}`);
         }
       }

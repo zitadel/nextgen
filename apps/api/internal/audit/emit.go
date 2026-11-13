@@ -15,15 +15,18 @@ type EmitSpec struct {
 	ProjectID  string
 	EntityType string
 	EntityID   string
-	Payload    any
-	SessionID  *string
+	// UserID is the user the event concerns, whoever acted
+	// (domain.Event.UserID). Empty when it concerns none.
+	UserID    string
+	Payload   any
+	SessionID *string
 	// FlowID, when set and not empty, is the event's login flow in place of
 	// the request's own. The handoff exchange sets it: a service call whose
 	// flow is the one of the attempt it consumed.
-	FlowID  *string
-	TokenID string
-	// Optional actor overrides when the request ActorContext is empty
-	// (anonymous session mint, token issue before AuthGate, etc.).
+	FlowID *string
+	// ActorID and ActorType, when set, name the event's actor in place of the
+	// request's. token_id has no override: it is always the credential the
+	// request presented.
 	ActorID   *string
 	ActorType *domain.EventActorType
 }
@@ -38,14 +41,15 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	if spec.ProjectID != "" {
 		ev.ProjectID = spec.ProjectID
 	}
+	if spec.UserID != "" {
+		userID := spec.UserID
+		ev.UserID = &userID
+	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
 	}
 	if spec.FlowID != nil && *spec.FlowID != "" {
 		ev.FlowID = spec.FlowID
-	}
-	if spec.TokenID != "" {
-		ev.TokenID = spec.TokenID
 	}
 	if spec.ActorID != nil {
 		ev.ActorID = spec.ActorID

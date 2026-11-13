@@ -67,6 +67,9 @@ async function aPatchedApp(): Promise<ScaffoldedApp> {
   return app;
 }
 
+/** A project's declared package manager that is not npm. */
+const PNPM = "pnpm@10.0.0";
+
 describe("eject", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -214,6 +217,15 @@ describe("eject", () => {
         });
       });
 
+      it("suggests removing the SDK with the project's own package manager", async () => {
+        const app = await aPatchedApp();
+        await app.usePackageManager(PNPM);
+
+        const result = await app.run(["eject", "--force", "--json"]);
+
+        expect(result).toSuggest("pnpm remove @zitadel/sdk-next");
+      });
+
       it("removes the managed files from the project", async () => {
         const app = await aPatchedApp();
         const before = await app.snapshot();
@@ -313,7 +325,7 @@ describe("eject", () => {
               ".env.development.local -> .env.development.local.ejected-<timestamp>",
             ],
             manual_steps: MANUAL_STEPS,
-            next_commands: [expectedPublicCliCommand(`eject --force --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("eject --force"))],
           },
           warnings: [],
         });
@@ -441,7 +453,7 @@ describe("eject", () => {
 
         const result = await app.run(["eject", "--force", "--dry-run"]);
 
-        expect(result).toSay(expectedPublicCliCommand(`eject --force --cwd ${app.path}`));
+        expect(result).toSay(expectedPublicCliCommand(app.againAsRun("eject --force")));
       });
 
       it("heads a skip with the headline the envelope carries", async () => {

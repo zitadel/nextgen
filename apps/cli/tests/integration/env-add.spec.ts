@@ -4,6 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -274,7 +275,7 @@ describe("env add", () => {
             deployment: null,
             next_commands: [
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
+                `deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `env --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
@@ -471,7 +472,7 @@ describe("env add", () => {
           source: "",
           code: "E_VALIDATION",
           message: 'Invalid app URL "ftp://x"',
-          hint: "Use a URL like https://app.acme.com.",
+          hint: `Use a URL like ${PRIMARY_ORIGIN}.`,
         });
       });
 
@@ -728,7 +729,7 @@ describe("env add", () => {
           `Give it an origin first: ${expectedPublicCliCommand(`origin add '<your-app-url>' --kind primary --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
         );
         expect(result).toPrint(
-          `Then deploy to it: ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
+          `Then deploy to it: ${expectedPublicCliCommand(`deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
         );
       });
 
@@ -746,7 +747,7 @@ describe("env add", () => {
 
         expect(added).toSayOnce(
           expectedPublicCliCommand(
-            `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
+            `deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
           ),
         );
       });

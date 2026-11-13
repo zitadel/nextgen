@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anUndeployedEnvironment, aSetUpApp } from "@tests/helpers/project";
+import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
 
@@ -145,7 +146,9 @@ describe("variable resolve", () => {
           message: "Nothing is deployed to the project.",
           hint: "Deploy first, then resolve its variables.",
           next_commands: [
-            expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --env staging")),
+            expectedPublicCliCommand(
+              app.againAsRun("deploy --message '<what changed>' --env staging"),
+            ),
           ],
         });
       });
@@ -178,8 +181,10 @@ describe("variable resolve", () => {
       it("resolves the live deployment of the origin it is given", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
         await app.setVariable("HOST", "app.acme.com");
         const deployed = await app.deployData();
+        await app.previewData(PREVIEW_URL);
 
         const result = await app.resolveVariables({ origin: "https://app.example.com" });
 
@@ -194,9 +199,25 @@ describe("variable resolve", () => {
             count: 1,
             next_page_token: null,
             deployment_id: deployed.deployment_id,
-            origins: ["https://app.example.com"],
+            origins: LIVE_ORIGINS,
           },
           warnings: [],
+        });
+      });
+
+      it("resolves the live deployment of a preview URL it is given", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.setVariable("HOST", "app.acme.com");
+        await app.deployData();
+        const previewed = await app.previewData(PREVIEW_URL);
+
+        const result = await app.resolveVariables({ origin: PREVIEW_URL });
+
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          status: "ok",
+          data: { deployment_id: previewed.deployment_id, origins: [PREVIEW_URL] },
         });
       });
 
@@ -356,14 +377,16 @@ describe("variable resolve", () => {
           code: "E_NOT_FOUND",
           message: "Nothing is deployed to https://c.example.com.",
           hint: "Deploy to it first, then resolve its variables.",
-          next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+          next_commands: [
+            expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+          ],
         });
       });
 
       it("suggests no deploy for a preview origin, which only a preview build serves", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
         await app.deployData();
 
         const result = await app.resolveVariables({ origin: "https://pr-7-acme.vercel.app" });
@@ -513,7 +536,11 @@ describe("variable resolve", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one, or omit it to read the live deployment.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -523,7 +550,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables({
           deploymentId,
-          origin: "https://app.acme.com",
+          origin: PRIMARY_ORIGIN,
         });
 
         expect(result).toFailWith("E_VALIDATION");

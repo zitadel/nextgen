@@ -47,7 +47,6 @@ const PASSWORD_ONLY = aUserSchema({ "x-auth-methods": authMethods("password") })
  */
 const PASSWORD_FLOW = {
   name: "default-login",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "identifier" },
   steps: [
@@ -115,7 +114,6 @@ const PASSWORD_BESIDE_EMAIL_FLOW: JsonObject = withStepChanged(PASSWORD_FLOW, "p
  */
 const PASSKEY_FIRST_FLOW = {
   name: "passkey-first",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "passkey-first", register: "register" },
   steps: [
@@ -158,7 +156,6 @@ const PASSKEY_FIRST_FLOW = {
  */
 const CHAINED_PASSWORD_FLOW = {
   name: "chained",
-  status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "first" },
   steps: [

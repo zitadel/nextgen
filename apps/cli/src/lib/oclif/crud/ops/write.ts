@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
   type BodyField,
@@ -23,10 +22,12 @@ import type {
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 import { nonBlankString } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { helpOf } from "@/lib/suggestion";
 import { json } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import { resourceSuggestion } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 
@@ -156,10 +157,11 @@ const describeWrite = <
 };
 
 /** What a write without a body to send is refused for. */
-const NEEDS_BODY_REFUSAL: Refusal = {
+const NEEDS_BODY_REFUSAL = {
   message: "{command} needs a body",
-  hint: "Pass the body's fields as flags (see `{command} --help`), --set <path>=<value>, or --data '<json>' / --file <path>.",
-};
+  hint: "Pass the body's fields as flags (the help below lists them), --set <path>=<value>, or --data '<json>' / --file <path>.",
+  next: ["{help}"],
+} as const satisfies Refusal;
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
   return (
@@ -190,9 +192,11 @@ abstract class WriteOperation<
     const { topic, spec, resource, options } = this.definition;
     const fields = fieldsOf(spec, options);
     if (!givesBody(flags, fields)) {
-      throw refusalError(NEEDS_BODY_REFUSAL, {
-        command: `${topic} ${this.verb}`,
-      });
+      throw refusalError(
+        NEEDS_BODY_REFUSAL,
+        { command: `${topic} ${this.verb}` },
+        { help: helpOf(`${topic}:${this.verb}`) },
+      );
     }
     const body = await resourceBody(
       {
@@ -227,17 +231,17 @@ abstract class WriteOperation<
     // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
-    let summary: Summary = {
-      title: "Command completed",
-      sections: [],
-    };
-    if (result !== undefined) {
-      summary = {
-        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
-        sections: [],
-        lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-      };
-    }
+    const summary: Summary =
+      result === undefined
+        ? {
+            title: "Command completed",
+            sections: [],
+          }
+        : {
+            title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
+            sections: [],
+            lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+          };
 
     return {
       status: "ok",
@@ -251,7 +255,12 @@ abstract class WriteOperation<
         ? {
             next: {
               commands: [
-                this.suggest(`${topic} get ${Cmd.quote(String(resource.idOf(result)))} --json`),
+                this.suggest(
+                  resourceSuggestion(topic, "get", {
+                    args: { [named(idName(resource))]: String(resource.idOf(result)) },
+                    flags: { json: true },
+                  }),
+                ),
               ],
             },
           }

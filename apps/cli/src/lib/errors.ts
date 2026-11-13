@@ -10,7 +10,7 @@ import {
   type UnavailableReason,
 } from "./backend";
 import { isObject } from "./json";
-import type { SuggestedCommand } from "./suggestion";
+import type { Suggested } from "./suggestion";
 import {
   ConflictError as ConfigConflictError,
   ConfigError,
@@ -95,8 +95,12 @@ export function confirmationHint(question: string): string {
  */
 export type ZitadelErrorOptions = {
   hint?: string;
-  /** Built by the `lib/suggestion` builders, so a project command keeps its selector. */
-  nextCommands?: readonly SuggestedCommand[];
+  /**
+   * What to run next. A {@link Suggested} rendered already, or a `Suggestion`
+   * the command's failure handler renders with the run's scope, so one raised
+   * below a command still aims at the run's project.
+   */
+  nextCommands?: readonly Suggested[];
   details?: unknown;
 };
 
@@ -109,7 +113,7 @@ export type ZitadelErrorOptions = {
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
-  readonly nextCommands?: readonly SuggestedCommand[];
+  readonly nextCommands?: readonly Suggested[];
   readonly details?: unknown;
 
   /**
@@ -466,24 +470,17 @@ function listedInDetails(
  * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
  * reports missing. Those are appended the same way.
  */
-function rejectedResources(body: unknown): string[] {
-  const lines: string[] = [];
-  let node: unknown = body;
-  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>).resources;
-    if (Array.isArray(listed)) {
-      for (const item of listed) {
-        const line = resourceLine(item);
-        if (line !== undefined) {
-          lines.push(line);
-        }
-      }
-      break;
-    }
-    node = (node as { details?: unknown }).details;
+function rejectedResources(body: unknown, depth = 0): readonly string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [];
   }
-
-  return lines;
+  const listed = (body as Record<string, unknown>).resources;
+  if (Array.isArray(listed)) {
+    return listed.flatMap((item) => {
+      return resourceLine(item) ?? [];
+    });
+  }
+  return rejectedResources((body as { details?: unknown }).details, depth + 1);
 }
 
 function resourceLine(item: unknown): string | undefined {

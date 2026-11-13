@@ -1,5 +1,4 @@
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -269,7 +268,7 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
+  // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
     listed ??= objectTypes(ctx).catch(() => {
@@ -385,9 +384,8 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
  *
  * @remarks
  * A flow's `user_schema` is an object type, or a schema id or `$id` URL that
- * the server resolves to one; a draft flow is never selected. A schema the
- * release carries is resolved the way the configuration resolves it, and any
- * other through the project's listing.
+ * the server resolves to one. A schema the release carries is resolved the way
+ * the configuration resolves it, and any other through the project's listing.
  *
  * Only the schema's designated identifier performs a lookup, and only when a
  * step on the login path ({@link Flow.loginFields}) collects it. The release
@@ -406,7 +404,7 @@ async function servedFlows(ctx: StepContext, names: Names): Promise<ServedFlows>
   // One flow at a time: the first to need the listing reads it for the rest.
   const lookups = await mapBounded(ctx.config.flows.all, 1, async (flow): Promise<FlowLookup> => {
     const reference = flow.userSchema;
-    if (reference === undefined || flow.body.status === "draft") {
+    if (reference === undefined) {
       return { kind: "ignored" };
     }
     const carried = ctx.config.flows.findSchemaOf(flow)?.objectType;
@@ -490,9 +488,11 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const fix = ctx.suggest(
-        `users update '<user_id>' --schema '<revision_id>' --set ${Cmd.quote(`attributes.${identifier}=<value>`)}`,
-      );
+      const fix = ctx.suggest({
+        id: "users:update",
+        args: { id: "<user_id>" },
+        flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
+      });
       return {
         warnings: [
           `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,

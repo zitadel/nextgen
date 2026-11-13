@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
 
@@ -373,13 +374,13 @@ describe("deployment rollback", () => {
       it("undoes the last deploy, not a preview deployed after it", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
         const first = await app.deployData();
         await app.editUserSchema((schema) => {
           schema.properties.one = { type: "string" };
         });
         await app.deployData();
-        await app.previewData("https://x-acme.vercel.app");
+        await app.previewData(PREVIEW_URL);
 
         const result = await app.run([
           "deployment",
@@ -417,7 +418,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -690,7 +695,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -709,7 +718,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });

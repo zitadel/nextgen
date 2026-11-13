@@ -22,7 +22,7 @@ jobs:
 
       - name: Generate Changesets status
         id: pr-status
-        uses: changesets/action/pr-status@v1
+        uses: changesets/action/pr-status@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
 
   pr-comment:
     needs: pr-status
@@ -32,6 +32,6 @@ jobs:
       pull-requests: write
     steps:
       - name: Comment on PR
-        uses: changesets/action/pr-comment@v1
+        uses: changesets/action/pr-comment@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           body: ${{ needs.pr-status.outputs.comment-body }}
