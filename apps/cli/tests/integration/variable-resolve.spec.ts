@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
-import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
 
@@ -386,7 +386,7 @@ describe("variable resolve", () => {
       it("suggests no deploy for a preview origin, which only a preview build serves", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
         await app.deployData();
 
         const result = await app.resolveVariables({ origin: "https://pr-7-acme.vercel.app" });
@@ -550,7 +550,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables({
           deploymentId,
-          origin: "https://app.acme.com",
+          origin: PRIMARY_ORIGIN,
         });
 
         expect(result).toFailWith("E_VALIDATION");
