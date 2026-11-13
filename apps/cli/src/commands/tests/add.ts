@@ -2,30 +2,27 @@ import { join, relative, sep } from "node:path";
 import { Flags } from "@oclif/core";
 
 import { pathExists } from "@/lib/fs";
+import { type DependencyInstall, installDependencies } from "@/lib/install";
 import { isObject } from "@/lib/json";
-import { log } from "@/lib/log";
 import { readPackageJson } from "@/lib/npm";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { createOrca } from "@/lib/orca";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
   detectPackageManager,
   execCommandFor,
   inDirectory,
-  installCommandFor,
   type PackageCommand,
   type PackageManager,
-  runPackageCommand,
   runScriptCommandFor,
 } from "@/lib/package-manager";
-import { hasZitadelConfig } from "@/lib/project";
+import { hasZitadelConfig, readFrameworkId, readZitadelConfig } from "@/lib/project";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
-import { readState } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
-  frameworkName,
   PLAYWRIGHT_CONFIG,
   PLAYWRIGHT_CONFIG_NAMES,
   supportsTestSuite,
@@ -48,15 +45,15 @@ const NOT_A_PROJECT_REFUSAL: Refusal = {
 /** How a project whose framework has no suite yet is refused. */
 const FRAMEWORK_REFUSAL: Refusal = {
   message: "tests add does not support {framework} apps yet",
-  hint: `It writes a suite for: {supported}. For another framework, configure ${TEST_KIT_PACKAGE} by hand: ${GUIDE_URL}#other-frameworks`,
+  hint: `It writes a suite for: {supported}. For another framework, see ${GUIDE_URL}#other-frameworks`,
   details: { framework: "{framework}", frameworks: "{frameworks}" },
 };
 
-/** How an app that already runs Playwright from another config is refused. */
+/** How an app that already has a Playwright config is refused. */
 const PLAYWRIGHT_CONFIG_REFUSAL: Refusal = {
   code: "E_CONFLICT",
   message: "This app already has a Playwright config, {config}",
-  hint: `Playwright would run it instead of the suite's. Add withZitadel() from ${TEST_KIT_PACKAGE}/playwright to it by hand: ${GUIDE_URL}`,
+  hint: `With a second config, Playwright's lookup order would pick which one runs. Add withZitadel() from ${TEST_KIT_PACKAGE}/playwright to {config} by hand: ${GUIDE_URL}`,
   details: { path: "{config}" },
 };
 
@@ -80,39 +77,25 @@ type Manifest = Readonly<{
   scripts: Readonly<Record<string, unknown>>;
 }>;
 
-/** The script that runs the suite, and whether this run added it. */
-type TestScript = {
-  name: string;
-  command: string;
-  status: "added" | "would-add" | "exists";
-};
-
-/** What the dependency install did. */
-type TestsInstall = {
-  status: "completed" | "would-run" | "skipped";
-  package_manager: PackageManager;
-  command: string;
-};
-
 /**
- * `zitadel tests add` — add a first end-to-end test to an app setup wired up.
+ * `zitadel tests add` — add end-to-end tests to an app setup wired up.
  *
  * Writes a Playwright config on `@zitadel/testing`, which boots a Zitadel
  * server of its own for every run, a test that signs a seeded user in, a test
- * that starts signed in, and a `test:e2e` script that runs them.
- * Nothing else adds them: `setup` installs no test tooling. Files that already
- * hold something else are refused unless `--force` is given; a rerun that
- * finds its own files writes nothing.
+ * that starts signed in, and a `test:e2e` script that runs them. The files
+ * are the app's from then on: they are in no scaffold manifest, so a file
+ * that no longer matches this CLI's template, edited or written by another
+ * version, is refused unless `--force` replaces it.
  */
 export default class TestsAdd extends BaseCommand {
   static override description =
-    `Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TEST_KIT_PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.`;
+    `Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TEST_KIT_PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.`;
   static override group = CommandGroups.localDevelopment;
 
   static override flags = {
     force: Flags.boolean({
       char: "f",
-      description: "Overwrite a test file that holds something else.",
+      description: "Replace a test file that differs from this CLI's version of it.",
     }),
     "skip-install": Flags.boolean({
       description: "Do not install the new dev dependencies.",
@@ -134,28 +117,44 @@ export default class TestsAdd extends BaseCommand {
     const manifest = await this.manifest();
     const plan = testSuitePlan({
       framework,
-      kitVersion: this.cliVersion,
+      cliVersion: this.cliVersion,
       declared: manifest.dependencies,
       scripts: new Set(Object.keys(manifest.scripts)),
     });
-    const packageManager = await detectPackageManager(this.cwd);
 
     // A dry run first, so a conflict refuses the run before any file is written.
     const planned = await this.scaffold(plan, true);
     const result = this.dryRun ? planned : await this.scaffold(plan, false);
-    const install = await this.install(result, packageManager, flags.skipInstall, flags.cwd);
-    const script = this.testScript(manifest);
+    const packageManager = await detectPackageManager(this.cwd);
+    const { install, command: installCommand } = await installDependencies({
+      cwd: this.cwd,
+      needed: result.depsAdded.length > 0,
+      dryRun: this.dryRun,
+      skipInstall: flags.skipInstall,
+      env: this.env,
+      json: this.isJson,
+      task: (label, work, done) => {
+        return this.ui.task(label, work, done);
+      },
+      failed: (error, command) => {
+        return refusalError(
+          INSTALL_REFUSAL,
+          { command: command.display, cwd: this.cwd, message: String(error) },
+          { install: this.shown(command, flags.cwd) },
+        );
+      },
+    });
 
     const written = result.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");
     });
-    const suite = `${frameworkName(framework)} test suite on ${TEST_KIT_PACKAGE}`;
+    const suite = `${createOrca().displayName(framework)} test suite on ${TEST_KIT_PACKAGE}`;
     const title = this.dryRun
       ? `Would add a ${suite} (dry run)`
       : written.length === 0
         ? `The ${suite} is already in place`
         : `Added a ${suite}`;
-    const next = this.nextCommands(packageManager, install, script, flags.cwd);
+    const ownScript = manifest.scripts[TEST_SCRIPT.name];
     const lines = [
       title,
       ...(written.length === 0
@@ -166,8 +165,9 @@ export default class TestsAdd extends BaseCommand {
               return `  ${file}`;
             }),
           ]),
-      ...(install === undefined ? [] : [`Dependencies: ${installLine(install)}`]),
-      ...scriptLines(script),
+      ...(ownScript === undefined || ownScript === TEST_SCRIPT.command
+        ? []
+        : [`Left the app's own ${TEST_SCRIPT.name} script as it is: ${String(ownScript)}`]),
       "Each run boots its own Zitadel server; the browser it drives is Chromium.",
     ];
 
@@ -178,9 +178,7 @@ export default class TestsAdd extends BaseCommand {
         ...(this.dryRun ? { dry_run: true } : {}),
         framework,
         files_written: written,
-        dependencies_added: result.depsAdded,
-        test_script: script,
-        install: install ?? null,
+        install,
       },
       pretty: prose(lines.join("\n")),
       summary: {
@@ -190,31 +188,35 @@ export default class TestsAdd extends BaseCommand {
           return escapeControlCharacters(line);
         }),
       },
-      next: { commands: this.dryRun ? [await this.realRun()] : next },
+      next: {
+        commands: this.dryRun
+          ? [await this.realRun()]
+          : this.nextCommands(packageManager, install, installCommand, ownScript, flags.cwd),
+      },
     });
   }
 
   /**
-   * The framework setup recorded for the project.
+   * The framework `zitadel.json` records for the project.
    *
-   * @throws The not-a-project refusal without `zitadel.json` or its state.
+   * @throws The not-a-project refusal without `zitadel.json` or a framework in it.
    * @throws The framework refusal when the framework has no suite.
    */
   private async projectFramework(): Promise<string> {
     if (!(await hasZitadelConfig(this.cwd))) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
-    const framework = await readState(this.cwd).then(
-      (state) => (typeof state.framework === "string" ? state.framework : undefined),
-      () => undefined,
-    );
+    const framework = readFrameworkId(await readZitadelConfig(this.cwd));
     if (framework === undefined) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
     if (!supportsTestSuite(framework)) {
+      const orca = createOrca();
       throw refusalError(FRAMEWORK_REFUSAL, {
         framework,
-        supported: TEST_SUITE_FRAMEWORKS.map(frameworkName).join(", "),
+        supported: TEST_SUITE_FRAMEWORKS.map((id) => {
+          return orca.displayName(id);
+        }).join(", "),
         frameworks: TEST_SUITE_FRAMEWORKS,
       });
     }
@@ -223,8 +225,7 @@ export default class TestsAdd extends BaseCommand {
 
   /**
    * Refuses an app with a Playwright config under another name than the
-   * suite's, which Playwright would pick instead; one under the suite's own
-   * name is the file writer's to compare.
+   * suite's; one under the suite's own name is the file writer's to compare.
    */
   private async refuseAnotherPlaywrightConfig(): Promise<void> {
     for (const config of PLAYWRIGHT_CONFIG_NAMES) {
@@ -250,114 +251,41 @@ export default class TestsAdd extends BaseCommand {
     };
   }
 
-  /**
-   * The script that runs the suite: the one this run adds, or the one of that
-   * name the app already had, which it leaves as it is.
-   */
-  private testScript(manifest: Manifest): TestScript {
-    const existing = manifest.scripts[TEST_SCRIPT.name];
-    if (existing !== undefined) {
-      return { name: TEST_SCRIPT.name, command: String(existing), status: "exists" };
-    }
-    return {
-      name: TEST_SCRIPT.name,
-      command: TEST_SCRIPT.command,
-      status: this.dryRun ? "would-add" : "added",
-    };
-  }
-
   private scaffold(plan: ScaffoldPlan, dryRun: boolean): Promise<ScaffoldResult> {
     return new FileWriter({ cwd: this.cwd, dryRun, force: this.force }).scaffold(plan);
   }
 
   /**
-   * Installs the dev dependencies the run added, with the package manager the
-   * app uses. A run that added none installs nothing.
-   */
-  private async install(
-    result: ScaffoldResult,
-    packageManager: PackageManager,
-    skip: boolean,
-    cwdFlag: string | undefined,
-  ): Promise<TestsInstall | undefined> {
-    if (result.depsAdded.length === 0) {
-      return undefined;
-    }
-    const command = installCommandFor(packageManager);
-    const shown = inDirectory(command, cwdFlag, this.cwd).display;
-    if (this.dryRun || skip) {
-      return {
-        status: this.dryRun ? "would-run" : "skipped",
-        package_manager: packageManager,
-        command: shown,
-      };
-    }
-    log.start(`Installing the test dependencies with ${command.display}`);
-    try {
-      await runPackageCommand(command, {
-        cwd: this.cwd,
-        env: this.env,
-        redirectStdoutToStderr: true,
-      });
-    } catch (error) {
-      throw refusalError(
-        INSTALL_REFUSAL,
-        { command: command.display, cwd: this.cwd, message: String(error) },
-        { install: shellCommand(shown) },
-      );
-    }
-    log.done("Installed the test dependencies");
-    return { status: "completed", package_manager: packageManager, command: shown };
-  }
-
-  /**
    * What the reader runs next, from the shell's directory, with the app's
    * package manager: the install when this run skipped it, Playwright's
-   * browser, then the suite, through the project's script when it is the
-   * suite's.
+   * browser, then the suite, through the project's script unless the app's
+   * own `test:e2e` runs something else.
    */
   private nextCommands(
     packageManager: PackageManager,
-    install: TestsInstall | undefined,
-    script: TestScript,
+    install: DependencyInstall,
+    installCommand: PackageCommand,
+    ownScript: unknown,
     cwdFlag: string | undefined,
   ): SuggestedCommand[] {
-    const shown = (command: PackageCommand) => {
-      return shellCommand(inDirectory(command, cwdFlag, this.cwd).display);
-    };
-    const runsTheSuite = script.status !== "exists" || script.command === TEST_SCRIPT.command;
+    const runsTheSuite = ownScript === undefined || ownScript === TEST_SCRIPT.command;
+    // npm runs a binary in the shell's directory even with --prefix, where
+    // Playwright would find no config, so a run elsewhere names it.
+    const config = cwdFlag === undefined ? [] : ["--config", join(this.cwd, PLAYWRIGHT_CONFIG)];
     return [
-      ...(install?.status === "skipped" ? [shellCommand(install.command)] : []),
-      shown(execCommandFor(packageManager, "playwright", ["install", "chromium"])),
-      shown(
+      ...(install.status === "skipped" ? [this.shown(installCommand, cwdFlag)] : []),
+      this.shown(execCommandFor(packageManager, "playwright", ["install", "chromium"]), cwdFlag),
+      this.shown(
         runsTheSuite
-          ? runScriptCommandFor(packageManager, script.name)
-          : execCommandFor(packageManager, "playwright", ["test"]),
+          ? runScriptCommandFor(packageManager, TEST_SCRIPT.name)
+          : execCommandFor(packageManager, "playwright", ["test", ...config]),
+        cwdFlag,
       ),
     ];
   }
-}
 
-function scriptLines(script: TestScript): string[] {
-  switch (script.status) {
-    case "added":
-      return [`Added the ${script.name} script: ${script.command}`];
-    case "would-add":
-      return [`Would add the ${script.name} script: ${script.command}`];
-    case "exists":
-      return script.command === TEST_SCRIPT.command
-        ? []
-        : [`Left the existing ${script.name} script as it is: ${script.command}`];
-  }
-}
-
-function installLine(install: TestsInstall): string {
-  switch (install.status) {
-    case "completed":
-      return `installed with ${install.command}`;
-    case "would-run":
-      return `would install with ${install.command}`;
-    case "skipped":
-      return `not installed (--skip-install)`;
+  /** A package manager command as the reader runs it, from the shell's directory. */
+  private shown(command: PackageCommand, cwdFlag: string | undefined): SuggestedCommand {
+    return shellCommand(inDirectory(command, cwdFlag, this.cwd).display);
   }
 }

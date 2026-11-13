@@ -35,6 +35,7 @@ export const PHASES = [
   "drift",
   "stop",
   "install",
+  "tests-add",
   "app",
   "playwright",
   "teardown",

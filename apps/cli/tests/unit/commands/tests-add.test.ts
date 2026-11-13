@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { SIGN_IN_SPEC } from "@/lib/test-kit";
+import { pathExists } from "@/lib/fs";
+import { PLAYWRIGHT_CONFIG, SIGN_IN_SPEC, SIGNED_IN_SPEC } from "@/lib/test-kit";
 import { test } from "@tests/helpers/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -13,14 +14,10 @@ type Answer = Readonly<{
   code?: string;
   message?: string;
   hint?: string;
-  data?: {
-    files_written?: string[];
-    test_script?: { name: string; command: string; status: string };
-    next_commands?: string[];
-  };
+  data?: { next_commands?: string[] };
 }>;
 
-/** A test of the developer's own, where the suite's first test goes. */
+/** A test of the developer's own, where the suite's test goes. */
 const OWN_SPEC = 'import { test } from "@playwright/test";\n';
 
 /** A test:e2e script of the developer's own. */
@@ -33,20 +30,28 @@ async function aProject(
     framework = "next",
     without = [],
     scripts = {},
-  }: { framework?: string; without?: string[]; scripts?: Record<string, string> } = {},
+  }: { framework?: string | null; without?: string[]; scripts?: Record<string, string> } = {},
 ): Promise<void> {
+  const config = {
+    version: "0.0.1",
+    ...(framework === null ? {} : { framework: { id: framework } }),
+  };
   const manifest = { name: "app", scripts, dependencies: { next: "^16.0.0" } };
   const files: Record<string, string> = {
-    "zitadel.json": `${JSON.stringify({ version: "0.0.1" })}\n`,
-    ".zitadel/state.json": `${JSON.stringify({ framework })}\n`,
+    "zitadel.json": `${JSON.stringify(config)}\n`,
     "package.json": `${JSON.stringify(manifest)}\n`,
   };
-  await mkdir(join(dir, ".zitadel"), { recursive: true });
   for (const [path, contents] of Object.entries(files)) {
     if (!without.includes(path)) {
       await writeFile(join(dir, path), contents);
     }
   }
+}
+
+/** Puts a test of the developer's own at `path` in `dir`. */
+async function anOwnTestAt(dir: string, path: string): Promise<void> {
+  await mkdir(join(dir, "e2e"), { recursive: true });
+  await writeFile(join(dir, path), OWN_SPEC);
 }
 
 /** Runs `tests add` in `dir`, without installing. */
@@ -73,8 +78,8 @@ describe("tests add", () => {
         message: "This directory is not a Zitadel project",
       },
       {
-        name: "a project without its state",
-        arrange: (dir: string) => aProject(dir, { without: [".zitadel/state.json"] }),
+        name: "a project that records no framework",
+        arrange: (dir: string) => aProject(dir, { framework: null }),
         code: "E_VALIDATION",
         message: "This directory is not a Zitadel project",
       },
@@ -94,10 +99,19 @@ describe("tests add", () => {
         name: "an app with a Playwright config of another name",
         arrange: async (dir: string) => {
           await aProject(dir);
-          await writeFile(join(dir, "playwright.config.ts"), "export default {};\n");
+          await writeFile(join(dir, "playwright.config.mjs"), "export default {};\n");
         },
         code: "E_CONFLICT",
-        message: "This app already has a Playwright config, playwright.config.ts",
+        message: "This app already has a Playwright config, playwright.config.mjs",
+      },
+      {
+        name: "a test of the developer's own where the suite's goes",
+        arrange: async (dir: string) => {
+          await aProject(dir);
+          await anOwnTestAt(dir, SIGNED_IN_SPEC);
+        },
+        code: "E_CONFLICT",
+        message: expect.stringMatching(new RegExp(`^Refusing to overwrite .*/${SIGNED_IN_SPEC}$`)),
       },
     ])("refuses $name", async ({ arrange, code, message }, { dir }) => {
       await arrange(dir);
@@ -115,24 +129,13 @@ describe("tests add", () => {
       expect(answer.hint).toContain("It writes a suite for: Next.js.");
     });
 
-    test("refuses to replace a test of the developer's own", async ({ dir }) => {
+    test("writes nothing before a file that conflicts", async ({ dir }) => {
       await aProject(dir);
-      await mkdir(join(dir, "e2e"));
-      await writeFile(join(dir, SIGN_IN_SPEC), OWN_SPEC);
-
-      const answer = await testsAdd(dir);
-
-      expect(answer).toMatchObject({ status: "error", code: "E_CONFLICT" });
-    });
-
-    test("writes nothing when one file conflicts", async ({ dir }) => {
-      await aProject(dir);
-      await mkdir(join(dir, "e2e"));
-      await writeFile(join(dir, SIGN_IN_SPEC), OWN_SPEC);
+      await anOwnTestAt(dir, SIGNED_IN_SPEC);
 
       await testsAdd(dir);
 
-      expect(await readFile(join(dir, "package.json"), "utf8")).not.toContain("@zitadel/testing");
+      expect(await pathExists(join(dir, PLAYWRIGHT_CONFIG))).toBe(false);
     });
   });
 
@@ -145,25 +148,15 @@ describe("tests add", () => {
       expect(await readFile(join(dir, "package.json"), "utf8")).toContain(OWN_SCRIPT);
     });
 
-    test("says it kept it", async ({ dir }) => {
-      await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
-
-      const answer = await testsAdd(dir);
-
-      expect(answer.data?.test_script).toEqual({
-        name: "test:e2e",
-        command: OWN_SCRIPT,
-        status: "exists",
-      });
-    });
-
-    test("suggests running the suite through Playwright instead", async ({ dir }) => {
+    test("suggests running Playwright on the suite's config from the shell's directory", async ({
+      dir,
+    }) => {
       await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
 
       const answer = await testsAdd(dir);
 
       expect(answer.data?.next_commands?.at(-1)).toBe(
-        `npm --prefix ${dir} exec -- playwright test`,
+        `npm --prefix ${dir} exec -- playwright test --config ${join(dir, PLAYWRIGHT_CONFIG)}`,
       );
     });
   });
@@ -186,8 +179,7 @@ describe("tests add", () => {
   describe("with --force", () => {
     test("replaces a test of the developer's own", async ({ dir }) => {
       await aProject(dir);
-      await mkdir(join(dir, "e2e"));
-      await writeFile(join(dir, SIGN_IN_SPEC), OWN_SPEC);
+      await anOwnTestAt(dir, SIGN_IN_SPEC);
 
       await testsAdd(dir, "--force");
 
@@ -201,7 +193,7 @@ describe("tests add", () => {
 
       await testsAdd(dir, "--dry-run");
 
-      expect(await readFile(join(dir, "package.json"), "utf8")).not.toContain("@zitadel/testing");
+      expect(await pathExists(join(dir, PLAYWRIGHT_CONFIG))).toBe(false);
     });
   });
 });

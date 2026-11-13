@@ -465,15 +465,17 @@ export class ScaffoldedApp {
   async addTests(
     extraArgs: string[] = [],
     { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(["tests", "add", "--skip-install", ...extraArgs]);
+      return this.cli(["tests", "add", "--skip-install", ...extraArgs], env);
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
     return this.cli(["tests", "add", ...extraArgs], {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
+      ...env,
     });
   }
 

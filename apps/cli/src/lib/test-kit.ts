@@ -1,5 +1,6 @@
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
-import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { sdkVersionForCli } from "@/lib/public-cli";
 
 /**
  * The test kit `tests add` wires an app to.
@@ -25,8 +26,8 @@ export const PLAYWRIGHT_RANGE = "^1.60.0";
 export const PLAYWRIGHT_CONFIG = "playwright.config.mts";
 
 /**
- * Every name Playwright looks for its config under, in its own order: an app
- * that already has one of the others runs that one and never this suite's.
+ * Every name Playwright looks for its config under, in its own order. A
+ * second config leaves which one runs to that order.
  */
 export const PLAYWRIGHT_CONFIG_NAMES = [
   "playwright.config.ts",
@@ -38,7 +39,7 @@ export const PLAYWRIGHT_CONFIG_NAMES = [
 ] as const;
 
 /**
- * The first test, in the suite's `testDir`.
+ * The test of the sign-in itself, in the suite's `testDir`.
  */
 export const SIGN_IN_SPEC = "e2e/sign-in.spec.ts";
 
@@ -59,49 +60,35 @@ export const TEST_SCRIPT = { name: "test:e2e", command: "playwright test" } as c
 export const TEST_RUN_OUTPUTS = [".zitadel-testing/", "test-results/", "playwright-report/"];
 
 /**
- * The port the kit's own Zitadel server listens on during a run, apart from
- * the local runtime's, which starts at 8080.
+ * The variables that move the run's two ports, and their defaults: apart
+ * from the dev server's (3000), the local runtime's (8080 on) and the repo's
+ * own e2e lanes', so a run collides with none of them.
  */
-export const TEST_SERVER_PORT = 8092;
+export const TEST_PORTS = {
+  app: { variable: "ZITADEL_TEST_APP_PORT", port: 3100 },
+  server: { variable: "ZITADEL_TEST_SERVER_PORT", port: 8090 },
+} as const;
 
 /**
- * The port the run serves the app on, apart from the dev server's, so a run
- * never collides with a dev server that is already up.
- */
-export const TEST_APP_PORT = 3100;
-
-/**
- * What the suite needs to know about a framework: how to start its dev server
- * on a port, and where its sign-in lands.
+ * What a framework's suite needs: how to start its dev server, and the kit's
+ * env template for it. The sign-in page, `/login`, and the protected page,
+ * `/profile`, are the same in every app setup scaffolds.
  */
 type FrameworkSuite = Readonly<{
-  /** The display name a refusal uses. */
-  name: string;
-  /** The kit's env template for the framework, as exported by `@zitadel/testing/playwright`. */
+  /** The kit's env template, as `@zitadel/testing/playwright` exports it. */
   envTemplate: string;
-  /** The dev server's argv, serving the app on {@link TEST_APP_PORT}. */
+  /** The dev server's argv, to which the app's port is appended. */
   devCommand: ReadonlyArray<string>;
-  /** The sign-in page setup writes. */
-  loginPath: string;
-  /** Where a completed sign-in lands: a page setup protects. */
-  signedInPath: string;
-  /** The test id of the sign-out control the signed-in page renders. */
-  signOutTestId: string;
 }>;
 
 /**
- * The frameworks a suite can be added for. Each one is the shape an
- * end-to-end lane runs against the published kit; a framework joins once one
- * does.
+ * The frameworks a suite can be added for. Each one is the shape the
+ * journey's testkit lane runs; a framework joins once that lane runs it.
  */
 const SUITES: Readonly<Record<string, FrameworkSuite>> = {
   next: {
-    name: "Next.js",
     envTemplate: "nextAppEnv",
-    devCommand: ["npx", "next", "dev", "--hostname", "localhost", "--port", String(TEST_APP_PORT)],
-    loginPath: "/login",
-    signedInPath: "/profile",
-    signOutTestId: "zitadel-session-logout",
+    devCommand: ["npx", "next", "dev", "--hostname", "localhost", "--port"],
   },
 };
 
@@ -113,7 +100,7 @@ export const TEST_SUITE_FRAMEWORKS: ReadonlyArray<string> = Object.keys(SUITES);
 /**
  * Whether a suite can be added for the framework setup recorded.
  *
- * @param framework - The framework id from `.zitadel/state.json`.
+ * @param framework - The framework id from `zitadel.json`.
  * @returns Whether {@link testSuitePlan} supports it.
  */
 export function supportsTestSuite(framework: string): boolean {
@@ -121,10 +108,10 @@ export function supportsTestSuite(framework: string): boolean {
 }
 
 /**
- * The files and dependencies of a first Playwright suite on the test kit.
+ * The files, dependencies and script of a first Playwright suite on the kit.
  *
- * @param input - The framework setup configured, the kit version to pin (the
- *   CLI's own, as setup pins the SDK), and the dev dependencies and scripts
+ * @param input - The framework setup configured, the CLI's version (the kit
+ *   is pinned to it as setup pins the SDK), and the dependencies and scripts
  *   the app already declares, which the plan leaves as they are.
  * @returns The plan for the file writer.
  * @throws {@link Error} When the framework has no suite; check
@@ -132,7 +119,7 @@ export function supportsTestSuite(framework: string): boolean {
  */
 export function testSuitePlan(input: {
   framework: string;
-  kitVersion: string;
+  cliVersion: string;
   declared: ReadonlySet<string>;
   scripts: ReadonlySet<string>;
 }): ScaffoldPlan {
@@ -140,57 +127,52 @@ export function testSuitePlan(input: {
   if (suite === undefined) {
     throw new Error(`no test suite for framework ${input.framework}`);
   }
-  const dependencies: FileOp[] = [
-    { kind: "add-dep", name: TEST_KIT_PACKAGE, version: input.kitVersion, dev: true },
-    ...(input.declared.has(PLAYWRIGHT_PACKAGE)
-      ? []
-      : [
-          {
-            kind: "add-dep",
-            name: PLAYWRIGHT_PACKAGE,
-            version: PLAYWRIGHT_RANGE,
-            dev: true,
-          } as const,
-        ]),
-  ];
   return {
     ops: [
       { kind: "write", path: PLAYWRIGHT_CONFIG, contents: playwrightConfig(suite) },
       { kind: "mkdir", path: "e2e" },
-      { kind: "write", path: SIGN_IN_SPEC, contents: signInSpec(suite) },
-      { kind: "write", path: SIGNED_IN_SPEC, contents: signedInSpec(suite) },
+      { kind: "write", path: SIGN_IN_SPEC, contents: SIGN_IN },
+      { kind: "write", path: SIGNED_IN_SPEC, contents: SIGNED_IN },
       { kind: "append-gitignore", entries: TEST_RUN_OUTPUTS },
       ...(input.scripts.has(TEST_SCRIPT.name)
         ? []
         : [{ kind: "edit", path: "package.json", edit: withTestScript } as const]),
-      ...dependencies,
-    ],
-    summary: [
       {
-        title: "Test suite",
-        detail: `A Playwright suite on ${TEST_KIT_PACKAGE} for the ${suite.name} app.`,
+        kind: "add-dep",
+        name: TEST_KIT_PACKAGE,
+        version: sdkVersionForCli(input.cliVersion),
+        dev: true,
       },
+      ...(input.declared.has(PLAYWRIGHT_PACKAGE)
+        ? []
+        : [
+            {
+              kind: "add-dep",
+              name: PLAYWRIGHT_PACKAGE,
+              version: PLAYWRIGHT_RANGE,
+              dev: true,
+            } as const,
+          ]),
     ],
+    summary: [{ title: "Test suite", detail: `A Playwright suite on ${TEST_KIT_PACKAGE}.` }],
   };
 }
 
-/**
- * The name a refusal gives the framework.
- *
- * @param framework - A framework id.
- * @returns Its display name, or the id when it has no suite.
- */
-export function frameworkName(framework: string): string {
-  return SUITES[framework]?.name ?? framework;
-}
-
 function playwrightConfig(suite: FrameworkSuite): string {
+  const command = suite.devCommand
+    .map((arg) => {
+      return JSON.stringify(arg);
+    })
+    .join(", ");
+  const { app, server } = TEST_PORTS;
   return `import { defineConfig } from "@playwright/test";
 import { ${suite.envTemplate}, withZitadel } from "${TEST_KIT_PACKAGE}/playwright";
 
 // Each run boots its own Zitadel server and project, and stops it when it ends.
-// The app runs on a port of its own, so a running dev server is no obstacle.
-const appOrigin = "http://localhost:${TEST_APP_PORT}";
+// Both ports are apart from the dev server's and the local runtime's; set
+// ${app.variable} or ${server.variable} to move them.
+const appPort = Number(process.env.${app.variable} ?? ${app.port});
+const appOrigin = \`http://localhost:\${appPort}\`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -200,13 +182,12 @@ export default defineConfig({
   },
   ...withZitadel({
     configDir: import.meta.dirname,
-    // The test server's port: keep it apart from the local runtime's.
-    port: ${TEST_SERVER_PORT},
+    port: Number(process.env.${server.variable} ?? ${server.port}),
     appOrigin,
     app: {
-      command: [${suite.devCommand.map((arg) => JSON.stringify(arg)).join(", ")}],
+      command: [${command}, String(appPort)],
       cwd: import.meta.dirname,
-      readyPath: "${suite.loginPath}",
+      readyPath: "/login",
       env: ${suite.envTemplate},
     },
   }),
@@ -214,36 +195,33 @@ export default defineConfig({
 `;
 }
 
-function signInSpec(suite: FrameworkSuite): string {
-  return `import { expect, loginWithPassword, test } from "${TEST_KIT_PACKAGE}/playwright";
+/** The test of the sign-in itself. */
+const SIGN_IN = `import { expect, loginWithPassword, test } from "${TEST_KIT_PACKAGE}/playwright";
 
-// seed.user() creates a user on the run's own server, ready to sign in.
 test("a seeded user signs in with their password", async ({ page, seed }) => {
   const user = await seed.user();
 
-  await page.goto("${suite.loginPath}");
+  await page.goto("/login");
   await loginWithPassword(page, user);
 
-  await expect(page).toHaveURL(/\\${suite.signedInPath}(?:[/?#]|$)/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\\/profile(?:[/?#]|$)/, { timeout: 30_000 });
 });
 `;
-}
 
-function signedInSpec(suite: FrameworkSuite): string {
-  return `import { expect, test } from "${TEST_KIT_PACKAGE}/playwright";
+/** The test to copy: a page behind the sign-in, started signed in. */
+const SIGNED_IN = `import { expect, test } from "${TEST_KIT_PACKAGE}/playwright";
 
 // Test the sign-in itself with the signed-out \`page\`, as sign-in.spec.ts does.
 // Test every other page from \`authenticatedPage\`: it starts signed in as a new user.
 test("a signed-in user sees the profile page", async ({ authenticatedPage }) => {
   const { page } = authenticatedPage;
 
-  await page.goto("${suite.signedInPath}");
+  await page.goto("/profile");
 
-  await expect(page).toHaveURL(/\\${suite.signedInPath}(?:[/?#]|$)/);
-  await expect(page.getByTestId("${suite.signOutTestId}")).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\\/profile(?:[/?#]|$)/);
+  await expect(page.getByTestId("zitadel-session-logout")).toBeVisible({ timeout: 30_000 });
 });
 `;
-}
 
 /**
  * Adds {@link TEST_SCRIPT} to `package.json`, splicing in the one key so every

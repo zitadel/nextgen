@@ -1,6 +1,6 @@
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/log";
+import { type DependencyInstall, installDependencies } from "@/lib/install";
 import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   detectPackageManager,
@@ -8,19 +8,11 @@ import {
   inDirectory,
   installCommandFor,
   type PackageCommand,
-  type PackageManager,
-  runPackageCommand,
+  type runPackageCommand,
 } from "@/lib/package-manager";
 import { type Suggest, type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 
-type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
-
-export type SetupInstall = {
-  status: "completed" | "would-run" | "skipped" | "not-needed";
-  package_manager: PackageManager;
-  command: string;
-  reason?: InstallReason;
-};
+export type SetupInstall = DependencyInstall;
 
 export type SetupInstallOutcome = {
   install: SetupInstall;
@@ -80,87 +72,36 @@ export async function installDependenciesForSetup(
   input: SetupInstallInput,
 ): Promise<SetupInstallOutcome> {
   const packageManager = await detectPackageManager(input.cwd);
-  const installCommand = installCommandFor(packageManager);
   const devCommand = devCommandFor(packageManager);
   // What the reader runs, from the shell's directory; setup itself runs the
   // plain commands in `cwd`.
-  const shownInstall = inDirectory(installCommand, input.cwdFlag, input.cwd).display;
+  const shownInstall = inDirectory(
+    installCommandFor(packageManager),
+    input.cwdFlag,
+    input.cwd,
+  ).display;
   const shownDev = inDirectory(devCommand, input.cwdFlag, input.cwd).display;
-  const needsInstall = input.scaffoldedFramework || input.depsAdded.length > 0;
-
-  if (!needsInstall) {
-    return outcome({
-      install: {
-        status: "not-needed",
-        package_manager: packageManager,
-        command: installCommand.display,
-        reason: "no-dependency-changes",
-      },
-      devCommand: shownDev,
-      installCommand: shownInstall,
-      issuer: input.issuer,
-      suggest: input.suggest,
-      includeInstallCommand: false,
-    });
-  }
-
-  if (input.dryRun || input.skipInstall) {
-    return outcome({
-      install: input.dryRun
-        ? {
-            status: "would-run",
-            package_manager: packageManager,
-            command: installCommand.display,
-          }
-        : {
-            status: "skipped",
-            package_manager: packageManager,
-            command: installCommand.display,
-            reason: "skip-install",
-          },
-      devCommand: shownDev,
-      installCommand: shownInstall,
-      issuer: input.issuer,
-      suggest: input.suggest,
-      includeInstallCommand: true,
-    });
-  }
-
-  const label = `Installing dependencies with ${installCommand.display}`;
-  const install = async (): Promise<void> => {
-    try {
-      await (input.run ?? runPackageCommand)(installCommand, {
-        cwd: input.cwd,
-        env: input.env,
-        redirectStdoutToStderr: input.json,
-      });
-    } catch (error) {
-      throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
-    }
-  };
-
-  if (input.json) {
-    await input.task(label, install, () => {
-      return "Installed dependencies";
-    });
-  } else {
-    // The package manager writes to the terminal itself, so no spinner may draw over it.
-    log.start(label);
-    await install();
-    log.done("Installed dependencies");
-  }
+  const { install } = await installDependencies({
+    cwd: input.cwd,
+    needed: input.scaffoldedFramework || input.depsAdded.length > 0,
+    dryRun: input.dryRun,
+    skipInstall: input.skipInstall,
+    env: input.env,
+    json: input.json,
+    task: input.task,
+    failed: (error, installCommand) => {
+      return installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+    },
+    ...(input.run === undefined ? {} : { run: input.run }),
+  });
 
   return outcome({
-    install: {
-      status: "completed",
-      package_manager: packageManager,
-      command: installCommand.display,
-    },
+    install,
     devCommand: shownDev,
     installCommand: shownInstall,
     issuer: input.issuer,
     suggest: input.suggest,
-    includeInstallCommand: false,
+    includeInstallCommand: install.status === "would-run" || install.status === "skipped",
   });
 }
 

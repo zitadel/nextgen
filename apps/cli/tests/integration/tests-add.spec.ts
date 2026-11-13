@@ -16,11 +16,6 @@ const SUITE_FILES = [
   "package.json",
 ];
 
-/**
- * The dev dependencies a first run adds.
- */
-const SUITE_DEPENDENCIES = ["@zitadel/testing", "@playwright/test"];
-
 describe("tests add", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -51,7 +46,7 @@ describe("tests add", () => {
       const app = await aSetUpApp();
 
       await app.inEveryRendering((how) => {
-        return app.addTests(how.json ? ["--json"] : [], { install: false });
+        return app.addTests(how.json ? ["--json"] : [], { install: false }, how.env);
       });
     });
 
@@ -64,17 +59,7 @@ describe("tests add", () => {
         expect(app.envelopeOf(result).data).toMatchObject({ files_written: SUITE_FILES });
       });
 
-      it("reports the dev dependencies it added", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.addTests(["--json"]);
-
-        expect(app.envelopeOf(result).data).toMatchObject({
-          dependencies_added: SUITE_DEPENDENCIES,
-        });
-      });
-
-      it("installs them with the app's package manager", async () => {
+      it("installs the dev dependencies with the app's package manager", async () => {
         const app = await aSetUpApp();
 
         await app.addTests(["--json"], { install: true });
@@ -87,7 +72,7 @@ describe("tests add", () => {
 
         const result = await app.addTests(["--json"]);
 
-        expect(result).toSuggest("install");
+        expect(app.envelopeOf(result).data).toMatchObject({ install: { status: "skipped" } });
       });
 
       it("suggests running the suite through the project's script", async () => {
@@ -96,16 +81,6 @@ describe("tests add", () => {
         const result = await app.addTests(["--json"]);
 
         expect(result).toSuggest("run test:e2e");
-      });
-
-      it("reports the script it added", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.addTests(["--json"]);
-
-        expect(app.envelopeOf(result).data).toMatchObject({
-          test_script: { name: "test:e2e", command: "playwright test", status: "added" },
-        });
       });
 
       it("writes nothing when run again", async () => {

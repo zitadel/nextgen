@@ -16,6 +16,16 @@ The kit is in preview: until 1.0.0, a minor version can change its API, and its 
 
 The kit does not use the project `setup` created or the runtime `zitadel start` runs. Each test run boots its own Zitadel server on a port you choose and creates a fresh project in it. When the run ends, the kit stops that server and deletes its data.
 
+## Let the CLI add the tests
+
+In a Next.js app that `setup` wired up, `tests add` writes the config and both tests this guide shows. It adds the kit and Playwright as dev dependencies, installs them, and adds a `test:e2e` script:
+
+```sh
+npx @zitadel/cli@latest tests add
+```
+
+Then follow its next steps: install Playwright's Chromium, and run `npm run test:e2e`. The sections below show what it writes, for an app you wire up by hand.
+
 ## Install the kit
 
 Install the kit and Playwright as dev dependencies, then Playwright's Chromium:
