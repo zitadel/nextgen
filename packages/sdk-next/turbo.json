@@ -2,9 +2,11 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // the edge tests import this package's built dist.
+    // The edge tests import this package's built dist, and the middleware and
+    // edge specs run the cases of @zitadel/server-sdk-contract, whose
+    // typecheck edge puts its source in this task's hash.
     "typecheck": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     },
     // src/components.ts re-exports the sdk-react wrappers, so tsc reads its
     // built dist; sdk-react's build waits for components and sdk-core.
@@ -12,7 +14,7 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     }
   }
 }
