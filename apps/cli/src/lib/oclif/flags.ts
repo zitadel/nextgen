@@ -67,7 +67,7 @@ type Unfilled<R, Declared> = Exclude<
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
  */
-export type Filled<R, Declared> =
+type Filled<R, Declared> =
   IsNever<Unfilled<R, Declared>> extends true
     ? unknown
     : {
@@ -75,6 +75,19 @@ export type Filled<R, Declared> =
           readonly [Name in Unfilled<R, Declared>]: NonNullable<unknown> | null;
         };
       };
+
+/**
+ * What a refusal must hold for {@link read} to fill it alone, with no
+ * `values` beside it: nothing when it asks only for the names `read` fills
+ * ({@link Parsed}), and otherwise a key naming the rest, so a refusal that
+ * asks for more does not compile rather than print its braces.
+ *
+ * @typeParam R - The refusal, as it is written.
+ */
+export type ReadAlone<R> =
+  IsNever<Unfilled<R, Record<never, never>>> extends true
+    ? unknown
+    : { readonly "asks for what only values could fill": Unfilled<R, Record<never, never>> };
 
 /**
  * Nothing but the keys a declaration and its refusal may have: any other key,

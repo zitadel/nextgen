@@ -1,8 +1,8 @@
 import { Args, Flags } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { filled, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import { filled, type ReadAlone, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
 import type { Placeholders } from "@/lib/oclif/refusal";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
@@ -313,5 +313,18 @@ describe("the server flag", () => {
       code: "E_VALIDATION",
       message: `Invalid server "${value}"`,
     });
+  });
+});
+
+describe("ReadAlone", () => {
+  it("asks nothing of a refusal that wants only what the parse fills", () => {
+    expectTypeOf<ReadAlone<{ readonly message: "{input} is empty" }>>().toEqualTypeOf<unknown>();
+  });
+
+  it("refuses a refusal that wants what only values could fill, values beside it or not", () => {
+    expectTypeOf<{
+      readonly message: "{max}";
+      readonly values: { readonly max: 5 };
+    }>().not.toExtend<ReadAlone<{ readonly message: "{max}" }>>();
   });
 });
