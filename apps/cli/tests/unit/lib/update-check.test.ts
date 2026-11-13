@@ -1,51 +1,64 @@
-import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect } from "vitest";
 
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
+import { test } from "@tests/helpers/fixtures";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
 const server = setupServer();
-let configHome: string;
-let requests: string[];
 
-function publishes(tags: Record<string, string>): void {
-  server.use(
-    http.get(REGISTRY, ({ request }) => {
-      requests.push(request.url);
-      return HttpResponse.json(tags);
-    }),
-  );
-}
-
-function env(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  return { XDG_CONFIG_HOME: configHome, ...extra };
-}
-
-async function cacheHolds(lookup: Record<string, unknown>): Promise<void> {
-  const file = join(configHome, "zitadel", "cli", "update-check.json");
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(lookup));
-}
+/** `it` with the registry, the config home it is read from, and the cache that lives there. */
+const it = test.extend<{
+  configHome: string;
+  requests: string[];
+  publishes: (tags: Record<string, string>) => void;
+  env: (extra?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  cacheHolds: (lookup: Record<string, unknown>) => Promise<void>;
+}>({
+  configHome: ({ dir }, use) => {
+    return use(dir);
+  },
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  requests: ({}, use) => {
+    return use([]);
+  },
+  publishes: ({ requests }, use) => {
+    return use((tags) => {
+      server.use(
+        http.get(REGISTRY, ({ request }) => {
+          requests.push(request.url);
+          return HttpResponse.json(tags);
+        }),
+      );
+    });
+  },
+  env: ({ configHome }, use) => {
+    return use((extra = {}) => {
+      return { XDG_CONFIG_HOME: configHome, ...extra };
+    });
+  },
+  cacheHolds: ({ configHome }, use) => {
+    return use(async (lookup) => {
+      const file = join(configHome, "zitadel", "cli", "update-check.json");
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, JSON.stringify(lookup));
+    });
+  },
+});
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
-beforeEach(async () => {
-  configHome = await mkdtemp(join(tmpdir(), "zitadel-update-check-"));
-  requests = [];
-});
-afterEach(async () => {
+afterEach(() => {
   server.resetHandlers();
-  await rm(configHome, { recursive: true, force: true });
 });
 
 describe("latestCliVersion", () => {
-  it("reads the version on the CLI's own dist-tag", async () => {
+  it("reads the version on the CLI's own dist-tag", async ({ configHome, env, publishes }) => {
     publishes({ latest: "2.0.0", alpha: "3.0.0-alpha.1" });
 
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
@@ -55,7 +68,7 @@ describe("latestCliVersion", () => {
     );
   });
 
-  it("asks the registry npm itself was pointed at", async () => {
+  it("asks the registry npm itself was pointed at", async ({ env }) => {
     server.use(
       http.get("https://mirror.example/npm/-/package/@zitadel%2fcli/dist-tags", () =>
         HttpResponse.json({ latest: "2.0.0" }),
@@ -70,7 +83,7 @@ describe("latestCliVersion", () => {
     ).resolves.toBe("2.0.0");
   });
 
-  it("asks at most once a day", async () => {
+  it("asks at most once a day", async ({ env, publishes, requests }) => {
     publishes({ latest: "2.0.0" });
 
     await latestCliVersion({ cliVersion: "1.0.0", env: env() });
@@ -79,7 +92,7 @@ describe("latestCliVersion", () => {
     expect(requests).toHaveLength(1);
   });
 
-  it("asks again once the answer is a day old", async () => {
+  it("asks again once the answer is a day old", async ({ cacheHolds, env, publishes }) => {
     await cacheHolds({
       checked_at: Date.now() - 25 * 60 * 60 * 1000,
       dist_tag: "latest",
@@ -91,7 +104,7 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
   });
 
-  it("does not take another dist-tag's answer", async () => {
+  it("does not take another dist-tag's answer", async ({ cacheHolds, env, publishes }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "alpha",
@@ -103,7 +116,7 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
   });
 
-  it("does not take another registry's answer", async () => {
+  it("does not take another registry's answer", async ({ cacheHolds, env, publishes }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -115,7 +128,10 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
   });
 
-  it("does not carry another registry's answer past a failed lookup", async () => {
+  it("does not carry another registry's answer past a failed lookup", async ({
+    cacheHolds,
+    env,
+  }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -127,7 +143,7 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
   });
 
-  it("does not take another registry's failure", async () => {
+  it("does not take another registry's failure", async ({ cacheHolds, env, publishes }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -138,7 +154,7 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
   });
 
-  it("keeps what it knew when the registry stops answering", async () => {
+  it("keeps what it knew when the registry stops answering", async ({ cacheHolds, env }) => {
     await cacheHolds({
       checked_at: Date.now() - 25 * 60 * 60 * 1000,
       dist_tag: "latest",
@@ -150,7 +166,10 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("1.5.0");
   });
 
-  it("remembers a failed lookup, so an offline machine waits only once a day", async () => {
+  it("remembers a failed lookup, so an offline machine waits only once a day", async ({
+    env,
+    requests,
+  }) => {
     server.use(
       http.get(REGISTRY, () => {
         requests.push("asked");
@@ -164,7 +183,7 @@ describe("latestCliVersion", () => {
     expect(requests).toHaveLength(1);
   });
 
-  it("skips the cache when asked for a fresh answer", async () => {
+  it("skips the cache when asked for a fresh answer", async ({ cacheHolds, env, publishes }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -178,7 +197,10 @@ describe("latestCliVersion", () => {
     );
   });
 
-  it("answers nothing fresh when the registry is down, whatever it knew", async () => {
+  it("answers nothing fresh when the registry is down, whatever it knew", async ({
+    cacheHolds,
+    env,
+  }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -192,7 +214,7 @@ describe("latestCliVersion", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("does not take a value that is not a version", async () => {
+  it("does not take a value that is not a version", async ({ env, publishes }) => {
     publishes({ latest: "not-a-version" });
 
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
@@ -200,7 +222,7 @@ describe("latestCliVersion", () => {
 
   // A file is as much an answer from outside as the response was, so it is held
   // to what the registry would have had to answer to get there.
-  it("does not take a cached value that is not a version", async () => {
+  it("does not take a cached value that is not a version", async ({ cacheHolds, env }) => {
     await cacheHolds({
       checked_at: Date.now(),
       dist_tag: "latest",
@@ -211,7 +233,7 @@ describe("latestCliVersion", () => {
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
   });
 
-  it("survives a home it cannot write to", async () => {
+  it("survives a home it cannot write to", async ({ configHome, env, publishes }) => {
     const file = join(configHome, "taken");
     await writeFile(file, "");
     publishes({ latest: "2.0.0" });
@@ -221,7 +243,7 @@ describe("latestCliVersion", () => {
     ).resolves.toBe("2.0.0");
   });
 
-  it("writes the answer where the next run reads it", async () => {
+  it("writes the answer where the next run reads it", async ({ configHome, env, publishes }) => {
     publishes({ latest: "2.0.0" });
 
     await latestCliVersion({ cliVersion: "1.0.0", env: env() });

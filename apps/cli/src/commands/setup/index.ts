@@ -143,6 +143,7 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Step, Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -347,14 +348,12 @@ export function retryOptionsFromFlags(flags: {
   // A custom connection is restated as typed, minus the credentials. One the
   // checks refuse is left out: it was refused, and a retry carrying it would be
   // refused again.
-  let selection: ProviderSelection | undefined;
-  if (flags.sso !== undefined) {
-    try {
-      selection = selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
-    } catch {
-      selection = undefined;
+  const [, selection] = tryCatch(() => {
+    if (flags.sso === undefined) {
+      return undefined;
     }
-  }
+    return selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
+  });
   // What was typed for a provider this run knows, kept when it cannot become a
   // selection yet, so a retry reproduces it.
   const typed: SsoFlags | undefined =
@@ -1266,22 +1265,32 @@ export default class Setup extends Destructive(BaseCommand) {
     // it patches it, so cancelling a question leaves the directory as it was,
     // and a dry run never creates one. Until then only its framework and dev
     // port are known.
-    let app: Readonly<{ framework: string; devPort: number }>;
-    let detected: FrameworkFacts | undefined;
-    // Whether `--force` scaffolds beside entries the directory already held,
-    // other than the local runtime `start` leaves, which counts as empty.
-    let scaffoldedBesideFiles = false;
-    try {
-      detected = await orca.detect(this.cwd, flags.framework);
-      app = {
-        framework: detected.id,
-        devPort: detected.devPort,
-      };
-      detecting.done(
-        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
+    const found: Readonly<{
+      app: Readonly<{ framework: string; devPort: number }>;
+      detected: FrameworkFacts | undefined;
+      // Whether `--force` scaffolds beside entries the directory already held,
+      // other than the local runtime `start` leaves, which counts as empty.
+      scaffoldedBesideFiles: boolean;
+    }> = await orca
+      .detect(this.cwd, flags.framework)
+      .then((facts) => {
+        detecting.done(
+          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
+        );
+        return {
+          app: {
+            framework: facts.id,
+            devPort: facts.devPort,
+          },
+          detected: facts,
+          scaffoldedBesideFiles: false,
+        };
+      })
+      .catch(async (error) => {
+        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+          detecting.fail();
+          throw error;
+        }
         const target = await inspectScaffoldTarget(this.cwd);
         if (!target.scaffoldable && !this.force) {
           detecting.fail();
@@ -1292,24 +1301,24 @@ export default class Setup extends Destructive(BaseCommand) {
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        app = await orca.planScaffold(
-          this.cwd,
-          await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
-            retry: retryOptionsOf(flags),
-            serverFlag: this.meta.serverFlag,
-            ask: wizardQuestions,
-          }),
-        );
-        scaffoldedBesideFiles = !target.scaffoldable;
-      } else {
-        detecting.fail();
-        throw error;
-      }
-    }
+        return {
+          app: await orca.planScaffold(
+            this.cwd,
+            await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
+              retry: retryOptionsOf(flags),
+              serverFlag: this.meta.serverFlag,
+              ask: wizardQuestions,
+            }),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
+      });
+    const { detected, scaffoldedBesideFiles } = found;
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
     this.recordTelemetry({
-      framework: app.framework,
+      framework: found.app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags.skipInstall),
@@ -1326,12 +1335,13 @@ export default class Setup extends Destructive(BaseCommand) {
     // dev-server port only when it is unset, so a project that already pins a
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
-    if (flags.devPort !== undefined) {
-      app = {
-        ...app,
-        devPort: flags.devPort,
-      };
-    }
+    const app =
+      flags.devPort === undefined
+        ? found.app
+        : {
+            ...found.app,
+            devPort: flags.devPort,
+          };
 
     const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
@@ -1394,12 +1404,12 @@ export default class Setup extends Destructive(BaseCommand) {
     // value space has to stay enumerable: comma-joining n providers makes it
     // combinatorial, and the question telemetry answers here is whether a
     // project enabled a provider at all, not which combination.
-    let ssoDimension = "multiple";
-    if (answers.sso.length === 0) {
-      ssoDimension = "none";
-    } else if (answers.sso.length === 1) {
-      ssoDimension = answers.sso[0] ? selectionName(answers.sso[0].selection) : "none";
-    }
+    const ssoDimension =
+      answers.sso.length > 1
+        ? "multiple"
+        : answers.sso[0]
+          ? selectionName(answers.sso[0].selection)
+          : "none";
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
@@ -1441,6 +1451,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
     const scaffolding = detected === undefined && !this.dryRun;
+    // biome-ignore lint/plugin: the active step, reassigned across scaffold, create and patch, and failed by the outer catch
     let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
       this.ui
@@ -1450,15 +1461,12 @@ export default class Setup extends Destructive(BaseCommand) {
     if (scaffolding) {
       current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
     }
-    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
-    if (scaffolding) {
-      try {
-        newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
-      } catch (error) {
-        current?.fail();
-        throw error;
-      }
-    }
+    const newApp = scaffolding
+      ? await orca.scaffoldUndoably(this.cwd, app.framework, this.force).catch((error) => {
+          current?.fail();
+          throw error;
+        })
+      : undefined;
     if (newApp !== undefined) {
       current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
@@ -1480,8 +1488,11 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let project: CreatedProject;
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let result: Awaited<ReturnType<typeof patcher.patch>>;
+    // biome-ignore lint/plugin: assigned inside the try that rolls back the new app, read after it
     let scaffolded: ScaffoldedConfiguration;
     try {
       if (framework !== undefined && !this.dryRun) {
@@ -1840,6 +1851,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // admin, so the project is attached to their team right away and
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
+    // biome-ignore lint/plugin: assigned inside a best-effort try
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
@@ -1972,10 +1984,12 @@ export default class Setup extends Destructive(BaseCommand) {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     const title = this.dryRun ? WOULD_SET_UP_TITLE : SET_UP_TITLE;
+    // biome-ignore lint/plugin: assigned only for a person's output, after the project facts are read
     let summary: Summary = {
       title,
       sections: [],
     };
+    // biome-ignore lint/plugin: assigned only when nothing is drawn live, from the summary
     let report = "";
     if (!this.dryRun) {
       this.ui.ranAgainst(project.id, answers.server);
@@ -2010,33 +2024,31 @@ export default class Setup extends Destructive(BaseCommand) {
         const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
           planned.change.after.connections.summarize(connection);
         const verifiedBy = new Map(
-          verifications.map(({ property, claim }) => {
-            return [property, claim];
+          verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+            if (claim === true) {
+              return [[property, "always counts as verified"]];
+            }
+            if (typeof claim === "string") {
+              return [[property, `counts as verified when ${text(claim)} is true`]];
+            }
+            return [];
           }),
         );
-        let mappingSection: string[] = [];
-        if (mappings.length > 0) {
-          mappingSection = [
-            createsUsers
-              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-            ...mappings.map(({ property, claim }) => {
-              const how = verifiedBy.get(property);
-              let verified = "is not treated as verified";
-              if (how === true) {
-                verified = "always counts as verified";
-              } else if (typeof how === "string") {
-                verified = `counts as verified when ${text(how)} is true`;
-              }
-              return [
-                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                `  It ${verified}.`,
-              ].join("\n");
-            }),
-          ];
-        }
         const sections = [
-          mappingSection,
+          mappings.length === 0
+            ? []
+            : [
+                createsUsers
+                  ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                  : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+                ...mappings.map(({ property, claim }) => {
+                  const verified = verifiedBy.get(property) ?? "is not treated as verified";
+                  return [
+                    `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                    `  It ${verified}.`,
+                  ].join("\n");
+                }),
+              ],
           scopes.length === 0
             ? []
             : [
@@ -2517,7 +2529,6 @@ export default class Setup extends Destructive(BaseCommand) {
     const moving = this.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
     );
-    let ended = false;
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -2543,12 +2554,10 @@ export default class Setup extends Destructive(BaseCommand) {
             `${dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
           );
         }
-        ended = true;
       },
     }).catch((error: unknown) => {
-      if (!ended) {
-        moving.fail();
-      }
+      // A step ends once, so this says nothing more when `filesMoved` ended it.
+      moving.fail();
       throw error;
     });
     // Pinned to the project just moved, as the other recoveries are: its env

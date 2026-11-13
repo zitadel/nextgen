@@ -53,10 +53,10 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      let found: Inspection;
-      try {
-        found = await this.inspected(ctx);
-      } catch {
+      const found = await this.inspected(ctx).catch(() => {
+        return undefined;
+      });
+      if (found === undefined) {
         // A file that cannot be read fails the way every check does.
         return await super.run(ctx);
       }

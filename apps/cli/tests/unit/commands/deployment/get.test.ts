@@ -16,14 +16,10 @@ const SERVER = "https://api.zitadel.cloud";
 const server = setupServer();
 const dirs: string[] = [];
 
-/** How many times the run asked for the frozen set, which only a terminal does. */
-let variableReads = 0;
-
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 afterEach(async () => {
   server.resetHandlers();
-  variableReads = 0;
   for (const dir of dirs.splice(0)) {
     await rm(dir, { recursive: true, force: true });
   }
@@ -42,7 +38,13 @@ const DEPLOYMENT = {
 
 const FROZEN = { HOST: "app.acme.com", TOKEN: { secret: true } };
 
-async function aProject(): Promise<string> {
+/**
+ * Builds a project the deployment can be read from.
+ *
+ * @param variableReads - Receives the URL of each request for the frozen set, which only a terminal makes.
+ * @returns The project's directory.
+ */
+async function aProject(variableReads: string[] = []): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-get-"));
   dirs.push(cwd);
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
@@ -58,8 +60,8 @@ async function aProject(): Promise<string> {
   );
   server.use(
     http.get(`${SERVER}/api/v1/deployments/dep_1`, () => HttpResponse.json(DEPLOYMENT)),
-    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, () => {
-      variableReads += 1;
+    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, ({ request }) => {
+      variableReads.push(request.url);
       return HttpResponse.json(FROZEN);
     }),
   );
@@ -127,13 +129,14 @@ describe("deployment get", () => {
   });
 
   it("asks for the frozen set only for the rendering that names it", async () => {
-    const cwd = await aProject();
+    const variableReads: string[] = [];
+    const cwd = await aProject(variableReads);
 
     await read(cwd);
-    expect(variableReads).toBe(0);
+    expect(variableReads).toHaveLength(0);
 
     await asTerminal(() => read(cwd));
-    expect(variableReads).toBe(1);
+    expect(variableReads).toHaveLength(1);
   });
 });
 

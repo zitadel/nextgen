@@ -107,10 +107,10 @@ export default class Status extends EnvironmentCommand {
       server.runtime?.backend === "binary" && server.process !== undefined
         ? `${backend}, pid ${server.process.pid}`
         : backend;
-    let dockerSaid = "";
-    if (backend === "docker" && !server.docker.available) {
-      dockerSaid = `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`;
-    }
+    const dockerSaid =
+      backend === "docker" && !server.docker.available
+        ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
+        : "";
 
     const title = "Checked the status of the project";
 

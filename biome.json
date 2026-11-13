@@ -103,6 +103,14 @@
       ]
     },
     {
+      "includes": [
+        "**/apps/cli/src/**",
+        "**/apps/cli/tests/**",
+        "!**/apps/cli/src/lib/orca/patchers/**"
+      ],
+      "plugins": ["./biome-plugins/no-let.grit"]
+    },
+    {
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],
       "linter": {
         "rules": {

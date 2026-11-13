@@ -149,10 +149,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             restored_origins: changes.restored,
             unserved_origins: changes.unserved,
           };
-    let consequence = "";
-    if (effects.length > 0) {
-      consequence = `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`;
-    }
+    const consequence =
+      effects.length > 0
+        ? `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`
+        : "";
 
     return this.emit(
       await this.confirmed({

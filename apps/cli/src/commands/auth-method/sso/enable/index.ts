@@ -888,8 +888,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
       change.after.connections.summarize(connection);
     const verifiedBy = new Map(
-      verifications.map(({ property, claim }) => {
-        return [property, claim];
+      verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+        if (claim === true) {
+          return [[property, "always counts as verified"]];
+        }
+        if (typeof claim === "string") {
+          return [[property, `counts as verified when ${text(claim)} is true`]];
+        }
+        return [];
       }),
     );
     const sections = [
@@ -900,13 +906,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
               : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
             ...mappings.map(({ property, claim }) => {
-              const how = verifiedBy.get(property);
-              const verified =
-                how === true
-                  ? "always counts as verified"
-                  : typeof how === "string"
-                    ? `counts as verified when ${text(how)} is true`
-                    : "is not treated as verified";
+              const verified = verifiedBy.get(property) ?? "is not treated as verified";
               return [
                 `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
                 `  It ${verified}.`,

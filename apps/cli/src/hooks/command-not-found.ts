@@ -98,9 +98,13 @@ export class NotFound extends BaseCommand {
     // A real command with no subcommands followed by a word it does not take:
     // the command's own refusal. After one with subcommands, the word is a
     // subcommand that does not exist.
-    for (let length = words.length - 1; length > 0; length -= 1) {
+    for (const length of Array.from({ length: words.length - 1 }, (_, drop) => {
+      return words.length - 1 - drop;
+    })) {
       const prefix = words.slice(0, length);
-      const exists = known.some((c) => c.length === length && prefix.every((w, i) => c[i] === w));
+      const exists = known.some(
+        (c) => c.length === prefix.length && prefix.every((w, i) => c[i] === w),
+      );
       if (exists && under(prefix).length === 0) {
         this.id = prefix.join(":");
         throw new ZitadelError(
@@ -113,10 +117,9 @@ export class NotFound extends BaseCommand {
 
     // A word that is no command where it was typed: the longest run of visible
     // topics, then that word.
-    let depth = 0;
-    while (depth < words.length - 1 && under(words.slice(0, depth + 1)).length > 0) {
-      depth += 1;
-    }
+    const depth = words.findIndex((_, at) => {
+      return at === words.length - 1 || under(words.slice(0, at + 1)).length === 0;
+    });
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
     const meant = near(typed[depth] as string, under(parent));
@@ -227,9 +230,13 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
     });
   };
   const words: string[] = [];
+  // biome-ignore lint/plugin: scanner state the loop updates as it reads argv
   let json = false;
+  // biome-ignore lint/plugin: scanner state the loop updates as it reads argv
   let passed = false;
+  // biome-ignore lint/plugin: scanner state the loop updates as it reads argv
   let closed = false;
+  // biome-ignore lint/plugin: the loop index is advanced inside the body to skip a flag's value
   for (let index = 0; index < typed.length; index += 1) {
     const word = typed[index] as string;
     const next = typed[index + 1];

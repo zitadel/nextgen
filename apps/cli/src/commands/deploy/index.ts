@@ -330,17 +330,15 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
     const title = `Deployed ${resources}`;
-    let live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live.`;
-    if (servedOrigins.length > 0) {
-      live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live on ${new Intl.ListFormat(
-        "en",
-        { type: "conjunction" },
-      ).format(
-        servedOrigins.map((origin) => {
-          return escapeControlCharacters(origin);
-        }),
-      )}.`;
-    }
+    const released = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live`;
+    const live =
+      servedOrigins.length > 0
+        ? `${released} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+            servedOrigins.map((origin) => {
+              return escapeControlCharacters(origin);
+            }),
+          )}.`
+        : `${released}.`;
 
     return this.emit({
       status: "ok",

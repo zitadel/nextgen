@@ -8,12 +8,7 @@ import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import {
-  readingFrom,
-  type SuggestedCommand,
-  type SuggestInput,
-  WHAT_CHANGED,
-} from "@/lib/suggestion";
+import { readingFrom, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
@@ -174,15 +169,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         return parseVariableValue(raw, flags.as);
       },
     };
-    let value: string | number | boolean;
-    if (write.secret) {
-      value = await this.ask.secret(question);
-    } else {
-      value = await this.ask.text({
-        ...question,
-        ...(args.value === undefined ? {} : { given: args.value }),
-      });
-    }
+    const value = write.secret
+      ? await this.ask.secret(question)
+      : await this.ask.text({
+          ...question,
+          ...(args.value === undefined ? {} : { given: args.value }),
+        });
 
     const written = await variableService.set(args.name, value, write);
     this.recordTelemetry({
@@ -234,36 +226,30 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           credentialSet: true,
           strict: false,
         });
-        let next: { actions: string[]; commands: SuggestedCommand[] } = {
-          actions: [
-            "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
-          ],
-          commands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
-        };
-        if (write.preview) {
-          next = {
-            actions: [
-              "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
-            ],
-            commands: [],
-          };
-          if (verdict === "preview") {
-            next.commands = [
-              this.suggest({
-                id: "preview",
-                flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
-              }),
+        const applies =
+          "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.";
+        const hint =
+          verdict === "unnamed-ci-build"
+            ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
+            : "Run it in the preview or development environment: preview skips any other.";
+        const previewActions = verdict === "preview" ? [applies] : [applies, hint];
+        const actions = write.preview
+          ? previewActions
+          : [
+              "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
             ];
-          } else if (verdict === "unnamed-ci-build") {
-            next.actions.push(
-              "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it.",
-            );
-          } else {
-            next.actions.push(
-              "Run it in the preview or development environment: preview skips any other.",
-            );
-          }
-        }
+        const previewCommands =
+          verdict === "preview"
+            ? [
+                this.suggest({
+                  id: "preview",
+                  flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
+                }),
+              ]
+            : [];
+        const commands = write.preview
+          ? previewCommands
+          : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })];
 
         return this.emit({
           status: "ok",
@@ -282,7 +268,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }).split("\n"),
           },
-          next,
+          next: { actions, commands },
         });
       }
     }
