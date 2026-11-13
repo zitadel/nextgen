@@ -243,6 +243,31 @@ paths:
                 properties:
                   gears: { type: array, items: { type: object } }
                   next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /gear_wheels/query:
+    post:
+      # Keeps the path's underscore: the component is `gear-wheel-sort-field`.
+      operationId: queryGearWheels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/gear_wheel-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gear_wheels: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
   # collection-plural
   /flow/{flow_id}:
     get:
@@ -327,6 +352,7 @@ components:
     part-sort-field: { type: string, enum: [created_at] }
     rivet-sort-field: { type: string, enum: [created_at] }
     spring-filter-field: { type: string, enum: [created_at] }
+    gear_wheel-sort-field: { type: string, enum: [created_at] }
     stock-sort-field: { type: string, enum: [created_at] }
     query-springs-request:
       type: object

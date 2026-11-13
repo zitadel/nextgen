@@ -195,6 +195,32 @@ paths:
                 properties:
                   categories: { type: array, items: { type: object } }
                   next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /flow_definitions/query:
+    post:
+      # A two-word collection sorts by its kebab-case component, and names
+      # its array by its snake_case wire field.
+      operationId: queryFlowDefinitions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/flow-definition-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flow_definitions: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
   /oauth_settings/{oauth_settings_id}:
     get:
       operationId: getOAuthSettings
@@ -223,6 +249,7 @@ components:
     thing-sort-field: { type: string, enum: [created_at, name] }
     thing-filter-field: { type: string, enum: [created_at, name] }
     category-sort-field: { type: string, enum: [created_at] }
+    flow-definition-sort-field: { type: string, enum: [created_at] }
     list-things-response:
       type: object
       properties:

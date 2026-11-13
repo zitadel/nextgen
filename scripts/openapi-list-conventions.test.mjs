@@ -182,7 +182,9 @@ const checks = {
     return listOperations(spec).flatMap(({ op, resource, body }) => {
       const field = deref(spec, body?.properties?.sorting)?.properties?.field;
       if (!field) return [];
-      const wanted = `${singular(resource)}-sort-field`;
+      // Component names are kebab-case file names: `flow_definitions` sorts by
+      // `flow-definition-sort-field`.
+      const wanted = `${singular(resource.replaceAll("_", "-"))}-sort-field`;
       const actual = refName(field);
       if (actual === wanted) return [];
       const named = actual ? `\`${actual}\`` : "an inline schema";
@@ -227,6 +229,7 @@ test("each check reports every violation in the fixture, each once, and nothing 
     "list-response-shape listTools",
     "list-response-shape listWidgets",
     "list-response-shape queryParts",
+    "query-sort-field queryGearWheels",
     "query-sort-field queryGears",
     "query-sort-field querySprings",
   ]);
@@ -238,6 +241,7 @@ test("compliant lists, singletons, actions and endpoints are left alone", async 
   // of the rest is a collection.
   assert.deepEqual([...collections(spec)].sort(), [
     "/categories",
+    "/flow_definitions",
     "/oauth_settings",
     "/things",
     "/things/me/parts",
@@ -248,7 +252,14 @@ test("compliant lists, singletons, actions and endpoints are left alone", async 
     listOperations(spec)
       .map(({ op }) => op.operationId)
       .sort(),
-    ["listMyParts", "listThingRevisions", "listThings", "queryCategories", "queryThings"],
+    [
+      "listMyParts",
+      "listThingRevisions",
+      "listThings",
+      "queryCategories",
+      "queryFlowDefinitions",
+      "queryThings",
+    ],
   );
   for (const [rule, check] of Object.entries(checks)) assert.deepEqual(check(spec), [], rule);
 });
