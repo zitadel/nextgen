@@ -8,7 +8,13 @@ const platform = usePlatformMock();
 /**
  * The files a first run writes in a set-up Next.js app.
  */
-const SUITE_FILES = ["playwright.config.mts", "e2e/sign-in.spec.ts", ".gitignore", "package.json"];
+const SUITE_FILES = [
+  "playwright.config.mts",
+  "e2e/sign-in.spec.ts",
+  "e2e/signed-in.spec.ts",
+  ".gitignore",
+  "package.json",
+];
 
 /**
  * The dev dependencies a first run adds.
@@ -84,12 +90,22 @@ describe("tests add", () => {
         expect(result).toSuggest("install");
       });
 
-      it("suggests running the suite", async () => {
+      it("suggests running the suite through the project's script", async () => {
         const app = await aSetUpApp();
 
         const result = await app.addTests(["--json"]);
 
-        expect(result).toSuggest("npx playwright test");
+        expect(result).toSuggest("run test:e2e");
+      });
+
+      it("reports the script it added", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.addTests(["--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          test_script: { name: "test:e2e", command: "playwright test", status: "added" },
+        });
       });
 
       it("writes nothing when run again", async () => {

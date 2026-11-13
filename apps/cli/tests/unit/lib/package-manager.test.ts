@@ -8,9 +8,11 @@ import {
   addExactCommandFor,
   detectPackageManager,
   devCommandFor,
+  execCommandFor,
   inDirectory,
   installCommandFor,
   type PackageManager,
+  runScriptCommandFor,
 } from "@/lib/package-manager";
 
 const dirs: string[] = [];
@@ -107,4 +109,30 @@ describe("package manager commands", () => {
         .display,
     ).toBe(display);
   });
+
+  it.each([
+    ["npm", "npm exec -- playwright install chromium"],
+    ["pnpm", "pnpm exec playwright install chromium"],
+    ["yarn", "yarn playwright install chromium"],
+    ["bun", "bun x playwright install chromium"],
+  ] satisfies Array<[PackageManager, string]>)(
+    "runs an installed binary with %s",
+    (packageManager, display) => {
+      expect(execCommandFor(packageManager, "playwright", ["install", "chromium"]).display).toBe(
+        display,
+      );
+    },
+  );
+
+  it.each([
+    ["npm", "npm run test:e2e"],
+    ["pnpm", "pnpm run test:e2e"],
+    ["yarn", "yarn run test:e2e"],
+    ["bun", "bun run test:e2e"],
+  ] satisfies Array<[PackageManager, string]>)(
+    "runs a project script with %s",
+    (packageManager, display) => {
+      expect(runScriptCommandFor(packageManager, "test:e2e").display).toBe(display);
+    },
+  );
 });

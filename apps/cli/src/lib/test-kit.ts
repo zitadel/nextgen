@@ -1,3 +1,4 @@
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 
 /**
@@ -42,6 +43,16 @@ export const PLAYWRIGHT_CONFIG_NAMES = [
 export const SIGN_IN_SPEC = "e2e/sign-in.spec.ts";
 
 /**
+ * The test to copy: a page behind the sign-in, started signed in.
+ */
+export const SIGNED_IN_SPEC = "e2e/signed-in.spec.ts";
+
+/**
+ * The `package.json` script that runs the suite, and what it runs.
+ */
+export const TEST_SCRIPT = { name: "test:e2e", command: "playwright test" } as const;
+
+/**
  * What a test run leaves in the app: the kit's handshake file, which holds the
  * test project's secret, and Playwright's results and report.
  */
@@ -72,8 +83,10 @@ type FrameworkSuite = Readonly<{
   devCommand: ReadonlyArray<string>;
   /** The sign-in page setup writes. */
   loginPath: string;
-  /** Where a completed sign-in lands. */
+  /** Where a completed sign-in lands: a page setup protects. */
   signedInPath: string;
+  /** The test id of the sign-out control the signed-in page renders. */
+  signOutTestId: string;
 }>;
 
 /**
@@ -88,6 +101,7 @@ const SUITES: Readonly<Record<string, FrameworkSuite>> = {
     devCommand: ["npx", "next", "dev", "--hostname", "localhost", "--port", String(TEST_APP_PORT)],
     loginPath: "/login",
     signedInPath: "/profile",
+    signOutTestId: "zitadel-session-logout",
   },
 };
 
@@ -110,8 +124,8 @@ export function supportsTestSuite(framework: string): boolean {
  * The files and dependencies of a first Playwright suite on the test kit.
  *
  * @param input - The framework setup configured, the kit version to pin (the
- *   CLI's own, as setup pins the SDK), and the dev dependencies the app
- *   already declares, which the plan leaves as they are.
+ *   CLI's own, as setup pins the SDK), and the dev dependencies and scripts
+ *   the app already declares, which the plan leaves as they are.
  * @returns The plan for the file writer.
  * @throws {@link Error} When the framework has no suite; check
  *   {@link supportsTestSuite} first.
@@ -120,6 +134,7 @@ export function testSuitePlan(input: {
   framework: string;
   kitVersion: string;
   declared: ReadonlySet<string>;
+  scripts: ReadonlySet<string>;
 }): ScaffoldPlan {
   const suite = SUITES[input.framework];
   if (suite === undefined) {
@@ -143,7 +158,11 @@ export function testSuitePlan(input: {
       { kind: "write", path: PLAYWRIGHT_CONFIG, contents: playwrightConfig(suite) },
       { kind: "mkdir", path: "e2e" },
       { kind: "write", path: SIGN_IN_SPEC, contents: signInSpec(suite) },
+      { kind: "write", path: SIGNED_IN_SPEC, contents: signedInSpec(suite) },
       { kind: "append-gitignore", entries: TEST_RUN_OUTPUTS },
+      ...(input.scripts.has(TEST_SCRIPT.name)
+        ? []
+        : [{ kind: "edit", path: "package.json", edit: withTestScript } as const]),
       ...dependencies,
     ],
     summary: [
@@ -208,4 +227,37 @@ test("a seeded user signs in with their password", async ({ page, seed }) => {
   await expect(page).toHaveURL(/\\${suite.signedInPath}(?:[/?#]|$)/, { timeout: 30_000 });
 });
 `;
+}
+
+function signedInSpec(suite: FrameworkSuite): string {
+  return `import { expect, test } from "${TEST_KIT_PACKAGE}/playwright";
+
+// Test the sign-in itself with the signed-out \`page\`, as sign-in.spec.ts does.
+// Test every other page from \`authenticatedPage\`: it starts signed in as a new user.
+test("a signed-in user sees the profile page", async ({ authenticatedPage }) => {
+  const { page } = authenticatedPage;
+
+  await page.goto("${suite.signedInPath}");
+
+  await expect(page).toHaveURL(/\\${suite.signedInPath}(?:[/?#]|$)/);
+  await expect(page.getByTestId("${suite.signOutTestId}")).toBeVisible({ timeout: 30_000 });
+});
+`;
+}
+
+/**
+ * Adds {@link TEST_SCRIPT} to `package.json`, splicing in the one key so every
+ * other byte of the developer's file stays as it is.
+ */
+function withTestScript(source: string | undefined): string {
+  const text = source ?? "{}";
+  const document = parseJsonObject(text, "package.json");
+  const scripts = isObject(document.scripts) ? document.scripts : {};
+  if (Object.hasOwn(scripts, TEST_SCRIPT.name)) {
+    return text;
+  }
+  return setTopLevelJsonKey(text, "package.json", "scripts", {
+    ...scripts,
+    [TEST_SCRIPT.name]: TEST_SCRIPT.command,
+  });
 }

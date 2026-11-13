@@ -173,6 +173,27 @@ function brandingStep(app: { readonly path: string }): string {
 }
 
 /**
+ * The step that offers a Next.js app a first end-to-end test, run in the
+ * directory setup ran in.
+ *
+ * @param app - The app setup ran in.
+ * @returns The step.
+ */
+function testsStep(app: { readonly path: string }): string {
+  return `Add a first end-to-end test whenever you want one: ${testsCommand(app)}`;
+}
+
+/**
+ * The `tests add` setup suggests for a Next.js app.
+ *
+ * @param app - The app setup ran in.
+ * @returns The command.
+ */
+function testsCommand(app: { readonly path: string }): string {
+  return expectedPublicCliCommand(`tests add --cwd ${app.path}`);
+}
+
+/**
  * Every file setup writes into an app, in the order it reports them.
  */
 const FILES_WRITTEN = [
@@ -591,6 +612,7 @@ describe("setup", () => {
               `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
               brandingStep(app),
               `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              testsStep(app),
             ],
             next_commands: [
               `npm --prefix ${app.path} install`,
@@ -600,6 +622,7 @@ describe("setup", () => {
               expectedPublicCliCommand(
                 app.asSetupSuggests("auth-method sso enable --provider google"),
               ),
+              testsCommand(app),
             ],
           },
           warnings: [],
@@ -729,6 +752,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -738,6 +762,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [
@@ -789,6 +814,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -798,6 +824,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -888,6 +915,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -897,6 +925,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -935,6 +964,7 @@ describe("setup", () => {
               `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
               brandingStep(app),
               `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              testsStep(app),
             ],
             next_commands: [
               `npm --prefix ${app.path} install`,
@@ -944,6 +974,7 @@ describe("setup", () => {
               expectedPublicCliCommand(
                 app.asSetupSuggests("auth-method sso enable --provider google"),
               ),
+              testsCommand(app),
             ],
           },
           warnings: [],
@@ -1004,6 +1035,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1013,6 +1045,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1081,6 +1114,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1090,6 +1124,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1127,6 +1162,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1136,6 +1172,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1173,6 +1210,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1182,6 +1220,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1220,6 +1259,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1229,6 +1269,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
                 expectedPublicCliCommand(
                   `setup --skip-install --framework next --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
@@ -1281,6 +1322,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1290,6 +1332,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1330,6 +1373,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1339,6 +1383,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
                 expectedPublicCliCommand(
                   `setup --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
@@ -1442,6 +1487,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} run dev`,
@@ -1450,6 +1496,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -1676,6 +1723,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
@@ -1686,6 +1734,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [
@@ -1747,6 +1796,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
@@ -1756,6 +1806,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [
@@ -1885,12 +1936,14 @@ describe("setup", () => {
                 CUSTOMIZE_STEP,
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
+                testsStep(app),
               ],
               next_commands: [
                 `npm --prefix ${app.path} install`,
                 `npm --prefix ${app.path} run dev`,
                 expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
                 expectedPublicCliCommand(app.asSetupSuggests("status")),
+                testsCommand(app),
               ],
             },
             warnings: [],
@@ -2140,6 +2193,7 @@ describe("setup", () => {
                 `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
                 brandingStep(app),
                 `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+                testsStep(app),
               ],
               next_commands: [
                 expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
@@ -2150,6 +2204,7 @@ describe("setup", () => {
                 expectedPublicCliCommand(
                   app.asSetupSuggests("auth-method sso enable --provider google"),
                 ),
+                testsCommand(app),
               ],
             },
             warnings: [

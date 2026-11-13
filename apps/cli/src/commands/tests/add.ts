@@ -1,8 +1,8 @@
 import { join, relative, sep } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { pathExists } from "@/lib/fs";
+import { isObject } from "@/lib/json";
 import { log } from "@/lib/log";
 import { readPackageJson } from "@/lib/npm";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
@@ -12,10 +12,13 @@ import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
   detectPackageManager,
+  execCommandFor,
   inDirectory,
   installCommandFor,
+  type PackageCommand,
   type PackageManager,
   runPackageCommand,
+  runScriptCommandFor,
 } from "@/lib/package-manager";
 import { hasZitadelConfig } from "@/lib/project";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
@@ -27,6 +30,7 @@ import {
   PLAYWRIGHT_CONFIG_NAMES,
   supportsTestSuite,
   TEST_KIT_PACKAGE,
+  TEST_SCRIPT,
   TEST_SUITE_FRAMEWORKS,
   testSuitePlan,
 } from "@/lib/test-kit";
@@ -70,6 +74,19 @@ const INSTALL_REFUSAL: Refusal = {
   details: { command: "{command}", cwd: "{cwd}", message: "{message}" },
 };
 
+/** What the app's `package.json` declares, as far as the suite cares. */
+type Manifest = Readonly<{
+  dependencies: ReadonlySet<string>;
+  scripts: Readonly<Record<string, unknown>>;
+}>;
+
+/** The script that runs the suite, and whether this run added it. */
+type TestScript = {
+  name: string;
+  command: string;
+  status: "added" | "would-add" | "exists";
+};
+
 /** What the dependency install did. */
 type TestsInstall = {
   status: "completed" | "would-run" | "skipped";
@@ -81,14 +98,15 @@ type TestsInstall = {
  * `zitadel tests add` — add a first end-to-end test to an app setup wired up.
  *
  * Writes a Playwright config on `@zitadel/testing`, which boots a Zitadel
- * server of its own for every run, and one test that signs a seeded user in.
+ * server of its own for every run, a test that signs a seeded user in, a test
+ * that starts signed in, and a `test:e2e` script that runs them.
  * Nothing else adds them: `setup` installs no test tooling. Files that already
  * hold something else are refused unless `--force` is given; a rerun that
  * finds its own files writes nothing.
  */
 export default class TestsAdd extends BaseCommand {
   static override description =
-    `Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts and e2e/sign-in.spec.ts, wired to ${TEST_KIT_PACKAGE}, and adds it and @playwright/test as dev dependencies. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.`;
+    `Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TEST_KIT_PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.`;
   static override group = CommandGroups.localDevelopment;
 
   static override flags = {
@@ -113,16 +131,20 @@ export default class TestsAdd extends BaseCommand {
   protected async execute({ flags }: Admitted<typeof TestsAdd>): Promise<JsonEnvelope> {
     const framework = await this.projectFramework();
     await this.refuseAnotherPlaywrightConfig();
+    const manifest = await this.manifest();
     const plan = testSuitePlan({
       framework,
       kitVersion: this.cliVersion,
-      declared: await this.declaredDependencies(),
+      declared: manifest.dependencies,
+      scripts: new Set(Object.keys(manifest.scripts)),
     });
+    const packageManager = await detectPackageManager(this.cwd);
 
     // A dry run first, so a conflict refuses the run before any file is written.
     const planned = await this.scaffold(plan, true);
     const result = this.dryRun ? planned : await this.scaffold(plan, false);
-    const install = await this.install(result, flags.skipInstall, flags.cwd);
+    const install = await this.install(result, packageManager, flags.skipInstall, flags.cwd);
+    const script = this.testScript(manifest);
 
     const written = result.filesWritten.map((file) => {
       return relative(this.cwd, file).split(sep).join("/");
@@ -133,7 +155,7 @@ export default class TestsAdd extends BaseCommand {
       : written.length === 0
         ? `The ${suite} is already in place`
         : `Added a ${suite}`;
-    const next = this.nextCommands(install, flags.cwd);
+    const next = this.nextCommands(packageManager, install, script, flags.cwd);
     const lines = [
       title,
       ...(written.length === 0
@@ -145,6 +167,7 @@ export default class TestsAdd extends BaseCommand {
             }),
           ]),
       ...(install === undefined ? [] : [`Dependencies: ${installLine(install)}`]),
+      ...scriptLines(script),
       "Each run boots its own Zitadel server; the browser it drives is Chromium.",
     ];
 
@@ -156,6 +179,7 @@ export default class TestsAdd extends BaseCommand {
         framework,
         files_written: written,
         dependencies_added: result.depsAdded,
+        test_script: script,
         install: install ?? null,
       },
       pretty: prose(lines.join("\n")),
@@ -210,17 +234,36 @@ export default class TestsAdd extends BaseCommand {
     }
   }
 
-  /** The dependencies `package.json` declares, in any section. */
-  private async declaredDependencies(): Promise<ReadonlySet<string>> {
+  /** The dependencies `package.json` declares, in any section, and its scripts. */
+  private async manifest(): Promise<Manifest> {
     const manifest = await readPackageJson(this.cwd).catch(() => undefined);
     if (manifest === undefined) {
       throw refusalError(MANIFEST_REFUSAL, {});
     }
-    return new Set(
-      [manifest.dependencies, manifest.devDependencies].flatMap((section) => {
-        return section === undefined ? [] : Object.keys(section);
-      }),
-    );
+    return {
+      dependencies: new Set(
+        [manifest.dependencies, manifest.devDependencies].flatMap((section) => {
+          return section === undefined ? [] : Object.keys(section);
+        }),
+      ),
+      scripts: isObject(manifest.scripts) ? manifest.scripts : {},
+    };
+  }
+
+  /**
+   * The script that runs the suite: the one this run adds, or the one of that
+   * name the app already had, which it leaves as it is.
+   */
+  private testScript(manifest: Manifest): TestScript {
+    const existing = manifest.scripts[TEST_SCRIPT.name];
+    if (existing !== undefined) {
+      return { name: TEST_SCRIPT.name, command: String(existing), status: "exists" };
+    }
+    return {
+      name: TEST_SCRIPT.name,
+      command: TEST_SCRIPT.command,
+      status: this.dryRun ? "would-add" : "added",
+    };
   }
 
   private scaffold(plan: ScaffoldPlan, dryRun: boolean): Promise<ScaffoldResult> {
@@ -233,13 +276,13 @@ export default class TestsAdd extends BaseCommand {
    */
   private async install(
     result: ScaffoldResult,
+    packageManager: PackageManager,
     skip: boolean,
     cwdFlag: string | undefined,
   ): Promise<TestsInstall | undefined> {
     if (result.depsAdded.length === 0) {
       return undefined;
     }
-    const packageManager = await detectPackageManager(this.cwd);
     const command = installCommandFor(packageManager);
     const shown = inDirectory(command, cwdFlag, this.cwd).display;
     if (this.dryRun || skip) {
@@ -268,23 +311,43 @@ export default class TestsAdd extends BaseCommand {
   }
 
   /**
-   * What the reader runs next, from the shell's directory: the install when
-   * this run skipped it, Playwright's browser, then the suite.
+   * What the reader runs next, from the shell's directory, with the app's
+   * package manager: the install when this run skipped it, Playwright's
+   * browser, then the suite, through the project's script when it is the
+   * suite's.
    */
   private nextCommands(
+    packageManager: PackageManager,
     install: TestsInstall | undefined,
+    script: TestScript,
     cwdFlag: string | undefined,
   ): SuggestedCommand[] {
-    const inDir = (command: string) => {
-      return shellCommand(
-        cwdFlag === undefined ? command : `cd ${Cmd.quote(cwdFlag)} && ${command}`,
-      );
+    const shown = (command: PackageCommand) => {
+      return shellCommand(inDirectory(command, cwdFlag, this.cwd).display);
     };
+    const runsTheSuite = script.status !== "exists" || script.command === TEST_SCRIPT.command;
     return [
       ...(install?.status === "skipped" ? [shellCommand(install.command)] : []),
-      inDir("npx playwright install chromium"),
-      inDir("npx playwright test"),
+      shown(execCommandFor(packageManager, "playwright", ["install", "chromium"])),
+      shown(
+        runsTheSuite
+          ? runScriptCommandFor(packageManager, script.name)
+          : execCommandFor(packageManager, "playwright", ["test"]),
+      ),
     ];
+  }
+}
+
+function scriptLines(script: TestScript): string[] {
+  switch (script.status) {
+    case "added":
+      return [`Added the ${script.name} script: ${script.command}`];
+    case "would-add":
+      return [`Would add the ${script.name} script: ${script.command}`];
+    case "exists":
+      return script.command === TEST_SCRIPT.command
+        ? []
+        : [`Left the existing ${script.name} script as it is: ${script.command}`];
   }
 }
 

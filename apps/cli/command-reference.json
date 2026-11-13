@@ -470,7 +470,7 @@
     {
       "id": "tests add",
       "group": "Local development",
-      "description": "Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts and e2e/sign-in.spec.ts, wired to @zitadel/testing, and adds it and @playwright/test as dev dependencies. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.",
+      "description": "Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to @zitadel/testing. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.",
       "args": [],
       "flags": [
         {

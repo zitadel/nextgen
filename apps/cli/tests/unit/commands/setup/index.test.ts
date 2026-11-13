@@ -1400,6 +1400,34 @@ describe("setup", () => {
     });
   });
 
+  describe("for a framework tests add writes a suite for", () => {
+    it("suggests tests add", async ({ dir }) => {
+      const cwd = await aNewAppDirectory(dir);
+
+      const res = await runCliForTest(onTheCloud(cwd, "--dry-run", "--framework", "next"), {
+        PATH: await aFakeAppGeneratorPath(),
+      });
+
+      expect(res).toSuggest(`tests add --cwd ${cwd}`);
+    });
+  });
+
+  describe("for a framework tests add writes no suite for", () => {
+    it.for(
+      FRAMEWORKS.filter((framework) => {
+        return framework !== "next";
+      }),
+    )("suggests no tests add for %s", async (framework, { dir }) => {
+      const cwd = await aNewAppDirectory(dir);
+
+      const res = await runCliForTest(onTheCloud(cwd, "--dry-run", "--framework", framework), {
+        PATH: await aFakeAppGeneratorPath(),
+      });
+
+      expect(res).not.toSuggest("tests add");
+    });
+  });
+
   describe("with --dry-run", () => {
     it("reports a stub project", async ({ dir }) => {
       await aNextApp(dir);

@@ -13,21 +13,33 @@ type Answer = Readonly<{
   code?: string;
   message?: string;
   hint?: string;
-  data?: { files_written?: string[] };
+  data?: {
+    files_written?: string[];
+    test_script?: { name: string; command: string; status: string };
+    next_commands?: string[];
+  };
 }>;
 
 /** A test of the developer's own, where the suite's first test goes. */
 const OWN_SPEC = 'import { test } from "@playwright/test";\n';
 
+/** A test:e2e script of the developer's own. */
+const OWN_SCRIPT = "vitest run --project e2e";
+
 /** Lays out what setup leaves in `dir` for `framework`, minus what `without` names. */
 async function aProject(
   dir: string,
-  { framework = "next", without = [] }: { framework?: string; without?: string[] } = {},
+  {
+    framework = "next",
+    without = [],
+    scripts = {},
+  }: { framework?: string; without?: string[]; scripts?: Record<string, string> } = {},
 ): Promise<void> {
+  const manifest = { name: "app", scripts, dependencies: { next: "^16.0.0" } };
   const files: Record<string, string> = {
     "zitadel.json": `${JSON.stringify({ version: "0.0.1" })}\n`,
     ".zitadel/state.json": `${JSON.stringify({ framework })}\n`,
-    "package.json": `${JSON.stringify({ name: "app", dependencies: { next: "^16.0.0" } })}\n`,
+    "package.json": `${JSON.stringify(manifest)}\n`,
   };
   await mkdir(join(dir, ".zitadel"), { recursive: true });
   for (const [path, contents] of Object.entries(files)) {
@@ -121,6 +133,53 @@ describe("tests add", () => {
       await testsAdd(dir);
 
       expect(await readFile(join(dir, "package.json"), "utf8")).not.toContain("@zitadel/testing");
+    });
+  });
+
+  describe("with a test:e2e script of the app's own", () => {
+    test("leaves it as it is", async ({ dir }) => {
+      await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
+
+      await testsAdd(dir);
+
+      expect(await readFile(join(dir, "package.json"), "utf8")).toContain(OWN_SCRIPT);
+    });
+
+    test("says it kept it", async ({ dir }) => {
+      await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
+
+      const answer = await testsAdd(dir);
+
+      expect(answer.data?.test_script).toEqual({
+        name: "test:e2e",
+        command: OWN_SCRIPT,
+        status: "exists",
+      });
+    });
+
+    test("suggests running the suite through Playwright instead", async ({ dir }) => {
+      await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
+
+      const answer = await testsAdd(dir);
+
+      expect(answer.data?.next_commands?.at(-1)).toBe(
+        `npm --prefix ${dir} exec -- playwright test`,
+      );
+    });
+  });
+
+  describe("with no test:e2e script", () => {
+    test("suggests the browser install and the script, with the app's package manager", async ({
+      dir,
+    }) => {
+      await aProject(dir);
+
+      const answer = await testsAdd(dir);
+
+      expect(answer.data?.next_commands?.slice(-2)).toEqual([
+        `npm --prefix ${dir} exec -- playwright install chromium`,
+        `npm --prefix ${dir} run test:e2e`,
+      ]);
     });
   });
 

@@ -10,6 +10,7 @@ import {
   PLAYWRIGHT_PACKAGE,
   PLAYWRIGHT_RANGE,
   SIGN_IN_SPEC,
+  SIGNED_IN_SPEC,
   supportsTestSuite,
   TEST_KIT_PACKAGE,
   testSuitePlan,
@@ -27,6 +28,7 @@ const NEXT_PLAN = testSuitePlan({
   framework: "next",
   kitVersion: KIT_VERSION,
   declared: new Set(["next"]),
+  scripts: new Set(["dev"]),
 });
 
 /** The dev dependencies a plan adds, as `name@version`. */
@@ -42,6 +44,14 @@ function written(ops: ReadonlyArray<FileOp>, path: string): string {
     return one.kind === "write" && one.path === path;
   });
   return op?.kind === "write" ? op.contents : "";
+}
+
+/** The plan's edit of `package.json`, or one that changes nothing. */
+function scriptEdit(ops: ReadonlyArray<FileOp>): (source: string) => string {
+  const op = ops.find((one) => {
+    return one.kind === "edit" && one.path === "package.json";
+  });
+  return op?.kind === "edit" ? op.edit : (source) => source;
 }
 
 /** The names a generated file imports from `module`. */
@@ -75,6 +85,7 @@ describe("testSuitePlan", () => {
       framework: "next",
       kitVersion: KIT_VERSION,
       declared: new Set(["next", PLAYWRIGHT_PACKAGE]),
+      scripts: new Set(),
     });
 
     expect(devDependencies(plan.ops)).toEqual([`${TEST_KIT_PACKAGE}@${KIT_VERSION}`]);
@@ -99,9 +110,48 @@ describe("testSuitePlan", () => {
     );
   });
 
+  it("starts the copyable test signed in and checks the page behind the sign-in", () => {
+    expect(written(NEXT_PLAN.ops, SIGNED_IN_SPEC)).toContain(
+      'await expect(page.getByTestId("zitadel-session-logout")).toBeVisible(',
+    );
+  });
+
+  it.each([
+    [
+      '{\n  "name": "app"\n}\n',
+      '{\n  "name": "app",\n  "scripts": {\n    "test:e2e": "playwright test"\n  }\n}\n',
+    ],
+    [
+      '{"name":"app","scripts":{"dev":"next dev"}}',
+      '{"name":"app","scripts":{"dev":"next dev","test:e2e":"playwright test"}}',
+    ],
+  ])("adds the test:e2e script to %j and leaves the rest as it is", (before, after) => {
+    expect(scriptEdit(NEXT_PLAN.ops)(before)).toBe(after);
+  });
+
+  it("adds no script when the app already has a test:e2e", () => {
+    const plan = testSuitePlan({
+      framework: "next",
+      kitVersion: KIT_VERSION,
+      declared: new Set(),
+      scripts: new Set(["test:e2e"]),
+    });
+
+    expect(
+      plan.ops.filter((op) => {
+        return op.kind === "edit";
+      }),
+    ).toEqual([]);
+  });
+
   it("refuses a framework it has no suite for", () => {
     const thrown = thrownBy(() => {
-      return testSuitePlan({ framework: "react", kitVersion: KIT_VERSION, declared: new Set() });
+      return testSuitePlan({
+        framework: "react",
+        kitVersion: KIT_VERSION,
+        declared: new Set(),
+        scripts: new Set(),
+      });
     });
 
     expect(thrown).toBeInstanceOf(Error);
@@ -110,7 +160,7 @@ describe("testSuitePlan", () => {
 });
 
 describe("the generated suite against the kit", () => {
-  it.each([PLAYWRIGHT_CONFIG, SIGN_IN_SPEC])(
+  it.each([PLAYWRIGHT_CONFIG, SIGN_IN_SPEC, SIGNED_IN_SPEC])(
     "%s imports only what the kit's Playwright entry exports",
     async (path) => {
       const entry = await readFile(`${KIT_ROOT}src/playwright.ts`, "utf8");

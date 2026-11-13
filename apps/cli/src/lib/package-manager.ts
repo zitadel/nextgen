@@ -67,6 +67,37 @@ export function devCommandFor(packageManager: PackageManager): PackageCommand {
 }
 
 /**
+ * Runs a binary the project installed, as each manager spells it: npm needs
+ * `--` before the binary's own flags, and Yarn runs a binary by its name.
+ */
+export function execCommandFor(
+  packageManager: PackageManager,
+  bin: string,
+  args: ReadonlyArray<string>,
+): PackageCommand {
+  switch (packageManager) {
+    case "npm":
+      return command("npm", ["exec", "--", bin, ...args]);
+    case "pnpm":
+      return command("pnpm", ["exec", bin, ...args]);
+    case "yarn":
+      return command("yarn", [bin, ...args]);
+    case "bun":
+      return command("bun", ["x", bin, ...args]);
+  }
+}
+
+/**
+ * Runs one of the project's `package.json` scripts.
+ */
+export function runScriptCommandFor(
+  packageManager: PackageManager,
+  script: string,
+): PackageCommand {
+  return command(packageManager, ["run", script]);
+}
+
+/**
  * The flag that runs a package manager in another directory, and whether a
  * relative directory may be given to it: npm's `--prefix` and pnpm's `--dir`
  * read one from the shell's directory, while bun documents `--cwd` as an

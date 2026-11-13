@@ -134,6 +134,7 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { supportsTestSuite } from "@/lib/test-kit";
 import type { Questions, Step, Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -1953,6 +1954,25 @@ export default class Setup extends Destructive(BaseCommand) {
             boxActions: [],
             commands: [] as SuggestedCommand[],
           };
+    // A first end-to-end test is opt-in: setup offers it where `tests add` has
+    // a suite for the framework, and installs no test tooling itself.
+    const testsCommand = this.suggest({ id: "tests:add" });
+    const testsStep = supportsTestSuite(app.framework)
+      ? {
+          actions: [`Add a first end-to-end test whenever you want one: ${testsCommand}`],
+          boxActions: [
+            {
+              text: "Add a first end-to-end test of the sign-in whenever you want one:",
+              command: testsCommand,
+            },
+          ],
+          commands: [testsCommand],
+        }
+      : {
+          actions: [],
+          boxActions: [],
+          commands: [] as SuggestedCommand[],
+        };
     // This run again without `--dry-run`, with every other flag as typed, which
     // is what a preview's one follow-up is.
     const realRun = this.dryRun ? await this.realRun() : undefined;
@@ -1987,6 +2007,7 @@ export default class Setup extends Destructive(BaseCommand) {
         ...installOutcome.boxActions,
         ...consoleStep.boxActions,
         ...ssoStep.boxActions,
+        ...testsStep.boxActions,
         ...claimNudge.boxActions,
         ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
       ];
@@ -2189,6 +2210,7 @@ export default class Setup extends Destructive(BaseCommand) {
           brandingGuidanceAction(this.suggest),
           ...consoleStep.actions,
           ...ssoStep.actions,
+          ...testsStep.actions,
           ...claimNudge.actions,
         ],
         // A JSON run prints no warnings, so a credential the project never
@@ -2218,6 +2240,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...ssoStep.commands,
+          ...testsStep.commands,
           ...(realRun === undefined ? [] : [realRun]),
           ...claimNudge.commands,
         ],

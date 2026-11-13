@@ -793,7 +793,9 @@ local admin's team and puts `console` in `data.next_commands`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it. A run that set up no social sign-in provider also puts the `auth-method sso enable --provider google`
-command in `data.next_commands`, so a later provider is one step away.
+command in `data.next_commands`, so a later provider is one step away. For a
+framework `tests add` writes a suite for (Next.js), `data.next_commands` also
+offers `tests add`; setup itself installs no test tooling.
 
 `reset` asks before it deletes the local server's database, which cannot be undone, and keeps
 `.zitadel/local/admin.json`.
@@ -1036,14 +1038,19 @@ project per test run, seeds users and sessions through the API, and ships
 Playwright fixtures and login helpers. It never uses the project `setup`
 created or the runtime `start` runs.
 
-- Add it only when asked; `setup` installs no test tooling. In a Next.js app
+- Add it only when asked; `setup` installs no test tooling, and offers
+  `tests add` in `next_commands` where it can write a suite. In a Next.js app
   that `setup` wired up, `tests add --non-interactive --json` writes
-  `playwright.config.mts` and `e2e/sign-in.spec.ts`, adds `@zitadel/testing`
-  (pinned to the CLI's version) and `@playwright/test` as dev dependencies,
-  and installs them (`--skip-install` leaves that to `next_commands`).
+  `playwright.config.mts`, `e2e/sign-in.spec.ts` (the sign-in itself) and
+  `e2e/signed-in.spec.ts` (a page tested from `authenticatedPage`, the shape
+  to copy for most tests). It adds `@zitadel/testing` (pinned to the CLI's
+  version) and `@playwright/test` as dev dependencies and installs them
+  (`--skip-install` leaves that to `next_commands`), and adds a `test:e2e`
+  script, `playwright test`. An app's own `test:e2e` is left as it is:
+  `data.test_script.status` is then `exists`, with its `command`.
   `data.files_written`, `data.dependencies_added` and `data.install` say what
-  it did; `next_commands` install Chromium and run the suite. A rerun that
-  finds its own files writes nothing.
+  it did; `next_commands` install Chromium and run the suite with the app's
+  package manager. A rerun that finds its own files writes nothing.
 - `tests add` refuses with `E_CONFLICT` a test file of the app's own
   (`--force` replaces it) and an app with a Playwright config under another
   name; add `withZitadel()` to that config by hand. Another framework is
