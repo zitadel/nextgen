@@ -9,7 +9,7 @@ import AuthMethodPasswordEnable from "./cli/commands/auth-method/password/enable
 import AuthMethodSsoDisable from "./cli/commands/auth-method/sso/disable";
 import AuthMethodSsoEnable from "./cli/commands/auth-method/sso/enable";
 import BrandingEject from "./cli/commands/branding/eject";
-import PoliciesTest from "./cli/commands/policies/test";
+import PolicyTest from "./cli/commands/policy/test";
 import Claim from "./cli/commands/claim";
 import Console from "./cli/commands/console";
 import Deploy from "./cli/commands/deploy";
@@ -52,8 +52,8 @@ import VariableSet from "./cli/commands/variable/set";
  * The hand-written commands of the explicit oclif command table
  * (`oclif.commands.strategy: "explicit"` in `package.json`). Keys are command
  * ids with `:` as the topic separator; oclif renders them with the configured
- * space separator (`users list`). The resource commands (`users`, `teams`,
- * `sessions`, …) come from the registry in `cli/commands/resources.ts`, so a new
+ * space separator (`user list`). The resource commands (`user`, `team`,
+ * `session`, …) come from the registry in `cli/commands/resources.ts`, so a new
  * backend resource is one registry entry.
  */
 export const WORKFLOW_COMMANDS = {
@@ -91,7 +91,7 @@ export const WORKFLOW_COMMANDS = {
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
-  "policies:test": PoliciesTest,
+  "policy:test": PolicyTest,
   "preview:list": PreviewList,
   "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,

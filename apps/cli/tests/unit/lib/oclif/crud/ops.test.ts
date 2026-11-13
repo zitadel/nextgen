@@ -38,10 +38,10 @@ import {
  * bound operation takes the id of a real command with the same verb.
  */
 const STAND_IN = new Map<unknown, string>([
-  [ListOperation, "teams:list"],
-  [GetOperation, "teams:get"],
-  [CreateOperation, "teams:create"],
-  [UpdateOperation, "teams:update"],
+  [ListOperation, "team:list"],
+  [GetOperation, "team:get"],
+  [CreateOperation, "team:create"],
+  [UpdateOperation, "team:update"],
 ]);
 
 /**
@@ -62,7 +62,7 @@ function inCli<Bound extends typeof Command>(command: Bound, id: string): Bound 
 const bindOperation: typeof bindOperationOnly = (operation, definition) => {
   return inCli(
     bindOperationOnly(operation, definition),
-    STAND_IN.get(operation) ?? "teams:deactivate",
+    STAND_IN.get(operation) ?? "team:deactivate",
   );
 };
 
@@ -105,7 +105,7 @@ const options = {
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
-  topic: "teams",
+  topic: "team",
   resource,
   spec,
   options,
@@ -127,7 +127,7 @@ describe("operation statics", () => {
     ]);
     expect(statics.args).toEqual({});
     expect(statics.examples[2]).toBe(
-      "<%= config.bin %> teams list --filter name=equals:<value> --sort created_at:desc",
+      "<%= config.bin %> team list --filter name=equals:<value> --sort created_at:desc",
     );
   });
 
@@ -157,7 +157,7 @@ describe("operation statics", () => {
     const filter = statics.flags.filter as { description?: string };
     expect(filter.description).toContain("category (equals; values a|b; repeats widen)");
     expect(statics.examples[2]).toBe(
-      "<%= config.bin %> teams list --filter category=equals:<value>",
+      "<%= config.bin %> team list --filter category=equals:<value>",
     );
   });
 
@@ -204,25 +204,25 @@ describe("operation statics", () => {
 
   it("leads the create and update examples with the required fields", () => {
     expect(CreateOperation.describe(definition(create)).examples[0]).toBe(
-      "<%= config.bin %> teams create --name <name> --json",
+      "<%= config.bin %> team create --name <name> --json",
     );
     expect(UpdateOperation.describe(definition(update)).examples[0]).toBe(
-      "<%= config.bin %> teams update <id> --name <name> --json",
+      "<%= config.bin %> team update <id> --name <name> --json",
     );
   });
 
   it("names the --file example as one shell word for a multi-word resource", () => {
     const idps = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
       ...definition(spec),
-      topic: "idps",
+      topic: "idp",
       resource: { ...resource, singular: "identity provider connection" },
     });
 
     expect(CreateOperation.describe(idps(create)).examples).toContain(
-      "<%= config.bin %> idps create --file ./identity-provider-connection.json",
+      "<%= config.bin %> idp create --file ./identity-provider-connection.json",
     );
     expect(UpdateOperation.describe(idps(update)).examples).toContain(
-      "<%= config.bin %> idps update <id> --file ./identity-provider-connection.json",
+      "<%= config.bin %> idp update <id> --file ./identity-provider-connection.json",
     );
   });
 
@@ -236,7 +236,7 @@ describe("operation statics", () => {
 
     const examples = CreateOperation.describe(definition(nested)).examples;
 
-    expect(examples[0]).toBe("<%= config.bin %> teams create --data '{...}' --json");
+    expect(examples[0]).toBe("<%= config.bin %> team create --data '{...}' --json");
     expect(examples.join(" ")).not.toContain("--name <name>");
   });
 
@@ -248,7 +248,7 @@ describe("operation statics", () => {
     };
 
     expect(CreateOperation.describe(definition(declared)).examples[0]).toBe(
-      "<%= config.bin %> teams create --name platform --json",
+      "<%= config.bin %> team create --name platform --json",
     );
   });
 
@@ -273,7 +273,7 @@ describe("operation statics", () => {
     // the command is `delete` everywhere, and the outcome is in the result.
     const statics = DeleteOperation.describe(definition(remove));
     expect(statics.description).toBe("Delete a team by id.");
-    expect(statics.examples).toEqual(["<%= config.bin %> teams delete <id> --force --json"]);
+    expect(statics.examples).toEqual(["<%= config.bin %> team delete <id> --force --json"]);
   });
 });
 
@@ -295,7 +295,7 @@ describe("bindOperation", () => {
     const a = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
     const b = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
       ...definition(get),
-      topic: "users",
+      topic: "user",
     });
     expect(a).not.toBe(b);
     expect(a.examples).not.toEqual(b.examples);
@@ -404,7 +404,7 @@ describe("list nouns", () => {
       next: () => undefined,
     };
     const named: OperationDefinition<Ctx, ListSpec<Ctx>> = {
-      topic: "idps",
+      topic: "idp",
       resource: {
         singular: "identity provider",
         ...(plural === undefined ? {} : { plural }),
@@ -427,14 +427,14 @@ describe("list nouns", () => {
     expect(await nothingListed("identity providers")).toContain("No identity providers found");
   });
 
-  it("falls back to the topic when the descriptor names no plural", async () => {
-    expect(await nothingListed(undefined)).toContain("No idps found");
+  it("adds an s to the singular when the descriptor names no plural", async () => {
+    expect(await nothingListed(undefined)).toContain("No identity providers found");
   });
 });
 
 describe("write results", () => {
   it("carries data and no next command when the server answers without a body", async () => {
-    // `grants create` by identifier answers 202 with no body.
+    // `grant create` by identifier answers 202 with no body.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
@@ -470,7 +470,7 @@ describe("write results", () => {
   });
 
   it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
-    // `grants create` by identifier answers 202 with no body, so there is no
+    // `grant create` by identifier answers 202 with no body, so there is no
     // record to print and the generic rendering is the honest one.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
@@ -556,14 +556,14 @@ describe("write results", () => {
     ]);
 
     expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
-      data: { next_commands: [expect.stringMatching(/ teams update team_1 --name a$/)] },
+      data: { next_commands: [expect.stringMatching(/ team update team_1 --name a$/)] },
     });
   });
 
   it("names the resource a dry run would write as the prompt does, not the topic", async () => {
     const command = bindOperation(CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>, {
       ...definition(create),
-      topic: "idps",
+      topic: "idp",
       resource: { ...resource, singular: "identity provider" },
     });
 
@@ -627,7 +627,7 @@ describe("write results", () => {
     };
     const envelope = await runnable.run(["team_1", "--name", "a", "--json"]);
 
-    expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
+    expect(envelope.data.next_commands[0]).toContain("team get team_1 --json");
   });
 });
 
@@ -680,7 +680,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain"]);
 
-    expect(stderr.join("\n")).toContain("teams list --plain --page-token p2");
+    expect(stderr.join("\n")).toContain("team list --plain --page-token p2");
   });
 
   it("carries --fields into the next page it suggests", async () => {
@@ -691,7 +691,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain", "--fields", "name"]);
 
-    expect(stderr.join("\n")).toContain("teams list --plain --fields name --page-token p2");
+    expect(stderr.join("\n")).toContain("team list --plain --fields name --page-token p2");
   });
 
   it("leaves a created resource's JSON body as the only thing on stdout", async () => {
@@ -770,7 +770,7 @@ describe("list paging", () => {
           return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
         },
       }),
-      topic: "idps",
+      topic: "idp",
       resource: { ...resource, singular: "identity provider", plural: "identity providers" },
     });
 
@@ -952,9 +952,9 @@ describe("get sections", () => {
 
 describe("delete confirmation", () => {
   const DELETING = {
-    delete: "users:delete",
-    revoke: "sessions:revoke",
-    deactivate: "teams:deactivate",
+    delete: "user:delete",
+    revoke: "session:revoke",
+    deactivate: "team:deactivate",
   } as const;
   const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
     Object.assign(

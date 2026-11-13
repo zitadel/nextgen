@@ -243,9 +243,9 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   /** Singular noun for messages (`user`). */
   singular: string;
   /**
-   * Plural noun for messages (`identity providers`). Defaults to the topic
-   * key, which is the command's name and not always a word for a person:
-   * `idps`, `flow-definitions`, and `release`, which is not even plural.
+   * Plural noun for messages (`identity providers`). Defaults to the singular
+   * with an `s`, so a noun that forms its plural another way names it:
+   * `policies`, `identity provider connections`.
    */
   plural?: string;
   /**

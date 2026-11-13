@@ -125,7 +125,7 @@ export class SchemaService extends ApiService {
     const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No schema named "${reference}"`, {
-        hint: "Run `schemas list` to see the object types this project has.",
+        hint: "Run `schema list` to see the object types this project has.",
       });
     }
     return current;

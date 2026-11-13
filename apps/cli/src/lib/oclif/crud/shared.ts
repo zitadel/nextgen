@@ -73,6 +73,14 @@ export const capitalize = (word: string): string => {
 };
 
 /**
+ * What a list calls its rows: the resource's own plural, else its singular
+ * with an `s`. Never the topic, which is the command's name and singular.
+ */
+export const pluralOf = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
+  return resource.plural ?? `${resource.singular}s`;
+};
+
+/**
  * Validate with a generated schema, translating a failure into the CLI's
  * `E_VALIDATION` envelope with the issues attached — the same shape
  * `toZitadelError` produces for a thrown Zod error, with a message and hint

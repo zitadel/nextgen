@@ -166,8 +166,8 @@ export class NotFound extends BaseCommand {
 /**
  * Hands a name that is no command to {@link NotFound}. It never offers to run
  * another command, as oclif's own prompt did, taking the closest name for the
- * one typed and dropping its flags: `teams delete x --dry-run` became an offer
- * to run `grants delete`.
+ * one typed and dropping its flags: `team delete x --dry-run` became an offer
+ * to run `grant delete`.
  *
  * It hands over only the words that name the command and `--json` when it was
  * asked for, since the flags typed belong to a command that does not exist and

@@ -26,56 +26,56 @@ Usage
 Run a command below. Use \`zitadel <command> --help\` to see its options.
 
 Getting started
-  setup             Create a Zitadel project and scaffold local auth
-  start             Start a local Zitadel server
-  status            Summarize the local Zitadel server and project state
-  claim             Claim this project to make it permanent
-  skills            Give coding agents the Zitadel skills
+  setup            Create a Zitadel project and scaffold local auth
+  start            Start a local Zitadel server
+  status           Summarize the local Zitadel server and project state
+  claim            Claim this project to make it permanent
+  skills           Give coding agents the Zitadel skills
 
 Local development
-  console           Open the local console, signed in as the local admin
-  logs              Show local Zitadel server logs
-  stop              Stop the local Zitadel server
-  reset             Delete the local Zitadel server runtime and data
-  eject             Remove managed files and local Zitadel state
-  tests             Add end-to-end tests of the sign-in
+  console          Open the local console, signed in as the local admin
+  logs             Show local Zitadel server logs
+  stop             Stop the local Zitadel server
+  reset            Delete the local Zitadel server runtime and data
+  eject            Remove managed files and local Zitadel state
+  tests            Add end-to-end tests of the sign-in
 
 Users and teams
-  users             Create and manage users
-  teams             Create and manage teams
-  grants            Manage access grants
+  user             Create and manage users
+  team             Create and manage teams
+  grant            Manage access grants
 
 Authentication
-  auth-method       Configure how users sign in
-  idps              Manage identity provider connections
-  sessions          View and revoke sessions
+  auth-method      Configure how users sign in
+  idp              Manage identity provider connections
+  session          View and revoke sessions
 
 Configuration and releases
-  deploy            Apply your local configuration to Zitadel
-  preview           Deploy and manage pull-request preview URLs
-  pull              Rebuild your .zitadel/ files from a release
-  branding          Manage the login branding
-  deployment        Deploy releases and roll them back
-  env               Show and bind environments
-  flow-definitions  View login flows
-  origin            Manage the project's allowed origins
-  policies          View and test policies
-  projects          View and update projects
-  release           Build and manage releases
-  schemas           View user schemas
-  variable          Manage project variables
+  deploy           Apply your local configuration to Zitadel
+  preview          Deploy and manage pull-request preview URLs
+  pull             Rebuild your .zitadel/ files from a release
+  branding         Manage the login branding
+  deployment       Deploy releases and roll them back
+  env              Show and bind environments
+  flow-definition  View login flows
+  origin           Manage the project's allowed origins
+  policy           View and test policies
+  project          View and update projects
+  release          Build and manage releases
+  schema           View user schemas
+  variable         Manage project variables
 
 Diagnostics and utilities
-  doctor            Verify local runtime and project state
-  upgrade           Upgrade this project to the latest Zitadel release
-  api               Call any operation of the Zitadel API
-  autocomplete      Display autocomplete installation instructions
-  commands          List all zitadel commands
-  events            View events
-  resources         List the resources this CLI manages
-  search            Search for a command
-  version           Show the CLI version
-  which             Show which plugin a command is in
+  doctor           Verify local runtime and project state
+  upgrade          Upgrade this project to the latest Zitadel release
+  api              Call any operation of the Zitadel API
+  autocomplete     Display autocomplete installation instructions
+  commands         List all zitadel commands
+  event            View events
+  resources        List the resources this CLI manages
+  search           Search for a command
+  version          Show the CLI version
+  which            Show which plugin a command is in
 
 Flags
   -h, --help  Show help for command
@@ -138,15 +138,15 @@ describe("root help", () => {
   });
 
   it("leaves topic help to oclif", async () => {
-    const { exitCode, stdout } = await runCliForTest(["schemas", "--help"]);
+    const { exitCode, stdout } = await runCliForTest(["schema", "--help"]);
 
     expect(exitCode).toBe(0);
-    expect(stripAnsi(stdout)).toContain("schemas list");
+    expect(stripAnsi(stdout)).toContain("schema list");
   });
 
   it.each([
     { label: "a command", argv: ["claim", "--help"] },
-    { label: "a family of commands", argv: ["users", "--help"] },
+    { label: "a family of commands", argv: ["user", "--help"] },
   ])("ends the help for $label with where to find every command", async ({ argv }) => {
     const { exitCode, stdout } = await runCliForTest(argv);
 

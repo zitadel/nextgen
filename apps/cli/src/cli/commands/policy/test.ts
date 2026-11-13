@@ -137,7 +137,7 @@ type CaseOutcome = {
 };
 
 /**
- * A decision as {@link PoliciesTest} words it: whether it allows, and the
+ * A decision as {@link PolicyTestCommand} words it: whether it allows, and the
  * code and rules of a refusal, each when known.
  */
 type DescribedDecision = {
@@ -163,7 +163,7 @@ type DescribedDecision = {
 const EVALUATE_CONCURRENCY = 8;
 
 /**
- * `zitadel policies test` — evaluate the cases in
+ * `zitadel policy test` — evaluate the cases in
  * `.zitadel/policies/<operation>.test.json` on the server.
  *
  * @remarks
@@ -176,7 +176,7 @@ const EVALUATE_CONCURRENCY = 8;
  * nothing is read from or written to the project's policies. A failing case
  * fails the command with `E_VALIDATION`, carrying the full results.
  */
-export default class PoliciesTest extends EnvironmentCommand {
+export default class PolicyTestCommand extends EnvironmentCommand {
   static override description = `Run the test cases in .zitadel/policies/ against the policies.
 
 A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.
@@ -185,10 +185,10 @@ The server evaluates every case, so the command needs a connection to it. By def
   static override group = CommandGroups.configuration;
 
   static override examples = [
-    "<%= config.bin %> policies test",
-    "<%= config.bin %> policies test auth.factor.password.set",
-    "<%= config.bin %> policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7",
-    "<%= config.bin %> policies test --json",
+    "<%= config.bin %> policy test",
+    "<%= config.bin %> policy test auth.factor.password.set",
+    "<%= config.bin %> policy test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7",
+    "<%= config.bin %> policy test --json",
   ];
   static override args = {
     operation: Args.string({
@@ -212,7 +212,10 @@ The server evaluates every case, so the command needs a connection to it. By def
    * @throws {@link ZitadelError} With `E_VALIDATION` when a test or policy file
    *   is not valid, or a case fails.
    */
-  protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
+  protected async execute({
+    args,
+    flags,
+  }: Admitted<typeof PolicyTestCommand>): Promise<JsonEnvelope> {
     const operations = args.operation === undefined ? [] : [args.operation];
     const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
     const selected = config.policies.selectTests(operations);

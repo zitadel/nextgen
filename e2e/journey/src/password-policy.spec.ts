@@ -26,10 +26,10 @@ import {
 /**
  * The password policy a release carries is the one sign-up enforces. Setup
  * writes `.zitadel/policies/auth.factor.password.set.json` and deploys it, so
- * a fresh app refuses a password below its minimum. `zitadel policies test`
+ * a fresh app refuses a password below its minimum. `zitadel policy test`
  * answers as the live sign-up does and refuses an expectation that cannot
  * pass. Deploying a higher minimum and a maximum bounds new passwords from
- * both sides, and leaves existing ones signing in; `policies test` checks the
+ * both sides, and leaves existing ones signing in; `policy test` checks the
  * history depth deployed with them, which no sign-up can reach because a new
  * user has no history; a release that is built but not deployed
  * changes nothing; rolling back brings the earlier minimum back; deploying
@@ -63,7 +63,7 @@ test.beforeAll(async () => {
   earlyUser.password = passwordOf(setupMinimum);
 });
 
-test("policies test answers as the deployed policy does", async () => {
+test("policy test answers as the deployed policy does", async () => {
   await writePolicyTest([
     {
       name: "one character short is refused",
@@ -77,18 +77,13 @@ test("policies test answers as the deployed policy does", async () => {
     },
   ]);
 
-  const envelope = (await runCli(metadata, [
-    "policies",
-    "test",
-    "--non-interactive",
-    "--json",
-  ])) as {
+  const envelope = (await runCli(metadata, ["policy", "test", "--non-interactive", "--json"])) as {
     data: { passed: number; failed: number };
   };
   expect(envelope.data).toMatchObject({ passed: 2, failed: 0 });
 });
 
-test("policies test refuses an expectation the policy cannot meet", async () => {
+test("policy test refuses an expectation the policy cannot meet", async () => {
   await writePolicyTest([
     {
       name: "one character short is wrongly expected to pass",
@@ -97,12 +92,7 @@ test("policies test refuses an expectation the policy cannot meet", async () => 
     },
   ]);
 
-  const envelope = await runCliFailing(metadata, [
-    "policies",
-    "test",
-    "--non-interactive",
-    "--json",
-  ]);
+  const envelope = await runCliFailing(metadata, ["policy", "test", "--non-interactive", "--json"]);
   expect(envelope.code).toBe("E_VALIDATION");
   expect(envelope.details).toMatchObject({ passed: 0, failed: 1 });
 
@@ -133,7 +123,7 @@ test("a deployed higher minimum and a maximum apply to new passwords", async ({ 
   await logout(page);
 });
 
-test("policies test refuses a password reused within the deployed history depth", async () => {
+test("policy test refuses a password reused within the deployed history depth", async () => {
   const password = passwordOf(raisedMinimum);
   await writePolicyTest([
     {
@@ -156,12 +146,7 @@ test("policies test refuses a password reused within the deployed history depth"
     },
   ]);
 
-  const envelope = (await runCli(metadata, [
-    "policies",
-    "test",
-    "--non-interactive",
-    "--json",
-  ])) as {
+  const envelope = (await runCli(metadata, ["policy", "test", "--non-interactive", "--json"])) as {
     data: { passed: number; failed: number };
   };
   expect(envelope.data).toMatchObject({ passed: 3, failed: 0 });

@@ -1,6 +1,6 @@
 get:
   operationId: getIdp
-  x-zitadel-cli: idps get
+  x-zitadel-cli: idp get
   summary: Get an identity provider by ID
   description: |
     Returns an identity provider, an external sign-in such as Google, by ID at

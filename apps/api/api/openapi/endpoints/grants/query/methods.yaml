@@ -1,6 +1,6 @@
 post:
   operationId: queryGrants
-  x-zitadel-cli: grants list
+  x-zitadel-cli: grant list
   summary: Query grants
   # Grants are not in `resource_scope_index`, so the project scope is required
   # on the query, as for getGrant. The `user.read` and `team.read` scopes for

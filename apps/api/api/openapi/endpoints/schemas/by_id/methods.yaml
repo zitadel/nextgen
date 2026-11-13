@@ -1,6 +1,6 @@
 get:
   operationId: getSchema
-  x-zitadel-cli: schemas get
+  x-zitadel-cli: schema get
   summary: Get a schema by ID
   description: |
     Returns a schema by ID. A schema ID identifies one immutable revision, so

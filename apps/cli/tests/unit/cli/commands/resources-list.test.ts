@@ -27,10 +27,10 @@ describe("zitadel resources", () => {
     const resources = (parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } })
       .data.items;
     const byTopic = Object.fromEntries(resources.map((resource) => [resource.topic, resource]));
-    expect(byTopic.users?.verbs).toEqual(["list", "get", "create", "update", "delete"]);
-    expect(byTopic.sessions?.verbs).toEqual(["list", "get", "revoke"]);
-    expect(byTopic.events?.verbs).toEqual(["list", "get"]);
-    expect(byTopic.projects?.verbs).toEqual(["list", "get", "update"]);
+    expect(byTopic.user?.verbs).toEqual(["list", "get", "create", "update", "delete"]);
+    expect(byTopic.session?.verbs).toEqual(["list", "get", "revoke"]);
+    expect(byTopic.event?.verbs).toEqual(["list", "get"]);
+    expect(byTopic.project?.verbs).toEqual(["list", "get", "update"]);
   });
 
   it("describes each write verb's own fields, since required differs between them", async () => {
@@ -47,7 +47,7 @@ describe("zitadel resources", () => {
       }
     ).data.items;
 
-    const grants = resources.find((resource) => resource.topic === "grants");
+    const grants = resources.find((resource) => resource.topic === "grant");
     expect(grants?.create_fields?.[0]).toMatchObject({
       name: "relation",
       flag: "--relation",
@@ -69,7 +69,7 @@ describe("zitadel resources", () => {
     // Grants have no update endpoint, so nothing claims otherwise.
     expect(grants?.update_fields).toBeUndefined();
 
-    const teams = resources.find((resource) => resource.topic === "teams");
+    const teams = resources.find((resource) => resource.topic === "team");
     expect(teams?.create_fields?.find((field) => field.flag === "--name")?.required).toBe(true);
     expect(teams?.update_fields?.find((field) => field.flag === "--name")?.required).toBe(false);
   });
@@ -82,7 +82,7 @@ describe("zitadel resources", () => {
           items: Array<{ topic: string; document_root?: string; create_fields?: Json[] }>;
         };
       }
-    ).data.items.find((resource) => resource.topic === "idps");
+    ).data.items.find((resource) => resource.topic === "idp");
     const field = (name: string) => idps?.create_fields?.find((entry) => entry.name === name);
 
     // The fields are the connection's own, as `.zitadel/idps/<slug>.json` spells them.
@@ -123,27 +123,27 @@ describe("zitadel resources", () => {
       resources.find((r) => r.topic === topic)?.filters?.find((f) => f.field === field);
 
     // A structured query endpoint offers the full operation set...
-    expect(find("teams", "name")?.operations).toContain("contains");
+    expect(find("team", "name")?.operations).toContain("contains");
     // ...and a GET list is described in the same vocabulary, narrowed to what
     // it actually accepts, so an agent never has to guess per transport.
-    expect(find("events", "category")?.operations).toEqual(["equals"]);
+    expect(find("event", "category")?.operations).toEqual(["equals"]);
     // A query-body field narrowed to what the server implements for it.
-    expect(find("users", "schema_object_type")?.operations).toEqual([
+    expect(find("user", "schema_object_type")?.operations).toEqual([
       "equals",
       "not_equals",
       "contains",
     ]);
-    expect(find("users", "identifier")?.operations).toEqual(["starts_with"]);
-    expect(find("events", "category")?.combine).toBe("or");
-    expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
+    expect(find("user", "identifier")?.operations).toEqual(["starts_with"]);
+    expect(find("event", "category")?.combine).toBe("or");
+    expect(find("schema", "revisions")?.values).toEqual(["all", "latest"]);
 
     // Paging is part of the same contract.
     expect(resources.find((r) => r.topic === "branding")?.paged).toBe(true);
     // A field whose default changes what a bare list returns is reported, so an
-    // agent knows `schemas list` is the current schemas rather than every
+    // agent knows `schema list` is the current schemas rather than every
     // revision.
     expect(
-      resources.find((r) => r.topic === "schemas")?.filters?.find((f) => f.field === "revisions")
+      resources.find((r) => r.topic === "schema")?.filters?.find((f) => f.field === "revisions")
         ?.default,
     ).toBe("latest");
   });
@@ -157,10 +157,10 @@ describe("zitadel resources", () => {
         }
       ).data.items.map((resource) => [resource.topic, resource.delete_outcome]),
     );
-    expect(byTopic.users).toBe("deleted");
-    expect(byTopic.teams).toBe("deactivated");
-    expect(byTopic.sessions).toBe("revoked");
-    expect(byTopic.events).toBeUndefined();
+    expect(byTopic.user).toBe("deleted");
+    expect(byTopic.team).toBe("deactivated");
+    expect(byTopic.session).toBe("revoked");
+    expect(byTopic.event).toBeUndefined();
   });
 
   it("renders a table for humans", async () => {
@@ -169,7 +169,7 @@ describe("zitadel resources", () => {
     );
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("topic");
-    expect(res.stdout).toContain("users");
+    expect(res.stdout).toContain("user");
     expect(res.stdout).toContain("list, get, create, update, delete");
     expect(res.stdout).toContain(`${Object.keys(RESOURCES).length} resources`);
   });

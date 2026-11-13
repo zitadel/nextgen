@@ -130,7 +130,7 @@ Then select it by name on the login component, here in React:
 
 On the plain element, set the `flow-name` attribute: `<zitadel-login flow-name="kiosk-login">`.
 
-Every deploy publishes every file in `.zitadel/flows/`. A login without `flowName` runs the project default: the newest flow the deployed release pins that has no `audience` and serves its purpose. A new flow without an `audience` becomes that default the moment it deploys, for every login that names no flow. To keep a flow you select by name out of the default, give it an `audience` before its first deploy, as above, with a team ID from `zitadel teams list`. The login component sends no team, so the flow then runs only where `flowName` names it.
+Every deploy publishes every file in `.zitadel/flows/`. A login without `flowName` runs the project default: the newest flow the deployed release pins that has no `audience` and serves its purpose. A new flow without an `audience` becomes that default the moment it deploys, for every login that names no flow. To keep a flow you select by name out of the default, give it an `audience` before its first deploy, as above, with a team ID from `zitadel team list`. The login component sends no team, so the flow then runs only where `flowName` names it.
 
 A login whose `flowName` names no deployed flow, or a flow that does not serve its `purpose`, shows the reason in place of the form.
 

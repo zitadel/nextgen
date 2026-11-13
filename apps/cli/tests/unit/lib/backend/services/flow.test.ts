@@ -97,7 +97,7 @@ describe("FlowService.get", () => {
     ).rejects.toMatchObject({
       name: "NotFoundError",
       message: 'No flow definition named "typo"',
-      hint: "Run `flow-definitions list` to see the flows this project has.",
+      hint: "Run `flow-definition list` to see the flows this project has.",
     });
   });
 });
