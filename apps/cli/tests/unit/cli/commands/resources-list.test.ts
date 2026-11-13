@@ -138,7 +138,7 @@ describe("zitadel resources", () => {
     expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
 
     // Paging is part of the same contract.
-    expect(resources.find((r) => r.topic === "branding")?.paged).toBe(false);
+    expect(resources.find((r) => r.topic === "branding")?.paged).toBe(true);
     // A field whose default changes what a bare list returns is reported, so an
     // agent knows `schemas list` is the current schemas rather than every
     // revision.
