@@ -74,7 +74,7 @@ func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *
 
 // Client implements [ApplicationService]. It finds registered clients only,
 // which every deployment shares, so deploymentID is unused until it also
-// finds the clients a release declares (ADR 082 §3).
+// finds the clients a release declares (#2790).
 func (s *applicationService) Client(ctx context.Context, projectID, _, clientID string) (_ domain.ApplicationClientDocument, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.Client")
 	defer end(&err)
