@@ -3,7 +3,13 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { createServer, type InlineConfig, type ProxyOptions } from "vite";
+import {
+  createServer,
+  type InlineConfig,
+  type ProxyOptions,
+  type ResolvedConfig,
+  resolveConfig,
+} from "vite";
 
 /** The dev server of a generated app, running in this process. */
 export interface DevApp {
@@ -33,6 +39,28 @@ export async function aViteApp(config: string, env: AppEnv): Promise<DevApp> {
   await symlink(viteDir, join(dir, "node_modules", "vite"), "dir");
   await writeFile(join(dir, "vite.config.mjs"), config);
   return serve(dir, env, () => ({ configFile: join(dir, "vite.config.mjs") }));
+}
+
+/**
+ * Loads a generated `vite.config` the way `vite build` does, from an app
+ * directory of its own, and removes the directory again.
+ */
+export async function aViteBuildConfig(config: string, env: AppEnv): Promise<ResolvedConfig> {
+  const dir = await mkdtemp(join(tmpdir(), "zitadel-vite-"));
+  await mkdir(join(dir, "node_modules"));
+  await symlink(viteDir, join(dir, "node_modules", "vite"), "dir");
+  await writeFile(join(dir, "vite.config.mjs"), config);
+  const previous = Object.fromEntries(Object.keys(env).map((name) => [name, process.env[name]]));
+  Object.assign(process.env, env);
+  try {
+    return await resolveConfig(
+      { configFile: join(dir, "vite.config.mjs"), root: dir, logLevel: "silent" },
+      "build",
+    );
+  } finally {
+    restore(previous);
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -79,12 +107,17 @@ async function serve(dir: string, env: AppEnv, config: () => InlineConfig): Prom
     await rm(dir, { recursive: true, force: true });
     throw error;
   } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
+    restore(previous);
+  }
+}
+
+/** Puts back the environment variables a run set, as they were before it. */
+function restore(previous: Readonly<Record<string, string | undefined>>): void {
+  for (const [name, value] of Object.entries(previous)) {
+    if (value === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
     }
   }
 }

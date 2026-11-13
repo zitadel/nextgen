@@ -1037,6 +1037,19 @@ reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
 wrote them; ones changed by hand must be updated by hand, which the failure
 says. Browsers signed in before the change sign in again.
 
+A Vite app's dev proxy reaches the server at `ZITADEL_URL`, read as Vite's
+`loadEnv` reads it: the process environment first, then the env files, among
+them `.env.local`, where `setup` writes it for every framework. So a test run
+points the app at its own server through the environment. Without it the dev
+server refuses to start, naming the variable and `.env.local`; `vite build`
+does not need it. A proxy an older CLI wrote fixes the server's address in
+`vite.config.*`: the app still works, but `doctor` fails it (`managed-files`,
+`outdated managed config wiring`). `doctor --fix` moves a proxy that is as the
+CLI wrote it and names the server `zitadel.json` names onto `ZITADEL_URL`, and
+writes that server to `.env.local` unless the file sets `ZITADEL_URL` already.
+A proxy changed by hand, or fixing another address, must be moved by hand,
+which the failure says.
+
 ## Testing the app
 
 When the developer wants automated tests of the sign-in, or of pages behind
@@ -1052,7 +1065,8 @@ created or the runtime `start` runs.
   then its `next_actions` (Chromium, once) and `next_commands`: it writes a
   sign-in test and a signed-in test, adds the dev dependencies and a
   `test:e2e` script. `tests add --help` lists what it writes and refuses.
-  Another framework: wire the kit by hand.
+  Another framework: wire the kit by hand. A React, Vue, Solid, Svelte or
+  Qwik app `setup` wired takes the kit's `viteAppEnv` as `app.env`.
 - Seed a user per test (`seed.user()`) and drive the real login
   (`loginWithPassword`) to test the sign-in itself.
 - Start other tests signed in (`authenticatedPage`, or `seed.session()` for

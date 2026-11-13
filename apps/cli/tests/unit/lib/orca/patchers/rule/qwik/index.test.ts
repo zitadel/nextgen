@@ -32,6 +32,17 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
 }
 
 describe("QwikPatcher.plan", () => {
+  it("writes the server's address to .env.local, where the dev proxy reads it", () => {
+    const env = new QwikPatcher()
+      .plan(ctx())
+      .ops.filter(
+        (op): op is Extract<FileOp, { kind: "merge-env" }> =>
+          op.kind === "merge-env" && op.path === ".env.local",
+      );
+
+    expect(env.map((op) => op.entries.ZITADEL_URL)).toContain("https://api.zitadel.cloud");
+  });
+
   it("writes the managed app.tsx and merges the Vite config", () => {
     const plan = new QwikPatcher().plan(ctx());
     expect(writeContents(plan, "src/app.tsx")).toContain(MANAGED_MARKER);

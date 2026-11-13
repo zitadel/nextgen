@@ -136,7 +136,7 @@ The README documents each of these with an example:
 
 ## Other frameworks
 
-Only the Next.js setup above is proven by an end-to-end run. For another framework, the app must take the test server's URL, project ID and secret from the environment `withZitadel()` hands it. Not every app that `setup` scaffolds does: a Vite app's dev proxy names the server it was set up against. The README explains the env template: [Quick start](https://github.com/zitadel/nextgen/tree/main/packages/testing#quick-start-playwright).
+Only the Next.js setup above is proven by an end-to-end run. For another framework, the app must take the test server's URL, project ID and secret from the environment `withZitadel()` hands it. A Vite app from `zitadel setup` (React, Vue, Solid, Svelte or Qwik) does: its dev proxy reads the server's URL from `ZITADEL_URL`, so pass `viteAppEnv` as the app's `env`. A Vite app set up by an older CLI has the server's URL fixed in `vite.config.*`; run `zitadel doctor --fix` to move it to `.env.local`. The README explains the env template: [Quick start](https://github.com/zitadel/nextgen/tree/main/packages/testing#quick-start-playwright).
 
 ## Limits
 

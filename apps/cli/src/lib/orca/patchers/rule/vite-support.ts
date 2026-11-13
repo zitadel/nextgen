@@ -33,6 +33,12 @@ import { ConfigModule } from "./utils/config-module";
  * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
  * client bundles, so this server-only key never leaks into the browser.
  *
+ * The backend's address is `ZITADEL_URL`, read the way the secret is: Vite's
+ * `loadEnv`, so the process environment comes first, then `.env.local` (which
+ * setup writes), and a test can point the app at its own server. The target is
+ * read when the config loads, but only the dev server refuses to start
+ * without it ({@link serverAddressCheck}): `vite build` loads the same config.
+ *
  * The backend is addressed by its own name: `changeOrigin` sends the target's
  * host as `Host`, which Node also uses as the TLS server name and for the
  * certificate check, so a remote https server accepts the connection — and one
@@ -46,13 +52,14 @@ import { ConfigModule } from "./utils/config-module";
  * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073,
  * ADR 083).
  */
-function proxyEntryCode(server: string): string {
+function proxyEntryCode(): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
-  target: ${JSON.stringify(server)},
+  target: ${SERVER_ADDRESS},
   changeOrigin: true,
   xfwd: true,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
+${serverAddressCheck("    ")}
     const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
     if (!secret) {
       throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
@@ -62,6 +69,20 @@ ${bearerListener("    ")}
 ${indented(viteSessionCookieStatements(), "    ")}
   },
 }`;
+}
+
+/** The generated proxy's `target`: `ZITADEL_URL` as Vite loads it, the process environment first. */
+const SERVER_ADDRESS = 'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_URL';
+
+/**
+ * The first statement of the generated `configure(proxy)`: the dev server
+ * refuses to start without the address, naming the variable and the file,
+ * as it does without the secret.
+ */
+function serverAddressCheck(indent: string): string {
+  return `${indent}if (!${SERVER_ADDRESS}) {
+${indent}  throw new Error("ZITADEL_URL is not set; add it to .env.local (zitadel setup writes it).");
+${indent}}`;
 }
 
 /**
@@ -156,7 +177,6 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  */
 export function viteProxyEdit(
   devPort: number,
-  server: string,
   previousPort?: number,
 ): (source: string | undefined) => string {
   return (source) => {
@@ -194,7 +214,7 @@ export function viteProxyEdit(
     const proxyConfig = file.objectAt(serverConfig, "proxy");
     const addsProxy = proxyConfig[PROXY_PATH] === undefined;
     if (addsProxy) {
-      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
+      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode());
     }
     const missingImports = PROXY_IMPORTS.filter((imp) => {
       return !file.module.imports.$items.some((item) => {
@@ -279,19 +299,11 @@ const HOOK_FINGERPRINTS = [
  * changed, yields `undefined`.
  */
 function cliEntryOf(config: unknown, source: string): CliEntry | undefined {
-  const root = (config as { $ast?: AstNode }).$ast;
-  const proxy = propertyOf(propertyOf(root, "server")?.value, "proxy")?.value;
-  const entry = propertyOf(proxy, PROXY_PATH);
+  const entry = markedEntryOf(config, source);
   const configure = propertyOf(entry?.value, "configure");
   const fn = configure?.type === "ObjectMethod" ? configure : configure?.value;
   const body = fn?.body;
-  if (
-    !entry ||
-    !body ||
-    Array.isArray(body) ||
-    (body as AstNode).type !== "BlockStatement" ||
-    !hasProxyCredentialPolicyMarker(source.slice(entry.start, entry.end))
-  ) {
+  if (!entry || !body || Array.isArray(body) || (body as AstNode).type !== "BlockStatement") {
     return undefined;
   }
   const statements = (body as AstNode).body as ReadonlyArray<AstNode>;
@@ -305,6 +317,19 @@ function cliEntryOf(config: unknown, source: string): CliEntry | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * The `/__nextgen` entry carrying the credential-policy marker, which setup
+ * wrote, whatever was changed in it since; `undefined` without one.
+ */
+function markedEntryOf(config: unknown, source: string): AstNode | undefined {
+  const root = (config as { $ast?: AstNode }).$ast;
+  const proxy = propertyOf(propertyOf(root, "server")?.value, "proxy")?.value;
+  const entry = propertyOf(proxy, PROXY_PATH);
+  return entry && hasProxyCredentialPolicyMarker(source.slice(entry.start, entry.end))
+    ? entry
+    : undefined;
 }
 
 /** What the session-cookie edit and its verdict call the file they read. */
@@ -495,6 +520,129 @@ export function viteApiPrefixVerdict(source: string): WiringVerdict {
 }
 
 /**
+ * The `target` of the marked `/__nextgen` entry in `text` (LF line ends), with
+ * the CLI's entry around it when the CLI wrote it, or `undefined` when setup
+ * wrote no entry there.
+ */
+function targetOf(
+  text: string,
+): { readonly node: AstNode | undefined; readonly cli: CliEntry | undefined } | undefined {
+  const file = ConfigModule.open(text, VITE_CONFIG_LABEL, { tabWidth: 1 });
+  const config = file.exportedObject();
+  const entry = markedEntryOf(config, text);
+  if (!entry) {
+    return undefined;
+  }
+  return { node: propertyOf(entry.value, "target")?.value, cli: cliEntryOf(config, text) };
+}
+
+/** The address a string-literal `target` fixes, or `undefined` for any other target. */
+function fixedAddress(text: string, target: AstNode | undefined): string | undefined {
+  if (target?.type !== "StringLiteral") {
+    return undefined;
+  }
+  return /^(["'])([^"'\\]*)\1$/.exec(text.slice(target.start, target.end))?.[2];
+}
+
+/** Whether `address` names the same server as `server`. */
+function sameOrigin(address: string, server: string): boolean {
+  try {
+    return new URL(address).origin === new URL(server).origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Builds the `edit` transform that moves the CLI's own `/__nextgen` entry off
+ * the address setup used to fix in it, `target: "<server>"`, onto `ZITADEL_URL`
+ * ({@link proxyEntryCode}), for apps set up before the proxy read it: the
+ * target becomes {@link SERVER_ADDRESS} and {@link serverAddressCheck} goes
+ * before the first statement of `configure(proxy)`. The address itself moves
+ * to `.env.local` through the `ZITADEL_URL` entry setup's base ops merge
+ * there, which keeps a value the file already holds; so only an address that
+ * names `server`, the one `zitadel.json` names, is moved, and the app keeps
+ * pointing at the same server. A hand-written entry, one whose bearer hook was
+ * changed, any other target and an entry that reads `ZITADEL_URL` already are
+ * returned untouched; {@link viteServerAddressVerdict} tells the doctor which
+ * it is. Line ends are the file's own. Throws `E_VALIDATION`, as
+ * {@link viteProxyEdit} does, when the file is absent or unreadable.
+ */
+export function viteServerAddressEdit(server: string): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      // Throws the E_VALIDATION a missing config gets everywhere.
+      ConfigModule.open(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      return "";
+    }
+    return withLfLineEnds(source, (text) => {
+      const found = targetOf(text);
+      const target = found?.node;
+      const first = found?.cli?.statements[0];
+      const address = fixedAddress(text, target);
+      if (
+        !target ||
+        !first ||
+        address === undefined ||
+        !sameOrigin(address, server) ||
+        target.end > first.start
+      ) {
+        return text;
+      }
+      const lineStart = text.lastIndexOf("\n", first.start - 1) + 1;
+      const indent = text.slice(lineStart, first.start);
+      if (!/^[\t ]*$/.test(indent)) {
+        return text;
+      }
+      return `${text.slice(0, target.start)}${SERVER_ADDRESS}${text.slice(target.end, lineStart)}${serverAddressCheck(indent)}\n${text.slice(lineStart)}`;
+    });
+  };
+}
+
+/**
+ * Whether the Vite config's dev proxy reads the server's address from
+ * `ZITADEL_URL`, for the doctor. The CLI's entry that fixes the address
+ * `server` names is `outdated` (`doctor --fix` moves it): the app works, but
+ * nothing outside the file can point it at another server, a test server
+ * included. So is one that fixes another address, or sits in an entry changed
+ * since setup wrote it, which only the developer can move. A marked entry with
+ * a target of its own is `unknown`. A config without the entry setup writes
+ * has nothing to move: the proxy's own wiring reports a missing one.
+ */
+export function viteServerAddressVerdict(server: string): (source: string) => WiringVerdict {
+  return (source) => {
+    const text = lfText(source);
+    const found = targetOf(text);
+    if (
+      !found?.node ||
+      fingerprint(text.slice(found.node.start, found.node.end)) === fingerprint(SERVER_ADDRESS)
+    ) {
+      return "applied";
+    }
+    if (viteServerAddressEdit(server)(text) !== text) {
+      return {
+        outdated:
+          "its /__nextgen proxy fixes the server's address; doctor --fix reads it from ZITADEL_URL in .env.local instead",
+      };
+    }
+    const address = fixedAddress(text, found.node);
+    if (address === undefined) {
+      return {
+        unknown:
+          "its /__nextgen proxy has a target of its own, so it reads ZITADEL_URL only if changed by hand",
+      };
+    }
+    const why =
+      found.cli && !sameOrigin(address, server)
+        ? `is not the server zitadel.json names (${server})`
+        : "sits in an entry changed since zitadel setup wrote it";
+    return {
+      outdated: `its /__nextgen proxy fixes the address ${address}, which ${why}, so it must read ZITADEL_URL by hand: set its target to ${SERVER_ADDRESS} and ZITADEL_URL=${address} in .env.local`,
+    };
+  };
+}
+
+/**
  * Candidate Vite config filenames, in resolution priority. The patcher hands
  * this list to the generic `edit` file-op, which patches the first one that
  * exists — so any project layout (`vite.config.ts`, `.mts`, `.js`, …) is covered.
@@ -506,24 +654,27 @@ export const VITE_CONFIG_PATHS = configCandidates("vite.config");
  * Vite framework): contributes the file-ops that non-destructively merge the
  * `/__nextgen` dev proxy into the project's Vite config. A patcher opts in by
  * declaring `implements ViteSupport` and spreading {@link viteProxyOp},
- * {@link viteApiPrefixOp} and {@link viteSessionCookieOp} into its `routeOps`, so the proxy logic is
+ * {@link viteApiPrefixOp}, {@link viteSessionCookieOp} and
+ * {@link viteServerAddressOp} into its `routeOps`, so the proxy logic is
  * written once and reused everywhere — no per-framework duplication.
  */
 export interface ViteSupport {
   /** The `edit` file-op that merges the `/__nextgen` proxy into the Vite config. */
-  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp;
+  viteProxyOp(devPort: number, previousPort?: number): FileOp;
   /** The `edit` file-op that gives a proxy setup wrote before its session-cookie hooks. */
   viteSessionCookieOp(): FileOp;
   /** The `edit` file-op that moves a v2 proxy's exchange check to the API prefix as well. */
   viteApiPrefixOp(): FileOp;
+  /** The `edit` file-op that moves the address a proxy fixes onto `ZITADEL_URL`. */
+  viteServerAddressOp(server: string): FileOp;
 }
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
-export function buildViteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
+export function buildViteProxyOp(devPort: number, previousPort?: number): FileOp {
   return {
     kind: "edit",
     path: [...VITE_CONFIG_PATHS],
-    edit: viteProxyEdit(devPort, server, previousPort),
+    edit: viteProxyEdit(devPort, previousPort),
     // The dev proxy is the auth request path — the doctor managed-files
     // check fails when this merge is no longer applied.
     wiring: "infrastructure",
@@ -556,5 +707,19 @@ export function buildViteApiPrefixOp(): FileOp {
     // fails: the doctor fails until `doctor --fix` moves the proxy to v3.
     wiring: "infrastructure",
     verify: viteApiPrefixVerdict,
+  };
+}
+
+/** Builds the shared server-address {@link FileOp} for a {@link ViteSupport} patcher. */
+export function buildViteServerAddressOp(server: string): FileOp {
+  return {
+    kind: "edit",
+    path: [...VITE_CONFIG_PATHS],
+    edit: viteServerAddressEdit(server),
+    // A proxy that fixes the address works, but cannot be pointed at another
+    // server, a test server included: the doctor fails it (`outdated`) until
+    // `doctor --fix` moves it onto ZITADEL_URL.
+    wiring: "infrastructure",
+    verify: viteServerAddressVerdict(server),
   };
 }

@@ -5,6 +5,7 @@ import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aSetUpApp,
+  aSetUpReactApp,
   MOCK_SERVER_URL,
   SETUP_ORIGIN,
   type ScaffoldedApp,
@@ -192,6 +193,17 @@ const CHECK = {
 };
 
 /** What the checks of a project that needs nothing say: all of them, passing. */
+/**
+ * A doctor run whose managed-files check is at `status`: among the checks of
+ * its `data` when the run passed, of its `details` when it found issues.
+ */
+function managedFilesAt(status: "pass" | "fail") {
+  const checks = {
+    checks: expect.arrayContaining([expect.objectContaining({ name: "managed-files", status })]),
+  };
+  return status === "pass" ? { data: checks } : { details: checks };
+}
+
 const HEALTHY = [
   CHECK.cliVersion,
   CHECK.serverBinary,
@@ -601,6 +613,53 @@ describe("doctor", () => {
           warnings: [],
         });
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      describe("in a Vite app", () => {
+        it("passes the dev proxy setup wrote", async () => {
+          const app = await aSetUpReactApp();
+
+          const result = await app.doctor();
+
+          expect(app.envelopeOf(result)).toMatchObject(managedFilesAt("pass"));
+        });
+
+        it("fails a dev proxy that fixes the server's address", async () => {
+          const app = await aSetUpReactApp();
+          await app.fixesItsServerAddress();
+
+          const result = await app.doctor();
+
+          expect(app.envelopeOf(result)).toMatchObject(managedFilesAt("fail"));
+        });
+
+        it("moves a dev proxy that fixes the server's address onto ZITADEL_URL with --fix", async () => {
+          const app = await aSetUpReactApp();
+          await app.fixesItsServerAddress();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(app.envelopeOf(result)).toMatchObject(managedFilesAt("pass"));
+        });
+
+        it("leaves a dev proxy fixing another server's address to the developer with --fix", async () => {
+          const app = await aSetUpReactApp();
+          await app.fixesItsServerAddress("https://other.zitadel.test");
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(app.envelopeOf(result)).toMatchObject(managedFilesAt("fail"));
+        });
+
+        it("leaves a dev proxy changed by hand to the developer with --fix", async () => {
+          const app = await aSetUpReactApp();
+          await app.fixesItsServerAddress();
+          await app.changesItsViteProxyByHand();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(app.envelopeOf(result)).toMatchObject(managedFilesAt("fail"));
+        });
       });
 
       it("removes nothing while repairing", async () => {

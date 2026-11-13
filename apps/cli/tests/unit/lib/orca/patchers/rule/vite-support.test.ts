@@ -13,15 +13,27 @@ import {
   viteApiPrefixEdit,
   viteApiPrefixVerdict,
   viteProxyEdit,
+  viteServerAddressEdit,
+  viteServerAddressVerdict,
   viteSessionCookieEdit,
   viteSessionCookieVerdict,
 } from "@/lib/orca/patchers/rule/vite-support";
 import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
-import { aViteApp, type DevApp } from "@tests/helpers/vite";
+import { rejectionOf } from "@tests/helpers/thrown-value";
+import { aViteApp, aViteBuildConfig, type DevApp } from "@tests/helpers/vite";
+import { withFixedAddress } from "@tests/helpers/vite-config";
 
-const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
+/** The server the configs below were set up against, as `zitadel.json` names it. */
+const SERVER = "https://zitadel.example.com";
+
+const edit = viteProxyEdit(5173);
 const sessionCookieEdit = viteSessionCookieEdit();
 const apiPrefixEdit = viteApiPrefixEdit();
+const addressEdit = viteServerAddressEdit(SERVER);
+const addressVerdict = viteServerAddressVerdict(SERVER);
+
+/** What setup's proxy reads the server's address with. */
+const SERVER_ADDRESS = 'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_URL';
 
 /** The path check of the bearer hook setup writes: the exchange with and without the API prefix. */
 const BOTH_EXCHANGE_PATHS =
@@ -131,7 +143,6 @@ describe("viteProxyEdit", () => {
     expect(out).toContain(BOTH_EXCHANGE_PATHS);
     expect(out).toContain('!proxyReq.getHeader("authorization")');
     expect(out).toContain("zitadel:proxy:v3");
-    expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
     // Bind the exact issuer port or fail — never drift to a port not in preview_origins.
     expect(out).toContain("strictPort: true");
@@ -144,6 +155,20 @@ describe("viteProxyEdit", () => {
     expect(out).not.toContain(".zitadel/secret");
     // Sanity: the project_id fallback the SDKs used to send is gone.
     expect(out).not.toContain("Bearer sk_${projectId}");
+  });
+
+  it("reads the server's address from ZITADEL_URL rather than fixing one", () => {
+    const out = edit(BARE_CONFIG);
+
+    expect(out).toContain(`target: ${SERVER_ADDRESS},`);
+  });
+
+  it("refuses to start the dev server without ZITADEL_URL, naming the variable and the file", () => {
+    const out = edit(BARE_CONFIG);
+
+    expect(out).toContain(
+      'throw new Error("ZITADEL_URL is not set; add it to .env.local (zitadel setup writes it).");',
+    );
   });
 
   it("preserves the user's existing plugins", () => {
@@ -159,14 +184,14 @@ describe("viteProxyEdit", () => {
   });
 
   it("moves a server.port still on the port the app is moving off", () => {
-    const move = viteProxyEdit(5180, "http://127.0.0.1:8099", 5173);
+    const move = viteProxyEdit(5180, 5173);
     const out = move("export default defineConfig({ server: { port: 5173 } });");
     expect(out).toContain("5180");
     expect(out).not.toContain("5173");
   });
 
   it("keeps a server.port the app is not moving off", () => {
-    const move = viteProxyEdit(5180, "http://127.0.0.1:8099", 5173);
+    const move = viteProxyEdit(5180, 5173);
     const out = move("export default defineConfig({ server: { port: 4000 } });");
     expect(out).toContain("4000");
     expect(out).not.toContain("5180");
@@ -203,15 +228,14 @@ describe("viteProxyEdit", () => {
     expect(out).toContain("changeOrigin: true,\n        xfwd: true,");
     expect(out).toContain("secure: false");
     expect(out).toContain("// preserved user note");
-    expect(out).not.toContain("http://127.0.0.1:8099");
   });
 
   it("moves the entry it wrote before onto the origin-forwarding shape", () => {
-    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+    const current = edit(BARE_CONFIG);
 
-    // As setup applies them: the entry's edit, its session-cookie hooks, then
-    // the exchange under the API prefix.
-    expect(apiPrefixEdit(sessionCookieEdit(edit(PREVIOUS_CONFIG)))).toBe(current);
+    // As setup applies them: the entry's edit, its session-cookie hooks, the
+    // exchange under the API prefix, then the address from ZITADEL_URL.
+    expect(addressEdit(apiPrefixEdit(sessionCookieEdit(edit(PREVIOUS_CONFIG))))).toBe(current);
   });
 
   it("leaves a hand-written entry that keeps the browser's Host alone", () => {
@@ -328,7 +352,7 @@ describe("viteSessionCookieEdit", () => {
   const bearerOnly = edit(PREVIOUS_CONFIG);
 
   it("gives the entry it wrote before the session-cookie hooks", () => {
-    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+    const current = withFixedAddress(edit(BARE_CONFIG), SERVER);
 
     expect(apiPrefixEdit(sessionCookieEdit(bearerOnly))).toBe(current);
   });
@@ -641,6 +665,131 @@ describe("viteApiPrefixVerdict", () => {
   });
 });
 
+describe("viteServerAddressEdit", () => {
+  /** What setup wrote before its proxy read the server's address from ZITADEL_URL. */
+  const fixed = withFixedAddress(edit(BARE_CONFIG), SERVER);
+
+  it("moves the entry it wrote onto ZITADEL_URL", () => {
+    expect(addressEdit(fixed)).toBe(edit(BARE_CONFIG));
+  });
+
+  it("finds the entry it wrote whatever a formatter did to its layout", () => {
+    const reformatted = fixed
+      .replace(/"/g, "'")
+      .replace(/;$/gm, "")
+      .replace(/^(?: {2})+/gm, (spaces) => "\t".repeat(spaces.length / 2));
+
+    const out = addressEdit(reformatted);
+
+    expect(out).toContain(`target: ${SERVER_ADDRESS},`);
+    expect(out).toContain("ZITADEL_URL is not set");
+    expect(addressEdit(out)).toBe(out);
+  });
+
+  it("moves an address written with a trailing slash", () => {
+    const slashed = withFixedAddress(edit(BARE_CONFIG), `${SERVER}/`);
+
+    expect(addressEdit(slashed)).toBe(edit(BARE_CONFIG));
+  });
+
+  it("moves a CRLF config with CRLF line ends", () => {
+    expect(addressEdit(fixed.replace(/\n/g, "\r\n"))).toBe(
+      edit(BARE_CONFIG).replace(/\n/g, "\r\n"),
+    );
+  });
+
+  it("leaves an address that is not the server zitadel.json names alone", () => {
+    const elsewhere = withFixedAddress(edit(BARE_CONFIG), "https://other.example");
+
+    expect(addressEdit(elsewhere)).toBe(elsewhere);
+  });
+
+  it("leaves an entry whose bearer hook was changed alone", () => {
+    const changed = fixed.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n          console.debug("exchange");',
+    );
+
+    expect(addressEdit(changed)).toBe(changed);
+  });
+
+  it("leaves a hand-written entry alone", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "${SERVER}" } } },
+});`;
+
+    expect(addressEdit(custom)).toBe(custom);
+  });
+
+  it("is idempotent — the entry setup writes now is left as it is", () => {
+    const current = edit(BARE_CONFIG);
+
+    expect(addressEdit(current)).toBe(current);
+  });
+
+  it("throws E_VALIDATION when the config is missing", () => {
+    expect(() => addressEdit(undefined)).toThrowError(/not found/);
+  });
+});
+
+describe("viteServerAddressVerdict", () => {
+  const fixed = withFixedAddress(edit(BARE_CONFIG), SERVER);
+
+  it("reads the entry setup writes now as applied", () => {
+    expect(addressVerdict(edit(BARE_CONFIG))).toBe("applied");
+  });
+
+  it("reads the entry that fixes the address zitadel.json names as outdated, offering doctor --fix", () => {
+    expect(addressVerdict(fixed)).toEqual({
+      outdated: expect.stringContaining("doctor --fix reads it from ZITADEL_URL in .env.local"),
+    });
+  });
+
+  it("reads an entry that fixes another server's address as outdated, leaving it to the developer", () => {
+    const elsewhere = withFixedAddress(edit(BARE_CONFIG), "https://other.example");
+
+    expect(addressVerdict(elsewhere)).toEqual({
+      outdated: expect.stringContaining(
+        "fixes the address https://other.example, which is not the server zitadel.json names",
+      ),
+    });
+  });
+
+  it("reads a fixed address in an entry changed since as outdated, leaving it to the developer", () => {
+    const changed = fixed.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n          console.debug("exchange");',
+    );
+
+    expect(addressVerdict(changed)).toEqual({
+      outdated: expect.stringContaining("sits in an entry changed since zitadel setup wrote it"),
+    });
+  });
+
+  it("reads an entry setup wrote whose target was replaced by hand as unknown", () => {
+    const own = edit(BARE_CONFIG).replace(
+      `target: ${SERVER_ADDRESS},`,
+      "target: process.env.API_URL,",
+    );
+
+    expect(addressVerdict(own)).toEqual({
+      unknown: expect.stringContaining("a target of its own"),
+    });
+  });
+
+  it("reads a hand-written proxy that fixes an address as applied", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "${SERVER}" } } },
+});`;
+
+    expect(addressVerdict(custom)).toBe("applied");
+  });
+
+  it("reads a config without a proxy as applied", () => {
+    expect(addressVerdict(BARE_CONFIG)).toBe("applied");
+  });
+});
+
 /** The CLI package: a config checked from here resolves `vite` and `@types/node` as an app does. */
 const CLI_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 
@@ -704,6 +853,14 @@ describe("the generated vite.config.ts, type-checked as a create-vite TS templat
     expect(strictDiagnostics(upgraded)).toEqual([]);
   });
 
+  it("type-checks once doctor --fix moved the address onto ZITADEL_URL", {
+    timeout: 60_000,
+  }, () => {
+    const upgraded = addressEdit(withFixedAddress(edit(BARE_CONFIG), SERVER));
+
+    expect(strictDiagnostics(upgraded)).toEqual([]);
+  });
+
   // Proves the check sees what a strict build sees.
   it("reports an untyped parameter", { timeout: 60_000 }, () => {
     const untyped = edit(BARE_CONFIG).replace(
@@ -728,13 +885,13 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   });
 
   async function serve(config: string, appEnv: Record<string, string> = env): Promise<DevApp> {
-    const app = await aViteApp(config, appEnv);
+    const app = await aViteApp(config, { ZITADEL_URL: remote.url, ...appEnv });
     apps.push(app);
     return app;
   }
 
   it("reaches the server by its own name", async () => {
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const { origin } = await serve(edit(BARE_CONFIG));
 
     const response = await fetch(`${origin}/__nextgen/healthz`);
 
@@ -747,7 +904,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   });
 
   it("tells the server the app's origin", async () => {
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const { origin } = await serve(edit(BARE_CONFIG));
 
     await fetch(`${origin}/__nextgen/healthz`);
 
@@ -758,7 +915,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   });
 
   it("attaches the project secret to the session exchange only", async () => {
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const { origin } = await serve(edit(BARE_CONFIG));
 
     await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
     await fetch(`${origin}/__nextgen/sessions/me`);
@@ -769,7 +926,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   });
 
   it("attaches the project secret to the session exchange under the API prefix too", async () => {
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const { origin } = await serve(edit(BARE_CONFIG));
 
     await fetch(`${origin}/__nextgen/api/v1/sessions/exchange`, { method: "POST" });
     await fetch(`${origin}/__nextgen/api/v1/sessions/me`);
@@ -778,6 +935,30 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     expect(exchange?.path).toBe("/api/v1/sessions/exchange");
     expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
     expect(me?.headers.authorization).toBeUndefined();
+  });
+
+  it("refuses to start without ZITADEL_URL, naming the variable and the file", async () => {
+    const refusal = await rejectionOf(() => serve(edit(BARE_CONFIG), { ...env, ZITADEL_URL: "" }));
+
+    expect(refusal).toBeInstanceOf(Error);
+    expect(refusal).toMatchObject({
+      message: expect.stringContaining("ZITADEL_URL is not set; add it to .env.local"),
+    });
+  });
+
+  it("leaves vite build free to load the config without ZITADEL_URL", async () => {
+    const config = await aViteBuildConfig(edit(BARE_CONFIG), { ZITADEL_URL: "" });
+
+    expect(config.command).toBe("build");
+  });
+
+  it("reaches the server ZITADEL_URL names once doctor --fix moved the address it fixed", async () => {
+    const { origin } = await serve(addressEdit(withFixedAddress(edit(BARE_CONFIG), SERVER)));
+
+    const response = await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(response.status).toBe(200);
+    expect(remote.requests.at(-1)).toMatchObject({ path: "/healthz", servername: REMOTE_HOST });
   });
 
   it("could not reach it with the entry it wrote before", async () => {
@@ -793,7 +974,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   });
 
   it("sends the app's session cookie to the server under the server's name", async () => {
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+    const { origin } = await serve(edit(BARE_CONFIG), withProject);
 
     await fetch(`${origin}/__nextgen/users/me`, {
       headers: { cookie: `theme=dark; ${OTHER_SESSION_COOKIES}; zitadel_session_proj_spa=mine` },
@@ -811,7 +992,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
         "_zflow=; Path=/; Max-Age=0",
       ],
     });
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+    const { origin } = await serve(edit(BARE_CONFIG), withProject);
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
@@ -823,7 +1004,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
 
   it("drops a session cookie from before ADR 083 the server sets", async () => {
     remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+    const { origin } = await serve(edit(BARE_CONFIG), withProject);
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
@@ -832,7 +1013,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
 
   it("passes the cookies through when no project is configured", async () => {
     remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
-    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), {
+    const { origin } = await serve(edit(BARE_CONFIG), {
       ...env,
       ZITADEL_PROJECT_ID: "",
     });
@@ -864,7 +1045,7 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
 
   it("keeps the session cookie per project once doctor --fix replaced the hooks before ADR 083", async () => {
     remote.answerWith({ "set-cookie": "zitadel_session=minted; Path=/; Max-Age=0" });
-    const v1 = withV1Hooks(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const v1 = withV1Hooks(edit(BARE_CONFIG));
     const { origin } = await serve(sessionCookieEdit(v1), withProject);
 
     const response = await fetch(`${origin}/__nextgen/sessions/me`, {
