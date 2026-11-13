@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { filled, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import type { Placeholders } from "@/lib/oclif/refusal";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -23,6 +24,9 @@ const NEEDS_A = "{input} needs {a}";
 
 /** The other, asking for `{b}`. */
 const NEEDS_B = "{input} needs {b}";
+
+/** Values typed as wide as `Placeholders`, which name nothing for certain. */
+const WIDE_VALUES: Placeholders = { max: 3 };
 
 /**
  * `required: true` asks only whether a token reached argv, and an empty one
@@ -234,6 +238,11 @@ describe("a refusal a flag or argument is built with", () => {
     });
 
     expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
+  });
+
+  it("does not compile with values whose names it cannot see", () => {
+    // @ts-expect-error values as wide as Placeholders may hide a name the parse replaces
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: WIDE_VALUES });
   });
 
   it("does not compile with a key a declaration does not have", () => {

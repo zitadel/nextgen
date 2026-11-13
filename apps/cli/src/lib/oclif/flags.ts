@@ -81,7 +81,8 @@ export type Filled<R, Declared> =
  * such as a misspelt `hint` or `values`, must be `never`, so it does not
  * compile rather than being dropped without a word. Its `values` may not give
  * one of the names {@link read} fills ({@link Parsed}) either, since the
- * parse would replace it.
+ * parse would replace it, and must name each value it gives: values typed as
+ * a wide {@link Placeholders} could hold one of those names unseen.
  *
  * @typeParam R - The declaration's refusal, as it is written.
  * @typeParam Declared - The declaration, as it is written.
@@ -91,9 +92,11 @@ type Known<R, Declared> = {
 } & {
   readonly refusal: { readonly [Key in Exclude<keyof R, keyof ParseRefusal>]: never };
 } & (Declared extends { readonly values: infer Values }
-    ? IsNever<Extract<keyof Values, Parsed>> extends true
-      ? unknown
-      : { readonly values: "a declaration's values may not give value, input or problem" }
+    ? string extends keyof Values
+      ? { readonly values: "a declaration's values must name each value they give" }
+      : IsNever<Extract<keyof Values, Parsed>> extends true
+        ? unknown
+        : { readonly values: "a declaration's values may not give value, input or problem" }
     : unknown);
 
 /**
