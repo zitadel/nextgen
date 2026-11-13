@@ -40,10 +40,10 @@
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
-- Suggest anything that is not the CLI as `shellCommand(program, ...words)`,
-  quoting a value a person typed with `Cmd.quote`; it refuses the CLI as a program.
-- Chain those with `shellSteps`, and a package manager's with `suggestedCommandOf`;
-  `inShell` wraps a pipe or redirection around a suggestion.
+- Suggest `cd`, `docker`, `git` or `rm` as `shellCommand(program, ...words)`,
+  quoting a value a person typed with `Cmd.quote`.
+- Suggest a package manager's command with `suggestedCommandOf`, chain commands
+  with `shellSteps`, and wrap one with `pipedFrom`, `readingFrom` or `andTheRest`.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
