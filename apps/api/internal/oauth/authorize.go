@@ -89,16 +89,20 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	if req.RequestParam != "" {
 		return nil, oidc.ErrRequestNotSupported()
 	}
+	// With PKCE optional, state is what protects the client from CSRF.
+	if req.State == "" {
+		return nil, oidc.ErrInvalidRequest().WithDescription("state is required")
+	}
+	// state is stored, so it must be text every dialect can hold.
+	if !storable(req.State) {
+		return nil, oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
+	}
 	// The metadata offers the query mode only.
 	if req.ResponseMode != "" && req.ResponseMode != oidc.ResponseModeQuery {
 		return nil, oidc.ErrInvalidRequest().WithDescription("response_mode must be query")
 	}
 	if !slices.Contains(c.grantTypes, oidc.GrantTypeCode) {
-		return nil, oidc.ErrUnauthorizedClient().WithDescription("the client may not use the authorization code grant")
-	}
-	// state is stored, so it must be text every dialect can hold.
-	if !storable(req.State) {
-		return nil, oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
+		return nil, oidc.ErrUnauthorizedClient().WithDescription("the client's grant_types do not include authorization_code")
 	}
 	if req.CodeChallenge != "" {
 		// The library reads a missing method as plain; this server accepts S256 only.

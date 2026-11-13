@@ -284,6 +284,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "unknown_method", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S512"}, wantError: "invalid_request"},
 		{name: "challenge_too_short", set: map[string]string{"code_challenge": challenge[:42], "code_challenge_method": "S256"}, wantError: "invalid_request"},
 		{name: "challenge_not_base64url", set: map[string]string{"code_challenge": challenge[:42] + "+", "code_challenge_method": "S256"}, wantError: "invalid_request"},
+		{name: "no_state", set: map[string]string{"state": ""}, wantError: "invalid_request"},
 		{name: "state_with_nul", set: map[string]string{"state": "xyz\x00"}, wantError: "invalid_request"},
 		{name: "state_not_utf8", set: map[string]string{"state": "xyz\xff"}, wantError: "invalid_request"},
 		{name: "no_authorization_code_grant", set: map[string]string{"client_id": "no-codes"}, wantError: "unauthorized_client"},
