@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -116,7 +117,7 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	issuer, _ := IssuerFromContext(ctx)
 	login, err := loginURL(issuer, r.Header.Get(LoginPathHeader))
 	if err != nil {
-		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("invalid login path"), http.StatusBadRequest)
+		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("invalid login path").WithParent(err), http.StatusBadRequest)
 	}
 	// The server does not serve the standard scopes yet, so they are ignored
 	// (ADR 082 §2). The library keeps them and drops every other scope.
@@ -160,7 +161,7 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 	}
 	// A leading slash keeps the origin: ParseRedirectTarget refuses "//host".
 	if !strings.HasPrefix(loginPath, "/") {
-		return nil, errors.New("the login path is not a path")
+		return nil, fmt.Errorf("the login path %q does not start with a slash", loginPath)
 	}
 	raw := issuer.Origin() + loginPath
 	u, err := httputil.ParseRedirectTarget(raw)
@@ -168,7 +169,7 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 		return nil, err
 	}
 	if u.String() != raw || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return nil, errors.New("the login path is not a plain path")
+		return nil, fmt.Errorf("the login path %q has a query or fragment, or is not in canonical form", loginPath)
 	}
 	return u, nil
 }
