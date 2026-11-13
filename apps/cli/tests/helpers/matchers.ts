@@ -123,6 +123,19 @@ function envelopeOf(result: CliResult): Envelope {
   }
 }
 
+/**
+ * The commands a run suggested, each without the runner that spells it out
+ * (`npx @zitadel/cli@<version>`), which differs by how the CLI was invoked.
+ *
+ * @param received - The finished run.
+ * @returns The suggested commands, in the order they were suggested.
+ */
+function commandsAfterRunner(received: CliResult): string[] {
+  return suggestionsIn(envelopeOf(received)).map((candidate) => {
+    return candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, "");
+  });
+}
+
 function describeResult(result: CliResult): string {
   const envelope = envelopeOf(result);
   const name = envelope.command ? `\`${envelope.command}\`` : "the command";
@@ -310,10 +323,7 @@ expect.extend({
   },
 
   toSuggestExactly(received: CliResult, command: string) {
-    // The command after the runner, which differs by how the CLI was invoked.
-    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
-      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
-    );
+    const suggested = commandsAfterRunner(received);
     const pass = suggested.includes(command);
     return {
       pass,
@@ -327,13 +337,12 @@ expect.extend({
   },
 
   toSuggestOnly(received: CliResult, ...commands: string[]) {
-    // The commands after the runner, in the order they were suggested.
-    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
-      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
-    );
+    const suggested = commandsAfterRunner(received);
     const pass =
       suggested.length === commands.length &&
-      suggested.every((command, index) => command === commands[index]);
+      suggested.every((command, index) => {
+        return command === commands[index];
+      });
     return {
       pass,
       message: () =>

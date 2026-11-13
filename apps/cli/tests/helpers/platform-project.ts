@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
 import { DEFAULT_SERVER } from "@/lib/server";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 
@@ -72,17 +72,6 @@ export async function aProjectDirectory(
   );
   return cwd;
 }
-
-/**
- * The preview pattern {@link aReleaseServedOn} registers, which admits
- * {@link PREVIEW_URL}.
- */
-export const PREVIEW_PATTERN = "https://*-acme.vercel.app";
-
-/**
- * A preview URL that {@link PREVIEW_PATTERN} admits.
- */
-export const PREVIEW_URL = "https://x-acme.vercel.app";
 
 /**
  * A new project on the mock with {@link PRIMARY_ORIGIN} as its primary origin.

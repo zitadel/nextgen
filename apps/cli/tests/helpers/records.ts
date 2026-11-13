@@ -16,6 +16,17 @@ export const PROJECT_ID = "proj_1";
 export const PRIMARY_ORIGIN = "https://app.acme.com";
 
 /**
+ * The preview pattern the preview fixtures register, which admits
+ * {@link PREVIEW_URL}.
+ */
+export const PREVIEW_PATTERN = "https://*-acme.vercel.app";
+
+/**
+ * A preview URL that {@link PREVIEW_PATTERN} admits.
+ */
+export const PREVIEW_URL = "https://x-acme.vercel.app";
+
+/**
  * A deployment as the API answers one: `dep_1`, serving `rel_1` live on the
  * primary origin `https://app.acme.com`.
  *

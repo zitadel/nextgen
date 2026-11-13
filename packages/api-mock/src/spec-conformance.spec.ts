@@ -2920,41 +2920,73 @@ describe("api-mock releases and deployments", () => {
   describe("revoking a release a primary origin and a preview serve", () => {
     const PREVIEW_URL = "https://acme-git-sso-acmeinc.vercel.app";
 
-    /** A project serving one release on its primary origin and on a preview URL. */
+    /**
+     * The id the platform answered a create with.
+     *
+     * @param response - The platform's answer to a create.
+     * @returns The created release's or deployment's id.
+     */
+    async function idOf(response: Response): Promise<string> {
+      const created = (await response.json()) as { id: string };
+
+      return created.id;
+    }
+
+    /**
+     * A project serving one release on its primary origin and on a preview URL.
+     *
+     * @param name - The project's name.
+     * @returns The project, the release, and the deployments that serve it on
+     * the primary origin and on the preview.
+     */
     async function aReleaseServedTwice(name: string) {
       const project = await newProject(name);
       await addPrimary(project.id, project.secret, "https://app.acme.com");
       await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
-      const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
-        id: string;
+      const release = {
+        id: await idOf(await createRelease(project.id, project.secret, rel1)),
       };
-      const primary = (await (
-        await createDeployment(project.id, project.secret, {
-          release_id: release.id,
-          targets: "primary",
-        })
-      ).json()) as { id: string };
-      const preview = (await (
-        await createDeployment(project.id, project.secret, {
-          release_id: release.id,
-          targets: [PREVIEW_URL],
-          ttl: "PT168H",
-        })
-      ).json()) as { id: string };
+      const primary = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: "primary",
+          }),
+        ),
+      };
+      const preview = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: [PREVIEW_URL],
+            ttl: "PT168H",
+          }),
+        ),
+      };
+
       return { project, release, primary, preview };
     }
 
-    /** Puts a second release live on the project's primary origins, as a deploy would. */
+    /**
+     * Puts a second release live on the project's primary origins, as a deploy
+     * would.
+     *
+     * @param project - The project's id and secret.
+     * @returns The second release and the deployment that made it live.
+     */
     async function aReplacementLive(project: { id: string; secret: string }) {
-      const release = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
-        id: string;
+      const release = {
+        id: await idOf(await createRelease(project.id, project.secret, rel2)),
       };
-      const deployment = (await (
-        await createDeployment(project.id, project.secret, {
-          release_id: release.id,
-          targets: "primary",
-        })
-      ).json()) as { id: string };
+      const deployment = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: "primary",
+          }),
+        ),
+      };
+
       return { release, deployment };
     }
 
@@ -3029,27 +3061,31 @@ describe("api-mock releases and deployments", () => {
       const reused = "https://app-acmeinc.vercel.app";
       await addPrimary(project.id, project.secret, reused);
       await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
-      const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
-        id: string;
+      const release = {
+        id: await idOf(await createRelease(project.id, project.secret, rel1)),
       };
-      const primary = (await (
-        await createDeployment(project.id, project.secret, {
-          release_id: release.id,
-          targets: "primary",
-        })
-      ).json()) as { id: string };
+      const primary = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: "primary",
+          }),
+        ),
+      };
       await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
         body: JSON.stringify({ pattern: reused }),
       });
-      const preview = (await (
-        await createDeployment(project.id, project.secret, {
-          release_id: release.id,
-          targets: [reused],
-          ttl: "PT168H",
-        })
-      ).json()) as { id: string };
+      const preview = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: [reused],
+            ttl: "PT168H",
+          }),
+        ),
+      };
 
       return { project, release, reused, primary, preview };
     }
@@ -3162,6 +3198,29 @@ describe("api-mock releases and deployments", () => {
       const live = await liveView(project.id, reused);
 
       expect(live).toEqual([]);
+    });
+
+    test("reports every origin a deployment serves in the live view when asked about one of them", async () => {
+      const project = await newProject("revoke-live-all-origins");
+      await addPrimary(project.id, project.secret, "https://app.acme.com");
+      await addPrimary(project.id, project.secret, "https://app2.acme.com");
+      const release = {
+        id: await idOf(await createRelease(project.id, project.secret, rel1)),
+      };
+      const deployment = {
+        id: await idOf(
+          await createDeployment(project.id, project.secret, {
+            release_id: release.id,
+            targets: "primary",
+          }),
+        ),
+      };
+
+      const live = await liveView(project.id, "https://app.acme.com");
+
+      expect(live).toEqual([
+        [deployment.id, release.id, ["https://app.acme.com", "https://app2.acme.com"]],
+      ]);
     });
 
     test("shows the primary deployment for a listed primary origin in the live view when asked about the origin", async () => {

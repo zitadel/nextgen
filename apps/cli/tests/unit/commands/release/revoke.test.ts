@@ -7,10 +7,9 @@ import {
   aProjectDirectory,
   aReleaseServedOn,
   PLATFORM_URL,
-  PREVIEW_URL,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import { runCliForTest, runCommand } from "@tests/helpers/run-cli";
 

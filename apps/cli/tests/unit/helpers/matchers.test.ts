@@ -58,7 +58,13 @@ describe("toPrintPlainRow", () => {
 });
 
 describe("toSuggestOnly", () => {
-  const suggesting = (...commands: string[]) => {
+  /**
+   * A finished run whose envelope suggests these commands, spelled out by the runner.
+   *
+   * @param commands - The commands the run suggested, without the runner.
+   * @returns The run as the matchers read it.
+   */
+  function suggesting(...commands: string[]) {
     return printed(
       JSON.stringify({
         status: "error",
@@ -67,7 +73,7 @@ describe("toSuggestOnly", () => {
         }),
       }),
     );
-  };
+  }
 
   it("matches exactly these suggestions, in this order, after the runner", () => {
     expect(suggesting("deploy --cwd a", "preview rm u --cwd a")).toSuggestOnly(
