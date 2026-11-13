@@ -395,7 +395,7 @@ function EventRow({
         // For the pinned menu cell's hover.
         "group",
         failure && "bg-destructive/5 hover:bg-destructive/10",
-        together && !selected && "bg-muted/50",
+        together && !selected && "bg-muted/60",
         selected && "bg-muted hover:bg-muted",
         added && "animate-in fade-in-0 duration-700 motion-reduce:animate-none",
       )}
@@ -404,7 +404,7 @@ function EventRow({
         className={cn(
           RESOURCE_CELL,
           // A rail down the rows that belong with the open one.
-          (together || selected) && "shadow-[inset_2px_0_0_var(--color-ring)]",
+          (together || selected) && "shadow-[inset_3px_0_0_var(--color-primary)]",
         )}
       >
         <span className="flex min-w-0 items-center gap-2">

@@ -7,6 +7,7 @@ import {
   belongingWith,
   flowSummary,
   formatSpan,
+  inOccurrenceOrder,
   SIGNIN_OUTCOME_TYPES,
   signinOf,
   withOutcome,
@@ -1161,6 +1162,19 @@ describe("the sign-ins", () => {
     expect(belongingWith(rows, event({ id: "evt_x", request_id: null, flow_id: null })).size).toBe(
       0,
     );
+  });
+
+  it("orders events by when they happened, keeping the server's order within a moment", () => {
+    const later = step("evt_later", "auth.check.succeeded", 12);
+    const request = step("evt_request", "request.api", 11, { category: "request" });
+    const first = step("evt_first", "auth.attempt.created", 12);
+    const second = step("evt_second", "auth.check.succeeded", 12);
+    expect(inOccurrenceOrder([first, second, later, request]).map((event) => event.id)).toEqual([
+      "evt_request",
+      "evt_first",
+      "evt_second",
+      "evt_later",
+    ]);
   });
 
   it("writes a span of time as the drawer's timeline does", () => {

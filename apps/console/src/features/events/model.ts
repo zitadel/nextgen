@@ -485,6 +485,19 @@ export function belongingWith(
   );
 }
 
+/**
+ * Events in the order they happened (`occurred_at`), keeping the server's
+ * order between events of the same moment. A read of one request or login
+ * flow comes back in the order the events were stored, and the API requests
+ * are stored in batches, after the changes they made.
+ */
+export function inOccurrenceOrder(events: readonly ProjectEvent[]): ProjectEvent[] {
+  return events
+    .map((event, index) => ({ event, index, at: Date.parse(event.occurred_at) }))
+    .sort((a, b) => a.at - b.at || a.index - b.index)
+    .map(({ event }) => event);
+}
+
 /** A span of time as the drawer's timeline writes it: `0 s`, `1.5 s`, `19 s`, `2 min 5 s`. */
 export function formatSpan(ms: number): string {
   const safe = Math.max(0, ms);
