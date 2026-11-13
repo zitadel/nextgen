@@ -68,8 +68,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
-	flipOK := flipResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, flipResp, helpers.MustMarshal(t, flipResp))
+	flipOK := flipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
 	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
@@ -88,8 +88,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
-	idOK := idResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie)
 
@@ -105,8 +105,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -407,7 +407,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 }
 
 // mustSubmitOK submits a flow action and requires a non-error step response.
-func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action string, fields api.FlowSubmitRequestFields) *api.SubmitFlowStepOK {
+func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action string, fields api.FlowSubmitRequestFields) *api.FlowResponseHeaders {
 	t.Helper()
 	req := &api.FlowSubmitRequest{Action: action}
 	if action == "submit" && fields["x-auth-methods#password"] != nil {
@@ -421,8 +421,8 @@ func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	ok := resp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	ok := resp.(*api.FlowResponseHeaders)
 	require.False(t, ok.Response.Step.Error.Set, "step error: %s", helpers.MustMarshal(t, resp))
 	return ok
 }

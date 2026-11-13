@@ -63,8 +63,8 @@ func TestUnknownIdentifierEvents(t *testing.T) {
 		}
 		resp, err := client.SubmitFlowStep(t.Context(), request, api.SubmitFlowStepParams{ID: flow.Response.ID, Zflow: zflow})
 		require.NoError(t, err)
-		require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-		step = resp.(*api.SubmitFlowStepOK).Response.Step.Name
+		require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+		step = resp.(*api.FlowResponseHeaders).Response.Step.Name
 
 		listed, err := client.ListEvents(t.Context(), api.ListEventsParams{
 			ProjectID: api.ProjectID(project.ID),

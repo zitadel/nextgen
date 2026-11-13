@@ -83,13 +83,13 @@ export function claimDeadline(input: {
  */
 const TIMEOUT_MIN = 1;
 
-const TIMEOUT: Refused<number> = {
+const TIMEOUT = {
   schema: whole.pipe(z.number().min(TIMEOUT_MIN)),
   refusal: {
     message: "{value} is not a valid {input}",
     hint: "Use a whole number of 1 or more.",
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * The challenge a `--no-wait` run returned, in the shape the claim contract
@@ -98,28 +98,28 @@ const TIMEOUT: Refused<number> = {
  * asked or sent.
  */
 /** How a link that died before the browser step finished is refused. */
-const LINK_EXPIRED_REFUSAL: Refusal = {
+const LINK_EXPIRED_REFUSAL = {
   message: "The link expired before the browser step finished",
   hint: "Links are valid for 10 minutes. Start a new one.",
   next: ["{claim}"],
-};
+} as const satisfies Refusal;
 
 /** How a run that stopped waiting for the browser step is refused. */
-const WAIT_STOPPED_REFUSAL: Refusal = {
+const WAIT_STOPPED_REFUSAL = {
   message: "Stopped waiting for the browser step to finish",
   hint: "Links are valid for 10 minutes. Start a new one.",
   next: ["{claim}"],
-};
+} as const satisfies Refusal;
 
 /**
  * How a project past its claim window is refused. Deliberately not the
  * retryable "start a new link" shape: a new challenge cannot fix a closed
  * window, so suggesting `claim` again would send the user in a circle.
  */
-const WINDOW_CLOSED_REFUSAL: Refusal = {
+const WINDOW_CLOSED_REFUSAL = {
   message: `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
   hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
-};
+} as const satisfies Refusal;
 
 const CHALLENGE_ID: Refused<string> = {
   schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),

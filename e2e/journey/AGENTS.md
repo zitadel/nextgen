@@ -30,9 +30,11 @@ the repo root.
 - Passkey coverage is required in CI and rides the `passkey-first` preset
   lane, because the shipped `password-first` flow offers no passkey.
   `JOURNEY_ENABLE_PASSKEY=0` is a local debugging escape hatch only.
-- The testkit suite (`turbo run journey --filter=@zitadel/e2e -- --suite testkit`) installs
-  `@zitadel/testing` from the journey registry into one Next app and runs the
-  consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
+- The testkit suite (`turbo run journey --filter=@zitadel/e2e -- --suite testkit`) runs
+  `zitadel tests add` in one fresh Next app, which installs `@zitadel/testing`
+  from the journey registry, and runs the suite it wrote with `npm run test:e2e`.
+  The starter suite lives only in the CLI (`apps/cli/src/lib/test-kit.ts`);
+  a framework joins `tests add` once this lane runs it. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.
 - Skip a spec that needs the mock OIDC provider when `JOURNEY_OIDC_MOCK_URL`

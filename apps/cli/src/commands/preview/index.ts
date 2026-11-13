@@ -21,20 +21,20 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
 
-const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
+const CREDENTIAL_REQUIRED_REFUSAL = {
   message: "{credential} is not set",
   hint: "Set {credential} for this build, or drop --strict to skip the preview when it is absent.",
-};
+} as const satisfies Refusal;
 
-const NO_URLS_REFUSAL: Refusal = {
+const NO_URLS_REFUSAL = {
   message: "No preview URLs to deploy to",
   hint: "Pass --origin, or run inside a pull-request build that sets one of: {variables}.",
-};
+} as const satisfies Refusal;
 
-const PRIMARY_ORIGIN_REFUSAL: Refusal = {
+const PRIMARY_ORIGIN_REFUSAL = {
   message: "{origins} is a primary origin",
   hint: "Pass the preview URLs with --origin; production is deployed after merge.",
-};
+} as const satisfies Refusal;
 
 /** The shortest and longest a preview may live, as the server fixes them. */
 const TTL_MINIMUM_MS = 60 * 1000;
@@ -46,7 +46,7 @@ const TTL_MAXIMUM_MS = 365 * 24 * 60 * 60 * 1000;
  * and `primary`, the deployment keyword for every primary origin, which a
  * preview build must never reach with its narrower credential.
  */
-const ORIGIN: Refused<string> = {
+const ORIGIN = {
   schema: filled
     .transform((origin) => {
       return origin.replace(/\/+$/, "");
@@ -58,14 +58,14 @@ const ORIGIN: Refused<string> = {
     message: "{problem}",
     hint: "Pass the preview URLs with --origin; production is deployed after merge.",
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * How long a preview stays live, as `7d`, `12h` or `90m`. `parseTtl` refuses a
  * value that is not a duration, in its own words; the schema refuses one
  * outside the server's fixed limits of a minute and 365 days.
  */
-const TTL: Refused<Ttl> = {
+const TTL = {
   schema: z
     .string()
     .transform(parseTtl)
@@ -76,7 +76,7 @@ const TTL: Refused<Ttl> = {
     message: "{value} is outside the allowed range",
     hint: "A preview lives between 60s and 365d.",
   },
-};
+} as const satisfies Refused<Ttl>;
 
 /**
  * What `-m/--message` records on the release this publishes. It refuses a blank
@@ -85,7 +85,7 @@ const TTL: Refused<Ttl> = {
  * counts code points, as the server does, so the length is its call and not the
  * schema's. The message is trimmed.
  */
-const MESSAGE: Refused<string> = {
+const MESSAGE = {
   schema: z
     .string()
     .trim()
@@ -100,7 +100,7 @@ const MESSAGE: Refused<string> = {
       argument: "--message",
     },
   },
-};
+} as const satisfies Refused<string>;
 
 /** Why a preview is skipped, or refused, instead of deployed. */
 export type PreviewVerdict =
