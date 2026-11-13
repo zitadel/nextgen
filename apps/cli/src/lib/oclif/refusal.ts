@@ -300,7 +300,7 @@ export type ValueNames<R> = R extends unknown
  *
  * @typeParam R - The refusal, as its declaration or the call spells it.
  */
-export type NextNames<R> = R extends { readonly next?: readonly (infer Entry)[] }
+type NextNames<R> = R extends { readonly next?: readonly (infer Entry)[] }
   ? WholeName<Entry>
   : never;
 
@@ -342,7 +342,7 @@ type WholeEntries<R> =
  *
  * @typeParam R - The refusal, as its declaration or the call spells it.
  */
-export type ValuesFor<R> = Placeholders & {
+type ValuesFor<R> = Placeholders & {
   readonly [Name in ValueNames<R>]: NonNullable<unknown> | null;
 };
 
@@ -352,7 +352,7 @@ export type ValuesFor<R> = Placeholders & {
  *
  * @typeParam R - The refusal, as its declaration or the call spells it.
  */
-export type NextFor<R> = NextPlaceholders & {
+type NextFor<R> = NextPlaceholders & {
   readonly [Name in NextNames<R>]: Suggested | readonly Suggested[];
 };
 
