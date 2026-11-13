@@ -69,9 +69,13 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 			return wrapError(err)
 		}
 		entity.StampExpiry(deployedAt, previewTTL)
+		expiries := make([]*time.Time, len(entity.Targets))
+		for i, target := range entity.Targets {
+			expiries[i] = target.ExpiresAt
+		}
 		if _, err := tx.Exec(ctx, createDeploymentOriginsStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), deployedAt,
-			entity.Origins(), deployment.NextSeqs(entity.Origins(), read), entity.Expiries(),
+			entity.Origins(), deployment.NextSeqs(entity.Origins(), read), expiries,
 		); err != nil {
 			return wrapError(err)
 		}

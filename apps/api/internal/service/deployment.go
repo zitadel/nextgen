@@ -324,8 +324,10 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 			return err
 		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
+			// The instant the statement stamped on the targets, from the same
+			// two inputs, so the service never reads it back out of the entity.
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
-				*written.Targets[0].ExpiresAt, written.DeployedAt); err != nil {
+				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
 				return err
 			}
 		}

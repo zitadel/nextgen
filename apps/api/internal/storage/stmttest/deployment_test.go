@@ -127,9 +127,6 @@ func TestDeploymentStatements_PreviewExpiryIsFixedByTheDeployment(t *testing.T) 
 		short := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(3*time.Minute))
 		long := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(7*24*time.Hour))
 
-		expiries := func(dep *domain.Deployment) []*time.Time {
-			return dep.Expiries()
-		}
 		for name, read := range map[string]func(string) *domain.Deployment{
 			"get": func(id string) *domain.Deployment {
 				got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, id)
@@ -149,7 +146,9 @@ func TestDeploymentStatements_PreviewExpiryIsFixedByTheDeployment(t *testing.T) 
 			},
 		} {
 			t.Run(name, func(t *testing.T) {
-				assert.Equal(t, []*time.Time{nil}, expiries(read(primary.ID)))
+				gotPrimary := read(primary.ID)
+				require.Len(t, gotPrimary.Targets, 1)
+				assert.Nil(t, gotPrimary.Targets[0].ExpiresAt)
 
 				gotShort := read(short.ID)
 				require.Len(t, gotShort.Targets, 2)

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { setupServer } from "msw/node";
 import { tmpdir } from "node:os";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { aDeployment, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -98,25 +98,14 @@ describe("deployment list at a terminal", () => {
     }
   });
 
-  const deployment = (id: string) => ({
-    id,
-    release_id: "rel_1",
-    kind: "primary",
-    targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
-    metadata: { reason: "deploy" },
-    deployed_at: "2026-01-01T00:00:00.000Z",
-  });
+  const deployment = (id: string) => aDeployment({ id });
 
-  const previewDeployment = (id: string) => ({
-    ...deployment(id),
-    kind: "preview",
-    targets: [{ origin: "https://pr-7.preview.acme.com", expires_at: "2030-01-01T00:00:00Z" }],
-  });
-
-  const listing = (...deployments: object[]) =>
-    http.get(`${SERVER}/api/v1/deployments`, () =>
-      HttpResponse.json({ deployments, next_page_token: null }),
-    );
+  const previewDeployment = (id: string) =>
+    aDeployment({
+      id,
+      kind: "preview",
+      targets: [{ origin: "https://pr-7.preview.acme.com", expires_at: "2030-01-01T00:00:00Z" }],
+    });
 
   async function aProject(): Promise<string> {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-list-"));
@@ -152,7 +141,14 @@ describe("deployment list at a terminal", () => {
   describe("deployment list", () => {
     it("ends each row with its kind and expiry, after deployed_at, piped", async () => {
       const cwd = await aProject();
-      server.use(listing(deployment("dep_1"), previewDeployment("dep_2")));
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, () =>
+          HttpResponse.json({
+            deployments: [deployment("dep_1"), previewDeployment("dep_2")],
+            next_page_token: null,
+          }),
+        ),
+      );
 
       const { stdout } = await runCliForTest([
         "deployment",
@@ -167,14 +163,18 @@ describe("deployment list at a terminal", () => {
       ]);
 
       expect(stdout.split("\n").filter(Boolean)).toEqual([
-        `dep_1\trel_1\tdeploy\t${PRIMARY_ORIGIN}\t2026-01-01T00:00:00.000Z\tprimary\t`,
-        "dep_2\trel_1\tdeploy\thttps://pr-7.preview.acme.com\t2026-01-01T00:00:00.000Z\tpreview\t2030-01-01T00:00:00Z",
+        `dep_1\trel_1\tdeploy\t${PRIMARY_ORIGIN}\t2026-01-01T00:00:00Z\tprimary\t`,
+        "dep_2\trel_1\tdeploy\thttps://pr-7.preview.acme.com\t2026-01-01T00:00:00Z\tpreview\t2030-01-01T00:00:00Z",
       ]);
     });
 
     it("heads the columns with kind and expires last, at a terminal", async () => {
       const cwd = await aProject();
-      server.use(listing(previewDeployment("dep_2")));
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, () =>
+          HttpResponse.json({ deployments: [previewDeployment("dep_2")], next_page_token: null }),
+        ),
+      );
 
       const res = await listed(cwd);
 

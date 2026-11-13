@@ -88,15 +88,17 @@ func TestDeploymentStampExpiry(t *testing.T) {
 	require.NoError(t, err)
 	preview.StampExpiry(deployedAt, 3*time.Minute)
 	want := deployedAt.Add(3 * time.Minute)
-	for _, expiry := range preview.Expiries() {
-		require.NotNil(t, expiry)
-		assert.True(t, want.Equal(*expiry))
+	require.Len(t, preview.Targets, 2)
+	for _, target := range preview.Targets {
+		require.NotNil(t, target.ExpiresAt)
+		assert.True(t, want.Equal(*target.ExpiresAt))
 	}
 
 	primary, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{"https://app.acme.com"}, DeploymentMetadata{})
 	require.NoError(t, err)
 	primary.StampExpiry(deployedAt, 3*time.Minute)
-	assert.Equal(t, []*time.Time{nil}, primary.Expiries(), "a primary deployment sets no expiry")
+	require.Len(t, primary.Targets, 1)
+	assert.Nil(t, primary.Targets[0].ExpiresAt, "a primary deployment sets no expiry")
 }
 
 func TestNewestOriginDeploymentBreaksTiesOnID(t *testing.T) {

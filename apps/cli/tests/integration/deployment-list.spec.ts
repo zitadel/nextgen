@@ -178,7 +178,7 @@ describe("deployment list", () => {
                 project_id: "proj_1",
                 release_id: "rel_1",
                 targets: [{ origin }],
-                kind: "deploy",
+                kind: "primary",
                 status: "live",
                 deployed_at: "2026-01-01T00:00:00Z",
                 metadata: { reason: "deploy" },

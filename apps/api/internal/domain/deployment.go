@@ -146,15 +146,6 @@ func (d *Deployment) StampExpiry(deployedAt time.Time, ttl time.Duration) {
 	}
 }
 
-// Expiries returns each target's expiry, in the order of Origins.
-func (d *Deployment) Expiries() []*time.Time {
-	expiries := make([]*time.Time, len(d.Targets))
-	for i, target := range d.Targets {
-		expiries[i] = target.ExpiresAt
-	}
-	return expiries
-}
-
 // Origins returns the deployment's origins in order.
 func (d *Deployment) Origins() []string {
 	origins := make([]string, len(d.Targets))

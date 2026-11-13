@@ -135,6 +135,19 @@ func expectInsert(statements *servicemocks.MockAllStatements, read []domain.Orig
 	statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", set.Hash).Return(nil)
 }
 
+// expectUnstampedInsert is expectInsert for a statement that writes the
+// deployment but leaves the targets' expiry unset.
+func expectUnstampedInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment, set *domain.VariableSet) {
+	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read, gomock.Any()).
+		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment, _ time.Duration) error {
+			entity.ID = "dep_new"
+			entity.DeployedAt = deployedAt
+			return nil
+		})
+	statements.EXPECT().EnsureVariableSet(gomock.Any(), set).Return(nil)
+	statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", set.Hash).Return(nil)
+}
+
 func servingDeployment(releaseID string) *domain.Deployment {
 	return &domain.Deployment{
 		ProjectID: "proj_1", ID: "dep_serving", ReleaseID: releaseID,
@@ -345,28 +358,37 @@ func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {
 	assert.True(t, result.Created)
 }
 
-// A preview deploy is always written, and renews the previews from its stamp.
+// A preview deploy is always written, and renews the previews from its stamp,
+// whether or not the statement stamped the targets itself.
 func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
-	svc, statements := newMockedDeploymentService(t)
-	serving := servingDeployment("rel_1")
-	serving.OriginKind = domain.DeploymentOriginKindPreview
-	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
-	expectLiveVariables(statements, domain.DeploymentOriginKindPreview)
-	read := []domain.OriginDeployment{{
-		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
-		DeployedAt: serving.DeployedAt, Seq: 7,
-	}}
-	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
-	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
-	expectInsert(statements, read, emptyVariableSet())
-	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
+	inserts := map[string]func(*servicemocks.MockAllStatements, []domain.OriginDeployment, *domain.VariableSet){
+		"a statement that stamps the targets": expectInsert,
+		"a statement that leaves them unset":  expectUnstampedInsert,
+	}
+	for name, insert := range inserts {
+		t.Run(name, func(t *testing.T) {
+			svc, statements := newMockedDeploymentService(t)
+			serving := servingDeployment("rel_1")
+			serving.OriginKind = domain.DeploymentOriginKindPreview
+			statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+			expectLiveVariables(statements, domain.DeploymentOriginKindPreview)
+			read := []domain.OriginDeployment{{
+				Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
+				DeployedAt: serving.DeployedAt, Seq: 7,
+			}}
+			statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
+			statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
+			insert(statements, read, emptyVariableSet())
+			statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
-	input := deploymentInput()
-	input.OriginKind = domain.DeploymentOriginKindPreview
-	input.PreviewTTL = 168 * time.Hour
-	result, err := svc.Create(t.Context(), input)
-	require.NoError(t, err)
-	assert.True(t, result.Created)
+			input := deploymentInput()
+			input.OriginKind = domain.DeploymentOriginKindPreview
+			input.PreviewTTL = 168 * time.Hour
+			result, err := svc.Create(t.Context(), input)
+			require.NoError(t, err)
+			assert.True(t, result.Created)
+		})
+	}
 }
 
 func TestDeploymentServiceCreateGuard(t *testing.T) {
