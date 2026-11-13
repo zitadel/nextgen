@@ -1,11 +1,13 @@
-import { http, HttpResponse } from "msw";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestProject } from "vitest/node";
 
 import type { InstanceHandle } from "../../src/types";
 import { injectZitadel, zitadelGlobalSetup } from "../../src/vitest";
-import { fakeCliBin } from "./helpers/fake-cli";
+import { bootstrapHandlers } from "./helpers/bootstrap-api";
+import { fakeCliBin, type FakeCli } from "./helpers/fake-cli";
 
 // The entry's reader goes through Vitest's own inject(); stand in for the
 // worker side of provide/inject so a test can play both halves of a run.
@@ -19,22 +21,7 @@ vi.mock("vitest", async (importOriginal) => ({
 const PORT = 18096;
 const BASE = `http://localhost:${PORT}`;
 
-const server = setupServer(
-  http.post(`${BASE}/api/v1/projects`, () =>
-    HttpResponse.json(
-      { id: "proj_1", project_secret: "secret_1", preview_secret: "preview_1" },
-      { status: 201 },
-    ),
-  ),
-  http.post(`${BASE}/api/v1/schemas`, () => HttpResponse.json({ id: "sch_1" }, { status: 201 })),
-  http.post(`${BASE}/api/v1/flow_definitions`, () =>
-    HttpResponse.json({ id: "flowdef_1" }, { status: 201 }),
-  ),
-  http.post(`${BASE}/api/v1/releases`, () => HttpResponse.json({ id: "rel_1" }, { status: 201 })),
-  http.post(`${BASE}/api/v1/deployments`, () =>
-    HttpResponse.json({ id: "dep_1" }, { status: 201 }),
-  ),
-);
+const server = setupServer(...bootstrapHandlers(BASE));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -46,6 +33,20 @@ function fakeProject(): TestProject {
   return {
     provide: (key: string, value: unknown) => provided.set(key, value),
   } as unknown as TestProject;
+}
+
+/** The CLI calls so far, read synchronously from the fake's record. */
+function callsNow(fake: FakeCli): string[][] {
+  return readFileSync(join(dirname(fake.binPath), "calls.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as string[]);
+}
+
+/** The state dir the fake CLI was started with. */
+function startedDir(fake: FakeCli): string {
+  const start = callsNow(fake).find((args) => args[0] === "start") ?? [];
+  return start[start.indexOf("-c") + 1] as string;
 }
 
 describe("zitadelGlobalSetup", () => {
@@ -79,29 +80,73 @@ describe("zitadelGlobalSetup", () => {
     expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
   });
 
-  it("forwards the boot options to startLocalZitadel", async () => {
-    const fake = await fakeCliBin();
-    const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
-    await teardown();
+  describe.each(["SIGINT", "SIGTERM"] as const)("on %s", (signal) => {
+    // Run with only the listeners a test installs, and keep process.kill from
+    // delivering a real signal to the test worker.
+    let saved: NodeJS.SignalsListener[];
+    let kill: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      saved = process.listeners(signal);
+      process.removeAllListeners(signal);
+      kill = vi.spyOn(process, "kill").mockImplementation(() => true);
+    });
+    afterEach(() => {
+      kill.mockRestore();
+      process.removeAllListeners(signal);
+      for (const listener of saved) {
+        process.on(signal, listener);
+      }
+    });
 
-    const [start] = (await fake.calls()).filter((args) => args[0] === "start");
-    expect(start).toEqual(expect.arrayContaining(["--port", String(PORT)]));
-  });
+    it("stops the instance before the handler returns and removes its dir", async () => {
+      const fake = await fakeCliBin();
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+      const dir = startedDir(fake);
+      expect(existsSync(dir)).toBe(true);
 
-  it("provides nothing and leaves no instance when the boot fails", async () => {
-    server.use(
-      http.post(`${BASE}/api/v1/projects`, () =>
-        HttpResponse.json({ code: "req.invalid", message: "nope" }, { status: 400 }),
-      ),
-    );
-    const fake = await fakeCliBin();
+      process.emit(signal, signal);
 
-    await expect(
-      zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject()),
-    ).rejects.toThrow();
-    expect(provided.size).toBe(0);
-    // startLocalZitadel stops the server it booted before rethrowing.
-    expect((await fake.calls()).filter((args) => args[0] === "stop")).toHaveLength(1);
+      // No await in between: Vitest exits a tick after the signal.
+      expect(callsNow(fake).filter((args) => args[0] === "stop")).toEqual([
+        ["stop", "--non-interactive", "--json", "-c", dir],
+      ]);
+      expect(existsSync(dir)).toBe(false);
+      expect(process.listenerCount(signal)).toBe(0);
+    });
+
+    it("re-raises the signal when nothing else ends the process", async () => {
+      const fake = await fakeCliBin();
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+
+      process.emit(signal, signal);
+
+      expect(kill).toHaveBeenCalledWith(process.pid, signal);
+    });
+
+    it("leaves the exit to the runner's own handler", async () => {
+      const runnerExit = vi.fn();
+      process.on(signal, runnerExit);
+      const fake = await fakeCliBin();
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+
+      process.emit(signal, signal);
+
+      expect(runnerExit).toHaveBeenCalledOnce();
+      expect(kill).not.toHaveBeenCalled();
+      expect(callsNow(fake).filter((args) => args[0] === "stop")).toHaveLength(1);
+    });
+
+    it("drops its handler on teardown", async () => {
+      const fake = await fakeCliBin();
+      const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(
+        fakeProject(),
+      );
+      expect(process.listenerCount(signal)).toBe(1);
+
+      await teardown();
+
+      expect(process.listenerCount(signal)).toBe(0);
+    });
   });
 });
 

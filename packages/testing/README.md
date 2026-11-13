@@ -29,10 +29,12 @@ The kit drives the `zitadel` CLI, which resolves the published
 
 One instance per suite, seeded per test. `withZitadel()` generates the
 `webServer` entries that boot the instance and run your app against it — no
-wrapper scripts:
+wrapper scripts. Name the config `.mts`: it uses `import.meta.dirname`, which
+a `.ts` config does not load in a package without `"type": "module"` (what
+`zitadel setup` scaffolds for Next.js):
 
 ```ts
-// playwright.config.ts
+// playwright.config.mts
 import { defineConfig } from "@playwright/test";
 import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
 
@@ -209,8 +211,9 @@ For tests that call your own API with a real session and no browser:
 npm i -D @zitadel/testing@latest vitest
 ```
 
-A global setup boots one instance for the run and stops it when the run
-ends. It takes the same options as `startLocalZitadel()`:
+A global setup boots an instance before the tests and stops it when the run
+ends, or when it is interrupted with SIGINT or SIGTERM. It takes the same
+options as `startLocalZitadel()`:
 
 ```ts
 // zitadel.global-setup.ts
@@ -228,10 +231,13 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     globalSetup: ["./zitadel.global-setup.ts"],
-    testTimeout: 30_000, // the first boot of a fresh data dir takes a few seconds
   },
 });
 ```
+
+Vitest runs a global setup once per project that lists it: with `projects`
+and `extends: true`, a root `globalSetup` boots one instance for the root and
+one for every project. List it on the one project whose tests need it.
 
 `injectZitadel()` connects a test to that instance, with the same surface
 `connectZitadel()` returns:
@@ -239,23 +245,25 @@ export default defineConfig({
 ```ts
 // me.test.ts
 import { expect, it } from "vitest";
-import { injectZitadel, SESSION_COOKIE_NAME } from "@zitadel/testing/vitest";
+import { injectZitadel, sessionCookieName } from "@zitadel/testing/vitest";
+
+const appUrl = "http://localhost:3000"; // your API, configured for this instance
 
 it("returns the signed-in user", async () => {
   const zitadel = injectZitadel();
   const { user, sessionToken } = await zitadel.seedSession(); // fresh user, real login flow
-  const response = await fetch("http://localhost:3000/api/me", {
-    headers: { cookie: `${SESSION_COOKIE_NAME}=${sessionToken}` },
-  });
+  // The cookie a server SDK reads on the app's own origin (see "Start tests
+  // authenticated" for the names).
+  const cookie = `${sessionCookieName(zitadel.handle.projectId, appUrl)}=${sessionToken}`;
+  const response = await fetch(`${appUrl}/api/me`, { headers: { cookie } });
   expect(await response.json()).toMatchObject({ id: user.id });
 });
 ```
 
 The global setup hands the serializable `handle` to the test workers through
-Vitest's own `provide`/`inject`, so every pool works. Your API needs the
-instance's coordinates too: start it from the global setup, or read them in
-the test from `zitadel.handle` and `zitadel.appEnv`. The entry is ESM only, as
-Vitest is.
+Vitest's own `provide`/`inject`. Your API has to talk to the same instance:
+start it inside the test files (in a `beforeAll`, say), configured from
+`zitadel.handle` or `zitadel.appEnv`. The entry is ESM only, as Vitest is.
 
 ## API
 
@@ -293,12 +301,6 @@ await z.stop(); // stop server and remove owned temp dir
 `connectZitadel(handle)` returns the same surface minus lifecycle — this is
 what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
-
-From `@zitadel/testing/vitest`: `zitadelGlobalSetup(options)`, the
-`globalSetup` default export that boots the run's instance (`options` are
-`startLocalZitadel`'s), and `injectZitadel()`, which returns the
-`ConnectedZitadel` for it inside a test. It needs `vitest` (4 or newer) and
-never loads Playwright.
 
 From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
 per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
@@ -373,7 +375,8 @@ or export.
 project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
 (demonstrated by the `demo-next-real` lane, 2 workers). The Vitest entry
-follows the same model: one instance per run, shared by every test file.
+follows the same model: one instance per project that lists its global setup,
+shared by that project's test files.
 
 Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 

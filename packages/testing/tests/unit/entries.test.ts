@@ -1,15 +1,13 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const SRC = resolve(import.meta.dirname, "../../src");
 
 /** Every module specifier a source file imports or re-exports. */
 function specifiers(file: string): string[] {
-  const source = readFileSync(file, "utf8");
-  return [...source.matchAll(/\b(?:import|export)\b[^"';]*?\bfrom\s+"([^"]+)"/g)].map(
-    (match) => match[1] as string,
-  );
+  return ts.preProcessFile(readFileSync(file, "utf8")).importedFiles.map((ref) => ref.fileName);
 }
 
 /** Bare specifiers reachable from an entry through its relative imports. */

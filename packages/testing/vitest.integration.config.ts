@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 import { baseTest } from "@zitadel/vitest-config";
 
@@ -18,7 +18,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: "@zitadel/testing (integration)",
-          include: ["tests/integration/*.test.ts"],
+          include: ["tests/integration/**/*.test.ts"],
+          exclude: [...configDefaults.exclude, "tests/integration/vitest-entry/**"],
         },
       },
       {

@@ -1,7 +1,10 @@
+// Peer floor `vitest >=4.0`: Vitest 3.2.4 reads worker state when `vitest` is
+// imported, so this entry would throw inside global setup; 4.0.0 made it lazy.
 import { inject } from "vitest";
 import type { TestProject } from "vitest/node";
 
 import { connectZitadel, startLocalZitadel, type StartLocalZitadelOptions } from "./index";
+import { stopLocalServerSync } from "./lifecycle";
 import type { ConnectedZitadel, InstanceHandle } from "./types";
 
 /**
@@ -11,20 +14,21 @@ import type { ConnectedZitadel, InstanceHandle } from "./types";
  */
 const HANDLE_KEY = "@zitadel/testing:handle";
 
+const LOG = "[zitadel-testing]";
+const SIGNALS = ["SIGINT", "SIGTERM"] as const;
+
 /**
- * Boot options for the run's instance: exactly what `startLocalZitadel`
- * takes.
+ * Boot options for the instance: exactly what `startLocalZitadel` takes.
  */
 export type ZitadelGlobalSetupOptions = StartLocalZitadelOptions;
 
-/** The function a Vitest `globalSetup` module default-exports. */
-export type ZitadelGlobalSetup = (project: TestProject) => Promise<() => Promise<void>>;
-
 /**
- * Vitest global setup that boots one local instance for the whole run with
- * `startLocalZitadel(options)`, provides its serializable handle to every
- * test file, and stops it when the run ends. Default-export its result from
- * the module the config names in `test.globalSetup`:
+ * Vitest global setup that boots a local instance with
+ * `startLocalZitadel(options)`, provides its serializable handle to the test
+ * files, and stops it when the run ends or is interrupted (SIGINT, SIGTERM).
+ * Vitest runs a global setup once per project that lists it, so list it in
+ * one place. Default-export its result from the module the config names in
+ * `test.globalSetup`:
  *
  * ```ts
  * // zitadel.global-setup.ts
@@ -34,22 +38,63 @@ export type ZitadelGlobalSetup = (project: TestProject) => Promise<() => Promise
  *
  * Tests read the instance with {@link injectZitadel}.
  */
-export function zitadelGlobalSetup(options: ZitadelGlobalSetupOptions = {}): ZitadelGlobalSetup {
+export function zitadelGlobalSetup(
+  options: ZitadelGlobalSetupOptions = {},
+): (project: TestProject) => Promise<() => Promise<void>> {
   return async (project) => {
+    // Whether something else already ends the process on each signal (the
+    // Vitest CLI does). Read before adding ours, which would otherwise turn
+    // off Node's default exit for that signal.
+    const othersExit = new Map(
+      SIGNALS.map((signal) => [signal, process.listenerCount(signal) > 0]),
+    );
     const zitadel = await startLocalZitadel(options);
+
+    // `vitest run` skips global teardown on SIGINT and SIGTERM and exits a
+    // tick after the signal, so an awaited stop never finishes and the
+    // detached server would outlive the run. Stop it synchronously instead,
+    // as the Playwright supervisor stops its instance on the same signals.
+    const onSignal = (signal: NodeJS.Signals): void => {
+      removeHandlers();
+      try {
+        stopLocalServerSync(zitadel.runtime.dir, options);
+      } catch (error) {
+        console.error(
+          `${LOG} ${signal} received; stopping the instance failed: ` +
+            `${error instanceof Error ? error.message : String(error)}\n` +
+            `${LOG} \`zitadel stop --all\` stops every instance the CLI started.`,
+        );
+      }
+      if (!othersExit.get(signal as (typeof SIGNALS)[number])) {
+        // Nobody else ends the process: restore Node's default for the signal.
+        process.kill(process.pid, signal);
+      }
+    };
+    const removeHandlers = (): void => {
+      for (const signal of SIGNALS) {
+        process.off(signal, onSignal);
+      }
+    };
+    for (const signal of SIGNALS) {
+      process.once(signal, onSignal);
+    }
+
     // The handle is the cross-process contract (JSON-serializable), which is
     // what provide() requires. The key is not declared on ProvidedContext so
     // the entry adds nothing to the consumer's vitest types.
     (project.provide as (key: string, value: InstanceHandle) => void)(HANDLE_KEY, zitadel.handle);
-    return zitadel.stop;
+    return async () => {
+      removeHandlers();
+      await zitadel.stop();
+    };
   };
 }
 
 /**
- * The run's instance, connected in this test worker: the same `seedUser` /
- * `seedUsers` / `seedSession` / `identity` / `api` surface `connectZitadel`
- * returns. Call it in a test or hook; seed a fresh user per test, since every
- * test file shares the one instance.
+ * The instance the global setup provided, connected in this test worker: the
+ * same `seedUser` / `seedUsers` / `seedSession` / `identity` / `api` surface
+ * `connectZitadel` returns. Call it in a test or hook; seed a fresh user per
+ * test, since the test files share the instance.
  */
 export function injectZitadel(): ConnectedZitadel {
   const handle = (inject as (key: string) => InstanceHandle | undefined)(HANDLE_KEY);
