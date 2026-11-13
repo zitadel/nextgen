@@ -446,3 +446,24 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
 - **Lookup names the inviter.** The invitee can't read platform users, so
   lookup returns the creator as a user reference, as the members list does.
   It is null when a project secret created the invitation.
+
+## Amendment (2026-11-13): a decline keeps the metadata, and the list's filters
+
+This replaces §4's erasure rule for declines and §4's cancel rule, and the
+matching sentence in the 2026-11-11 amendment.
+
+- **A decline keeps `metadata`.** The administrators still see who the
+  declined link was for. Accept still nulls it in the same transaction.
+- **`rejected_at` records when the invitee declined,** as `accepted_at` does
+  for accept. It is set only on a rejected invitation.
+- **Cancel deletes a pending or a rejected invitation.** It is how an
+  administrator removes a declined invitation and its metadata before the
+  cleanup job exists. An expired invitation still keeps its row.
+- **Replace moves a rejected original's metadata** when the replace sends none
+  of its own.
+- **The list's `status` filter repeats** (`status=pending&status=expired`)
+  and matches any of the values, as the events list's filters do. The console
+  hides accepted invitations by listing the other statuses.
+- **The list expands the inviter** with `expand=inviter`: `inviter` is the
+  creator as a user reference, as lookup returns it, and null when a project
+  secret created the invitation.

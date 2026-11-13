@@ -731,10 +731,13 @@ type ListInvitationsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// Only invitations with this status.
-	Status OptInvitationStatus `json:",omitempty,omitzero"`
+	// Only invitations with this status. Repeat the parameter to match any
+	// of several statuses.
+	Status []InvitationStatus `json:",omitempty"`
 	// Only invitations of this type.
 	Type OptListInvitationsType `json:",omitempty,omitzero"`
+	// Related objects to embed on each returned invitation.
+	Expand []InvitationExpand `json:",omitempty"`
 }
 
 // ListMyIdentityLinksParams is parameters of listMyIdentityLinks operation.

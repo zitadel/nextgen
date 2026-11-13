@@ -18430,8 +18430,8 @@ func (s *CreateInvitationProjectMemberRequestType) UnmarshalText(data []byte) er
 type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace delete the row.
+	// Who the administrator said the link is for. Null after accept; a
+	// decline keeps it. Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18448,7 +18448,14 @@ type CreateInvitationProjectMemberResponse struct {
 	// The user who redeemed the link. Null until accepted.
 	AcceptedBy OptNilString `json:"accepted_by"`
 	// When the invitation was accepted. Null until accepted.
-	AcceptedAt    OptNilDateTime                            `json:"accepted_at"`
+	AcceptedAt OptNilDateTime `json:"accepted_at"`
+	// When the invitation was declined. Null until declined.
+	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who created the invitation, resolved for display: render
+	// `display`, falling back to `identifier`, then `user_id`. Present only
+	// when `listInvitations` is called with `expand=inviter`; null when a
+	// project secret created the invitation.
+	Inviter       OptNilUserRef                             `json:"inviter"`
 	Type          CreateInvitationProjectMemberResponseType `json:"type"`
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
@@ -18509,6 +18516,16 @@ func (s *CreateInvitationProjectMemberResponse) GetAcceptedBy() OptNilString {
 // GetAcceptedAt returns the value of AcceptedAt.
 func (s *CreateInvitationProjectMemberResponse) GetAcceptedAt() OptNilDateTime {
 	return s.AcceptedAt
+}
+
+// GetRejectedAt returns the value of RejectedAt.
+func (s *CreateInvitationProjectMemberResponse) GetRejectedAt() OptNilDateTime {
+	return s.RejectedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *CreateInvitationProjectMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -18579,6 +18596,16 @@ func (s *CreateInvitationProjectMemberResponse) SetAcceptedBy(val OptNilString) 
 // SetAcceptedAt sets the value of AcceptedAt.
 func (s *CreateInvitationProjectMemberResponse) SetAcceptedAt(val OptNilDateTime) {
 	s.AcceptedAt = val
+}
+
+// SetRejectedAt sets the value of RejectedAt.
+func (s *CreateInvitationProjectMemberResponse) SetRejectedAt(val OptNilDateTime) {
+	s.RejectedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *CreateInvitationProjectMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -18924,8 +18951,8 @@ func (s *CreateInvitationTeamMemberRequestType) UnmarshalText(data []byte) error
 type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace delete the row.
+	// Who the administrator said the link is for. Null after accept; a
+	// decline keeps it. Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18942,7 +18969,14 @@ type CreateInvitationTeamMemberResponse struct {
 	// The user who redeemed the link. Null until accepted.
 	AcceptedBy OptNilString `json:"accepted_by"`
 	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime                         `json:"accepted_at"`
+	AcceptedAt OptNilDateTime `json:"accepted_at"`
+	// When the invitation was declined. Null until declined.
+	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who created the invitation, resolved for display: render
+	// `display`, falling back to `identifier`, then `user_id`. Present only
+	// when `listInvitations` is called with `expand=inviter`; null when a
+	// project secret created the invitation.
+	Inviter    OptNilUserRef                          `json:"inviter"`
 	Type       CreateInvitationTeamMemberResponseType `json:"type"`
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
@@ -19003,6 +19037,16 @@ func (s *CreateInvitationTeamMemberResponse) GetAcceptedBy() OptNilString {
 // GetAcceptedAt returns the value of AcceptedAt.
 func (s *CreateInvitationTeamMemberResponse) GetAcceptedAt() OptNilDateTime {
 	return s.AcceptedAt
+}
+
+// GetRejectedAt returns the value of RejectedAt.
+func (s *CreateInvitationTeamMemberResponse) GetRejectedAt() OptNilDateTime {
+	return s.RejectedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *CreateInvitationTeamMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -19073,6 +19117,16 @@ func (s *CreateInvitationTeamMemberResponse) SetAcceptedBy(val OptNilString) {
 // SetAcceptedAt sets the value of AcceptedAt.
 func (s *CreateInvitationTeamMemberResponse) SetAcceptedAt(val OptNilDateTime) {
 	s.AcceptedAt = val
+}
+
+// SetRejectedAt sets the value of RejectedAt.
+func (s *CreateInvitationTeamMemberResponse) SetRejectedAt(val OptNilDateTime) {
+	s.RejectedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *CreateInvitationTeamMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -49933,6 +49987,45 @@ func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalText(data []byte) erro
 	}
 }
 
+// A related object to embed on each returned invitation.
+// - `inviter`: the user who created the invitation, as `inviter`, a user
+// reference. It is null when a project secret created the invitation. The
+// property is omitted when not requested.
+// Ref: #
+type InvitationExpand string
+
+const (
+	InvitationExpandInviter InvitationExpand = "inviter"
+)
+
+// AllValues returns all InvitationExpand values.
+func (InvitationExpand) AllValues() []InvitationExpand {
+	return []InvitationExpand{
+		InvitationExpandInviter,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationExpandInviter:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationExpand) UnmarshalText(data []byte) error {
+	switch InvitationExpand(data) {
+	case InvitationExpandInviter:
+		*s = InvitationExpandInviter
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type InvitationID string
 
 // Merged schema.
@@ -50408,8 +50501,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 
 // What the administrator entered at creation, so other administrators know who
 // the link is for. It is only displayed, never matched. Null once the
-// invitation is accepted or declined. Cancel deletes the row with it; replace
-// moves it to the new invitation unless that sends its own.
+// invitation is accepted; a declined one keeps it. Cancel deletes the row with
+// it; replace moves it to the new invitation unless that sends its own.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -50431,8 +50524,8 @@ func (s *InvitationMetadata) SetName(val string) {
 type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace delete the row.
+	// Who the administrator said the link is for. Null after accept; a
+	// decline keeps it. Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -50449,7 +50542,14 @@ type InvitationProjectMember struct {
 	// The user who redeemed the link. Null until accepted.
 	AcceptedBy OptNilString `json:"accepted_by"`
 	// When the invitation was accepted. Null until accepted.
-	AcceptedAt    OptNilDateTime                 `json:"accepted_at"`
+	AcceptedAt OptNilDateTime `json:"accepted_at"`
+	// When the invitation was declined. Null until declined.
+	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who created the invitation, resolved for display: render
+	// `display`, falling back to `identifier`, then `user_id`. Present only
+	// when `listInvitations` is called with `expand=inviter`; null when a
+	// project secret created the invitation.
+	Inviter       OptNilUserRef                  `json:"inviter"`
 	Type          InvitationProjectMemberType    `json:"type"`
 	ProjectMember InvitationProjectMemberPayload `json:"project_member"`
 }
@@ -50507,6 +50607,16 @@ func (s *InvitationProjectMember) GetAcceptedBy() OptNilString {
 // GetAcceptedAt returns the value of AcceptedAt.
 func (s *InvitationProjectMember) GetAcceptedAt() OptNilDateTime {
 	return s.AcceptedAt
+}
+
+// GetRejectedAt returns the value of RejectedAt.
+func (s *InvitationProjectMember) GetRejectedAt() OptNilDateTime {
+	return s.RejectedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationProjectMember) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -50572,6 +50682,16 @@ func (s *InvitationProjectMember) SetAcceptedBy(val OptNilString) {
 // SetAcceptedAt sets the value of AcceptedAt.
 func (s *InvitationProjectMember) SetAcceptedAt(val OptNilDateTime) {
 	s.AcceptedAt = val
+}
+
+// SetRejectedAt sets the value of RejectedAt.
+func (s *InvitationProjectMember) SetRejectedAt(val OptNilDateTime) {
+	s.RejectedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationProjectMember) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -51279,8 +51399,8 @@ func (s *InvitationStatus) UnmarshalText(data []byte) error {
 type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
-	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace delete the row.
+	// Who the administrator said the link is for. Null after accept; a
+	// decline keeps it. Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -51297,7 +51417,14 @@ type InvitationTeamMember struct {
 	// The user who redeemed the link. Null until accepted.
 	AcceptedBy OptNilString `json:"accepted_by"`
 	// When the invitation was accepted. Null until accepted.
-	AcceptedAt OptNilDateTime              `json:"accepted_at"`
+	AcceptedAt OptNilDateTime `json:"accepted_at"`
+	// When the invitation was declined. Null until declined.
+	RejectedAt OptNilDateTime `json:"rejected_at"`
+	// The user who created the invitation, resolved for display: render
+	// `display`, falling back to `identifier`, then `user_id`. Present only
+	// when `listInvitations` is called with `expand=inviter`; null when a
+	// project secret created the invitation.
+	Inviter    OptNilUserRef               `json:"inviter"`
 	Type       InvitationTeamMemberType    `json:"type"`
 	TeamMember InvitationTeamMemberPayload `json:"team_member"`
 }
@@ -51355,6 +51482,16 @@ func (s *InvitationTeamMember) GetAcceptedBy() OptNilString {
 // GetAcceptedAt returns the value of AcceptedAt.
 func (s *InvitationTeamMember) GetAcceptedAt() OptNilDateTime {
 	return s.AcceptedAt
+}
+
+// GetRejectedAt returns the value of RejectedAt.
+func (s *InvitationTeamMember) GetRejectedAt() OptNilDateTime {
+	return s.RejectedAt
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationTeamMember) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetType returns the value of Type.
@@ -51420,6 +51557,16 @@ func (s *InvitationTeamMember) SetAcceptedBy(val OptNilString) {
 // SetAcceptedAt sets the value of AcceptedAt.
 func (s *InvitationTeamMember) SetAcceptedAt(val OptNilDateTime) {
 	s.AcceptedAt = val
+}
+
+// SetRejectedAt sets the value of RejectedAt.
+func (s *InvitationTeamMember) SetRejectedAt(val OptNilDateTime) {
+	s.RejectedAt = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationTeamMember) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetType sets the value of Type.
@@ -65834,52 +65981,6 @@ func (o OptInvitationRejectedEventDelegationType) Get() (v InvitationRejectedEve
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvitationRejectedEventDelegationType) Or(d InvitationRejectedEventDelegationType) InvitationRejectedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInvitationStatus returns new OptInvitationStatus with value set to v.
-func NewOptInvitationStatus(v InvitationStatus) OptInvitationStatus {
-	return OptInvitationStatus{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInvitationStatus is optional InvitationStatus.
-type OptInvitationStatus struct {
-	Value InvitationStatus
-	Set   bool
-}
-
-// IsSet returns true if OptInvitationStatus was set.
-func (o OptInvitationStatus) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInvitationStatus) Reset() {
-	var v InvitationStatus
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInvitationStatus) SetTo(v InvitationStatus) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInvitationStatus) Get() (v InvitationStatus, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInvitationStatus) Or(d InvitationStatus) InvitationStatus {
 	if v, ok := o.Get(); ok {
 		return v
 	}

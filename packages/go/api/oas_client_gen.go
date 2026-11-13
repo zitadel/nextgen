@@ -114,10 +114,10 @@ type Invoker interface {
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CancelInvitation invokes cancelInvitation operation.
 	//
-	// Deletes a pending invitation. Its link can no longer be redeemed. Only a
-	// `pending` invitation can be cancelled; a finished invitation answers the
-	// same opaque `404` as a miss. Expired invitations keep their row until a
-	// later cleanup job removes them.
+	// Deletes a pending or rejected invitation. A pending invitation's link can
+	// no longer be redeemed; a rejected one's row and metadata are removed. An
+	// accepted or expired invitation answers the same opaque `404` as a miss.
+	// Expired invitations keep their row until a later cleanup job removes them.
 	// Authenticate with a project secret (`oauth2`) or a console session cookie
 	// (`sessionCookie`). Cancelling needs the same project `admin` check as
 	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
@@ -1153,8 +1153,11 @@ type Invoker interface {
 	//
 	// Lists a project's invitations, newest first, in any status, paginated with
 	// `limit` and `page_token`.
-	// Optional `status` and `type` filters narrow the page. `expired` is derived
-	// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+	// Optional `status` and `type` filters narrow the page. Repeat `status` to
+	// match any of several statuses, for example
+	// `status=pending&status=expired&status=rejected`. `expired` is derived on
+	// read from `expires_at`. `expand=inviter` adds `inviter` to each
+	// invitation. Authenticate with a project secret (`oauth2`) or
 	// a console session cookie (`sessionCookie`). Listing needs the same project
 	// `admin` check as `createGrant` (`POST /grants`).
 	//
@@ -2433,10 +2436,10 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 
 // CancelInvitation invokes cancelInvitation operation.
 //
-// Deletes a pending invitation. Its link can no longer be redeemed. Only a
-// `pending` invitation can be cancelled; a finished invitation answers the
-// same opaque `404` as a miss. Expired invitations keep their row until a
-// later cleanup job removes them.
+// Deletes a pending or rejected invitation. A pending invitation's link can
+// no longer be redeemed; a rejected one's row and metadata are removed. An
+// accepted or expired invitation answers the same opaque `404` as a miss.
+// Expired invitations keep their row until a later cleanup job removes them.
 // Authenticate with a project secret (`oauth2`) or a console session cookie
 // (`sessionCookie`). Cancelling needs the same project `admin` check as
 // `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
@@ -12794,8 +12797,11 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 //
 // Lists a project's invitations, newest first, in any status, paginated with
 // `limit` and `page_token`.
-// Optional `status` and `type` filters narrow the page. `expired` is derived
-// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+// Optional `status` and `type` filters narrow the page. Repeat `status` to
+// match any of several statuses, for example
+// `status=pending&status=expired&status=rejected`. `expired` is derived on
+// read from `expires_at`. `expand=inviter` adds `inviter` to each
+// invitation. Authenticate with a project secret (`oauth2`) or
 // a console session cookie (`sessionCookie`). Listing needs the same project
 // `admin` check as `createGrant` (`POST /grants`).
 //
@@ -12914,8 +12920,17 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Status.Get(); ok {
-				return e.EncodeValue(conv.StringToString(string(val)))
+			if params.Status != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Status {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {
@@ -12933,6 +12948,32 @@ func (c *Client) sendListInvitations(ctx context.Context, params ListInvitations
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Type.Get(); ok {
 				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {

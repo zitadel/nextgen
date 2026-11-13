@@ -27993,6 +27993,18 @@ func (s *CreateInvitationProjectMemberResponse) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.RejectedAt.Set {
+			e.FieldStart("rejected_at")
+			s.RejectedAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
@@ -28006,7 +28018,7 @@ func (s *CreateInvitationProjectMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateInvitationProjectMemberResponse = [14]string{
+var jsonFieldsNameOfCreateInvitationProjectMemberResponse = [16]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "metadata",
@@ -28018,9 +28030,11 @@ var jsonFieldsNameOfCreateInvitationProjectMemberResponse = [14]string{
 	8:  "journey_id",
 	9:  "accepted_by",
 	10: "accepted_at",
-	11: "type",
-	12: "project_member",
-	13: "link",
+	11: "rejected_at",
+	12: "inviter",
+	13: "type",
+	14: "project_member",
+	15: "link",
 }
 
 // Decode decodes CreateInvitationProjectMemberResponse from json.
@@ -28148,8 +28162,28 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"accepted_at\"")
 			}
+		case "rejected_at":
+			if err := func() error {
+				s.RejectedAt.Reset()
+				if err := s.RejectedAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rejected_at\"")
+			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "type":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -28159,7 +28193,7 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "project_member":
-			requiredBitSet[1] |= 1 << 4
+			requiredBitSet[1] |= 1 << 6
 			if err := func() error {
 				if err := s.ProjectMember.Decode(d); err != nil {
 					return err
@@ -28169,7 +28203,7 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"project_member\"")
 			}
 		case "link":
-			requiredBitSet[1] |= 1 << 5
+			requiredBitSet[1] |= 1 << 7
 			if err := func() error {
 				v, err := d.Str()
 				s.Link = string(v)
@@ -28191,7 +28225,7 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
 		0b11001011,
-		0b00111001,
+		0b11100001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -28514,6 +28548,18 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.RejectedAt.Set {
+					e.FieldStart("rejected_at")
+					s.RejectedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
+				}
+			}
+			{
 				e.FieldStart("project_member")
 				s.ProjectMember.Encode(e)
 			}
@@ -28579,6 +28625,18 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 				if s.AcceptedAt.Set {
 					e.FieldStart("accepted_at")
 					s.AcceptedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.RejectedAt.Set {
+					e.FieldStart("rejected_at")
+					s.RejectedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
 				}
 			}
 			{
@@ -28908,6 +28966,18 @@ func (s *CreateInvitationTeamMemberResponse) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.RejectedAt.Set {
+			e.FieldStart("rejected_at")
+			s.RejectedAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
@@ -28921,7 +28991,7 @@ func (s *CreateInvitationTeamMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateInvitationTeamMemberResponse = [14]string{
+var jsonFieldsNameOfCreateInvitationTeamMemberResponse = [16]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "metadata",
@@ -28933,9 +29003,11 @@ var jsonFieldsNameOfCreateInvitationTeamMemberResponse = [14]string{
 	8:  "journey_id",
 	9:  "accepted_by",
 	10: "accepted_at",
-	11: "type",
-	12: "team_member",
-	13: "link",
+	11: "rejected_at",
+	12: "inviter",
+	13: "type",
+	14: "team_member",
+	15: "link",
 }
 
 // Decode decodes CreateInvitationTeamMemberResponse from json.
@@ -29063,8 +29135,28 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"accepted_at\"")
 			}
+		case "rejected_at":
+			if err := func() error {
+				s.RejectedAt.Reset()
+				if err := s.RejectedAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rejected_at\"")
+			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "type":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -29074,7 +29166,7 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "team_member":
-			requiredBitSet[1] |= 1 << 4
+			requiredBitSet[1] |= 1 << 6
 			if err := func() error {
 				if err := s.TeamMember.Decode(d); err != nil {
 					return err
@@ -29084,7 +29176,7 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"team_member\"")
 			}
 		case "link":
-			requiredBitSet[1] |= 1 << 5
+			requiredBitSet[1] |= 1 << 7
 			if err := func() error {
 				v, err := d.Str()
 				s.Link = string(v)
@@ -29106,7 +29198,7 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
 		0b11001011,
-		0b00111001,
+		0b11100001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -78799,6 +78891,18 @@ func (s Invitation) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.RejectedAt.Set {
+					e.FieldStart("rejected_at")
+					s.RejectedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
+				}
+			}
+			{
 				e.FieldStart("project_member")
 				s.ProjectMember.Encode(e)
 			}
@@ -78860,6 +78964,18 @@ func (s Invitation) encodeFields(e *jx.Encoder) {
 				if s.AcceptedAt.Set {
 					e.FieldStart("accepted_at")
 					s.AcceptedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.RejectedAt.Set {
+					e.FieldStart("rejected_at")
+					s.RejectedAt.Encode(e, json.EncodeDateTime)
+				}
+			}
+			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
 				}
 			}
 			{
@@ -83106,6 +83222,18 @@ func (s *InvitationProjectMember) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.RejectedAt.Set {
+			e.FieldStart("rejected_at")
+			s.RejectedAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
@@ -83115,7 +83243,7 @@ func (s *InvitationProjectMember) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationProjectMember = [13]string{
+var jsonFieldsNameOfInvitationProjectMember = [15]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "metadata",
@@ -83127,8 +83255,10 @@ var jsonFieldsNameOfInvitationProjectMember = [13]string{
 	8:  "journey_id",
 	9:  "accepted_by",
 	10: "accepted_at",
-	11: "type",
-	12: "project_member",
+	11: "rejected_at",
+	12: "inviter",
+	13: "type",
+	14: "project_member",
 }
 
 // Decode decodes InvitationProjectMember from json.
@@ -83256,8 +83386,28 @@ func (s *InvitationProjectMember) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"accepted_at\"")
 			}
+		case "rejected_at":
+			if err := func() error {
+				s.RejectedAt.Reset()
+				if err := s.RejectedAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rejected_at\"")
+			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "type":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -83267,7 +83417,7 @@ func (s *InvitationProjectMember) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "project_member":
-			requiredBitSet[1] |= 1 << 4
+			requiredBitSet[1] |= 1 << 6
 			if err := func() error {
 				if err := s.ProjectMember.Decode(d); err != nil {
 					return err
@@ -83287,7 +83437,7 @@ func (s *InvitationProjectMember) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
 		0b11001011,
-		0b00011001,
+		0b01100001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -84357,6 +84507,18 @@ func (s *InvitationTeamMember) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.RejectedAt.Set {
+			e.FieldStart("rejected_at")
+			s.RejectedAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
@@ -84366,7 +84528,7 @@ func (s *InvitationTeamMember) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationTeamMember = [13]string{
+var jsonFieldsNameOfInvitationTeamMember = [15]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "metadata",
@@ -84378,8 +84540,10 @@ var jsonFieldsNameOfInvitationTeamMember = [13]string{
 	8:  "journey_id",
 	9:  "accepted_by",
 	10: "accepted_at",
-	11: "type",
-	12: "team_member",
+	11: "rejected_at",
+	12: "inviter",
+	13: "type",
+	14: "team_member",
 }
 
 // Decode decodes InvitationTeamMember from json.
@@ -84507,8 +84671,28 @@ func (s *InvitationTeamMember) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"accepted_at\"")
 			}
+		case "rejected_at":
+			if err := func() error {
+				s.RejectedAt.Reset()
+				if err := s.RejectedAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"rejected_at\"")
+			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "type":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -84518,7 +84702,7 @@ func (s *InvitationTeamMember) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "team_member":
-			requiredBitSet[1] |= 1 << 4
+			requiredBitSet[1] |= 1 << 6
 			if err := func() error {
 				if err := s.TeamMember.Decode(d); err != nil {
 					return err
@@ -84538,7 +84722,7 @@ func (s *InvitationTeamMember) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
 		0b11001011,
-		0b00011001,
+		0b01100001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

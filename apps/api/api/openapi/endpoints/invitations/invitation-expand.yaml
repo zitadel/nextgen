@@ -1,0 +1,9 @@
+type: string
+description: |
+  A related object to embed on each returned invitation.
+
+  - `inviter`: the user who created the invitation, as `inviter`, a user
+    reference. It is null when a project secret created the invitation. The
+    property is omitted when not requested.
+enum:
+  - inviter
