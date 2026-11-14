@@ -20,8 +20,9 @@ root.
 - `src/contract.test.ts` has one test per operation, named `METHOD /path`, plus
   one per family for the multi-step phase (`Stateful tests (<family>)`). A
   failing test names the check; the raw report and output are in
-  `api-contract/test-output/schemathesis/<family>/` (gitignored), and `st replay
-  <id>` in the image replays a case.
+  `api-contract/test-output/schemathesis/<family>/` (gitignored; the management
+  family keeps each slice in `shard-N/` and its multi-step run in `stateful/`),
+  and `st replay <id>` in the image replays a case.
 - The run takes about two minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
 - The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
 
@@ -47,6 +48,12 @@ Never add a line to hide a failure you introduced. Fix it, or fix the spec.
 
 A baseline is only worth anything if a run repeats.
 
+- Which operations fail depends on how many containers hit the server at once,
+  because a few operations share server state. `API_CONTRACT_SHARDS` (default 4,
+  at most the core count) sets the slices of a big family and
+  `API_CONTRACT_WORKERS` (default 1) the requests in flight inside one run.
+  The baseline is only valid for the defaults; with more of either, expect
+  failures the baseline does not list.
 - The Schemathesis release and the seed are pinned in `src/schemathesis.ts` (release) and `src/command.ts` (seed).
   Bumping the release adds checks, so regenerate the baseline in the same
   change and say so.

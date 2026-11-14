@@ -50,7 +50,28 @@ describe("ContractSummary", () => {
       baseline,
     );
     expect(summary.annotations()).toEqual([
-      '::error title=API contract: GET /teams::New failure: "Server error" (3 requests).',
+      '::error title=API contract%3A GET /teams::New failure: "Server error" (3 requests).',
     ]);
+  });
+
+  test("tells how long each family took, and copes with no families", () => {
+    const page = new ContractSummary([run([])], baseline).markdown();
+    expect(page).toContain("| management | 1 | 1s |");
+    expect(page).toContain("| slowest (the families run at the same time) | | 1s |");
+    expect(new ContractSummary([], baseline).timing()).toContain("| | 0s |");
+  });
+
+  test("escapes the title and message of an annotation", () => {
+    const summary = new ContractSummary(
+      [run([{ operation: "GET /teams", check: "Server error", count: 3 }])],
+      {
+        verdict: () => {
+          return ["50%, done\r\nnext"];
+        },
+      } as unknown as Baseline,
+    );
+    expect(summary.annotations()[0]).toBe(
+      "::error title=API contract%3A GET /teams::50%25, done%0D%0Anext",
+    );
   });
 });

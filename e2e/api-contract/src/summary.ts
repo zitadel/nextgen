@@ -81,7 +81,7 @@ export class ContractSummary {
     lines.push(
       "### What to do",
       "",
-      "- The request that broke each check is in the `diagnostics` artifact of this run, under `e2e/api-contract/test-output/schemathesis/<family>/` (`report.json`, `output.log`).",
+      "- The request that broke each check is in the `diagnostics` artifact of this run, under `e2e/api-contract/test-output/schemathesis/<family>/` (`report.json`, `output.log`); a family that was split into slices keeps them in `<family>/shard-N/` and its multi-step run in `<family>/stateful/`.",
       "- Reproduce it on your machine: `turbo run api-contract --filter=@zitadel/e2e`.",
       "- A new failure means the server or the spec is wrong: fix one of them. Do not add the failure to `known-failures.json`.",
       "- A listed failure that stopped happening: delete its line from `e2e/api-contract/known-failures.json`.",
@@ -104,6 +104,7 @@ export class ContractSummary {
       return sum + run.seconds;
     }, 0);
     const slowest = Math.max(
+      0,
       ...this.runs.map((run) => {
         return run.seconds;
       }),
@@ -127,8 +128,18 @@ export class ContractSummary {
    */
   annotations(): string[] {
     return this.problems().map((problem) => {
-      const message = problem.findings.join(" ").replaceAll("%", "%25").replaceAll("\n", "%0A");
-      return `::error title=API contract: ${problem.operation}::${message}`;
+      const message = problem.findings
+        .join(" ")
+        .replaceAll("%", "%25")
+        .replaceAll("\r", "%0D")
+        .replaceAll("\n", "%0A");
+      const title = `API contract: ${problem.operation}`
+        .replaceAll("%", "%25")
+        .replaceAll("\r", "%0D")
+        .replaceAll("\n", "%0A")
+        .replaceAll(":", "%3A")
+        .replaceAll(",", "%2C");
+      return `::error title=${title}::${message}`;
     });
   }
 }

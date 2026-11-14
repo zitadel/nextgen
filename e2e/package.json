@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check .",
-    "test": "vitest run --config journey/vitest.config.ts && vitest run --config api-contract/vitest.unit.config.ts",
+    "test": "vitest run --config journey/vitest.config.ts",
+    "api-contract-unit": "vitest run --config api-contract/vitest.unit.config.ts",
     "install-browsers": "playwright install chromium",
     "console-smoke": "playwright test --config console/playwright.config.mts",
     "console-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test --config console/playwright.real.config.mts",
