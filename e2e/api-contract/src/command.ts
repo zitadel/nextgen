@@ -99,6 +99,7 @@ export class SchemathesisCommand {
     const environment: Record<string, string> = {
       SCHEMATHESIS_HOOKS: HOOKS_PATH,
       PYTHONDONTWRITEBYTECODE: "1",
+      SCHEMATHESIS_COVERAGE: "false",
     };
     Object.entries(this.input.headers).forEach(([name, value], index) => {
       environment[`HEADER_${String(index)}`] = `${name}: ${value}`;
