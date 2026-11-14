@@ -30,6 +30,9 @@ import {
   customExample,
   customFlagValues,
   givenCustomFlags,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
@@ -69,6 +72,7 @@ import { ChooseUseCase } from "./steps/choose-use-case";
 import { DetectFramework } from "./steps/detect-framework";
 import { InstallDependencies } from "./steps/install-dependencies";
 import { KeepChanges } from "./steps/keep-changes";
+import { MapClaims } from "./steps/map-claims";
 import { WriteManifest } from "./steps/write-manifest";
 import { MoveAppPort, RECOVERY_ENV_FILE } from "./steps/move-app-port";
 import { ClaimOwnership } from "./steps/claim-ownership";
@@ -96,6 +100,14 @@ const DESIGN_REMOVED_REFUSAL = {
  */
 const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
+  hint: "Name the provider with --sso, e.g. --sso google.",
+} as const satisfies Refusal;
+
+/**
+ * The refusal for the claim flags without `--sso`.
+ */
+const CLAIMS_NEED_SSO_REFUSAL = {
+  message: "{flags} needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
 } as const satisfies Refusal;
 
@@ -215,6 +227,21 @@ export type SetupFlagsToCheck = Readonly<{
   ssoClientId?: string;
 
   /**
+   * The claims the provider fills user properties from.
+   */
+  ssoClaim?: readonly string[];
+
+  /**
+   * How the mapped properties are verified.
+   */
+  ssoVerifiedClaim?: readonly string[];
+
+  /**
+   * The extra scopes the mapped claims need.
+   */
+  ssoClaimScope?: string;
+
+  /**
    * The name of a custom connection.
    */
   ssoSlug?: string;
@@ -257,6 +284,14 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
   }
   const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
   if (flags.sso === undefined) {
+    const claimFlags = [
+      ...(flags.ssoClaim === undefined ? [] : ["--sso-claim"]),
+      ...(flags.ssoVerifiedClaim === undefined ? [] : ["--sso-verified-claim"]),
+      ...(flags.ssoClaimScope === undefined ? [] : ["--sso-claim-scope"]),
+    ];
+    if (claimFlags.length > 0) {
+      throw refusalError(CLAIMS_NEED_SSO_REFUSAL, { flags: claimFlags.join(", ") });
+    }
     if (given[0] !== undefined) {
       throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
         flag: given[0],
@@ -433,6 +468,26 @@ export default class Setup extends Destructive(BaseCommand) {
       }),
     })({
       description: "Client id of the OAuth application registered with the --sso provider.",
+    }),
+    "sso-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry),
+    })({
+      description:
+        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "sso-verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry),
+    })({
+      description:
+        "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+    }),
+    "sso-claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList),
+    })({
+      description:
+        "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
     }),
     [SETUP_FLAG_KEYS.slug]: Flags.custom<string>({
       parse: accepts((value) => {
@@ -675,6 +730,14 @@ export default class Setup extends Destructive(BaseCommand) {
           nonInteractive: this.nonInteractive,
           serverFlag: this.meta.serverFlag,
           suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new MapClaims({
+          ask: this.ask,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
           ui: this.ui,
         }),
       )

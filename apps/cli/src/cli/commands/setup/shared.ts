@@ -19,9 +19,17 @@ import {
   slugFromDisplayName,
 } from "@zitadel/config/idp";
 import {
+  applyRequest,
+  type ClaimRequest,
+  choiceOf,
+  claimFlagTexts,
+  claimRequestFromFlags,
+  claimsOrRefuse,
   customFlagValues,
+  NO_CLAIM_REQUEST,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  seedMapping,
   selectionFromFlags,
   ssoEnableFlags,
 } from "@/lib/idp";
@@ -150,6 +158,13 @@ export type SsoDraft = {
    * up locally — see {@link ChooseSocialSignIn}.
    */
   readonly endpoints?: ConnectionEndpoints;
+
+  /**
+   * What the connection maps beyond the provider's defaults: given with
+   * `--sso-claim`, or answered in {@link MapClaims}. Left out, the defaults
+   * stand.
+   */
+  readonly claimRequest?: ClaimRequest;
 };
 
 /**
@@ -687,6 +702,11 @@ export type SetupRetryOptions = {
    */
   sso?: readonly ProviderSelection[];
   /**
+   * The claims asked for with `--sso-claim`. They are not credentials, so they
+   * travel in the command.
+   */
+  ssoClaims?: ClaimRequest;
+  /**
    * The minimum password length the run was given: a number, or `null` for
    * an explicit "none", carried as `--password-min-length 0` so a kept policy
    * file still loses its minimum on the retry.
@@ -751,7 +771,7 @@ export async function scaffoldOf(
   force: boolean,
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
   signupPolicy = true,
-): Promise<Scaffold<SsoDraft>> {
+): Promise<Scaffold<SsoDraft & ScaffoldedProvider>> {
   try {
     return (
       await ZitadelConfig.loadKinds(new DiskStore(cwd), [
@@ -763,7 +783,22 @@ export async function scaffoldOf(
     ).scaffold({
       preset: answers.preset,
       useCase: answers.useCase,
-      sso: answers.sso,
+      sso: answers.sso.map((draft): SsoDraft & ScaffoldedProvider => {
+        return {
+          ...draft,
+          claims: (connection, template) => {
+            return choiceOf(
+              claimsOrRefuse(
+                applyRequest(
+                  seedMapping(connection, template),
+                  draft.claimRequest ?? NO_CLAIM_REQUEST,
+                ),
+              ),
+              "--sso-verified-claim",
+            );
+          },
+        };
+      }),
       passwordMinLength: answers.passwordMinLength,
       signupPolicy,
       force,
@@ -1258,6 +1293,23 @@ function ssoSettingFlags(values: CustomFlagValues): SsoSettingFlags {
 }
 
 /**
+ * The `--sso-claim` flags that restate a claim request.
+ *
+ * @param request - The claims asked for, if any.
+ * @returns The flags, each left out when the request does not use it.
+ */
+export function ssoClaimFlags(
+  request: ClaimRequest | undefined,
+): Pick<SuggestFlags<"setup">, "ssoClaim" | "ssoVerifiedClaim" | "ssoClaimScope"> {
+  const texts = claimFlagTexts(request ?? NO_CLAIM_REQUEST);
+  return {
+    ssoClaim: texts.claim,
+    ssoVerifiedClaim: texts.verifiedClaim,
+    ssoClaimScope: texts.claimScope,
+  };
+}
+
+/**
  * The flags of the current invocation for retry guidance, ending in
  * `--server local` unless the run named a server.
  *
@@ -1294,6 +1346,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
     renderer: opts.renderer === "react" ? undefined : opts.renderer,
     devPort: opts.devPort,
     passwordMinLength: opts.passwordMinLength === null ? 0 : opts.passwordMinLength,
+    ...ssoClaimFlags(opts.ssoClaims),
     ...(firstSso === undefined
       ? opts.ssoTyped
       : {
@@ -1347,6 +1400,9 @@ export function retryOptionsFromFlags(flags: {
   ssoDisplayName?: string;
   ssoIssuer?: string;
   ssoScopes?: string;
+  ssoClaim?: readonly string[];
+  ssoVerifiedClaim?: readonly string[];
+  ssoClaimScope?: string;
 }): SetupRetryOptions {
   const [, selection] = tryCatch(() => {
     if (flags.sso === undefined) {
@@ -1374,6 +1430,11 @@ export function retryOptionsFromFlags(flags: {
     devPort: flags.devPort,
     passwordMinLength: flags.passwordMinLength,
     sso: selection === undefined ? undefined : [selection],
+    ssoClaims: claimRequestFromFlags({
+      claim: flags.ssoClaim,
+      scope: flags.ssoClaimScope,
+      verified: flags.ssoVerifiedClaim,
+    }),
   };
 }
 

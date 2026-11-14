@@ -1,4 +1,5 @@
 import {
+  claimRequestFromFlags,
   customExample,
   customFlagValues,
   loopbackIssuerWarning,
@@ -7,7 +8,7 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import type { Fact, SetupServices, SsoDraft } from "@/cli/commands/setup/shared";
-import { askCustomSettings } from "@/cli/commands/setup/shared";
+import { askCustomSettings, ssoClaimFlags } from "@/cli/commands/setup/shared";
 import { type ClientId, CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 import { andTheRest, pipedFrom, type Suggest } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
@@ -126,6 +127,9 @@ export async function ssoFromFlags(
     ssoDisplayName?: string;
     ssoIssuer?: string;
     ssoScopes?: string;
+    ssoClaim?: readonly string[];
+    ssoVerifiedClaim?: readonly string[];
+    ssoClaimScope?: string;
   },
   nonInteractive: boolean,
   dryRun: boolean,
@@ -136,6 +140,11 @@ export async function ssoFromFlags(
   if (flags.sso === undefined) {
     return undefined;
   }
+  const claimRequest = claimRequestFromFlags({
+    claim: flags.ssoClaim,
+    scope: flags.ssoClaimScope,
+    verified: flags.ssoVerifiedClaim,
+  });
   const selection = selectionFromFlags(
     flags.sso,
     flags.sso === CUSTOM_PROVIDER && !nonInteractive
@@ -152,16 +161,19 @@ export async function ssoFromFlags(
     return {
       selection,
       credentials: {},
+      claimRequest,
     };
   }
   if (!nonInteractive || dryRun) {
     return {
       selection,
       credentials: { clientId: flags.ssoClientId },
+      claimRequest,
     };
   }
   return {
     selection,
+    claimRequest,
     credentials: {
       clientId: flags.ssoClientId,
       secret: await ask.secret({
@@ -177,6 +189,7 @@ export async function ssoFromFlags(
               flags: {
                 sso: flags.sso,
                 ssoClientId: ID_TO_FILL_IN,
+                ...ssoClaimFlags(claimRequest),
               },
             }),
           ),

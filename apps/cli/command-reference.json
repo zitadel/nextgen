@@ -208,6 +208,23 @@
           "type": "option"
         },
         {
+          "name": "sso-claim",
+          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-verified-claim",
+          "description": "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-claim-scope",
+          "description": "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+          "type": "option"
+        },
+        {
           "name": "sso-slug",
           "description": "With --sso custom: the name of the connection. Schemas and flows refer to it.",
           "type": "option"

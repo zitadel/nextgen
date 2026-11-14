@@ -298,6 +298,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
           secret,
         },
         endpoints,
+        claimRequest: flagged?.claimRequest,
       },
       ...(await this.collect(rest, answers, ctx)),
     ];

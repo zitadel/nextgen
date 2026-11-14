@@ -469,6 +469,9 @@ export class ShowResult extends WizardStep<
                   return [property, claim];
                 }),
               ),
+              new_attributes: entry.created.map((property) => {
+                return property.name;
+              }),
               verified_claims: Object.fromEntries(
                 mapped.verifications.map(({ property, claim }) => {
                   return [property, claim];
