@@ -22,7 +22,8 @@ root.
   failing test names the check; the raw report and output are in
   `api-contract/test-output/schemathesis/<family>/` (gitignored), and `st replay
   <id>` in the image replays a case.
-- The run takes about two minutes, and is not cached.
+- The run takes about two minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
+- The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
 
 ## The baseline
 
