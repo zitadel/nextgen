@@ -394,8 +394,9 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
         .replace(/[_.-]+/g, " ")
         .trim()
         .toLowerCase();
+      const label = words === "" ? words : `${words[0]?.toUpperCase()}${words.slice(1)}`;
       log.info(
-        `The login form will label it "${plain(words === "" ? words : `${words[0]?.toUpperCase()}${words.slice(1)}`)}". To use other wording, set register.field.${plain(attribute)} and register-sso.field.${plain(attribute)} in the locales of your login page.`,
+        `The login form will label it "${plain(label)}". To use other wording, set register.field.${plain(attribute)} and register-sso.field.${plain(attribute)} in the locales of your login page.`,
       );
     }
     const rest = await this.askMore(
