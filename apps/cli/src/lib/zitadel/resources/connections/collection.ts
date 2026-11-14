@@ -196,11 +196,21 @@ export class Connections extends Collection<Connection> {
         attributes.map((property) => {
           return property.name;
         }),
+        provided.skipped.map((region) => {
+          return region.step;
+        }),
       );
       return {
         document: fields.document,
         changed: provided.changed || fields.changed,
-        skipped: provided.skipped,
+        skipped: [
+          ...provided.skipped.filter((region) => {
+            return !fields.skipped.some((left) => {
+              return left.step === region.step;
+            });
+          }),
+          ...fields.skipped,
+        ],
       };
     });
     const after = flowEdits.reduce((current, flowEdit) => {
@@ -581,6 +591,12 @@ export class Connections extends Collection<Connection> {
     }
     const outcome = dryRun ? "it would be left alone" : "it was left alone";
     const lead = `${flow.path} ${region.region} has been edited by hand, so ${outcome}.`;
+    if (region.fields !== undefined) {
+      return {
+        severity: "warning",
+        message: `${lead} Add ${region.fields.join(", ")} to its fields.`,
+      };
+    }
     if (region.step === "password") {
       return {
         severity: "warning",

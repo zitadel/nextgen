@@ -730,6 +730,32 @@ describe("Flow.withFields", () => {
     ]);
   });
 
+  it("leaves a step edited by hand as it is and reports the fields it was left without", () => {
+    const flow = registering([
+      { name: "register", fields: ["email"] },
+      { name: "register-sso", fields: ["email"] },
+    ]);
+
+    const edit = flow.withFields(["employeeNumber"], ["register-sso"]);
+
+    expect({
+      fields: edit.document.steps.map((step) => {
+        return step.fields;
+      }),
+      skipped: edit.skipped,
+    }).toEqual({
+      fields: [["email", "employeeNumber"], ["email"]],
+      skipped: [
+        {
+          step: "register-sso",
+          region: "steps.register-sso",
+          reason: "hand-edited",
+          fields: ["employeeNumber"],
+        },
+      ],
+    });
+  });
+
   it("does not add a field a step lists already", () => {
     const flow = registering([{ name: "register", fields: ["email", "employeeNumber"] }]);
 

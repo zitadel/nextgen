@@ -19,6 +19,7 @@ import {
   type ReadableFile,
   type DocumentStatus,
   type Edit,
+  type SkippedRegion,
 } from "@/lib/zitadel/resources/document";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import { Step } from "@/lib/zitadel/resources/flows/step";
@@ -535,12 +536,15 @@ export class Flow extends ConfigDocument<FlowValue> {
    * names none), which is where a provider's new users are asked for their
    * details too, and the `register-sso` step, when they list their fields. A
    * field a step lists already is not added twice, and every other step is
-   * left as it is.
+   * left as it is. A step the developer edited by hand, which the caller names,
+   * is left as it is too, and reported with the fields to add to it.
    *
    * @param names - The fields to add.
-   * @returns The edit: the edited flow, or this one when no step takes them.
+   * @param handEdited - The steps edited by hand, which are left alone.
+   * @returns The edit: the edited flow, or this one when no step takes them,
+   *   and the hand-edited steps that were left without them.
    */
-  withFields(names: readonly string[]): Edit<Flow> {
+  withFields(names: readonly string[], handEdited: readonly string[] = []): Edit<Flow> {
     const steps = this.body.steps;
     if (names.length === 0 || !Array.isArray(steps)) {
       return { document: this, changed: false, skipped: [] };
@@ -549,26 +553,52 @@ export class Flow extends ConfigDocument<FlowValue> {
       this.value.purposes.register ?? "register",
       REGISTER_SSO_STEP,
     ];
-    const edited = steps.map((step) => {
+    const wanting = steps.flatMap((step) => {
       if (
         !isJsonObject(step) ||
         typeof step.name !== "string" ||
         !asking.includes(step.name) ||
         !Array.isArray(step.fields)
       ) {
-        return step;
+        return [];
       }
       const fields = step.fields;
-      const missing = names.filter((name) => {
-        return !fields.includes(name);
+      return [
+        {
+          step,
+          name: step.name,
+          fields,
+          missing: names.filter((name) => {
+            return !fields.includes(name);
+          }),
+        },
+      ];
+    });
+    const skipped: readonly SkippedRegion[] = wanting
+      .filter((wanted) => {
+        return wanted.missing.length > 0 && handEdited.includes(wanted.name);
+      })
+      .map((wanted) => {
+        return {
+          step: wanted.name,
+          region: `steps.${wanted.name}`,
+          reason: "hand-edited",
+          fields: wanted.missing,
+        };
       });
-      return missing.length === 0 ? step : { ...step, fields: [...fields, ...missing] };
+    const edited = steps.map((step) => {
+      const wanted = wanting.find((one) => {
+        return one.step === step;
+      });
+      return wanted === undefined || wanted.missing.length === 0 || handEdited.includes(wanted.name)
+        ? step
+        : { ...wanted.step, fields: [...wanted.fields, ...wanted.missing] };
     });
     const unchanged = edited.every((step, at) => {
       return step === steps[at];
     });
     if (unchanged) {
-      return { document: this, changed: false, skipped: [] };
+      return { document: this, changed: false, skipped };
     }
     return {
       document: Flow.build(
@@ -576,7 +606,7 @@ export class Flow extends ConfigDocument<FlowValue> {
         this.editedStatus,
       ),
       changed: true,
-      skipped: [],
+      skipped,
     };
   }
 
