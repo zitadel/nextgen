@@ -3,4 +3,4 @@
 "@zitadel/api": patch
 ---
 
-Creating a session for another project's user now returns 403 instead of a server error, a schema URL the server cannot fetch returns a 400, and a deployment can be created from a release's `content_hash`, which used to return 501. The query endpoints' reference now states which value and operation each filter field accepts. Creating or patching a user with an attribute name that is empty or contains a `.` now returns a 400 instead of storing an attribute that could not be read back.
+The API now answers a foreign project's session with 403, an unreachable schema URL with 400, a user attribute name that is empty or holds a `.` with 400, and creates a deployment from a release's `content_hash` instead of returning 501.
