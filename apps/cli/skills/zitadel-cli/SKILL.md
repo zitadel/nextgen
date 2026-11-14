@@ -392,7 +392,11 @@ Each invocation prints one JSON object:
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
-  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  line to pin). Each `data.previews[]` entry is `{ url, expires_at }`, where
+  `expires_at` is the live preview's expiry read after the deploy; a later
+  deploy to the URL renews it (`preview list` reads it again). Every preview
+  expires, so `expires_at: null` means that read failed: the run still answers
+  `ok` with a warning, and the preview and `data.release_env` stand. It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
   outside a preview or development build it is a no-op — even with an explicit
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
