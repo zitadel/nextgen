@@ -1,7 +1,3 @@
-import type { Fact } from "@/cli/commands/setup/shared";
-import { accepts, parses, type Refused, reads, whole } from "@/lib/oclif/flags";
-import { errorMessage } from "@/lib/errors";
-import { reportWarning } from "@/lib/warnings";
 import { Flags } from "@oclif/core";
 import {
   BRANDING_DESIGNS,
@@ -26,6 +22,7 @@ import {
 } from "@zitadel/config/idp";
 import { z } from "zod";
 
+import { errorMessage } from "@/lib/errors";
 import {
   customExample,
   customFlagValues,
@@ -43,6 +40,7 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
+import { accepts, parses, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { createOrca } from "@/lib/orca";
 import {
@@ -50,41 +48,42 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { PAGE_LAYOUT_HINT, PasswordPolicy, type PasswordMinLength } from "@/lib/zitadel";
-
+import { reportWarning } from "@/lib/warnings";
 import { Wizard } from "@/lib/wizard";
+import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import { ReportAlreadySetUp } from "./steps/report-already-set-up";
-import { MakeInitialCommit } from "./steps/make-initial-commit";
-import { WriteConfiguration } from "./steps/write-configuration";
+import { DEFAULT_RENDERER, type Fact } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
-import { DoInitialDeploy } from "./steps/do-initial-deploy";
+import { CheckPatch } from "./steps/check-patch";
+import { CheckPreconditions } from "./steps/check-preconditions";
 import { ChooseDevPort } from "./steps/choose-dev-port";
-import { ConfirmFramework } from "./steps/confirm-framework";
-import { SetPasswordPolicy } from "./steps/set-password-policy";
 import { ChooseServer } from "./steps/choose-server";
-import { SettleAnswers } from "./steps/settle-answers";
 import { ChooseSignIn } from "./steps/choose-sign-in";
 import { ChooseSocialSignIn } from "./steps/choose-social-sign-in";
 import { ChooseUseCase } from "./steps/choose-use-case";
+import { ClaimOwnership } from "./steps/claim-ownership";
+import { ConfirmFramework } from "./steps/confirm-framework";
+import { CreateProject } from "./steps/create-project";
 import { DetectFramework } from "./steps/detect-framework";
+import { DoInitialDeploy } from "./steps/do-initial-deploy";
 import { InstallDependencies } from "./steps/install-dependencies";
 import { KeepChanges } from "./steps/keep-changes";
-import { WriteManifest } from "./steps/write-manifest";
+import { MakeInitialCommit } from "./steps/make-initial-commit";
 import { MoveAppPort, RECOVERY_ENV_FILE } from "./steps/move-app-port";
-import { ClaimOwnership } from "./steps/claim-ownership";
-import { CheckPatch } from "./steps/check-patch";
 import { PatchApp } from "./steps/patch-app";
 import { PlanConfiguration } from "./steps/plan-configuration";
-import { CreateProject } from "./steps/create-project";
 import { PublishCredentials } from "./steps/publish-credentials";
-import { ShowResult } from "./steps/show-result";
-import { ScaffoldApp } from "./steps/scaffold-app";
 import { ReadSsoFlags } from "./steps/read-sso-flags";
-import { CheckPreconditions } from "./steps/check-preconditions";
+import { ReportAlreadySetUp } from "./steps/report-already-set-up";
+import { ScaffoldApp } from "./steps/scaffold-app";
+import { SetPasswordPolicy } from "./steps/set-password-policy";
+import { SettleAnswers } from "./steps/settle-answers";
+import { ShowResult } from "./steps/show-result";
+import { WriteConfiguration } from "./steps/write-configuration";
+import { WriteManifest } from "./steps/write-manifest";
 
 /**
- * The refusal for `--design`, which setup no longer takes.
+ * How `--design`, which setup no longer takes, is refused.
  */
 const DESIGN_REMOVED_REFUSAL = {
   message: "setup no longer applies a login template, so --design was removed",
@@ -93,7 +92,7 @@ const DESIGN_REMOVED_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The refusal for `--sso-client-id` without `--sso`.
+ * How `--sso-client-id` without `--sso` is refused.
  */
 const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
@@ -101,7 +100,7 @@ const CLIENT_ID_NEEDS_SSO_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The refusal for a custom connection's setting without `--sso`.
+ * How a custom connection's setting without `--sso` is refused.
  */
 const SETTING_NEEDS_SSO_REFUSAL = {
   message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
@@ -109,7 +108,7 @@ const SETTING_NEEDS_SSO_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The refusal for a custom connection's settings given with another provider.
+ * How a custom connection's settings given with another provider are refused.
  */
 const SETTINGS_NEED_CUSTOM_REFUSAL = {
   message: "{names} only applies to a custom connection",
@@ -120,7 +119,7 @@ const SETTINGS_NEED_CUSTOM_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The refusal for a custom connection that a script left incomplete.
+ * How a custom connection that a script left incomplete is refused.
  */
 const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   message: "A custom connection needs {list}",
@@ -131,7 +130,7 @@ const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The refusal for a provider that a script gave no client id.
+ * How a provider that a script gave no client id is refused.
  */
 const SSO_NEEDS_CLIENT_ID_REFUSAL = {
   message: "--sso {sso} needs --sso-client-id",
@@ -140,9 +139,11 @@ const SSO_NEEDS_CLIENT_ID_REFUSAL = {
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
- * flag can't drift from what the CLI can actually scaffold. `createOrca` is
- * pure (it only builds the in-memory registries), so this is safe at module
- * load.
+ * flag cannot drift from what the CLI can scaffold.
+ *
+ * @remarks
+ * `createOrca` is pure, as it only builds the in-memory registries, so calling
+ * it at module load is safe.
  */
 const FRAMEWORK_OPTIONS = createOrca()
   .availableFrameworks()
@@ -151,12 +152,14 @@ const FRAMEWORK_OPTIONS = createOrca()
   });
 
 /**
- * `--renderer` offers only ids `getRenderer` will resolve: a
- * declared-but-unpublished renderer (ADR 006) keeps its registry entry to
- * reserve the id, but is surfaced as unavailable in the flag description
- * instead of in `options`, so `--help` never advertises a value that is
- * guaranteed to fail and an explicit pass is rejected at parse time — before
- * any remote project is created.
+ * The renderer ids that are declared but not published yet.
+ *
+ * @remarks
+ * `--renderer` offers only ids `getRenderer` will resolve. A declared renderer
+ * that is not published (ADR 006) keeps its registry entry to reserve the id
+ * but is named unavailable in the flag description instead of in `options`, so
+ * `--help` never advertises a value that is guaranteed to fail and an explicit
+ * pass is rejected at parse time, before any remote project is created.
  */
 const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => {
   return !AVAILABLE_RENDERER_IDS.includes(id);
@@ -167,8 +170,8 @@ const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => {
  */
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
-    ? "Renderer (default: react)."
-    : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+    ? `Renderer (default: ${DEFAULT_RENDERER}).`
+    : `Renderer (default: ${DEFAULT_RENDERER}). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
 /**
  * The lowest TCP port a server can listen on.
@@ -197,96 +200,10 @@ const PORT = {
 } as const satisfies Refused<number>;
 
 /**
- * The flags the command admitted, which every step reads what it needs from.
- */
-export type SetupFlags = Admitted<typeof Setup>["flags"];
-
-/**
- * The flags {@link refuseUnusableFlags} reads, as a command reads them.
- */
-export type SetupFlagsToCheck = Readonly<
-  Partial<
-    Pick<
-      SetupFlags,
-      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
-    > & {
-      ssoClientId: string;
-    }
-  >
->;
-
-/**
- * Refuses a command line setup cannot act on, before anything is detected,
- * created or written: a removed flag, and a set of `--sso` flags that
- * contradict each other or leaves out what nobody can be asked for.
- *
- * @remarks
- * `scripted` says nobody can be asked; a person at a terminal is asked for what
- * is missing instead.
- *
- * @param flags - The flags the command was given.
- * @param scripted - Whether nobody can be asked.
- * @throws A refusal for the first flag that cannot be acted on.
- */
-export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
-  if (flags.design !== undefined) {
-    throw refusalError(DESIGN_REMOVED_REFUSAL, {});
-  }
-  if (flags.ssoClientId !== undefined && flags.sso === undefined) {
-    throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
-  }
-  const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
-  if (flags.sso === undefined) {
-    if (given[0] !== undefined) {
-      throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
-        flag: given[0],
-      });
-    }
-    return;
-  }
-  if (flags.sso !== CUSTOM_PROVIDER && given.length > 0) {
-    throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
-      names: given.join(", "),
-      them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
-      flags: given,
-    });
-  }
-  if (!scripted) {
-    return;
-  }
-  if (flags.sso === CUSTOM_PROVIDER) {
-    const missing = [
-      SETUP_FLAG_NAMES.slug,
-      SETUP_FLAG_NAMES.displayName,
-      SETUP_FLAG_NAMES.issuer,
-    ].filter((name) => {
-      return !given.includes(name);
-    });
-    if (missing.length > 0) {
-      throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
-        list: missing.join(", "),
-        missing,
-      });
-    }
-  }
-  if (flags.ssoClientId === undefined) {
-    const entry = flags.sso === CUSTOM_PROVIDER ? undefined : parseProviderSelection(flags.sso);
-    const catalog = entry === undefined ? undefined : providerOf(entry);
-    throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
-      sso: flags.sso,
-      registration:
-        catalog?.consoleUrl === undefined
-          ? `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`
-          : `an OAuth application at ${catalog.consoleUrl}`,
-    });
-  }
-}
-
-/**
  * `zitadel setup` — create a Zitadel project and scaffold local auth.
  *
  * @remarks
- * Runs as a wizard of steps (see `wizard()`): detect the app, ask what the
+ * Runs as a wizard of steps (see `Wizard`): detect the app, ask what the
  * flags left open, create the project, patch the app and write the editable
  * `.zitadel/**` configuration, then publish credentials, install, commit and
  * deploy. An interactive setup ends with a note about the Zitadel agent skills,
@@ -557,7 +474,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ({ flags, found, scaffoldedFramework }) => {
             this.recordTelemetry({
               framework: found.app.framework,
-              renderer: flags.renderer ?? "react",
+              renderer: flags.renderer ?? DEFAULT_RENDERER,
               scaffolded_skeleton: scaffoldedFramework,
               skip_install: Boolean(flags.skipInstall),
               dev_port_explicit: flags.devPort !== undefined,
@@ -756,5 +673,91 @@ export default class Setup extends Destructive(BaseCommand) {
           },
         ),
     );
+  }
+}
+
+/**
+ * The flags the command admitted, which every step reads what it needs from.
+ */
+export type SetupFlags = Admitted<typeof Setup>["flags"];
+
+/**
+ * The flags {@link refuseUnusableFlags} reads, as a command reads them.
+ */
+export type SetupFlagsToCheck = Readonly<
+  Partial<
+    Pick<
+      SetupFlags,
+      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
+    > & {
+      ssoClientId: string;
+    }
+  >
+>;
+
+/**
+ * Refuses a command line setup cannot act on, before anything is detected,
+ * created or written: a removed flag, and a set of `--sso` flags that
+ * contradict each other or leaves out what nobody can be asked for.
+ *
+ * @remarks
+ * `scripted` says nobody can be asked; a person at a terminal is asked for what
+ * is missing instead.
+ *
+ * @param flags - The flags the command was given.
+ * @param scripted - Whether nobody can be asked.
+ * @throws A refusal for the first flag that cannot be acted on.
+ */
+export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
+  if (flags.design !== undefined) {
+    throw refusalError(DESIGN_REMOVED_REFUSAL, {});
+  }
+  if (flags.ssoClientId !== undefined && flags.sso === undefined) {
+    throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
+  }
+  const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
+  if (flags.sso === undefined) {
+    if (given[0] !== undefined) {
+      throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
+        flag: given[0],
+      });
+    }
+    return;
+  }
+  if (flags.sso !== CUSTOM_PROVIDER && given.length > 0) {
+    throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
+      names: given.join(", "),
+      them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
+      flags: given,
+    });
+  }
+  if (!scripted) {
+    return;
+  }
+  if (flags.sso === CUSTOM_PROVIDER) {
+    const missing = [
+      SETUP_FLAG_NAMES.slug,
+      SETUP_FLAG_NAMES.displayName,
+      SETUP_FLAG_NAMES.issuer,
+    ].filter((name) => {
+      return !given.includes(name);
+    });
+    if (missing.length > 0) {
+      throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
+        list: missing.join(", "),
+        missing,
+      });
+    }
+  }
+  if (flags.ssoClientId === undefined) {
+    const entry = flags.sso === CUSTOM_PROVIDER ? undefined : parseProviderSelection(flags.sso);
+    const catalog = entry === undefined ? undefined : providerOf(entry);
+    throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
+      sso: flags.sso,
+      registration:
+        catalog?.consoleUrl === undefined
+          ? `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`
+          : `an OAuth application at ${catalog.consoleUrl}`,
+    });
   }
 }
