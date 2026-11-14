@@ -24,6 +24,12 @@
 
 export { callbackUriFor } from "./callback";
 export {
+  type AddedClaim,
+  ClaimQuestions,
+  type ClaimQuestionsRun,
+  claimTable,
+} from "./claim-questions";
+export {
   applyRequest,
   asksForClaims,
   attributesOf,
@@ -33,6 +39,7 @@ export {
   type ClaimFlagValues,
   type ClaimRequest,
   type ClaimType,
+  choiceOf,
   claimFlagTexts,
   claimNotes,
   claimRequestFromFlags,

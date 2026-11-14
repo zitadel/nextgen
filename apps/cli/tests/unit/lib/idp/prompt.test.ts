@@ -73,6 +73,22 @@ describe("CredentialPrompt.ask for a new connection", () => {
     });
   });
 
+  it("repeats the claims the run was given in the command it suggests", async () => {
+    const asked = promptFor({
+      claims: {
+        claim: ["companyName=organization"],
+        verifiedClaim: undefined,
+        claimScope: "organization",
+      },
+    }).ask(undefined);
+
+    await expect(asked).rejects.toMatchObject({
+      nextCommands: [
+        expect.stringContaining("--claim companyName=organization --claim-scope organization"),
+      ],
+    });
+  });
+
   it("refuses a run with no secret on stdin, naming the variable", async () => {
     const asked = promptFor({ ask: asking(undefined) }).ask(clientId("abc"));
 

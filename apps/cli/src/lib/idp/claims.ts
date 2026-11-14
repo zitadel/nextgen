@@ -1,7 +1,13 @@
 import { type Parsed, validated } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
-import { type Connection, standardClaim, STANDARD_CLAIMS, type UserSchema } from "@/lib/zitadel";
+import {
+  type ClaimChoice,
+  type Connection,
+  standardClaim,
+  STANDARD_CLAIMS,
+  type UserSchema,
+} from "@/lib/zitadel";
 
 /**
  * The value types a claim can carry into a user-schema property.
@@ -187,12 +193,12 @@ export type ClaimFlagTexts = {
   /**
    * Each claim, as `<property>=<claim>[:type]`.
    */
-  readonly claim: readonly string[] | undefined;
+  readonly claim: string[] | undefined;
 
   /**
    * Each verification, as `<property>=<claim>` or `<property>=true`.
    */
-  readonly verifiedClaim: readonly string[] | undefined;
+  readonly verifiedClaim: string[] | undefined;
 
   /**
    * The extra scopes, separated by spaces.
@@ -846,6 +852,27 @@ export function claimRequestFromFlags(values: ClaimFlagValues): ClaimRequest {
       return validated(parseVerifiedEntry(text));
     }),
     scopes: validated(parseScopeList(values.scope ?? "")),
+  };
+}
+
+/**
+ * What a mapping makes of a connection: the claims, how they are verified, the
+ * scopes, the attributes it creates, and what the developer should hear.
+ *
+ * @param state - What is mapped.
+ * @param flag - The flag that says how a property is verified, as the command
+ *   spells it, which the notes name.
+ * @returns What the connection is written with.
+ */
+export function choiceOf(state: MappingState, flag: string): ClaimChoice {
+  return {
+    mapping: state.mapping,
+    verified: state.verified,
+    scopes: state.scopes,
+    created: state.created.map((attribute) => {
+      return { name: attribute.name, type: attribute.type ?? "string" };
+    }),
+    notes: claimNotes(state, flag),
   };
 }
 

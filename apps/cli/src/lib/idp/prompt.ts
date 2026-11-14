@@ -12,6 +12,7 @@ import {
 import { type FillIn, pipedFrom, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 
+import type { ClaimFlagTexts } from "./claims";
 import type { GivenCredentials } from "./credentials";
 import { askConnectionEndpoints } from "./endpoints";
 
@@ -56,6 +57,12 @@ export type PromptRun = {
    * same project.
    */
   readonly suggest: Suggest;
+
+  /**
+   * The claims the run was given, which a suggested retry repeats: a rerun
+   * that dropped them would create the connection with the defaults.
+   */
+  readonly claims?: ClaimFlagTexts | undefined;
 };
 
 /**
@@ -178,6 +185,7 @@ export class CredentialPrompt {
       flags: {
         provider: selectionName(selection),
         clientId,
+        ...this.run.claims,
       },
     });
 
