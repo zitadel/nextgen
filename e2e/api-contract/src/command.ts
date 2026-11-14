@@ -11,6 +11,15 @@ export const SEED = 24184733292255574161660497485948756999n;
 export const MAX_EXAMPLES = 25;
 
 /**
+ * How many requests Schemathesis sends at once within one run. It stays at 1:
+ * with more, which requests overlap changes from run to run, and so does what
+ * fails. The lane gets its speed from running containers side by side instead
+ * (see `Lane`), which repeats exactly. `API_CONTRACT_WORKERS` overrides it to
+ * measure that.
+ */
+export const WORKERS = Number(process.env.API_CONTRACT_WORKERS ?? 1);
+
+/**
  * Schemathesis fails a response slower than its request timeout (10s by
  * default). A fuzzed schema URL makes the server fetch an arbitrary host, which
  * can take that long, so the limit would make a run flaky. The server answers
@@ -49,6 +58,8 @@ export interface CommandInput {
   schemes: Record<string, SchemeCredential>;
   /** The `operationId`s to test; the run is limited to them. */
   operationIds: readonly string[];
+  /** The phases to run (`examples`, `coverage`, `fuzzing`, `stateful`); all of them when absent. */
+  phases?: readonly string[];
   /** Checks to switch off for an operation, which the exemptions in `checks.ts` explain. */
   exemptions?: readonly Exemption[];
   /**
@@ -163,6 +174,8 @@ export class SchemathesisCommand {
       `--request-timeout ${String(REQUEST_TIMEOUT_SECONDS)}`,
       `--seed ${String(SEED)}`,
       `--max-examples ${String(MAX_EXAMPLES)}`,
+      `--workers ${String(WORKERS)}`,
+      ...(this.input.phases ? [`--phases ${this.input.phases.join(",")}`] : []),
       "--report json --report-json-path /work/report.json",
       "--no-color",
       // The leading newline puts the marker on a line of its own even when

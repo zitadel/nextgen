@@ -46,6 +46,8 @@ export interface SchemathesisInput {
   operationIds: readonly string[];
   /** The checks to apply, by name. */
   checks: readonly string[];
+  /** The phases to run; all of them when absent. */
+  phases?: readonly string[];
   /** The operations that may answer a valid-looking request with a 400. */
   refusals?: readonly string[];
   /** The checks to switch off for an operation. */
@@ -69,7 +71,9 @@ export class Schemathesis {
     // The image runs as an unprivileged user whose id is not the host user's, so
     // on Linux it can only write its report into a folder everyone can write to.
     await chmod(input.workDir, 0o777);
-    await writeFile(join(input.workDir, "openapi.json"), input.spec);
+    // Written as the JSON it parses to, so only a document that is valid JSON
+    // reaches the file, whatever the server answered.
+    await writeFile(join(input.workDir, "openapi.json"), JSON.stringify(JSON.parse(input.spec)));
     await copyFile(join(import.meta.dirname, "..", "hooks.py"), join(input.workDir, "hooks.py"));
 
     const url = new URL(input.baseUrl);
@@ -80,6 +84,7 @@ export class Schemathesis {
       schemes: input.schemes,
       operationIds: input.operationIds,
       checks: input.checks,
+      phases: input.phases,
       refusals: input.refusals,
       exemptions: input.exemptions,
     });

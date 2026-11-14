@@ -79,6 +79,7 @@ describe("BaselineUpdate", () => {
     stopReason: "finished",
     errors: [],
     failures: [{ operation: "GET /z", check: "Server error", count: 4 }],
+    seconds: 1,
   };
 
   test("writes the failures of runs that tested everything they were asked to", async () => {
