@@ -1,9 +1,5 @@
 [
   {
-    "operation": "Stateful tests (public)",
-    "check": "API rejected schema-compliant request"
-  },
-  {
     "operation": "GET /oauth_settings/{oauth_settings_id}",
     "check": "Server error"
   },
@@ -12,40 +8,12 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /auth_attempts/{attempt_id}/challenges",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /idps/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /projects/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /schemas",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /sessions/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /teams/query",
-    "check": "API rejected schema-compliant request"
-  },
-  {
     "operation": "POST /users/query",
-    "check": "Server error"
+    "check": "API rejected schema-compliant request"
   },
   {
     "operation": "Stateful tests (management)",
     "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "PATCH /users/me",
-    "check": "Server error"
   },
   {
     "operation": "POST /invitations/accept",
