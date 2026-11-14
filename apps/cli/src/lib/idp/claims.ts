@@ -1,6 +1,7 @@
 import { type Parsed, validated } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   type ClaimChoice,
   type Connection,
@@ -386,6 +387,10 @@ export function parseClaimName(value: string): Parsed<string> {
  * A claim name no property is filled from yet.
  *
  * @param state - What is mapped so far.
+ * @remarks
+ * The property that uses the claim was read from a file, and the refusal is
+ * drawn as the person types, so its name is escaped for the terminal.
+ *
  * @param value - What was typed.
  * @returns The claim, or what is wrong with it, including what already uses it.
  */
@@ -399,7 +404,9 @@ export function parseUnusedClaim(state: MappingState, value: string): Parsed<str
   })?.[0];
   return holder === undefined
     ? claim
-    : refuse(`${claim.value} already fills ${holder}: a claim fills one property.`);
+    : refuse(
+        `${claim.value} already fills ${escapeControlCharacters(holder, { keepLayout: false })}: a claim fills one property.`,
+      );
 }
 
 /**

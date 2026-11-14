@@ -1,7 +1,6 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { applyRequest, asksForClaims, choiceOf, ClaimQuestions, claimsOrRefuse } from "@/lib/idp";
 import { log } from "@/lib/log";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 
@@ -70,21 +69,12 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     const request = await new ClaimQuestions({
       ask: this.deps.ask,
       show: (title, lines) => {
-        log.info(
-          [title, ...lines]
-            .map((line) => {
-              return escapeControlCharacters(line, { keepLayout: false });
-            })
-            .join("\n"),
-        );
+        log.info([title, ...lines].join("\n"));
       },
       say: (line) => {
-        log.info(escapeControlCharacters(line, { keepLayout: false }));
+        log.info(line);
       },
-    }).ask(
-      needs.mapping,
-      escapeControlCharacters(needs.provider.displayName, { keepLayout: false }),
-    );
+    }).ask(needs.mapping, needs.provider.displayName);
     const answered = choiceOf(claimsOrRefuse(applyRequest(needs.mapping, request)), VERIFIED_FLAG);
     const heard = new Set(needs.claims?.notes);
     for (const note of answered.notes) {

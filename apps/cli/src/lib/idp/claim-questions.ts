@@ -1,5 +1,6 @@
 import type { Parsed } from "@zitadel/config/idp";
 
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions } from "@/lib/ui";
 
 import {
@@ -42,6 +43,17 @@ const TYPE_LABELS: Readonly<Record<ClaimType, string>> = {
  * can equal.
  */
 const CREATE = Symbol("create a new attribute");
+
+/**
+ * Escapes a value that came from a file or a provider, newlines included, so it
+ * cannot drive the terminal or forge a line of what is shown.
+ *
+ * @param value - The value.
+ * @returns The value, safe to print on one line.
+ */
+function plain(value: string): string {
+  return escapeControlCharacters(value, { keepLayout: false });
+}
 
 /**
  * What a person is asked about, and where it is shown.
@@ -98,12 +110,12 @@ export type AddedClaim = {
  */
 export function claimTable(state: MappingState, provider: string): readonly string[] {
   const rows = [
-    ["User attribute", `Claim from "${provider}"`, "Verified"],
+    ["User attribute", `Claim from "${plain(provider)}"`, "Verified"],
     ...Object.entries(state.mapping).map(([attribute, claim]) => {
       const source = state.verified[attribute];
       const verified =
-        source === undefined ? "no" : source === true ? "yes, trusted" : `yes, by ${source}`;
-      return [attribute, claim, verified];
+        source === undefined ? "no" : source === true ? "yes, trusted" : `yes, by ${plain(source)}`;
+      return [plain(attribute), plain(claim), verified];
     }),
   ];
   const widths = [0, 1].map((column) => {
@@ -128,6 +140,10 @@ export function claimTable(state: MappingState, provider: string): readonly stri
  * a unique attribute, who vouches for the value. The attribute list offers only
  * attributes whose type holds the claim, and the claim question refuses a claim
  * already in use, so a mapping the guards would refuse cannot be built here.
+ *
+ * Everything the questions show that a file or a provider wrote, such as a
+ * provider's name or a claim, is escaped for the terminal where it is worded,
+ * while the answers keep the raw values the mapping is made of.
  *
  * What was asked for comes back as the request the command line would have
  * carried, so both ways of asking meet in the same place. It is for a run with
@@ -160,7 +176,7 @@ export class ClaimQuestions {
    */
   async ask(state: MappingState, provider: string): Promise<ClaimRequest> {
     this.run.show(
-      `${provider} maps these claims to user attributes by default`,
+      `${plain(provider)} maps these claims to user attributes by default`,
       claimTable(state, provider),
     );
     return this.askMore(state, provider);
@@ -177,7 +193,7 @@ export class ClaimQuestions {
   private async askMore(state: MappingState, provider: string): Promise<ClaimRequest> {
     const more = await this.run.ask.select({
       name: "whether to map another claim",
-      message: `Should any other claims be mapped from "${provider}"?`,
+      message: `Should any other claims be mapped from "${plain(provider)}"?`,
       options: [
         {
           value: false,
@@ -244,7 +260,7 @@ export class ClaimQuestions {
               ...candidates.map((one) => {
                 return {
                   value: one.name,
-                  label: one.name,
+                  label: plain(one.name),
                   hint: [
                     one.type,
                     one.required ? "required" : undefined,
@@ -285,7 +301,7 @@ export class ClaimQuestions {
     const suggested = standardClaimScope(claim);
     const extra = await this.run.ask.text({
       name: "scope",
-      message: `Which scope makes "${provider}" send it? Leave blank if none.`,
+      message: `Which scope makes "${plain(provider)}" send it? Leave blank if none.`,
       parse: parseScopeList,
       initialValue: suggested !== undefined && !before.scopes.includes(suggested) ? suggested : "",
     });
@@ -309,11 +325,11 @@ export class ClaimQuestions {
         })
       : [];
     this.run.say(
-      `"${claim}" now maps to "${attribute}"${chosen === CREATE ? ", a new attribute in your user schema" : ""}.`,
+      `"${plain(claim)}" now maps to "${plain(attribute)}"${chosen === CREATE ? ", a new attribute in your user schema" : ""}.`,
     );
     if (chosen === CREATE) {
       this.run.say(
-        `The login form will label it "${fieldLabelFor(attribute)}". To use other wording, set register.field.${attribute} and register-sso.field.${attribute} in the locales of your login page.`,
+        `The login form will label it "${plain(fieldLabelFor(attribute))}". To use other wording, set register.field.${plain(attribute)} and register-sso.field.${plain(attribute)} in the locales of your login page.`,
       );
     }
     return {
@@ -343,12 +359,12 @@ export class ClaimQuestions {
     const replaced = before.verified[attribute];
     if (replaced !== undefined && before.mapping[attribute] !== claim) {
       this.run.say(
-        `"${attribute}" now comes from "${claim}", so "${replaced === true ? provider : replaced}" no longer vouches for it.`,
+        `"${plain(attribute)}" now comes from "${plain(claim)}", so "${plain(replaced === true ? provider : replaced)}" no longer vouches for it.`,
       );
     }
     const how = await this.run.ask.select<Verification>({
       name: "verification",
-      message: `Does "${provider}" confirm that ${attribute} is verified?`,
+      message: `Does "${plain(provider)}" confirm that ${plain(attribute)} is verified?`,
       options: [
         {
           value: "none",
@@ -382,7 +398,7 @@ export class ClaimQuestions {
         attribute,
         source: await this.run.ask.text({
           name: "verifying claim",
-          message: `Which claim says ${attribute} is verified?`,
+          message: `Which claim says ${plain(attribute)} is verified?`,
           parse: parseClaimName,
           initialValue: `${claim}_verified`,
         }),

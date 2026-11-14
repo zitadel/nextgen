@@ -526,6 +526,14 @@ describe("parseUnusedClaim", () => {
     );
   });
 
+  it("spells out a control character in the property that uses it", () => {
+    const state = { ...seeded(), mapping: { "bad\u001b[2J": "employee_id" } };
+
+    expect(problem(parseUnusedClaim(state, "employee_id"))).toBe(
+      "employee_id already fills bad\\x1b[2J: a claim fills one property.",
+    );
+  });
+
   it("accepts a claim nothing uses", () => {
     expect(value(parseUnusedClaim(seeded(), " employee_id "))).toBe("employee_id");
   });
