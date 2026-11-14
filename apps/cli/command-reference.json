@@ -1087,7 +1087,7 @@
         },
         {
           "name": "team-team-id",
-          "description": "",
+          "description": "Platform-homed team id (`team_<opaque>`).",
           "type": "option",
           "helpGroup": "TEAM FIELD"
         },

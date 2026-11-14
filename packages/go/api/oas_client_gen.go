@@ -17727,6 +17727,15 @@ func (c *Client) RemoveProjectOrigin(ctx context.Context, request *RemoveProject
 }
 
 func (c *Client) sendRemoveProjectOrigin(ctx context.Context, request *RemoveProjectOriginReq, params RemoveProjectOriginParams) (res RemoveProjectOriginRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("removeProjectOrigin"),
 		semconv.HTTPRequestMethodKey.String("POST"),

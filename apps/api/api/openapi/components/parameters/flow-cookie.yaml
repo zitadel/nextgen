@@ -11,3 +11,9 @@ description: |
   `Set-Cookie` header and resend it.
 schema:
   type: string
+  # The value is the encrypted state token the server issued (a compact JWE:
+  # base64url segments joined by dots), so these are the only characters it can
+  # hold. Anything else is `flow.cookie_invalid`, which the fuzzer would
+  # otherwise generate as a "valid" request.
+  pattern: '^[A-Za-z0-9._-]+$'
+  x-zitadel-pattern-message: "must be the cookie value the server issued: letters, digits, ., _ or -"

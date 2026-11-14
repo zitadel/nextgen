@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
@@ -249,3 +250,16 @@ func (s *stubQueryUsersService) SearchUsersInProjects(context.Context, service.S
 }
 
 var _ service.UserService = (*stubQueryUsersService)(nil)
+
+func TestAttributeNamesInvalid(t *testing.T) {
+	t.Run("accepts plain names", func(t *testing.T) {
+		require.NoError(t, attributeNamesInvalid(map[string]any{"a": map[string]any{"b": 1}}))
+	})
+	t.Run("refuses a dotted or empty name, naming each", func(t *testing.T) {
+		err := attributeNamesInvalid(map[string]any{"b.c": 1, "": 2})
+		domainErr, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		require.Equal(t, domain.ErrRequestInvalid().Code, domainErr.Code)
+		require.Equal(t, domain.InvalidFieldPathsDetails{Fields: []string{"attributes.", "attributes.b.c"}}, domainErr.Details)
+	})
+}

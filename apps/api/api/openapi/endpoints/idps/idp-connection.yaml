@@ -1,9 +1,10 @@
 # Mirrors endpoints/schemas/idp-connection.json so generated clients get a
 # typed connection body. Two keywords differ from the JSON because ogen
-# cannot express them: the root `allOf` (the protocol requires its block)
-# would turn the object into an untyped field, and the `verified_claims`
-# `anyOf` of a const and a pattern aborts generation, so it is written as a
-# boolean-or-string `oneOf`.
+# cannot express them: the root `allOf` would turn the object into an untyped
+# field, so its one rule (the protocol requires its block) is written as the
+# bare `if` and `then` it holds, and the `verified_claims` `anyOf` of a const
+# and a pattern aborts generation, so it is written as a boolean-or-string
+# `oneOf`.
 # `format: uri` is left off the endpoint fields on purpose: with it ogen
 # drops the URL patterns and parses the value into url.URL. The server
 # validates every body against the JSON before storing it. The mirror test in
@@ -16,6 +17,15 @@ required:
   - protocol
   - display_name
 additionalProperties: false
+if:
+  properties:
+    protocol:
+      const: oidc
+  required:
+    - protocol
+then:
+  required:
+    - oidc
 properties:
   "$schema":
     type: string

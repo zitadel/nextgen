@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: Request to query the users of a project.
 properties:
   limit:
@@ -22,6 +23,7 @@ properties:
       $ref: user-expand.yaml
   sorting:
     type: object
+    additionalProperties: false
     required:
       - field
       - direction
@@ -35,11 +37,66 @@ properties:
   filter:
     type: array
     description: Filter criteria for querying users. Criteria are combined with AND.
+    # `team_id` may be given once: the server refuses a second one.
+    contains:
+      type: object
+      properties:
+        field:
+          const: team_id
+    minContains: 0
+    maxContains: 1
     items:
       type: object
+      additionalProperties: false
       required:
         - field
         - operation
+      # What a `value` and an `operation` may be depends on the field: a timestamp
+      # takes an RFC 3339 string and a comparison, a status or state one of its
+      # names with `equals`, any other field a string with `equals` or `contains`.
+      # The server refuses anything else, and a missing value, with `400`.
+      if:
+        required:
+          - field
+        properties:
+          field:
+            enum: [created_at]
+      then:
+        $ref: ../../../components/schemas/filter-timestamp-value.yaml
+      else:
+        if:
+          required:
+            - field
+          properties:
+            field:
+              enum: [status]
+        then:
+          required:
+            - value
+          properties:
+            field: {}
+            operation:
+              const: equals
+            value:
+              enum: [active, suspended, deactivated, pending_purge]
+        else:
+          if:
+            required:
+              - field
+            properties:
+              field:
+                enum: [team_id]
+          then:
+            required:
+              - value
+            properties:
+              field: {}
+              operation:
+                const: equals
+              value:
+                type: string
+          else:
+            $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: user-filter-field.yaml

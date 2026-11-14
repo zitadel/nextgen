@@ -240,6 +240,18 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-user-request"
+              },
+              "examples": {
+                "person": {
+                  "summary": "Create a user from the default schema",
+                  "value": {
+                    "schema": "default",
+                    "attributes": {
+                      "email": "ada@example.com",
+                      "name": "Ada Lovelace"
+                    }
+                  }
+                }
               }
             }
           }
@@ -491,6 +503,16 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/patch-user-request"
+              },
+              "examples": {
+                "rename": {
+                  "summary": "Change one attribute",
+                  "value": {
+                    "attributes": {
+                      "name": "Ada King"
+                    }
+                  }
+                }
               }
             }
           }
@@ -1392,6 +1414,16 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/patch-my-user-request"
+              },
+              "examples": {
+                "rename": {
+                  "summary": "Change one attribute",
+                  "value": {
+                    "attributes": {
+                      "name": "Ada King"
+                    }
+                  }
+                }
               }
             }
           }
@@ -2302,6 +2334,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-auth-attempt-request"
+              },
+              "examples": {
+                "newAttempt": {
+                  "summary": "Start an authentication attempt",
+                  "value": {
+                    "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
+                  }
+                }
               }
             }
           }
@@ -2405,6 +2445,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/issue-challenge-request"
+              },
+              "examples": {
+                "password": {
+                  "summary": "Challenge the password factor",
+                  "value": {
+                    "method": "password"
+                  }
+                }
               }
             }
           }
@@ -3348,6 +3396,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/project-origin"
+              },
+              "examples": {
+                "preview": {
+                  "summary": "A wildcard for preview deploys",
+                  "value": {
+                    "pattern": "https://*-acmeinc.vercel.app",
+                    "kind": "preview"
+                  }
+                }
               }
             }
           }
@@ -3406,6 +3463,7 @@
                 "properties": {
                   "pattern": {
                     "type": "string",
+                    "pattern": "^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
                     "description": "The origin pattern exactly as stored on the project: the string\nthat `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addProjectOrigin` (`POST /projects/{project_id}/origins`) returns.\n",
                     "example": "https://app.example.com"
                   }
@@ -8642,6 +8700,17 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-grant-request"
+              },
+              "examples": {
+                "user": {
+                  "summary": "Give a user a role",
+                  "value": {
+                    "relation": "viewer",
+                    "user": {
+                      "user_id": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
+                    }
+                  }
+                }
               }
             }
           }
@@ -12741,6 +12810,78 @@
         "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
+      "attribute-value-depth-5": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          }
+        }
+      },
+      "attribute-value-depth-4": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-5"
+          }
+        }
+      },
+      "attribute-value-depth-3": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-4"
+          }
+        }
+      },
+      "attribute-value-depth-2": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-3"
+          }
+        }
+      },
+      "attribute-value": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself: its property names are\nnot empty and hold no `.`, because the server stores an attribute under its\ndot-joined path and `{\"a.b\": 1}` would be the same attribute as\n`{\"a\": {\"b\": 1}}`. The rule is spelled out for 5 levels of nesting; the\nserver applies it at every depth.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value-depth-2"
+          }
+        }
+      },
       "create-user-request": {
         "title": "CreateUserRequest",
         "description": "The request body for creating a user: the `schema` it follows and the\n`attributes` that must satisfy that schema.\n\nThe server assigns the user's ID and returns it in the response, so the\nrequest carries no `id`. `metadata` is server-owned for the same reason.\nNeither is part of this schema, which is what frees a user schema to declare\nproperties of those names.\n\nA request carrying any other top-level property is rejected rather than\nignored. `attributes` stays open, since the user schema determines what\nbelongs in it.\n",
@@ -12759,7 +12900,18 @@
           "attributes": {
             "type": "object",
             "additionalProperties": true,
-            "description": "The user's schema-defined content. Validated against `schema`; a\nproperty the schema does not permit is rejected with `req.invalid`.\n"
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
+            },
+            "description": "The user's schema-defined content. Validated against `schema`; a\nproperty the schema does not permit is rejected with `req.invalid`.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },
@@ -13188,6 +13340,47 @@
           "desc"
         ]
       },
+      "filter-timestamp-value": {
+        "title": "FilterTimestampValue",
+        "description": "What a filter on a timestamp field must hold: a `value`, as an RFC 3339\nstring, and an operation that compares it. The server refuses a missing\nvalue, a `null`, a number or a boolean with `400`, and `contains` too.\nUsed under `then` of the filter items, which ogen ignores, so it checks\nrequests without changing the generated clients.\n",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "field": {},
+          "operation": {
+            "enum": [
+              "equals",
+              "less_than",
+              "greater_than",
+              "greater_than_or_equal"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "filter-text-value": {
+        "title": "FilterTextValue",
+        "description": "What a filter on a text field must hold: a `value`, as a string, and an\noperation that matches text. The server refuses a missing value, a `null`,\na number or a boolean with `400`, and a comparison too. Used under `else`\nof the filter items, which ogen ignores, so it checks requests without\nchanging the generated clients.\n",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "field": {},
+          "operation": {
+            "enum": [
+              "equals",
+              "contains"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "user-filter-field": {
         "type": "string",
         "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `identifier`: the value returned as the user's `identifier`: the property\n  designated by `x-identifier` in the revision of the schema the user is on.\n  `starts_with`, a case-insensitive match on the start of the value, is the\n  only operation. Case is folded as for a unique property, so a value found\n  here is the value sign-in resolves. The value may not be empty or longer\n  than 256 characters, only string values match, and the filter may be given\n  once. An index answers it, and the users come back ordered by identifier,\n  then `id`: `sorting` cannot be combined with it.\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`identifier`, `team_id` and `schema_object_type` are filterable but not\nsortable, so none is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
@@ -13236,6 +13429,7 @@
       },
       "query-users-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the users of a project.",
         "properties": {
           "limit": {
@@ -13262,6 +13456,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -13280,12 +13475,102 @@
           "filter": {
             "type": "array",
             "description": "Filter criteria for querying users. Criteria are combined with AND.",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "const": "team_id"
+                }
+              }
+            },
+            "minContains": 0,
+            "maxContains": 1,
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "active",
+                        "suspended",
+                        "deactivated",
+                        "pending_purge"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "team_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/user-filter-field",
@@ -13367,8 +13652,19 @@
           "attributes": {
             "type": "object",
             "additionalProperties": true,
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
+            },
             "minProperties": 1,
-            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n"
+            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },
@@ -14049,8 +14345,19 @@
           "attributes": {
             "type": "object",
             "additionalProperties": true,
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
+            },
             "minProperties": 1,
-            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n"
+            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },
@@ -14062,9 +14369,31 @@
           "pattern",
           "kind"
         ],
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "primary"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "properties": {
+            "pattern": {
+              "not": {
+                "pattern": "\\*",
+                "x-zitadel-pattern-message": "must not contain *: only a preview origin may have a wildcard"
+              }
+            }
+          }
+        },
         "properties": {
           "pattern": {
             "type": "string",
+            "pattern": "^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
+            "x-zitadel-pattern-message": "must be an origin with at most one *: http or https, a lowercase host and an optional port, with no path",
             "description": "The origin pattern: an exact origin for `primary`, or an origin with at\nmost one `*` for `preview`.\n"
           },
           "kind": {
@@ -15956,6 +16285,21 @@
         "required": [
           "project_id"
         ],
+        "if": {
+          "required": [
+            "session_id"
+          ],
+          "properties": {
+            "session_id": {
+              "type": "string"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "session_token"
+          ]
+        },
         "properties": {
           "project_id": {
             "$ref": "#/components/schemas/project-id"
@@ -16399,11 +16743,26 @@
       },
       "issue-challenge-request": {
         "type": "object",
-        "description": "Request to issue a challenge for one factor.\n\nThe `method` field selects which factor to challenge. Additional fields are\nonly relevant for specific methods:\n- `passkey_options` is optional and only used when `method` is `passkey`.\n- `idp_provider` is required when `method` is `idp` and must be omitted otherwise.\n  The server enforces this conditional requirement.\n",
+        "description": "Request to issue a challenge for one factor.\n\nThe `method` field selects which factor to challenge. Additional fields are\nonly relevant for specific methods:\n- `passkey_options` is required when `method` is `passkey`.\n- `idp_provider` is required when `method` is `idp` and must be omitted otherwise.\n  The server enforces this conditional requirement.\n",
         "required": [
           "method"
         ],
         "additionalProperties": false,
+        "if": {
+          "properties": {
+            "method": {
+              "const": "passkey"
+            }
+          },
+          "required": [
+            "method"
+          ]
+        },
+        "then": {
+          "required": [
+            "passkey_options"
+          ]
+        },
         "properties": {
           "method": {
             "$ref": "#/components/schemas/challenge-method",
@@ -16411,7 +16770,7 @@
           },
           "passkey_options": {
             "type": "object",
-            "description": "Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.",
+            "description": "WebAuthn ceremony options. Required when `method` is `passkey`, and only relevant then.",
             "additionalProperties": false,
             "properties": {
               "rp_id": {
@@ -16544,6 +16903,7 @@
         "properties": {
           "name": {
             "type": "string",
+            "minLength": 1,
             "description": "The name of the project."
           },
           "origins": {
@@ -16709,6 +17069,7 @@
       },
       "query-projects-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query projects.",
         "properties": {
           "limit": {
@@ -16727,6 +17088,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -16747,10 +17109,29 @@
             "description": "Filter criteria for querying projects.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "$ref": "#/components/schemas/filter-text-value"
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/filter-field",
@@ -16862,6 +17243,7 @@
       },
       "patch-project-request": {
         "type": "object",
+        "minProperties": 1,
         "properties": {
           "name": {
             "description": "The name of the project.",
@@ -16870,7 +17252,8 @@
                 "type": "null"
               },
               {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             ]
           },
@@ -17809,6 +18192,7 @@
       },
       "query-sessions-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the sessions of a project.",
         "properties": {
           "limit": {
@@ -17827,6 +18211,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -17847,10 +18232,89 @@
             "description": "Filter criteria for querying sessions.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "state"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "expired",
+                        "building",
+                        "active"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "lifecycle_owner_team_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/session-filter-field",
@@ -18154,6 +18618,26 @@
               "code": {
                 "type": "string",
                 "const": "sch.fetch_downgrade"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "sch-fetch_failed": {
+        "description": "The schema URL could not be fetched\n\nError code: sch.fetch_failed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "sch.fetch_failed"
               }
             },
             "required": [
@@ -19184,6 +19668,7 @@
       },
       "query-teams-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the teams of a project.",
         "properties": {
           "limit": {
@@ -19202,6 +19687,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -19222,10 +19708,60 @@
             "description": "Filter criteria for querying teams.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "active",
+                        "deactivated"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "$ref": "#/components/schemas/filter-text-value"
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/team-filter-field",
@@ -19290,6 +19826,7 @@
       },
       "update-team-request": {
         "type": "object",
+        "minProperties": 1,
         "properties": {
           "name": {
             "description": "The new name of the team. Must be unique within the project, ignoring case.",
@@ -19641,6 +20178,21 @@
           "display_name"
         ],
         "additionalProperties": false,
+        "if": {
+          "properties": {
+            "protocol": {
+              "const": "oidc"
+            }
+          },
+          "required": [
+            "protocol"
+          ]
+        },
+        "then": {
+          "required": [
+            "oidc"
+          ]
+        },
         "properties": {
           "$schema": {
             "type": "string",
@@ -19975,6 +20527,7 @@
       },
       "query-idps-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the identity providers of a project.",
         "properties": {
           "limit": {
@@ -19993,6 +20546,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "description": "Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.",
             "required": [
               "field",
@@ -20014,10 +20568,29 @@
             "description": "Filter criteria for querying identity providers. Combined with AND.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "$ref": "#/components/schemas/filter-text-value"
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/idp-filter-field",
@@ -21419,6 +21992,7 @@
         "type": "object",
         "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`, and one that never turned on its\nOAuth authorization server omits `oauth`. `branding` and `oauth` are\nsingle objects, because a project has one of each. The bundle carries at\nleast one resource. The release it builds pins at most 50 resources, which\ncounts the resources the bundle carries plus those resolved from the\nproject. The server refuses anything outside that with `rel.invalid`.\nUnknown keys are refused.\n",
         "additionalProperties": false,
+        "minProperties": 1,
         "properties": {
           "schemas": {
             "type": "array",
@@ -21658,6 +22232,23 @@
         "description": "Names a user with exactly one of `user_id` or `identifier`. Sending both\nor neither is `grant.invalid`. Unknown properties are rejected as\n`req.invalid`.\n",
         "type": "object",
         "additionalProperties": false,
+        "if": {
+          "required": [
+            "user_id"
+          ]
+        },
+        "then": {
+          "not": {
+            "required": [
+              "identifier"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "identifier"
+          ]
+        },
         "properties": {
           "user_id": {
             "$ref": "#/components/schemas/user-id",
@@ -21676,9 +22267,29 @@
         "description": "Names a team with exactly one of `team_id` or `name`. Sending both\nor neither is `grant.invalid`. Unknown properties are rejected as\n`req.invalid`.\n",
         "type": "object",
         "additionalProperties": false,
+        "if": {
+          "required": [
+            "team_id"
+          ]
+        },
+        "then": {
+          "not": {
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "name"
+          ]
+        },
         "properties": {
           "team_id": {
-            "$ref": "#/components/schemas/team-id",
+            "type": "string",
+            "pattern": "^team_[a-zA-Z0-9_-]+$",
+            "x-zitadel-pattern-message": "must start with team_ and then hold letters, digits, _ or -",
+            "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1",
             "description": "Platform-homed team id (`team_<opaque>`). The team must be active.\n"
           },
           "name": {
@@ -21696,6 +22307,23 @@
         "required": [
           "relation"
         ],
+        "if": {
+          "required": [
+            "user"
+          ]
+        },
+        "then": {
+          "not": {
+            "required": [
+              "team"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "team"
+          ]
+        },
         "properties": {
           "relation": {
             "type": "string",
@@ -21987,6 +22615,7 @@
       },
       "query-grants-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the grants of a project.",
         "properties": {
           "limit": {
@@ -22013,6 +22642,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -22033,10 +22663,125 @@
             "description": "Filter criteria for querying grants. Combined with AND.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "expires_at"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "enum": [
+                        "equals",
+                        "less_than",
+                        "greater_than",
+                        "greater_than_or_equal"
+                      ]
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "if": {
+                    "anyOf": [
+                      {
+                        "not": {
+                          "required": [
+                            "value"
+                          ]
+                        }
+                      },
+                      {
+                        "properties": {
+                          "value": {
+                            "type": "null"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "operation": {
+                        "const": "equals"
+                      }
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "value"
+                    ]
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "relation"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "enum": [
+                          "viewer",
+                          "editor",
+                          "admin"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/grant-filter-field",
@@ -25918,6 +26663,23 @@
           "targets"
         ],
         "additionalProperties": false,
+        "if": {
+          "required": [
+            "release_id"
+          ]
+        },
+        "then": {
+          "not": {
+            "required": [
+              "content_hash"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "content_hash"
+          ]
+        },
         "properties": {
           "release_id": {
             "description": "The release to make live.",
@@ -26837,6 +27599,13 @@
         "value": {
           "code": "sch.fetch_downgrade",
           "message": "fetching the schema URL was redirected from https to http, which is not allowed"
+        }
+      },
+      "sch-fetch_failed": {
+        "summary": "sch.fetch_failed",
+        "value": {
+          "code": "sch.fetch_failed",
+          "message": "the schema URL could not be fetched"
         }
       },
       "sch-fetch_timeout": {
@@ -32324,6 +33093,9 @@
                   "$ref": "#/components/schemas/sch-fetch_downgrade"
                 },
                 {
+                  "$ref": "#/components/schemas/sch-fetch_failed"
+                },
+                {
                   "$ref": "#/components/schemas/sch-fetch_timeout"
                 },
                 {
@@ -32363,6 +33135,7 @@
                   "sch.already_exists": "#/components/schemas/sch-already_exists",
                   "sch.fetch_denied": "#/components/schemas/sch-fetch_denied",
                   "sch.fetch_downgrade": "#/components/schemas/sch-fetch_downgrade",
+                  "sch.fetch_failed": "#/components/schemas/sch-fetch_failed",
                   "sch.fetch_timeout": "#/components/schemas/sch-fetch_timeout",
                   "sch.fetch_too_large": "#/components/schemas/sch-fetch_too_large",
                   "sch.fetch_too_many_redirects": "#/components/schemas/sch-fetch_too_many_redirects",
@@ -32394,6 +33167,9 @@
               },
               "sch.fetch_downgrade": {
                 "$ref": "#/components/examples/sch-fetch_downgrade"
+              },
+              "sch.fetch_failed": {
+                "$ref": "#/components/examples/sch-fetch_failed"
               },
               "sch.fetch_timeout": {
                 "$ref": "#/components/examples/sch-fetch_timeout"
@@ -34774,6 +35550,9 @@
                   "$ref": "#/components/schemas/sch-fetch_downgrade"
                 },
                 {
+                  "$ref": "#/components/schemas/sch-fetch_failed"
+                },
+                {
                   "$ref": "#/components/schemas/sch-fetch_timeout"
                 },
                 {
@@ -34833,6 +35612,7 @@
                   "internal": "#/components/schemas/internal",
                   "sch.fetch_denied": "#/components/schemas/sch-fetch_denied",
                   "sch.fetch_downgrade": "#/components/schemas/sch-fetch_downgrade",
+                  "sch.fetch_failed": "#/components/schemas/sch-fetch_failed",
                   "sch.fetch_timeout": "#/components/schemas/sch-fetch_timeout",
                   "sch.fetch_too_large": "#/components/schemas/sch-fetch_too_large",
                   "sch.fetch_too_many_redirects": "#/components/schemas/sch-fetch_too_many_redirects",
@@ -34876,6 +35656,9 @@
               },
               "sch.fetch_downgrade": {
                 "$ref": "#/components/examples/sch-fetch_downgrade"
+              },
+              "sch.fetch_failed": {
+                "$ref": "#/components/examples/sch-fetch_failed"
               },
               "sch.fetch_timeout": {
                 "$ref": "#/components/examples/sch-fetch_timeout"
@@ -37105,7 +37888,9 @@
         "required": true,
         "description": "Encrypted flow state cookie set by `POST /flows` or the previous\n`POST /flows/{flow_id}/submit`. The cookie holds the sealed state of one\nflow; the `{flow_id}` path parameter must name that flow, any other id is\nrefused.\n\nBrowsers send this automatically; non-browser clients must capture the\n`Set-Cookie` header and resend it.\n",
         "schema": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "x-zitadel-pattern-message": "must be the cookie value the server issued: letters, digits, ., _ or -"
         }
       },
       "attempt-id": {

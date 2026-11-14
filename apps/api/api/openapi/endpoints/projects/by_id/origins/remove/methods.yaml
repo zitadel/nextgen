@@ -32,6 +32,10 @@ post:
           properties:
             pattern:
               type: string
+              # The same format an origin is stored in (`project-origin.yaml`),
+              # so a pattern that could never have been stored is refused here
+              # as a bad request and not looked up.
+              pattern: '^https?://(\*[a-z0-9._-]*|[a-z0-9._-]+\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$'
               description: |
                 The origin pattern exactly as stored on the project: the string
                 that `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addProjectOrigin` (`POST /projects/{project_id}/origins`) returns.

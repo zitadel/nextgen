@@ -66,6 +66,12 @@ patch:
       application/json:
         schema:
           $ref: patch-my-user-request.yaml
+        examples:
+          rename:
+            summary: Change one attribute
+            value:
+              attributes:
+                name: Ada King
   responses:
     '200':
       description: The updated user.

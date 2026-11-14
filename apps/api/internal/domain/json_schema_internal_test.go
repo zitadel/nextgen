@@ -32,6 +32,8 @@ func TestClassifyFetchError(t *testing.T) {
 		{"too many redirects", wrap(httputil.ErrTooManyRedirects), ErrJSONSchemaFetchTooManyRedirects()},
 		{"https downgrade", wrap(httputil.ErrHTTPSDowngrade), ErrJSONSchemaFetchDowngrade()},
 		{"context deadline", wrap(context.DeadlineExceeded), ErrJSONSchemaFetchTimeout()},
+		{"unreachable host", wrap(errors.New("connection refused")), ErrJSONSchemaFetchFailed()},
+		{"not found", &httputil.StatusError{StatusCode: 404}, ErrJSONSchemaFetchFailed()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,9 +46,8 @@ func TestClassifyFetchError(t *testing.T) {
 		})
 	}
 
-	t.Run("unclassified errors pass through untouched", func(t *testing.T) {
-		plain := errors.New("connection refused")
-		assert.Equal(t, plain, classifyFetchError(schemaURL, plain))
+	t.Run("a cancelled request passes through untouched", func(t *testing.T) {
+		assert.Equal(t, context.Canceled, classifyFetchError(schemaURL, context.Canceled))
 	})
 
 	t.Run("details name the hop that failed, not the requested URL", func(t *testing.T) {

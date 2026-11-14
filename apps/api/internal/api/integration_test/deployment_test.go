@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -657,35 +658,28 @@ func TestPreviews(t *testing.T) {
 	assert.Equal(t, origins[1:], list(t))
 }
 
-// TestDeploymentsNotImplemented pins the deployment operations not served
-// yet to 501. Each request goes through the
-// real server, so the new shapes decode and the access check still runs
-// first.
-func TestDeploymentsNotImplemented(t *testing.T) {
+// TestCreateDeploymentByContentHash names the release by its digest instead of
+// its id: a known digest deploys that release, an unknown one is a 404.
+func TestCreateDeploymentByContentHash(t *testing.T) {
 	t.Parallel()
 
-	fixture := newReleaseFixture(t)
-	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
-	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-	project := api.ProjectID(fixture.project)
+	fixture := newDeploymentFixture(t)
 
-	expectNotImplemented := func(t *testing.T, resp any) {
-		t.Helper()
-		status, code, _, ok := errorResponseParts(t, resp)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
-	}
+	t.Run("a known digest deploys the release", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ContentHash: api.NewOptReleaseContentHash(fixture.release.ContentHash),
+			Targets:     primaryTargets(),
+		})
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, fixture.release.ID, resp.(*api.CreateDeploymentCreated).ReleaseID)
+	})
 
-	t.Run("create by content hash", func(t *testing.T) {
-		resp, err := fixture.client.CreateDeployment(t.Context(),
-			&api.CreateDeploymentRequest{
-				ContentHash: api.NewOptReleaseContentHash(created.(*api.CreateReleaseCreated).ContentHash),
-				Targets:     previewTargets("https://app.acme.com"),
-			},
-			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
+	t.Run("an unknown digest is not found", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ContentHash: api.NewOptReleaseContentHash(api.ReleaseContentHash("sha256:" + strings.Repeat("0", 64))),
+			Targets:     primaryTargets(),
+		})
+		refused(t, resp, &api.CreateDeploymentNotFound{}, domain.ErrReleaseNotFound().Code)
 	})
 }
 

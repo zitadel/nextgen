@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,6 +49,19 @@ func TestOriginsAddRemove(t *testing.T) {
 			{Pattern: "https://*-acme.vercel.app", Kind: api.ProjectOriginKindPreview},
 		}, resp.Origins)
 		harness.CleanupProject(t, resp.ID)
+	})
+
+	t.Run("a pattern that is not scheme://host[:port] fails the spec's pattern", func(t *testing.T) {
+		for _, pattern := range []string{"", "http://", "ftp://example.com", "https://Example.com", "https://example.com/path", "https://a*b*c.example.com", "https://example.com:99999"} {
+			_, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
+				Pattern: pattern,
+				Kind:    api.ProjectOriginKindPreview,
+			}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
+			require.ErrorAs(t, err, new(*validate.Error), pattern)
+
+			_, err = client.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{Pattern: pattern}, api.RemoveProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
+			require.ErrorAs(t, err, new(*validate.Error), pattern)
+		}
 	})
 
 	t.Run("add is idempotent and rejects kind conflict", func(t *testing.T) {

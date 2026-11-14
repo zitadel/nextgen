@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: Request to query the grants of a project.
 properties:
   limit:
@@ -22,6 +23,7 @@ properties:
       $ref: grant-expand.yaml
   sorting:
     type: object
+    additionalProperties: false
     required:
       - field
       - direction
@@ -37,9 +39,72 @@ properties:
     description: Filter criteria for querying grants. Combined with AND.
     items:
       type: object
+      additionalProperties: false
       required:
         - field
         - operation
+      # What a `value` and an `operation` may be depends on the field: a timestamp
+      # takes an RFC 3339 string and a comparison, a status or state one of its
+      # names with `equals`, any other field a string with `equals` or `contains`.
+      # The server refuses anything else, and a missing value, with `400`.
+      if:
+        required:
+          - field
+        properties:
+          field:
+            enum: [created_at]
+      then:
+        $ref: ../../../components/schemas/filter-timestamp-value.yaml
+      else:
+        if:
+          required:
+            - field
+          properties:
+            field:
+              enum: [expires_at]
+        then:
+          # A grant that does not expire has a null `expires_at`: a null or missing
+          # `value` selects it, and only `equals` can.
+          properties:
+            field: {}
+            operation:
+              enum: [equals, less_than, greater_than, greater_than_or_equal]
+            value:
+              type: [string, 'null']
+              format: date-time
+          if:
+            anyOf:
+              - not:
+                  required:
+                    - value
+              - properties:
+                  value:
+                    type: 'null'
+          then:
+            properties:
+              operation:
+                const: equals
+          else:
+            required:
+              - value
+        else:
+          if:
+            required:
+              - field
+            properties:
+              field:
+                enum: [relation]
+          then:
+            required:
+              - value
+            properties:
+              field: {}
+              operation:
+                const: equals
+              value:
+                enum: [viewer, editor, admin]
+          else:
+            $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: grant-filter-field.yaml

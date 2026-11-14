@@ -12,6 +12,7 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_denied.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_downgrade.yaml'
+        - $ref: '../../../components/schemas/errors/sch-fetch_failed.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_timeout.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
@@ -39,6 +40,7 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           sch.fetch_denied: '../../../components/schemas/errors/sch-fetch_denied.yaml'
           sch.fetch_downgrade: '../../../components/schemas/errors/sch-fetch_downgrade.yaml'
+          sch.fetch_failed: '../../../components/schemas/errors/sch-fetch_failed.yaml'
           sch.fetch_timeout: '../../../components/schemas/errors/sch-fetch_timeout.yaml'
           sch.fetch_too_large: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
           sch.fetch_too_many_redirects: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
@@ -72,6 +74,8 @@ content:
         $ref: '../../../components/examples/errors/sch-fetch_denied.yaml'
       sch.fetch_downgrade:
         $ref: '../../../components/examples/errors/sch-fetch_downgrade.yaml'
+      sch.fetch_failed:
+        $ref: '../../../components/examples/errors/sch-fetch_failed.yaml'
       sch.fetch_timeout:
         $ref: '../../../components/examples/errors/sch-fetch_timeout.yaml'
       sch.fetch_too_large:

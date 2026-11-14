@@ -42,6 +42,15 @@ post:
       application/json:
         schema:
           $ref: create-grant-request.yaml
+        # The docs build its SDK sample from the first example, because its
+        # sampler drops the required fields of a schema that uses `if`/`then`.
+        examples:
+          user:
+            summary: Give a user a role
+            value:
+              relation: viewer
+              user:
+                user_id: user_01KWH3B72K7M7F0N9WD3P2E4YM
   responses:
     '201':
       description: |

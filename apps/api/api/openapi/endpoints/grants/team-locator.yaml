@@ -5,9 +5,26 @@ description: |
   `req.invalid`.
 type: object
 additionalProperties: false
+# Exactly one of `team_id` and `name`. Written as if/then/else because ogen
+# cannot generate a `oneOf` of bare `required` lists.
+if:
+  required:
+    - team_id
+then:
+  not:
+    required:
+      - name
+else:
+  required:
+    - name
 properties:
   team_id:
-    $ref: ../../components/schemas/team-id.yaml
+    # Not the shared `team-id.yaml`, whose pattern has no `team_` prefix: this
+    # field takes the prefixed id only, and the server refuses any other.
+    type: string
+    pattern: '^team_[a-zA-Z0-9_-]+$'
+    x-zitadel-pattern-message: "must start with team_ and then hold letters, digits, _ or -"
+    example: team_01KZZY8PX8K8ATNVDSMRCZY4N1
     description: |
       Platform-homed team id (`team_<opaque>`). The team must be active.
   name:

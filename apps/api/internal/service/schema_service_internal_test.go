@@ -29,6 +29,14 @@ func TestResolveSchemaError(t *testing.T) {
 		assert.ErrorIs(t, de.Parent, cause)
 	})
 
+	t.Run("an unfetchable URL keeps fetch_failed", func(t *testing.T) {
+		in := domain.ErrJSONSchemaFetchFailed().
+			WithDetails(domain.SchemaFetchDetails{URL: "https://host.test/x.json"})
+
+		out := resolveSchemaError(in)
+		require.ErrorIs(t, out, domain.ErrJSONSchemaFetchFailed())
+	})
+
 	t.Run("a bare envelope expiry becomes fetch_timeout", func(t *testing.T) {
 		out := resolveSchemaError(context.DeadlineExceeded)
 		require.ErrorIs(t, out, domain.ErrJSONSchemaFetchTimeout())

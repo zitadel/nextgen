@@ -395,6 +395,7 @@ func TestPatchProject(t *testing.T) {
 			{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 		}
 		nameInvalid   = domain.ErrProjectNameInvalid()
+		reqInvalid    = domain.ErrRequestInvalid()
 		notFound      = domain.ErrProjectNotFound()
 		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
 	)
@@ -423,7 +424,7 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "absent name",
 			req:  &api.PatchProjectRequest{},
-			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(reqInvalid.Code), Message: reqInvalid.Message},
 		},
 		{
 			name: "null name",
@@ -431,8 +432,8 @@ func TestPatchProject(t *testing.T) {
 			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
-			name: "empty name",
-			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
+			name: "whitespace-only name",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("   ")},
 			want: &api.UpdateProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{

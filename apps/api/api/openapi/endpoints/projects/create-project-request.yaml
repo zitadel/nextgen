@@ -4,6 +4,8 @@ required:
 properties:
   name:
     type: string
+    # `NewProject` trims the name and refuses an empty one (`proj.name_invalid`).
+    minLength: 1
     description: The name of the project.
   origins:
     type: array

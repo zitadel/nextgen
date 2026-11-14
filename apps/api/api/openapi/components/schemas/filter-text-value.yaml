@@ -1,0 +1,19 @@
+title: FilterTextValue
+description: |
+  What a filter on a text field must hold: a `value`, as a string, and an
+  operation that matches text. The server refuses a missing value, a `null`,
+  a number or a boolean with `400`, and a comparison too. Used under `else`
+  of the filter items, which ogen ignores, so it checks requests without
+  changing the generated clients.
+required:
+  - value
+properties:
+  # Named so the linter, which closes a branch to the properties it names, counts
+  # them as evaluated; the item's own schema types them.
+  field: {}
+  operation:
+    enum:
+      - equals
+      - contains
+  value:
+    type: string

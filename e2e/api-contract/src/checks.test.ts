@@ -30,6 +30,12 @@ describe("exemptionsFor", () => {
       ]),
     ).toEqual([{ operationId: "getTeam", check: "use_after_free" }]);
   });
+
+  test("exempts rollbackDeployment from negative data rejection", () => {
+    expect(exemptionsFor([{ id: "rollbackDeployment", alternatives: 1 }])).toEqual([
+      { operationId: "rollbackDeployment", check: "negative_data_rejection" },
+    ]);
+  });
 });
 
 describe("refusalsFor", () => {

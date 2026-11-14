@@ -21,6 +21,7 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$":   ogenregex.MustCompile("^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$"),
 	"^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$": ogenregex.MustCompile("^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$"),
 	"^[0-9a-f]{32}$":        ogenregex.MustCompile("^[0-9a-f]{32}$"),
+	"^[A-Za-z0-9._-]+$":     ogenregex.MustCompile("^[A-Za-z0-9._-]+$"),
 	"^[A-Za-z0-9_.~@-]+$":   ogenregex.MustCompile("^[A-Za-z0-9_.~@-]+$"),
 	"^[^$]":                 ogenregex.MustCompile("^[^$]"),
 	"^[a-z0-9][a-z0-9_-]*$": ogenregex.MustCompile("^[a-z0-9][a-z0-9_-]*$"),
@@ -34,12 +35,14 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^att_[a-zA-Z0-9_-]+$":               ogenregex.MustCompile("^att_[a-zA-Z0-9_-]+$"),
 	"^ch_[a-zA-Z0-9_-]+$":                ogenregex.MustCompile("^ch_[a-zA-Z0-9_-]+$"),
 	"^dep_[a-zA-Z0-9_-]+$":               ogenregex.MustCompile("^dep_[a-zA-Z0-9_-]+$"),
+	"^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$":                                            ogenregex.MustCompile("^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$"),
 	"^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$": ogenregex.MustCompile("^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$"),
 	"^pol_[a-zA-Z0-9_-]+$":    ogenregex.MustCompile("^pol_[a-zA-Z0-9_-]+$"),
 	"^polrev_[a-zA-Z0-9_-]+$": ogenregex.MustCompile("^polrev_[a-zA-Z0-9_-]+$"),
 	"^rel_[a-zA-Z0-9_-]+$":    ogenregex.MustCompile("^rel_[a-zA-Z0-9_-]+$"),
 	"^sess_[a-zA-Z0-9_-]+$":   ogenregex.MustCompile("^sess_[a-zA-Z0-9_-]+$"),
 	"^sha256:[0-9a-f]{64}$":   ogenregex.MustCompile("^sha256:[0-9a-f]{64}$"),
+	"^team_[a-zA-Z0-9_-]+$":   ogenregex.MustCompile("^team_[a-zA-Z0-9_-]+$"),
 	"^user_[a-zA-Z0-9_-]+$":   ogenregex.MustCompile("^user_[a-zA-Z0-9_-]+$"),
 }
 var (

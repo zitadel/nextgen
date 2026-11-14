@@ -191,6 +191,8 @@ func resolveSchemaError(err error) error {
 		return domain.ErrJSONSchemaFetchDowngrade().WithDetails(de.Details).WithParent(de.Parent)
 	case domain.ErrJSONSchemaFetchTimeout().Code:
 		return domain.ErrJSONSchemaFetchTimeout().WithDetails(de.Details).WithParent(de.Parent)
+	case domain.ErrJSONSchemaFetchFailed().Code:
+		return domain.ErrJSONSchemaFetchFailed().WithDetails(de.Details).WithParent(de.Parent)
 	}
 	return de
 }

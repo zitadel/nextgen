@@ -61,7 +61,7 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 		got, err := createGrantInput("proj_a", &api.CreateGrantRequest{
 			Relation: api.CreateGrantRequestRelationEditor,
 			Team: api.NewOptTeamLocator(api.TeamLocator{
-				TeamID: api.NewOptTeamID("team_1"),
+				TeamID: api.NewOptString("team_1"),
 			}),
 		})
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
 			Relation: api.CreateGrantRequestRelationViewer,
 			User:     api.NewOptUserLocator(api.UserLocator{UserID: api.NewOptUserID("user_1")}),
-			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptTeamID("team_1")}),
+			Team:     api.NewOptTeamLocator(api.TeamLocator{TeamID: api.NewOptString("team_1")}),
 		})
 		require.ErrorIs(t, err, domain.ErrGrantInvalid())
 	})
@@ -105,7 +105,7 @@ func TestCreateGrantInput_Locators(t *testing.T) {
 		_, err := createGrantInput("proj_a", &api.CreateGrantRequest{
 			Relation: api.CreateGrantRequestRelationViewer,
 			Team: api.NewOptTeamLocator(api.TeamLocator{
-				TeamID: api.NewOptTeamID("team_1"),
+				TeamID: api.NewOptString("team_1"),
 				Name:   api.NewOptString("Acme AI Admins"),
 			}),
 		})

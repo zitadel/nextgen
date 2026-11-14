@@ -45,7 +45,24 @@ properties:
   attributes:
     type: object
     additionalProperties: true
+    propertyNames:
+      # No "." and at least one character.
+      pattern: '^[^.]+$'
+    # Said once more for the objects nested in the values, down to five levels (a schema that refers to itself loops the
+    # test tool and the docs sampler; the server applies the rule at every depth). It sits
+    # in an always-true `if` because a `$ref` here would turn the generated
+    # clients' attribute map into a named type; the generator ignores `if`.
+    if:
+      type: object
+    then:
+      additionalProperties:
+        $ref: ../../../components/schemas/attribute-value.yaml
     minProperties: 1
     description: |
       The changed attributes only. `null` deletes an attribute; omitted
       keys are untouched.
+
+      An attribute name must not be empty or contain a `.`, at any depth: the
+      server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+      would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+      rejected with `req.invalid`, naming it in `details.fields`.

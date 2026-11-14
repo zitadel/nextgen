@@ -199,23 +199,15 @@ describe("origin add", () => {
         ]);
       });
 
-      it("carries a pattern holding a control character raw, and spells it out in the title", async () => {
+      it("refuses a pattern holding a control character, as the spec's pattern does", async () => {
         const app = await aSetUpApp();
 
         const result = await app.addOrigin("https://w\u001b[2J.example.com", "primary");
 
-        expect(app.envelopeOf(result)).toEqual({
-          status: "ok",
-          cli_version: expect.any(String),
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
           command: "origin:add",
-          source: "http://mock.zitadel.test",
-          data: {
-            title: "Added https://w\\x1b[2J.example.com (primary)",
-            pattern: "https://w\u001b[2J.example.com",
-            kind: "primary",
-            next_commands: [expectedPublicCliCommand(app.againAsRun("origin list"))],
-          },
-          warnings: [],
         });
       });
 
@@ -383,7 +375,7 @@ describe("origin add", () => {
         expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("origin list")));
       });
 
-      it("spells out a control character in the pattern given", async () => {
+      it("refuses a control character in the pattern given, and prints none raw", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run([
@@ -394,7 +386,8 @@ describe("origin add", () => {
           "primary",
         ]);
 
-        expect(result.stdout.split("\n")[0]).toBe("Added https://w\\x1b[2J.example.com (primary)");
+        expect(result.exitCode).not.toBe(0);
+        expect(`${result.stdout}${result.stderr}`).not.toContain("\u001b");
       });
 
       it.each(RENDERINGS)(

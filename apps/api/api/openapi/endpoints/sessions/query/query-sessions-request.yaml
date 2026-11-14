@@ -1,4 +1,5 @@
 type: object
+additionalProperties: false
 description: Request to query the sessions of a project.
 properties:
   limit:
@@ -10,6 +11,7 @@ properties:
       - type: 'null'
   sorting:
     type: object
+    additionalProperties: false
     required:
       - field
       - direction
@@ -25,9 +27,56 @@ properties:
     description: Filter criteria for querying sessions.
     items:
       type: object
+      additionalProperties: false
       required:
         - field
         - operation
+      # What a `value` and an `operation` may be depends on the field: a timestamp
+      # takes an RFC 3339 string and a comparison, a status or state one of its
+      # names with `equals`, any other field a string with `equals` or `contains`.
+      # The server refuses anything else, and a missing value, with `400`.
+      if:
+        required:
+          - field
+        properties:
+          field:
+            enum: [created_at]
+      then:
+        $ref: ../../../components/schemas/filter-timestamp-value.yaml
+      else:
+        if:
+          required:
+            - field
+          properties:
+            field:
+              enum: [state]
+        then:
+          required:
+            - value
+          properties:
+            field: {}
+            operation:
+              const: equals
+            value:
+              enum: [expired, building, active]
+        else:
+          if:
+            required:
+              - field
+            properties:
+              field:
+                enum: [lifecycle_owner_team_id]
+          then:
+            required:
+              - value
+            properties:
+              field: {}
+              operation:
+                const: equals
+              value:
+                type: string
+          else:
+            $ref: ../../../components/schemas/filter-text-value.yaml
       properties:
         field:
           $ref: session-filter-field.yaml

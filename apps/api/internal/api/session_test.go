@@ -287,6 +287,15 @@ func myUser(self domain.Self) *domain.User {
 	}
 }
 
+func TestCreateSession_RefusesAnotherProject(t *testing.T) {
+	t.Parallel()
+
+	h := Handler{}
+	ctx := WithScopeContext(t.Context(), ScopeContext{ProjectID: "proj_secret"})
+	_, err := h.CreateSession(ctx, &api.CreateSessionRequest{ProjectID: api.ProjectID("proj_other")})
+	require.ErrorIs(t, err, domain.ErrProjectMismatch())
+}
+
 // RevokeMySession is idempotent: logging out a session that is already gone
 // still returns 204 and clears the cookie, rather than surfacing a 404.
 func TestRevokeMySession_IdempotentWhenSessionGone(t *testing.T) {

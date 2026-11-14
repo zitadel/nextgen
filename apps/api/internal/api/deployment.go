@@ -22,13 +22,17 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if req.ReleaseID.Set == req.ContentHash.Set {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("name the release by exactly one of release_id and content_hash")
 	}
-	// TODO(#1574): look the release up by its digest.
+	releaseID := string(req.ReleaseID.Value)
 	if req.ContentHash.Set {
-		return nil, domain.ErrNotImplemented()
+		release, err := h.releaseService.GetByContentHash(ctx, string(params.ProjectID), releaseContentHashFromWire(req.ContentHash.Value))
+		if err != nil {
+			return nil, err
+		}
+		releaseID = release.ID
 	}
 	input := service.DeployInput{
 		ProjectID: string(params.ProjectID),
-		ReleaseID: string(req.ReleaseID.Value),
+		ReleaseID: releaseID,
 	}
 	if urls, ok := req.Targets.GetDeploymentPreviewUrls(); ok {
 		input.To = domain.DeployToPreviews(urls)
