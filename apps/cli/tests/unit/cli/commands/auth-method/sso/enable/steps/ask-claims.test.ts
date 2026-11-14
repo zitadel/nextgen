@@ -273,6 +273,117 @@ describe("AskClaims", () => {
     });
   });
 
+  describe("the properties a claim could fill", () => {
+    /**
+     * A property of the user schema that no claim fills.
+     *
+     * @param name - The property's name.
+     * @param type - The type it declares.
+     * @returns The property.
+     */
+    function aProperty(
+      name: string,
+      type: "string" | "integer" = "string",
+    ): MappingState["attributes"][number] {
+      return {
+        name,
+        type,
+        required: false,
+        unique: false,
+      };
+    }
+
+    /**
+     * Walks a text claim to the question of which property it fills, and answers it.
+     *
+     * @param state - What is mapped so far.
+     * @param answer - The property the person picks.
+     * @returns The choices the question offered, one to a line.
+     */
+    async function offered(state: MappingState, answer: string): Promise<string> {
+      const { talk } = await walked(
+        needsFor(state),
+        "Yes, map another claim",
+        "employee_id",
+        "Text",
+        answer,
+        "",
+        "No, keep these",
+      );
+
+      return talk.options()[3]?.join("\n") ?? "";
+    }
+
+    it("lists an attribute that has no claim yet and could hold the type", async () => {
+      expect(
+        await offered(
+          { ...STATE, attributes: [aProperty("phoneNumber")], mapping: {}, verified: {} },
+          "phoneNumber",
+        ),
+      ).toContain("phoneNumber");
+    });
+
+    it("lists an attribute only a default fills, which the claim would replace", async () => {
+      expect(
+        await offered(
+          {
+            ...STATE,
+            attributes: [aProperty("givenName")],
+            mapping: { givenName: "given_name" },
+            verified: {},
+          },
+          "givenName",
+        ),
+      ).toContain("givenName");
+    });
+
+    it("leaves out an attribute an earlier claim of the request mapped", async () => {
+      expect(
+        await offered(
+          {
+            ...STATE,
+            attributes: [aProperty("givenName"), aProperty("phoneNumber")],
+            mapping: { givenName: "first_name" },
+            verified: {},
+            explicit: ["givenName"],
+          },
+          "phoneNumber",
+        ),
+      ).not.toContain("givenName");
+    });
+
+    it("leaves out an attribute that could not hold the type", async () => {
+      expect(
+        await offered(
+          {
+            ...STATE,
+            attributes: [aProperty("staffNumber", "integer"), aProperty("phoneNumber")],
+            mapping: {},
+            verified: {},
+          },
+          "phoneNumber",
+        ),
+      ).not.toContain("staffNumber");
+    });
+  });
+
+  describe("a claim a property already uses", () => {
+    it("is refused, naming the property it fills", async () => {
+      const { talk } = await walked(
+        needsFor({ ...STATE, mapping: { givenName: "given_name" }, verified: {} }),
+        "Yes, map another claim",
+        "given_name",
+        "organization",
+        "Text",
+        "employeeNumber",
+        "",
+        "No, keep these",
+      );
+
+      expect(talk.shown()).toContain("given_name already fills givenName");
+    });
+  });
+
   describe("a new attribute", () => {
     it.each([
       ["employeeNumber", "Employee number"],

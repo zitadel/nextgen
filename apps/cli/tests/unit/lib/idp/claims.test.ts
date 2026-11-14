@@ -4,9 +4,8 @@ import { ZitadelError } from "@/lib/errors";
 import {
   applyRequest,
   asksForClaims,
-  attributesOf,
+  choiceOf,
   claimFlagTexts,
-  claimNotes,
   claimRequestFromFlags,
   claimsOrRefuse,
   type MappingState,
@@ -14,15 +13,11 @@ import {
   parseClaimEntry,
   parseNewAttributeName,
   parseScopeList,
-  parseUnusedClaim,
   parseVerifiedEntry,
   seedMapping,
-  standardClaimScope,
   standardClaimType,
-  fillable,
-  verifyAttribute,
 } from "@/lib/idp";
-import { Connection, type JsonObject, UserSchema } from "@/lib/zitadel";
+import { Connection, type JsonObject, standardClaim, UserSchema } from "@/lib/zitadel";
 import { aFile, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -144,7 +139,7 @@ function namesOf(attributes: ReadonlyArray<{ readonly name: string }>): readonly
 }
 
 describe("attributesOf", () => {
-  const attributes = attributesOf(aSchemaOf(PROPERTIES));
+  const attributes = seedMapping(aConnection(), aSchemaOf(PROPERTIES)).attributes;
   const named = (name: string) => {
     return attributes.find((one) => {
       return one.name === name;
@@ -178,7 +173,7 @@ describe("attributesOf", () => {
   });
 
   it("is empty for a schema without properties", () => {
-    expect(attributesOf(aSchemaOf({}))).toEqual([]);
+    expect(seedMapping(aConnection(), aSchemaOf({})).attributes).toEqual([]);
   });
 });
 
@@ -316,7 +311,7 @@ describe("standard claims", () => {
   });
 
   it("knows the scope that returns a standard claim", () => {
-    expect([standardClaimScope("phone_number"), standardClaimScope("employee_id")]).toEqual([
+    expect([standardClaim("phone_number")?.scope, standardClaim("employee_id")?.scope]).toEqual([
       "phone",
       undefined,
     ]);
@@ -443,21 +438,32 @@ describe("mapClaim", () => {
   it("says that the replaced default is no longer verified", () => {
     const next = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
 
-    expect(claimNotes(next, VERIFIED_FLAG).join(" ")).toContain("--verified-claim email=<claim>");
+    expect(choiceOf(next, VERIFIED_FLAG).notes.join(" ")).toContain(
+      "--verified-claim email=<claim>",
+    );
   });
 
   it("takes the note away once the replaced default is given a verification", () => {
     const replaced = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
 
-    const verified = value(verifyAttribute(replaced, { attribute: "email", source: true }));
+    const verified = value(
+      applyRequest(replaced, {
+        entries: [],
+        verified: [{ attribute: "email", source: true }],
+        scopes: [],
+      }),
+    );
 
-    expect(claimNotes(verified, VERIFIED_FLAG)).toEqual([]);
+    expect(choiceOf(verified, VERIFIED_FLAG).notes).toEqual([]);
   });
 
   it("keeps the verification when the same claim is named again", () => {
     const next = value(mapClaim(seeded(), { attribute: "email", claim: "email" }));
 
-    expect([next.verified.email, claimNotes(next, VERIFIED_FLAG)]).toEqual(["email_verified", []]);
+    expect([next.verified.email, choiceOf(next, VERIFIED_FLAG).notes]).toEqual([
+      "email_verified",
+      [],
+    ]);
   });
 
   it("frees the claim a replaced default held, so another property can take it", () => {
@@ -562,26 +568,6 @@ describe("mapClaim", () => {
   });
 });
 
-describe("parseUnusedClaim", () => {
-  it("refuses a claim that already fills a property", () => {
-    expect(problem(parseUnusedClaim(seeded(), "given_name"))).toContain(
-      "given_name already fills givenName",
-    );
-  });
-
-  it("carries the property that uses it as it is, for whoever draws it to escape", () => {
-    const state = { ...seeded(), mapping: { "bad\u001b[2J": "employee_id" } };
-
-    expect(problem(parseUnusedClaim(state, "employee_id"))).toBe(
-      "employee_id already fills bad\u001b[2J: a claim fills one property.",
-    );
-  });
-
-  it("accepts a claim nothing uses", () => {
-    expect(value(parseUnusedClaim(seeded(), " employee_id "))).toBe("employee_id");
-  });
-});
-
 describe("parseNewAttributeName", () => {
   it.each(["employeeNumber", "staff_no", "_x", "a1"])("accepts %s", (name) => {
     expect(value(parseNewAttributeName(name, ["email"]))).toBe(name);
@@ -673,7 +659,7 @@ describe("mapClaim with create", () => {
       mapClaim(seeded(), { attribute: "departmentName", claim: "department", create: true }),
     );
 
-    expect(claimNotes(next, VERIFIED_FLAG)).toEqual([
+    expect(choiceOf(next, VERIFIED_FLAG).notes).toEqual([
       "departmentName is a new optional attribute, so a user the provider sends no department for can sign up without it and may never be asked for it.",
     ]);
   });
@@ -707,35 +693,25 @@ describe("mapClaim with create", () => {
   });
 });
 
-describe("fillable", () => {
-  it("lists an attribute that has no claim yet and could hold the type", () => {
-    expect(namesOf(fillable(seeded(), "string"))).toContain("phoneNumber");
-  });
-
-  it("lists an attribute only a default fills, which the claim would replace", () => {
-    expect(namesOf(fillable(seeded(), "string"))).toContain("givenName");
-  });
-
-  it("leaves out an attribute an earlier claim of the request mapped", () => {
-    const state = value(mapClaim(seeded(), { attribute: "givenName", claim: "first_name" }));
-
-    expect(namesOf(fillable(state, "string"))).not.toContain("givenName");
-  });
-
-  it("leaves out an attribute that could not hold the type", () => {
-    expect(namesOf(fillable(seeded(), "string"))).not.toContain("staffNumber");
-  });
-});
-
-describe("verifyAttribute", () => {
+describe("applyRequest verifying a property", () => {
   it("records how a mapped property is verified, replacing the default", () => {
-    const verified = value(verifyAttribute(seeded(), { attribute: "email", source: true }));
+    const verified = value(
+      applyRequest(seeded(), {
+        entries: [],
+        verified: [{ attribute: "email", source: true }],
+        scopes: [],
+      }),
+    );
 
     expect(verified.verified.email).toBe(true);
   });
 
   it("refuses a property with no claim mapping", () => {
-    const parsed = verifyAttribute(seeded(), { attribute: "staffNumber", source: true });
+    const parsed = applyRequest(seeded(), {
+      entries: [],
+      verified: [{ attribute: "staffNumber", source: true }],
+      scopes: [],
+    });
 
     expect(problem(parsed)).toContain("has no claim mapping");
   });

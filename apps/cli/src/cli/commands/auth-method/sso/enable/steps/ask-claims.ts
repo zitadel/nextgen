@@ -15,21 +15,20 @@ import {
   type ClaimType,
   choiceOf,
   claimsOrRefuse,
-  fillable,
+  fits,
   type MappingState,
   mapClaim,
   NO_CLAIM_REQUEST,
   parseClaimName,
   parseNewAttributeName,
   parseScopeList,
-  parseUnusedClaim,
-  standardClaimScope,
   standardClaimType,
   type VerifiedEntry,
 } from "@/lib/idp";
 import { log } from "@/lib/log";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
+import { standardClaim } from "@/lib/zitadel";
 
 /**
  * How a type is named to a person, not to a schema.
@@ -185,6 +184,11 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
    * Ask whether another claim should be mapped, and if so ask the questions for
    * it and say what they mapped, until the person says no.
    *
+   * @remarks
+   * A claim of a type could fill the properties whose type holds it that no claim of this request
+   * has mapped yet: those no claim fills, and those only a default fills, which the claim would
+   * replace. A claim name no property is filled from yet is the one asked for.
+   *
    * @param before - What is mapped so far.
    * @param provider - How the provider is named in messages: "Google", "Corp SSO".
    * @returns Everything asked for from here on.
@@ -215,7 +219,21 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
       message: "Which claim should be read?",
       placeholder: "employee_id",
       parse: (value): Parsed<string> => {
-        return escaped(parseUnusedClaim(before, value));
+        const named = parseClaimName(value);
+        if (!named.ok) {
+          return escaped(named);
+        }
+        const holder = Object.entries(before.mapping).find(([, used]) => {
+          return used === named.value;
+        })?.[0];
+        return escaped(
+          holder === undefined
+            ? named
+            : {
+                ok: false,
+                problem: `${named.value} already fills ${holder}: a claim fills one property.`,
+              },
+        );
       },
     });
     const type: ClaimType =
@@ -231,7 +249,13 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
         }),
         initialValue: "string",
       }));
-    const candidates = fillable(before, type);
+    const candidates = before.attributes.filter((attribute) => {
+      return (
+        attribute.type !== undefined &&
+        fits(type, attribute.type) &&
+        !before.explicit.includes(attribute.name)
+      );
+    });
     if (candidates.length === 0 && type !== "string") {
       log.info(
         `No user attribute holds a ${type} claim, and the login form submits a new attribute as text. Add a ${type} property to your user schema, then map "${plain(claim)}" to it with --claim.`,
@@ -291,7 +315,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
             },
           })
         : chosen;
-    const suggested = standardClaimScope(claim);
+    const suggested = standardClaim(claim)?.scope;
     const extra = await this.deps.ask.text({
       name: "scope",
       message: `Which scope makes "${plain(provider)}" send it? Leave blank if none.`,
