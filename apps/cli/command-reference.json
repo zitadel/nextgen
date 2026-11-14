@@ -209,7 +209,7 @@
         },
         {
           "name": "sso-claim",
-          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. The standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
           "type": "option",
           "multiple": true
         },

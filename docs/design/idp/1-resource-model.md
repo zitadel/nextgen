@@ -231,7 +231,7 @@ into the external provider's claim names (values):
   The CLI also maps the standard OpenID Connect claims whose names match a
   schema property (`given_name` to `givenName`) when the connection requests
   the claim's scope. For any remaining unmapped properties, `--claim
-  <property>=<claim>` or the interactive claim questions add rows, and
+  <property>=<claim>` or the interactive claim questions of `auth-method sso enable` add rows, and
   tenants may add rows by hand with the exact claim name found in the
   provider's documentation. An explicit `--claim` replaces the default for
   its property, and the replaced default stops being verified until

@@ -950,9 +950,9 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   scopes the claims need, and `--verified-claim <property>=<claim>` (or
   `<property>=true` to trust the provider) says how a unique property is
   verified. `setup` takes the same as `--sso-claim`, `--sso-claim-scope` and
-  `--sso-verified-claim`. Interactively, with none of these given, both
-  commands list what is mapped and ask for more claims until the person
-  continues; a claim can fill an attribute with no claim yet, or a new
+  `--sso-verified-claim`, and never asks about claims. Interactively, with none of
+  these given, `auth-method sso enable` lists what is mapped and asks for more
+  claims until the person continues; a claim can fill an attribute with no claim yet, or a new
   attribute, which is added to the user schema and the register steps of the
   login flow (`new_attributes` lists them). A connection that already exists
   keeps the mapping in its file; edit `claim_mapping` there.

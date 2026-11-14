@@ -71,7 +71,6 @@ import { DoInitialDeploy } from "./steps/do-initial-deploy";
 import { InstallDependencies } from "./steps/install-dependencies";
 import { KeepChanges } from "./steps/keep-changes";
 import { MakeInitialCommit } from "./steps/make-initial-commit";
-import { MapClaims } from "./steps/map-claims";
 import { MoveAppPort, RECOVERY_ENV_FILE } from "./steps/move-app-port";
 import { PatchApp } from "./steps/patch-app";
 import { PlanConfiguration } from "./steps/plan-configuration";
@@ -316,7 +315,7 @@ export default class Setup extends Destructive(BaseCommand) {
       parse: accepts(parseClaimEntry),
     })({
       description:
-        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. The standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
     }),
     "sso-verified-claim": Flags.custom<string>({
       multiple: true,
@@ -502,7 +501,6 @@ export default class Setup extends Destructive(BaseCommand) {
         .step(new ChooseSignIn(prompting))
         .step(new SetPasswordPolicy(prompting))
         .step(new ChooseSocialSignIn(prompting))
-        .step(new MapClaims(prompting))
         .step(
           new SettleAnswers({
             dryRun: this.dryRun,

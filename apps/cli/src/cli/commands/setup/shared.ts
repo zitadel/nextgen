@@ -171,7 +171,7 @@ export type SsoDraft = Readonly<{
 
   /**
    * What the connection maps beyond the provider's defaults: given with
-   * `--sso-claim`, or answered in `MapClaims`. Left out, the defaults stand.
+   * `--sso-claim`. Left out, the defaults stand.
    */
   claimRequest?: ClaimRequest;
 }>;
