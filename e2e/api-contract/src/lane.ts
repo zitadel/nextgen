@@ -43,10 +43,32 @@ const SHARD_FROM = 30;
  * never more than the cores there are (each container is about one core) and
  * never less than 1.
  */
-const SHARDS = Math.max(
-  1,
-  Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || Math.min(4, availableParallelism()),
-);
+const SHARDS = Math.max(1, Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || 1000);
+
+/** At most this many containers run at once. */
+const SLOTS = Math.max(1, availableParallelism());
+const waiting: (() => void)[] = [];
+let busy = 0;
+
+async function inSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (busy >= SLOTS) {
+    await new Promise<void>((resolve) => {
+      waiting.push(resolve);
+    });
+  } else {
+    busy += 1;
+  }
+  try {
+    return await work();
+  } finally {
+    const next = waiting.shift();
+    if (next) {
+      next();
+    } else {
+      busy -= 1;
+    }
+  }
+}
 
 /**
  * Waits for every promise, then throws the first failure. `Promise.all` would
@@ -174,7 +196,7 @@ export class Lane {
             { name: "stateful", operationIds: ids, phases: STATEFUL_PHASES },
           ];
     const runs = await allSettled(
-      parts.map(async (part) => {
+      parts.map((part) => inSlot(async () => {
         const partStarted = Date.now();
         const instance = await this.input.instances.start();
         try {
@@ -196,7 +218,7 @@ export class Lane {
         } finally {
           await instance.stop();
         }
-      }),
+      })),
     );
     this.input.log(`${family}: done in ${String(Math.round((Date.now() - started) / 1000))}s`);
     // The slices cover every operation once; the stateful run repeats them, so
@@ -266,7 +288,7 @@ export class Lane {
     if (ids.length < SHARD_FROM) {
       return [[...ids]];
     }
-    const slices: string[][] = Array.from({ length: SHARDS }, () => {
+    const slices: string[][] = Array.from({ length: Math.min(SHARDS, ids.length) }, () => {
       return [];
     });
     ids.forEach((id, index) => {
