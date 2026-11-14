@@ -198,22 +198,15 @@ describe("origin rm", () => {
         });
       });
 
-      it("carries a pattern holding a control character raw, and spells it out in the title", async () => {
+      it("refuses a pattern holding a control character, as the spec's pattern does", async () => {
         const app = await aSetUpApp();
 
         const result = await app.removeOrigin("https://w\u001b[2J.example.com");
 
-        expect(app.envelopeOf(result)).toEqual({
-          status: "ok",
-          cli_version: expect.any(String),
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
           command: "origin:rm",
-          source: "http://mock.zitadel.test",
-          data: {
-            title: "Removed https://w\\x1b[2J.example.com from the project's origins",
-            pattern: "https://w\u001b[2J.example.com",
-            deleted: true,
-          },
-          warnings: [],
         });
       });
 
@@ -455,14 +448,13 @@ describe("origin rm", () => {
         );
       });
 
-      it("spells out a control character in the pattern given", async () => {
+      it("refuses a control character in the pattern given, and prints none raw", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["origin", "rm", "https://w\u001b[2J.example.com", "--force"]);
 
-        expect(result.stdout.split("\n")[0]).toBe(
-          "Removed https://w\\x1b[2J.example.com from the project's origins",
-        );
+        expect(result.exitCode).not.toBe(0);
+        expect(`${result.stdout}${result.stderr}`).not.toContain("\u001b");
       });
 
       it("spells out a control character in the question it refuses with", async () => {
