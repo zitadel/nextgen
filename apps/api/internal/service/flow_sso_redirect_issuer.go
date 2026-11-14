@@ -129,7 +129,7 @@ func plainVariable(ctx context.Context, variables VariableService, projectID, de
 
 // secretVariable is the decrypted string of a secret variable. A missing
 // name or a plain value returns an empty string. A decrypt failure is
-// [domain.ErrFailedToDecryptVariable], as [VariableService.GetDecryptedVariables]
+// [domain.ErrFailedToDecryptVariable], as [VariableResolver.GetDecryptedVariables]
 // reports one.
 func secretVariable(ctx context.Context, variables VariableService, decrypter crypto.Decrypter, projectID, deploymentID, name string) (string, error) {
 	variable, err := ssoVariable(ctx, variables, projectID, deploymentID, name)
