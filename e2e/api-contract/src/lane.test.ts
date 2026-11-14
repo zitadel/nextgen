@@ -262,8 +262,10 @@ describe("Lane", () => {
     });
 
     test("counts only the slices as tested, and adds up the failures", async () => {
+      let containers = 0;
       const fake: Runner = {
         run(input) {
+          containers += 1;
           const text = slicedReport(
             input.phases?.join() === "stateful" ? 32 : input.operationIds.length,
           );
@@ -280,7 +282,7 @@ describe("Lane", () => {
 
       expect(run?.accounting).toMatchObject({ selected: 32, tested: 32 });
       expect(run?.failures).toEqual([
-        { operation: "GET /things/0", check: "Server error", count: 2 * 5 },
+        { operation: "GET /things/0", check: "Server error", count: 2 * containers },
       ]);
     });
   });
@@ -346,6 +348,25 @@ describe("Lane", () => {
     expect(fake.inputs.length).toBeGreaterThan(2);
     expect(new Set(fake.inputs.map((input) => input.baseUrl)).size).toBe(fake.inputs.length);
     expect(provider.running.size).toBe(0);
+  });
+
+  test("logs how long each container took, so the slowest one can be found", async () => {
+    const messages: string[] = [];
+
+    await new Lane({
+      spec,
+      specText: "{}",
+      instances: instances(),
+      runner: runner(),
+      workDir: join(directory, "work"),
+      artifactsDir: join(directory, "out"),
+      log: (message) => {
+        messages.push(message);
+      },
+    }).run();
+
+    expect(messages).toContain("public/.: 1 operations in 0s");
+    expect(messages).toContain("management/.: 1 operations in 0s");
   });
 
   test("stops an instance whose run failed", async () => {
