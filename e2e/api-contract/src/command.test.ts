@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import { EXIT_MARKER, HOOKS_PATH, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
+import {
+  EXIT_MARKER,
+  HOOKS_PATH,
+  MAX_EXAMPLES,
+  WORKERS,
+  SchemathesisCommand,
+  SEED,
+} from "./command";
 
 /** The hooks the lane loads into every run (it keeps a made-up page token out of the requests), and no bytecode written beside them. */
 const HOOKS_ENVIRONMENT = { SCHEMATHESIS_HOOKS: HOOKS_PATH, PYTHONDONTWRITEBYTECODE: "1" };
@@ -27,6 +34,7 @@ describe("SchemathesisCommand", () => {
 
     expect(shell).toContain(`--seed ${String(SEED)}`);
     expect(shell).toContain(`--max-examples ${String(MAX_EXAMPLES)}`);
+    expect(shell).toContain(`--workers ${String(WORKERS)}`);
   });
 
   test("selects the checks in the config, never with a flag that would override an exemption", () => {
