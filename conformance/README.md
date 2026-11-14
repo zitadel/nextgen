@@ -97,7 +97,8 @@ It does not catch:
   next run that misses the cache (and every night for `generatorPinned: false`);
 - the scaffolded pages of a fixture with no `typecheck` script: its generator
   writes no type-check, and this lane and the journeys both run `dev`, so
-  nothing compiles those pages against the SDK's types;
+  nothing compiles those pages against the SDK's types. Angular's `dev` does:
+  `ng serve` fails to build on a type error, and the lane with it;
 - what setup writes only after an install, such as TanStack Start's
   `src/routeTree.gen.ts`: a fixture is generated with `--skip-install`, so the
   lane's dev server writes the route tree and git ignores it there;

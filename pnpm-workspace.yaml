@@ -181,6 +181,13 @@ supportedArchitectures:
 
 # Fail the install on an unmet or conflicting peer dependency instead of warning.
 strictPeerDependencies: true
+# oxc-parser's wasm32 binding (0.156 and later, through @angular/build 22.2.6
+# and later) pins @emnapi 2.0.0-alpha.6, which its own @napi-rs/wasm-runtime
+# does not list. Nothing here installs wasm32 (supportedArchitectures).
+peerDependencyRules:
+  allowedVersions:
+    "@napi-rs/wasm-runtime>@emnapi/core": "2.0.0-alpha.6"
+    "@napi-rs/wasm-runtime>@emnapi/runtime": "2.0.0-alpha.6"
 
 # pnpm 12 no longer reads the "pnpm" field of package.json.
 allowBuilds:
