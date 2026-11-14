@@ -1,9 +1,9 @@
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { LocalServer } from "@/lib/local-server/server";
 import { DEFAULT_SERVER } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
+import { promptContext } from "@/cli/commands/setup/shared";
 
 /**
  * The value the choice select returns when the person picks "Custom URL".
@@ -70,39 +70,13 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
    * @returns The answers, with this question's settled.
    */
   async run(needs: Needs): Promise<Fact<"answers">> {
-    const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
-      answers: await this.ask(needs.answers, {
-        ask: this.deps.ask,
-        note: (title, lines) => {
-          this.deps.ui.note(title, lines);
-        },
-        say: (text) => {
-          this.deps.ui.say(text);
-        },
-        spinner: (label, options) => {
-          return this.deps.ui.spinner(label, options);
-        },
-        framework: {
-          id: app.framework,
-          displayName: orca.displayName(app.framework),
-        },
-        suggest: this.deps.suggest,
-        cwd: this.deps.cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.deps.serverFlag,
-        devPortFromFlag: flags.devPort !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags.useCase !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      }),
+      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
     };
   }
 

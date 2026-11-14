@@ -133,7 +133,12 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
    * @throws {ZitadelError} When the server refuses the new origin.
    */
   async run(needs: Needs): Promise<CommandResult> {
-    const devPort = needs.flags.devPort ?? 0;
+    const { devPort } = needs.flags;
+    if (devPort === undefined) {
+      throw new ZitadelError("E_VALIDATION", "Moving the app needs the port to move it to", {
+        hint: "Pass --dev-port with the port the app should run on.",
+      });
+    }
     const source = readProjectServer(await readZitadelConfig(this.deps.cwd));
     const moving = this.deps.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${this.deps.dryRun ? " (dry run)" : ""}`,

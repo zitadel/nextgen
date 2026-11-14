@@ -24,7 +24,7 @@ import {
 } from "@/lib/idp";
 import { type Admitted, CommandGroups, type CommandResult, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
-import { accepts, AS_REFUSED, parses } from "@/lib/oclif/flags";
+import { accepts, parses } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
 import { Wizard } from "@/lib/wizard";
@@ -93,30 +93,30 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         (value) => {
           return parseConnectionSlug(value, RESERVED_SLUGS);
         },
-        { empty: AS_REFUSED },
+        { blankAsValue: true },
       ),
     })({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
     }),
     "display-name": Flags.custom<string>({
-      parse: accepts(parseDisplayName, { empty: AS_REFUSED }),
+      parse: accepts(parseDisplayName, { blankAsValue: true }),
     })({
       description: "Name shown on the custom connection's sign-in button.",
     }),
     issuer: Flags.custom<string>({
-      parse: accepts(parseIssuer, { empty: AS_REFUSED }),
+      parse: accepts(parseIssuer, { blankAsValue: true }),
     })({
       description: "Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.",
     }),
     scopes: Flags.custom<string>({
-      parse: accepts(parseScopes, { empty: AS_REFUSED }),
+      parse: accepts(parseScopes, { blankAsValue: true }),
     })({
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
     "client-id": Flags.custom<ClientId>({
       parse: parses(parseClientId, {
-        empty: AS_REFUSED,
+        blankAsValue: true,
         refusal: {
           message: "{input} was given an empty value",
           hint: "Pass a value for {input}, or omit it entirely.",
@@ -239,6 +239,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(new BuildChange())
         .step(
           new PublishCredentials({
+            signal: this.signal,
             source: this.meta.source,
           }),
         )
@@ -267,7 +268,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .run(
           { flags },
           {
-            signal: this.signal,
             onUndoError: (key, error) => {
               reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

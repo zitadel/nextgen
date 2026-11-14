@@ -52,8 +52,9 @@ Fixtures take `32xx`, `82xx` and `83xx` with the same `xx`.
 `.nuxt/` and `next-env.d.ts`), less what no fixture commits: the secret and
 the env files that carry it, the CLI's own state (`zitadel.json`,
 `.zitadel/`), which the app never reads, the docs setup writes for a person
-(`README.md`, `AGENTS.md`), editor and npm settings, and the tooling only the
-scripts it drops or an editor would load, with its config files (one list in
+(`README.md`, `AGENTS.md`), editor and npm settings, and tooling only the
+scripts it drops or an editor would load that costs installs or moves another
+package's resolution, with its config files (one list in
 `suite/bin/conformance-fixture.mjs`). Of the generated scripts it keeps `dev`
 and the generator's own type-check as `typecheck` (sv's `check`, the `tsc -b`
 or `vue-tsc -b` create-vite's `build` starts with, create-qwik's
@@ -97,7 +98,8 @@ It does not catch:
   next run that misses the cache (and every night for `generatorPinned: false`);
 - the scaffolded pages of a fixture with no `typecheck` script: its generator
   writes no type-check, and this lane and the journeys both run `dev`, so
-  nothing compiles those pages against the SDK's types;
+  nothing compiles those pages against the SDK's types. Angular's `dev` does:
+  `ng serve` fails to build on a type error, and the lane with it;
 - what setup writes only after an install, such as TanStack Start's
   `src/routeTree.gen.ts`: a fixture is generated with `--skip-install`, so the
   lane's dev server writes the route tree and git ignores it there;

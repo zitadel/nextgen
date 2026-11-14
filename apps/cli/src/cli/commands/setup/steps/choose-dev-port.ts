@@ -1,27 +1,8 @@
-import { z } from "zod";
-
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { LocalServer } from "@/lib/local-server/server";
-import { whole } from "@/lib/oclif/flags";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-
-/**
- * The lowest TCP port a server can listen on.
- */
-const MIN_PORT = 1;
-
-/**
- * The highest TCP port a server can listen on.
- */
-const MAX_PORT = 65_535;
-
-/**
- * The schema of a TCP port, refusing what is not a whole number from 1 to 65535,
- * which is no port a server can listen on.
- */
-const PORT = whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT));
+import { PORT, promptContext } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -77,39 +58,13 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
    * @returns The answers, with this question's settled.
    */
   async run(needs: Needs): Promise<Fact<"answers">> {
-    const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
-      answers: await this.ask(needs.answers, {
-        ask: this.deps.ask,
-        note: (title, lines) => {
-          this.deps.ui.note(title, lines);
-        },
-        say: (text) => {
-          this.deps.ui.say(text);
-        },
-        spinner: (label, options) => {
-          return this.deps.ui.spinner(label, options);
-        },
-        framework: {
-          id: app.framework,
-          displayName: orca.displayName(app.framework),
-        },
-        suggest: this.deps.suggest,
-        cwd: this.deps.cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.deps.serverFlag,
-        devPortFromFlag: flags.devPort !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags.useCase !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      }),
+      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
     };
   }
 
@@ -139,7 +94,7 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
         placeholder: suggested,
         initialValue: suggested,
         parse: (value) => {
-          const parsed = PORT.safeParse(value);
+          const parsed = PORT.schema.safeParse(value);
           return parsed.success
             ? {
                 ok: true,

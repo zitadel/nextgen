@@ -10,7 +10,7 @@ type Needs = Fact<"remote" | "delivery" | "given">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "source">;
+type Deps = Pick<EnableServices, "signal" | "source">;
 
 /**
  * Stores the credentials in the project's variables, where the engine resolves
@@ -44,6 +44,9 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
    * Publish what was given.
    *
    * @remarks
+   * A Ctrl-C during a write comes back from the delivery as a failed outcome, not as an error, so the
+   * signal is checked once it returns and the run stops there instead of writing the files.
+   *
    * The credentials reach the project through its own variables, which is where
    * the engine resolves a connection's `${{ NAME }}` references from. There is
    * no publisher when there is no project behind the run: `--source mock`
@@ -57,22 +60,24 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
       this.deps.source === "mock"
         ? undefined
         : new VariableService(needs.remote.client, needs.remote.projectId);
+    const published = await needs.delivery.publish(
+      needs.given,
+      variableService === undefined
+        ? undefined
+        : async (name, value, options) => {
+            await variableService.set(
+              name,
+              value,
+              VariableWrite.of({
+                secret: options.secret,
+                preview: false,
+              }),
+            );
+          },
+    );
+    this.deps.signal.throwIfAborted();
     return {
-      published: await needs.delivery.publish(
-        needs.given,
-        variableService === undefined
-          ? undefined
-          : async (name, value, options) => {
-              await variableService.set(
-                name,
-                value,
-                VariableWrite.of({
-                  secret: options.secret,
-                  preview: false,
-                }),
-              );
-            },
-      ),
+      published,
     };
   }
 }

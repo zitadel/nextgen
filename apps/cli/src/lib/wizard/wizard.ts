@@ -16,12 +16,6 @@ type Observer<Known extends object> = (known: Known) => void;
  */
 type RunOptions = {
   /**
-   * Stops the run between steps when it aborts, as the person's Ctrl-C does.
-   * What had finished is undone first.
-   */
-  readonly signal?: AbortSignal;
-
-  /**
    * Told when a step's undo itself failed. The run goes on undoing the steps
    * before it, and the error that started the undo is still the one thrown.
    */
@@ -34,27 +28,6 @@ type RunOptions = {
  */
 type Unmet<Needs extends object, State extends object> = {
   readonly "this step needs answers that no earlier step gives": Exclude<keyof Needs, keyof State>;
-};
-
-/**
- * What is known inside one pass of a loop: everything the loop's own state
- * holds, and the item the pass is for.
- *
- * @typeParam State - What is known where the loop starts.
- * @typeParam Item - What the loop goes over.
- */
-type Pass<State extends object, Item> = State & { readonly item: Item };
-
-/**
- * What is known after a loop: what was known before it, and each pass's result,
- * in order, under the loop's key.
- *
- * @typeParam State - What is known where the loop starts.
- * @typeParam Key - The loop's name.
- * @typeParam Inner - What each pass ends with.
- */
-type Looped<State extends object, Key extends string, Inner extends object> = State & {
-  readonly [K in Key]: readonly Inner[];
 };
 
 /**
@@ -111,9 +84,6 @@ function nothingToUndo(): Promise<void> {
  *   .endWhen(new AlreadySetUp(terminal))
  *   .step(new Detect(terminal), (state) => terminal.say(state.framework))
  *   .step(new DevPort(terminal))
- *   .each("connections", (state) => state.providers, (provider) => {
- *     return provider.step(new ClientId(terminal)).step(new ClientSecret(terminal));
- *   })
  *   .finish((state) => report(state));
  * ```
  *
@@ -209,7 +179,6 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
-        options.signal?.throwIfAborted();
         const out = await reader.run(before.state);
         const undo = async (): Promise<void> => {
           try {
@@ -266,7 +235,6 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State, Result>> => {
-        options.signal?.throwIfAborted();
         const ends = await reader.when(before.state);
         if (!ends) {
           return before;
@@ -283,98 +251,6 @@ export class Wizard<Initial extends object, State extends object, Result> {
         await before.undo();
         throw error;
       });
-    };
-    return new Wizard(this.name, keys, runner);
-  }
-
-  /**
-   * Add a list of steps that runs once for each item of a list the earlier
-   * steps settled, in order.
-   *
-   * @remarks
-   * Each pass sees everything known so far and the item as `item`. What each
-   * pass ends with is collected, in order, under `key`. If a pass fails, the
-   * passes before it are undone, newest first, and then the steps before the
-   * loop.
-   *
-   * The state a loop adds is built with one assertion: a key that is only known
-   * as a type parameter is not understood by the compiler as the key of the
-   * added property, so the object it builds is told to be what the signature
-   * promises.
-   *
-   * @param key - The step's name, and where the passes' results are kept.
-   * @param source - The items, from what is known.
-   * @param build - Builds the steps each pass runs.
-   * @returns The wizard with the loop added, knowing each pass's result.
-   * @throws {@link WizardDefinitionError} When a step already has its name.
-   */
-  each<Key extends string, Item, Inner extends object>(
-    key: Key,
-    source: (state: State) => readonly Item[],
-    build: (
-      pass: Wizard<Pass<State, Item>, Pass<State, Item>, never>,
-    ) => Wizard<Pass<State, Item>, Inner, never>,
-  ): Wizard<Initial, Looped<State, Key, Inner>, Result> {
-    const keys = this.claim(key);
-    const pass = build(Wizard.named<Pass<State, Item>, never>(`${this.name}.${key}`)).runner;
-    const runner: Runner<Initial, Looped<State, Key, Inner>, Result> = async (initial, options) => {
-      const before = await this.runner(initial, options);
-      if (before.kind === "end") {
-        return before;
-      }
-      const passes = source(before.state).reduce<
-        Promise<{ readonly results: readonly Inner[]; readonly undo: Undo }>
-      >(
-        async (accumulated, item) => {
-          const soFar = await accumulated;
-          const progress = await pass(
-            {
-              ...before.state,
-              item,
-            },
-            options,
-          ).catch(async (error: unknown) => {
-            await soFar.undo();
-            throw error;
-          });
-          if (progress.kind === "end") {
-            throw new WizardDefinitionError(
-              `The loop "${key}" in "${this.name}" cannot end the wizard`,
-            );
-          }
-          return {
-            results: [...soFar.results, progress.state],
-            undo: async (): Promise<void> => {
-              await progress.undo();
-              await soFar.undo();
-            },
-          };
-        },
-        Promise.resolve({
-          results: [],
-          undo: nothingToUndo,
-        }),
-      );
-      return passes.then(
-        (done) => {
-          const progress: Progress<Looped<State, Key, Inner>, Result> = {
-            kind: "continue",
-            state: {
-              ...before.state,
-              [key]: done.results,
-            } as Looped<State, Key, Inner>,
-            undo: async (): Promise<void> => {
-              await done.undo();
-              await before.undo();
-            },
-          };
-          return progress;
-        },
-        async (error: unknown) => {
-          await before.undo();
-          throw error;
-        },
-      );
     };
     return new Wizard(this.name, keys, runner);
   }
@@ -473,8 +349,9 @@ class ReadyWizard<Initial extends object, Result> {
    * Run the steps in order.
    *
    * @remarks
-   * When a step fails, or the signal aborts, what had finished is undone, newest
-   * first, and the error that stopped the run is thrown.
+   * When a step fails, including one that throws because the run was aborted, what
+   * had finished is undone, newest first, and the error that stopped the run is
+   * thrown.
    *
    * @param initial - What the run starts from.
    * @param options - How the run behaves.

@@ -20,7 +20,6 @@ import {
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
-import { z } from "zod";
 
 import { errorMessage } from "@/lib/errors";
 import {
@@ -43,7 +42,7 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { accepts, parses, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { accepts, parses, reads } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { createOrca } from "@/lib/orca";
 import {
@@ -55,7 +54,7 @@ import { reportWarning } from "@/lib/warnings";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
-import { DEFAULT_RENDERER, type Fact } from "./shared";
+import { DEFAULT_RENDERER, type Fact, PORT } from "./shared";
 import { ApplyDefaults } from "./steps/apply-defaults";
 import { CheckPatch } from "./steps/check-patch";
 import { CheckPreconditions } from "./steps/check-preconditions";
@@ -184,32 +183,6 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? `Renderer (default: ${DEFAULT_RENDERER}).`
     : `Renderer (default: ${DEFAULT_RENDERER}). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
-
-/**
- * The lowest TCP port a server can listen on.
- */
-const MIN_PORT = 1;
-
-/**
- * The highest TCP port a server can listen on.
- */
-const MAX_PORT = 65_535;
-
-/**
- * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
- * port a server can listen on.
- */
-const PORT = {
-  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
-  refusal: {
-    message: "{value} is not a TCP port",
-    hint: "Use a TCP port from {min} to {max}.",
-  },
-  values: {
-    min: MIN_PORT,
-    max: MAX_PORT,
-  },
-} as const satisfies Refused<number>;
 
 /**
  * `zitadel setup` — create a Zitadel project and scaffold local auth.
@@ -428,7 +401,10 @@ export default class Setup extends Destructive(BaseCommand) {
    * @remarks
    * The steps are built when this runs, not when the file loads, so a step may
    * import what it needs from this file. Every step that may ask the person
-   * takes the same services, held once as `prompting`.
+   * takes the same services, held once as `prompting`. Every step is built
+   * before the first one runs, so nothing handed to a step may read the server
+   * from `this.meta.source`: the preconditions settle it, and later steps read
+   * it from their `preflight`.
    *
    * @param admitted - What the command admitted.
    * @param admitted.flags - The flags.
@@ -699,7 +675,6 @@ export default class Setup extends Destructive(BaseCommand) {
         .run(
           { flags },
           {
-            signal: this.signal,
             onUndoError: (key, error) => {
               reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },

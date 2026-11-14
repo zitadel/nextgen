@@ -24,7 +24,9 @@ describe("ReadIssuer", () => {
     const cwd = await setUpProject(dir);
     await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=${ISSUER}\n`);
 
-    const { issuer } = await new ReadIssuer({ cwd, env: process.env }).run({ flags: {} });
+    const { issuer } = await new ReadIssuer({ cwd, env: process.env }).run({
+      flags: { server: undefined, env: undefined, envFile: undefined },
+    });
 
     expect(issuer).toBe(ISSUER);
   });
@@ -33,7 +35,9 @@ describe("ReadIssuer", () => {
     const cwd = await makeProject(dir);
 
     const error = await rejectionOf(() => {
-      return new ReadIssuer({ cwd, env: process.env }).run({ flags: {} });
+      return new ReadIssuer({ cwd, env: process.env }).run({
+        flags: { server: undefined, env: undefined, envFile: undefined },
+      });
     });
 
     expect(error).toBeInstanceOf(ZitadelError);
