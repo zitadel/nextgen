@@ -732,7 +732,11 @@ export async function scaffoldOf(
             return choiceOf(
               claimsOrRefuse(
                 applyRequest(
-                  seedMapping(connection, template),
+                  seedMapping(
+                    connection,
+                    template,
+                    (draft.claimRequest ?? NO_CLAIM_REQUEST).scopes,
+                  ),
                   draft.claimRequest ?? NO_CLAIM_REQUEST,
                 ),
               ),
@@ -797,6 +801,7 @@ export function refuseUnmappableClaims(
       seedMapping(
         Connection.forProvider(providerOf(draft.selection), template, draft.endpoints),
         template,
+        (draft.claimRequest ?? NO_CLAIM_REQUEST).scopes,
       ),
       draft.claimRequest ?? NO_CLAIM_REQUEST,
     ),

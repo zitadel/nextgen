@@ -243,6 +243,12 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
         initialValue: "string",
       }));
     const candidates = fillable(before, type);
+    if (candidates.length === 0 && type !== "string") {
+      log.info(
+        `No user attribute holds a ${type} claim, and the login form submits a new attribute as text. Add a ${type} property to your user schema, then map "${plain(claim)}" to it with --claim.`,
+      );
+      return this.askMore(before, provider);
+    }
     const chosen =
       candidates.length === 0
         ? CREATE
@@ -272,8 +278,10 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
                 value: CREATE,
                 label: "Create a new attribute",
                 hint: `a ${type} property added to your user schema`,
-              },
-            ],
+              } as const,
+            ].filter((option) => {
+              return type === "string" || option.value !== CREATE;
+            }),
           });
     if (chosen === CREATE && candidates.length === 0) {
       log.info("No user attribute is free to hold it, so it needs a new one.");

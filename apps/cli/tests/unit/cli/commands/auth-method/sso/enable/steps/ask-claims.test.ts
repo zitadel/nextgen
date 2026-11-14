@@ -256,6 +256,23 @@ describe("AskClaims", () => {
     });
   });
 
+  describe("a claim that is not text, when no attribute holds it", () => {
+    it("says a new attribute would be text and moves on without creating one", async () => {
+      const { said, result } = await walked(
+        needsFor({ ...STATE, mapping: {}, verified: {} }),
+        "Yes, map another claim",
+        "employee_id",
+        "Integer",
+        "No, keep these",
+      );
+
+      expect([
+        said.includes("the login form submits a new attribute as text"),
+        result.answered,
+      ]).toEqual([true, expect.objectContaining({ created: [] })]);
+    });
+  });
+
   describe("a new attribute", () => {
     it.each([
       ["employeeNumber", "Employee number"],

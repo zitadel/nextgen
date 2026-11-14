@@ -385,6 +385,11 @@ export function parseClaimName(value: string): Parsed<string> {
       "A claim name cannot start with $, which the connection reserves for future forms.",
     );
   }
+  if (standardClaim(claim)?.type === "object") {
+    return refuse(
+      `${claim} is an object claim in OpenID Connect, which no single property can hold.`,
+    );
+  }
   return ok(claim);
 }
 
@@ -552,20 +557,42 @@ export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
  * schema with `givenName` or `picture` is filled without being asked.
  *
  * @remarks
- * A standard claim is only added when the connection already asks for its
- * scope: adding a scope the provider does not know would break its sign-in.
+ * A standard claim is only added when the connection requests its scope, or
+ * the request adds it: adding a scope the provider does not know would break
+ * its sign-in. What the connection already maps is held to the same rules, so a
+ * standard claim whose scope is not requested, or whose type the property would
+ * not hold, is dropped together with how it was verified.
  *
  * @param connection - The connection the provider's defaults make.
  * @param schema - The user schema the connection signs people in to.
+ * @param requested - The extra scopes the request asks for, which the defaults
+ *   are read against too.
  * @returns The mapping the connection starts from.
  */
-export function seedMapping(connection: Connection, schema: UserSchema): MappingState {
+export function seedMapping(
+  connection: Connection,
+  schema: UserSchema,
+  requested: readonly string[] = [],
+): MappingState {
   const attributes = attributesOf(schema);
-  const scopes = connection.scopes ?? [];
+  const scopes = union(connection.scopes ?? [], requested);
   const existing = Object.fromEntries(
-    connection.mappings.map(({ property, claim }) => {
-      return [property, claim];
-    }),
+    connection.mappings
+      .filter(({ property, claim }) => {
+        const standard = standardClaim(claim);
+        const type = standardClaimType(claim);
+        const held = attributes.find((one) => {
+          return one.name === property;
+        })?.type;
+        return (
+          standard === undefined ||
+          (scopes.includes(standard.scope) &&
+            (type === undefined || held === undefined || fits(type, held)))
+        );
+      })
+      .map(({ property, claim }) => {
+        return [property, claim];
+      }),
   );
   const defaults = Object.entries(STANDARD_CLAIMS).flatMap(([claim, standard]) => {
     const type = standardClaimType(claim);
@@ -584,7 +611,9 @@ export function seedMapping(connection: Connection, schema: UserSchema): Mapping
   const mapping = { ...existing, ...Object.fromEntries(defaults) };
   const given = Object.fromEntries(
     connection.verifications.flatMap(({ property, claim }) => {
-      return typeof claim === "string" || claim === true ? [[property, claim] as const] : [];
+      return Object.hasOwn(mapping, property) && (typeof claim === "string" || claim === true)
+        ? [[property, claim] as const]
+        : [];
     }),
   );
   const derived = Object.entries(mapping).flatMap(([attribute, claim]) => {
@@ -693,9 +722,15 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
     if (!name.ok) {
       return name;
     }
+    const created = entry.type ?? standardClaimType(entry.claim) ?? "string";
+    if (created !== "string") {
+      return refuse(
+        `${entry.claim} is a ${created} claim, but the login form submits a new attribute as text. Add a ${created} property to the user schema yourself and map the claim to it.`,
+      );
+    }
     const added: SchemaAttribute = {
       name: name.value,
-      type: entry.type ?? standardClaimType(entry.claim) ?? "string",
+      type: created,
       required: false,
       unique: false,
     };
@@ -802,13 +837,18 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
  * @returns One note for each such property.
  */
 export function claimNotes(state: MappingState, flag: string): readonly string[] {
-  return state.unverifiedByReplacing
-    .filter((attribute) => {
-      return !Object.hasOwn(state.verified, attribute);
-    })
-    .map((attribute) => {
-      return `${attribute} is now filled from ${state.mapping[attribute]} and is no longer verified, so a user whose ${attribute} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with ${flag} ${attribute}=<claim> (or =true to trust the provider).`;
-    });
+  return [
+    ...state.unverifiedByReplacing
+      .filter((attribute) => {
+        return !Object.hasOwn(state.verified, attribute);
+      })
+      .map((attribute) => {
+        return `${attribute} is now filled from ${state.mapping[attribute]} and is no longer verified, so a user whose ${attribute} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with ${flag} ${attribute}=<claim> (or =true to trust the provider).`;
+      }),
+    ...state.created.map((attribute) => {
+      return `${attribute.name} is a new optional attribute, so a user the provider sends no ${state.mapping[attribute.name]} for can sign up without it and may never be asked for it.`;
+    }),
+  ];
 }
 
 /**

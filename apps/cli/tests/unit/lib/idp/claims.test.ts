@@ -183,6 +183,10 @@ describe("attributesOf", () => {
 });
 
 describe("parseClaimEntry", () => {
+  it("refuses a standard claim whose value is an object, which no property holds", () => {
+    expect(problem(parseClaimEntry("postalAddress=address"))).toContain("is an object claim");
+  });
+
   it("reads a property and a claim", () => {
     expect(value(parseClaimEntry("contactEmail=mail"))).toEqual({
       attribute: "contactEmail",
@@ -374,6 +378,31 @@ describe("seedMapping", () => {
 
   it("starts from the scopes the connection requests", () => {
     expect(seeded().scopes).toEqual(DEFAULT_SCOPES);
+  });
+
+  it("drops what the connection maps from a standard claim whose scope it does not request", () => {
+    expect(seeded(["openid"]).mapping).toEqual({});
+  });
+
+  it("drops how a dropped mapping was verified", () => {
+    const connection = aConnection({ verified_claims: { email: true } }, ["openid"]);
+
+    expect(seeded(undefined, connection).verified).toEqual({});
+  });
+
+  it("drops a standard claim the property it fills would not hold", () => {
+    const state = seedMapping(
+      aConnection({ claim_mapping: { givenName: "given_name" } }),
+      aSchemaOf({ givenName: { type: "integer" } }),
+    );
+
+    expect(state.mapping).toEqual({});
+  });
+
+  it("reads the defaults against the scopes the request adds as well", () => {
+    const state = seedMapping(aConnection(), aSchemaOf(PROPERTIES), ["phone"]);
+
+    expect(state.mapping.phoneNumber).toBe("phone_number");
   });
 });
 
@@ -593,37 +622,60 @@ describe("mapClaim with create", () => {
       mapClaim(seeded(), {
         attribute: "employeeNumber",
         claim: "employee_id",
-        type: "integer",
         create: true,
       }),
     );
 
     expect([next.mapping.employeeNumber, next.created]).toEqual([
       "employee_id",
-      [{ name: "employeeNumber", type: "integer", required: false, unique: false }],
+      [{ name: "employeeNumber", type: "string", required: false, unique: false }],
     ]);
   });
 
-  it("types a standard claim's attribute by the standard", () => {
-    const next = value(
-      mapClaim(seeded(), { attribute: "verifiedMail", claim: "email_verified", create: true }),
-    );
+  it.each(["integer", "number", "boolean"] as const)(
+    "refuses to create an attribute for a %s claim, which the login form would submit as text",
+    (type) => {
+      const parsed = mapClaim(seeded(), {
+        attribute: "employeeNumber",
+        claim: "employee_id",
+        type,
+        create: true,
+      });
 
-    expect(next.created[0]?.type).toBe("boolean");
+      expect(problem(parsed)).toContain(`the login form submits a new attribute as text`);
+    },
+  );
+
+  it("refuses to create an attribute for a standard claim that is not text", () => {
+    const parsed = mapClaim(seeded(), {
+      attribute: "verifiedMail",
+      claim: "email_verified",
+      create: true,
+    });
+
+    expect(problem(parsed)).toContain("email_verified is a boolean claim");
   });
 
   it("makes the new attribute known to later entries", () => {
     const next = value(
       applyRequest(seeded(), {
-        entries: [
-          { attribute: "employeeNumber", claim: "employee_id", type: "integer", create: true },
-        ],
+        entries: [{ attribute: "employeeNumber", claim: "employee_id", create: true }],
         verified: [{ attribute: "employeeNumber", source: true }],
         scopes: [],
       }),
     );
 
     expect(next.verified.employeeNumber).toBe(true);
+  });
+
+  it("says the new attribute is optional, so it may never be collected", () => {
+    const next = value(
+      mapClaim(seeded(), { attribute: "departmentName", claim: "department", create: true }),
+    );
+
+    expect(claimNotes(next, VERIFIED_FLAG)).toEqual([
+      "departmentName is a new optional attribute, so a user the provider sends no department for can sign up without it and may never be asked for it.",
+    ]);
   });
 
   it("refuses to create an attribute the schema already has", () => {

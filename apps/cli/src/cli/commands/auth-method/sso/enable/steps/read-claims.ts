@@ -67,7 +67,7 @@ export class ReadClaims extends WizardStep<
       };
     }
     const mapping = claimsOrRefuse(
-      applyRequest(seedMapping(plain, needs.target.schema), claimRequest),
+      applyRequest(seedMapping(plain, needs.target.schema, claimRequest.scopes), claimRequest),
     );
     const claims = choiceOf(mapping, VERIFIED_FLAG);
     for (const note of claims.notes) {
