@@ -51,3 +51,4 @@ def before_add_examples(ctx, examples):
     # token is a made-up string, and it does not pass through `map_case`.
     for case in examples:
         _without_page_token(case)
+# timing probe
