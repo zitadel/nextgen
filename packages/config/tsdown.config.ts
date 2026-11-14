@@ -2,6 +2,7 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
+    "application-presets": "src/application-presets.ts",
     "branding-contrast": "src/branding-contrast.ts",
     "css-color": "src/css-color.ts",
     "branding-url": "src/branding-url.ts",
