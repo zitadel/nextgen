@@ -1,7 +1,6 @@
 import { type Parsed, validated } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   type ClaimChoice,
   type Connection,
@@ -394,8 +393,8 @@ export function parseClaimName(value: string): Parsed<string> {
  *
  * @param state - What is mapped so far.
  * @remarks
- * The property that uses the claim was read from a file, and the refusal is
- * drawn as the person types, so its name is escaped for the terminal.
+ * The property that uses the claim was read from a file, so the refusal carries
+ * its name as it is; whoever draws the refusal escapes it for the terminal.
  *
  * @param value - What was typed.
  * @returns The claim, or what is wrong with it, including what already uses it.
@@ -410,9 +409,7 @@ export function parseUnusedClaim(state: MappingState, value: string): Parsed<str
   })?.[0];
   return holder === undefined
     ? claim
-    : refuse(
-        `${claim.value} already fills ${escapeControlCharacters(holder, { keepLayout: false })}: a claim fills one property.`,
-      );
+    : refuse(`${claim.value} already fills ${holder}: a claim fills one property.`);
 }
 
 /**
@@ -435,7 +432,7 @@ export function parseScopeList(value: string): Parsed<readonly string[]> {
   return invalid === undefined
     ? ok(union(typed))
     : refuse(
-        `${escapeControlCharacters(invalid, { keepLayout: false })} is not a valid scope: a scope is printable ASCII without quotes or backslashes.`,
+        `${invalid} is not a valid scope: a scope is printable ASCII without quotes or backslashes.`,
       );
 }
 
@@ -660,26 +657,6 @@ export function parseNewAttributeName(value: string, taken: readonly string[]): 
     return refuse(`"${name}" is a name every object already has, so it cannot be an attribute.`);
   }
   return taken.includes(name) ? refuse(`"${name}" is already a user attribute.`) : ok(name);
-}
-
-/**
- * The label the login form shows for an attribute nobody has written text for:
- * the name split at capitals and underscores, in sentence case.
- *
- * @remarks
- * The login component does the same (`humaniseFieldName` in
- * `@zitadel/components`).
- *
- * @param name - The attribute's name.
- * @returns The label.
- */
-export function fieldLabelFor(name: string): string {
-  const words = name
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_.-]+/g, " ")
-    .trim()
-    .toLowerCase();
-  return words === "" ? words : `${words[0]?.toUpperCase()}${words.slice(1)}`;
 }
 
 /**

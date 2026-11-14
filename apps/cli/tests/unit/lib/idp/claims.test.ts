@@ -9,7 +9,6 @@ import {
   claimNotes,
   claimRequestFromFlags,
   claimsOrRefuse,
-  fieldLabelFor,
   type MappingState,
   mapClaim,
   parseClaimEntry,
@@ -541,11 +540,11 @@ describe("parseUnusedClaim", () => {
     );
   });
 
-  it("spells out a control character in the property that uses it", () => {
+  it("carries the property that uses it as it is, for whoever draws it to escape", () => {
     const state = { ...seeded(), mapping: { "bad\u001b[2J": "employee_id" } };
 
     expect(problem(parseUnusedClaim(state, "employee_id"))).toBe(
-      "employee_id already fills bad\\x1b[2J: a claim fills one property.",
+      "employee_id already fills bad\u001b[2J: a claim fills one property.",
     );
   });
 
@@ -653,19 +652,6 @@ describe("mapClaim with create", () => {
     });
 
     expect(namesOf(value(parsed).created)).toEqual(["employeeNumber"]);
-  });
-});
-
-describe("fieldLabelFor", () => {
-  it.each([
-    ["employeeNumber", "Employee number"],
-    ["staff_no", "Staff no"],
-    ["email", "Email"],
-    ["dateOfBirth", "Date of birth"],
-    ["address2Line", "Address2 line"],
-    ["x", "X"],
-  ])("labels %s as %s, as the login form does", (name, label) => {
-    expect(fieldLabelFor(name)).toBe(label);
   });
 });
 

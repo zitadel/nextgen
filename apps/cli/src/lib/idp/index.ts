@@ -24,12 +24,6 @@
 
 export { callbackUriFor } from "./callback";
 export {
-  type AddedClaim,
-  ClaimQuestions,
-  type ClaimQuestionsRun,
-  claimTable,
-} from "./claim-questions";
-export {
   applyRequest,
   asksForClaims,
   attributesOf,
@@ -44,7 +38,6 @@ export {
   claimNotes,
   claimRequestFromFlags,
   claimsOrRefuse,
-  fieldLabelFor,
   type MappingState,
   mapClaim,
   NO_CLAIM_REQUEST,
