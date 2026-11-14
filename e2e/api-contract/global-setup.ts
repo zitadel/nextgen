@@ -2,22 +2,14 @@ import { appendFile, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { startLocalZitadel, type LocalZitadel } from "@zitadel/testing";
 import type { TestProject } from "vitest/node";
 
 import { Baseline, BaselineUpdate } from "./src/baseline";
-import { Credentials } from "./src/credentials";
+import { API_PREFIX, LocalInstances } from "./src/instances";
 import { Lane, type FamilyRun } from "./src/lane";
 import { Schemathesis } from "./src/schemathesis";
 import { OpenApiSpec } from "./src/spec";
 import { ContractSummary } from "./src/summary";
-
-/**
- * Where the resource API lives on a deployment's host (ADR 077). The served
- * spec states it as its `servers` URL; the lane asserts the two agree, as the
- * Go side does for its own copy of this constant.
- */
-const API_PREFIX = "/api/v1";
 
 const workspaceRoot = join(import.meta.dirname, "..", "..");
 
@@ -48,53 +40,46 @@ async function publish(summary: ContractSummary): Promise<void> {
 }
 
 /**
- * Boots a real instance of this working tree's server, fetches the spec it
- * serves, and runs Schemathesis against it once for each family of operations.
- * Testing the spec the binary serves, and not the YAML beside it, is the point:
- * it is the contract a customer's client reads, and it cannot drift from the
- * server under test.
+ * Boots a real instance of this working tree's server to fetch the spec it
+ * serves, then runs Schemathesis against it once for each family of
+ * operations, every container on an instance of its own. Testing the spec the
+ * binary serves, and not the YAML beside it, is the point: it is the contract a
+ * customer's client reads, and it cannot drift from the server under test.
  */
 export default async function setup({ provide }: TestProject): Promise<() => Promise<void>> {
   const workDir = await mkdtemp(join(tmpdir(), "api-contract-"));
   // Schemathesis's container user must be able to reach the folders below it.
   await chmod(workDir, 0o755);
-  console.info("[api-contract] booting an instance");
-  let zitadel: LocalZitadel;
-  try {
-    zitadel = await startLocalZitadel({
-      serverBinary:
-        process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
-    });
-  } catch (error) {
-    await rm(workDir, { recursive: true, force: true });
-    throw error;
-  }
-
   const teardown = async (): Promise<void> => {
-    try {
-      await zitadel.stop();
-    } finally {
-      await rm(workDir, { recursive: true, force: true });
-    }
+    await rm(workDir, { recursive: true, force: true });
   };
 
   try {
-    const baseUrl = `${zitadel.handle.baseUrl.replace(/\/$/, "")}${API_PREFIX}`;
-    const response = await fetch(`${baseUrl}/openapi.json`);
-    if (!response.ok) {
-      throw new Error(`GET ${baseUrl}/openapi.json answered ${String(response.status)}`);
+    console.info("[api-contract] booting an instance to read the spec");
+    const instances = new LocalInstances(
+      process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
+    );
+    const probe = await instances.start();
+    let specText: string;
+    try {
+      const response = await fetch(`${probe.baseUrl}/openapi.json`);
+      if (!response.ok) {
+        throw new Error(`GET ${probe.baseUrl}/openapi.json answered ${String(response.status)}`);
+      }
+      specText = await response.text();
+    } finally {
+      await probe.stop();
     }
-    const specText = await response.text();
     const spec = OpenApiSpec.parse(specText);
     if (spec.prefix !== API_PREFIX) {
       throw new Error(`the served spec's servers URL is ${String(spec.prefix)}, not ${API_PREFIX}`);
     }
+    instances.useSpec(spec);
 
     const runs = await new Lane({
       spec,
       specText,
-      baseUrl,
-      credentials: new Credentials(zitadel, spec, baseUrl),
+      instances,
       runner: new Schemathesis(),
       workDir,
       artifactsDir: join(import.meta.dirname, "test-output", "schemathesis"),

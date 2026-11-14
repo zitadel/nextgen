@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { compare } from "./order";
 import { CHECKS, exemptionsFor, refusalsFor } from "./checks";
-import type { Credential, Credentials } from "./credentials";
+import type { Credential } from "./credentials";
 import type { Accounting, Failure } from "./report";
 import type { SchemathesisInput, SchemathesisRun } from "./schemathesis";
 import { FAMILIES, type Family, type OpenApiSpec } from "./spec";
@@ -82,12 +82,25 @@ export interface Runner {
   run(input: SchemathesisInput): Promise<SchemathesisRun>;
 }
 
+/** One booted server a single Schemathesis run is made against, and the credentials it answers to. */
+export interface Instance {
+  /** The resource API's base URL on this instance. */
+  baseUrl: string;
+  credentialFor(family: Family): Promise<Credential>;
+  stop(): Promise<void>;
+}
+
+/** Boots instances. Every call returns a server and database nothing else touches. */
+export interface Instances {
+  start(): Promise<Instance>;
+}
+
 export interface LaneInput {
   spec: OpenApiSpec;
   /** The spec exactly as the server served it. */
   specText: string;
-  baseUrl: string;
-  credentials: Credentials;
+  /** Starts the instances the runs are made against, one for each run. */
+  instances: Instances;
   runner: Runner;
   /** A scratch folder; each family works in a folder of its own inside it. */
   workDir: string;
@@ -115,22 +128,14 @@ export class Lane {
   }
 
   /**
-   * Runs every family at the same time. They share the instance but not state:
-   * each has credentials and a user of its own, and the operations of one
-   * family are the ones no other family calls.
+   * Runs every family at the same time. Each container runs against an
+   * instance of its own, so what one run creates, changes or deletes can never
+   * be seen by another, however many there are.
    */
   async run(): Promise<FamilyRun[]> {
-    // Credentials are minted one at a time: two sessions seeded at once would
-    // share the instance's seeding helper.
-    const credentials = new Map<Family, Credential>();
-    for (const family of FAMILIES) {
-      if (this.input.spec.operationsOf(family).length > 0) {
-        credentials.set(family, await this.input.credentials.forFamily(family));
-      }
-    }
     const runs = await allSettled(
       FAMILIES.map((family) => {
-        return this.runFamily(family, credentials.get(family));
+        return this.runFamily(family);
       }),
     );
     return runs.filter((run): run is FamilyRun => {
@@ -138,12 +143,9 @@ export class Lane {
     });
   }
 
-  private async runFamily(
-    family: Family,
-    credential: Credential | undefined,
-  ): Promise<FamilyRun | undefined> {
+  private async runFamily(family: Family): Promise<FamilyRun | undefined> {
     const operations = this.input.spec.operationsOf(family);
-    if (operations.length === 0 || credential === undefined) {
+    if (operations.length === 0) {
       return undefined;
     }
     this.input.log(`${family}: ${String(operations.length)} operations`);
@@ -152,10 +154,7 @@ export class Lane {
       return operation.id;
     });
     const shared = {
-      baseUrl: this.input.baseUrl,
       spec: this.input.specText,
-      headers: credential.headers,
-      schemes: credential.schemes,
       checks: CHECKS,
       exemptions: exemptionsFor(operations),
       refusals: refusalsFor(operations),
@@ -176,14 +175,23 @@ export class Lane {
           ];
     const runs = await allSettled(
       parts.map(async (part) => {
-        const run = await this.input.runner.run({
-          ...shared,
-          workDir: join(this.input.workDir, family, part.name),
-          operationIds: part.operationIds,
-          phases: part.phases,
-        });
-        await this.keep(join(family, part.name), run);
-        return { part, run };
+        const instance = await this.input.instances.start();
+        try {
+          const credential = await instance.credentialFor(family);
+          const run = await this.input.runner.run({
+            ...shared,
+            baseUrl: instance.baseUrl,
+            headers: credential.headers,
+            schemes: credential.schemes,
+            workDir: join(this.input.workDir, family, part.name),
+            operationIds: part.operationIds,
+            phases: part.phases,
+          });
+          await this.keep(join(family, part.name), run);
+          return { part, run };
+        } finally {
+          await instance.stop();
+        }
       }),
     );
     this.input.log(`${family}: done in ${String(Math.round((Date.now() - started) / 1000))}s`);

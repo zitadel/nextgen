@@ -48,12 +48,14 @@ Never add a line to hide a failure you introduced. Fix it, or fix the spec.
 
 A baseline is only worth anything if a run repeats.
 
-- Which operations fail depends on how many containers hit the server at once,
-  because a few operations share server state. `API_CONTRACT_SHARDS` (default 4,
-  at most the core count) sets the slices of a big family and
-  `API_CONTRACT_WORKERS` (default 1) the requests in flight inside one run.
-  The baseline is only valid for the defaults; with more of either, expect
-  failures the baseline does not list.
+- Every Schemathesis container runs against a server and database of its own
+  (`src/instances.ts`), so slices never see each other's data and
+  `API_CONTRACT_SHARDS` (default 4, at most the core count) can change without
+  changing which operations fail. Keep it that way: a new run must start its own
+  instance, never share one.
+- `API_CONTRACT_WORKERS` (default 1) is the requests in flight inside one run, and
+  they do share that run's instance, so with more than 1 expect failures the
+  baseline does not list.
 - The Schemathesis release and the seed are pinned in `src/schemathesis.ts` (release) and `src/command.ts` (seed).
   Bumping the release adds checks, so regenerate the baseline in the same
   change and say so.
