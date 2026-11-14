@@ -1,17 +1,17 @@
-import { describe, expect, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
-import {
-  afterInstallScriptFor,
-  installDependenciesForSetup,
-  type SetupInstallInput,
-} from "@/cli/commands/setup/steps/install-dependencies";
+import type { SetupFlags } from "@/cli/commands/setup";
+import { InstallDependencies } from "@/cli/commands/setup/steps/install-dependencies";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { installLogSink } from "@/lib/log";
 import { createOrca } from "@/lib/orca";
 import type { PackageCommand, runPackageCommand } from "@/lib/package-manager";
+import type { Suggest } from "@/lib/suggestion";
+import { Ui } from "@/lib/ui";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
+import { recordLog, type Said } from "@tests/helpers/log";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { takeReportedWarnings } from "@/lib/warnings";
@@ -133,20 +133,23 @@ function optionsOf(run: ReturnType<typeof aRunner>, display: string) {
 }
 
 /**
- * A stand-in for the command's `this.ui.task`: it runs the work and remembers
- * the label it was given and the line the step settled on.
- *
- * @param steps - Where the labels are kept, in the order they were said.
- * @returns The task.
+ * What the run is given besides the project's files.
  */
-function recordingTask(steps: string[]): SetupInstallInput["task"] {
-  return async (label, work, done) => {
-    steps.push(label);
-    const result = await work();
-    steps.push(done?.(result) ?? label);
-    return result;
-  };
-}
+type InstallInput = Readonly<{
+  cwd: string;
+  cwdFlag?: string;
+  depsAdded: ReadonlyArray<string>;
+  dryRun: boolean;
+  env: NodeJS.ProcessEnv;
+  issuer: string;
+  json: boolean;
+  suggest: Suggest;
+  scaffoldedFramework: boolean;
+  framework: string;
+  skipInstall: boolean;
+  signal: AbortSignal;
+  run?: typeof runPackageCommand;
+}>;
 
 /**
  * Setup's install input for CLI 1.2.3, having added the Next.js SDK to the
@@ -155,7 +158,7 @@ function recordingTask(steps: string[]): SetupInstallInput["task"] {
  * @param overrides - What the input differs in from the default.
  * @returns The input.
  */
-function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
+function anInstallInput(overrides: Partial<InstallInput> = {}): InstallInput {
   return {
     cwd: "",
     depsAdded: ["@zitadel/sdk-next"],
@@ -165,12 +168,68 @@ function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstal
     json: true,
     suggest: SUGGEST,
     scaffoldedFramework: false,
+    framework: "next",
     skipInstall: false,
     signal: new AbortController().signal,
-    task: recordingTask([]),
     ...overrides,
   };
 }
+
+/**
+ * Runs setup's install step for `input`.
+ *
+ * @param input - What the run knows and how it is run.
+ * @returns What installing did, and what the reader runs next.
+ */
+async function installWith(input: InstallInput) {
+  const { installOutcome } = await new InstallDependencies({
+    cwd: input.cwd,
+    dryRun: input.dryRun,
+    env: input.env,
+    isJson: input.json,
+    signal: input.signal,
+    suggest: input.suggest,
+    ui: new Ui({ interactive: false, force: false }),
+    ...(input.run === undefined ? {} : { run: input.run }),
+  }).run({
+    flags: {
+      ...(input.cwdFlag === undefined ? {} : { cwd: input.cwdFlag }),
+      skipInstall: input.skipInstall,
+    } as SetupFlags,
+    orca: createOrca(),
+    app: { framework: input.framework, devPort: 3000 },
+    patched: {
+      dryRun: input.dryRun,
+      files: [],
+      filesWritten: [],
+      filesSkipped: [],
+      depsAdded: input.depsAdded,
+    },
+    scaffoldedFramework: input.scaffoldedFramework,
+    issuer: input.issuer,
+  });
+  return installOutcome;
+}
+
+/**
+ * The steps a run narrated: what it began and how it ended, in order.
+ *
+ * @param said - Everything the run said.
+ * @returns The lines that open and close a step.
+ */
+function stepsOf(said: ReadonlyArray<Said>): string[] {
+  return said
+    .filter(({ level }) => {
+      return level === "start" || level === "done";
+    })
+    .map(({ text }) => {
+      return text;
+    });
+}
+
+beforeEach(({ onTestFinished }) => {
+  onTestFinished(installLogSink(() => {}));
+});
 
 /**
  * The box's actions as one text, each command after its prose.
@@ -178,7 +237,7 @@ function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstal
  * @param actions - The box's actions.
  * @returns The text.
  */
-function textOf(actions: BoxAction[]): string {
+function textOf(actions: ReadonlyArray<BoxAction>): string {
   return actions
     .map((action) => {
       return [action.text, action.command].filter(Boolean).join(" ");
@@ -186,40 +245,36 @@ function textOf(actions: BoxAction[]): string {
     .join("\n");
 }
 
-describe("installDependenciesForSetup", () => {
+describe("InstallDependencies", () => {
   describe("when setup added a dependency", () => {
     it("reports the install as a step of the command's own chain", async ({ dir }) => {
       await aProject(dir);
-      const steps: string[] = [];
+      const log = recordLog();
 
-      await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner(), task: recordingTask(steps) }),
-      );
+      await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
+      log.stop();
 
-      expect(steps).toEqual(["Installing dependencies with npm install", "Installed dependencies"]);
+      expect(stepsOf(log.said)).toEqual([
+        "Installing dependencies with npm install",
+        "Installed dependencies",
+      ]);
     });
 
     it("reports no step when there is nothing to install", async ({ dir }) => {
       await aProject(dir);
-      const steps: string[] = [];
+      const log = recordLog();
 
-      await installDependenciesForSetup(
-        anInstallInput({
-          cwd: dir,
-          run: aRunner(),
-          skipInstall: true,
-          task: recordingTask(steps),
-        }),
-      );
+      await installWith(anInstallInput({ cwd: dir, run: aRunner(), skipInstall: true }));
+      log.stop();
 
-      expect(steps).toEqual([]);
+      expect(stepsOf(log.said)).toEqual([]);
     });
 
     it("runs the install once", async ({ dir }) => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, run }));
+      await installWith(anInstallInput({ cwd: dir, run }));
 
       expect(run).toHaveBeenCalledOnce();
     });
@@ -228,7 +283,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, run }));
+      await installWith(anInstallInput({ cwd: dir, run }));
 
       expect(run.mock.calls[0]?.[0]).toMatchObject({ display: "npm install" });
     });
@@ -237,7 +292,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, run }));
+      await installWith(anInstallInput({ cwd: dir, run }));
 
       expect(run.mock.calls[0]?.[1]).toMatchObject({ cwd: dir, redirectStdoutToStderr: true });
     });
@@ -245,9 +300,7 @@ describe("installDependenciesForSetup", () => {
     it("reports the install completed", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       expect(result.install).toMatchObject({
         status: "completed",
@@ -266,9 +319,7 @@ describe("installDependenciesForSetup", () => {
     ])("says %s in the next actions", async (said, { dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       expect(result.nextActions.join("\n")).toContain(said);
     });
@@ -276,9 +327,7 @@ describe("installDependenciesForSetup", () => {
     it("does not send the reader to the issuer's root", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       expect(result.nextActions.join("\n")).not.toContain(
         "Start your project: npm run dev (then open http://localhost:3000)",
@@ -288,9 +337,7 @@ describe("installDependenciesForSetup", () => {
     it("suggests starting the project, then previewing a deploy", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
@@ -300,9 +347,7 @@ describe("installDependenciesForSetup", () => {
     it("ends the box on one breadcrumb to status", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       // One sentence per fact: the step that introduces a command says when to
       // run it, and where customizing is written up is a sentence of its own
@@ -321,9 +366,7 @@ describe("installDependenciesForSetup", () => {
       async (said, { dir }) => {
         await aProject(dir);
 
-        const result = await installDependenciesForSetup(
-          anInstallInput({ cwd: dir, run: aRunner() }),
-        );
+        const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
         expect(textOf(result.boxActions)).toContain(said);
       },
@@ -334,9 +377,7 @@ describe("installDependenciesForSetup", () => {
       async (left, { dir }) => {
         await aProject(dir);
 
-        const result = await installDependenciesForSetup(
-          anInstallInput({ cwd: dir, run: aRunner() }),
-        );
+        const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
         expect(textOf(result.boxActions)).not.toContain(left);
       },
@@ -345,9 +386,7 @@ describe("installDependenciesForSetup", () => {
     it("quotes the box's verify mission verbatim in the next actions", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner() }));
 
       expect(result.nextActions).toContain(
         result.boxActions.find((action) => {
@@ -362,7 +401,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir, { packageManager: "pnpm@10.33.2" });
       const run = aRunner();
 
-      await installDependenciesForSetup(
+      await installWith(
         anInstallInput({ cwd: dir, depsAdded: [], scaffoldedFramework: true, run }),
       );
 
@@ -372,7 +411,7 @@ describe("installDependenciesForSetup", () => {
     it("suggests starting the project with pnpm", async ({ dir }) => {
       await aProject(dir, { packageManager: "pnpm@10.33.2" });
 
-      const result = await installDependenciesForSetup(
+      const result = await installWith(
         anInstallInput({ cwd: dir, depsAdded: [], scaffoldedFramework: true, run: aRunner() }),
       );
 
@@ -385,7 +424,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, run, ...skip }));
+      await installWith(anInstallInput({ cwd: dir, run, ...skip }));
 
       expect(run).not.toHaveBeenCalled();
     });
@@ -395,9 +434,7 @@ describe("installDependenciesForSetup", () => {
       async ([, skip, reported], { dir }) => {
         await aProject(dir);
 
-        const result = await installDependenciesForSetup(
-          anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
-        );
+        const result = await installWith(anInstallInput({ cwd: dir, run: aRunner(), ...skip }));
 
         expect(result.install).toMatchObject(reported);
       },
@@ -406,9 +443,7 @@ describe("installDependenciesForSetup", () => {
     it.for(SKIPS)("suggests installing first with %s", async ([, skip], { dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, run: aRunner(), ...skip }));
 
       expect(result.nextCommands).toEqual([
         "npm install",
@@ -421,7 +456,7 @@ describe("installDependenciesForSetup", () => {
     it("keeps the install step first in the box", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
+      const result = await installWith(
         anInstallInput({ cwd: dir, run: aRunner(), skipInstall: true }),
       );
 
@@ -436,7 +471,7 @@ describe("installDependenciesForSetup", () => {
     it("keeps the install step first in the next actions", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
+      const result = await installWith(
         anInstallInput({ cwd: dir, run: aRunner(), skipInstall: true }),
       );
 
@@ -448,7 +483,7 @@ describe("installDependenciesForSetup", () => {
     it("names the directory in the suggested install and dev commands", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
+      const result = await installWith(
         anInstallInput({ cwd: dir, cwdFlag: CWD_FLAG, run: aRunner(), skipInstall: true }),
       );
 
@@ -462,7 +497,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, cwdFlag: CWD_FLAG, run }));
+      await installWith(anInstallInput({ cwd: dir, cwdFlag: CWD_FLAG, run }));
 
       expect(run.mock.calls[0]?.[0]).toMatchObject({ display: "npm install" });
     });
@@ -473,7 +508,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(anInstallInput({ cwd: dir, depsAdded: [], run }));
+      await installWith(anInstallInput({ cwd: dir, depsAdded: [], run }));
 
       expect(run).not.toHaveBeenCalled();
     });
@@ -481,9 +516,7 @@ describe("installDependenciesForSetup", () => {
     it("reports the install not needed", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }));
 
       expect(result.install).toMatchObject({ status: "not-needed" });
     });
@@ -491,9 +524,7 @@ describe("installDependenciesForSetup", () => {
     it("suggests starting the project, then previewing a deploy", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }),
-      );
+      const result = await installWith(anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }));
 
       expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
@@ -504,32 +535,25 @@ describe("installDependenciesForSetup", () => {
     // and its raw mode keeps Ctrl-C from reaching the child.
     it("says a plain line first and runs no step around it", async ({ dir }) => {
       await aProject(dir);
-      const steps: string[] = [];
-      const said: string[] = [];
-      const restore = installLogSink((level, text) => {
-        said.push(`${level} ${text}`);
-      });
+      const log = recordLog();
 
-      await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, json: false, run: aRunner(), task: recordingTask(steps) }),
-      );
-      restore();
+      await installWith(anInstallInput({ cwd: dir, json: false, run: aRunner() }));
+      log.stop();
 
-      expect(steps).toEqual([]);
-      expect(said).toEqual([
-        "start Installing dependencies with npm install",
-        "done Installed dependencies",
+      expect(log.said).toEqual([
+        { level: "start", text: "Installing dependencies with npm install" },
+        { level: "done", text: "Installed dependencies" },
       ]);
     });
   });
 
   describe("when the new app has an after-install script", () => {
     /** The input for a new app whose scaffolder names `generate-routes`. */
-    function aNewAppInput(dir: string, overrides: Partial<SetupInstallInput> = {}) {
+    function aNewAppInput(dir: string, overrides: Partial<InstallInput> = {}) {
       return anInstallInput({
         cwd: dir,
         scaffoldedFramework: true,
-        afterInstallScript: "generate-routes",
+        framework: "tanstack-start",
         ...overrides,
       });
     }
@@ -538,7 +562,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir, { packageManager: "pnpm@10.33.2" });
       const run = aRunner();
 
-      await installDependenciesForSetup(aNewAppInput(dir, { run }));
+      await installWith(aNewAppInput(dir, { run }));
 
       expect(
         run.mock.calls.map(([command]) => {
@@ -551,7 +575,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(aNewAppInput(dir, { run }));
+      await installWith(aNewAppInput(dir, { run }));
 
       expect(optionsOf(run, "npm run generate-routes")).toMatchObject({
         cwd: dir,
@@ -561,13 +585,12 @@ describe("installDependenciesForSetup", () => {
 
     it("reports it as a step of the command's own chain", async ({ dir }) => {
       await aProject(dir);
-      const steps: string[] = [];
+      const log = recordLog();
 
-      await installDependenciesForSetup(
-        aNewAppInput(dir, { run: aRunner(), task: recordingTask(steps) }),
-      );
+      await installWith(aNewAppInput(dir, { run: aRunner() }));
+      log.stop();
 
-      expect(steps.slice(2)).toEqual([
+      expect(stepsOf(log.said).slice(2)).toEqual([
         "Running npm run generate-routes",
         "Ran npm run generate-routes",
       ]);
@@ -577,22 +600,22 @@ describe("installDependenciesForSetup", () => {
     // install's, which writes to the terminal itself.
     it("reports it as a step without --json too", async ({ dir }) => {
       await aProject(dir);
-      const steps: string[] = [];
-      const restore = installLogSink(() => {});
+      const log = recordLog();
 
-      await installDependenciesForSetup(
-        aNewAppInput(dir, { json: false, run: aRunner(), task: recordingTask(steps) }),
-      );
-      restore();
+      await installWith(aNewAppInput(dir, { json: false, run: aRunner() }));
+      log.stop();
 
-      expect(steps).toEqual(["Running npm run generate-routes", "Ran npm run generate-routes"]);
+      expect(stepsOf(log.said).slice(2)).toEqual([
+        "Running npm run generate-routes",
+        "Ran npm run generate-routes",
+      ]);
     });
 
     it.for(SKIPS)("does not run it with %s", async ([, skip], { dir }) => {
       await aProject(dir);
       const run = aRunner();
 
-      await installDependenciesForSetup(aNewAppInput(dir, { run, ...skip }));
+      await installWith(aNewAppInput(dir, { run, ...skip }));
 
       expect(run).not.toHaveBeenCalled();
     });
@@ -600,9 +623,7 @@ describe("installDependenciesForSetup", () => {
     it("still reports the install completed when it fails", async ({ dir }) => {
       await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }),
-      );
+      const result = await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
       takeReportedWarnings();
 
       expect(result.install).toMatchObject({ status: "completed" });
@@ -612,7 +633,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       takeReportedWarnings();
 
-      await installDependenciesForSetup(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
+      await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall() }));
 
       expect(takeReportedWarnings()).toEqual([
         "npm run generate-routes failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: npm run generate-routes failed with exit 1",
@@ -623,7 +644,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
       takeReportedWarnings();
 
-      await installDependenciesForSetup(
+      await installWith(
         aNewAppInput(dir, { cwdFlag: CWD_FLAG, run: aRunnerFailingAfterInstall() }),
       );
 
@@ -637,9 +658,7 @@ describe("installDependenciesForSetup", () => {
         return `line ${String(line + 1)}`;
       }).join("\n");
 
-      await installDependenciesForSetup(
-        aNewAppInput(dir, { run: aRunnerFailingAfterInstall(`${output}\n`) }),
-      );
+      await installWith(aNewAppInput(dir, { run: aRunnerFailingAfterInstall(`${output}\n`) }));
 
       expect(takeReportedWarnings()[0]?.split("\n").slice(1)).toEqual(
         output.split("\n").slice(-20),
@@ -654,7 +673,7 @@ describe("installDependenciesForSetup", () => {
       const controller = new AbortController();
 
       const error = await rejectionOf(() => {
-        return installDependenciesForSetup(
+        return installWith(
           aNewAppInput(dir, {
             run: aRunnerInterruptedAfterInstall(controller),
             signal: controller.signal,
@@ -667,17 +686,50 @@ describe("installDependenciesForSetup", () => {
     });
   });
 
-  describe("afterInstallScriptFor", () => {
-    it("names the scaffolder's script for an app setup scaffolded", () => {
-      expect(afterInstallScriptFor(createOrca(), "tanstack-start", true)).toBe("generate-routes");
+  describe("which after-install script it runs", () => {
+    it("names the scaffolder's script for an app setup scaffolded", async ({ dir }) => {
+      await aProject(dir);
+      const run = aRunner();
+
+      await installWith(
+        anInstallInput({ cwd: dir, framework: "tanstack-start", scaffoldedFramework: true, run }),
+      );
+
+      expect(
+        run.mock.calls.map(([command]) => {
+          return command.display;
+        }),
+      ).toEqual(["npm install", "npm run generate-routes"]);
     });
 
-    it("names none for an app that was already there", () => {
-      expect(afterInstallScriptFor(createOrca(), "tanstack-start", false)).toBeUndefined();
+    it("names none for an app that was already there", async ({ dir }) => {
+      await aProject(dir);
+      const run = aRunner();
+
+      await installWith(
+        anInstallInput({ cwd: dir, framework: "tanstack-start", scaffoldedFramework: false, run }),
+      );
+
+      expect(
+        run.mock.calls.map(([command]) => {
+          return command.display;
+        }),
+      ).toEqual(["npm install"]);
     });
 
-    it("names none for a scaffolder without one", () => {
-      expect(afterInstallScriptFor(createOrca(), "next", true)).toBeUndefined();
+    it("names none for a scaffolder without one", async ({ dir }) => {
+      await aProject(dir);
+      const run = aRunner();
+
+      await installWith(
+        anInstallInput({ cwd: dir, framework: "next", scaffoldedFramework: true, run }),
+      );
+
+      expect(
+        run.mock.calls.map(([command]) => {
+          return command.display;
+        }),
+      ).toEqual(["npm install"]);
     });
   });
 
@@ -686,7 +738,7 @@ describe("installDependenciesForSetup", () => {
       await aProject(dir);
 
       const error = await rejectionOf(() => {
-        return installDependenciesForSetup(anInstallInput({ cwd: dir, run: aFailingRunner() }));
+        return installWith(anInstallInput({ cwd: dir, run: aFailingRunner() }));
       });
 
       expect(error).toBeInstanceOf(ZitadelError);

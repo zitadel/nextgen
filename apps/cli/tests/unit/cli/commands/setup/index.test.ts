@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { parseEnv } from "node:util";
 
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
@@ -25,16 +26,16 @@ vi.mock("@/lib/scaffold-manifest", async (importOriginal) => {
 
 import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
 
-import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "@/cli/commands/setup";
+import Setup, {
+  refuseUnusableFlags,
+  type SetupFlags,
+  type SetupFlagsToCheck,
+} from "@/cli/commands/setup";
 import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
-import {
-  readCredentialEnvFiles,
-  restoreCredentialEnvFiles,
-} from "@/cli/commands/setup/steps/patch-app";
-import { buildSummary } from "@/cli/commands/setup/steps/show-result";
-import { portInUseWarning } from "@/cli/commands/setup/steps/settle-answers";
-import { localServerHostsPlatform } from "@/cli/commands/setup/steps/claim-ownership";
-import { ssoFromFlags } from "@/cli/commands/setup/steps/read-sso-flags";
+import { PatchApp } from "@/cli/commands/setup/steps/patch-app";
+import { SettleAnswers } from "@/cli/commands/setup/steps/settle-answers";
+import { ClaimOwnership } from "@/cli/commands/setup/steps/claim-ownership";
+import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -46,11 +47,15 @@ import {
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { createOrca } from "@/lib/orca";
 import { readZitadelSecret } from "@/lib/project";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
+import { Ui } from "@/lib/ui";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
+import { aPatchContext } from "@tests/helpers/patch-context";
+import { recordLog } from "@tests/helpers/log";
 import { it, type Serve } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -3317,169 +3322,122 @@ describe("Setup.run", () => {
   });
 });
 
-describe("readCredentialEnvFiles", () => {
-  it("refuses a file it cannot open rather than reading it as absent, which a rollback would delete", async ({
-    dir,
-  }) => {
-    await mkdir(join(dir, ".env.development.local"));
+/**
+ * The project setup created, as the patch step reads it.
+ */
+const CREATED_PROJECT = { ...aPatchContext("next").project, name: "demo" };
 
-    const error = await rejectionOf(() => {
-      return readCredentialEnvFiles(dir);
-    });
-
-    expect(error).toBeInstanceOf(Error);
-    expect(error).toMatchObject({ code: "EISDIR" });
+/**
+ * Reads the credential files of `dir` as setup's patch step does before it patches, without
+ * patching anything.
+ *
+ * @param dir - The project directory.
+ * @returns The step, and what it read.
+ */
+async function readingCredentialFiles(dir: string) {
+  const step = new PatchApp({
+    cwd: dir,
+    dryRun: false,
+    force: false,
+    ui: new Ui({ interactive: false, force: false }),
   });
-});
+  const log = recordLog();
+  try {
+    return {
+      step,
+      out: await step.run({
+        patcher: createOrca().patcherFor("next"),
+        patchContext: () => {
+          return aPatchContext("next");
+        },
+        framework: undefined,
+        project: CREATED_PROJECT,
+      }),
+    };
+  } finally {
+    log.stop();
+  }
+}
 
-describe("restoreCredentialEnvFiles", () => {
+describe("PatchApp", () => {
   beforeEach(() => {
     takeReportedWarnings();
   });
 
-  it("puts back a file that existed", async ({ dir }) => {
-    await write(dir, { ".env.local": "KEEP=1\n" });
-    const before = await readCredentialEnvFiles(dir);
-    await write(dir, { ".env.local": "KEEP=1\nZITADEL_PROJECT_ID=abandoned\n" });
-
-    await restoreCredentialEnvFiles(dir, before);
-
-    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("KEEP=1\n");
-  });
-
-  it("removes a file setup created", async ({ dir }) => {
-    const before = await readCredentialEnvFiles(dir);
-    await write(dir, { ".env.development.local": "ZITADEL_PROJECT_ID=abandoned\n" });
-
-    await restoreCredentialEnvFiles(dir, before);
-
-    expect(existsSync(join(dir, ".env.development.local"))).toBe(false);
-  });
-
-  describe("with a file it cannot restore", () => {
-    it("does not throw", async ({ dir }) => {
-      await mkdir(join(dir, ".env.local"));
+  describe("reading the credential files", () => {
+    it("refuses a file it cannot open rather than reading it as absent, which a rollback would delete", async ({
+      dir,
+    }) => {
+      await mkdir(join(dir, ".env.development.local"));
 
       const error = await rejectionOf(() => {
-        return restoreCredentialEnvFiles(dir, new Map([[".env.local", Buffer.from("KEEP=1\n")]]));
+        return readingCredentialFiles(dir);
       });
 
-      expect(error).toBeUndefined();
-    });
-
-    it("warns that it could not restore it", async ({ dir }) => {
-      await mkdir(join(dir, ".env.local"));
-
-      await restoreCredentialEnvFiles(dir, new Map([[".env.local", Buffer.from("KEEP=1\n")]]));
-
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("Could not restore .env.local"),
-      ]);
-    });
-  });
-});
-
-describe("buildSummary", () => {
-  const SUMMARY_INPUT = {
-    projectFacts: { framework: "next", typescript: true, packageManager: "npm" },
-    writtenRel: [],
-    depsAdded: [],
-    project: {
-      id: "proj_test",
-      name: "demo",
-      project_secret: "sk_proj_test",
-      preview_secret: "sk_proj_test_preview",
-      origins: [],
-      created_at: "2026-06-01T00:00:00.000Z",
-    },
-    server: "http://localhost:8080",
-    issuer: "http://localhost:3000",
-    scaffoldedFramework: false,
-    scaffoldedBesideFiles: false,
-    connections: [],
-    signIn: {
-      starts_with: "password",
-      methods: ["password", "passkey"],
-      fields: [
-        { name: "email", required: true },
-        { name: "givenName", required: false },
-      ],
-      password_min_length: 15,
-      providers: [],
-    },
-  } satisfies Parameters<typeof buildSummary>[0];
-
-  it.each([
-    {
-      situation: "a scaffold, without claiming the directory was empty",
-      scaffoldedBesideFiles: false,
-      value: "new project",
-    },
-    {
-      situation: "a scaffold --force put over files the directory already held",
-      scaffoldedBesideFiles: true,
-      value: "new project over existing files (--force)",
-    },
-  ])("describes $situation", ({ scaffoldedBesideFiles, value }) => {
-    const sections = buildSummary({
-      ...SUMMARY_INPUT,
-      scaffoldedFramework: true,
-      scaffoldedBesideFiles,
-    });
-
-    expect(sections).toContainEqual(
-      expect.objectContaining({
-        title: "Detected",
-        rows: expect.arrayContaining([{ label: "Scaffold", value }]),
-      }),
-    );
-  });
-
-  it("has no scaffold row for an app that already existed", () => {
-    const sections = buildSummary(SUMMARY_INPUT);
-
-    expect(sections).toContainEqual(
-      expect.objectContaining({
-        title: "Detected",
-        rows: expect.not.arrayContaining([expect.objectContaining({ label: "Scaffold" })]),
-      }),
-    );
-  });
-
-  it("says what sign-in enables and which registration fields are optional", () => {
-    const sections = buildSummary(SUMMARY_INPUT);
-
-    expect(sections).toContainEqual({
-      title: "Sign-in",
-      rows: [
-        { label: "Starts with", value: "password" },
-        { label: "Methods", value: "password, passkey" },
-        { label: "Registration", value: "email, givenName (optional)" },
-        { label: "Passwords", value: "at least 15 characters" },
-      ],
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toMatchObject({ code: "EISDIR" });
     });
   });
 
-  it("points at each customizable folder setup wrote, the password policy included", () => {
-    const sections = buildSummary({
-      ...SUMMARY_INPUT,
-      writtenRel: [
-        ".zitadel/schemas/default-human-user.json",
-        ".zitadel/flows/default-login.json",
-        ".zitadel/policies/auth.factor.password.set.json",
-      ],
+  describe("undoing the patch", () => {
+    it("puts back a file that existed", async ({ dir }) => {
+      await write(dir, { ".env.local": "KEEP=1\n" });
+      const { step, out } = await readingCredentialFiles(dir);
+      await write(dir, { ".env.local": "KEEP=1\nZITADEL_PROJECT_ID=abandoned\n" });
+
+      await step.undo(out);
+
+      expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("KEEP=1\n");
     });
 
-    expect(sections).toContainEqual(
-      expect.objectContaining({
-        title: "Customize",
-        rows: [
-          expect.objectContaining({ label: "User schema" }),
-          expect.objectContaining({ label: "Login flow" }),
-          expect.objectContaining({ label: "Password policy" }),
-        ],
-      }),
-    );
+    it("removes a file setup created", async ({ dir }) => {
+      const { step, out } = await readingCredentialFiles(dir);
+      await write(dir, { ".env.development.local": "ZITADEL_PROJECT_ID=abandoned\n" });
+
+      await step.undo(out);
+
+      expect(existsSync(join(dir, ".env.development.local"))).toBe(false);
+    });
+
+    it("removes the markers a rerun would be skipped on", async ({ dir }) => {
+      const { step, out } = await readingCredentialFiles(dir);
+      await write(dir, { "zitadel.json": "{}\n", ".zitadel/secret": "{}\n" });
+
+      await step.undo(out);
+
+      expect([
+        existsSync(join(dir, "zitadel.json")),
+        existsSync(join(dir, ".zitadel/secret")),
+      ]).toEqual([false, false]);
+    });
+
+    describe("with a file it cannot restore", () => {
+      it("does not throw", async ({ dir }) => {
+        await write(dir, { ".env.local": "KEEP=1\n" });
+        const { step, out } = await readingCredentialFiles(dir);
+        await rm(join(dir, ".env.local"));
+        await mkdir(join(dir, ".env.local"));
+
+        const error = await rejectionOf(() => {
+          return step.undo(out);
+        });
+
+        expect(error).toBeUndefined();
+      });
+
+      it("warns that it could not restore it", async ({ dir }) => {
+        await write(dir, { ".env.local": "KEEP=1\n" });
+        const { step, out } = await readingCredentialFiles(dir);
+        await rm(join(dir, ".env.local"));
+        await mkdir(join(dir, ".env.local"));
+
+        await step.undo(out);
+
+        expect(takeReportedWarnings()).toEqual([
+          expect.stringContaining("Could not restore .env.local"),
+        ]);
+      });
+    });
   });
 });
 
@@ -3704,27 +3662,66 @@ describe("refuseUnusableFlags", () => {
   });
 });
 
-describe("portInUseWarning", () => {
-  describe("when a later port is free", () => {
-    it("suggests setup on that port, from the run's directory", () => {
-      const warning = portInUseWarning(3000, 3001, aSuggest({ cwd: "app" }, "1.2.3"));
+describe("SettleAnswers", () => {
+  /**
+   * Settles the answers of a run that asks nothing, for an app on port 3000 that no flag moved.
+   *
+   * @param suggest - Renders the suggested command.
+   * @returns Once the step has said what it has to.
+   */
+  async function settleOnTakenPort3000(suggest = aSuggest()): Promise<void> {
+    await new SettleAnswers({ dryRun: false, nonInteractive: true, suggest }).run({
+      flags: {} as SetupFlags,
+      answers: {
+        server: "http://localhost:8080",
+        devPort: 3000,
+        preset: DEFAULT_SETUP_PRESET,
+        useCase: DEFAULT_SETUP_USE_CASE,
+        sso: [],
+      },
+    });
+  }
 
-      expect(warning).toContain("npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app");
+  beforeEach(() => {
+    takeReportedWarnings();
+  });
+
+  describe("when a later port is free", () => {
+    it("suggests setup on that port, from the run's directory", async ({ onTestFinished }) => {
+      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+      const next = vi.spyOn(LocalServer, "nextFreePort").mockResolvedValue(3001);
+      onTestFinished(() => {
+        taken.mockRestore();
+        next.mockRestore();
+      });
+
+      await settleOnTakenPort3000(aSuggest({ cwd: "app" }, "1.2.3"));
+
+      expect(takeReportedWarnings().join("\n")).toContain(
+        "npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app",
+      );
     });
   });
 
   describe("when the ports after the taken one are taken too", () => {
-    it("names only the flag, since a placeholder would run as a shell redirection", () => {
-      const warning = portInUseWarning(3000, undefined, aSuggest());
+    it("names only the flag, since a placeholder would run as a shell redirection", async ({
+      onTestFinished,
+    }) => {
+      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+      onTestFinished(() => {
+        taken.mockRestore();
+      });
 
-      expect(warning).toBe(
+      await settleOnTakenPort3000();
+
+      expect(takeReportedWarnings()).toEqual([
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
-      );
+      ]);
     });
   });
 });
 
-describe("localServerHostsPlatform", () => {
+describe("ClaimOwnership", () => {
   it.each([
     {
       situation: "a runtime document naming the platform project",
@@ -3759,9 +3756,32 @@ describe("localServerHostsPlatform", () => {
     async ({ answer, hosts }) => {
       server.use(http.get(`${LOCAL_SERVER}/console/runtime.json`, answer));
 
-      const hosting = await localServerHostsPlatform(LOCAL_SERVER);
+      const owned = await new ClaimOwnership({
+        cwd: join(tmpdir(), "zitadel-no-local-admin"),
+        dryRun: false,
+        signal: new AbortController().signal,
+        suggest: aSuggest(),
+        ui: new Ui({ interactive: false, force: false }),
+      }).run({
+        answers: {
+          server: LOCAL_SERVER,
+          devPort: 3000,
+          preset: DEFAULT_SETUP_PRESET,
+          useCase: DEFAULT_SETUP_USE_CASE,
+          sso: [],
+        },
+        project: {
+          id: "proj_local",
+          name: "app",
+          project_secret: "sk_proj_local",
+          preview_secret: "sk_proj_local_preview",
+          origins: [],
+          created_at: "2026-04-21T14:03:11.000Z",
+        },
+      });
+      takeReportedWarnings();
 
-      expect(hosting).toBe(hosts);
+      expect(owned.hostsPlatform).toBe(hosts);
     },
   );
 });
@@ -3867,9 +3887,26 @@ describe("setupRetryFlags", () => {
   });
 });
 
-describe("ssoFromFlags", () => {
+describe("ReadSsoFlags", () => {
   describe("with a custom provider described in part", () => {
-    const partial = { sso: "custom", ssoSlug: "acme-sso" };
+    const partial = { sso: "custom", ssoSlug: "acme-sso" } as SetupFlags;
+
+    /**
+     * Reads the `--sso` flags of a run that is, or is not, scripted.
+     *
+     * @param nonInteractive - Whether nothing can be asked.
+     * @returns The provider the command line asked for.
+     */
+    async function readingFlags(nonInteractive: boolean) {
+      return (
+        await new ReadSsoFlags({
+          ask,
+          dryRun: false,
+          nonInteractive,
+          suggest: aSuggest(),
+        }).run({ flags: partial })
+      ).ssoFromCommandLine;
+    }
 
     beforeEach(() => {
       vi.mocked(askCustomSettings).mockReset();
@@ -3883,7 +3920,7 @@ describe("ssoFromFlags", () => {
         scopes: "openid",
       });
 
-      const draft = await ssoFromFlags(partial, false, false, ask, aSuggest());
+      const draft = await readingFlags(false);
 
       expect(draft?.selection).toMatchObject({
         kind: "custom",
@@ -3899,7 +3936,7 @@ describe("ssoFromFlags", () => {
         scopes: "openid",
       });
 
-      await ssoFromFlags(partial, false, false, ask, aSuggest());
+      await readingFlags(false);
 
       expect(askCustomSettings).toHaveBeenCalledWith(
         expect.objectContaining({ slug: "acme-sso" }),
@@ -3910,7 +3947,7 @@ describe("ssoFromFlags", () => {
     describe("when nobody is there to answer", () => {
       it("refuses with E_VALIDATION", async () => {
         const error = await rejectionOf(() => {
-          return ssoFromFlags(partial, true, false, ask, aSuggest());
+          return readingFlags(true);
         });
 
         expect(error).toBeInstanceOf(ZitadelError);
@@ -3919,7 +3956,7 @@ describe("ssoFromFlags", () => {
 
       it("does not ask", async () => {
         await rejectionOf(() => {
-          return ssoFromFlags(partial, true, false, ask, aSuggest());
+          return readingFlags(true);
         });
 
         expect(askCustomSettings).not.toHaveBeenCalled();
