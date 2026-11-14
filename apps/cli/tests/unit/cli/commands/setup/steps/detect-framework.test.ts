@@ -1,28 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/local-server/server", async (importOriginal) => {
-  return {
-    ...(await importOriginal<object>()),
-    LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
-  };
-});
-
 import { isCancel, select } from "@clack/prompts";
 
-import { PickFrameworkPrompt } from "@/cli/commands/setup/steps/detect-framework";
+import type { SetupFlags } from "@/cli/commands/setup";
+import { DetectFramework } from "@/cli/commands/setup/steps/detect-framework";
 import { ZitadelError } from "@/lib/errors";
 import { asker } from "@/lib/input";
-import { LocalServer } from "@/lib/local-server/server";
+import { Ui } from "@/lib/ui";
+import { it } from "@tests/helpers/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-
-/**
- * The framework setup detected.
- */
-const FRAMEWORK = { id: "next", displayName: "Next.js" };
 
 /**
  * What a cancelled prompt answers.
@@ -30,45 +20,64 @@ const FRAMEWORK = { id: "next", displayName: "Next.js" };
 const CANCEL = Symbol("cancel");
 
 /**
- * How the wizard asks: interactively, without `--force`.
+ * How the wizard asks and draws: interactively, without `--force`.
  */
-const ask = asker({ interactive: true, force: false });
+const AUDIENCE = { interactive: true, force: false };
+
+/**
+ * The step, run in an empty directory, where nothing is detected and a framework
+ * has to be chosen.
+ *
+ * @param cwd - The empty directory.
+ * @returns The step's result.
+ */
+function detectIn(cwd: string) {
+  return new DetectFramework({
+    ask: asker(AUDIENCE),
+    cwd,
+    env: {},
+    force: false,
+    nonInteractive: false,
+    serverFlag: undefined,
+    ui: new Ui(AUDIENCE),
+  }).run({ flags: {} as SetupFlags });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
-  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
-  vi.mocked(LocalServer.isPortFree).mockResolvedValue(true);
 });
 
-describe("PickFrameworkPrompt", () => {
-  it("returns the selected framework id", async () => {
-    vi.mocked(select).mockResolvedValueOnce("next");
+describe("DetectFramework", () => {
+  describe("in an empty directory", () => {
+    it("scaffolds the framework that was selected", async ({ dir }) => {
+      vi.mocked(select).mockResolvedValueOnce("next");
 
-    const id = await new PickFrameworkPrompt().ask([FRAMEWORK], ask);
+      const result = await detectIn(dir);
 
-    expect(id).toBe("next");
-  });
-
-  it("asks which framework to scaffold", async () => {
-    vi.mocked(select).mockResolvedValueOnce("next");
-
-    await new PickFrameworkPrompt().ask([FRAMEWORK], ask);
-
-    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
-      "Which framework would you like to scaffold?",
-    );
-  });
-
-  it("refuses with E_CANCELLED on Ctrl-C", async () => {
-    vi.mocked(select).mockResolvedValueOnce(CANCEL);
-    vi.mocked(isCancel).mockReturnValueOnce(true);
-
-    const error = await rejectionOf(() => {
-      return new PickFrameworkPrompt().ask([FRAMEWORK], ask);
+      expect(result.found.app.framework).toBe("next");
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({ code: "E_CANCELLED" });
+    it("asks which framework to scaffold", async ({ dir }) => {
+      vi.mocked(select).mockResolvedValueOnce("next");
+
+      await detectIn(dir);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+        "Which framework would you like to scaffold?",
+      );
+    });
+
+    it("refuses with E_CANCELLED on Ctrl-C", async ({ dir }) => {
+      vi.mocked(select).mockResolvedValueOnce(CANCEL);
+      vi.mocked(isCancel).mockReturnValueOnce(true);
+
+      const error = await rejectionOf(() => {
+        return detectIn(dir);
+      });
+
+      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toMatchObject({ code: "E_CANCELLED" });
+    });
   });
 });

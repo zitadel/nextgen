@@ -1,34 +1,22 @@
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { GivenCredentials } from "@/lib/idp";
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
-import type { ClaimChoice, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
-
-import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{
-  target: SchemaTarget;
-  candidate: Connection;
-  preview: DocumentChange<Connection>;
-  options: SsoOptions;
-  summary: Summary;
-  given: GivenCredentials;
-  claims: ClaimChoice | undefined;
-  answered: ClaimChoice | undefined;
-}>;
+type Needs = Fact<
+  "target" | "candidate" | "preview" | "options" | "summary" | "given" | "claims" | "answered"
+>;
 
 /**
  * Settles the change to write, and checks that saving it would be accepted.
  */
-export class BuildChange extends WizardStep<
-  "change",
-  Readonly<{ change: DocumentChange<Connection> }>,
-  Needs
-> {
+export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "change";
 
   /**
@@ -50,11 +38,10 @@ export class BuildChange extends WizardStep<
    * too.
    *
    * @param needs - What was read and decided.
-   * @param _services - What the command provides.
    * @returns The change.
    * @throws {@link ZitadelError} When saving the change would be refused.
    */
-  async run(needs: Needs): Promise<Readonly<{ change: DocumentChange<Connection> }>> {
+  async run(needs: Needs): Promise<Fact<"change">> {
     const claimed =
       needs.answered === undefined
         ? needs.candidate

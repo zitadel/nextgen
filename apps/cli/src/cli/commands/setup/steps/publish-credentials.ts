@@ -1,20 +1,19 @@
+import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
+
+import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 import { createZitadelClient, VariableService, VariableWrite } from "@/lib/backend";
-import type { SecretPublisher } from "@/lib/idp";
 import {
   publishClientId,
   type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
   type SecretOutcome,
+  type SecretPublisher,
   storeClientSecret,
 } from "@/lib/idp";
 import { userAgent } from "@/lib/user-agent";
-
-import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -45,13 +44,19 @@ export class PublishCredentials extends WizardStep<
   Fact<"ssoOutcomes">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "publishCredentials";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -71,7 +76,6 @@ export class PublishCredentials extends WizardStep<
    * has been claimed yet, so there is no owner for the developer to name.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials.
    * @throws {Error} When a provider reaches here without the credentials the wizard collects.
    */
@@ -146,14 +150,15 @@ export class PublishCredentials extends WizardStep<
    *
    * @param answers - The providers still to publish.
    * @param publish - How the credentials reach the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials, by slug.
    */
   private async publishEach(
-    answers: readonly SsoAnswer[],
+    answers: ReadonlyArray<SsoAnswer>,
     publish: SecretPublisher | undefined,
   ): Promise<
-    ReadonlyArray<readonly [ConnectionSlug, { clientId: PublishState; secret: SecretOutcome }]>
+    ReadonlyArray<
+      readonly [ConnectionSlug, Readonly<{ clientId: PublishState; secret: SecretOutcome }>]
+    >
   > {
     const [answer, ...rest] = answers;
     if (answer === undefined) {

@@ -1,11 +1,19 @@
-import type { Questions } from "@/lib/ui";
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
-
-import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
 import { ZitadelError } from "@/lib/errors";
+import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
+
+import {
+  type Fact,
+  retryOptionsFromFlags,
+  type SetupServices,
+  setupRetryFlags,
+} from "@/cli/commands/setup/shared";
+
+/**
+ * The framework a rerun is told to scaffold when the available ones include it.
+ */
+const PREFERRED_FRAMEWORK = "next";
 
 /**
  * What the step reads from what is known.
@@ -34,13 +42,19 @@ export class DetectFramework extends WizardStep<
   Fact<"orca" | "found" | "scaffoldedFramework">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "detect";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -63,14 +77,17 @@ export class DetectFramework extends WizardStep<
    * pointing at a prompt it can't see, and for a local server hands over the exact rerun. Only
    * then: `setupRetryFlags` pins `--server local`.
    *
+   * The framework is asked about in the only prompt outside the main wizard: it runs at the
+   * empty-directory branch, before any other detection, and its choices are
+   * `Orca.availableFrameworks`.
+   *
    * @param needs - The flags.
-   * @param this.deps - What the command provides.
    * @returns What was found.
    * @throws {@link ZitadelError} When no framework is found and the directory
    *   cannot be scaffolded into, or no framework was chosen.
    */
   async run(needs: Needs): Promise<Fact<"orca" | "found" | "scaffoldedFramework">> {
-    const flags = needs.flags;
+    const { flags } = needs;
     const orca = createOrca();
     const home = this.deps.env.HOME;
     const detecting = this.deps.ui.begin(
@@ -107,9 +124,7 @@ export class DetectFramework extends WizardStep<
             error.code,
             "Could not detect a supported app framework, and this directory is not empty",
             {
-              hint:
-                `${target.reason ?? "Directory is not empty."} ` +
-                "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
+              hint: `${target.reason ?? "Directory is not empty."} Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.`,
               details: {
                 cwd: this.deps.cwd,
                 entries: target.entries,
@@ -124,15 +139,14 @@ export class DetectFramework extends WizardStep<
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
         if (!flags.framework && this.deps.nonInteractive) {
-          const choices = orca.availableFrameworks().map((choice) => {
+          const choices: readonly string[] = orca.availableFrameworks().map((choice) => {
             return choice.id;
           });
-          const suggested = choices.includes("next") ? "next" : choices[0];
+          const suggested = choices.includes(PREFERRED_FRAMEWORK)
+            ? PREFERRED_FRAMEWORK
+            : choices[0];
           throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-            hint: (
-              "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-              `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
-            ).trimEnd(),
+            hint: `Setup asks which framework to scaffold only in a terminal. Without one, or with --json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`,
             nextCommands:
               this.deps.serverFlag === "local" && suggested
                 ? [
@@ -152,47 +166,25 @@ export class DetectFramework extends WizardStep<
           app: await orca.planScaffold(
             this.deps.cwd,
             flags.framework ||
-              (await new PickFrameworkPrompt().ask(orca.availableFrameworks(), this.deps.ask)),
+              (await this.deps.ask.select({
+                name: "framework",
+                message: "Which framework would you like to scaffold?",
+                options: orca.availableFrameworks().map((choice) => {
+                  return {
+                    value: choice.id,
+                    label: choice.displayName,
+                  };
+                }),
+              })),
           ),
           detected: undefined,
           scaffoldedBesideFiles: !target.scaffoldable,
         };
       });
-    const scaffoldedFramework = found.detected === undefined;
     return {
       orca,
       found,
-      scaffoldedFramework,
+      scaffoldedFramework: found.detected === undefined,
     };
-  }
-}
-
-/**
- * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.
- * Runs at the empty-directory branch (before any other detection). Returns the chosen framework id; choices come from
- * `Orca.availableFrameworks`.
- */
-export class PickFrameworkPrompt {
-  /**
-   * Ask which framework to scaffold.
-   *
-   * @param choices - The frameworks that can be scaffolded.
-   * @param ask - How questions are asked.
-   * @returns The id of the chosen framework.
-   */
-  async ask(
-    choices: ReadonlyArray<{ id: string; displayName: string }>,
-    ask: Questions,
-  ): Promise<string> {
-    return ask.select({
-      name: "framework",
-      message: "Which framework would you like to scaffold?",
-      options: choices.map((choice) => {
-        return {
-          value: choice.id,
-          label: choice.displayName,
-        };
-      }),
-    });
   }
 }

@@ -23,13 +23,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "force">;
  * directory as already set up.
  */
 export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "patchCheck";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -42,7 +48,6 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
    * The placeholder is a deterministic stand-in project, so no remote call is made.
    *
    * @param needs - The patcher, the app and the issuer.
-   * @param this.deps - What the command provides.
    * @returns Nothing is added.
    * @throws {@link ZitadelError} With `E_CONFLICT` for a file it would refuse.
    */

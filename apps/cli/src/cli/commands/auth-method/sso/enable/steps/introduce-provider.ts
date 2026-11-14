@@ -1,17 +1,12 @@
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-
-import type { IdpProvider } from "@zitadel/config/idp";
-
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{ target: SchemaTarget; provider: IdpProvider; summary: Summary }>;
+type Needs = Fact<"target" | "provider" | "summary">;
 
 /**
  * Says what the run addresses and what to register with the provider.
@@ -20,6 +15,9 @@ type Needs = Readonly<{ target: SchemaTarget; provider: IdpProvider; summary: Su
  * Said before a dry run returns, so a preview is enough to register the client.
  */
 export class IntroduceProvider extends WizardStep<"introduce", object, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "introduce";
 
   /**
@@ -31,7 +29,6 @@ export class IntroduceProvider extends WizardStep<"introduce", object, Needs> {
    * the issuer they gave is the only address known.
    *
    * @param needs - What was read and decided.
-   * @param _services - What the command provides.
    * @returns Nothing is added.
    */
   async run(needs: Needs): Promise<object> {

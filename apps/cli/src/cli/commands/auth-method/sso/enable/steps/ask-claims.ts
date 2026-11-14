@@ -1,20 +1,9 @@
-import type { IdpProvider } from "@zitadel/config/idp";
-
-import {
-  applyRequest,
-  asksForClaims,
-  choiceOf,
-  ClaimQuestions,
-  type ClaimRequest,
-  claimsOrRefuse,
-  type MappingState,
-} from "@/lib/idp";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { applyRequest, asksForClaims, choiceOf, ClaimQuestions, claimsOrRefuse } from "@/lib/idp";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-import type { ClaimChoice } from "@/lib/zitadel";
 
 /**
  * How `--verified-claim` is spelled, for the note about a replaced default.
@@ -22,29 +11,14 @@ import type { ClaimChoice } from "@/lib/zitadel";
 const VERIFIED_FLAG = "--verified-claim";
 
 /**
- * What the step reads from the steps before it.
+ * What the step reads from what is known.
  */
-type Needs = Readonly<{
-  provider: IdpProvider;
-  claimRequest: ClaimRequest;
-  mapping: MappingState | undefined;
-  claims: ClaimChoice | undefined;
-}>;
+type Needs = Fact<"provider" | "claimRequest" | "mapping" | "claims">;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Readonly<{
-  /**
-   * How a question is asked.
-   */
-  ask: Questions;
-
-  /**
-   * Whether the run may not ask anything.
-   */
-  nonInteractive: boolean;
-}>;
+type Deps = Pick<EnableServices, "ask" | "nonInteractive">;
 
 /**
  * Shows what the provider fills by default and asks whether other claims should
@@ -54,18 +28,20 @@ type Deps = Readonly<{
  * Flags that name claims are the whole answer, as `--preset` is for its
  * question, and a run nobody can answer takes the defaults.
  */
-export class AskClaims extends WizardStep<
-  "answered",
-  Readonly<{ answered: ClaimChoice | undefined }>,
-  Needs
-> {
+export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "answered";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -76,13 +52,12 @@ export class AskClaims extends WizardStep<
    * had not.
    *
    * @param needs - The provider and what the flags settled.
-   * @param this.deps - What the command provides.
    * @returns What the connection is written with: what the flags settled when
    *   nothing was asked, otherwise what the answers settled.
    * @throws {@link ZitadelError} With `E_VALIDATION` when an answer cannot be
    *   mapped, which the questions are built not to allow.
    */
-  async run(needs: Needs): Promise<Readonly<{ answered: ClaimChoice | undefined }>> {
+  async run(needs: Needs): Promise<Fact<"answered">> {
     if (
       needs.mapping === undefined ||
       asksForClaims(needs.claimRequest) ||

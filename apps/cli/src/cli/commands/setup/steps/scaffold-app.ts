@@ -1,10 +1,8 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -27,13 +25,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "env" | "force" | "ui">;
  * half-set-up one for an app the developer brought.
  */
 export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framework">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "scaffold";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -48,7 +52,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
    * issuer and the registered origin (both derived from `answers.devPort`).
    *
    * @param needs - What detection found and what was answered.
-   * @param this.deps - What the command provides.
    * @returns The new app, and the app the patch works on.
    */
   async run(needs: Needs): Promise<Fact<"newApp" | "framework">> {
@@ -99,8 +102,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
    * everywhere.
    *
    * @param out - The new app.
-   * @param _needs - What was known when the step ran.
-   * @param this.deps - What the command provides.
    * @returns Once it is removed.
    */
   override async undo(out: Fact<"newApp" | "framework">): Promise<void> {

@@ -1,19 +1,11 @@
 import { VariableService, VariableWrite } from "@/lib/backend";
-import type { CredentialDelivery, GivenCredentials, PublishedCredentials } from "@/lib/idp";
-
-import type { Connection as RemoteConnection } from "@/lib/oclif/types";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { WizardStep } from "@/lib/wizard";
-
-import type { EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{
-  remote: RemoteConnection;
-  delivery: CredentialDelivery;
-  given: GivenCredentials;
-}>;
+type Needs = Fact<"remote" | "delivery" | "given">;
 
 /**
  * What the step is given by the command.
@@ -29,18 +21,20 @@ type Deps = Pick<EnableServices, "source">;
  * first, a failed write leaves nothing behind but credentials the rerun asks for
  * and stores again.
  */
-export class PublishCredentials extends WizardStep<
-  "publish",
-  Readonly<{ published: PublishedCredentials }>,
-  Needs
-> {
+export class PublishCredentials extends WizardStep<"publish", Fact<"published">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "publish";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -56,10 +50,9 @@ export class PublishCredentials extends WizardStep<
    * answers from fixtures and has no variables to write.
    *
    * @param needs - The delivery, the credentials and the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each credential.
    */
-  async run(needs: Needs): Promise<Readonly<{ published: PublishedCredentials }>> {
+  async run(needs: Needs): Promise<Fact<"published">> {
     const variableService =
       this.deps.source === "mock"
         ? undefined

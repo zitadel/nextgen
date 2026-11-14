@@ -1,13 +1,15 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { scaffoldOf } from "@/cli/commands/setup/shared";
-
-import type { FrameworkFacts } from "@/lib/orca";
-import { issuerFromPort } from "@/lib/orca";
-import { derivePosture } from "@/lib/orca/patchers/posture";
+import { type Fact, type SetupServices, scaffoldOf } from "@/cli/commands/setup/shared";
 import type { CreatedProject } from "@/lib/backend";
+import { type FrameworkFacts, issuerFromPort } from "@/lib/orca";
+import { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
+
+/**
+ * The renderer the widgets are drawn with when `--renderer` names none.
+ */
+const DEFAULT_RENDERER = "react";
 
 /**
  * What the step reads from what is known.
@@ -34,13 +36,19 @@ export class PlanConfiguration extends WizardStep<
   Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "plan";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -54,7 +62,6 @@ export class PlanConfiguration extends WizardStep<
    * embeddable cards inside its own layout (ADR 044).
    *
    * @param needs - The flags, the app and the answers.
-   * @param this.deps - What the command provides.
    * @returns What the later steps patch and write by.
    * @throws {@link ZitadelError} When a file setup will not replace is there.
    */
@@ -63,7 +70,7 @@ export class PlanConfiguration extends WizardStep<
   ): Promise<Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">> {
     const { answers, app, flags, orca, scaffoldedFramework } = needs;
     const issuer = issuerFromPort(answers.devPort);
-    const rendererId = flags.renderer ?? "react";
+    const rendererId = flags.renderer ?? DEFAULT_RENDERER;
     const posture = derivePosture(app.framework, scaffoldedFramework);
     const planned = await scaffoldOf(this.deps.cwd, this.deps.force, answers);
     for (const note of planned.connections.flatMap((entry) => {

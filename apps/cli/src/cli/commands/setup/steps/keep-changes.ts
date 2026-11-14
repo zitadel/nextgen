@@ -1,7 +1,8 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import {
   describeWrittenFile,
+  type Fact,
   relativeDisplayPath as relativeDisplay,
+  type SetupServices,
   signInOf,
 } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
@@ -27,13 +28,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun">;
  * to delete, and nothing before this takes back what a later step does.
  */
 export class KeepChanges extends WizardStep<"keep", Fact<"allFilesWritten" | "signIn">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "keep";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -49,7 +56,6 @@ export class KeepChanges extends WizardStep<"keep", Fact<"allFilesWritten" | "si
    * much as the answers do.
    *
    * @param needs - What the patch and the configuration did.
-   * @param this.deps - What the command provides.
    * @returns Every file written, and what sign-in is configured to do.
    */
   async run(needs: Needs): Promise<Fact<"allFilesWritten" | "signIn">> {

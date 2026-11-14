@@ -1,23 +1,37 @@
-import { errorMessage, ZitadelError } from "@/lib/errors";
 import {
-  DEFAULT_SETUP_PRESET,
-  DEFAULT_SETUP_USE_CASE,
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_SCHEMA_CONFIG_PATH,
+  DEFAULT_SETUP_PRESET,
+  DEFAULT_SETUP_USE_CASE,
+  SETUP_PRESETS,
+  SETUP_USE_CASES,
+  type SetupPreset,
+  type SetupUseCase,
 } from "@zitadel/config/defaults";
 import {
+  type ConnectionEndpoints,
+  type ConnectionSlug,
+  type Credentials,
   CUSTOM_PROVIDER,
-  IDP_PROVIDERS,
-  providerOf,
-  selectionName,
   DEFAULT_SCOPES,
+  IDP_PROVIDERS,
+  type ProviderSelection,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  providerOf,
   RESERVED_SLUGS,
+  selectionName,
   slugFromDisplayName,
 } from "@zitadel/config/idp";
+import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+
+import type { CreatedProject } from "@/lib/backend";
+import type { Consent, Gate } from "@/lib/consent";
+import type { InitialDeployment } from "@/lib/environment";
+import { errorMessage, ZitadelError } from "@/lib/errors";
+import { Repository } from "@/lib/git";
 import {
   applyRequest,
   type ClaimRequest,
@@ -25,73 +39,47 @@ import {
   claimFlagTexts,
   claimRequestFromFlags,
   claimsOrRefuse,
+  type CustomFlagValues,
   customFlagValues,
   NO_CLAIM_REQUEST,
+  type PublishState,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  type SecretOutcome,
   seedMapping,
   selectionFromFlags,
   ssoEnableFlags,
 } from "@/lib/idp";
-import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
-import { tryCatch } from "@/lib/try-catch";
 import type { GlobalOptions } from "@/lib/oclif/types";
+import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
+import type { derivePosture } from "@/lib/orca/patchers/posture";
+import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
+import { isLocalRuntimePath } from "@/lib/secret-paths";
 import type { ResolvedServer } from "@/lib/server";
-
-import type {
-  ProviderSelection,
-  ConnectionEndpoints,
-  ConnectionSlug,
-  Credentials,
-} from "@zitadel/config/idp";
+import { path as stylePath } from "@/lib/style";
+import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { tryCatch } from "@/lib/try-catch";
+import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
+  CONFIG_DIRECTORIES,
   ConnectionExistsError,
   DiskStore,
   FileExistsError,
   PasswordPolicy,
+  type PasswordMinLength,
   type Scaffold,
   type ScaffoldedConnection,
-  SignupPolicy,
-  ZitadelConfig,
-  type PasswordMinLength,
   type ScaffoldedProvider,
+  SignupPolicy,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
-  CONFIG_DIRECTORIES,
+  ZitadelConfig,
 } from "@/lib/zitadel";
 
-import type { CustomFlagValues, PublishState, SecretOutcome } from "@/lib/idp";
-import type { Questions, Step, Ui, Spinner } from "@/lib/ui";
-
-import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
-
-import type { CreatedProject } from "@/lib/backend";
-import type { InitialDeployment } from "@/lib/environment";
-import type { FrameworkFacts, Orca, UndoableScaffold, FrameworkChoice } from "@/lib/orca";
-import type { derivePosture } from "@/lib/orca/patchers/posture";
-import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-
-import type { SetupFlags } from "@/cli/commands/setup";
-
-import type { Consent, Gate } from "@/lib/consent";
-import type { CommandResult } from "@/lib/oclif";
-
-import { path as stylePath } from "@/lib/style";
-
-import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { InitialCommitOutcome } from "@/cli/commands/setup/steps/make-initial-commit";
-import type { installDependenciesForSetup } from "@/cli/commands/setup/steps/install-dependencies";
-import type { ChooseDevPort } from "./steps/choose-dev-port";
-import type { ConfirmFramework } from "./steps/confirm-framework";
-import type { SetPasswordPolicy } from "./steps/set-password-policy";
-import type { ChooseServer } from "./steps/choose-server";
-import type { ChooseSignIn } from "./steps/choose-sign-in";
-import type { ChooseSocialSignIn } from "./steps/choose-social-sign-in";
-import type { ChooseUseCase } from "./steps/choose-use-case";
-
-import { Repository } from "@/lib/git";
-import { isLocalRuntimePath } from "@/lib/secret-paths";
+import type { SetupFlags } from "./index";
+import type { InitialCommitOutcome } from "./steps/make-initial-commit";
+import type { SetupInstallOutcome } from "./steps/install-dependencies";
 
 /**
  * The name of the README setup writes into each configuration directory.
@@ -99,44 +87,49 @@ import { isLocalRuntimePath } from "@/lib/secret-paths";
 export const README = "README.md";
 
 /**
- * Map from the patcher's deterministic output paths to a short noun
- * phrase describing what the file is for. Anything not in the map falls
- * back to the bare path in the narration; add an entry here when a new
- * scaffolded file deserves a clearer label.
+ * The renderer setup draws the widgets with when `--renderer` names none.
  */
-const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
-  ".gitignore": { subject: "the project's .gitignore additions" },
-  ".zitadel/secret": { subject: "the local project secret" },
-  "zitadel.json": { subject: "the Zitadel project configuration" },
-  ".env.example": { subject: "the .env example template" },
-  ".env.local": { subject: "the local development environment variables" },
-  ".env.development.local": { subject: "the environment variables the CLI reads" },
-  ".zitadel/state.json": { subject: "the scaffold state file" },
-  [DEFAULT_FLOW_CONFIG_PATH]: { subject: "the editable default login flow" },
-  [`${CONFIG_DIRECTORIES.flows}/${README}`]: { subject: "the flows folder README" },
-  [DEFAULT_SCHEMA_CONFIG_PATH]: { subject: "the editable default human user schema" },
-  [`${CONFIG_DIRECTORIES.schemas}/${README}`]: { subject: "the schemas folder README" },
-  [PasswordPolicy.PATH]: { subject: "the editable password policy" },
-  [SignupPolicy.PATH]: { subject: "the editable sign-up policy" },
-  [`${CONFIG_DIRECTORIES.policies}/${README}`]: { subject: "the policies folder README" },
-  [`${META_SCHEMA_DIR}/policy.json`]: { subject: "the policy dialect spec (editor $schema)" },
-  [`${META_SCHEMA_DIR}/flow-definition.json`]: {
-    subject: "the flow dialect spec (editor $schema)",
-  },
-  [`${META_SCHEMA_DIR}/user-schema.json`]: { subject: "the user-schema dialect spec" },
-  [`${META_SCHEMA_DIR}/user-property.json`]: { subject: "the user-property dialect spec" },
-  [`${META_SCHEMA_DIR}/branding.json`]: { subject: "the branding dialect spec" },
-  [`${META_SCHEMA_DIR}/project.json`]: { subject: "the zitadel.json spec (editor $schema)" },
-  "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
-  "README.md": { subject: "the README's Zitadel section" },
-  "app/page.tsx": { subject: "the home page redirect" },
-  "app/login/page.tsx": { subject: "the login page" },
-  "app/register/page.tsx": { subject: "the registration page" },
-  "app/profile/page.tsx": { subject: "the profile page" },
-  "middleware.ts": { subject: "the Next.js middleware" },
-  "proxy.ts": { subject: "the Next.js proxy" },
-  "custom-elements.d.ts": { subject: "the web-component type declarations" },
-  "package.json": { subject: "package.json with the SDK dependency" },
+export const DEFAULT_RENDERER = "react";
+
+/**
+ * A short noun phrase for what each file the patcher writes is for, by its
+ * deterministic output path.
+ *
+ * @remarks
+ * A path not listed falls back to the bare path in the narration; add an entry
+ * when a new scaffolded file deserves a clearer label.
+ */
+const SENTENCE_BY_PATH: Readonly<Record<string, string>> = {
+  ".gitignore": "the project's .gitignore additions",
+  ".zitadel/secret": "the local project secret",
+  "zitadel.json": "the Zitadel project configuration",
+  ".env.example": "the .env example template",
+  ".env.local": "the local development environment variables",
+  ".env.development.local": "the environment variables the CLI reads",
+  ".zitadel/state.json": "the scaffold state file",
+  [DEFAULT_FLOW_CONFIG_PATH]: "the editable default login flow",
+  [`${CONFIG_DIRECTORIES.flows}/${README}`]: "the flows folder README",
+  [DEFAULT_SCHEMA_CONFIG_PATH]: "the editable default human user schema",
+  [`${CONFIG_DIRECTORIES.schemas}/${README}`]: "the schemas folder README",
+  [PasswordPolicy.PATH]: "the editable password policy",
+  [SignupPolicy.PATH]: "the editable sign-up policy",
+  [`${CONFIG_DIRECTORIES.policies}/${README}`]: "the policies folder README",
+  [`${META_SCHEMA_DIR}/policy.json`]: "the policy dialect spec (editor $schema)",
+  [`${META_SCHEMA_DIR}/flow-definition.json`]: "the flow dialect spec (editor $schema)",
+  [`${META_SCHEMA_DIR}/user-schema.json`]: "the user-schema dialect spec",
+  [`${META_SCHEMA_DIR}/user-property.json`]: "the user-property dialect spec",
+  [`${META_SCHEMA_DIR}/branding.json`]: "the branding dialect spec",
+  [`${META_SCHEMA_DIR}/project.json`]: "the zitadel.json spec (editor $schema)",
+  "AGENTS.md": "the agent guidance (golden journey + config dialect)",
+  "README.md": "the README's Zitadel section",
+  "app/page.tsx": "the home page redirect",
+  "app/login/page.tsx": "the login page",
+  "app/register/page.tsx": "the registration page",
+  "app/profile/page.tsx": "the profile page",
+  "middleware.ts": "the Next.js middleware",
+  "proxy.ts": "the Next.js proxy",
+  "custom-elements.d.ts": "the web-component type declarations",
+  "package.json": "package.json with the SDK dependency",
 };
 
 /**
@@ -149,23 +142,30 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
  * and then withholding one scaffolds a sign-in button that cannot work, and it
  * should not be possible to write the code that lets it happen.
  */
-export type SsoDraft = {
-  readonly selection: ProviderSelection;
-  readonly credentials: Partial<Credentials>;
+export type SsoDraft = Readonly<{
+  /**
+   * The provider, as it was chosen.
+   */
+  selection: ProviderSelection;
+
+  /**
+   * The credentials known so far.
+   */
+  credentials: Readonly<Partial<Credentials>>;
+
   /**
    * Where the connection points, when not at the vendor. Asked for only on a
    * development run (ZITADEL_CLI_DEV), whose one job is standing the provider
-   * up locally — see {@link ChooseSocialSignIn}.
+   * up locally; see `ChooseSocialSignIn`.
    */
-  readonly endpoints?: ConnectionEndpoints;
+  endpoints?: ConnectionEndpoints;
 
   /**
    * What the connection maps beyond the provider's defaults: given with
-   * `--sso-claim`, or answered in {@link MapClaims}. Left out, the defaults
-   * stand.
+   * `--sso-claim`, or answered in `MapClaims`. Left out, the defaults stand.
    */
-  readonly claimRequest?: ClaimRequest;
-};
+  claimRequest?: ClaimRequest;
+}>;
 
 /**
  * A provider with both credentials. Both are required: the connection document
@@ -177,22 +177,36 @@ export type SsoDraft = {
  *
  * Neither value is ever written to a `.zitadel/` file.
  */
-export type SsoAnswer = SsoDraft & { readonly credentials: Credentials };
+export type SsoAnswer = SsoDraft & Readonly<{ credentials: Readonly<Credentials> }>;
 
 /**
  * What the person, the flags and the defaults decided, which the steps after the
  * questions read and the patcher turns into the generated `zitadel.json`.
  */
-export type SetupAnswers = {
+export type SetupAnswers = Readonly<{
+  /**
+   * The server the run addresses.
+   */
   server: string;
+
+  /**
+   * The port the app's dev server starts on.
+   */
   devPort: number;
-  /** Sign-in preset (flow + auth methods); see `SETUP_PRESETS` in @zitadel/config. */
+
+  /**
+   * Sign-in preset (flow + auth methods); see `SETUP_PRESETS` in @zitadel/config.
+   */
   preset: SetupPreset;
-  /** Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config. */
+
+  /**
+   * Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config.
+   */
   useCase: SetupUseCase;
+
   /**
    * Social providers to enable while scaffolding, empty for email sign-in
-   * only. Chosen by {@link ChooseSocialSignIn};
+   * only. Chosen by `ChooseSocialSignIn`;
    * `auth-method sso enable` adds one to an existing Project later, so this is
    * never the only way in.
    *
@@ -201,15 +215,15 @@ export type SetupAnswers = {
    * provider, each with its own credentials.
    */
   sso: readonly SsoDraft[];
+
   /**
    * The minimum password length to put into the password policy setup
    * writes: a number, `null` for an explicit "none", or `undefined` when none
    * was given, which writes the recommended minimum (`PasswordPolicy.initial`).
-   * Chosen by {@link SetPasswordPolicy} or
-   * `--password-min-length`.
+   * Chosen by `SetPasswordPolicy` or `--password-min-length`.
    */
   passwordMinLength?: PasswordMinLength;
-};
+}>;
 
 /**
  * The app the questions are about: its framework and the port its dev server
@@ -244,7 +258,17 @@ export type SetupFacts = Readonly<{
    * What the run settled before the first step: the server, and whether the
    * directory is already set up.
    */
-  preflight: SetupPreflight;
+  preflight: Readonly<{
+    /**
+     * The server the run addresses.
+     */
+    server: ResolvedServer;
+
+    /**
+     * Whether the directory is already set up.
+     */
+    configured: boolean;
+  }>;
 
   /**
    * The provider the command line asked for, with what it said about it.
@@ -351,7 +375,19 @@ export type SetupFacts = Readonly<{
   /**
    * The default configuration written under `.zitadel/`.
    */
-  scaffolded: ScaffoldedConfiguration;
+  scaffolded: Readonly<{
+    /**
+     * The absolute paths of the files written.
+     */
+    filesWritten: readonly string[];
+
+    /**
+     * The minimum password length the password policy holds. A kept policy
+     * file decides that as much as the answers do: one without `min_length`
+     * keeps none when none was given. `null` when it has none.
+     */
+    passwordMinLength: number | null;
+  }>;
 
   /**
    * Every file written, as an absolute path.
@@ -368,16 +404,16 @@ export type SetupFacts = Readonly<{
    */
   ssoOutcomes: ReadonlyMap<
     ConnectionSlug,
-    {
+    Readonly<{
       clientId: PublishState;
       secret: SecretOutcome;
-    }
+    }>
   >;
 
   /**
    * What installing the dependencies did.
    */
-  installOutcome: Awaited<ReturnType<typeof installDependenciesForSetup>>;
+  installOutcome: SetupInstallOutcome;
 
   /**
    * What committing the project did.
@@ -418,16 +454,6 @@ export type SetupFacts = Readonly<{
 export type Fact<Key extends keyof SetupFacts> = Pick<SetupFacts, Key>;
 
 /**
- * What a run of `setup` starts from.
- */
-export type SetupInput = Fact<"flags">;
-
-/**
- * What the run answers: the command's envelope.
- */
-export type SetupAnswer = CommandResult;
-
-/**
  * What the command provides every step: the run's facts, and the parts of the
  * command that draw, write the configuration and word the result, which stay
  * in the command.
@@ -454,7 +480,7 @@ export type SetupServices = Readonly<{
   /**
    * The run's environment variables.
    */
-  env: NodeJS.ProcessEnv;
+  env: Readonly<NodeJS.ProcessEnv>;
 
   /**
    * The questions the run may ask a person.
@@ -549,7 +575,7 @@ export type SetupServices = Readonly<{
 /**
  * Read-only facts a question may need.
  */
-export type PromptContext = {
+export type PromptContext = Readonly<{
   /**
    * How a prompt asks its question: the typed questions every other command
    * asks through, so every question the wizard asks behaves like every other
@@ -557,110 +583,123 @@ export type PromptContext = {
    * setup's `--force`, which means "overwrite files", never answers one of its
    * questions.
    */
-  readonly ask: Questions;
+  ask: Questions;
+
   /**
    * Something the person must read or go and do outside the terminal, such as
    * registering an OAuth application, as the one boxed thing a prompt draws.
    * It goes through the UI package for the same reason `ask` does: a prompt
    * that drew its own box would draw one that matches nothing else.
    */
-  readonly note: (title: string, lines: readonly string[]) => void;
+  note: (title: string, lines: readonly string[]) => void;
+
   /**
    * One line in the chain that is not a question, such as what happens now
    * that a provider was skipped.
    */
-  readonly say: (text: string) => void;
+  say: (text: string) => void;
+
   /**
    * A spinner for a probe that takes long enough to need saying so, stopped or
    * cleared by the prompt that started it. It draws nothing when nobody is
    * watching, so a prompt never tests for a terminal.
    */
-  readonly spinner: (label: string, options?: { guide?: boolean }) => Spinner;
+  spinner: (label: string, options?: Readonly<{ guide?: boolean }>) => Spinner;
+
   /**
    * The framework of the app setup integrates: its id and the name a question
    * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
    * asks, because setup creates it once it has every answer.
    */
-  readonly framework: FrameworkChoice;
+  framework: FrameworkChoice;
+
   /**
    * A command for this app's project, for a question that names what to run
    * once setup is done, such as adding a skipped provider. It carries the
    * selector setup's own recovery commands carry, so it reaches the project
    * setup creates and not one the shell's environment names.
    */
-  readonly suggest: Suggest;
+  suggest: Suggest;
+
   /**
-   * The app directory setup runs in. {@link ChooseServer}
-   * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
-   * to detect a managed local server started here.
+   * The app directory setup runs in. `ChooseServer` reads the local runtime
+   * metadata (`.zitadel/local/runtime.json`) under it to detect a managed local
+   * server started here.
    */
-  readonly cwd: string;
+  cwd: string;
+
   /**
    * Whether the developer already named the framework: picked it to scaffold
-   * an empty directory, or passed `--framework`. Then
-   * {@link ConfirmFramework} has nothing
-   * left to confirm and skips itself.
+   * an empty directory, or passed `--framework`. Then `ConfirmFramework` has
+   * nothing left to confirm and skips itself.
    */
-  readonly frameworkChosen?: boolean;
+  frameworkChosen?: boolean;
+
   /**
-   * The raw `--server` flag value as the user passed it, or `undefined`
-   * when not provided. Prompts use this to skip themselves when the flag
-   * already pinned the answer (a step returns unchanged answers in
-   * that case). Distinct from
-   * `answers.server`, which is *always* populated by the base command's
-   * server-resolution chain — checking that alone can't distinguish "user
-   * passed a flag" from "we fell back to the cloud default".
+   * The raw `--server` flag value as the user passed it, or `undefined` when
+   * not provided.
+   *
+   * @remarks
+   * Prompts use this to skip themselves when the flag already pinned the answer
+   * (a step returns unchanged answers in that case). It is distinct from
+   * `answers.server`, which the base command's server resolution always
+   * populates, so that alone cannot tell "user passed a flag" from "we fell
+   * back to the cloud default".
    */
-  readonly serverFlag?: string;
+  serverFlag?: string;
+
   /**
    * Whether `--dev-port` was passed explicitly. When set, the flag is
-   * authoritative and {@link ChooseDevPort} skips itself so
-   * an interactive answer can't override a scripted/flagged port.
+   * authoritative and `ChooseDevPort` skips itself so an interactive answer
+   * cannot override a scripted or flagged port.
    */
-  readonly devPortFromFlag?: boolean;
+  devPortFromFlag?: boolean;
+
   /**
    * Whether `--preset` was passed explicitly. When set, the flag is
-   * authoritative and {@link ChooseSignIn}
-   * skips itself.
+   * authoritative and `ChooseSignIn` skips itself.
    */
-  readonly presetFromFlag?: boolean;
+  presetFromFlag?: boolean;
+
   /**
    * Whether `--use-case` was passed explicitly. When set, the flag is
-   * authoritative and {@link ChooseUseCase} skips itself.
+   * authoritative and `ChooseUseCase` skips itself.
    */
-  readonly useCaseFromFlag?: boolean;
+  useCaseFromFlag?: boolean;
+
   /**
    * Whether `--sso` was passed explicitly. When set, the flag answers the
-   * provider question and {@link ChooseSocialSignIn}
-   * does not ask it.
+   * provider question and `ChooseSocialSignIn` does not ask it.
    *
+   * @remarks
    * The credential questions are a separate matter: the prompt still asks for
    * a client id or secret the invocation did not supply, because a connection
    * missing either is one that cannot work. Only a `--non-interactive` run has
    * nobody to ask, and that one is refused rather than left incomplete.
    */
-  readonly ssoFromFlag?: boolean;
+  ssoFromFlag?: boolean;
+
   /**
    * Whether `--password-min-length` was passed explicitly. When set, the flag
-   * is authoritative and {@link SetPasswordPolicy}
-   * skips itself.
+   * is authoritative and `SetPasswordPolicy` skips itself.
    */
-  readonly passwordMinLengthFromFlag?: boolean;
+  passwordMinLengthFromFlag?: boolean;
+
   /**
    * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
-   * development run asks where a provider's endpoints are — see
-   * {@link ChooseSocialSignIn}. Passed in rather
-   * than read from the bundle so a test can drive both answers.
+   * development run asks where a provider's endpoints are; see
+   * `ChooseSocialSignIn`. Passed in rather than read from the bundle so a test
+   * can drive both answers.
    */
-  readonly developmentBuild?: boolean;
-};
+  developmentBuild?: boolean;
+}>;
 
 /**
  * The parts of a setup invocation that a retry suggestion must reproduce.
  * Suggested retries are followed verbatim (especially by agents), so dropping
  * a flag here silently changes what the retry scaffolds.
  */
-export type SetupRetryOptions = {
+export type SetupRetryOptions = Readonly<{
   /**
    * The framework as `--framework` named it.
    */
@@ -691,7 +730,33 @@ export type SetupRetryOptions = {
    * yet: a custom connection described in part, which the wizard completes.
    * Dropping them would send the developer back without what they typed.
    */
-  ssoTyped?: SsoFlags;
+  ssoTyped?: Readonly<{
+    /**
+     * The provider, as typed.
+     */
+    sso: string;
+
+    /**
+     * The name of the connection.
+     */
+    ssoSlug?: string;
+
+    /**
+     * The name shown on the sign-in button.
+     */
+    ssoDisplayName?: string;
+
+    /**
+     * The provider's issuer URL.
+     */
+    ssoIssuer?: string;
+
+    /**
+     * The scopes to request.
+     */
+    ssoScopes?: string;
+  }>;
+
   /**
    * The social provider and its client id. The secret is deliberately absent:
    * a retry asks for it again, or takes it on stdin, because putting a
@@ -701,40 +766,26 @@ export type SetupRetryOptions = {
    * connection's `${{ NAME }}` from.
    */
   sso?: readonly ProviderSelection[];
+
   /**
    * The claims asked for with `--sso-claim`. They are not credentials, so they
    * travel in the command.
    */
   ssoClaims?: ClaimRequest;
+
   /**
    * The minimum password length the run was given: a number, or `null` for
    * an explicit "none", carried as `--password-min-length 0` so a kept policy
    * file still loses its minimum on the retry.
    */
   passwordMinLength?: PasswordMinLength;
+
   /**
    * The server as the developer typed it. Left out, a retry pins the local
    * server; `null` leaves it to the default, as a run that typed none did.
    */
   server?: string | null;
-};
-
-/**
- * What setup's default configuration left behind.
- */
-export type ScaffoldedConfiguration = {
-  /**
-   * The absolute paths of the files written.
-   */
-  filesWritten: string[];
-
-  /**
-   * The minimum password length the password policy holds. A kept policy file
-   * decides that as much as the answers do: one without `min_length` keeps
-   * none when none was given. `null` when it has none.
-   */
-  passwordMinLength: number | null;
-};
+}>;
 
 /**
  * The default configuration setup scaffolds into a project, planned against
@@ -963,9 +1014,12 @@ export async function askCustomSettings(
  */
 export function relativeDisplayPath(cwd: string, absolute: string): string {
   const boundary = absolute[cwd.length];
-  const withinCwd = absolute.startsWith(cwd) && (boundary === "/" || boundary === "\\");
-  const display = withinCwd ? absolute.slice(cwd.length + 1) : absolute;
-  return display.replaceAll("\\", "/");
+
+  return (
+    absolute.startsWith(cwd) && (boundary === "/" || boundary === "\\")
+      ? absolute.slice(cwd.length + 1)
+      : absolute
+  ).replaceAll("\\", "/");
 }
 
 /**
@@ -975,7 +1029,7 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * profile fields are optional. It describes what is configured, not that
  * sign-in works: an enabled method is not a credential a user has registered.
  */
-export type SignIn = {
+export type SignIn = Readonly<{
   /**
    * The method the login flow's entry step offers.
    */
@@ -985,15 +1039,17 @@ export type SignIn = {
    * The methods the user schema enables: the one sign-in starts with, the
    * other, then `sso` when a provider is on.
    */
-  methods: string[];
+  methods: readonly string[];
 
   /**
    * What registration asks for, in order, and whether each is required.
    */
-  fields: {
-    name: string;
-    required: boolean;
-  }[];
+  fields: ReadonlyArray<
+    Readonly<{
+      name: string;
+      required: boolean;
+    }>
+  >;
 
   /**
    * `null` when passwords have no minimum length.
@@ -1003,8 +1059,8 @@ export type SignIn = {
   /**
    * The external providers' slugs, in the order they were chosen.
    */
-  providers: string[];
-};
+  providers: readonly string[];
+}>;
 
 /**
  * The sign-in configuration setup's answers add up to, read off the
@@ -1020,12 +1076,14 @@ export type SignIn = {
  *   length setup was given.
  * @returns What sign-in and registration are configured to do.
  */
-export function signInOf(answers: {
-  preset: SetupPreset;
-  useCase: SetupUseCase;
-  sso: readonly ScaffoldedProvider[];
-  passwordMinLength?: PasswordMinLength;
-}): SignIn {
+export function signInOf(
+  answers: Readonly<{
+    preset: SetupPreset;
+    useCase: SetupUseCase;
+    sso: readonly ScaffoldedProvider[];
+    passwordMinLength?: PasswordMinLength;
+  }>,
+): SignIn {
   const { schema, policy } = ZitadelConfig.empty().scaffold({
     preset: answers.preset,
     useCase: answers.useCase,
@@ -1071,7 +1129,7 @@ export function signInOf(answers: {
  * @param suffix - The ending of the path to find.
  * @returns The first file that ends in `suffix`, or nothing.
  */
-export function pickWrittenFile(written: string[], suffix: string): string | undefined {
+export function pickWrittenFile(written: readonly string[], suffix: string): string | undefined {
   return written.find((file) => {
     return file.endsWith(suffix);
   });
@@ -1093,34 +1151,11 @@ export function pickWrittenFile(written: string[], suffix: string): string | und
  */
 export function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   const verb = dryRun ? "Would write" : "Wrote";
-  const sentence = SENTENCE_BY_PATH[relPath];
-  if (sentence) {
-    return `${verb} ${sentence.subject} (${stylePath(escapeControlCharacters(relPath))})`;
+  const subject = SENTENCE_BY_PATH[relPath];
+  if (subject) {
+    return `${verb} ${subject} (${stylePath(escapeControlCharacters(relPath))})`;
   }
   return `${verb} ${stylePath(escapeControlCharacters(relPath))}`;
-}
-
-/**
- * Whether the CLI writes a path itself, so it does not count as the
- * developer's uncommitted work.
- *
- * @remarks
- * Matched against a path already made relative to the project directory, never
- * the repository root: in a monorepo the two differ, and comparing the wrong
- * one refuses every subdirectory project.
- *
- * Just the two `start` leaves behind: the `.zitadel/local/` it writes and the
- * `.gitignore` line that ignores it. It runs immediately before `setup` on the
- * documented golden path, so counting those would refuse every project that
- * has ever been started. Nothing else under `.zitadel/` is exempt: a
- * connection in `.zitadel/idps/` or a policy file is the developer's, and an
- * uncommitted edit there must not be committed under setup's subject.
- *
- * @param path - The path, relative to the project directory.
- * @returns Whether the CLI writes it.
- */
-function isCliOwned(path: string): boolean {
-  return path === ".gitignore" || path.endsWith("/.gitignore") || isLocalRuntimePath(path);
 }
 
 /**
@@ -1128,25 +1163,25 @@ function isCliOwned(path: string): boolean {
  * it writes.
  */
 export type WorktreeState =
-  | {
-      readonly kind: "no-repository";
-    }
-  | {
-      readonly kind: "unknown";
-      readonly reason: string;
-    }
-  | {
-      readonly kind: "blocked";
-      readonly blocked: string;
-    }
-  | {
-      readonly kind: "dirty";
-      readonly modified: readonly string[];
-      readonly untracked: readonly string[];
-    }
-  | {
-      readonly kind: "clean";
-    };
+  | Readonly<{
+      kind: "no-repository";
+    }>
+  | Readonly<{
+      kind: "unknown";
+      reason: string;
+    }>
+  | Readonly<{
+      kind: "blocked";
+      blocked: string;
+    }>
+  | Readonly<{
+      kind: "dirty";
+      modified: readonly string[];
+      untracked: readonly string[];
+    }>
+  | Readonly<{
+      kind: "clean";
+    }>;
 
 /**
  * Reports what the repository of a project holds, before setup writes a single
@@ -1165,6 +1200,16 @@ export type WorktreeState =
  * merge, rebase, cherry-pick, revert or bisect, or on a detached HEAD) is
  * `blocked` for the same reason: found only at commit time, setup would
  * already have done all its work.
+ *
+ * A path the CLI writes itself does not count as the developer's uncommitted
+ * work, and is matched against a path already made relative to the project
+ * directory, never the repository root: in a monorepo the two differ, and
+ * comparing the wrong one refuses every subdirectory project. Just the two
+ * `start` leaves behind are exempt, the `.zitadel/local/` it writes and the
+ * `.gitignore` line that ignores it, because `start` runs immediately before
+ * `setup` on the documented golden path. Nothing else under `.zitadel/` is
+ * exempt: a connection in `.zitadel/idps/` or a policy file is the developer's,
+ * and an uncommitted edit there must not be committed under setup's subject.
  *
  * When git cannot answer, the state is `unknown`: the commit does not check
  * again, so going ahead would stage and commit the very work this guard exists
@@ -1189,7 +1234,11 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
       };
     }
     const dirty = (await repository.uncommittedFiles()).filter((file) => {
-      return !isCliOwned(file.path);
+      return !(
+        file.path === ".gitignore" ||
+        file.path.endsWith("/.gitignore") ||
+        isLocalRuntimePath(file.path)
+      );
     });
     if (dirty.length === 0) {
       return {
@@ -1219,77 +1268,6 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
       reason: errorMessage(error),
     };
   }
-}
-
-/**
- * What setup needs to know about the run before it detects or writes anything.
- */
-export type SetupPreflight = Readonly<{
-  /**
-   * The server the run addresses.
-   */
-  server: ResolvedServer;
-
-  /**
-   * Whether the directory is already set up.
-   */
-  configured: boolean;
-}>;
-
-/**
- * The `--sso-*` flags that describe a custom connection, as `setup` takes them.
- * A setting that was not given is `undefined`, which a suggestion leaves out.
- */
-type SsoSettingFlags = Readonly<{
-  /**
-   * The name of the connection.
-   */
-  ssoSlug?: string;
-
-  /**
-   * The name shown on the sign-in button.
-   */
-  ssoDisplayName?: string;
-
-  /**
-   * The provider's issuer URL.
-   */
-  ssoIssuer?: string;
-
-  /**
-   * The scopes to request.
-   */
-  ssoScopes?: string;
-}>;
-
-/**
- * `--sso` and the settings that go with it, as typed.
- */
-type SsoFlags = SsoSettingFlags & Readonly<{ sso: string }>;
-
-/**
- * Whether `--sso` names a provider this CLI offers.
- *
- * @param name - What `--sso` was given.
- * @returns Whether it is a provider in the catalogue, or a custom connection.
- */
-function isKnownSsoName(name: string): boolean {
-  return name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
-}
-
-/**
- * The `--sso-*` flags for the settings that were given.
- *
- * @param values - The custom connection's settings, each perhaps missing.
- * @returns The flags, in the order the command line takes them.
- */
-function ssoSettingFlags(values: CustomFlagValues): SsoSettingFlags {
-  return {
-    ssoSlug: values.slug,
-    ssoDisplayName: values.displayName,
-    ssoIssuer: values.issuer,
-    ssoScopes: values.scopes,
-  };
 }
 
 /**
@@ -1343,7 +1321,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
     framework: opts.framework || undefined,
     preset: opts.preset === DEFAULT_SETUP_PRESET ? undefined : opts.preset,
     useCase: opts.useCase === DEFAULT_SETUP_USE_CASE ? undefined : opts.useCase,
-    renderer: opts.renderer === "react" ? undefined : opts.renderer,
+    renderer: opts.renderer === DEFAULT_RENDERER ? undefined : opts.renderer,
     devPort: opts.devPort,
     passwordMinLength: opts.passwordMinLength === null ? 0 : opts.passwordMinLength,
     ...ssoClaimFlags(opts.ssoClaims),
@@ -1352,12 +1330,12 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
       : {
           sso: selectionName(firstSso),
           ...(firstSso.kind === "custom"
-            ? ssoSettingFlags({
-                slug: firstSso.connection.slug,
-                displayName: firstSso.connection.displayName,
-                issuer: firstSso.connection.issuer,
-                scopes: firstSso.connection.scopes.join(" "),
-              })
+            ? {
+                ssoSlug: firstSso.connection.slug,
+                ssoDisplayName: firstSso.connection.displayName,
+                ssoIssuer: firstSso.connection.issuer,
+                ssoScopes: firstSso.connection.scopes.join(" "),
+              }
             : {}),
         }),
     server: opts.server === null ? undefined : (opts.server ?? "local"),
@@ -1387,23 +1365,25 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
  * @param flags - The flags the invocation was given.
  * @returns The options a retry has to carry.
  */
-export function retryOptionsFromFlags(flags: {
-  framework?: string;
-  preset?: string;
-  useCase?: string;
-  renderer?: string;
-  devPort?: number;
-  passwordMinLength?: PasswordMinLength;
-  sso?: string;
-  ssoClientId?: string;
-  ssoSlug?: string;
-  ssoDisplayName?: string;
-  ssoIssuer?: string;
-  ssoScopes?: string;
-  ssoClaim?: readonly string[];
-  ssoVerifiedClaim?: readonly string[];
-  ssoClaimScope?: string;
-}): SetupRetryOptions {
+export function retryOptionsFromFlags(
+  flags: Readonly<{
+    framework?: string;
+    preset?: string;
+    useCase?: string;
+    renderer?: string;
+    devPort?: number;
+    passwordMinLength?: PasswordMinLength;
+    sso?: string;
+    ssoClientId?: string;
+    ssoSlug?: string;
+    ssoDisplayName?: string;
+    ssoIssuer?: string;
+    ssoScopes?: string;
+    ssoClaim?: readonly string[];
+    ssoVerifiedClaim?: readonly string[];
+    ssoClaimScope?: string;
+  }>,
+): SetupRetryOptions {
   const [, selection] = tryCatch(() => {
     if (flags.sso === undefined) {
       return undefined;
@@ -1417,15 +1397,27 @@ export function retryOptionsFromFlags(flags: {
   });
   return {
     ssoTyped:
-      selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
+      selection === undefined &&
+      flags.sso !== undefined &&
+      (flags.sso === CUSTOM_PROVIDER ||
+        IDP_PROVIDERS.some((provider) => {
+          return provider === flags.sso;
+        }))
         ? {
             sso: flags.sso,
-            ...ssoSettingFlags(customFlagValues(flags, SETUP_FLAG_KEYS)),
+            ssoSlug: flags.ssoSlug,
+            ssoDisplayName: flags.ssoDisplayName,
+            ssoIssuer: flags.ssoIssuer,
+            ssoScopes: flags.ssoScopes,
           }
         : undefined,
     framework: flags.framework,
-    preset: flags.preset as SetupPreset | undefined,
-    useCase: flags.useCase as SetupUseCase | undefined,
+    preset: SETUP_PRESETS.find((preset) => {
+      return preset === flags.preset;
+    }),
+    useCase: SETUP_USE_CASES.find((useCase) => {
+      return useCase === flags.useCase;
+    }),
     renderer: flags.renderer,
     devPort: flags.devPort,
     passwordMinLength: flags.passwordMinLength,
@@ -1471,7 +1463,7 @@ export function retryOptionsFromFlags(flags: {
 export function ssoRecovery(
   retry: SetupRetryOptions,
   suggest: Suggest,
-): { hint: string; commands: SuggestedCommand[] } {
+): Readonly<{ hint: string; commands: readonly SuggestedCommand[] }> {
   const [first, ...remaining] = retry.sso ?? [];
   if (remaining.length === 0) {
     return {

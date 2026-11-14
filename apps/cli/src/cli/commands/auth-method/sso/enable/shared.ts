@@ -1,42 +1,230 @@
+import type { IdpProvider, ProviderName, ProviderSelection } from "@zitadel/config/idp";
+
 import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { CommandResult } from "@/lib/oclif";
+import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
+import type { Origins } from "@/lib/backend";
+import type {
+  ClaimRequest,
+  CredentialDelivery,
+  CredentialNames,
+  CredentialPrompt,
+  GivenCredentials,
+  MappingState,
+  ProviderChoice,
+  PublishedCredentials,
+} from "@/lib/idp";
+import { log } from "@/lib/log";
+import type { Admitted, CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
-import type { Questions } from "@/lib/ui";
-import type {
-  Change,
-  ClaimChoice,
-  Connection,
-  ConnectionSummary,
-  DocumentChange,
-} from "@/lib/zitadel";
-
-import type { EnableFlags } from "@/cli/commands/auth-method/sso/enable";
-import type { ProviderName } from "@zitadel/config/idp";
-import type { CredentialNames, PublishedCredentials, PublishState } from "@/lib/idp";
-import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import type { Questions } from "@/lib/ui";
+import type { Change, ClaimChoice, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
 
 /**
- * What a run of `auth-method sso enable` starts from.
+ * Joins a list the way a sentence does: "a, b and c".
  */
-export type EnableInput = Readonly<{
+const CONJUNCTION = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * What a run says about the connection it adds, before any credential is
+ * asked for.
+ */
+export type Summary = Readonly<{
   /**
-   * The flags the command admitted.
+   * The Project the run addresses. `--json` suppresses the console line that
+   * otherwise carries it, and a result that names only the schema does not
+   * say which Project was changed.
    */
-  flags: EnableFlags;
+  projectId: string;
+
+  /**
+   * The provider, as a command line names it.
+   */
+  provider: ProviderName;
+
+  /**
+   * The name a sign-in button and every message show for the provider.
+   */
+  displayName: string;
+
+  /**
+   * The schema the provider is added to.
+   */
+  schema: string;
+
+  /**
+   * The connection the schema lists: the one created, or the one reused.
+   */
+  connection: Connection;
+
+  /**
+   * Whether the connection was already in the project.
+   */
+  reused: boolean;
+
+  /**
+   * The redirect URI to register with the provider, on the Project's
+   * development issuer.
+   */
+  callbackUri: string;
+
+  /**
+   * The redirect URI on each primary origin, where a deploy lands the app.
+   */
+  deployedCallbackUris: readonly string[];
+
+  /**
+   * The redirect URI pattern for each preview origin. A preview URL is one
+   * pull-request build of the same app, so each needs its own entry at the
+   * provider, and a wildcard pattern cannot be registered as one.
+   */
+  previewCallbackUris: readonly string[];
 }>;
 
 /**
- * What the run answers: the command's envelope.
+ * Everything the steps of `auth-method sso enable` settle between them, by
+ * name. A step reads some of it and adds some, as {@link Fact} says.
  */
-export type EnableAnswer = CommandResult;
+export type EnableFacts = Readonly<{
+  /**
+   * The flags the command admitted.
+   */
+  flags: Admitted<typeof AuthMethodSsoEnable>["flags"];
+
+  /**
+   * How the flags choose a provider.
+   */
+  choice: ProviderChoice;
+
+  /**
+   * The origin the app serves from, which every callback URI is built on.
+   */
+  issuer: string;
+
+  /**
+   * What the run read: the schema it changes and everything around it.
+   */
+  target: SchemaTarget;
+
+  /**
+   * The connection to the project and server.
+   */
+  remote: RemoteConnection;
+
+  /**
+   * The origins the project serves, which name more callback URIs.
+   */
+  origins: Origins;
+
+  /**
+   * The provider, as it was chosen.
+   */
+  selection: ProviderSelection;
+
+  /**
+   * The provider's own facts.
+   */
+  provider: IdpProvider;
+
+  /**
+   * What the configuration is edited with.
+   */
+  options: SsoOptions;
+
+  /**
+   * What the flags asked for beyond the provider's claim mapping defaults.
+   */
+  claimRequest: ClaimRequest;
+
+  /**
+   * What the connection maps before anything is asked, or `undefined` when the
+   * connection already exists and keeps its own mapping.
+   */
+  mapping: MappingState | undefined;
+
+  /**
+   * What the connection is written with once the flags are applied, or
+   * `undefined` for a connection that already exists.
+   */
+  claims: ClaimChoice | undefined;
+
+  /**
+   * What the connection is written with once the person has been asked, which
+   * is {@link EnableFacts.claims} when nothing was asked.
+   */
+  answered: ClaimChoice | undefined;
+
+  /**
+   * The connection the provider's defaults make, with the claims the flags
+   * mapped.
+   */
+  candidate: Connection;
+
+  /**
+   * The change worked out before anything was asked.
+   */
+  preview: DocumentChange<Connection>;
+
+  /**
+   * Where the credentials go, and how that is reported.
+   */
+  delivery: CredentialDelivery;
+
+  /**
+   * The questions that ask for the credentials.
+   */
+  prompt: CredentialPrompt;
+
+  /**
+   * What the run says about the connection.
+   */
+  summary: Summary;
+
+  /**
+   * The credentials the developer gave, and the endpoints a development run
+   * answered.
+   */
+  given: GivenCredentials;
+
+  /**
+   * The change to write, checked to be accepted.
+   */
+  change: DocumentChange<Connection>;
+
+  /**
+   * What became of each credential.
+   */
+  published: PublishedCredentials;
+
+  /**
+   * The files written.
+   */
+  written: readonly string[];
+
+  /**
+   * The result the command answers with.
+   */
+  answer: CommandResult;
+}>;
 
 /**
- * What the command provides every step: the run's facts, and the parts of the
- * command that read the project, draw and answer, which stay in the command.
+ * The part of what is known that a step reads or adds, by name.
+ *
+ * @typeParam Key - The facts.
+ */
+export type Fact<Key extends keyof EnableFacts> = Pick<EnableFacts, Key>;
+
+/**
+ * What the command provides the steps: the run's settings, and the parts of the
+ * command that read, write and word the result, which stay in the command.
  */
 export type EnableServices = Readonly<{
+  /**
+   * The server the run addresses.
+   */
+  source: string;
+
   /**
    * The project's directory.
    */
@@ -45,17 +233,12 @@ export type EnableServices = Readonly<{
   /**
    * The run's environment variables.
    */
-  env: NodeJS.ProcessEnv;
+  env: Readonly<NodeJS.ProcessEnv>;
 
   /**
    * The questions the run may ask a person.
    */
   ask: Questions;
-
-  /**
-   * Builds the commands the run suggests.
-   */
-  suggest: Suggest;
 
   /**
    * Whether the run only previews.
@@ -68,24 +251,27 @@ export type EnableServices = Readonly<{
   nonInteractive: boolean;
 
   /**
+   * Whether the run answers with JSON.
+   */
+  isJson: boolean;
+
+  /**
    * Whether this is a development build that may ask where a provider answers.
    */
   developmentBuild: boolean;
 
   /**
-   * Reads the schema the run changes and everything around it.
-   *
-   * @param flags - The flags the command admitted.
-   * @returns What the run read.
+   * Builds the commands the run suggests.
    */
-  loadSchemaTarget(flags: EnableFlags): Promise<SchemaTarget>;
+  suggest: Suggest;
 
   /**
-   * Resolves the project and server the run addresses.
+   * The arguments a suggested command is run with.
    *
-   * @returns The connection to them.
+   * @param command - The command.
+   * @returns Its arguments.
    */
-  connect(): Promise<RemoteConnection>;
+  argsOf(command: SuggestedCommand): readonly string[];
 
   /**
    * The run again without `--dry-run`, as the developer typed it.
@@ -95,23 +281,19 @@ export type EnableServices = Readonly<{
   realRun(): Promise<SuggestedCommand>;
 
   /**
-   * Writes the change to the project's files.
+   * Resolves the project and server the run addresses.
    *
-   * @param target - What the run read.
-   * @param change - The change.
-   * @returns The files written.
+   * @returns The connection to them.
    */
-  write(target: SchemaTarget, change: Change): Promise<readonly string[]>;
+  connect(): Promise<RemoteConnection>;
 
   /**
-   * Whether the run answers with JSON.
+   * Reads the schema the run changes and everything around it.
+   *
+   * @param flags - The flags the command admitted.
+   * @returns What the run read.
    */
-  isJson: boolean;
-
-  /**
-   * The server the run addresses.
-   */
-  source: string;
+  loadSchemaTarget(flags: EnableFacts["flags"]): Promise<SchemaTarget>;
 
   /**
    * Says what a configuration change did, and what else the developer would not
@@ -122,12 +304,13 @@ export type EnableServices = Readonly<{
   report(change: Change): void;
 
   /**
-   * The arguments a suggested command is run with.
+   * Writes the change to the project's files.
    *
-   * @param command - The command.
-   * @returns Its arguments.
+   * @param target - What the run read.
+   * @param change - The change.
+   * @returns The files written.
    */
-  argsOf(command: SuggestedCommand): readonly string[];
+  write(target: SchemaTarget, change: Change): Promise<readonly string[]>;
 
   /**
    * The commands to run after a change: what leads, then deploy when a file changed.
@@ -140,109 +323,15 @@ export type EnableServices = Readonly<{
 }>;
 
 /**
- * What a run says about the connection it adds, before any credential is
- * asked for.
+ * Escapes a value read from a file, newlines included, so it cannot drive the
+ * terminal or forge a line of a notice.
+ *
+ * @param value - The value.
+ * @returns The value, safe to print on one line.
  */
-export type Summary = {
-  /**
-   * The Project the run addresses. `--json` suppresses the console line that
-   * otherwise carries it, and a result that names only the schema does not
-   * say which Project was changed.
-   */
-  readonly projectId: string;
-
-  /**
-   * The provider, as a command line names it.
-   */
-  readonly provider: ProviderName;
-
-  /**
-   * The name a sign-in button and every message show for the provider.
-   */
-  readonly displayName: string;
-
-  /**
-   * The schema the provider is added to.
-   */
-  readonly schema: string;
-
-  /**
-   * The connection the schema lists: the one created, or the one reused.
-   */
-  readonly connection: Connection;
-
-  /**
-   * Whether the connection was already in the project.
-   */
-  readonly reused: boolean;
-
-  /**
-   * The redirect URI to register with the provider, on the Project's
-   * development issuer.
-   */
-  readonly callbackUri: string;
-
-  /**
-   * The redirect URI on each primary origin, where a deploy lands the app.
-   */
-  readonly deployedCallbackUris: readonly string[];
-
-  /**
-   * The redirect URI pattern for each preview origin. A preview URL is one
-   * pull-request build of the same app, so each needs its own entry at the
-   * provider, and a wildcard pattern cannot be registered as one.
-   */
-  readonly previewCallbackUris: readonly string[];
-};
-
-/**
- * A credential's variable, and whether the project holds its value.
- */
-type PublishedVariable = {
-  readonly variable: string;
-  readonly published: PublishState;
-};
-
-/**
- * What `payload` words the result's data from.
- */
-type PayloadInput = {
-  readonly summary: Summary;
-  readonly change: DocumentChange<Connection>;
-  readonly published: PublishedCredentials;
-  readonly names: CredentialNames;
-
-  /**
-   * What the claim mapping makes of the connection, or `undefined` for one the
-   * project already had.
-   */
-  readonly claims: ClaimChoice | undefined;
-};
-
-/**
- * The machine-readable result. Never the secret, only whether it is held.
- */
-type Payload = {
-  readonly project_id: string;
-  readonly provider: ProviderName;
-  readonly schema: string;
-  readonly connection: {
-    readonly action: "reuse" | "create";
-    readonly slug: string;
-    readonly file: string;
-    readonly claim_mapping: Readonly<Record<string, string>>;
-    readonly new_attributes: readonly string[];
-    readonly verified_claims: Readonly<Record<string, string | boolean>>;
-    readonly scopes: readonly string[];
-    readonly unmapped: ConnectionSummary["unmapped"];
-    readonly used_by: readonly string[];
-  };
-  readonly callback_uri: string;
-  readonly changed: readonly string[];
-  readonly notices: Change["notices"];
-  readonly client_id: PublishedVariable | null;
-  readonly secret: PublishedVariable | null;
-};
+function plain(value: string): string {
+  return escapeControlCharacters(value, { keepLayout: false });
+}
 
 /**
  * The machine-readable result. Never the secret, only whether it is held.
@@ -253,9 +342,23 @@ type Payload = {
  *
  * @param input - The summary, the change, what became of each credential,
  *   and the variables they go to.
+ * @param input.summary - What the run says about the connection.
+ * @param input.change - The change that adds the connection.
+ * @param input.published - What became of each credential.
+ * @param input.names - The variables the credentials go to.
+ * @param input.claims - What the claim mapping makes of the connection, or
+ *   `undefined` for one the project already had.
  * @returns The result's data.
  */
-export function payload(input: PayloadInput): Payload {
+export function payload(
+  input: Readonly<{
+    summary: Summary;
+    change: DocumentChange<Connection>;
+    published: PublishedCredentials;
+    names: CredentialNames;
+    claims: ClaimChoice | undefined;
+  }>,
+) {
   const mapped = input.change.after.connections.summarize(input.change.document);
   return {
     project_id: input.summary.projectId,
@@ -314,9 +417,6 @@ export function payload(input: PayloadInput): Payload {
  * @param change - The change that adds the connection.
  */
 export function drawMapping(change: DocumentChange<Connection>): void {
-  const text = (value: string) => {
-    return escapeControlCharacters(value, { keepLayout: false });
-  };
   const connection = change.document;
   const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
     change.after.connections.summarize(connection);
@@ -326,57 +426,57 @@ export function drawMapping(change: DocumentChange<Connection>): void {
         return [[property, "always counts as verified"]];
       }
       if (typeof claim === "string") {
-        return [[property, `counts as verified when ${text(claim)} is true`]];
+        return [[property, `counts as verified when ${plain(claim)} is true`]];
       }
       return [];
     }),
   );
-  const sections = [
-    mappings.length === 0
-      ? []
-      : [
-          createsUsers
-            ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-            : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-          ...mappings.map(({ property, claim }) => {
-            const verified = verifiedBy.get(property) ?? "is not treated as verified";
-            return [
-              `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-              `  It ${verified}.`,
-            ].join("\n");
-          }),
-        ],
-    scopes.length === 0
-      ? []
-      : [
-          `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
-        ],
-    unmapped.length === 0
-      ? []
-      : [
-          "These attributes have no claim yet:",
-          ...unmapped.map(({ property, required }) => {
-            if (!required) {
-              return `- ${text(property)} is optional, so it can stay empty.`;
-            }
-            return createsUsers
-              ? `- ${text(property)} is required, so sign-up will have to ask for it.`
-              : `- ${text(property)} is required, but this connection does not create users.`;
-          }),
-        ],
-    usedBy.length === 0
-      ? []
-      : [
-          `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
-        ],
-    [
-      `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
-    ],
-  ].filter((section) => {
-    return section.length > 0;
-  });
   log.info(
-    sections
+    [
+      mappings.length === 0
+        ? []
+        : [
+            createsUsers
+              ? `When someone signs in with ${plain(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+              : `${plain(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+            ...mappings.map(({ property, claim }) => {
+              const verified = verifiedBy.get(property) ?? "is not treated as verified";
+              return [
+                `- ${plain(property)} comes from the provider's ${plain(claim)} claim.`,
+                `  It ${verified}.`,
+              ].join("\n");
+            }),
+          ],
+      scopes.length === 0
+        ? []
+        : [
+            `Zitadel asks ${plain(connection.displayName)} for these scopes: ${CONJUNCTION.format(scopes.map(plain))}.`,
+          ],
+      unmapped.length === 0
+        ? []
+        : [
+            "These attributes have no claim yet:",
+            ...unmapped.map(({ property, required }) => {
+              if (!required) {
+                return `- ${plain(property)} is optional, so it can stay empty.`;
+              }
+              return createsUsers
+                ? `- ${plain(property)} is required, so sign-up will have to ask for it.`
+                : `- ${plain(property)} is required, but this connection does not create users.`;
+            }),
+          ],
+      usedBy.length === 0
+        ? []
+        : [
+            `This connection is used by ${CONJUNCTION.format(usedBy.map(plain))}, so a change here affects the people who sign in with it.`,
+          ],
+      [
+        `To change which claim fills an attribute, edit claim_mapping in ${plain(connection.path)} and run deploy.`,
+      ],
+    ]
+      .filter((section) => {
+        return section.length > 0;
+      })
       .flatMap((section, at) => {
         return at === 0 ? section : ["", ...section];
       })

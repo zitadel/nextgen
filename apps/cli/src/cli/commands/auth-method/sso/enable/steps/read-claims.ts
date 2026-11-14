@@ -1,19 +1,15 @@
-import type { IdpProvider } from "@zitadel/config/idp";
-
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   applyRequest,
   asksForClaims,
   choiceOf,
-  type ClaimRequest,
   claimRequestFromFlags,
   claimsOrRefuse,
-  type MappingState,
   seedMapping,
 } from "@/lib/idp";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-import { type ClaimChoice, Connection, type SsoOptions } from "@/lib/zitadel";
+import { Connection } from "@/lib/zitadel";
 
 /**
  * How `--verified-claim` is spelled, for the note about a replaced default.
@@ -21,40 +17,9 @@ import { type ClaimChoice, Connection, type SsoOptions } from "@/lib/zitadel";
 const VERIFIED_FLAG = "--verified-claim";
 
 /**
- * What the step reads from the steps before it.
+ * What the step reads from what is known.
  */
-type Needs = Readonly<{
-  flags: Readonly<{
-    claim: readonly string[] | undefined;
-    claimScope: string | undefined;
-    verifiedClaim: readonly string[] | undefined;
-  }>;
-  target: SchemaTarget;
-  provider: IdpProvider;
-  options: SsoOptions;
-}>;
-
-/**
- * What the step settles.
- */
-type Read = Readonly<{
-  /**
-   * What the flags asked for beyond the provider's defaults.
-   */
-  claimRequest: ClaimRequest;
-
-  /**
-   * What the connection maps before anything is asked, or `undefined` when the
-   * connection already exists and keeps its own mapping.
-   */
-  mapping: MappingState | undefined;
-
-  /**
-   * What the connection is written with once the flags are applied, or
-   * `undefined` for a connection that already exists.
-   */
-  claims: ClaimChoice | undefined;
-}>;
+type Needs = Fact<"flags" | "target" | "provider" | "options">;
 
 /**
  * Reads the claims the flags map and refuses what the user schema cannot take,
@@ -63,7 +28,14 @@ type Read = Readonly<{
  * @remarks
  * A reused connection keeps the mapping it has: it is the developer's file.
  */
-export class ReadClaims extends WizardStep<"claims", Read, Needs> {
+export class ReadClaims extends WizardStep<
+  "claims",
+  Fact<"claimRequest" | "mapping" | "claims">,
+  Needs
+> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "claims";
 
   /**
@@ -78,7 +50,7 @@ export class ReadClaims extends WizardStep<"claims", Read, Needs> {
    * @throws {@link ZitadelError} With `E_VALIDATION` when a claim does not fit
    *   the user schema.
    */
-  async run(needs: Needs): Promise<Read> {
+  async run(needs: Needs): Promise<Fact<"claimRequest" | "mapping" | "claims">> {
     const claimRequest = claimRequestFromFlags({
       claim: needs.flags.claim,
       scope: needs.flags.claimScope,

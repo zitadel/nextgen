@@ -1,24 +1,16 @@
-import { payload, drawMapping } from "@/cli/commands/auth-method/sso/enable/shared";
+import {
+  drawMapping,
+  type EnableServices,
+  type Fact,
+  payload,
+} from "@/cli/commands/auth-method/sso/enable/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-
-import type { CommandResult } from "@/lib/oclif";
-import type { CredentialDelivery, PublishedCredentials } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
-import type { ClaimChoice, Connection, DocumentChange } from "@/lib/zitadel";
-
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{
-  summary: Summary;
-  change: DocumentChange<Connection>;
-  written: readonly string[];
-  published: PublishedCredentials;
-  delivery: CredentialDelivery;
-  answered: ClaimChoice | undefined;
-}>;
+type Needs = Fact<"summary" | "change" | "written" | "published" | "delivery" | "answered">;
 
 /**
  * What the step is given by the command.
@@ -28,14 +20,20 @@ type Deps = Pick<EnableServices, "followUps" | "isJson" | "suggest">;
 /**
  * Words what the run did as the command's result.
  */
-export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandResult }>, Needs> {
+export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "result";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -51,10 +49,9 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
    * connection was reused and no file was written.
    *
    * @param needs - What the run did.
-   * @param this.deps - What the command provides.
    * @returns The result the command answers with.
    */
-  async run(needs: Needs): Promise<Readonly<{ answer: CommandResult }>> {
+  async run(needs: Needs): Promise<Fact<"answer">> {
     const name = needs.summary.displayName;
     const unpublished = !needs.summary.reused || needs.written.length > 0;
     const followUps = this.deps.followUps(

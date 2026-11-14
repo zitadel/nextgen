@@ -1,6 +1,6 @@
 import { providerOf } from "@zitadel/config/idp";
 
-import type { Fact, SetupServices, SsoDraft } from "@/cli/commands/setup/shared";
+import type { Fact, SetupAnswers, SetupServices, SsoDraft } from "@/cli/commands/setup/shared";
 import { asksForClaims, ClaimQuestions, NO_CLAIM_REQUEST, seedMapping } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
 import { Connection, ZitadelConfig } from "@/lib/zitadel";
@@ -25,13 +25,19 @@ type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive" | "ui">;
  * question; a run nobody can answer, and a preview, take the defaults.
  */
 export class MapClaims extends WizardStep<"claims", Fact<"answers">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "claims";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -41,7 +47,6 @@ export class MapClaims extends WizardStep<"claims", Fact<"answers">, Needs> {
    * Ask about the claims of each provider that the flags left out.
    *
    * @param needs - The answers so far.
-   * @param this.deps - What the command provides.
    * @returns The answers, with what each provider maps.
    */
   async run(needs: Needs): Promise<Fact<"answers">> {
@@ -67,7 +72,7 @@ export class MapClaims extends WizardStep<"claims", Fact<"answers">, Needs> {
    * @returns Each provider with what it maps beyond the defaults.
    */
   private async askAbout(
-    answers: Needs["answers"],
+    answers: SetupAnswers,
     drafts: readonly SsoDraft[],
   ): Promise<readonly SsoDraft[]> {
     const [draft, ...rest] = drafts;

@@ -1,17 +1,19 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import {
-  retryOptionsFromFlags,
-  setupRetryFlags,
-  type SetupRetryOptions,
-  ssoRecovery,
-} from "@/cli/commands/setup/shared";
 import { basename } from "node:path";
+
 import { type CreatedProject, createZitadelClient, ProjectService } from "@/lib/backend";
 import { toZitadelError, ZitadelError } from "@/lib/errors";
-
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { WizardStep } from "@/lib/wizard";
+
+import {
+  type Fact,
+  retryOptionsFromFlags,
+  type SetupRetryOptions,
+  type SetupServices,
+  setupRetryFlags,
+  ssoRecovery,
+} from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -33,13 +35,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "signal" | "suggest" | "ui">;
  * deploy publishes them.
  */
 export class CreateProject extends WizardStep<"project", Fact<"project" | "retry">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "project";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -62,7 +70,6 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
    * name. A refusal carries the hint to start a local server first and the commands to retry.
    *
    * @param needs - The flags, the app and the answers.
-   * @param this.deps - What the command provides.
    * @returns The project, and what a retry has to carry.
    * @throws {@link ZitadelError} When the server refuses to create the project.
    */
@@ -119,10 +126,7 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
               const normalized = toZitadelError(error);
               const sso = ssoRecovery(retry, this.deps.suggest);
               throw new ZitadelError(normalized.code, normalized.message, {
-                hint:
-                  `${normalized.hint ? `${normalized.hint} ` : ""}` +
-                  "If you meant to use a local Zitadel server, start it first " +
-                  `and retry setup with the commands below. ${sso.hint}`.trimEnd(),
+                hint: `${normalized.hint ? `${normalized.hint} ` : ""}If you meant to use a local Zitadel server, start it first and retry setup with the commands below. ${sso.hint}`.trimEnd(),
                 nextCommands: [
                   this.deps.suggest({ id: "start" }),
                   this.deps.suggest({

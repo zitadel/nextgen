@@ -1,23 +1,6 @@
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { isCancelled, Origins, OriginService } from "@/lib/backend";
-import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { WizardStep } from "@/lib/wizard";
-
-import type { EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
-
-/**
- * What the run learned about the project it addresses.
- */
-type Remote = Readonly<{
-  /**
-   * The connection to the project and server.
-   */
-  remote: RemoteConnection;
-
-  /**
-   * The origins the project serves, which name more callback URIs.
-   */
-  origins: Origins;
-}>;
 
 /**
  * What the step is given by the command.
@@ -28,14 +11,20 @@ type Deps = Pick<EnableServices, "connect">;
  * Resolves the project and server before anything else is asked for: being
  * turned away after typing a secret would mean typing it again.
  */
-export class ReadOrigins extends WizardStep<"remote", Remote, object> {
+export class ReadOrigins extends WizardStep<"remote", Fact<"remote" | "origins">, object> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "remote";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -50,22 +39,20 @@ export class ReadOrigins extends WizardStep<"remote", Remote, object> {
    * instead, as `OriginService.remove` does.
    *
    * @param _needs - Nothing from earlier steps.
-   * @param this.deps - What the command provides.
    * @returns The connection and the origins.
    */
-  async run(_needs: object): Promise<Remote> {
+  async run(_needs: object): Promise<Fact<"remote" | "origins">> {
     const remote = await this.deps.connect();
-    const origins = await new OriginService(remote.client, remote.projectId)
-      .list()
-      .catch((cause: unknown) => {
-        if (isCancelled(remote.client)) {
-          throw cause;
-        }
-        return Origins.wrap([]);
-      });
     return {
       remote,
-      origins,
+      origins: await new OriginService(remote.client, remote.projectId)
+        .list()
+        .catch((cause: unknown) => {
+          if (isCancelled(remote.client)) {
+            throw cause;
+          }
+          return Origins.wrap([]);
+        }),
     };
   }
 }

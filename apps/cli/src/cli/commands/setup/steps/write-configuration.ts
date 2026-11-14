@@ -1,8 +1,25 @@
+import { join } from "node:path";
+
+import {
+  flowsReadmeContent,
+  policiesReadmeContent,
+  schemasReadmeContent,
+} from "@zitadel/config/defaults";
+
+import {
+  type Fact,
+  README,
+  type SetupServices,
+  scaffoldOf,
+  setupRefusal,
+  setupRetryFlags,
+  signInOf,
+} from "@/cli/commands/setup/shared";
 import { createZitadelClient, InvalidError, PolicyService } from "@/lib/backend";
 import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { normalizePublicCliProse } from "@/lib/public-cli";
-import { userAgent } from "@/lib/user-agent";
 import { WHAT_CHANGED } from "@/lib/suggestion";
+import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 import {
@@ -12,21 +29,6 @@ import {
   FileExistsError,
   SignupPolicy,
 } from "@/lib/zitadel";
-import {
-  flowsReadmeContent,
-  policiesReadmeContent,
-  schemasReadmeContent,
-} from "@zitadel/config/defaults";
-import { join } from "node:path";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import {
-  README,
-  scaffoldOf,
-  setupRefusal,
-  setupRetryFlags,
-  signInOf,
-} from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -52,13 +54,19 @@ type Deps = Pick<
  * patch step's undo.
  */
 export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffolded">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "configuration";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -87,7 +95,6 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
    * file, and it does not cover a connection under `.zitadel/idps/`, which is the developer's.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns The absolute paths written and the minimum password length the policy holds.
    * @throws {@link ZitadelError} When a file cannot be written: with `E_CONFLICT` when a file setup
    *   will not replace is there, or `E_VALIDATION` when a policy `--force` keeps is not valid.

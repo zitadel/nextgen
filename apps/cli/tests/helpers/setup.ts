@@ -1,8 +1,8 @@
-import { write } from "@tests/helpers/git-repo";
-import { parseJson } from "@tests/helpers/run-cli";
 import type { SetupServices } from "@/cli/commands/setup/shared";
 import { asker } from "@/lib/input";
 import { Ui } from "@/lib/ui";
+import { write } from "@tests/helpers/git-repo";
+import { parseJson } from "@tests/helpers/run-cli";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /**

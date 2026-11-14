@@ -1,11 +1,11 @@
-import type { Parsed } from "@zitadel/config/idp";
 import { z } from "zod";
-import { type Refused, whole } from "@/lib/oclif/flags";
+
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { LocalServer } from "@/lib/local-server/server";
+import { whole } from "@/lib/oclif/flags";
+import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { isDevelopmentBuild } from "@/lib/build-channel";
-import { WizardStep } from "@/lib/wizard";
 
 /**
  * The lowest TCP port a server can listen on.
@@ -18,25 +18,15 @@ const MIN_PORT = 1;
 const MAX_PORT = 65_535;
 
 /**
- * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
- * port a server can listen on.
+ * The schema of a TCP port, refusing what is not a whole number from 1 to 65535,
+ * which is no port a server can listen on.
  */
-const PORT = {
-  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
-  refusal: {
-    message: "{value} is not a TCP port",
-    hint: "Use a TCP port from {min} to {max}.",
-  },
-  values: {
-    min: MIN_PORT,
-    max: MAX_PORT,
-  },
-} as const satisfies Refused<number>;
+const PORT = whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT));
 
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 
 /**
  * What the step is given by the command.
@@ -61,14 +51,20 @@ type Deps = Pick<
  * validated answer becomes the issuer URL (`http://localhost:<port>`) via
  * `issuerFromPort`.
  */
-export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, QuestionNeeds> {
+export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "devPort";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -78,10 +74,9 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Questi
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
+  async run(needs: Needs): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
@@ -122,8 +117,8 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Questi
    * Ask which port the app runs on, when the detected one is taken.
    *
    * @remarks
-   * `--dev-port <n>` is authoritative: skip the prompt so an interactive answer can't override the
-   * explicit flag (the base command already folded it into answers.devPort).
+   * `--dev-port <n>` is authoritative: the prompt is skipped so an interactive answer cannot
+   * override the explicit flag, which the command already folded into `answers.devPort`.
    *
    * With the next ones all taken too, the detected port is still the best guess.
    *
@@ -143,28 +138,19 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Questi
         message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
         placeholder: suggested,
         initialValue: suggested,
-        parse: readPort,
+        parse: (value) => {
+          const parsed = PORT.safeParse(value);
+          return parsed.success
+            ? {
+                ok: true,
+                value: parsed.data,
+              }
+            : {
+                ok: false,
+                problem: "Must be a port number",
+              };
+        },
       }),
     };
   }
-}
-
-/**
- * The port a value names, for the dev-port prompt, so a port typed at the
- * prompt and one passed as `--dev-port` are held to the same rule.
- *
- * @param value - What was typed.
- * @returns The port, or what is wrong with the value.
- */
-export function readPort(value: string): Parsed<number> {
-  const parsed = PORT.schema.safeParse(value);
-  return parsed.success
-    ? {
-        ok: true,
-        value: parsed.data,
-      }
-    : {
-        ok: false,
-        problem: "Must be a port number",
-      };
 }

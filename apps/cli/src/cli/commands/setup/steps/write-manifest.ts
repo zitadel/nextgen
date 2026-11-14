@@ -1,9 +1,8 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -27,13 +26,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun">;
  * fallback, it never breaks setup.
  */
 export class WriteManifest extends WizardStep<"manifest", object, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "manifest";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -43,7 +48,6 @@ export class WriteManifest extends WizardStep<"manifest", object, Needs> {
    * Write the manifest.
    *
    * @param needs - What the patch did.
-   * @param this.deps - What the command provides.
    * @returns Nothing is added.
    */
   async run(needs: Needs): Promise<object> {

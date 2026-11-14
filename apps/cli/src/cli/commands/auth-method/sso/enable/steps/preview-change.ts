@@ -1,13 +1,18 @@
-import { drawMapping, payload } from "@/cli/commands/auth-method/sso/enable/shared";
-import type { ClientId } from "@zitadel/config/idp";
-import type { CredentialDelivery, PublishedCredentials } from "@/lib/idp";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-
+import {
+  drawMapping,
+  type EnableServices,
+  type Fact,
+  payload,
+} from "@/cli/commands/auth-method/sso/enable/shared";
+import type { PublishedCredentials } from "@/lib/idp";
 import type { CommandResult } from "@/lib/oclif";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { EndStep } from "@/lib/wizard";
-import type { ClaimChoice, Connection, DocumentChange } from "@/lib/zitadel";
 
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
+/**
+ * Joins a list the way a sentence does: "a, b and c".
+ */
+const CONJUNCTION = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * Nothing sent to the project, as a dry run reports it.
@@ -20,13 +25,7 @@ const NOTHING_PUBLISHED: PublishedCredentials = {
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{
-  flags: Readonly<{ clientId: ClientId | undefined }>;
-  summary: Summary;
-  preview: DocumentChange<Connection>;
-  delivery: CredentialDelivery;
-  claims: ClaimChoice | undefined;
-}>;
+type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "claims">;
 
 /**
  * What the step is given by the command.
@@ -38,13 +37,19 @@ type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "isJson" | "realRun" | "r
  * asked or read.
  */
 export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "preview";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -54,7 +59,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
    * Whether the run only previews.
    *
    * @param _needs - What was read and decided.
-   * @param this.deps - What the command provides.
    * @returns Whether to end here.
    */
   when(_needs: Needs): boolean {
@@ -73,7 +77,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
    * client id given with `--client-id` is listed.
    *
    * @param needs - What was read and decided.
-   * @param this.deps - What the command provides.
    * @returns The dry run's result.
    */
   async run(needs: Needs): Promise<CommandResult> {
@@ -93,11 +96,7 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
       ...needs.preview.changedPaths.map((file) => {
         return `Would write ${file}`;
       }),
-      ...(toStore.length > 0
-        ? [
-            `Would store ${new Intl.ListFormat("en", { type: "conjunction" }).format(toStore)} on the project`,
-          ]
-        : []),
+      ...(toStore.length > 0 ? [`Would store ${CONJUNCTION.format(toStore)} on the project`] : []),
     ];
     const title = escapeControlCharacters(
       said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,

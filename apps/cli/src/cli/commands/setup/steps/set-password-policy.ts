@@ -1,21 +1,17 @@
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { isDevelopmentBuild } from "@/lib/build-channel";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { WizardStep } from "@/lib/wizard";
 
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "answers">;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
 
 /**
  * "Which minimum length should passwords have?" — a choice of 15
@@ -32,105 +28,68 @@ type Deps = Pick<
  *
  * `--password-min-length` is authoritative and skips the question.
  */
-export class SetPasswordPolicy extends WizardStep<
-  "passwordPolicy",
-  Fact<"answers">,
-  QuestionNeeds
-> {
+export class SetPasswordPolicy extends WizardStep<"passwordPolicy", Fact<"answers">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "passwordPolicy";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @param this.deps - What the command provides.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
-    const { app, flags, orca, scaffoldedFramework } = needs;
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, {
-        ask: this.deps.ask,
-        note: (title, lines) => {
-          this.deps.ui.note(title, lines);
-        },
-        say: (text) => {
-          this.deps.ui.say(text);
-        },
-        spinner: (label, options) => {
-          return this.deps.ui.spinner(label, options);
-        },
-        framework: {
-          id: app.framework,
-          displayName: orca.displayName(app.framework),
-        },
-        suggest: this.deps.suggest,
-        cwd: this.deps.cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.deps.serverFlag,
-        devPortFromFlag: flags.devPort !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags.useCase !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      }),
-    };
-  }
-
-  /**
-   * Ask which minimum length passwords have.
+   * Ask which minimum length passwords have, or leave the answers as they are when nothing can be
+   * asked.
    *
    * @remarks
    * The recommended label is not suffixed "(recommended)": the prompt puts the hint in
    * parentheses too.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
-   * @returns The answers, with the minimum length settled.
+   * @param needs - The flags and the answers so far.
+   * @returns The answers, with this question's settled.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.passwordMinLengthFromFlag) {
-      return answers;
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers, flags } = needs;
+    if (this.deps.nonInteractive || this.deps.dryRun || flags.passwordMinLength !== undefined) {
+      return {
+        answers,
+      };
     }
     return {
-      ...answers,
-      passwordMinLength: await ctx.ask.select({
-        name: "minimum password length",
-        message: "Which minimum length should passwords have? You can change it later.",
-        initialValue: RECOMMENDED_PASSWORD_MIN_LENGTH,
-        options: [
-          {
-            value: RECOMMENDED_PASSWORD_MIN_LENGTH,
-            label: `${RECOMMENDED_PASSWORD_MIN_LENGTH} characters — recommended`,
-            hint: "NIST minimum for password-only sign-in",
-          },
-          {
-            value: 8,
-            label: "8 characters",
-            hint: "NIST minimum with a second factor",
-          },
-          {
-            value: null,
-            label: "No minimum",
-          },
-        ],
-      }),
+      answers: {
+        ...answers,
+        passwordMinLength: await this.deps.ask.select({
+          name: "minimum password length",
+          message: "Which minimum length should passwords have? You can change it later.",
+          initialValue: RECOMMENDED_PASSWORD_MIN_LENGTH,
+          options: [
+            {
+              value: RECOMMENDED_PASSWORD_MIN_LENGTH,
+              label: `${RECOMMENDED_PASSWORD_MIN_LENGTH} characters — recommended`,
+              hint: "NIST minimum for password-only sign-in",
+            },
+            {
+              value: 8,
+              label: "8 characters",
+              hint: "NIST minimum with a second factor",
+            },
+            {
+              value: null,
+              label: "No minimum",
+            },
+          ],
+        }),
+      },
     };
   }
 }
