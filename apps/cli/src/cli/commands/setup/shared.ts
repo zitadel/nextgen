@@ -140,6 +140,32 @@ const SENTENCE_BY_PATH: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The lowest TCP port a server can listen on.
+ */
+const MIN_PORT = 1;
+
+/**
+ * The highest TCP port a server can listen on.
+ */
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+export const PORT = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+} as const satisfies Refused<number>;
+
+/**
  * A social provider chosen during setup, with whatever of its application's
  * credentials is known so far.
  *
@@ -247,6 +273,164 @@ type App = Readonly<{
    */
   devPort: number;
 }>;
+
+/**
+ * The parts of a setup invocation that a retry suggestion must reproduce.
+ * Suggested retries are followed verbatim (especially by agents), so dropping
+ * a flag here silently changes what the retry scaffolds.
+ */
+export type SetupRetryOptions = Readonly<{
+  /**
+   * The framework as `--framework` named it.
+   */
+  framework?: string;
+
+  /**
+   * The sign-in preset.
+   */
+  preset?: SetupPreset;
+
+  /**
+   * The use case.
+   */
+  useCase?: SetupUseCase;
+
+  /**
+   * The renderer.
+   */
+  renderer?: string;
+
+  /**
+   * The dev-server port.
+   */
+  devPort?: number;
+
+  /**
+   * The `--sso` flags as typed, when they could not be resolved to a provider
+   * yet: a custom connection described in part, which the wizard completes.
+   * Dropping them would send the developer back without what they typed.
+   */
+  ssoTyped?: Readonly<{
+    /**
+     * The provider, as typed.
+     */
+    sso: string;
+
+    /**
+     * The name of the connection.
+     */
+    ssoSlug?: string;
+
+    /**
+     * The name shown on the sign-in button.
+     */
+    ssoDisplayName?: string;
+
+    /**
+     * The provider's issuer URL.
+     */
+    ssoIssuer?: string;
+
+    /**
+     * The scopes to request.
+     */
+    ssoScopes?: string;
+  }>;
+
+  /**
+   * The social provider and its client id. The secret is deliberately absent:
+   * a retry asks for it again, or takes it on stdin, because putting a
+   * credential in suggested command text is exactly what piping the secret
+   * exists to avoid. It never reaches the filesystem either way — the value
+   * goes to the project's variables, which is where the engine resolves the
+   * connection's `${{ NAME }}` from.
+   */
+  sso?: readonly ProviderSelection[];
+
+  /**
+   * The claims asked for with `--sso-claim`. They are not credentials, so they
+   * travel in the command.
+   */
+  ssoClaims?: ClaimRequest;
+
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
+
+  /**
+   * The server as the developer typed it. Left out, a retry pins the local
+   * server; `null` leaves it to the default, as a run that typed none did.
+   */
+  server?: string | null;
+}>;
+
+/**
+ * The sign-in configuration setup's answers add up to, as `data.sign_in`
+ * reports it. Read off the schema setup renders rather than inferred from the
+ * preset's name: `password-first` enables passkeys too, and a use case's
+ * profile fields are optional. It describes what is configured, not that
+ * sign-in works: an enabled method is not a credential a user has registered.
+ */
+export type SignIn = Readonly<{
+  /**
+   * The method the login flow's entry step offers.
+   */
+  starts_with: "password" | "passkey";
+
+  /**
+   * The methods the user schema enables: the one sign-in starts with, the
+   * other, then `sso` when a provider is on.
+   */
+  methods: readonly string[];
+
+  /**
+   * What registration asks for, in order, and whether each is required.
+   */
+  fields: ReadonlyArray<
+    Readonly<{
+      name: string;
+      required: boolean;
+    }>
+  >;
+
+  /**
+   * `null` when passwords have no minimum length.
+   */
+  password_min_length: number | null;
+
+  /**
+   * The external providers' slugs, in the order they were chosen.
+   */
+  providers: readonly string[];
+}>;
+
+/**
+ * What the git working tree of a project holds, as setup needs to know before
+ * it writes.
+ */
+export type WorktreeState =
+  | Readonly<{
+      kind: "no-repository";
+    }>
+  | Readonly<{
+      kind: "unknown";
+      reason: string;
+    }>
+  | Readonly<{
+      kind: "blocked";
+      blocked: string;
+    }>
+  | Readonly<{
+      kind: "dirty";
+      modified: readonly string[];
+      untracked: readonly string[];
+    }>
+  | Readonly<{
+      kind: "clean";
+    }>;
 
 /**
  * Everything a run of `setup` comes to know, by the name each fact is read by.
@@ -541,6 +725,11 @@ export type SetupServices = Readonly<{
   isJson: boolean;
 
   /**
+   * Whether this is a development build that may ask where a provider answers.
+   */
+  developmentBuild: boolean;
+
+  /**
    * The server as the developer typed it, when they did.
    */
   serverFlag: string | undefined;
@@ -583,99 +772,6 @@ export type SetupServices = Readonly<{
    * @param server - The server to pin them to.
    */
   recoverAt: (server: string) => void;
-}>;
-
-/**
- * The parts of a setup invocation that a retry suggestion must reproduce.
- * Suggested retries are followed verbatim (especially by agents), so dropping
- * a flag here silently changes what the retry scaffolds.
- */
-export type SetupRetryOptions = Readonly<{
-  /**
-   * The framework as `--framework` named it.
-   */
-  framework?: string;
-
-  /**
-   * The sign-in preset.
-   */
-  preset?: SetupPreset;
-
-  /**
-   * The use case.
-   */
-  useCase?: SetupUseCase;
-
-  /**
-   * The renderer.
-   */
-  renderer?: string;
-
-  /**
-   * The dev-server port.
-   */
-  devPort?: number;
-
-  /**
-   * The `--sso` flags as typed, when they could not be resolved to a provider
-   * yet: a custom connection described in part, which the wizard completes.
-   * Dropping them would send the developer back without what they typed.
-   */
-  ssoTyped?: Readonly<{
-    /**
-     * The provider, as typed.
-     */
-    sso: string;
-
-    /**
-     * The name of the connection.
-     */
-    ssoSlug?: string;
-
-    /**
-     * The name shown on the sign-in button.
-     */
-    ssoDisplayName?: string;
-
-    /**
-     * The provider's issuer URL.
-     */
-    ssoIssuer?: string;
-
-    /**
-     * The scopes to request.
-     */
-    ssoScopes?: string;
-  }>;
-
-  /**
-   * The social provider and its client id. The secret is deliberately absent:
-   * a retry asks for it again, or takes it on stdin, because putting a
-   * credential in suggested command text is exactly what piping the secret
-   * exists to avoid. It never reaches the filesystem either way — the value
-   * goes to the project's variables, which is where the engine resolves the
-   * connection's `${{ NAME }}` from.
-   */
-  sso?: readonly ProviderSelection[];
-
-  /**
-   * The claims asked for with `--sso-claim`. They are not credentials, so they
-   * travel in the command.
-   */
-  ssoClaims?: ClaimRequest;
-
-  /**
-   * The minimum password length the run was given: a number, or `null` for
-   * an explicit "none", carried as `--password-min-length 0` so a kept policy
-   * file still loses its minimum on the retry.
-   */
-  passwordMinLength?: PasswordMinLength;
-
-  /**
-   * The server as the developer typed it. Left out, a retry pins the local
-   * server; `null` leaves it to the default, as a run that typed none did.
-   */
-  server?: string | null;
 }>;
 
 /**
@@ -972,46 +1068,6 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
 }
 
 /**
- * The sign-in configuration setup's answers add up to, as `data.sign_in`
- * reports it. Read off the schema setup renders rather than inferred from the
- * preset's name: `password-first` enables passkeys too, and a use case's
- * profile fields are optional. It describes what is configured, not that
- * sign-in works: an enabled method is not a credential a user has registered.
- */
-export type SignIn = Readonly<{
-  /**
-   * The method the login flow's entry step offers.
-   */
-  starts_with: "password" | "passkey";
-
-  /**
-   * The methods the user schema enables: the one sign-in starts with, the
-   * other, then `sso` when a provider is on.
-   */
-  methods: readonly string[];
-
-  /**
-   * What registration asks for, in order, and whether each is required.
-   */
-  fields: ReadonlyArray<
-    Readonly<{
-      name: string;
-      required: boolean;
-    }>
-  >;
-
-  /**
-   * `null` when passwords have no minimum length.
-   */
-  password_min_length: number | null;
-
-  /**
-   * The external providers' slugs, in the order they were chosen.
-   */
-  providers: readonly string[];
-}>;
-
-/**
  * The sign-in configuration setup's answers add up to, read off the
  * configuration setup scaffolds for them.
  *
@@ -1106,31 +1162,6 @@ export function describeWrittenFile(relPath: string, dryRun: boolean): string | 
   }
   return `${verb} ${stylePath(escapeControlCharacters(relPath))}`;
 }
-
-/**
- * What the git working tree of a project holds, as setup needs to know before
- * it writes.
- */
-export type WorktreeState =
-  | Readonly<{
-      kind: "no-repository";
-    }>
-  | Readonly<{
-      kind: "unknown";
-      reason: string;
-    }>
-  | Readonly<{
-      kind: "blocked";
-      blocked: string;
-    }>
-  | Readonly<{
-      kind: "dirty";
-      modified: readonly string[];
-      untracked: readonly string[];
-    }>
-  | Readonly<{
-      kind: "clean";
-    }>;
 
 /**
  * Reports what the repository of a project holds, before setup writes a single
@@ -1462,29 +1493,3 @@ export function ssoRecovery(
     }),
   };
 }
-
-/**
- * The lowest TCP port a server can listen on.
- */
-const MIN_PORT = 1;
-
-/**
- * The highest TCP port a server can listen on.
- */
-const MAX_PORT = 65_535;
-
-/**
- * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
- * port a server can listen on.
- */
-export const PORT = {
-  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
-  refusal: {
-    message: "{value} is not a TCP port",
-    hint: "Use a TCP port from {min} to {max}.",
-  },
-  values: {
-    min: MIN_PORT,
-    max: MAX_PORT,
-  },
-} as const satisfies Refused<number>;

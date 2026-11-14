@@ -22,10 +22,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "ui">;
 
 /**
  * "Which Zitadel server should your app use?" — Zitadel Cloud, the managed

@@ -21,6 +21,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { errorMessage } from "@/lib/errors";
 import {
   customExample,
@@ -399,11 +400,10 @@ export default class Setup extends Destructive(BaseCommand) {
    *
    * @remarks
    * The steps are built when this runs, not when the file loads, so a step may
-   * import what it needs from this file. Every step that may ask the person
-   * takes the same services, held once as `prompting`. Every step is built
-   * before the first one runs, so nothing handed to a step may read the server
-   * from `this.meta.source`: the preconditions settle it, and later steps read
-   * it from their `preflight`.
+   * import what it needs from this file. Every step is built before the first
+   * one runs, so nothing handed to a step may read the server from
+   * `this.meta.source`: the preconditions settle it, and later steps read it
+   * from their `preflight`.
    *
    * @param admitted - What the command admitted.
    * @param admitted.flags - The flags.
@@ -411,16 +411,6 @@ export default class Setup extends Destructive(BaseCommand) {
    */
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
-
-    const prompting = {
-      ask: this.ask,
-      cwd: this.cwd,
-      dryRun: this.dryRun,
-      nonInteractive: this.nonInteractive,
-      serverFlag: this.meta.serverFlag,
-      suggest: this.suggest,
-      ui: this.ui,
-    };
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
@@ -494,13 +484,61 @@ export default class Setup extends Destructive(BaseCommand) {
           },
         )
         .step(new ApplyDefaults())
-        .step(new ConfirmFramework(prompting))
-        .step(new ChooseServer(prompting))
-        .step(new ChooseDevPort(prompting))
-        .step(new ChooseUseCase(prompting))
-        .step(new ChooseSignIn(prompting))
-        .step(new SetPasswordPolicy(prompting))
-        .step(new ChooseSocialSignIn(prompting))
+        .step(
+          new ConfirmFramework({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseServer({
+            ask: this.ask,
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            serverFlag: this.meta.serverFlag,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new ChooseDevPort({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseUseCase({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseSignIn({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new SetPasswordPolicy({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseSocialSignIn({
+            ask: this.ask,
+            developmentBuild: isDevelopmentBuild(),
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
         .step(
           new SettleAnswers({
             dryRun: this.dryRun,

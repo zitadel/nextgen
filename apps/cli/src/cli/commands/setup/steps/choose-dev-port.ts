@@ -12,10 +12,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
 
 /**
  * "Port 3000 is in use. Which port should your app run on?" — asked only when

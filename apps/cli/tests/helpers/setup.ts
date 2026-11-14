@@ -55,12 +55,13 @@ export function aQuestionDeps(
   cwd = "/tmp/app",
 ): Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "developmentBuild" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
 > {
   const audience = { interactive: true, force: false };
   return {
     ask: asker(audience),
     cwd,
+    developmentBuild: false,
     dryRun: false,
     nonInteractive: false,
     serverFlag: undefined,

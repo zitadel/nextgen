@@ -100,6 +100,24 @@ export class PublishCredentials extends WizardStep<
             }),
             project.id,
           );
+    const publish: SecretPublisher | undefined =
+      variables === undefined
+        ? undefined
+        : async (name, value, options) => {
+            try {
+              await variables.set(
+                name,
+                value,
+                VariableWrite.of({
+                  secret: options.secret,
+                  preview: false,
+                }),
+              );
+            } catch (error) {
+              log.debug(`Publishing ${name} to the project failed`, error);
+              throw error;
+            }
+          };
     return {
       ssoOutcomes: new Map(
         await this.publishEach(
@@ -118,23 +136,7 @@ export class PublishCredentials extends WizardStep<
               },
             };
           }),
-          variables === undefined
-            ? undefined
-            : async (name, value, { secret }) => {
-                try {
-                  await variables.set(
-                    name,
-                    value,
-                    VariableWrite.of({
-                      secret,
-                      preview: false,
-                    }),
-                  );
-                } catch (error) {
-                  log.debug(`Publishing ${name} to the project failed`, error);
-                  throw error;
-                }
-              },
+          publish,
         ),
       ),
     };

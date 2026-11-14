@@ -196,10 +196,10 @@ async function socialFor(
   answers: SetupAnswers,
   options: { flags?: Partial<SetupFlags>; developmentBuild?: boolean } = {},
 ): Promise<SetupAnswers> {
-  vi.stubEnv("ZITADEL_CLI_DEV", options.developmentBuild === true ? "1" : "");
   return (
     await new ChooseSocialSignIn({
       ...aQuestionDeps(),
+      developmentBuild: options.developmentBuild === true,
       suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
       ui: UI,
     }).run({

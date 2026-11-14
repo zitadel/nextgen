@@ -12,10 +12,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
 
 /**
  * "Which fields should registration collect?" — picks the use case,

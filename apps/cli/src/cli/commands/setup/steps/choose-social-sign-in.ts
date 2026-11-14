@@ -20,7 +20,6 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
 import { reportWarning } from "@/lib/warnings";
@@ -46,7 +45,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
  */
 type Deps = Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "developmentBuild" | "dryRun" | "nonInteractive" | "suggest" | "ui"
 >;
 
 /**
@@ -202,7 +201,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       selection.kind === "custom"
         ? undefined
         : (flagged?.endpoints ??
-          (isDevelopmentBuild()
+          (this.deps.developmentBuild
             ? {
                 issuer: await this.deps.ask.text({
                   name: "issuer",

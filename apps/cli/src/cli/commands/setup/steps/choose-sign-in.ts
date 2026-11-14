@@ -12,10 +12,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
 
 /**
  * "Which sign-in method would you like your users to see first?" — picks the
