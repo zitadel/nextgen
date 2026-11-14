@@ -435,6 +435,20 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
   }
 
   /**
+   * Whether a property is declared `x-unique`, so two users cannot hold the
+   * same value of it.
+   *
+   * @remarks
+   * The contract keeps no `x-unique`, so it is read from the body as written.
+   *
+   * @param property - The property's name.
+   * @returns Whether it is unique.
+   */
+  isUnique(property: PropertyName): boolean {
+    return typeof objectAt(objectAt(this.body, "properties"), property)["x-unique"] === "string";
+  }
+
+  /**
    * Find the JSON types a property declares.
    *
    * @remarks

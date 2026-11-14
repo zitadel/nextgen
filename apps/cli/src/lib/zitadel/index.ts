@@ -131,6 +131,7 @@ export {
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas";
 export { DiskStore } from "@/lib/zitadel/storage";
+export { standardClaim, STANDARD_CLAIMS, type StandardClaimName } from "@/lib/zitadel/rules/claims";
 export {
   RULE_IDS,
   type FlowCheck,
