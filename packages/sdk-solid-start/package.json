@@ -51,13 +51,13 @@
     "solid-js": "^1.8.0"
   },
   "devDependencies": {
-    "@solidjs/router": "^1.0.0",
-    "@solidjs/start": "^2.0.6",
+    "@solidjs/router": "^1.0.1",
+    "@solidjs/start": "^2.2.1",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/server-sdk-contract": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
-    "solid-js": "^1.9.12",
+    "solid-js": "^1.9.18",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
