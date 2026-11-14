@@ -2,10 +2,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import type { Credentials } from "./credentials";
-import { Lane, type Runner } from "./lane";
+import { Lane, type Instance, type Instances, type Runner } from "./lane";
 import { SchemathesisReport } from "./report";
 import type { SchemathesisInput } from "./schemathesis";
 import { OpenApiSpec } from "./spec";
@@ -37,17 +36,36 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-function lane(runner: Runner, credentials?: Partial<Credentials>): Lane {
+/** Hands out a new instance on each call, and remembers which are still running. */
+function instances(): Instances & { started: Instance[]; running: Set<Instance> } {
+  const started: Instance[] = [];
+  const running = new Set<Instance>();
+  return {
+    started,
+    running,
+    start() {
+      const instance: Instance = {
+        baseUrl: `http://instance-${String(started.length)}/api/v1`,
+        credentialFor: (family) => {
+          return Promise.resolve({ headers: { Family: family }, schemes: {} });
+        },
+        stop: () => {
+          running.delete(instance);
+          return Promise.resolve();
+        },
+      };
+      started.push(instance);
+      running.add(instance);
+      return Promise.resolve(instance);
+    },
+  };
+}
+
+function lane(runner: Runner, provider: Instances = instances()): Lane {
   return new Lane({
     spec,
     specText: "{}",
-    baseUrl: "http://x/api/v1",
-    credentials: {
-      forFamily: vi.fn().mockImplementation((family: string) => {
-        return Promise.resolve({ headers: { Family: family }, schemes: {} });
-      }),
-      ...credentials,
-    } as unknown as Credentials,
+    instances: provider,
     runner,
     workDir: join(directory, "work"),
     artifactsDir: join(directory, "out"),
@@ -188,10 +206,7 @@ describe("Lane", () => {
       return new Lane({
         spec: big,
         specText: "{}",
-        baseUrl: "http://x/api/v1",
-        credentials: {
-          forFamily: () => Promise.resolve({ headers: {}, schemes: {} }),
-        } as unknown as Credentials,
+        instances: instances(),
         runner,
         workDir: join(directory, "work"),
         artifactsDir: join(directory, "out"),
@@ -295,23 +310,53 @@ describe("Lane", () => {
     expect(finished).toBe(true);
   });
 
-  test("mints credentials one family at a time", async () => {
-    let active = 0;
-    let most = 0;
-    const credentials = {
-      forFamily: async () => {
-        active += 1;
-        most = Math.max(most, active);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 5);
-        });
-        active -= 1;
-        return { headers: {}, schemes: {} };
+  test("runs every container on an instance of its own and stops each one", async () => {
+    const provider = instances();
+    const fake = runner();
+
+    await lane(fake, provider).run();
+
+    expect(new Set(fake.inputs.map((input) => input.baseUrl)).size).toBe(fake.inputs.length);
+    expect(provider.started).toHaveLength(fake.inputs.length);
+    expect(provider.running.size).toBe(0);
+  });
+
+  test("gives every slice and the multi-step run of a big family an instance of their own", async () => {
+    const paths: Record<string, Record<string, unknown>> = {};
+    for (let index = 0; index < 32; index += 1) {
+      paths[`/things/${String(index)}`] = { get: { operationId: `get${String(index)}` } };
+    }
+    const provider = instances();
+    const fake = runner();
+
+    await new Lane({
+      spec: new OpenApiSpec({
+        components: { securitySchemes: { oauth2: { type: "oauth2" } } },
+        security: [{ oauth2: [] }],
+        paths,
+      }),
+      specText: "{}",
+      instances: provider,
+      runner: fake,
+      workDir: join(directory, "work"),
+      artifactsDir: join(directory, "out"),
+      log: () => undefined,
+    }).run();
+
+    expect(fake.inputs.length).toBeGreaterThan(2);
+    expect(new Set(fake.inputs.map((input) => input.baseUrl)).size).toBe(fake.inputs.length);
+    expect(provider.running.size).toBe(0);
+  });
+
+  test("stops an instance whose run failed", async () => {
+    const provider = instances();
+    const fake: Runner = {
+      run() {
+        return Promise.reject(new Error("container did not start"));
       },
-    } as unknown as Credentials;
+    };
 
-    await lane(runner(), credentials).run();
-
-    expect(most).toBe(1);
+    await expect(lane(fake, provider).run()).rejects.toThrow("container did not start");
+    expect(provider.running.size).toBe(0);
   });
 });
