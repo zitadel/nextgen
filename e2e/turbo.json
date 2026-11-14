@@ -232,6 +232,24 @@
       "env": ["ZITADEL_*", "NEXTGEN_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "!ZITADEL_TELEMETRY*"],
       "passThroughEnv": ["ZITADEL_TELEMETRY*", "JOURNEY_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
+    // The lane's unit tests import @zitadel/testing, so they wait for its build;
+    // the journey's `test` does not.
+    "api-contract-unit": {
+      "dependsOn": ["@zitadel/testing#build"],
+      "inputs": ["$TURBO_EXTENDS$", "api-contract/**", "!**/README.md", "!**/AGENTS.md"]
+    },
+    "api-contract": {
+      "inputs": [
+        "api-contract/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "outputs": ["api-contract/test-output/**"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "API_CONTRACT_*", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
     "demo-nuxt-mock": {
       "inputs": [
         "demo-nuxt/**",

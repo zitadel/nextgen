@@ -153,6 +153,7 @@ catalog:
   storybook: ^10.6.2
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.2.4
+  testcontainers: ^12.2.1
   ts-lit-plugin: ^2.0.2
   tsdown: ^0.23.0
   tslib: ^2.8.1
@@ -209,10 +210,13 @@ allowBuilds:
   "@parcel/watcher": false
   "@swc/core": false
   "cbor-extract": false
+  "cpu-features": false
   "lmdb": false
   "msgpackr-extract": false
   "msw": false
+  "protobufjs": false
   "rs-module-lexer": false
+  "ssh2": false
   "vue-demi": false
 overrides:
   "@types/react": "^19.3.0"

@@ -205,6 +205,7 @@ jobs:
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
+            e2e/api-contract/test-output
             conformance/fixtures/*/test-results
             conformance/fixtures/*/playwright-report
             ${{ runner.temp }}/ci-journey/*/diagnostics

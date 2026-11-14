@@ -7,11 +7,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check .",
     "test": "vitest run --config journey/vitest.config.ts",
+    "api-contract-unit": "vitest run --config api-contract/vitest.unit.config.ts",
     "install-browsers": "playwright install chromium",
     "console-smoke": "playwright test --config console/playwright.config.mts",
     "console-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test --config console/playwright.real.config.mts",
     "console-embedded": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config console/playwright.embedded.config.mts",
     "console-platform": "playwright test --config console/playwright.platform.config.mts",
+    "api-contract": "NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} vitest run --config api-contract/vitest.config.ts",
     "console-deployment": "playwright test --config console/playwright.deployment.config.mts",
     "schemas-deployment": "playwright test --config schemas/playwright.deployment.config.mts",
     "cli-deployment": "playwright test --config cli/playwright.deployment.config.mts",
@@ -44,6 +46,7 @@
     "@zitadel/testing": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "p-map": "catalog:",
+    "testcontainers": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
