@@ -42,7 +42,9 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // The auth boundary is written on every setup; a pre-existing plugin at
       // this exact path is a genuine conflict the file-writer refuses (and
@@ -96,7 +98,9 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("routes/plugin@nextgen.ts"),
       src("routes/index.tsx"),

@@ -485,11 +485,13 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     readonly verified: Readonly<Record<string, string | boolean>>;
     readonly scopes: readonly string[];
   }): Edit<Connection> {
-    const { claim_mapping: _mapping, verified_claims: _verified, ...rest } = this.body;
-    void _mapping;
-    void _verified;
+    const kept = Object.fromEntries(
+      Object.entries(this.body).filter(([block]) => {
+        return block !== "claim_mapping" && block !== "verified_claims";
+      }),
+    );
     const body = {
-      ...rest,
+      ...kept,
       ...(Object.keys(claims.mapping).length > 0 ? { claim_mapping: { ...claims.mapping } } : {}),
       ...(Object.keys(claims.verified).length > 0
         ? { verified_claims: { ...claims.verified } }

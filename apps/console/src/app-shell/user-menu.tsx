@@ -1,18 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { ChevronRight, ExternalLink, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
+import { useRootSearch } from "@/features/platform/access";
+import { DOCS_URL } from "@/lib/docs";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix of Settings, whose pages the sidebar lists in place of the account's. */
@@ -167,27 +170,31 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
 }
 
 /**
- * The account dropdown, opening to the right of the sidebar's footer row.
+ * The account dropdown, opening to the right of the sidebar's footer row. On
+ * a phone the sidebar is a sheet with no room beside it, so the menu opens
+ * above the row instead, which sits at the bottom of the sheet.
  *
  * It follows Vercel's: the person heads it and opens their profile
- * (Settings); then Theme and Log out.
- * Nothing else repeats a Settings page. `Documentation` and `Feedback` are
- * parked: neither has a destination yet, and a row that does nothing reads as
- * broken.
+ * (`/account`, apart from the root's Settings, D42); then Theme, Documentation
+ * and Log out. Nothing else repeats a Settings page. `Feedback` is parked: it has no
+ * destination yet, and a row that does nothing reads as broken.
  */
 function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const { name, second } = accountName(user);
+  const { isMobile } = useSidebar();
+  // The profile is the root's: it holds the root, not a project (D44).
+  const rootSearch = useRootSearch();
 
   return (
     <DropdownMenuContent
-      side="right"
+      side={isMobile ? "top" : "right"}
       align="end"
       sideOffset={8}
       className="w-64 border-foreground/10 p-0"
     >
-      <div className="p-1">
+      <DropdownMenuGroup className="p-1">
         <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
-          <Link to="/settings/profile">
+          <Link to="/account" search={rootSearch}>
             <span className="max-w-full truncate text-sm font-medium">{name}</span>
             {second && (
               <span className="max-w-full truncate text-xs leading-none text-muted-foreground">
@@ -196,16 +203,25 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
             )}
           </Link>
         </DropdownMenuItem>
-      </div>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
       <ThemeRow />
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
-      <div className="p-1">
+      <DropdownMenuGroup className="p-1">
+        <DropdownMenuItem asChild className="h-8">
+          <a href={DOCS_URL} target="_blank" rel="noreferrer">
+            Documentation
+            <ExternalLink className="ml-auto" strokeWidth={1.5} aria-hidden />
+          </a>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator className={MENU_SEPARATOR} />
+      <DropdownMenuGroup className="p-1">
         <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut} className="h-8">
           {/* The design spells it `Logout`, the noun; the action is the verb. */}
           Log out
         </DropdownMenuItem>
-      </div>
+      </DropdownMenuGroup>
     </DropdownMenuContent>
   );
 }

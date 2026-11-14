@@ -1,8 +1,18 @@
-import { ZitadelError } from "@/lib/errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
+import { join } from "node:path";
+
+import { readIfReadable } from "@/lib/fs";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
 import { sdkVersionForCli } from "@/lib/public-cli";
+import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
-import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import type {
+  ConfigWiringStatus,
+  EjectActions,
+  PatchContext,
+  PatchExecOptions,
+  PatchResult,
+  PatchView,
+} from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
 import {
   angularEntry,
@@ -14,6 +24,13 @@ import { angularRoutesEdit } from "./angular-routes";
 import {
   appComponentTemplate,
   appTemplateHtml,
+  devScriptEdit,
+  LAUNCHER_PATH,
+  launcherScriptsEdit,
+  launcherTemplate,
+  PROJECT_ID_MODULE_GITIGNORE,
+  PROJECT_ID_MODULE_PATH,
+  projectIdModuleEdit,
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
   proxyConfEdit,
@@ -37,31 +54,53 @@ const ROOT: RootMount = {
 };
 
 /**
- * Adds a `dev: "ng serve"` script only when the project does not already define
- * one. `ng new` ships only a `start` script, but the CLI tells every framework
- * to run `npm run dev` (and `ng serve` reads the proxy + port from
- * `angular.json`). Non-destructive: an existing `dev` script is preserved, so
- * patching a project that already wires its own `dev` leaves it untouched.
+ * What setup does after the plan, and a repair, which replays the plan, never
+ * does: it writes the module once (the launcher keeps it current, and an app
+ * an earlier CLI set up never imports it), has git ignore it, and runs the
+ * app's own scripts through the launcher, whose project id such an app
+ * neither has nor needs: it builds without `.env.local`, which the launcher
+ * would refuse.
  */
-function ensureDevScript(source: string | undefined): string {
-  if (source === undefined) {
-    throw new ZitadelError("E_VALIDATION", "package.json is required to add the dev script", {
-      hint: "Run setup from a project that has a package.json.",
-    });
-  }
-  const pkg = parseJsonObject(source, "package.json");
-  const scripts = isObject(pkg.scripts) ? pkg.scripts : undefined;
-  // Leave an existing dev script untouched, returning the source unchanged so
-  // the edit op skips the file instead of reformatting the user's package.json.
-  if (scripts?.dev !== undefined) {
-    return source;
-  }
-  // package.json is user-owned: splice only the scripts value; every byte
-  // outside it stays untouched.
-  return setTopLevelJsonKey(source, "package.json", "scripts", {
-    ...(scripts ?? {}),
-    dev: "ng serve",
+function setupOnlyOps(ctx: PatchContext): FileOp[] {
+  return [
+    { kind: "edit", path: PROJECT_ID_MODULE_PATH, edit: projectIdModuleEdit(ctx.project.id) },
+    { kind: "append-gitignore", rules: [PROJECT_ID_MODULE_GITIGNORE] },
+    // Golden-path `npm run dev`, through the launcher.
+    { kind: "edit", path: "package.json", edit: devScriptEdit },
+    { kind: "edit", path: "package.json", edit: launcherScriptsEdit },
+  ];
+}
+
+/** Whether a script of `source`, a `package.json`, runs the launcher: setup moved this app's scripts. */
+function runsLauncher(source: string | undefined): boolean {
+  const pkg = source === undefined ? undefined : parseJsonOrUndefined(source);
+  const scripts = isObject(pkg) && isObject(pkg.scripts) ? Object.values(pkg.scripts) : [];
+  return scripts.some((command) => {
+    return typeof command === "string" && command.startsWith(`node ${LAUNCHER_PATH}`);
   });
+}
+
+/** `a` and `b`, two runs of the file-writer over one app, as one result, each path once. */
+function bothRuns(a: PatchResult, b: PatchResult): PatchResult {
+  const unique = (paths: ReadonlyArray<string>) => {
+    return [...new Set(paths)];
+  };
+  const written = unique([...a.filesWritten, ...b.filesWritten]);
+  return {
+    dryRun: a.dryRun,
+    files: [...a.files, ...b.files].filter((file, index, all) => {
+      return (
+        all.findIndex((other) => {
+          return other.path === file.path;
+        }) === index
+      );
+    }),
+    filesWritten: written,
+    filesSkipped: unique([...a.filesSkipped, ...b.filesSkipped]).filter((path) => {
+      return !written.includes(path);
+    }),
+    depsAdded: unique([...a.depsAdded, ...b.depsAdded]),
+  };
 }
 
 /**
@@ -70,13 +109,13 @@ function ensureDevScript(source: string | undefined): string {
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
  * widgets, a `proxy.conf.cjs` dev proxy (attaching the project secret from
  * `ZITADEL_PROJECT_SECRET` only to `POST /sessions/exchange`) wired into `angular.json`,
- * and the SDK dep.
+ * the `zitadel-ng.cjs` launcher, which writes the project id `app.ts` imports
+ * into a git-ignored module before it runs `ng`, and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the
  * `serve` target. In production the same-origin path comes from a platform
- * rewrite or minimal worker (ADR 036); CLI scaffolding for it is tracked in
- * issue #560.
+ * rewrite or minimal worker (ADR 036).
  */
 export class AngularPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -85,6 +124,54 @@ export class AngularPatcher extends AbstractRulePatcher {
 
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await angularEntry(cwd), ROOT);
+  }
+
+  /** Applies the plan, then what only setup does ({@link setupOnlyOps}). */
+  override async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
+    const planned = await super.patch(ctx, opts);
+    const setupOnly = await new FileWriter(opts).scaffold({ ops: setupOnlyOps(ctx), summary: [] });
+    return bothRuns(planned, setupOnly);
+  }
+
+  /**
+   * Restores what is missing, as the base repair does, except `app.ts`, which
+   * imports the module the launcher writes, and the launcher, in an app whose
+   * scripts do not run it: one an earlier CLI set up, whose `app.ts` names its
+   * project. A missing `app.ts` there stays missing, and the doctor reports it.
+   */
+  override async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
+    // An app whose scripts run `ng` gets neither file (see `verify`).
+    return runsLauncher(await readIfReadable(join(opts.cwd, "package.json")))
+      ? super.repair(ctx, opts)
+      : super.repair(ctx, {
+          ...opts,
+          excludePaths: [...(opts.excludePaths ?? []), ROOT.path, LAUNCHER_PATH],
+        });
+  }
+  /**
+   * The base wirings, and, in an app whose scripts run `ng` (set up by an
+   * earlier CLI) and whose `app.ts` is missing, why the repair leaves it
+   * missing and what to do instead.
+   */
+  override async verify(
+    ctx: PatchContext,
+    opts: { cwd: string },
+  ): Promise<ReadonlyArray<ConfigWiringStatus>> {
+    const statuses = await super.verify(ctx, opts);
+    const missing =
+      (await readIfReadable(join(opts.cwd, ROOT.path))) === undefined &&
+      !runsLauncher(await readIfReadable(join(opts.cwd, "package.json")));
+    return missing
+      ? [
+          ...statuses,
+          {
+            path: ROOT.path,
+            wiring: "convenience",
+            state: "unknown",
+            reason: `doctor --fix writes it only into an app whose serve, build and test scripts run ${LAUNCHER_PATH}: restore it from version control, or run those scripts as "node ${LAUNCHER_PATH} …" and run doctor --fix again`,
+          },
+        ]
+      : statuses;
   }
 
   protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
@@ -109,6 +196,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         contents: appComponentTemplate(ctx),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml(ctx) },
+      { kind: "write", path: LAUNCHER_PATH, contents: launcherTemplate() },
       {
         kind: "edit",
         path: "src/app/app.routes.ts",
@@ -153,13 +241,6 @@ export class AngularPatcher extends AbstractRulePatcher {
         wiring: "infrastructure",
       },
       {
-        kind: "edit",
-        path: "package.json",
-        edit: ensureDevScript,
-        // Golden-path convenience (`npm run dev`); its absence only warns.
-        wiring: "convenience",
-      },
-      {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
         version: sdkVersionForCli(ctx.cliVersion),
@@ -168,13 +249,26 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return [ROOT.path, "src/app/app.html", "proxy.conf.cjs"];
+    return [ROOT.path, "src/app/app.html", "proxy.conf.cjs", LAUNCHER_PATH];
   }
 
   protected override infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
     // The dev proxy is the auth request path (it also attaches the project
-    // secret); the root component pair is the user's customization surface.
-    return ["proxy.conf.cjs"];
+    // secret), and the launcher writes the project id the client imports; the
+    // root component pair is the user's customization surface.
+    return ["proxy.conf.cjs", LAUNCHER_PATH];
+  }
+
+  protected override conditionallyScaffoldedFiles(_view: PatchView): ReadonlyArray<string> {
+    // An app an earlier CLI set up has no launcher, and a repair adds none, so
+    // only a scaffold manifest that recorded one tracks it.
+    return [LAUNCHER_PATH];
+  }
+
+  /** The base artifacts, and the module the launcher writes, which `eject` removes whole. */
+  override artifacts(view: PatchView): EjectActions {
+    const actions = super.artifacts(view);
+    return { ...actions, rootConfigFiles: [...actions.rootConfigFiles, PROJECT_ID_MODULE_PATH] };
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
@@ -183,8 +277,8 @@ export class AngularPatcher extends AbstractRulePatcher {
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
     // These files are touched via `edit` ops eject can't auto-revert: the proxy
-    // wired into angular.json, auth paths added to app.routes.ts, and the `dev`
-    // script added to package.json.
+    // wired into angular.json, auth paths added to app.routes.ts, and the
+    // package.json scripts setup runs through zitadel-ng.cjs or added (`dev`).
     return ["angular.json", "src/app/app.routes.ts", "package.json"];
   }
 
@@ -192,7 +286,7 @@ export class AngularPatcher extends AbstractRulePatcher {
     return {
       title: "Angular integration",
       detail:
-        "Wrote the app root component + proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
+        "Wrote the app root component and proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
     };
   }
 }

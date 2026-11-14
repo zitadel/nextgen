@@ -41,13 +41,13 @@ type runtimeRow struct {
 var runtimePlaneOperations = []runtimeRow{
 	{op: "CreateAuthAttempt", carriesProject: true, emptyAccepted: true},
 	{op: "GetAuthAttempt"},
-	{op: "IssueChallenge", adjust: func(t *testing.T, a opArgs) {
+	{op: "CreateAuthAttemptChallenge", adjust: func(t *testing.T, a opArgs) {
 		argOf[api.IssueChallengeRequest](t, a).Method = api.ChallengeMethodIdentifier
 	}},
-	{op: "VerifyChallengeProof", adjust: func(t *testing.T, a opArgs) {
+	{op: "VerifyAuthAttemptChallenge", adjust: func(t *testing.T, a opArgs) {
 		argOf[api.VerifyChallengeRequest](t, a).OneOf = api.NewIdentifierProofVerifyChallengeRequestSum(api.IdentifierProof{LoginName: "alice"})
 	}},
-	{op: "CreateHandoff"},
+	{op: "CreateAuthAttemptHandoff"},
 	{op: "CreateSession", carriesProject: true, serve: func(f *gateFixture, asked *[]string) {
 		f.sessions.EXPECT().Create(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, in service.CreateSessionInput) (*domain.Session, error) {
 			*asked = append(*asked, in.ProjectID)
@@ -78,7 +78,7 @@ var selfServiceOperations = []string{
 	"GetMySessionCsrfToken",
 	"RevokeMySession",
 	"GetMyUser",
-	"PatchMyUser",
+	"UpdateMyUser",
 	"GetMyUserSchema",
 	"GetMyPasswordState",
 	"ListMyIdentityLinks",
@@ -100,21 +100,22 @@ const (
 type reasonOnly struct{ class, reason string }
 
 var reasonOnlyOperations = map[string]reasonOnly{
-	"GetLive":        {classPublic, "health probe"},
-	"GetReady":       {classPublic, "health probe"},
-	"CreateFlow":     {classPublic, "the login flow engine a browser drives before anyone signs in"},
-	"GetFlowStep":    {classPublic, "the login flow engine a browser drives before anyone signs in"},
-	"SubmitFlowStep": {classPublic, "the login flow engine a browser drives before anyone signs in"},
-	"CreateProject":  {classPublic, "anonymous bootstrap; the claim flow attaches an owner"},
-	"GetClaimWindow": {classPublic, "tells a claim link's holder whether it expired"},
+	"GetLive":               {classPublic, "health probe"},
+	"GetReady":              {classPublic, "health probe"},
+	"CreateFlow":            {classPublic, "the login flow engine a browser drives before anyone signs in"},
+	"GetFlowStep":           {classPublic, "the login flow engine a browser drives before anyone signs in"},
+	"SubmitFlowStep":        {classPublic, "the login flow engine a browser drives before anyone signs in"},
+	"CreateProject":         {classPublic, "anonymous bootstrap; the claim flow attaches an owner"},
+	"GetProjectClaimWindow": {classPublic, "tells a claim link's holder whether it expired"},
 
-	"AcceptInvitation": {classTokenCredential, "the invitation token is the credential"},
-	"LookupInvitation": {classTokenCredential, "the invitation token is the credential"},
-	"RejectInvitation": {classTokenCredential, "the invitation token is the credential"},
-	"CompleteClaim":    {classTokenCredential, "the claim challenge and the platform session are the credential (verifyClaimSession)"},
+	"AcceptInvitation":     {classTokenCredential, "the invitation token is the credential"},
+	"LookupInvitation":     {classTokenCredential, "the invitation token is the credential"},
+	"RejectInvitation":     {classTokenCredential, "the invitation token is the credential"},
+	"CompleteProjectClaim": {classTokenCredential, "the claim challenge and the platform session are the credential (verifyClaimSession)"},
 
-	"CreateApplication":  {classNotImplemented, "answers 501"},
-	"GetApplicationById": {classNotImplemented, "answers 501"},
+	"PublishApplication": {classNotImplemented, "answers 501"},
+	"GetApplication":     {classNotImplemented, "answers 501"},
+	"GetOAuthSettings":   {classNotImplemented, "answers 501 until the OAuth settings are stored"},
 }
 
 // ungatedClasses maps each ungated operation to the classes it is listed in.

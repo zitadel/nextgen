@@ -3,7 +3,7 @@ type: object
 description: |
   The branding of the login: logo, theme colors, typography, shape and
   template. It has one shape in two places: the request body of
-  `createBranding` (`POST /branding`), which publishes it as a new immutable
+  `publishBranding` (`POST /branding`), which publishes it as a new immutable
   revision, and a read-only copy on flow responses, which carries the
   revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
   that `zitadel deploy` publishes.

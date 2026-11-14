@@ -2,9 +2,10 @@
  * Lints the OpenAPI spec the way `redocly lint --format=github-actions` does,
  * through the library the Redocly CLI is built on: the repo's redocly.yaml and
  * .redocly.lint-ignore.yaml apply, mistakes in redocly.yaml itself are warned
- * about, problems print as GitHub annotations, and any spec error fails the run.
+ * about, problems print as GitHub annotations, and any spec error fails the run,
+ * as does an ignore entry that no longer suppresses a problem.
  */
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { formatProblems, getTotals, lint, lintConfig, loadConfig } from "@redocly/openapi-core";
@@ -27,3 +28,29 @@ console.log(
   `${spec}: ${totals.errors} error(s), ${totals.warnings} warning(s), ${totals.ignored} ignored`,
 );
 if (totals.errors > 0) process.exitCode = 1;
+
+// Each .redocly.lint-ignore.yaml entry is a named exception; one that no
+// longer suppresses a problem was fixed, and is deleted so the file shrinks
+// with the spec. Redocly itself never reports an unused entry.
+const suppressed = new Set(
+  problems
+    .filter((p) => p.ignored)
+    .map((p) => `${p.location[0].source.absoluteRef}\0${p.ruleId}\0${p.location[0].pointer}`),
+);
+let stale = 0;
+for (const [file, rules] of Object.entries(config.ignore ?? {})) {
+  for (const [ruleId, pointers] of Object.entries(rules)) {
+    for (const pointer of pointers) {
+      if (suppressed.has(`${file}\0${ruleId}\0${pointer}`)) continue;
+      stale++;
+      const where = `${relative(repoRoot, file)} ${ruleId} ${pointer}`;
+      console.log(
+        `::error file=.redocly.lint-ignore.yaml,title=Stale ignore entry::${where} suppresses no problem; delete the entry`,
+      );
+    }
+  }
+}
+if (stale > 0) {
+  console.log(`.redocly.lint-ignore.yaml: ${stale} entry(ies) suppress no problem`);
+  process.exitCode = 1;
+}

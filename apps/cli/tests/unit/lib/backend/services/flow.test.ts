@@ -97,26 +97,25 @@ describe("FlowService.get", () => {
     ).rejects.toMatchObject({
       name: "NotFoundError",
       message: 'No flow definition named "typo"',
-      hint: "Run `flow-definitions list` to see the flows this project has.",
+      hint: "Run `flow-definition list` to see the flows this project has.",
     });
   });
 });
 
 describe("FlowService.create", () => {
   it("sends the flow with the project it is bound to", async () => {
-    const createFlowDefinition = vi.fn(async () => ({ id: "flowdef_1" }));
+    const publishFlowDefinition = vi.fn(async () => ({ id: "flowdef_1" }));
 
     const flowDefinition = {
       name: "default-login",
-      status: "active" as const,
       user_schema: "sch_1",
       purposes: { login: "step-1" },
       steps: [],
     };
 
-    await service({ createFlowDefinition }).create({ flow_definition: flowDefinition });
+    await service({ publishFlowDefinition }).create({ flow_definition: flowDefinition });
 
-    expect(createFlowDefinition).toHaveBeenCalledWith({
+    expect(publishFlowDefinition).toHaveBeenCalledWith({
       flow_definition: flowDefinition,
       project_id: "proj_1",
     });

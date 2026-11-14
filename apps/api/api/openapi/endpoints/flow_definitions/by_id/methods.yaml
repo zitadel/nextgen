@@ -1,10 +1,10 @@
 get:
   operationId: getFlowDefinition
-  x-zitadel-cli: flow-definitions get
+  x-zitadel-cli: flow-definition get
   summary: Get a flow definition by ID
   description: |
     Returns one flow definition revision. Pass the `id` that
-    `createFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
+    `publishFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
   tags:
     - Flow Definitions
   security:

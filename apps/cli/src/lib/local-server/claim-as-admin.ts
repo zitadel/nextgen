@@ -28,7 +28,7 @@ export async function claimProjectAsAdmin(input: {
     baseUrl: serverUrl,
     token: projectSecret,
     signal,
-  }).initClaim(projectId, localAdminRequest(serverUrl));
+  }).createProjectClaim(projectId, localAdminRequest(serverUrl));
 
   // claim/complete authenticates by the admin's session cookie, not a bearer
   // token, so this client carries none. As a cookie-authenticated write it
@@ -40,7 +40,7 @@ export async function claimProjectAsAdmin(input: {
     undefined,
     localAdminRequest(serverUrl, { cookie }),
   );
-  const { team_id, claimed_at } = await session.completeClaim(
+  const { team_id, claimed_at } = await session.completeProjectClaim(
     projectId,
     { challenge_id },
     localAdminRequest(serverUrl, { cookie, [CSRF_HEADER]: csrf_token }),

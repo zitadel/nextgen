@@ -1,20 +1,20 @@
 import {
   CUSTOM_PROVIDER,
-  type CustomOidcInput,
   IDP_PROVIDERS,
   isLoopbackIssuer,
-  RESERVED_SLUGS,
+  type Parsed,
+  type ProviderSelection,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseProviderSelection,
   parseScopes,
-  type Parsed,
-  type ProviderSelection,
+  RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
+import type { SuggestFlags } from "@/lib/suggestion";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -106,7 +106,7 @@ export const SETUP_FLAG_NAMES: CustomFlagNames = flagNamesOf(SETUP_FLAG_KEYS);
  * and reads `displayName`.
  *
  * @remarks
- * The rule is `src/lib/oclif/names.ts`, repeated here because this library
+ * The rule is `src/lib/names.ts`, repeated here because this library
  * knows nothing of the command layer.
  */
 type AsRead<Key extends string> = Key extends `${infer Head}-${infer Tail}`
@@ -157,6 +157,7 @@ export function customFlagValues<K extends FlagKeys>(
     }
     return undefined;
   };
+
   return {
     slug: read("slug"),
     displayName: read("displayName"),
@@ -197,9 +198,10 @@ export function loopbackIssuerWarning(
     return undefined;
   }
   if (reach === "container") {
-    return `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the server with \`zitadel start --runtime binary\` instead.`;
+    return `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the local server with its binary runtime instead.`;
   }
-  return `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A server \`zitadel start\` runs allows it by default.`;
+
+  return `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A local server the CLI starts allows it by default.`;
 }
 
 /**
@@ -220,6 +222,7 @@ export function customExample(flag: CustomFlagNames, withScopes = false): string
   if (withScopes) {
     return [...described, `${flag.scopes} 'openid profile email groups'`].join(" ");
   }
+
   return described.join(" ");
 }
 
@@ -257,6 +260,7 @@ function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
       details: { flag: name },
     });
   }
+
   return parsed.value;
 }
 
@@ -322,12 +326,11 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      const pronoun = given.length === 1 ? "it" : "them";
       throw new ZitadelError(
         "E_VALIDATION",
         `${given.join(", ")} only applies to a custom connection`,
         {
-          hint: `Add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${pronoun}.`,
+          hint: `Add ${flag.provider} ${CUSTOM_PROVIDER}, or remove ${new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them"}.`,
           details: { flags: given },
         },
       );
@@ -339,6 +342,7 @@ export function selectionFromFlags(
         hint: `Use one of ${known.join(", ")}.`,
       });
     }
+
     return selection;
   }
 
@@ -352,6 +356,7 @@ export function selectionFromFlags(
       details: { missing },
     });
   }
+
   return {
     kind: "custom",
     connection: {
@@ -364,72 +369,26 @@ export function selectionFromFlags(
 }
 
 /**
- * The flags that restate a custom connection, for a command offered as text.
- *
- * @remarks
- * Suggested commands are run verbatim, so a display name with a space or a
- * metacharacter in it must arrive as one argument. Nothing here is a
- * credential: the name, issuer and scopes are the developer's own settings.
- *
- * @param custom - The custom connection.
- * @param flag - How the command spells each flag.
- * @returns The flags, each value one shell word.
- */
-export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): string {
-  const values: CustomFlagValues = {
-    slug: custom.slug,
-    displayName: custom.displayName,
-    issuer: custom.issuer,
-    scopes: custom.scopes.join(" "),
-  };
-  return flagText(values, flag);
-}
-
-/**
- * The `auth-method sso enable` arguments that add `selection` to a project:
- * the provider, and for a custom connection the settings that describe it.
- *
- * @remarks
- * A suggestion builder wraps them with the selector its command needs.
+ * The flags `auth-method sso enable` takes to add `selection` to a project: the
+ * provider, and for a custom connection the settings that describe it. None
+ * of them is a credential: the client id is asked for, as the secret is.
  *
  * @param selection - The provider.
- * @returns The arguments.
+ * @returns The flags, in the order the command line takes them.
  */
-export function ssoEnableArgs(selection: ProviderSelection): string {
-  const command = `auth-method sso enable --provider ${selectionName(selection)}`;
+export function ssoEnableFlags(
+  selection: ProviderSelection,
+): SuggestFlags<"auth-method:sso:enable"> {
   if (selection.kind !== "custom") {
-    return command;
+    return { provider: selectionName(selection) };
   }
-  return `${command} ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`;
-}
+  const { slug, displayName, issuer, scopes } = selection.connection;
 
-/**
- * One value as a single shell word: as it is when it needs no quoting, and in
- * single quotes otherwise.
- *
- * @param value - The value.
- * @returns The word.
- */
-export function shellWord(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
-    return value;
-  }
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-/**
- * The flags for whichever settings were given, each value as one shell word.
- *
- * @param values - The settings.
- * @param flag - How the command spells each flag.
- * @returns The flags, in command-line order.
- */
-export function flagText(values: CustomFlagValues, flag: CustomFlagNames): string {
-  return CUSTOM_SETTINGS.flatMap((setting) => {
-    const value = values[setting];
-    if (value === undefined) {
-      return [];
-    }
-    return [`${flag[setting]} ${shellWord(value)}`];
-  }).join(" ");
+  return {
+    provider: selectionName(selection),
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
 }

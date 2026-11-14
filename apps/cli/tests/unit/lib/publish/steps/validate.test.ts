@@ -119,6 +119,32 @@ describe("validateStep", () => {
     });
   });
 
+  it("counts a single refused file as one issue", async () => {
+    const config = aConfig({ schemas: { "a.json": { objectType: "a" } } });
+
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
+    });
+
+    expect(error).toMatchObject({
+      message: expect.stringMatching(/^Configuration validation failed \(1 issue\):/),
+    });
+  });
+
+  it("counts several refused files as issues", async () => {
+    const config = aConfig({
+      schemas: { "a.json": { objectType: "a" }, "b.json": { objectType: "b" } },
+    });
+
+    const error = await rejectionOf(() => {
+      return validateStep.run(aStepContext({ config }));
+    });
+
+    expect(error).toMatchObject({
+      message: expect.stringMatching(/^Configuration validation failed \(\d+ issues\):/),
+    });
+  });
+
   describe("with a schema file", () => {
     it("refuses one that is not a user schema", async () => {
       const config = aConfig({ schemas: { "human-user.json": { objectType: "human-user" } } });
@@ -188,7 +214,7 @@ describe("validateStep", () => {
       });
 
       expect(error).toMatchObject({
-        hint: "Fix the files named above and re-run; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
+        hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
       });
     });
   });
@@ -231,7 +257,7 @@ describe("validateStep", () => {
       });
 
       expect(error).toMatchObject({
-        hint: "Fix the files named above and re-run; no changes were made.",
+        hint: "Fix the files named above and rerun; no changes were made.",
       });
     });
 
@@ -280,16 +306,16 @@ describe("validateStep", () => {
     });
 
     it("refuses a literal client_secret before the project's variables are read", async () => {
-      const getVariables = vi.fn(async () => {
+      const listVariables = vi.fn(async () => {
         return {};
       });
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
       await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: { getVariables } }));
+        return validateStep.run(aStepContext({ config, client: { listVariables } }));
       });
 
-      expect(getVariables).not.toHaveBeenCalled();
+      expect(listVariables).not.toHaveBeenCalled();
     });
 
     it("never echoes a literal client_secret in the refusal", async () => {

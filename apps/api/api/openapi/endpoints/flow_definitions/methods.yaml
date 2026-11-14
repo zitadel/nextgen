@@ -1,9 +1,9 @@
 post:
-  operationId: createFlowDefinition
-  summary: Create a flow definition
+  operationId: publishFlowDefinition
+  summary: Publish a flow definition
   description: |
-    Creates a flow definition by publishing a new revision of it. It records a
-    `flowdef.created` event.
+    Publishes a new revision of a flow definition, creating the flow definition
+    on its first publish. It records a `flowdef.created` event.
 
     A [flow definition](/docs/concepts/flows-and-schemas) is a template that
     defines the sequence of steps (capabilities) for one user journey, such as
@@ -64,18 +64,18 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      $ref: createFlowDefinition-error-response.yaml
+      $ref: publishFlowDefinition-error-response.yaml
 
 get:
   operationId: listFlowDefinitions
-  x-zitadel-cli: flow-definitions list
+  x-zitadel-cli: flow-definition list
   summary: List flow definitions
   description: |
     Lists the project's flow definitions with their configurations, newest by
     creation time first. A flow definition sets which step of a sign-in
     renders when, and which fields each step collects.
 
-    The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{id}`)
+    The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET /flow_definitions/{flow_definition_id}`)
     takes. Filter by `name` to list the revisions of one flow.
   tags:
     - Flow Definitions

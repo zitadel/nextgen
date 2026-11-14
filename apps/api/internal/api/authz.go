@@ -64,6 +64,11 @@ type resourceAccess struct {
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
+	// configuration marks what a project deploys or registers: what a release
+	// ships, a deployment serves, an origin admits, and an application whose
+	// clients sign in to it. On the reserved platform project only its admins
+	// write it (requirePlatformConfigurationAdmin).
+	configuration bool
 }
 
 func (res resourceAccess) miss(op accessOp) error {
@@ -74,17 +79,19 @@ func (res resourceAccess) miss(op accessOp) error {
 }
 
 var schemaAccess = resourceAccess{
-	kind:      domain.ResourceKindSchema,
-	readMiss:  domain.ErrJSONSchemaNotFound,
-	writeMiss: func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
-	denied:    domain.ErrJSONSchemaPermissionDenied,
+	kind:          domain.ResourceKindSchema,
+	readMiss:      domain.ErrJSONSchemaNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
+	denied:        domain.ErrJSONSchemaPermissionDenied,
+	configuration: true,
 }
 
 var flowDefinitionAccess = resourceAccess{
-	kind:      domain.ResourceKindFlowDefinition,
-	readMiss:  domain.ErrFlowDefinitionNotFound,
-	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
-	denied:    domain.ErrFlowDefinitionPermissionDenied,
+	kind:          domain.ResourceKindFlowDefinition,
+	readMiss:      domain.ErrFlowDefinitionNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
+	denied:        domain.ErrFlowDefinitionPermissionDenied,
+	configuration: true,
 }
 
 var userAccess = resourceAccess{
@@ -114,10 +121,11 @@ var sessionAccess = resourceAccess{
 }
 
 var brandingAccess = resourceAccess{
-	kind:      domain.ResourceKindBranding,
-	readMiss:  domain.ErrBrandingNotFound,
-	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
-	denied:    domain.ErrBrandingPermissionDenied,
+	kind:          domain.ResourceKindBranding,
+	readMiss:      domain.ErrBrandingNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
+	denied:        domain.ErrBrandingPermissionDenied,
+	configuration: true,
 }
 
 // policyAccess gates operation policies (ADR 066). Publish and the revision
@@ -130,7 +138,8 @@ var policyAccess = resourceAccess{
 	writeMiss: func() domain.Error {
 		return domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: project does not exist")
 	},
-	denied: domain.ErrPolicyPermissionDenied,
+	denied:        domain.ErrPolicyPermissionDenied,
+	configuration: true,
 }
 
 // variableAccess gates the project's variables and secrets (ADR 062). Like
@@ -138,9 +147,10 @@ var policyAccess = resourceAccess{
 // row — it is addressed by name under the project_id the request carries — so
 // every op is project-scoped and there is no kind to check.
 var variableAccess = resourceAccess{
-	readMiss:  domain.ErrVariableNotFound,
-	writeMiss: domain.ErrVariableNotFound,
-	denied:    domain.ErrVariablePermissionDenied,
+	readMiss:      domain.ErrVariableNotFound,
+	writeMiss:     domain.ErrVariableNotFound,
+	denied:        domain.ErrVariablePermissionDenied,
+	configuration: true,
 }
 
 // releaseAccess gates the project's release snapshots (ADR 035, #531).
@@ -148,10 +158,11 @@ var variableAccess = resourceAccess{
 // filters its lookup by it, so no route resolves a path id through RSI and the
 // kind is only used to narrow a partial-access list.
 var releaseAccess = resourceAccess{
-	kind:      domain.ResourceKindRelease,
-	readMiss:  domain.ErrReleaseNotFound,
-	writeMiss: domain.ErrReleaseProjectNotFound,
-	denied:    domain.ErrReleasePermissionDenied,
+	kind:          domain.ResourceKindRelease,
+	readMiss:      domain.ErrReleaseNotFound,
+	writeMiss:     domain.ErrReleaseProjectNotFound,
+	denied:        domain.ErrReleasePermissionDenied,
+	configuration: true,
 }
 
 // idpAccess guards the project's identity provider connections (#1003). Every
@@ -161,10 +172,21 @@ var releaseAccess = resourceAccess{
 // stay project-scoped: revisions have no RSI row. On the query the kind
 // narrows a partial-access list.
 var idpAccess = resourceAccess{
-	kind:      domain.ResourceKindIDPConnection,
-	readMiss:  domain.ErrIDPConnectionNotFound,
-	writeMiss: domain.ErrIDPConnectionNotFound,
-	denied:    domain.ErrIDPConnectionPermissionDenied,
+	kind:          domain.ResourceKindIDPConnection,
+	readMiss:      domain.ErrIDPConnectionNotFound,
+	writeMiss:     domain.ErrIDPConnectionNotFound,
+	denied:        domain.ErrIDPConnectionPermissionDenied,
+	configuration: true,
+}
+
+// applicationAccess guards the project's registered applications. Create is
+// project-scoped; the get resolves the path id through RSI in the project.
+var applicationAccess = resourceAccess{
+	kind:          domain.ResourceKindApplication,
+	readMiss:      domain.ErrApplicationNotFound,
+	writeMiss:     domain.ErrApplicationNotFound,
+	denied:        domain.ErrApplicationPermissionDenied,
+	configuration: true,
 }
 
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
@@ -173,19 +195,21 @@ var idpAccess = resourceAccess{
 // path id through RSI and the kind is only used to narrow a partial-access
 // list.
 var deploymentAccess = resourceAccess{
-	kind:      domain.ResourceKindDeployment,
-	readMiss:  domain.ErrDeploymentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrDeploymentPermissionDenied,
+	kind:          domain.ResourceKindDeployment,
+	readMiss:      domain.ErrDeploymentNotFound,
+	writeMiss:     domain.ErrEnvironmentProjectNotFound,
+	denied:        domain.ErrDeploymentPermissionDenied,
+	configuration: true,
 }
 
 // originAccess gates add/remove of project origin patterns. Origins have no
 // minted id and no RSI row — they are addressed by pattern under the
 // project_id the request carries — so every op is project-scoped.
 var originAccess = resourceAccess{
-	readMiss:  domain.ErrOriginNotFound,
-	writeMiss: domain.ErrOriginNotFound,
-	denied:    domain.ErrOriginPermissionDenied,
+	readMiss:      domain.ErrOriginNotFound,
+	writeMiss:     domain.ErrOriginNotFound,
+	denied:        domain.ErrOriginPermissionDenied,
+	configuration: true,
 }
 
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
@@ -365,7 +389,39 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 	if h == nil || h.pool == nil {
 		return domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
+	if err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op); err != nil {
+		return err
+	}
+	return h.requirePlatformConfigurationAdmin(ctx, projectID, res, op)
+}
+
+// requirePlatformConfigurationAdmin holds a write to the configuration of the
+// reserved platform project to that project's admins (Console ADR 0004 §1).
+// The project holds who may use the platform, never an application's end
+// users: each of its users can be granted any project and can claim, so what
+// signs someone in to it (an origin, a deployment, a schema, an application) is
+// for the people who own the platform to change. A platform operator is one
+// of them (root ADR 075); an editor of the platform project is not.
+//
+// It asks the admin relation only after the operation's own check allowed
+// the caller, so the answers to anyone else are unchanged, and an editor's
+// refusal reads as a missing permission. A project the deployment merely pins
+// is not reserved (domain.ReservedPlatformProjectID) and keeps the relations
+// every project asks. The server's own start-up deploy (bootstrap/platform)
+// calls the services, not this gate.
+func (h *Handler) requirePlatformConfigurationAdmin(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
+	// A read asks nothing more, and a removal already asked for admin.
+	if !res.configuration || op != opWrite {
+		return nil
+	}
+	if reserved := domain.ReservedPlatformProjectID(h.platformProjectID); reserved == "" || projectID != reserved {
+		return nil
+	}
+	err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, opDelete)
+	if denied := res.denied(); errors.Is(err, denied) {
+		return denied.WithMessage(denied.Message + ": the platform project's configuration is written with its admin role")
+	}
+	return err
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
@@ -475,6 +531,12 @@ func markPlatformOperator(ctx context.Context, scope ScopeContext) {
 // can read every project (ADR 075 §3): the question listMyProjects asks without
 // a target project.
 func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
+	return h.platformOperatorWith(ctx, resolver.New(), scope)
+}
+
+// platformOperatorWith is platformOperator asking through r, so a caller that
+// checks projects next reads the active catalog once.
+func (h *Handler) platformOperatorWith(ctx context.Context, r *resolver.Resolver, scope ScopeContext) (bool, error) {
 	req := resolver.Request{
 		PrincipalType:     scope.PrincipalType,
 		PrincipalID:       scope.PrincipalID,
@@ -490,7 +552,7 @@ func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (boo
 	if h == nil || h.pool == nil {
 		return false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), req)
+	ok, err := r.PlatformOperator(ctx, h.pool.Statements(), req)
 	if err != nil {
 		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
@@ -627,22 +689,53 @@ func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string
 }
 
 func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
+	gate, err := decideProjectListGate(ctx, stmts, projectID, res)
+	if err != nil {
+		return ctx, false, err
+	}
+	return gate.listContext(ctx, kind), gate.allow, nil
+}
+
+// projectListGate is what the caller may read of one project's lists, decided
+// once: every list, or the rows the caller's narrower grants reach. A search
+// across several types reads each type's list behind the one decision.
+type projectListGate struct {
+	projectID string
+	allow     bool
+	// params narrow each list to the caller's grants when allow is false.
+	params domain.AuthzCheckParams
+}
+
+// decideProjectListGate asks whether the caller may read projectID's lists,
+// answering a project they cannot reach with res's miss.
+func decideProjectListGate(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess) (projectListGate, error) {
+	gate := projectListGate{projectID: projectID}
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {
-		return ctx, false, mapCeilingError(err, res, opRead, nil)
+		return gate, mapCeilingError(err, res, opRead, nil)
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListSkipOnce(ctx), true, nil
+		gate.allow = true
+		return gate, nil
 	case resolver.DecisionForbidden:
-		ctx, err := withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
-		return ctx, false, err
-	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return ctx, false, res.miss(opRead)
+		gate.params, err = authzListFilterParams(ctx, r, stmts, projectID, opRead)
+		return gate, err
 	default:
-		return ctx, false, res.miss(opRead)
+		return gate, res.miss(opRead)
 	}
+}
+
+// listContext marks ctx for one list read of kind behind the gate.
+func (g projectListGate) listContext(ctx context.Context, kind domain.ResourceKind) context.Context {
+	if g.allow {
+		return service.WithAuthzListSkipOnce(ctx)
+	}
+	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
+		AuthzCheckParams: g.params,
+		ResourceKind:     kind,
+	})
 }
 
 // mapAuthzDecisionAfterRSI maps Check results after RSI already located the
@@ -664,13 +757,9 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 // withAuthzListFilter attaches the EXISTS list predicate using the same
 // CheckParams builder as resolver.Check (including ConstraintTeamID).
 func withAuthzListFilter(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
-	scope, ok := GetScopeContext(ctx)
-	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
-		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
-	}
-	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
+	params, err := authzListFilterParams(ctx, r, stmts, projectID, op)
 	if err != nil {
-		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+		return ctx, err
 	}
 	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
 		AuthzCheckParams: params,
@@ -678,9 +767,23 @@ func withAuthzListFilter(ctx context.Context, r *resolver.Resolver, stmts servic
 	}), nil
 }
 
-// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
+// authzListFilterParams are the check parameters a list filter narrows a
+// project's rows to the caller's grants with.
+func authzListFilterParams(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp) (domain.AuthzCheckParams, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return domain.AuthzCheckParams{}, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
+	}
+	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
+	if err != nil {
+		return domain.AuthzCheckParams{}, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+	}
+	return params, nil
+}
+
+// requireTeamDelete gates deactivateTeam via the team's RSI. Unknown teams are
 // gone (204) for operators. Check denials (including foreign foothold misses)
-// stay permission_denied for the historical deleteTeam contract. Internal
+// stay permission_denied for the historical deactivateTeam contract. Internal
 // errors pass through unwrapped so operators see 500, not a false 403.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)

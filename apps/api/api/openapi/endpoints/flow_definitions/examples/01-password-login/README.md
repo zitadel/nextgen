@@ -27,7 +27,7 @@ flowchart TD
 
 ## Walk-through
 
-1. `POST /flow` with `purpose: login` → engine resolves this definition, mints
+1. `POST /flows` with `purpose: login` → engine resolves this definition, mints
    an auth attempt, and returns the `identifier` step.
 2. The user submits `email`. The engine resolves the identifier against the
    user schema's `x-unique` index. If found, it transitions on `submit` to

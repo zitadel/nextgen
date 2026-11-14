@@ -2,6 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
   - "e2e"
+  # The SDK conformance lane: its shared suite and one fixture app per SDK
+  # (conformance/README.md).
+  - "conformance/suite"
+  - "conformance/fixtures/*"
   # The release, benchmark and mock OIDC provider projects (tools/release,
   # tools/bench, tools/oidc-mock) carry no code the workspace installs; they
   # are packages so the task runner can address their tasks (see turbo.json).
@@ -9,7 +13,20 @@ packages:
 
 catalog:
   "@arethetypeswrong/cli": ^0.18.5
+  # One Angular for sdk-angular and its conformance fixture, whose packages peer
+  # on each other's exact version: bump these together.
+  "@angular/build": ^22.2.3
+  # Exact: only the Angular fixture declares it, so a range would take the newest.
+  "@angular/cli": 22.2.3
+  "@angular/common": ^22.2.3
+  "@angular/compiler": ^22.2.3
+  "@angular/compiler-cli": ^22.2.3
+  "@angular/core": ^22.2.3
+  # Exact, for the same reason as @angular/cli.
+  "@angular/forms": 22.2.3
+  "@angular/platform-browser": ^22.2.3
   "@angular/platform-server": ^22.2.3
+  "@angular/router": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
   # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
   # its graph, and it pairs their required @babel/core peer with the newest
@@ -28,7 +45,6 @@ catalog:
   "@fumadocs/json-schema": ^0.3.2
   "@fumadocs/story": ^1.5.1
   "@modelcontextprotocol/server": ^2.3.1
-  "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.6.3
   "@nuxt/schema": ^4.6.3
@@ -36,7 +52,6 @@ catalog:
   '@oclif/plugin-autocomplete': ^3.2.50
   '@oclif/plugin-commands': ^4.1.55
   '@oclif/plugin-help': ^6.2.49
-  '@oclif/plugin-not-found': ^3.2.86
   '@oclif/plugin-search': ^1.2.50
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
@@ -59,6 +74,7 @@ catalog:
   "@tanstack/react-devtools": ^0.10.2
   "@tanstack/react-router": ^1.170.46
   "@tanstack/react-router-devtools": ^1.167.2
+  "@tanstack/react-start": ^1.169.5
   "@tanstack/router-plugin": ^1.168.48
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
@@ -68,14 +84,14 @@ catalog:
   '@types/culori': ^4.0.1
   "@types/express": ^4.17.21
   "@types/mdx": ^2.0.14
-  "@types/node": ^24.19.1
-  "@types/react": ^19.2.14
-  "@types/react-dom": ^19.2.3
+  "@types/node": ^24.19.2
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
   "@types/sanitize-html": ^2.16.2
   "@types/semver": ^7.7.1
   "@vercel/analytics": ^2.0.1
   "@vercel/speed-insights": ^2.0.0
-  "@vitejs/plugin-react": ^6.0.1
+  "@vitejs/plugin-react": ^6.1.2
   "@vitest/browser": ^4.1.12
   "@vitest/browser-playwright": ^4.1.12
   "@vitest/coverage-v8": ^4.1.12
@@ -108,8 +124,8 @@ catalog:
   memfs: ^4.80.0
   msw: ^2.14.6
   msw-storybook-addon: ^3.0.3
-  next: ^16.3.8
-  nuxt: ^4.6.3
+  next: ^16.4.2
+  nuxt: ^4.6.4
   oclif: ^4.17.46
   open: ^11.0.4
   orval: ^8.42.0
@@ -121,8 +137,8 @@ catalog:
   playwright: ^1.64.1
   publint: ^0.3.25
   radix-ui: ^1.6.4
-  react: ^19.2.8
-  react-dom: ^19.2.8
+  react: ^19.3.1
+  react-dom: ^19.3.1
   react-markdown: ^10.1.0
   remark: ^15.0.1
   remark-gfm: ^4.0.1
@@ -147,12 +163,12 @@ catalog:
   type-fest: ^5.10.0
   typescript: ^6.0.3
   ufo: ^1.6.4
-  vite: ^8.3.3
+  vite: ^8.3.4
   vite-plugin-dts: ^5.1.2
   vite-plugin-web-components-hmr: ^0.1.3
   vitest: ^4.1.12
-  vue: ^3.5.42
-  vue-tsc: ^3.2.8
+  vue: ^3.5.44
+  vue-tsc: ^3.3.13
   workflow: ^5.2.3
   xstate: ^5.31.1
   yaml: ^2.9.0
@@ -160,7 +176,7 @@ catalog:
 
 catalogMode: strict
 
-# Installs every platform's native packages (esbuild, Biome, moon, Next.js'
+# Installs every platform's native packages (esbuild, Biome, turbo, Next.js'
 # SWC, sharp, …), not only this machine's. Set here, not in package.json: in
 # a workspace, pnpm 10 lets package.json's value override the `--os` and
 # `--cpu` flags of `pnpm install`, which the cloud build passes to install
@@ -179,6 +195,13 @@ supportedArchitectures:
 # Fail the install on an unmet or conflicting peer dependency instead of warning.
 strictPeerDependencies: true
 
+# Hoist every package but server-only. @solidjs/start imports it undeclared and
+# expects its Vite plugin to stub it; with sdk-next's real copy hoisted, Node
+# loads that instead and every SSR request is a 500. Next.js bundles its own.
+hoistPattern:
+  - "*"
+  - "!server-only"
+
 # pnpm 12 no longer reads the "pnpm" field of package.json.
 allowBuilds:
   "esbuild": true
@@ -192,11 +215,15 @@ allowBuilds:
   "rs-module-lexer": false
   "vue-demi": false
 overrides:
-  "@types/react": "^19.2.14"
+  "@types/react": "^19.3.0"
   "@types/node": "catalog:"
   "@angular/build>vite": "^8.3.3"
   "@microsoft/api-extractor>typescript": "^6.0.3"
   "web-component-analyzer>typescript": "^6.0.3"
+  # tsconfck peers on typescript ^5; the Qwik Router conformance fixture's
+  # vite-tsconfig-paths brings it, and strictPeerDependencies fails any
+  # install that re-resolves without this.
+  "tsconfck>typescript": "^6.0.3"
   "@angular/build>rolldown": "^1.2.12"
   "unrun>rolldown": "^1.2.12"
   "@vercel/analytics>nuxt": "-"

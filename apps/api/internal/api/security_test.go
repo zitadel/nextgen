@@ -80,7 +80,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(tc.token, nil)
 
 			handler := NewSecurityHandler(tokenService)
-			ctx, err := handler.HandleOAuth2(t.Context(), api.InitClaimOperation, api.OAuth2{Token: "raw-bearer"})
+			ctx, err := handler.HandleOAuth2(t.Context(), api.CreateProjectClaimOperation, api.OAuth2{Token: "raw-bearer"})
 			require.NoError(t, err)
 
 			got, ok := GetScopeContext(ctx)
@@ -306,19 +306,22 @@ func TestHandleSessionCookie(t *testing.T) {
 			api.QueryUsersOperation,
 			api.ListMyProjectsOperation,
 			api.GetProjectOperation,
-			api.PatchProjectOperation,
+			api.UpdateProjectOperation,
 			api.ListProjectAdminsOperation,
 			// #2320: the project settings page's origin writes and variable
 			// reads, and the policy reads, which a session without a user
 			// answered with the resource's not found before they were listed.
-			api.AddOriginOperation,
-			api.RemoveOriginOperation,
-			api.GetVariablesOperation,
+			api.AddProjectOriginOperation,
+			api.RemoveProjectOriginOperation,
+			api.ListVariablesOperation,
 			api.GetVariableOperation,
 			api.ListPoliciesOperation,
 			api.GetPolicyOperation,
 			api.ListPolicyRevisionsOperation,
 			api.GetPolicyRevisionOperation,
+			// Declared ahead of its handler, so it is listed before the
+			// handler could ever run without a principal.
+			api.GetOAuthSettingsOperation,
 		} {
 			t.Run(string(op), func(t *testing.T) {
 				t.Parallel()

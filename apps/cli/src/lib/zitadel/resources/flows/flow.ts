@@ -204,11 +204,10 @@ export class Flow extends ConfigDocument<FlowValue> {
   /**
    * Whether the flow can sign anyone in.
    *
-   * @returns True when it is `active`, the only status that is served, and has
-   *   a `login` entry.
+   * @returns True when it has a `login` entry.
    */
   get servesLogin(): boolean {
-    return this.value.status === "active" && this.value.purposes.login !== undefined;
+    return this.value.purposes.login !== undefined;
   }
 
   /**
@@ -544,7 +543,6 @@ export class Flow extends ConfigDocument<FlowValue> {
     if (names.length === 0 || !Array.isArray(steps)) {
       return { document: this, changed: false, skipped: [] };
     }
-    let changed = false;
     const edited = steps.map((step) => {
       if (
         !isJsonObject(step) ||
@@ -557,13 +555,12 @@ export class Flow extends ConfigDocument<FlowValue> {
       const missing = names.filter((name) => {
         return !fields.includes(name);
       });
-      if (missing.length === 0) {
-        return step;
-      }
-      changed = true;
-      return { ...step, fields: [...fields, ...missing] };
+      return missing.length === 0 ? step : { ...step, fields: [...fields, ...missing] };
     });
-    if (!changed) {
+    const unchanged = edited.every((step, at) => {
+      return step === steps[at];
+    });
+    if (unchanged) {
       return { document: this, changed: false, skipped: [] };
     }
     return {

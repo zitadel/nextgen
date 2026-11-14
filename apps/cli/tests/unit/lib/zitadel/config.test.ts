@@ -14,6 +14,7 @@ import {
   PasswordPolicy,
   Policy,
   PolicyTest,
+  SignupPolicy,
   type ConfigKind,
   type ScaffoldOptions,
   type StoredFile,
@@ -110,6 +111,18 @@ const WITH_PROVIDERS: ScaffoldOptions = {
  */
 const KEPT_POLICY: ConfigDocuments = {
   policies: { [PASSWORD_POLICY_FILE]: aPasswordPolicy({ max_length: 64, min_length: 9 }) },
+};
+
+/**
+ * The name the sign-up policy's file must have under `.zitadel/policies/`.
+ */
+const SIGNUP_POLICY_FILE = Policy.fileName(SignupPolicy.OPERATION);
+
+/**
+ * A sign-up policy the project already has, naming no challenge.
+ */
+const KEPT_SIGNUP_POLICY: ConfigDocuments = {
+  policies: { [SIGNUP_POLICY_FILE]: { operation: SignupPolicy.OPERATION, config: {} } },
 };
 
 /**
@@ -560,13 +573,14 @@ describe("ZitadelConfig.changedDocuments", () => {
 
 describe("ZitadelConfig.scaffold", () => {
   describe("with no provider", () => {
-    it("writes the default schema, the default flow and the password policy", () => {
+    it("writes the default schema, the default flow and the two policies", () => {
       const scaffold = ZitadelConfig.empty().scaffold(MINIMAL);
 
       expect(scaffold.change.changedPaths).toEqual([
         DEFAULT_SCHEMA_CONFIG_PATH,
         DEFAULT_FLOW_CONFIG_PATH,
         PasswordPolicy.PATH,
+        SignupPolicy.PATH,
       ]);
     });
 
@@ -667,19 +681,21 @@ describe("ZitadelConfig.scaffold", () => {
   });
 
   describe("when a default file is already there", () => {
-    it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH, PasswordPolicy.PATH])(
-      "refuses %s without force",
-      async (path) => {
-        const config = await ZitadelConfig.loadUnchecked(aStoreHolding([{ path, body: {} }]));
+    it.each([
+      DEFAULT_SCHEMA_CONFIG_PATH,
+      DEFAULT_FLOW_CONFIG_PATH,
+      PasswordPolicy.PATH,
+      SignupPolicy.PATH,
+    ])("refuses %s without force", async (path) => {
+      const config = await ZitadelConfig.loadUnchecked(aStoreHolding([{ path, body: {} }]));
 
-        const error = thrownBy(() => {
-          return config.scaffold(MINIMAL);
-        });
+      const error = thrownBy(() => {
+        return config.scaffold(MINIMAL);
+      });
 
-        expect(error).toBeInstanceOf(FileExistsError);
-        expect(error).toMatchObject({ path });
-      },
-    );
+      expect(error).toBeInstanceOf(FileExistsError);
+      expect(error).toMatchObject({ path });
+    });
 
     it("replaces the default schema and flow under force", async () => {
       const store = aStoreHolding([
@@ -732,6 +748,47 @@ describe("ZitadelConfig.scaffold", () => {
 
       expect(error).toBeInstanceOf(ConfigError);
       expect(error).toMatchObject({ details: { file: PasswordPolicy.PATH } });
+    });
+  });
+
+  describe("the sign-up policy", () => {
+    it("is the default, which restates the server's own protection", () => {
+      const { signupPolicy } = ZitadelConfig.empty().scaffold(MINIMAL);
+
+      expect(signupPolicy?.operation).toBe(SignupPolicy.OPERATION);
+      expect(signupPolicy?.config).toEqual({ challenge: "zitadel_pow" });
+    });
+
+    it("is left out for a server that does not take it", () => {
+      const scaffold = ZitadelConfig.empty().scaffold({ ...MINIMAL, signupPolicy: false });
+
+      expect(scaffold.signupPolicy).toBeUndefined();
+      expect(scaffold.change.changedPaths).not.toContain(SignupPolicy.PATH);
+    });
+
+    it.each([true, false])(
+      "is the file force keeps, unwritten, when the server taking it is %s",
+      (taken) => {
+        const config = aConfig(KEPT_SIGNUP_POLICY);
+
+        const scaffold = config.scaffold({ ...MINIMAL, signupPolicy: taken, force: true });
+
+        expect(scaffold.signupPolicy?.config).toEqual({});
+        expect(scaffold.change.changedPaths).not.toContain(SignupPolicy.PATH);
+      },
+    );
+
+    it("refuses one force keeps that is not a valid sign-up policy", () => {
+      const config = aConfig({
+        policies: { [SIGNUP_POLICY_FILE]: { operation: SignupPolicy.OPERATION } },
+      });
+
+      const error = thrownBy(() => {
+        return config.scaffold({ ...MINIMAL, force: true });
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ details: { file: SignupPolicy.PATH } });
     });
   });
 
@@ -1057,16 +1114,18 @@ describe("ZitadelConfig.scaffold with a claim choice", () => {
   const withChoice = () => {
     return ZitadelConfig.empty().scaffold({
       ...MINIMAL,
-      sso: [{ selection: { kind: "catalog", id: "google" }, claims: () => choice }],
+      sso: [{ selection: googleSelection, claims: () => choice }],
     });
   };
 
   it("writes the mapping into the connection", () => {
     const { connections } = withChoice();
 
-    expect(connections.map((entry) => entry.connection.body.claim_mapping)).toEqual([
-      choice.mapping,
-    ]);
+    expect(
+      connections.map((entry) => {
+        return entry.connection.body.claim_mapping;
+      }),
+    ).toEqual([choice.mapping]);
   });
 
   it("adds the attributes it creates to the schema", () => {
@@ -1078,21 +1137,33 @@ describe("ZitadelConfig.scaffold with a claim choice", () => {
   it("asks for them on the register step of the flow", () => {
     const { flow } = withChoice();
 
-    expect(flow.steps.find((step) => step.name === "register")?.fields).toContain("employeeNumber");
+    expect(
+      flow.steps.find((step) => {
+        return step.name === "register";
+      })?.fields,
+    ).toContain("employeeNumber");
   });
 
   it("hands back what the choice has to say", () => {
     const { connections } = withChoice();
 
-    expect(connections.flatMap((entry) => entry.notes)).toEqual(choice.notes);
+    expect(
+      connections.flatMap((entry) => {
+        return entry.notes;
+      }),
+    ).toEqual(choice.notes);
   });
 
   it("keeps the provider's defaults for a provider with no choice", () => {
     const { connections } = ZitadelConfig.empty().scaffold({
       ...MINIMAL,
-      sso: [{ selection: { kind: "catalog", id: "google" } }],
+      sso: [{ selection: googleSelection }],
     });
 
-    expect(connections.map((entry) => entry.created)).toEqual([[]]);
+    expect(
+      connections.map((entry) => {
+        return entry.created;
+      }),
+    ).toEqual([[]]);
   });
 });

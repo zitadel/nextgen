@@ -17,9 +17,9 @@ to check progress.
   `npx @zitadel/cli@latest doctor` to check the project state
   ([Deploy](/docs/guides/deploy#before-you-start) lists what the CLI reads).
 - **The target revision's ID.** Read it from
-  `zitadel schemas list --filter object_type=equals:<objectType>`, as the table
+  `zitadel schema list --filter object_type=equals:<objectType>`, as the table
   in [Three revisions to tell apart](#three-revisions-to-tell-apart) shows.
-- **The user's ID.** Find users with `zitadel users list`
+- **The user's ID.** Find users with `zitadel user list`
   ([Find users by revision](#find-users-by-revision)).
 
 ## Three separate steps
@@ -50,9 +50,9 @@ migration is in progress.
 
 | Revision               | What it is                                                      | Where to read it                                                     |
 |------------------------|-----------------------------------------------------------------|----------------------------------------------------------------------|
-| The newest             | The most recently created revision of the schema                | `zitadel schemas list --filter object_type=equals:<objectType>`      |
+| The newest             | The most recently created revision of the schema                | `zitadel schema list --filter object_type=equals:<objectType>`      |
 | The one a release pins | The revision new registrations use while that release is served | `zitadel release get <release_id>`, `zitadel deployment list --live` |
-| A user's own           | The revision the user's attributes are validated against        | `schema` on the user: `zitadel users get <user_id>`                  |
+| A user's own           | The revision the user's attributes are validated against        | `schema` on the user: `zitadel user get <user_id>`                  |
 
 The newest revision is not automatically the one in use: a revision you released
 but didn't deploy takes no registrations.
@@ -95,7 +95,7 @@ to `PATCH /users/{user_id}` (see [Users](/docs/reference/api/users)). The CLI
 sends the same request:
 
 ```sh
-npx @zitadel/cli@latest users update <user_id> \
+npx @zitadel/cli@latest user update <user_id> \
   --schema <target revision id> \
   --attributes country=CH \
   --json
@@ -115,7 +115,7 @@ The target must be a revision of the user's own schema, the same `objectType`,
 older or newer. A schema with another `objectType` is refused with
 `400 user.invalid`.
 
-Check that it worked: `zitadel users get <user_id>` shows the new revision as
+Check that it worked: `zitadel user get <user_id>` shows the new revision as
 the user's `schema`, with the merged attributes.
 
 To move one user by hand, open them in the console. Their page says when a newer
@@ -206,7 +206,7 @@ A value that another user already holds under a uniqueness rule answers
 Add `--dry-run` to ask the server whether the request would succeed:
 
 ```sh
-npx @zitadel/cli@latest users update <user_id> \
+npx @zitadel/cli@latest user update <user_id> \
   --schema <target revision id> \
   --attributes country=CH \
   --dry-run --json
@@ -246,7 +246,7 @@ them again if the older revision needs them.
 List the users on one revision:
 
 ```sh
-npx @zitadel/cli@latest users list \
+npx @zitadel/cli@latest user list \
   --filter schema=equals:<revision id> \
   --all --json
 ```
@@ -255,7 +255,7 @@ List the users of a schema who are not on its newest revision yet, which is
 the list left to migrate:
 
 ```sh
-npx @zitadel/cli@latest users list \
+npx @zitadel/cli@latest user list \
   --filter schema_object_type=equals:<objectType> \
   --filter schema=not_equals:<newest revision id> \
   --all --json

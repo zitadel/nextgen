@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
 import { TanStackStartScaffolder } from "@/lib/orca/scaffolders/tanstack-start";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -23,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("TanStackStartScaffolder", () => {
-  it("runs @tanstack/cli create (full Start mode) then removes the starter routes/index.tsx", async () => {
+  it("runs @tanstack/cli create (full Start mode) without an install, then removes the starter routes/index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new TanStackStartScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "tanstack-start");
@@ -32,7 +33,7 @@ describe("TanStackStartScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "@tanstack/cli@latest",
+      frameworkCli("@tanstack/cli"),
       "create",
       ".",
       "--framework",
@@ -44,6 +45,7 @@ describe("TanStackStartScaffolder", () => {
       "--no-intent",
       "--no-git",
       "-y",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/index.tsx"), {
@@ -55,12 +57,16 @@ describe("TanStackStartScaffolder", () => {
     make: (node, platform) => new TanStackStartScaffolder(node, platform),
     framework: "tanstack-start",
     label: "@tanstack/cli",
-    spec: "@tanstack/cli@latest",
+    spec: frameworkCli("@tanstack/cli"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],
     warned: ["21.0.0", "20.18.0"],
     refused: [],
+  });
+
+  it("names the template's generate-routes script as its after-install script", () => {
+    expect(new TanStackStartScaffolder().afterInstallScript).toBe("generate-routes");
   });
 
   it("only supports tanstack-start", () => {

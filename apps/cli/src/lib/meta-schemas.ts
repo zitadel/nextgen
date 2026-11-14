@@ -15,16 +15,16 @@
 import { lstat, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-
+import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import semver from "semver";
 
-import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import { Dependencies } from "@/lib/upgrade/dependencies";
+import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 
-import { exactZitadelPins } from "@/lib/zitadel-pins";
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
-import { mapBounded } from "./map-bounded";
 import { parseJsonOrUndefined } from "./json";
+import { mapBounded } from "./map-bounded";
 import { maskPublicCliVersion, normalizePublicCliJson } from "./public-cli";
 
 /**
@@ -257,16 +257,16 @@ async function newerPinFor(cwd: string, stale: readonly Stale[]): Promise<NewerP
   if (semver.valid(cliVersion) === null) {
     return undefined;
   }
-  const pins = await exactZitadelPins(cwd).catch(() => {
+  const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
     return undefined;
   });
-  const pin = pins?.find(([, version]) => {
-    return semver.gt(version, cliVersion);
+  const pin = dependencies?.exact().find((dependency) => {
+    return dependency.isAhead(cliVersion);
   });
   if (pin === undefined) {
     return undefined;
   }
-  return { name: pin[0], version: pin[1] };
+  return { name: pin.name, version: pin.specifier };
 }
 
 /**

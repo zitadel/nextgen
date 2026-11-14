@@ -1,15 +1,14 @@
 import type {
-  CreateSchema201,
-  CreateSchemaBody,
-  GetSchemaById200,
+  PublishSchema201,
+  PublishSchemaBody,
+  GetSchema200,
   ListSchemas200,
   ListSchemasParams,
 } from "@zitadel/api/generated/model";
-
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
@@ -22,13 +21,13 @@ export type SchemaSummary = ListSchemas200["schemas"][number];
 export type SchemaPage = Page<SchemaSummary>;
 
 /** A schema revision, as a read returns it. */
-export type SchemaRecord = GetSchemaById200;
+export type SchemaRecord = GetSchema200;
 
 /** What creating a schema takes: the document. */
-export type SchemaInput = Readonly<CreateSchemaBody>;
+export type SchemaInput = Readonly<PublishSchemaBody>;
 
 /** A schema revision as creation returns it. */
-export type CreatedSchema = CreateSchema201;
+export type CreatedSchema = PublishSchema201;
 
 /**
  * The user schemas of one project: listing them, reading one by revision id or
@@ -106,7 +105,7 @@ export class SchemaService extends ApiService {
       // within a project and not across them — the seeded default schema
       // carries the same `$id` in every project — so a credential that can see
       // more than one resolves it ambiguously without the project named.
-      return await this.client.getSchemaById(reference, {
+      return await this.client.getSchema(reference, {
         project_id: this.projectId,
       });
     } catch (error) {
@@ -126,7 +125,7 @@ export class SchemaService extends ApiService {
     const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No schema named "${reference}"`, {
-        hint: "Run `schemas list` to see the object types this project has.",
+        hint: "Run `schema list` to see the object types this project has.",
       });
     }
     return current;
@@ -139,7 +138,7 @@ export class SchemaService extends ApiService {
    * @returns The revision that was created.
    */
   async create(input: SchemaInput): Promise<CreatedSchema> {
-    return this.client.createSchema(input, {
+    return this.client.publishSchema(input, {
       project_id: this.projectId,
     });
   }

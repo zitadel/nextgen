@@ -234,8 +234,8 @@ browser-plane preview secret carries.
 |---|---|
 | `POST /invitations?project_id=`: create, or replace with `replaces_invitation_id`; returns the invitation and `link` | project `admin` |
 | `GET /invitations?project_id=[&status=][&type=]`: list | project `admin` |
-| `GET /invitations/{id}?project_id=` | project `admin` |
-| `DELETE /invitations/{id}?project_id=`: cancel | project `admin` |
+| `GET /invitations/{invitation_id}?project_id=` | project `admin` |
+| `DELETE /invitations/{invitation_id}?project_id=`: cancel | project `admin` |
 | `POST /invitations/lookup`, `/accept`, `/reject` with `{token}` | platform-project session; CSRF on writes |
 | `GET /projects/{project_id}/members` | `project.write`, or a session that can read the project |
 
@@ -402,3 +402,18 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   (`platform.bootstrap_project`); the link is the only delivery.
 - v4 migration docs: v4 project members map to grants; v4 invite codes don't
   carry over.
+
+## Amendment (2026-11-11): replace deletes any unaccepted original
+
+This replaces the replace rule in §4, and the matching sentences in §4's
+erasure rule and §10's state changes (#2852).
+
+- Replace deletes the original in the same transaction whether it is pending,
+  expired or rejected. The list shows one invitation per journey, and the
+  events keep the history (`invitation.cancelled` with reason `replaced`).
+- An accepted invitation can't be replaced; replace answers the same `404` as
+  for an unknown id.
+- Metadata still moves to the new invitation when the replace sends none of
+  its own. A rejected original has none left to move.
+- Cancel is unchanged: it deletes only a pending invitation, and an expired
+  one keeps its row until the cleanup job exists.

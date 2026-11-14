@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { CreateSchemaBody as CreateSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { PublishSchemaBody as CreateSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
 import type {
-  CreateFlowDefinitionBodyFlowDefinition,
-  CreateSchemaBody,
+  PublishFlowDefinitionBodyFlowDefinition,
+  PublishSchemaBody,
 } from "@zitadel/api/generated/model";
 
 import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
@@ -289,7 +289,7 @@ export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SC
 }
 
 /** A user schema document, as the create body carries one rather than a URL. */
-export type UserSchemaDocument = Extract<CreateSchemaBody, { kind: "user-schema" }>;
+export type UserSchemaDocument = Extract<PublishSchemaBody, { kind: "user-schema" }>;
 
 /**
  * The default human user schema: a create body, plus the template's `$id`, the
@@ -352,7 +352,7 @@ export type DefaultFlowRenderOptions = Omit<DefaultConfigRenderOptions, "userSch
 
 export function getDefaultLoginFlow(
   options: DefaultFlowRenderOptions = {},
-): CreateFlowDefinitionBodyFlowDefinition {
+): PublishFlowDefinitionBodyFlowDefinition {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
@@ -362,7 +362,7 @@ export function getDefaultLoginFlow(
   return applyUseCaseToFlow(
     rendered,
     options.useCase ?? DEFAULT_SETUP_USE_CASE,
-  ) as CreateFlowDefinitionBodyFlowDefinition;
+  ) as PublishFlowDefinitionBodyFlowDefinition;
 }
 
 function renderTemplate(value: unknown, replacements: Record<string, string>): unknown {

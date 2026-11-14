@@ -1,126 +1,364 @@
-import type { Writable } from "node:stream";
-import { styleText } from "node:util";
-
-import type { Asker } from "../input";
-
-import { Rail, visibleLength } from "./rail";
-
-/** What a message means, and so what colour its mark is. */
-export type Tone = "info" | "warn" | "success";
-
-const TONE_COLOUR = { info: "cyan", warn: "yellow", success: "green" } as const;
-
-/** One cell of a table: its text, and optionally a tone to colour it with. */
-export type Cell = string | { readonly text: string; readonly tone: Tone | "muted" };
-
-type Target = Writable & { columns?: number; rows?: number; isTTY?: boolean };
+import type { EndStep, WizardStep } from "./step";
 
 /**
- * A small framework for interactive flows that talk to a person, built on the
- * prompts the CLI already uses.
- *
- * A flow is a left rail of questions, with messages and tables between them
- * and branches that indent a group of related questions:
- *
- * ```
- * ◇  Add sign-in with another service?
- * │  Google
- * │
- * ├─●  Configuring the new provider
- * │  │
- * │  ◇  What should this connection be called?
- * │  │  corp-sso
- * │  │
- * │  ●  "Corp SSO" needs an OAuth application.
- * ```
- *
- * It owns presentation only: what to ask and what to do with the answers stays
- * with the command. Questions go through the same `Asker` the commands use, so
- * they behave like every other question the CLI asks, and a branch only changes
- * where they are drawn. Nothing here knows about identity providers, so it can
- * carry any command's flow.
+ * Takes back what the steps up to a point did, newest first.
  */
-export class Wizard {
-  private readonly rail: Rail;
-  private readonly target: Target;
-  private readonly base: Asker;
+type Undo = () => Promise<void>;
+
+/**
+ * Told what is known right after a step finished, for a caller that reacts to
+ * what a step produced without the step knowing.
+ */
+type Observer<Known extends object> = (known: Known) => void;
+
+/**
+ * How one run behaves.
+ */
+type RunOptions = {
+  /**
+   * Told when a step's undo itself failed. The run goes on undoing the steps
+   * before it, and the error that started the undo is still the one thrown.
+   */
+  readonly onUndoError?: (key: string, error: unknown) => void;
+};
+
+/**
+ * What the compiler says when a step needs answers no earlier step gives: the
+ * argument it asks for is this type, so the missing names are in the message.
+ */
+type Unmet<Needs extends object, State extends object> = {
+  readonly "this step needs answers that no earlier step gives": Exclude<keyof Needs, keyof State>;
+};
+
+/**
+ * Where a run stands after some of its steps: still going with what is known,
+ * or ended by a step with the wizard's answer. Either way it can take back
+ * what ran.
+ */
+type Progress<State extends object, Result> =
+  | { readonly kind: "continue"; readonly state: State; readonly undo: Undo }
+  | { readonly kind: "end"; readonly result: Result; readonly undo: Undo };
+
+/**
+ * Runs the steps added so far.
+ */
+type Runner<Initial extends object, State extends object, Result> = (
+  initial: Initial,
+  options: RunOptions,
+) => Promise<Progress<State, Result>>;
+
+/**
+ * Refuses a wizard that is put together wrongly, such as two steps of one name.
+ */
+export class WizardDefinitionError extends Error {
+  /**
+   * Describe how the wizard is wrong.
+   *
+   * @param message - What is wrong.
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = "WizardDefinitionError";
+  }
+}
+
+/**
+ * Does nothing, for the start of a run, where nothing has run to undo.
+ *
+ * @returns Once it has done nothing.
+ */
+function nothingToUndo(): Promise<void> {
+  return Promise.resolve();
+}
+
+/**
+ * A wizard being put together: an ordered list of steps, each reading what the
+ * steps before it settled, checked by the compiler.
+ *
+ * @remarks
+ * Every call returns a new wizard and leaves the one it was called on as it
+ * was, so a wizard can be shared and extended.
+ *
+ * ```ts
+ * const flow = Wizard.named<Input, Report>("setup")
+ *   .endWhen(new AlreadySetUp(terminal))
+ *   .step(new Detect(terminal), (state) => terminal.say(state.framework))
+ *   .step(new DevPort(terminal))
+ *   .finish((state) => report(state));
+ * ```
+ *
+ * @typeParam Initial - What the run starts from.
+ * @typeParam State - Everything known after the steps added so far.
+ * @typeParam Result - What the wizard answers.
+ */
+export class Wizard<Initial extends object, State extends object, Result> {
+  /**
+   * The wizard's name, for the errors that say how it is wrong.
+   */
+  readonly name: string;
 
   /**
-   * @param options.ask - The CLI's asker, with its session already filled in.
-   * @param options.output - Where to draw. The terminal unless a test says otherwise.
+   * The step names taken so far.
    */
-  constructor(options: { ask: Asker; output?: Target }) {
-    this.base = options.ask;
-    this.target = options.output ?? process.stdout;
-    this.rail = new Rail(this.target);
-  }
+  private readonly keys: ReadonlySet<string>;
 
-  /** Ask a question, drawn under the branch the flow is in. */
-  readonly ask: Asker = (question) => this.base({ ...question, output: this.rail.stream });
+  /**
+   * Runs the steps added so far.
+   */
+  private readonly runner: Runner<Initial, State, Result>;
 
-  /** How deep the flow is: zero at the top, one more inside each branch. */
-  get depth(): number {
-    return this.rail.depth;
-  }
-
-  /** Text in a tone, coloured only when the terminal shows colour. */
-  style(tone: Tone | "muted" | "heading", text: string): string {
-    const format = tone === "muted" ? "gray" : tone === "heading" ? "bold" : TONE_COLOUR[tone];
-    return styleText(format, text, { stream: this.target });
+  /**
+   * Hold the steps added so far.
+   *
+   * @param name - The wizard's name.
+   * @param keys - The step names taken.
+   * @param runner - Runs the steps.
+   */
+  private constructor(
+    name: string,
+    keys: ReadonlySet<string>,
+    runner: Runner<Initial, State, Result>,
+  ) {
+    this.name = name;
+    this.keys = keys;
+    this.runner = runner;
   }
 
   /**
-   * A message on the rail. The first line carries the mark, the rest hang
-   * under it, and an empty line keeps the rail unbroken.
+   * Start a wizard with no steps, knowing only what the run starts from.
+   *
+   * @typeParam Initial - What the run starts from.
+   * @typeParam Result - What the wizard answers.
+   * @param name - The wizard's name.
+   * @returns The empty wizard.
    */
-  say(lines: string | readonly string[], tone: Tone = "info"): void {
-    const [first = "", ...rest] = typeof lines === "string" ? [lines] : lines;
-    const rail = this.style("muted", "│");
-    this.write([
-      rail,
-      `${this.style(tone, "●")}  ${first}`,
-      ...rest.map((line) => (line === "" ? rail : `${rail}  ${line}`)),
-    ]);
+  static named<Initial extends object, Result = never>(
+    name: string,
+  ): Wizard<Initial, Initial, Result> {
+    return new Wizard<Initial, Initial, Result>(name, new Set<string>(), (initial) => {
+      return Promise.resolve({
+        kind: "continue",
+        state: initial,
+        undo: nothingToUndo,
+      });
+    });
   }
 
   /**
-   * A table as lines, columns aligned on what is visible so colour does not
-   * throw them off. The header is bold; a cell may carry a tone.
+   * Add a step that runs after the ones so far.
+   *
+   * @remarks
+   * It does not compile when the step reads something no earlier step gives;
+   * the argument it then asks for names what is missing. The overload checks
+   * that, so the step is held as one that reads any object once it is running.
+   *
+   * The observer is told what is known, with what the step added, right after
+   * the step finished. It is not told of a step that failed. If it throws, the
+   * step is undone with the ones before it and the error is thrown.
+   *
+   * @param step - The step.
+   * @param rest - The observer, if any; or, only when the step needs what is
+   *   not known, the argument that names what is missing.
+   * @returns The wizard with the step added, knowing what it adds.
+   * @throws {@link WizardDefinitionError} When a step already has its name.
    */
-  table(columns: readonly string[], rows: readonly (readonly Cell[])[]): string[] {
-    const text = (cell: Cell): string => (typeof cell === "string" ? cell : cell.text);
-    const shown = (cell: Cell): string =>
-      typeof cell === "string" ? cell : this.style(cell.tone, cell.text);
-    const widths = columns.map((column, at) =>
-      Math.max(visibleLength(column), ...rows.map((row) => visibleLength(text(row[at] ?? "")))),
-    );
-    const pad = (value: string, width: number): string =>
-      value + " ".repeat(Math.max(0, width - visibleLength(value)));
-    const line = (cells: readonly string[]): string =>
-      `  ${cells.map((cell, at) => pad(cell, widths[at] ?? 0)).join("    ")}`.trimEnd();
-    return [
-      line(columns.map((column) => this.style("heading", column))),
-      ...rows.map((row) => line(columns.map((_, at) => shown(row[at] ?? "")))),
-    ];
+  step<Out extends object, Needs extends object>(
+    step: WizardStep<string, Out, Needs>,
+    ...rest: State extends Needs ? [observe?: Observer<State & Out>] : [Unmet<Needs, State>]
+  ): Wizard<Initial, State & Out, Result>;
+  step<Out extends object, Needs extends object>(
+    step: WizardStep<string, Out, Needs>,
+    argument?: Observer<State & Out> | Unmet<Needs, State>,
+  ): Wizard<Initial, State & Out, Result> {
+    const keys = this.claim(step.key);
+    const reader: WizardStep<string, Out, object> = step;
+    const observe = typeof argument === "function" ? argument : undefined;
+    const runner: Runner<Initial, State & Out, Result> = async (initial, options) => {
+      const before = await this.runner(initial, options);
+      if (before.kind === "end") {
+        return before;
+      }
+      const attempt = async (): Promise<Progress<State & Out, Result>> => {
+        const out = await reader.run(before.state);
+        const undo = async (): Promise<void> => {
+          try {
+            await reader.undo(out);
+          } catch (error) {
+            options.onUndoError?.(step.key, error);
+          }
+          await before.undo();
+        };
+
+        return {
+          kind: "continue",
+          state: {
+            ...before.state,
+            ...out,
+          },
+          undo,
+        };
+      };
+      const finished = await attempt().catch(async (error: unknown) => {
+        await before.undo();
+        throw error;
+      });
+      if (finished.kind === "continue") {
+        try {
+          observe?.(finished.state);
+        } catch (error) {
+          await finished.undo();
+          throw error;
+        }
+      }
+      return finished;
+    };
+    return new Wizard(this.name, keys, runner);
   }
 
   /**
-   * Open a branch, run its questions indented under it, and close it. The
-   * title says what is happening and names nothing the person has not yet
-   * typed. The branch is closed even if a question is cancelled.
+   * Add a step that may end the wizard: if it applies, nothing after it runs.
+   *
+   * @param step - The step.
+   * @param _unmet - Present only when the step needs what is not known.
+   * @returns The wizard with the step added.
+   * @throws {@link WizardDefinitionError} When a step already has its name.
    */
-  async branch<T>(title: string, body: () => Promise<T>): Promise<T> {
-    const rail = this.style("muted", "│");
-    this.write([rail, `${this.style("muted", "├─")}${this.style("info", "●")}  ${title}`]);
-    this.rail.push(`${rail}  `);
-    try {
-      return await body();
-    } finally {
-      this.rail.pop();
+  endWhen<Needs extends object>(
+    step: EndStep<string, Result, Needs>,
+    ..._unmet: State extends Needs ? [] : [Unmet<Needs, State>]
+  ): Wizard<Initial, State, Result> {
+    const keys = this.claim(step.key);
+    const reader: EndStep<string, Result, object> = step;
+    const runner: Runner<Initial, State, Result> = async (initial, options) => {
+      const before = await this.runner(initial, options);
+      if (before.kind === "end") {
+        return before;
+      }
+      const attempt = async (): Promise<Progress<State, Result>> => {
+        const ends = await reader.when(before.state);
+        if (!ends) {
+          return before;
+        }
+        const result = await reader.run(before.state);
+
+        return {
+          kind: "end",
+          result,
+          undo: before.undo,
+        };
+      };
+      return attempt().catch(async (error: unknown) => {
+        await before.undo();
+        throw error;
+      });
+    };
+    return new Wizard(this.name, keys, runner);
+  }
+
+  /**
+   * Mark the point of no return: a step that fails after it no longer takes back
+   * the steps before it.
+   *
+   * @remarks
+   * For work that is kept once it is done, such as a new app that is only worth
+   * removing while the project around it is still being set up.
+   *
+   * @returns The wizard with the mark added.
+   */
+  commit(): Wizard<Initial, State, Result> {
+    return new Wizard(this.name, this.keys, async (initial, options) => {
+      const before = await this.runner(initial, options);
+      if (before.kind === "end") {
+        return before;
+      }
+
+      return {
+        kind: "continue",
+        state: before.state,
+        undo: nothingToUndo,
+      };
+    });
+  }
+
+  /**
+   * Say what the wizard answers when every step has run, which makes it ready
+   * to run.
+   *
+   * @param answer - Builds the answer from everything the steps settled.
+   * @returns The wizard, ready to run.
+   */
+  finish(answer: (state: State) => Result): ReadyWizard<Initial, Result> {
+    return new ReadyWizard(this.name, async (initial, options) => {
+      const progress = await this.runner(initial, options);
+      if (progress.kind === "end") {
+        return progress.result;
+      }
+      try {
+        return answer(progress.state);
+      } catch (error) {
+        await progress.undo();
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Take a step's name, refusing one that is taken.
+   *
+   * @param key - The name.
+   * @returns The names taken, with this one.
+   * @throws {@link WizardDefinitionError} When the name is taken.
+   */
+  private claim(key: string): ReadonlySet<string> {
+    if (this.keys.has(key)) {
+      throw new WizardDefinitionError(`The wizard "${this.name}" already has a step "${key}"`);
     }
+    return new Set([...this.keys, key]);
+  }
+}
+
+/**
+ * A wizard that has said what it answers, and so can run.
+ *
+ * @typeParam Initial - What the run starts from.
+ * @typeParam Result - What the wizard answers.
+ */
+class ReadyWizard<Initial extends object, Result> {
+  /**
+   * The wizard's name.
+   */
+  readonly name: string;
+
+  /**
+   * Runs the steps and answers.
+   */
+  private readonly execute: (initial: Initial, options: RunOptions) => Promise<Result>;
+
+  /**
+   * Hold what runs the wizard.
+   *
+   * @param name - The wizard's name.
+   * @param execute - Runs the steps and answers.
+   */
+  constructor(name: string, execute: (initial: Initial, options: RunOptions) => Promise<Result>) {
+    this.name = name;
+    this.execute = execute;
   }
 
-  private write(lines: readonly string[]): void {
-    this.rail.stream.write(`${lines.join("\n")}\n`);
+  /**
+   * Run the steps in order.
+   *
+   * @remarks
+   * When a step fails, including one that throws because the run was aborted, what
+   * had finished is undone, newest first, and the error that stopped the run is
+   * thrown.
+   *
+   * @param initial - What the run starts from.
+   * @param options - How the run behaves.
+   * @returns What the wizard answers.
+   * @throws Whatever stopped the run.
+   */
+  run(initial: Initial, options: RunOptions = {}): Promise<Result> {
+    return this.execute(initial, options);
   }
 }

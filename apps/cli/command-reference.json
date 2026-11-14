@@ -208,6 +208,23 @@
           "type": "option"
         },
         {
+          "name": "sso-claim",
+          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-verified-claim",
+          "description": "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-claim-scope",
+          "description": "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+          "type": "option"
+        },
+        {
           "name": "sso-slug",
           "description": "With --sso custom: the name of the connection. Schemas and flows refer to it.",
           "type": "option"
@@ -225,23 +242,6 @@
         {
           "name": "sso-scopes",
           "description": "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
-          "type": "option"
-        },
-        {
-          "name": "sso-claim",
-          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
-          "type": "option",
-          "multiple": true
-        },
-        {
-          "name": "sso-verified-claim",
-          "description": "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
-          "type": "option",
-          "multiple": true
-        },
-        {
-          "name": "sso-claim-scope",
-          "description": "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
           "type": "option"
         }
       ],
@@ -381,7 +381,7 @@
     {
       "id": "console",
       "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -402,7 +402,7 @@
     {
       "id": "logs",
       "group": "Local development",
-      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -485,14 +485,41 @@
       "examples": []
     },
     {
-      "id": "users create",
+      "id": "tests add",
+      "group": "Local development",
+      "description": "Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to @zitadel/testing. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.",
+      "args": [],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Replace a test file that differs from this CLI's version of it.",
+          "type": "boolean"
+        },
+        {
+          "name": "skip-install",
+          "description": "Do not install the new dev dependencies.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "tests add"
+        },
+        {
+          "command": "tests add --skip-install"
+        }
+      ]
+    },
+    {
+      "id": "user create",
       "group": "Users and teams",
       "description": "Create a user.",
       "args": [],
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `publishSchema` (`POST…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -542,18 +569,18 @@
       ],
       "examples": [
         {
-          "command": "users create --schema <schema> --attributes <key>=<value> --json"
+          "command": "user create --schema <schema> --attributes <key>=<value> --json"
         },
         {
-          "command": "users create --data '{...}' --json"
+          "command": "user create --data '{...}' --json"
         },
         {
-          "command": "users create --file ./user.json"
+          "command": "user create --file ./user.json"
         }
       ]
     },
     {
-      "id": "users delete",
+      "id": "user delete",
       "group": "Users and teams",
       "description": "Delete a user by id.",
       "args": [
@@ -584,12 +611,12 @@
       ],
       "examples": [
         {
-          "command": "users delete <id> --force --json"
+          "command": "user delete <id> --force --json"
         }
       ]
     },
     {
-      "id": "users get",
+      "id": "user get",
       "group": "Users and teams",
       "description": "Get one user by id.",
       "args": [
@@ -619,15 +646,15 @@
       ],
       "examples": [
         {
-          "command": "users get <id>"
+          "command": "user get <id>"
         },
         {
-          "command": "users get <id> --json"
+          "command": "user get <id> --json"
         }
       ]
     },
     {
-      "id": "users list",
+      "id": "user list",
       "group": "Users and teams",
       "description": "List users.",
       "args": [],
@@ -688,18 +715,18 @@
       ],
       "examples": [
         {
-          "command": "users list --json"
+          "command": "user list --json"
         },
         {
-          "command": "users list --all --json"
+          "command": "user list --all --json"
         },
         {
-          "command": "users list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "user list --filter created_at=equals:<value> --sort created_at:desc"
         }
       ]
     },
     {
-      "id": "users update",
+      "id": "user update",
       "group": "Users and teams",
       "description": "Update a user by id.",
       "args": [
@@ -712,7 +739,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `publishSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -762,15 +789,15 @@
       ],
       "examples": [
         {
-          "command": "users update <id> --data '{...}' --json"
+          "command": "user update <id> --data '{...}' --json"
         },
         {
-          "command": "users update <id> --file ./user.json"
+          "command": "user update <id> --file ./user.json"
         }
       ]
     },
     {
-      "id": "teams create",
+      "id": "team create",
       "group": "Users and teams",
       "description": "Create a team.",
       "args": [],
@@ -820,18 +847,18 @@
       ],
       "examples": [
         {
-          "command": "teams create --name <name> --json"
+          "command": "team create --name <name> --json"
         },
         {
-          "command": "teams create --data '{...}' --json"
+          "command": "team create --data '{...}' --json"
         },
         {
-          "command": "teams create --file ./team.json"
+          "command": "team create --file ./team.json"
         }
       ]
     },
     {
-      "id": "teams deactivate",
+      "id": "team deactivate",
       "group": "Users and teams",
       "description": "Deactivate a team by id.",
       "args": [
@@ -862,12 +889,12 @@
       ],
       "examples": [
         {
-          "command": "teams deactivate <id> --force --json"
+          "command": "team deactivate <id> --force --json"
         }
       ]
     },
     {
-      "id": "teams get",
+      "id": "team get",
       "group": "Users and teams",
       "description": "Get one team by id.",
       "args": [
@@ -897,15 +924,15 @@
       ],
       "examples": [
         {
-          "command": "teams get <id>"
+          "command": "team get <id>"
         },
         {
-          "command": "teams get <id> --json"
+          "command": "team get <id> --json"
         }
       ]
     },
     {
-      "id": "teams list",
+      "id": "team list",
       "group": "Users and teams",
       "description": "List teams.",
       "args": [],
@@ -966,18 +993,18 @@
       ],
       "examples": [
         {
-          "command": "teams list --json"
+          "command": "team list --json"
         },
         {
-          "command": "teams list --all --json"
+          "command": "team list --all --json"
         },
         {
-          "command": "teams list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "team list --filter created_at=equals:<value> --sort created_at:desc"
         }
       ]
     },
     {
-      "id": "teams update",
+      "id": "team update",
       "group": "Users and teams",
       "description": "Update a team by id.",
       "args": [
@@ -1033,15 +1060,15 @@
       ],
       "examples": [
         {
-          "command": "teams update <id> --data '{...}' --json"
+          "command": "team update <id> --data '{...}' --json"
         },
         {
-          "command": "teams update <id> --file ./team.json"
+          "command": "team update <id> --file ./team.json"
         }
       ]
     },
     {
-      "id": "grants create",
+      "id": "grant create",
       "group": "Users and teams",
       "description": "Create a grant.",
       "args": [],
@@ -1126,18 +1153,18 @@
       ],
       "examples": [
         {
-          "command": "grants create --relation viewer --user-identifier alice@acme.com --json"
+          "command": "grant create --relation viewer --user-identifier alice@acme.com --json"
         },
         {
-          "command": "grants create --data '{...}' --json"
+          "command": "grant create --data '{...}' --json"
         },
         {
-          "command": "grants create --file ./grant.json"
+          "command": "grant create --file ./grant.json"
         }
       ]
     },
     {
-      "id": "grants delete",
+      "id": "grant delete",
       "group": "Users and teams",
       "description": "Delete a grant by id.",
       "args": [
@@ -1168,12 +1195,12 @@
       ],
       "examples": [
         {
-          "command": "grants delete <id> --force --json"
+          "command": "grant delete <id> --force --json"
         }
       ]
     },
     {
-      "id": "grants get",
+      "id": "grant get",
       "group": "Users and teams",
       "description": "Get one grant by id.",
       "args": [
@@ -1203,15 +1230,15 @@
       ],
       "examples": [
         {
-          "command": "grants get <id>"
+          "command": "grant get <id>"
         },
         {
-          "command": "grants get <id> --json"
+          "command": "grant get <id> --json"
         }
       ]
     },
     {
-      "id": "grants list",
+      "id": "grant list",
       "group": "Users and teams",
       "description": "List grants.",
       "args": [],
@@ -1272,13 +1299,13 @@
       ],
       "examples": [
         {
-          "command": "grants list --json"
+          "command": "grant list --json"
         },
         {
-          "command": "grants list --all --json"
+          "command": "grant list --all --json"
         },
         {
-          "command": "grants list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "grant list --filter created_at=equals:<value> --sort created_at:desc"
         }
       ]
     },
@@ -1296,7 +1323,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1317,7 +1344,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1344,7 +1371,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1365,7 +1392,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1397,7 +1424,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1480,7 +1507,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1503,7 +1530,7 @@
       ]
     },
     {
-      "id": "idps create",
+      "id": "idp create",
       "group": "Authentication",
       "description": "Create an identity provider connection.",
       "args": [],
@@ -1684,18 +1711,18 @@
       ],
       "examples": [
         {
-          "command": "idps create --slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --json"
+          "command": "idp create --slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --json"
         },
         {
-          "command": "idps create --data '{...}' --json"
+          "command": "idp create --data '{...}' --json"
         },
         {
-          "command": "idps create --file ./identity-provider-connection.json"
+          "command": "idp create --file ./identity-provider-connection.json"
         }
       ]
     },
     {
-      "id": "idps get",
+      "id": "idp get",
       "group": "Authentication",
       "description": "Get one identity provider connection by id.",
       "args": [
@@ -1725,17 +1752,17 @@
       ],
       "examples": [
         {
-          "command": "idps get <id>"
+          "command": "idp get <id>"
         },
         {
-          "command": "idps get <id> --json"
+          "command": "idp get <id> --json"
         }
       ]
     },
     {
-      "id": "idps list",
+      "id": "idp list",
       "group": "Authentication",
-      "description": "List idps.",
+      "description": "List identity provider connections.",
       "args": [],
       "flags": [
         {
@@ -1794,18 +1821,18 @@
       ],
       "examples": [
         {
-          "command": "idps list --json"
+          "command": "idp list --json"
         },
         {
-          "command": "idps list --all --json"
+          "command": "idp list --all --json"
         },
         {
-          "command": "idps list --filter slug=equals:<value> --sort slug:desc"
+          "command": "idp list --filter slug=equals:<value> --sort slug:desc"
         }
       ]
     },
     {
-      "id": "sessions get",
+      "id": "session get",
       "group": "Authentication",
       "description": "Get one session by id.",
       "args": [
@@ -1835,15 +1862,15 @@
       ],
       "examples": [
         {
-          "command": "sessions get <id>"
+          "command": "session get <id>"
         },
         {
-          "command": "sessions get <id> --json"
+          "command": "session get <id> --json"
         }
       ]
     },
     {
-      "id": "sessions list",
+      "id": "session list",
       "group": "Authentication",
       "description": "List sessions.",
       "args": [],
@@ -1904,18 +1931,18 @@
       ],
       "examples": [
         {
-          "command": "sessions list --json"
+          "command": "session list --json"
         },
         {
-          "command": "sessions list --all --json"
+          "command": "session list --all --json"
         },
         {
-          "command": "sessions list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "session list --filter created_at=equals:<value> --sort created_at:desc"
         }
       ]
     },
     {
-      "id": "sessions revoke",
+      "id": "session revoke",
       "group": "Authentication",
       "description": "Revoke a session by id.",
       "args": [
@@ -1946,7 +1973,7 @@
       ],
       "examples": [
         {
-          "command": "sessions revoke <id> --force --json"
+          "command": "session revoke <id> --force --json"
         }
       ]
     },
@@ -2143,9 +2170,30 @@
     {
       "id": "branding list",
       "group": "Configuration and releases",
-      "description": "List branding.",
+      "description": "List branding revisions.",
       "args": [],
       "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
         {
           "name": "fields",
           "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
@@ -2171,6 +2219,9 @@
       "examples": [
         {
           "command": "branding list --json"
+        },
+        {
+          "command": "branding list --all --json"
         }
       ]
     },
@@ -2316,14 +2367,14 @@
       "args": [
         {
           "name": "deployment_id",
-          "description": "The deployment to re-apply. Omit to undo the last deploy."
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
         }
       ],
       "flags": [
         {
           "name": "force",
           "char": "f",
-          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -2456,7 +2507,7 @@
       ]
     },
     {
-      "id": "flow-definitions get",
+      "id": "flow-definition get",
       "group": "Configuration and releases",
       "description": "Get one flow definition by flow name (newest revision) or revision id.",
       "args": [
@@ -2486,17 +2537,17 @@
       ],
       "examples": [
         {
-          "command": "flow-definitions get <flow>"
+          "command": "flow-definition get <flow>"
         },
         {
-          "command": "flow-definitions get <flow> --json"
+          "command": "flow-definition get <flow> --json"
         }
       ]
     },
     {
-      "id": "flow-definitions list",
+      "id": "flow-definition list",
       "group": "Configuration and releases",
-      "description": "List flow-definitions.",
+      "description": "List flow definitions.",
       "args": [],
       "flags": [
         {
@@ -2550,13 +2601,13 @@
       ],
       "examples": [
         {
-          "command": "flow-definitions list --json"
+          "command": "flow-definition list --json"
         },
         {
-          "command": "flow-definitions list --all --json"
+          "command": "flow-definition list --all --json"
         },
         {
-          "command": "flow-definitions list --filter name=equals:<value>"
+          "command": "flow-definition list --filter name=equals:<value>"
         }
       ]
     },
@@ -2675,7 +2726,7 @@
       ]
     },
     {
-      "id": "policies get",
+      "id": "policy get",
       "group": "Configuration and releases",
       "description": "Get one policy by policy id or operation.",
       "args": [
@@ -2705,15 +2756,15 @@
       ],
       "examples": [
         {
-          "command": "policies get <policy>"
+          "command": "policy get <policy>"
         },
         {
-          "command": "policies get <policy> --json"
+          "command": "policy get <policy> --json"
         }
       ]
     },
     {
-      "id": "policies list",
+      "id": "policy list",
       "group": "Configuration and releases",
       "description": "List policies.",
       "args": [],
@@ -2769,18 +2820,18 @@
       ],
       "examples": [
         {
-          "command": "policies list --json"
+          "command": "policy list --json"
         },
         {
-          "command": "policies list --all --json"
+          "command": "policy list --all --json"
         },
         {
-          "command": "policies list --filter operation=equals:<value>"
+          "command": "policy list --filter operation=equals:<value>"
         }
       ]
     },
     {
-      "id": "policies test",
+      "id": "policy test",
       "group": "Configuration and releases",
       "description": "Run the test cases in .zitadel/policies/ against the policies.\n\nA policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.\n\nThe server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.",
       "args": [
@@ -2809,16 +2860,16 @@
       ],
       "examples": [
         {
-          "command": "policies test"
+          "command": "policy test"
         },
         {
-          "command": "policies test auth.factor.password.set"
+          "command": "policy test auth.factor.password.set"
         },
         {
-          "command": "policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7"
+          "command": "policy test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7"
         },
         {
-          "command": "policies test --json"
+          "command": "policy test --json"
         }
       ]
     },
@@ -2918,7 +2969,7 @@
       ]
     },
     {
-      "id": "projects get",
+      "id": "project get",
       "group": "Configuration and releases",
       "description": "Get one project by id.",
       "args": [
@@ -2948,15 +2999,15 @@
       ],
       "examples": [
         {
-          "command": "projects get <id>"
+          "command": "project get <id>"
         },
         {
-          "command": "projects get <id> --json"
+          "command": "project get <id> --json"
         }
       ]
     },
     {
-      "id": "projects list",
+      "id": "project list",
       "group": "Configuration and releases",
       "description": "List projects.",
       "args": [],
@@ -3017,18 +3068,18 @@
       ],
       "examples": [
         {
-          "command": "projects list --json"
+          "command": "project list --json"
         },
         {
-          "command": "projects list --all --json"
+          "command": "project list --all --json"
         },
         {
-          "command": "projects list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "project list --filter created_at=equals:<value> --sort created_at:desc"
         }
       ]
     },
     {
-      "id": "projects update",
+      "id": "project update",
       "group": "Configuration and releases",
       "description": "Update a project by id.",
       "args": [
@@ -3141,10 +3192,10 @@
       ],
       "examples": [
         {
-          "command": "projects update <id> --data '{...}' --json"
+          "command": "project update <id> --data '{...}' --json"
         },
         {
-          "command": "projects update <id> --file ./project.json"
+          "command": "project update <id> --file ./project.json"
         }
       ]
     },
@@ -3222,7 +3273,7 @@
     {
       "id": "release list",
       "group": "Configuration and releases",
-      "description": "List release.",
+      "description": "List releases.",
       "args": [],
       "flags": [
         {
@@ -3317,7 +3368,7 @@
       ]
     },
     {
-      "id": "schemas get",
+      "id": "schema get",
       "group": "Configuration and releases",
       "description": "Get one schema by object type (current revision) or revision id.",
       "args": [
@@ -3347,15 +3398,15 @@
       ],
       "examples": [
         {
-          "command": "schemas get <schema>"
+          "command": "schema get <schema>"
         },
         {
-          "command": "schemas get <schema> --json"
+          "command": "schema get <schema> --json"
         }
       ]
     },
     {
-      "id": "schemas list",
+      "id": "schema list",
       "group": "Configuration and releases",
       "description": "List schemas.",
       "args": [],
@@ -3411,13 +3462,13 @@
       ],
       "examples": [
         {
-          "command": "schemas list --json"
+          "command": "schema list --json"
         },
         {
-          "command": "schemas list --all --json"
+          "command": "schema list --all --json"
         },
         {
-          "command": "schemas list --filter object_type=equals:<value>"
+          "command": "schema list --filter object_type=equals:<value>"
         }
       ]
     },
@@ -3766,6 +3817,17 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -3773,7 +3835,7 @@
           "command": "api queryUsers -F limit=5"
         },
         {
-          "command": "api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
+          "command": "api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
         },
         {
           "command": "api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json"
@@ -3792,7 +3854,7 @@
     {
       "id": "api ls",
       "group": "Diagnostics and utilities",
-      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
           "name": "filter",
@@ -3827,7 +3889,7 @@
       ]
     },
     {
-      "id": "events get",
+      "id": "event get",
       "group": "Diagnostics and utilities",
       "description": "Get one event by id.",
       "args": [
@@ -3857,15 +3919,15 @@
       ],
       "examples": [
         {
-          "command": "events get <id>"
+          "command": "event get <id>"
         },
         {
-          "command": "events get <id> --json"
+          "command": "event get <id> --json"
         }
       ]
     },
     {
-      "id": "events list",
+      "id": "event list",
       "group": "Diagnostics and utilities",
       "description": "List events.",
       "args": [],
@@ -3898,7 +3960,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
           "type": "option",
           "multiple": true
         },
@@ -3926,13 +3988,13 @@
       ],
       "examples": [
         {
-          "command": "events list --json"
+          "command": "event list --json"
         },
         {
-          "command": "events list --all --json"
+          "command": "event list --all --json"
         },
         {
-          "command": "events list --filter category=equals:<value> --sort occurred_at:desc"
+          "command": "event list --filter category=equals:<value> --sort occurred_at:desc"
         }
       ]
     },

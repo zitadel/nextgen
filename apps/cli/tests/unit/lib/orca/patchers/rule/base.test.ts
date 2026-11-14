@@ -5,7 +5,7 @@ import Ajv2020 from "ajv/dist/2020";
 import { describe, expect } from "vitest";
 
 import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
-import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { it } from "@tests/helpers/fixtures";
@@ -142,6 +142,17 @@ function metaSchemaContents(path: string): string | undefined {
 }
 
 describe("AbstractRulePatcher.plan", () => {
+  it("writes the server's address to .env.local, which the app reads", () => {
+    const env = aRulePatcher()
+      .plan(aContext())
+      .ops.filter(
+        (op): op is Extract<FileOp, { kind: "merge-env" }> =>
+          op.kind === "merge-env" && op.path === ".env.local",
+      );
+
+    expect(env.map((op) => op.entries.ZITADEL_URL)).toContain("http://localhost:8080");
+  });
+
   describe("with a preset and a use case", () => {
     const context = aContext({ preset: "passkey-first", useCase: "consumer" });
 

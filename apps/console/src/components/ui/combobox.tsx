@@ -9,6 +9,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemText,
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
@@ -48,12 +49,16 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-input/50 opacity-50 dark:bg-inpu
 const TRIGGER_INVALID =
   "border-destructive ring-destructive/20 dark:ring-destructive/40 aria-invalid:ring-[3px]";
 
-const LIST = "w-(--radix-popover-trigger-width) rounded-md border-foreground/10 p-0";
+/** The list's popover without its width, for a menu drawn like it (`ResourceFilter`). */
+export const COMBOBOX_SURFACE = "rounded-md border-foreground/10 p-0";
+const LIST = `w-(--radix-popover-trigger-width) ${COMBOBOX_SURFACE}`;
 
 // One-line is 32px; two-line stacks a 14px label over a 12px description and
 // measures 48px.
 const ITEM_SIMPLE = "h-8 gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
+/** A row of any height, for a menu drawn like this list. */
+export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
 // filled row, so the fill is suppressed until the operator points or arrows.
@@ -358,15 +363,8 @@ export function ComboboxContent({
                             </span>
                           )}
                         </span>
-                      ) : option.description ? (
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate font-medium">{option.label}</span>
-                          <span className="truncate text-xs leading-4 text-muted-foreground">
-                            {option.description}
-                          </span>
-                        </span>
                       ) : (
-                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                        <CommandItemText label={option.label} description={option.description} />
                       )}
                       {isSelected && indicator === "check" && (
                         <Check className="absolute right-2 size-4" aria-hidden />

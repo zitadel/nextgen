@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -244,6 +245,75 @@ func TestSessionService_Exchange(t *testing.T) {
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
+}
+
+// exchangeEvents runs a handoff exchange that storage answers with session, and
+// returns the events it wrote, by type.
+func exchangeEvents(t *testing.T, ctx context.Context, session *domain.Session) map[domain.EventType]*domain.Event {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		})
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	statements.EXPECT().ExchangeSession(gomock.Any(), session.ProjectID, "handoff-token", gomock.Any(), gomock.Any()).
+		Return(session, nil)
+	written := map[domain.EventType]*domain.Event{}
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+			written[ev.EventType] = ev
+			return nil
+		}).Times(2)
+	svc := service.NewSessionService(pool, &refResolverStub{}, sessionConfigForTest())
+
+	_, err := svc.Exchange(ctx, service.ExchangeInput{ProjectID: session.ProjectID, HandoffToken: "handoff-token"})
+	require.NoError(t, err)
+	for _, eventType := range []domain.EventType{domain.EventTypeSessionEstablished, domain.EventTypeAuthTokenIssued} {
+		require.NotNil(t, written[eventType], "the exchange wrote no %s", eventType)
+	}
+	return written
+}
+
+// The exchange is a service call that names no flow. Its session, its token
+// and its request event join the sign-in through the flow of the attempt the
+// exchange consumed, which storage hands back on the session.
+func TestSessionService_Exchange_StampsTheAttemptsFlow(t *testing.T) {
+	userID := "user_1"
+	ctx := audit.WithActorSlot(t.Context())
+	written := exchangeEvents(t, ctx, &domain.Session{ProjectID: "proj", ID: "sess_1", TokenID: "tkn_1", UserID: &userID, FlowID: "flow_1"})
+
+	for eventType, ev := range written {
+		require.NotNil(t, ev.FlowID, "%s has no flow_id", eventType)
+		assert.Equal(t, "flow_1", *ev.FlowID, "%s", eventType)
+	}
+	slot, ok := audit.ActorSlotFromContext(ctx)
+	require.True(t, ok)
+	require.NotNil(t, slot.FlowID, "the exchange's request event has no flow_id")
+	assert.Equal(t, "flow_1", *slot.FlowID)
+}
+
+// The exchange is the app's call, made with its key. Both events it writes
+// carry that key in token_id, where every event carries the credential its
+// request presented; the token it mints is the token event's entity.
+func TestSessionService_Exchange_KeepsTheCallersToken(t *testing.T) {
+	userID := "user_1"
+	caller := domain.EventActorTypeService
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
+		ProjectID: "proj", TokenID: "tkn_caller", ActorType: &caller, Authenticated: true,
+	})
+	written := exchangeEvents(t, ctx, &domain.Session{ProjectID: "proj", ID: "sess_1", TokenID: "tkn_minted", UserID: &userID, FlowID: "flow_1"})
+
+	for eventType, ev := range written {
+		assert.Equal(t, "tkn_caller", ev.TokenID, "%s token_id", eventType)
+	}
+	minted := written[domain.EventTypeAuthTokenIssued].EntityID
+	require.NotNil(t, minted, "the token event names no token")
+	assert.Equal(t, "tkn_minted", *minted)
 }
 
 func TestSessionService_Get(t *testing.T) {

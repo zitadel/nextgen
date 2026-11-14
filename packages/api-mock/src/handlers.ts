@@ -1,9 +1,10 @@
+import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
- * Drives an xstate `flowMachine` actor. `POST /flow` resets the actor and
- * starts a new walk; `POST /flow/{id}/submit` advances the actor and returns
- * the matching step fixture; `GET /flow/{id}` re-renders the current step;
+ * Drives an xstate `flowMachine` actor. `POST /flows` resets the actor and
+ * starts a new walk; `POST /flows/{flow_id}/submit` advances the actor and returns
+ * the matching step fixture; `GET /flows/{flow_id}` re-renders the current step;
  * `GET /__nextgen/idp/callback` (and `/idp/callback`) is the provider's return.
  *
  * Branding is applied by `withBranding` (overlay set via `applyBranding`).
@@ -17,7 +18,6 @@
  */
 import {
   getCreateFlowMockHandler,
-  getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
@@ -25,6 +25,7 @@ import type {
   CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
+  ExchangeHandoff200,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
@@ -46,6 +47,7 @@ import {
   passkeyUpsellStep,
   passwordStep,
   recoverStep,
+  registerPasskeyStep,
   registerPasswordStep,
   registerStep,
   registerSsoStep,
@@ -169,6 +171,37 @@ function returnTargetRefusal(
     };
   }
   return { target: parsed.href };
+}
+
+/**
+ * The spec's project-id pattern, written out. This file runs in the browser
+ * (Storybook, the docs' live examples), and importing it from orval's zod
+ * module would build every schema there, whose `new Function` probe a strict
+ * CSP reports as an eval. Keep validators out of the handlers' import graph.
+ */
+const PROJECT_ID = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * The session an in-process exchange answers with: active, with the verified
+ * factor a completed sign-in leaves, and ids in the spec's patterns. The
+ * project is the one the request names, when it is a valid project id.
+ */
+function exchangedSession(projectId: string | undefined): ExchangeHandoff200 {
+  const created = new Date();
+  const expires = new Date(created.getTime() + 3600 * 1000);
+  return {
+    session: {
+      session_id: "sess_mock",
+      project_id: projectId && PROJECT_ID.test(projectId) ? projectId : "proj_mock",
+      state: "active",
+      user_id: "user_mock",
+      factors: [{ method: "password", verified_at: created.toISOString() }],
+      assurance_levels: [],
+      created_at: created.toISOString(),
+      expires_at: expires.toISOString(),
+    },
+    session_token: "mock-session-token",
+  };
 }
 
 /**
@@ -331,7 +364,7 @@ export function setupMockHandlers(
    * has no `id_token` either, so an `email` query parameter stands in for its
    * email claim, falling back to the address the flow already captured.
    * Either way the browser goes back with `303` to the `return_target` of the
-   * `sso` submission, where `GET /flow/{id}` shows the result.
+   * `sso` submission, where `GET /flows/{flow_id}` shows the result.
    */
   function idpCallback({ request }: { request: Request }): Response {
     const noStore = { "Cache-Control": "private, no-store" };
@@ -364,7 +397,7 @@ export function setupMockHandlers(
    *
    * Reads `capturedFields.email` from the actor snapshot to look up the user's
    * registered credentials in `authn`, then selects and renders the matching
-   * step fixture. Called after every state transition and on `GET /flow/{id}`.
+   * step fixture. Called after every state transition and on `GET /flows/{flow_id}`.
    */
   /**
    * The non-branding overlays: identity providers and the passkey offer on the
@@ -420,7 +453,9 @@ export function setupMockHandlers(
     const step = snapshot.value as FlowStepName | "idle";
     switch (step) {
       case "register":
-        return withBranding(registerStep(input));
+        return withBranding(
+          snapshot.context.passkeyRegistration ? registerPasskeyStep(input) : registerStep(input),
+        );
       case "register-password":
         return withBranding(registerPasswordStep(input));
       case "recover":
@@ -455,9 +490,9 @@ export function setupMockHandlers(
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
     // with whatever it is given, and the refusal below is a 400.
-    http.post("*/flow/:id/submit", async ({ params, request }) => {
+    http.post("*/flows/:flow_id/submit", async ({ params, request }) => {
       const ok = (step: CreateFlow201) => HttpResponse.json(step, { status: 200 });
-      const flowId = String(params.id);
+      const flowId = String(params.flow_id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
       const delayed = submitDelay;
@@ -510,6 +545,23 @@ export function setupMockHandlers(
         iss,
       };
 
+      // A sign-up spends the proof where the user is created: the password
+      // submit, or the attestation of a passkey registration.
+      const signingUp =
+        (before === "register-password" && body.action === "submit") ||
+        (before === "register" &&
+          body.action === "passkey_register" &&
+          Boolean(body.challenge_response) &&
+          snapshot.context.passkeyRegistration);
+      if (
+        signingUp &&
+        !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
+      ) {
+        return HttpResponse.json(
+          { code: "flow.proof_invalid", message: "signup proof is missing or invalid" },
+          { status: 403 },
+        );
+      }
       const outcome = accountOutcome(before, body.action, email);
 
       // With account routing the collision is the switch to sign-in, as the
@@ -602,12 +654,13 @@ export function setupMockHandlers(
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
         outcome,
+        attested: Boolean(body.challenge_response),
       });
       const after = actor.getSnapshot();
       const createdEmail = after.context.capturedFields.email;
       if (
         routesByAccount &&
-        (before === "register-password" || before === "register-sso") &&
+        (before === "register" || before === "register-password" || before === "register-sso") &&
         after.value === "done" &&
         createdEmail
       ) {
@@ -621,8 +674,16 @@ export function setupMockHandlers(
       );
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
-      captured.push({ kind: "getFlowStep", flowId: String(params.id) });
-      return currentResponse();
+      captured.push({ kind: "getFlowStep", flowId: String(params.flowId) });
+      const response = await currentResponse();
+      // As on the server, only GET prepares the announced signup challenge.
+      if (response.step.gates.signup_pow) {
+        response.step.gates = {
+          ...response.step.gates,
+          ...signupGate(actor.getSnapshot().context.sessionToken),
+        };
+      }
+      return response;
     }),
     // Both mounts the engine serves (`internal/api/flow_sso.go`): the
     // published path, and the one an SDK proxy forwards after stripping its
@@ -641,7 +702,7 @@ export function setupMockHandlers(
           { status: 503 },
         );
       }
-      return HttpResponse.json(getExchangeHandoffResponseMock());
+      return HttpResponse.json(exchangedSession(projectId));
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
     // mount and on sign-out. In-process there is no session cookie to present,

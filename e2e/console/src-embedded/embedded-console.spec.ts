@@ -41,7 +41,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // nothing. The widget below is what needs a live API.
   await expect(page).toHaveURL(/\/ui\/console\/login$/);
 
-  // `POST /api/v1/flow` — the first call whose result is visible on screen.
+  // `POST /api/v1/flows` — the first call whose result is visible on screen.
   // With a wrong base the widget renders "POST … returned 404" here.
   await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByLabel("Email").fill(user.email);

@@ -17,7 +17,8 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
-import { expect } from "vitest";
+import { snapshotPlatformStore } from "@zitadel/api-mock/platform";
+import { expect, vi } from "vitest";
 import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
@@ -42,8 +43,9 @@ export type InterruptedRun = Readonly<{
   stderr: string;
 }>;
 import { aBinaryRecord } from "./runtime-record";
-import { parseJson, runCliForTest } from "./run-cli";
+import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -165,11 +167,17 @@ export interface PublishedPolicy {
   readonly id: string;
   readonly operation: string;
   readonly revision_id: string;
-  readonly config: Readonly<Record<string, number>>;
+  readonly config: Readonly<Record<string, number | string>>;
 }
 
 /** The operation the password policy guards, and its file's name. */
 export const PASSWORD_POLICY = "auth.factor.password.set";
+
+/** The sign-up policy `setup` publishes beside it: the default, the built-in proof of work. */
+export const DEFAULT_SIGNUP_POLICY = {
+  operation: "user.create",
+  config: { challenge: "zitadel_pow" },
+};
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -415,6 +423,18 @@ function customFlags(connection: CustomConnection, prefix: string): string[] {
  * and not how it stores things: a corrupt file matters only insofar as a later
  * command surfaces it. Sync state and the mock's own store are never read.
  */
+/**
+ * The identity the developer committed with, as `git -c` gives it: setup commits
+ * as the developer on every machine, a CI runner with no git identity included.
+ */
+const DEVELOPER_GIT = {
+  GIT_CONFIG_COUNT: "2",
+  GIT_CONFIG_KEY_0: "user.name",
+  GIT_CONFIG_VALUE_0: "Dev",
+  GIT_CONFIG_KEY_1: "user.email",
+  GIT_CONFIG_VALUE_1: "dev@example.com",
+};
+
 export class ScaffoldedApp {
   readonly path: string;
   readonly committed: CommittedFiles;
@@ -430,16 +450,38 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(
-        ["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs],
-        env,
-      );
+      return this.cli(["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs], {
+        ...DEVELOPER_GIT,
+        ...env,
+      });
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
     return this.cli(["setup", "--non-interactive", "--json", ...extraArgs], {
+      ...DEVELOPER_GIT,
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
+   * Runs `tests add`, with a fake npm on `PATH` that records the install when
+   * `install` is set, and `--skip-install` otherwise.
+   */
+  async addTests(
+    extraArgs: string[] = [],
+    { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    if (!install) {
+      return this.cli(["tests", "add", "--skip-install", ...extraArgs], env);
+    }
+    const npm = await fakePackageManager();
+    this.installLogPath = npm.logPath;
+    return this.cli(["tests", "add", ...extraArgs], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
+      ...env,
     });
   }
 
@@ -507,6 +549,39 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * The paths the next commit of everything would take: those under version
+   * control, and those outside it that no ignore rule keeps out. Read from git,
+   * which decides it, without committing.
+   */
+  async committableFiles(): Promise<string[]> {
+    const { stdout } = await execFileAsync(
+      "git",
+      [
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "-z",
+      ],
+      { cwd: this.path },
+    );
+    return stdout.split("\0").filter((line) => line !== "");
+  }
+
+  /**
+   * Puts an app set up without git in the state a setup before this CLI left a
+   * SvelteKit app in: `gitignore` as its `.gitignore`, and everything it does
+   * not ignore committed, so `.env.example`, which it ignores, never was.
+   */
+  async leftByAnOlderSetup(gitignore: string): Promise<void> {
+    await this.replaceGitignore(gitignore);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await this.commitEverything();
+  }
+
   /** Commits everything outstanding, as the developer would before deploying. */
   async commitEverything(): Promise<void> {
     await execFileAsync("git", ["add", "--all"], { cwd: this.path });
@@ -540,7 +615,10 @@ export class ScaffoldedApp {
 
   /** `setup` without `--json`, for a spec asserting what the developer reads. */
   setupRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], env);
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], {
+      ...DEVELOPER_GIT,
+      ...env,
+    });
   }
 
   /**
@@ -558,7 +636,10 @@ export class ScaffoldedApp {
         "next",
         ...extraArgs,
       ],
-      { PATH: await aFakeAppGeneratorPath() },
+      {
+        ...DEVELOPER_GIT,
+        PATH: await aFakeAppGeneratorPath(),
+      },
     );
   }
 
@@ -787,10 +868,56 @@ export class ScaffoldedApp {
   /** Runs `upgrade --json` against a fake npm and npx on PATH. */
   upgrade(
     extraArgs: string[] = [],
-    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+    behavior: UpgradeBehavior = {},
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     return this.upgradeWith(["--json", ...extraArgs], behavior, env);
+  }
+
+  /**
+   * `upgrade --json` with Ctrl-C pressed once its install or its refresh is
+   * running, against fakes slow enough to still be running when it is.
+   *
+   * @param during - Which of the two the keypress lands in.
+   * @returns What the interrupted run ended with.
+   */
+  async upgradeInterrupted(during: "install" | "refresh"): Promise<CliResult> {
+    const running = this.upgrade(
+      [],
+      during === "install" ? { install: "slow" } : { refresh: "slow" },
+    );
+    await vi.waitFor(
+      async () => {
+        const started = during === "install" ? this.installLogPath : this.refreshLogPath;
+        if (started === undefined) {
+          throw new Error("upgrade has not reached the fakes");
+        }
+        await stat(started);
+      },
+      { timeout: 30_000 },
+    );
+    pressCtrlC();
+    return running;
+  }
+
+  /**
+   * `claim --json` with Ctrl-C pressed once it is waiting on the browser step,
+   * which it is when the platform holds the challenge it opened.
+   *
+   * @returns What the interrupted run ended with.
+   */
+  async claimInterrupted(): Promise<CliResult> {
+    const running = this.cli(["claim", "--no-open", "--timeout", "30", "--json"]);
+    await vi.waitFor(
+      () => {
+        if (snapshotPlatformStore().claimChallengeIds.length === 0) {
+          throw new Error("claim has not opened a challenge");
+        }
+      },
+      { timeout: 30_000 },
+    );
+    pressCtrlC();
+    return running;
   }
 
   /** Runs `upgrade` for a person, against the same fakes. */
@@ -819,10 +946,13 @@ export class ScaffoldedApp {
 
   private async upgradeWith(
     args: string[],
-    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+    behavior: UpgradeBehavior,
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
-    const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
+    const npm = await fakePackageManager(
+      behavior.install === "fails" ? 1 : 0,
+      behavior.install === "slow",
+    );
     const npx = await fakeNpx(behavior.refresh ?? "done");
     this.installLogPath = npm.logPath;
     this.refreshLogPath = npx.logPath;
@@ -851,9 +981,24 @@ export class ScaffoldedApp {
     });
   }
 
-  /** The port a `doctor` run reported it checked. */
+  /**
+   * The port a `doctor` run reported it checked, whether it passed (in `data`)
+   * or found issues (in the error's `details`).
+   *
+   * @param result - The `doctor --json` run.
+   * @returns The port.
+   */
   doctoredPortOf(result: CliResult): number {
-    return this.envelopeOf<{ port: number }>(result).data.port;
+    const envelope = this.envelopeOf(result) as Readonly<{
+      data?: Readonly<{ port: number }>;
+      details?: Readonly<{ port: number }>;
+    }>;
+    const port = envelope.data?.port ?? envelope.details?.port;
+    if (port === undefined) {
+      throw new Error(`expected doctor to report its port, got: ${result.stdout}`);
+    }
+
+    return port;
   }
 
   /**
@@ -890,12 +1035,14 @@ export class ScaffoldedApp {
   async startLocalServer({
     shape = "plain",
     port = nextPort(),
+    json = true,
   }: {
     shape?: ServerShape;
     port?: number;
+    json?: boolean;
   } = {}): Promise<CliResult> {
     trackLocalServerDir(this.path);
-    return this.cli(["start", "--port", String(port), "--json"], {
+    return this.cli(["start", "--port", String(port), ...(json ? ["--json"] : [])], {
       ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
     });
   }
@@ -1264,6 +1411,7 @@ export class ScaffoldedApp {
   async inEveryRendering(
     run: (how: { json: boolean; env: NodeJS.ProcessEnv }) => Promise<CliResult>,
   ): Promise<void> {
+    const ran: CliResult[] = [];
     for (const how of [
       { json: true, terminal: false, env: {} },
       { json: false, terminal: false, env: {} },
@@ -1282,11 +1430,24 @@ export class ScaffoldedApp {
         return run({ json: how.json, env: how.env });
       };
       const result = await (how.terminal ? onTerminalReadingAFile(once) : offTerminal(once));
+      ran.push(result);
       // A run that named no command would otherwise pass every rendering but
       // the one the envelope is checked in.
       expect(result.stdout + result.stderr, "the command ran").not.toContain(
         "is not a zitadel command",
       );
+      if (how.env.FORCE_COLOR === undefined) {
+        expect(
+          result.stdout + result.stderr,
+          "a run without colour carries no colour code",
+        ).not.toContain("\u001B");
+      }
+    }
+    // The two runs on a terminal came last and back to back, so they ended the
+    // same way: what the envelope says, the screen says in the same words.
+    const [onScreen, asEnvelope] = ran.slice(-2);
+    if (onScreen !== undefined && asEnvelope !== undefined) {
+      assertOneText(asEnvelope, onScreen);
     }
   }
 
@@ -1473,16 +1634,16 @@ export class ScaffoldedApp {
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
-    return this.listed<RegisteredIdp>("idps");
+    return this.listed<RegisteredIdp>("idp");
   }
 
   /** The policies the platform holds, each at its newest revision. */
   publishedPolicies(): Promise<PublishedPolicy[]> {
-    return this.listed<PublishedPolicy>("policies");
+    return this.listed<PublishedPolicy>("policy");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
-    return this.listed<PublishedSchema>("schemas");
+    return this.listed<PublishedSchema>("schema");
   }
 
   /** The one schema a scaffolded project publishes. */
@@ -1491,7 +1652,7 @@ export class ScaffoldedApp {
   }
 
   publishedFlows(): Promise<PublishedFlow[]> {
-    return this.listed<PublishedFlow>("flow-definitions");
+    return this.listed<PublishedFlow>("flow-definition");
   }
 
   /** The one login flow a scaffolded project publishes. */
@@ -1527,7 +1688,7 @@ export class ScaffoldedApp {
   }
 
   /**
-   * The auth methods the published user schema names, as `schemas list`
+   * The auth methods the published user schema names, as `schema list`
    * reports them.
    *
    * @returns The schema's `x-auth-methods`, empty when it names none.
@@ -1792,6 +1953,20 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Gives the app `contents` as its `.gitignore`, as its framework's generator or the developer left it. */
+  replaceGitignore(contents: string): Promise<void> {
+    return this.writeProjectFile(".gitignore", contents);
+  }
+
+  /**
+   * Gives the Vite app's dev proxy the target setup fixed in it, the server it
+   * ran against, before the proxy read `ZITADEL_URL`.
+   */
+  async fixesItsServerAddress(): Promise<void> {
+    const config = await this.readProjectFile(VITE_CONFIG);
+    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, MOCK_SERVER_URL));
+  }
+
   /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
   async hasInstalled(name: string, version: string): Promise<void> {
     await mkdir(join(this.path, "node_modules", name), { recursive: true });
@@ -1921,6 +2096,15 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes the sign-up policy file, as the developer owning it would. */
+  async writeSignupPolicy(config: Record<string, string>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: DEFAULT_SIGNUP_POLICY.operation, config }, null, 2)}\n`,
+    );
+  }
+
   /** Writes the password policy's test file with `cases`, as the developer owning it would. */
   async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
     await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
@@ -1930,9 +2114,9 @@ export class ScaffoldedApp {
     );
   }
 
-  /** Runs `zitadel policies test` with `args`. */
+  /** Runs `zitadel policy test` with `args`. */
   testPolicies(args: string[] = []): Promise<CliResult> {
-    return this.run(["policies", "test", "--non-interactive", ...args]);
+    return this.run(["policy", "test", "--non-interactive", ...args]);
   }
 
   /** Removes the committed password policy file, as the developer owning it would. */
@@ -1963,6 +2147,19 @@ export class ScaffoldedApp {
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
     return this.editDocument("package.json", PackageJsonSchema, edit);
+  }
+
+  /**
+   * Declares the project's package manager in `package.json`, as a project
+   * set up with pnpm, yarn or bun does, so a command that suggests one picks it.
+   *
+   * @param spec - The manager and its version, as the field holds them: `pnpm@10.0.0`.
+   * @returns When the file is written.
+   */
+  usePackageManager(spec: string): Promise<void> {
+    return this.editDocument("package.json", AnyObjectSchema, (pkg) => {
+      pkg.packageManager = spec;
+    });
   }
 
   /** Adds a second flow definition, for a spec whose input is the flow itself. */
@@ -2017,6 +2214,18 @@ export class ScaffoldedApp {
         Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
       ),
     };
+  }
+
+  /**
+   * How a question to a person names where it would act: the project this app
+   * is bound to, then the server's host without its scheme.
+   *
+   * @param serverUrl - The server the run is pointed at, which defaults to the mock platform.
+   * @returns `project <id> on <host>`.
+   */
+  async projectPlace(serverUrl = MOCK_SERVER_URL): Promise<string> {
+    const { ZITADEL_PROJECT_ID } = await this.developmentValues();
+    return `project ${ZITADEL_PROJECT_ID} on ${new URL(serverUrl).host}`;
   }
 
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
@@ -2268,7 +2477,60 @@ export function assertNothingDrivesTheTerminal(
       );
     }
   }
+  assertEndingIsWellFormed(result, where);
   assertAJsonBodyParses(result, where);
+}
+
+/**
+ * A run's ending is built from the command's own words, which at a colour
+ * terminal carry escapes, so a rule that reads them only when they are bare
+ * leaves a coloured run ending differently from a plain one. Two symptoms say
+ * so for any command, in any rendering: the command overview named twice, and
+ * a step's `$ command` line left raw inside the box instead of being laid out
+ * as a step. Both are checked here, on every invocation, because the command
+ * that breaks them is never the one a spec for colour was written for.
+ */
+export function assertEndingIsWellFormed(
+  result: { stdout: string; stderr: string },
+  where: string,
+): void {
+  for (const [stream, raw] of [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const) {
+    const text = raw.replace(SGR, "");
+    const overview = text.match(/Explore all commands:/g)?.length ?? 0;
+    expect(
+      overview,
+      `${where}: ${stream} names the command overview ${overview} times`,
+    ).toBeLessThan(2);
+    const raw$ = text.split("\n").filter((line) => /^\s*│\s+\$ /.test(line));
+    expect(raw$, `${where}: ${stream} has a raw $ command line inside its box`).toEqual([]);
+    // A command a person is told to run is one line: broken across lines with
+    // nothing to continue it, it can no longer be copied and run. A line that
+    // continues a `$` command, indented under it and not ended by a backslash,
+    // is that command folded as prose.
+    const lines = text.split("\n");
+    const folded = lines.filter(
+      (line, at) =>
+        /^ {4}-{1,2}\w/.test(line) &&
+        /^ {2}\$ /.test(lines[at - 1] ?? "") &&
+        !/\\$/.test(lines[at - 1] ?? ""),
+    );
+    expect(folded, `${where}: ${stream} folds a command across lines`).toEqual([]);
+    // The CLI's own colour spelled out a second time is a pair: the code that
+    // starts it and the reset that ends it (`\x1b[36m` ... `\x1b[39m`). A
+    // hostile payload that carries a colour sequence spells out the one it was
+    // given, which is not followed by a reset the CLI added, so a lone code is
+    // allowed and only the pair is refused.
+    const spelled = text.match(/\\x1b\[[0-9;]*m/g) ?? [];
+    const closes = spelled.some((code) => /^\\x1b\[(?:0|22|39|49)m$/.test(code));
+    const opens = spelled.some((code) => !/^\\x1b\[(?:0|22|39|49)m$/.test(code));
+    expect(
+      opens && closes ? spelled : [],
+      `${where}: ${stream} prints a colour code as text`,
+    ).toEqual([]);
+  }
 }
 
 /**
@@ -2281,7 +2543,7 @@ export function assertNothingDrivesTheTerminal(
  * spelled for a person apart from one spelled for a parser.
  *
  * An object and nothing else: a `{` cannot begin anything else the CLI prints,
- * whereas a `[` begins consola's own `[info]` prefix as readily as an array, and
+ * whereas a `[` begins a line's own prefix as readily as an array, and
  * a rule that has to tell those apart would be guessing rather than checking. A
  * command whose body is a bare array says so in its own spec.
  */
@@ -2335,6 +2597,103 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const contract = ContractEnvelope.parse(parsed);
   assertRunnableSuggestions(where, contract);
   assertDataShape(where, contract);
+  if (args.includes("--dry-run")) {
+    assertDryRun(where, parsed);
+  }
+}
+
+/**
+ * Whether a text holds a control character, which a screen spells out.
+ *
+ * @param text - The text.
+ * @returns Whether it holds one.
+ */
+function hasControlCharacter(text: string): boolean {
+  return [...text].some((char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code < 0x20 || (code >= 0x7f && code <= 0x9f);
+  });
+}
+
+/**
+ * A message is written once: the envelope's error `message`, or its
+ * `data.title`, is on the screen word for word, never capitalised, trimmed or
+ * ended with a full stop for one of the two, and each warning is said exactly
+ * once. Skipped for a text holding a control character, which the screen spells
+ * out. The two runs must have ended the same way and the envelope must parse:
+ * a check that skips on either would pass on what it was meant to catch.
+ *
+ * @param envelope - The run that printed the envelope.
+ * @param screen - The same run, as a person reads it.
+ */
+export function assertOneText(envelope: CliResult, screen: CliResult): void {
+  expect(envelope.exitCode, "the envelope run and the screen run ended the same way").toBe(
+    screen.exitCode,
+  );
+  const body = parseJsonOrUndefined(stripAnsi(envelope.stdout));
+  const parsed = z
+    .object({
+      status: z.string(),
+      message: z.string().optional(),
+      warnings: z.array(z.string()).optional(),
+      data: z.object({ title: z.string().optional() }).passthrough().optional(),
+    })
+    .safeParse(body);
+  expect(parsed.success, "the envelope run printed an envelope that parses").toBe(true);
+  if (!parsed.success) {
+    return;
+  }
+  const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
+  const printed = stripAnsi(`${screen.stdout}\n${screen.stderr}`);
+  if (said !== undefined && !hasControlCharacter(said)) {
+    expect(printed, "the screen says what the envelope says").toContain(said);
+  }
+  for (const warning of parsed.data.warnings ?? []) {
+    if (!hasControlCharacter(warning)) {
+      expect(
+        printed.split(warning).length - 1,
+        `the warning "${warning}" is said exactly once on the screen`,
+      ).toBe(1);
+    }
+  }
+}
+
+/**
+ * A dry run answers `ok` with `data.dry_run: true` and a headline ending in
+ * `(dry run)`; it is never `skipped`, which means a person said no. Checked on
+ * every spec's `--dry-run --json` run, so a command that breaks the rule fails
+ * in its own spec. A refusal is an error, and a skip for another reason keeps
+ * its own token. The headline is `data.title`, the words the terminal draws.
+ *
+ * @param where - The command, for the failure message.
+ * @param parsed - The parsed envelope.
+ */
+export function assertDryRun(where: string, parsed: unknown): void {
+  const shape = z
+    .looseObject({
+      status: z.string(),
+      reason: z.string().optional(),
+      data: z
+        .looseObject({ dry_run: z.unknown().optional(), title: z.unknown().optional() })
+        .optional(),
+    })
+    .safeParse(parsed);
+  expect(shape.success, `${where}: a dry run answers an envelope that parses`).toBe(true);
+  if (!shape.success) {
+    return;
+  }
+  const { status, reason, data } = shape.data;
+  expect(reason, `${where}: a dry run is answered ok, never skipped as a dry run`).not.toBe(
+    "dry-run",
+  );
+  if (status !== "ok") {
+    return;
+  }
+  expect(data?.dry_run, `${where}: a dry run says data.dry_run`).toBe(true);
+  expect(typeof data?.title, `${where}: a dry run carries its headline as data.title`).toBe(
+    "string",
+  );
+  expect(data?.title, `${where}: a dry run's headline ends in (dry run)`).toMatch(/\(dry run\)$/);
 }
 
 /**
@@ -2433,10 +2792,15 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
  */
 export async function anApp({
   nextVersion = "^16.0.0",
+  usesClaudeCode = false,
 }: {
   nextVersion?: string;
+  usesClaudeCode?: boolean;
 } = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
+  if (usesClaudeCode) {
+    await mkdir(join(path, ".claude"), { recursive: true });
+  }
 
   await mkdir(join(path, "app"), { recursive: true });
   await writeFile(
@@ -2457,6 +2821,51 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
+}
+
+/** A Vite app's config, into which setup merges the dev proxy. */
+const VITE_CONFIG = "vite.config.ts";
+
+/** A React app as create-vite's react-ts template leaves it, before setup. */
+export async function aReactApp(): Promise<ScaffoldedApp> {
+  const path = await mkdtemp(join(tmpdir(), "zitadel-react-"));
+  await mkdir(join(path, "src"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-react-app",
+        private: true,
+        type: "module",
+        scripts: { dev: "vite" },
+        dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" },
+        devDependencies: { vite: "^8.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "index.html":
+      '<!doctype html>\n<html>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
+    "src/main.tsx":
+      'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\n\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
+    "src/App.tsx": "export default function App() {\n  return null;\n}\n",
+    [VITE_CONFIG]: BARE_VITE_CONFIG,
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * A React app already through `setup`, for specs about its dev proxy. Setup
+ * replaces create-vite's own `src/App.tsx` only when forced.
+ */
+export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
+  const app = await aReactApp();
+  const result = await app.setup(["--no-git", "--force", "--framework", "react"]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
 }
 
 /**
@@ -2561,7 +2970,10 @@ export async function aCommittedApp(): Promise<ScaffoldedApp> {
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
-async function fakePackageManager(exitCode = 0): Promise<{ binDir: string; logPath: string }> {
+async function fakePackageManager(
+  exitCode = 0,
+  slow = false,
+): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
@@ -2575,22 +2987,31 @@ fs.appendFileSync(
 );
 process.stdout.write("fake npm stdout\\n");
 process.stderr.write("fake npm stderr\\n");
-process.exitCode = ${String(exitCode)};
+${slow ? "setTimeout(() => { process.exitCode = 1; }, 700);" : `process.exitCode = ${String(exitCode)};`}
 `,
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
 }
 
+/** How the fake npm and npx an `upgrade` run is given behave. */
+type UpgradeBehavior = {
+  refresh?: "done" | "issues" | "broken" | "slow";
+  install?: "fails" | "slow";
+};
+
 /** A fake `npx` on PATH that records its invocation and answers as the new release's doctor. */
 async function fakeNpx(
-  outcome: "done" | "issues" | "broken",
+  outcome: "done" | "issues" | "broken" | "slow",
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
   const logPath = join(binDir, "npx.log");
-  const answer = { done: '{"status":"ok"}', issues: '{"status":"error"}', broken: "not json" }[
-    outcome
-  ];
+  const answer = {
+    done: '{"status":"ok"}',
+    issues: '{"status":"error"}',
+    broken: "not json",
+    slow: '{"status":"ok"}',
+  }[outcome];
   const binPath = join(binDir, "npx");
   await writeFile(
     binPath,
@@ -2599,7 +3020,7 @@ require("node:fs").appendFileSync(
   process.env.FAKE_NPX_LOG,
   JSON.stringify({ args: process.argv.slice(2) }) + "\\n",
 );
-process.stdout.write(${JSON.stringify(answer)});
+${outcome === "slow" ? "setTimeout(() => {" : ""}process.stdout.write(${JSON.stringify(answer)});${outcome === "slow" ? "}, 700);" : ""}
 `,
   );
   await chmod(binPath, 0o755);

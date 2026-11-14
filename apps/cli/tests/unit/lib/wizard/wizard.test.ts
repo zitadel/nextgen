@@ -1,179 +1,419 @@
-import { PassThrough } from "node:stream";
-
 import { describe, expect, it } from "vitest";
 
-import type { Asker } from "../../../../src/lib/input";
-import { Wizard } from "../../../../src/lib/wizard";
-
-type Question = Parameters<Asker>[0];
+import { EndStep, Wizard, WizardDefinitionError, WizardStep } from "@/lib/wizard";
 
 /**
- * A wizard whose asker writes the question to the stream it was given, as a
- * prompt would, and answers from a script.
+ * What every run starts from.
  */
-function wizardWith(answers: unknown[] = []): { wizard: Wizard; drawn: () => string } {
-  const sink = new PassThrough();
-  let drawn = "";
-  sink.on("data", (chunk) => {
-    drawn += chunk.toString();
-  });
-  const ask = (async (question: Question) => {
-    question.output?.write(`◇  ${question.message}\n│  ${String(answers[0])}\n`);
-    return answers.shift();
-  }) as Asker;
-  return { wizard: new Wizard({ ask, output: sink }), drawn: () => drawn };
+type Initial = { readonly input: string };
+
+/**
+ * Where the steps in these tests write as they run and as they are undone, so
+ * the order of both can be read back.
+ */
+type Log = string[];
+
+/**
+ * Adds a fact, and says in the log when it ran and when it was undone.
+ */
+class Adds<Key extends string, Value> extends WizardStep<
+  Key,
+  { readonly [K in Key]: Value },
+  Initial
+> {
+  readonly key: Key;
+
+  private readonly value: Value;
+
+  private readonly log: Log;
+
+  constructor(log: Log, key: Key, value: Value) {
+    super();
+    this.log = log;
+    this.key = key;
+    this.value = value;
+  }
+
+  async run(): Promise<{ readonly [K in Key]: Value }> {
+    this.log.push(`run ${this.key}`);
+    return { [this.key]: this.value } as { readonly [K in Key]: Value };
+  }
+
+  override async undo(): Promise<void> {
+    this.log.push(`undo ${this.key}`);
+  }
+}
+
+/**
+ * Fails when it runs.
+ */
+class Fails extends WizardStep<"fails", { readonly never: true }, Initial> {
+  readonly key = "fails";
+
+  async run(): Promise<{ readonly never: true }> {
+    throw new Error("boom");
+  }
+}
+
+/**
+ * Finishes, and fails when it is undone.
+ */
+class UndoFails extends WizardStep<"undoFails", { readonly a: true }, Initial> {
+  readonly key = "undoFails";
+
+  async run(): Promise<{ readonly a: true }> {
+    return { a: true };
+  }
+
+  override async undo(): Promise<void> {
+    throw new Error("could not undo");
+  }
+}
+
+/**
+ * Throws what an aborted run throws.
+ */
+class Aborted extends WizardStep<"aborted", { readonly b: true }, Initial> {
+  readonly key = "aborted";
+
+  async run(): Promise<{ readonly b: true }> {
+    throw new DOMException("interrupted", "AbortError");
+  }
+}
+
+/**
+ * Reads what an earlier step added.
+ */
+class Reads extends WizardStep<"reads", { readonly seen: string }, { readonly first: number }> {
+  readonly key = "reads";
+
+  async run(needs: { readonly first: number }): Promise<{ readonly seen: string }> {
+    return { seen: `first is ${needs.first}` };
+  }
+}
+
+/**
+ * Ends the wizard when told to.
+ */
+class EndsWhen extends EndStep<"ends", string, Initial> {
+  readonly key = "ends";
+
+  private readonly applies: boolean;
+
+  constructor(applies: boolean) {
+    super();
+    this.applies = applies;
+  }
+
+  when(): boolean {
+    return this.applies;
+  }
+
+  async run(needs: Initial): Promise<string> {
+    return `ended on ${needs.input}`;
+  }
+}
+
+/**
+ * A wizard that answers with a string.
+ */
+function started(): Wizard<Initial, Initial, string> {
+  return Wizard.named<Initial, string>("test");
 }
 
 describe("Wizard", () => {
-  describe("say", () => {
-    it("draws a message on the rail with a mark", () => {
-      const { wizard, drawn } = wizardWith();
+  describe("running the steps", () => {
+    it("runs them in the order they were added", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Adds(log, "second", 2))
+        .finish(() => "done");
 
-      wizard.say("Google needs an OAuth application.");
+      await wizard.run({ input: "x" });
 
-      expect(drawn()).toBe("│\n●  Google needs an OAuth application.\n");
+      expect(log).toEqual(["run first", "run second"]);
     });
 
-    it("hangs further lines under the mark", () => {
-      const { wizard, drawn } = wizardWith();
+    it("hands each step what the steps before it added", async () => {
+      const wizard = started()
+        .step(new Adds([], "first", 1))
+        .step(new Reads())
+        .finish((state) => state.seen);
 
-      wizard.say(["First line", "second line"]);
+      const answer = await wizard.run({ input: "x" });
 
-      expect(drawn()).toBe("│\n●  First line\n│  second line\n");
+      expect(answer).toBe("first is 1");
     });
 
-    it("keeps the rail through an empty line", () => {
-      const { wizard, drawn } = wizardWith();
+    it("answers with what the finish step builds from everything settled", async () => {
+      const wizard = started()
+        .step(new Adds([], "first", 1))
+        .step(new Adds([], "second", 2))
+        .finish((state) => `${state.input} ${state.first} ${state.second}`);
 
-      wizard.say(["Heading", "", "after"]);
+      const answer = await wizard.run({ input: "x" });
 
-      expect(drawn()).toBe("│\n●  Heading\n│\n│  after\n");
-    });
-  });
-
-  describe("table", () => {
-    it("aligns columns on what is visible", () => {
-      const { wizard } = wizardWith();
-
-      const lines = wizard.table(
-        ["User attribute", "Claim", "Verified"],
-        [
-          ["email", "email", { text: "yes, by email_verified", tone: "success" }],
-          ["givenName", "given_name", { text: "no", tone: "muted" }],
-        ],
-      );
-
-      expect(lines).toEqual([
-        "  User attribute    Claim         Verified",
-        "  email             email         yes, by email_verified",
-        "  givenName         given_name    no",
-      ]);
+      expect(answer).toBe("x 1 2");
     });
 
-    it("sits under a message's text when it is drawn with it", () => {
-      const { wizard, drawn } = wizardWith();
+    it("leaves the wizard it extended as it was", async () => {
+      const log: Log = [];
+      const base = started();
+      const extended = base.step(new Adds(log, "first", 1));
 
-      wizard.say(["Maps:", "", ...wizard.table(["A", "B"], [["x", "y"]])]);
+      await base.finish(() => "base").run({ input: "x" });
+      await extended.finish(() => "extended").run({ input: "x" });
 
-      expect(drawn()).toBe("│\n●  Maps:\n│\n│    A    B\n│    x    y\n");
+      expect(log).toEqual(["run first"]);
     });
   });
 
-  describe("branch", () => {
-    it("opens with a connector and a title", async () => {
-      const { wizard, drawn } = wizardWith();
+  describe("naming a step twice", () => {
+    it("refuses the second one", () => {
+      const build = (): unknown => {
+        return started()
+          .step(new Adds([], "first", 1))
+          .step(new Adds([], "first", 2));
+      };
 
-      await wizard.branch("Adding a claim", async () => undefined);
-
-      expect(drawn()).toBe("│\n├─●  Adding a claim\n");
+      expect(build).toThrow(WizardDefinitionError);
     });
 
-    it("indents the questions asked inside it", async () => {
-      const { wizard, drawn } = wizardWith(["corp-sso"]);
+    it("names the wizard and the step in the refusal", () => {
+      const build = (): unknown => {
+        return started()
+          .step(new Adds([], "first", 1))
+          .step(new Adds([], "first", 2));
+      };
 
-      await wizard.branch("Configuring the new provider", async () => {
-        await wizard.ask({
-          kind: "text",
-          name: "slug",
-          message: "What should this connection be called?",
-          parse: (value) => ({ ok: true, value }),
+      expect(build).toThrow('The wizard "test" already has a step "first"');
+    });
+  });
+
+  describe("a step that needs what no step before it adds", () => {
+    it("does not compile", () => {
+      // @ts-expect-error `Reads` needs `first`, which nothing before it adds.
+      const wizard = started().step(new Reads());
+
+      expect(wizard).toBeInstanceOf(Wizard);
+    });
+  });
+
+  describe("observing a step", () => {
+    it("tells the observer what is known, with what the step added", async () => {
+      const seen: string[] = [];
+      const wizard = started()
+        .step(new Adds([], "first", 1))
+        .step(new Adds([], "second", 2), (state) => {
+          seen.push(`${state.input} ${state.first} ${state.second}`);
+        })
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" });
+
+      expect(seen).toEqual(["x 1 2"]);
+    });
+
+    it("tells it right after its own step, before the next one runs", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1), () => log.push("saw first"))
+        .step(new Adds(log, "second", 2), () => log.push("saw second"))
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" });
+
+      expect(log).toEqual(["run first", "saw first", "run second", "saw second"]);
+    });
+
+    it("does not tell it of a step that failed", async () => {
+      const seen: string[] = [];
+      const wizard = started()
+        .step(new Fails(), () => seen.push("fails"))
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(seen).toEqual([]);
+    });
+
+    it("does not tell it of a step that was undone before its turn", async () => {
+      const seen: string[] = [];
+      const wizard = started()
+        .step(new Fails())
+        .step(new Adds([], "later", 1), () => seen.push("later"))
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(seen).toEqual([]);
+    });
+
+    it("undoes the step, and those before it, when the observer throws", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Adds(log, "second", 2), () => {
+          throw new Error("observer");
+        })
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(log).toEqual(["run first", "run second", "undo second", "undo first"]);
+    });
+
+    it("throws what the observer threw", async () => {
+      const wizard = started()
+        .step(new Adds([], "first", 1), () => {
+          throw new Error("observer");
+        })
+        .finish(() => "done");
+
+      const run = wizard.run({ input: "x" });
+
+      await expect(run).rejects.toThrow("observer");
+    });
+  });
+
+  describe("when a step fails", () => {
+    it("throws the error that stopped the run", async () => {
+      const wizard = started()
+        .step(new Adds([], "first", 1))
+        .step(new Fails())
+        .finish(() => "done");
+
+      const run = wizard.run({ input: "x" });
+
+      await expect(run).rejects.toThrow("boom");
+    });
+
+    it("undoes the steps that finished, newest first", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Adds(log, "second", 2))
+        .step(new Fails())
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(log).toEqual(["run first", "run second", "undo second", "undo first"]);
+    });
+
+    it("does not undo the step that failed, which never finished", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Fails())
+        .step(new Adds(log, "later", 1))
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(log).toEqual([]);
+    });
+
+    it("keeps undoing when one undo fails, and says which", async () => {
+      const log: Log = [];
+      const undoErrors: string[] = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new UndoFails())
+        .step(new Fails())
+        .finish(() => "done");
+
+      await wizard
+        .run({ input: "x" }, { onUndoError: (key) => undoErrors.push(key) })
+        .catch(() => undefined);
+
+      expect({ log, undoErrors }).toEqual({
+        log: ["run first", "undo first"],
+        undoErrors: ["undoFails"],
+      });
+    });
+
+    it("undoes the steps that finished when the answer cannot be built", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .finish(() => {
+          throw new Error("no answer");
         });
-      });
 
-      expect(drawn()).toBe(
-        "│\n├─●  Configuring the new provider\n│  ◇  What should this connection be called?\n│  │  corp-sso\n",
-      );
-    });
+      await wizard.run({ input: "x" }).catch(() => undefined);
 
-    it("indents deeper inside a branch within a branch", async () => {
-      const { wizard, drawn } = wizardWith();
-
-      await wizard.branch("Outer", async () => {
-        await wizard.branch("Inner", async () => {
-          wizard.say("deep");
-        });
-      });
-
-      expect(drawn()).toContain("│  │\n│  ├─●  Inner\n│  │  │\n│  │  ●  deep\n");
-    });
-
-    it("returns what its body returns", async () => {
-      const { wizard } = wizardWith();
-
-      const value = await wizard.branch("Any", async () => 42);
-
-      expect(value).toBe(42);
-    });
-
-    it("leaves the branch even when its body throws", async () => {
-      const { wizard } = wizardWith();
-
-      await expect(
-        wizard.branch("Any", async () => {
-          throw new Error("cancelled");
-        }),
-      ).rejects.toThrow("cancelled");
-      expect(wizard.depth).toBe(0);
-    });
-
-    it("counts depth by branches", async () => {
-      const { wizard } = wizardWith();
-      let inside = -1;
-
-      await wizard.branch("Any", async () => {
-        inside = wizard.depth;
-      });
-
-      expect(inside).toBe(1);
+      expect(log).toEqual(["run first", "undo first"]);
     });
   });
 
-  describe("ask", () => {
-    it("hands the question the stream it is drawn on", async () => {
-      const seen: Question[] = [];
-      const wizard = new Wizard({
-        ask: (async (question: Question) => {
-          seen.push(question);
-          return true;
-        }) as Asker,
-        output: new PassThrough(),
-      });
+  describe("when a step throws because the run was aborted", () => {
+    it("undoes what finished, newest first", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Adds(log, "second", 2))
+        .step(new Aborted())
+        .step(new Adds(log, "later", 3))
+        .finish(() => "done");
 
-      await wizard.ask({
-        kind: "yes-no",
-        name: "go on",
-        message: "Go on?",
-      });
+      await wizard.run({ input: "x" }).catch(() => undefined);
 
-      expect(seen[0]?.output).toBeDefined();
+      expect(log).toEqual(["run first", "run second", "undo second", "undo first"]);
     });
   });
 
-  describe("style", () => {
-    it("leaves text plain when the output shows no colour", () => {
-      const { wizard } = wizardWith();
+  describe("the point of no return", () => {
+    it("keeps the steps before it when a later step fails", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .commit()
+        .step(new Adds(log, "second", 2))
+        .step(new Fails())
+        .finish(() => "done");
 
-      expect(wizard.style("success", "ok")).toBe("ok");
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(log).toEqual(["run first", "run second", "undo second"]);
+    });
+
+    it("still undoes the steps before it when a step before it fails", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Fails())
+        .commit()
+        .finish(() => "done");
+
+      await wizard.run({ input: "x" }).catch(() => undefined);
+
+      expect(log).toEqual(["run first", "undo first"]);
+    });
+  });
+
+  describe("a step that ends the wizard", () => {
+    it("answers with its result and runs nothing after it", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .endWhen(new EndsWhen(true))
+        .step(new Adds(log, "first", 1))
+        .finish(() => "finished normally");
+
+      const answer = await wizard.run({ input: "x" });
+
+      expect({ answer, log }).toEqual({ answer: "ended on x", log: [] });
+    });
+
+    it("lets the wizard go on when it does not apply", async () => {
+      const wizard = started()
+        .endWhen(new EndsWhen(false))
+        .step(new Adds([], "first", 1))
+        .finish(() => "finished normally");
+
+      const answer = await wizard.run({ input: "x" });
+
+      expect(answer).toBe("finished normally");
     });
   });
 });

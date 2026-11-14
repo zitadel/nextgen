@@ -109,6 +109,8 @@ export {
   POLICY_FILE_SUFFIX,
   POLICY_TEST_SUFFIX,
   PolicyTest,
+  SignupPolicy,
+  USER_CREATE_POLICY_OPERATION,
   type PasswordMinLength,
   type PolicyCase,
   type PolicyCaseResult,
@@ -129,6 +131,7 @@ export {
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas";
 export { DiskStore } from "@/lib/zitadel/storage";
+export { standardClaim, STANDARD_CLAIMS, type StandardClaimName } from "@/lib/zitadel/rules/claims";
 export {
   RULE_IDS,
   type FlowCheck,
@@ -148,12 +151,12 @@ export {
   type ConfigFile,
   type ConfigurationBundle,
   type ConfigFiles,
+  type ClaimChoice,
   type ConfigKind,
   type JsonArray,
   type JsonObject,
   type JsonPrimitive,
   type JsonValue,
-  type ClaimChoice,
   type Scaffold,
   type ScaffoldedConnection,
   type ScaffoldedProvider,

@@ -25,3 +25,26 @@ export function isSecretPath(path: string): boolean {
 export function isLocalRuntimePath(path: string): boolean {
   return /(^|\/)\.zitadel\/local(\/|$)/.test(path);
 }
+
+/**
+ * The file an environment's project id and secrets live in: `.env.<name>.local`,
+ * which `env add` writes and a prompt's answer is saved to.
+ *
+ * @param name - The environment, as {@link import("./environment").isEnvironmentName} allows it.
+ * @returns The file's name, in the project's root.
+ */
+export function environmentFileName(name: string): string {
+  return `.env.${name}.local`;
+}
+
+/**
+ * What `eject` renames an env file to, keeping the secrets it holds beside the
+ * app rather than deleting them.
+ *
+ * @param path - The env file.
+ * @param stamp - When it was ejected, as a name can hold it.
+ * @returns The backup's path.
+ */
+export function ejectedBackup(path: string, stamp: string): string {
+  return `${path}.ejected-${stamp}`;
+}

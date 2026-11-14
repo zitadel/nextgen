@@ -86,7 +86,7 @@ export class Connections extends Collection<Connection> {
       throw new ConflictError(
         `More than one ${candidate.displayName} connection exists: ${matches.paths.join(", ")}`,
         {
-          hint: "Keep the one this Project should use and remove the others, then run the command again.",
+          hint: "Keep the one this project should use and remove the others, then run the command again.",
           details: { provider: candidate.slug, files: matches.paths },
         },
       );
@@ -267,7 +267,7 @@ export class Connections extends Collection<Connection> {
       .map((flow): Notice => {
         return {
           severity: "info",
-          message: `The steps ${flow.generatedSsoSteps.join(" and ")} stay in ${flow.path} for the next provider you enable.`,
+          message: `The steps ${new Intl.ListFormat("en", { type: "conjunction" }).format(flow.generatedSsoSteps)} stay in ${flow.path} for the next provider you enable.`,
         };
       });
     return new Change({
@@ -463,7 +463,7 @@ export class Connections extends Collection<Connection> {
     if (unapplied.length === 0) {
       return [];
     }
-    const settings = unapplied.join(" and ");
+    const settings = new Intl.ListFormat("en", { type: "conjunction" }).format(unapplied);
     if (unapplied.length === 1) {
       return [
         {
@@ -508,7 +508,7 @@ export class Connections extends Collection<Connection> {
     const variables = this.findUnsharedVariables(connection);
     const kept =
       variables.length > 0
-        ? `${connection.path} and the project variables ${variables.join(" and ")}`
+        ? `${connection.path} and the project variables ${new Intl.ListFormat("en", { type: "conjunction" }).format(variables)}`
         : connection.path;
     return [
       {

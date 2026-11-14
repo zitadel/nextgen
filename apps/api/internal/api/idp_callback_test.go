@@ -42,14 +42,14 @@ type stubSSOCallback struct {
 	in    service.FlowSSOCallbackInput
 	out   service.FlowSSOCallbackOutput
 	err   error
-	// serverSpan is the server span context Process found in the holder.
+	// serverSpan is the span context Process ran under.
 	serverSpan trace.SpanContext
 }
 
 func (s *stubSSOCallback) Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
 	s.calls++
 	s.in = in
-	s.serverSpan = middleware.GetServerSpanContext(ctx)
+	s.serverSpan = trace.SpanContextFromContext(ctx)
 	return s.out, s.err
 }
 
@@ -289,15 +289,15 @@ func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
 	assert.Equal(t, "idpCallback", operationID)
 }
 
-// The route is not an ogen operation, so it starts its own server span: the
-// service and storage spans below it are sampled with it, and the request
-// line reads its IDs from the holder.
-func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
+// The route is not an ogen operation, so it names the request's server span
+// itself and starts none: the service and storage spans run below the one
+// span the request has.
+func TestIDPCallbackHandler_NamesTheServerSpan(t *testing.T) {
 	t.Parallel()
 	ctx := middleware.WithOperationIDContext(t.Context(), "")
 	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
 	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
-	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(httptest.NewRecorder(), req)
+	middleware.WithServerSpan(otel.GetTracerProvider())(callbackMux(t, api.NewIDPCallbackHandler(stub))).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.True(t, stub.serverSpan.IsValid())
 	// Other tests in this package run the handler in parallel, so only the

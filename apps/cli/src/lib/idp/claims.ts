@@ -1,28 +1,71 @@
-import type { Parsed } from "@zitadel/config/idp";
+import { type Parsed, validated } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
-import { isObject } from "../json";
-import { shellWord } from "./custom";
+import { ZitadelError } from "@/lib/errors";
+import {
+  type ClaimChoice,
+  type Connection,
+  standardClaim,
+  STANDARD_CLAIMS,
+  type UserSchema,
+} from "@/lib/zitadel";
 
-/** The value types a claim can carry into a user-schema property. */
+/**
+ * The value types a claim can carry into a user-schema property.
+ */
 export const CLAIM_TYPES = ["string", "number", "integer", "boolean"] as const;
+
+/**
+ * The value type of a claim a mapping fills a property from.
+ */
 export type ClaimType = (typeof CLAIM_TYPES)[number];
 
-/** A user-schema property, as far as filling it from a claim is concerned. */
+/**
+ * A user-schema property, as far as filling it from a claim is concerned.
+ */
 export type SchemaAttribute = {
+  /**
+   * The property's name.
+   */
   readonly name: string;
-  /** `undefined` for an object, an array or an untyped property: a claim cannot fill it. */
+
+  /**
+   * The one scalar type it declares; `undefined` for an object, an array or an
+   * untyped property, which no claim can fill.
+   */
   readonly type: ClaimType | undefined;
+
+  /**
+   * Whether the server requires a user created from a provider to have it.
+   */
   readonly required: boolean;
+
+  /**
+   * Whether two users cannot hold the same value of it.
+   */
   readonly unique: boolean;
 };
 
-/** One mapping: the schema property, the provider claim, and the claim's declared type. */
+/**
+ * One mapping: the schema property, the provider claim, and the claim's
+ * declared type.
+ */
 export type ClaimEntry = {
+  /**
+   * The schema property the claim fills.
+   */
   readonly attribute: string;
+
+  /**
+   * The claim the provider returns.
+   */
   readonly claim: string;
-  /** What the provider returns. Left out, it is the standard's type, else a string. */
+
+  /**
+   * What the provider returns. Left out, it is the standard's type, else a
+   * string.
+   */
   readonly type?: ClaimType;
+
   /**
    * The property does not exist yet: add it to the user schema, typed to hold
    * the claim, and map the claim to it.
@@ -30,137 +73,299 @@ export type ClaimEntry = {
   readonly create?: boolean;
 };
 
-/** How a property is verified: the boolean claim that says so, or `true` to trust the provider. */
+/**
+ * How a property is verified: the boolean claim that says so, or `true` to
+ * trust the provider.
+ */
 export type VerifiedEntry = {
+  /**
+   * The mapped property.
+   */
   readonly attribute: string;
+
+  /**
+   * The claim that must be true, or `true` to trust the provider.
+   */
   readonly source: string | true;
 };
 
-/** Everything the developer asked for beyond the defaults. */
+/**
+ * Everything the developer asked for beyond the defaults.
+ */
 export type ClaimRequest = {
+  /**
+   * The claims to map.
+   */
   readonly entries: readonly ClaimEntry[];
+
+  /**
+   * How the mapped properties are verified.
+   */
   readonly verified: readonly VerifiedEntry[];
-  /** Extra scopes the provider needs before it returns the claims. */
+
+  /**
+   * Extra scopes the provider needs before it returns the claims.
+   */
   readonly scopes: readonly string[];
 };
 
-export const NO_CLAIM_REQUEST: ClaimRequest = { entries: [], verified: [], scopes: [] };
+/**
+ * A request that asks for nothing, so the provider's defaults stand.
+ */
+export const NO_CLAIM_REQUEST: ClaimRequest = {
+  entries: [],
+  verified: [],
+  scopes: [],
+};
 
-/** Where a mapping stands while it is built up and checked. */
+/**
+ * Where a mapping stands while it is built up and checked.
+ */
 export type MappingState = {
+  /**
+   * The properties of the user schema, and any the request adds.
+   */
   readonly attributes: readonly SchemaAttribute[];
-  /** Schema property → claim. */
+
+  /**
+   * Schema property to claim.
+   */
   readonly mapping: Readonly<Record<string, string>>;
-  /** Claim → the type it was declared with, for checking against the property. */
+
+  /**
+   * Claim to the type it was declared with, for checking against the property.
+   */
   readonly claimTypes: Readonly<Record<string, ClaimType>>;
-  /** Schema property → the claim that verifies it, or `true`. */
+
+  /**
+   * Schema property to the claim that verifies it, or `true`.
+   */
   readonly verified: Readonly<Record<string, string | true>>;
+
+  /**
+   * The scopes the connection requests.
+   */
   readonly scopes: readonly string[];
+
   /**
    * Properties a request has mapped. A property the defaults mapped is not here
    * and a request may replace it; one in here is settled for this request.
    */
   readonly explicit: readonly string[];
-  /** Properties whose default was replaced and which had been verified by the claim replaced. */
+
+  /**
+   * Properties whose default was replaced and which had been verified by the
+   * claim replaced.
+   */
   readonly unverifiedByReplacing: readonly string[];
-  /** Properties the request adds to the user schema, so the commands can write them. */
+
+  /**
+   * Properties the request adds to the user schema, so the commands can write
+   * them.
+   */
   readonly created: readonly SchemaAttribute[];
 };
 
-type StandardClaim = {
-  readonly claim: string;
-  readonly type: ClaimType;
-  /** The scope that makes a provider return it (OpenID Connect Core 5.4). */
-  readonly scope: string;
-  /** The boolean claim that says the provider checked it. */
-  readonly verifiedBy?: string;
+/**
+ * The flag values a command parsed, before they are read as a request.
+ */
+export type ClaimFlagValues = {
+  /**
+   * Each `<property>=<claim>[:type]`.
+   */
+  readonly claim?: readonly string[] | undefined;
+
+  /**
+   * The extra scopes, separated by spaces or commas.
+   */
+  readonly scope?: string | undefined;
+
+  /**
+   * Each `<property>=<claim>` or `<property>=true`.
+   */
+  readonly verified?: readonly string[] | undefined;
 };
 
 /**
- * The claims OpenID Connect itself defines, with the type and the scope each
- * comes with. Not a list of providers: every conforming provider returns these
- * for these scopes, so it is the default mapping for any of them.
+ * The flags that restate a request, in the words a suggested command carries.
  */
-const STANDARD_CLAIMS: readonly StandardClaim[] = [
-  { claim: "name", type: "string", scope: "profile" },
-  { claim: "given_name", type: "string", scope: "profile" },
-  { claim: "family_name", type: "string", scope: "profile" },
-  { claim: "middle_name", type: "string", scope: "profile" },
-  { claim: "nickname", type: "string", scope: "profile" },
-  { claim: "preferred_username", type: "string", scope: "profile" },
-  { claim: "profile", type: "string", scope: "profile" },
-  { claim: "picture", type: "string", scope: "profile" },
-  { claim: "website", type: "string", scope: "profile" },
-  { claim: "gender", type: "string", scope: "profile" },
-  { claim: "birthdate", type: "string", scope: "profile" },
-  { claim: "zoneinfo", type: "string", scope: "profile" },
-  { claim: "locale", type: "string", scope: "profile" },
-  { claim: "updated_at", type: "number", scope: "profile" },
-  { claim: "email", type: "string", scope: "email", verifiedBy: "email_verified" },
-  { claim: "email_verified", type: "boolean", scope: "email" },
-  { claim: "phone_number", type: "string", scope: "phone", verifiedBy: "phone_number_verified" },
-  { claim: "phone_number_verified", type: "boolean", scope: "phone" },
-];
+export type ClaimFlagTexts = {
+  /**
+   * Each claim, as `<property>=<claim>[:type]`.
+   */
+  readonly claim: string[] | undefined;
 
-const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
-const refuse = (problem: string): Parsed<never> => ({ ok: false, problem });
+  /**
+   * Each verification, as `<property>=<claim>` or `<property>=true`.
+   */
+  readonly verifiedClaim: string[] | undefined;
 
-/** The standard's type for a claim, or `undefined` for one it does not define. */
+  /**
+   * The extra scopes, separated by spaces.
+   */
+  readonly claimScope: string | undefined;
+};
+
+/**
+ * The boolean claim that says the provider checked a standard claim.
+ */
+const VERIFIED_BY: ReadonlyMap<string, string> = new Map([
+  ["email", "email_verified"],
+  ["phone_number", "phone_number_verified"],
+]);
+
+/**
+ * What a person might type for a type, and the type it means.
+ */
+const TYPE_ALIASES: Readonly<Partial<Record<string, ClaimType>>> = {
+  int: "integer",
+  long: "integer",
+  bool: "boolean",
+  str: "string",
+  text: "string",
+  float: "number",
+  double: "number",
+  num: "number",
+};
+
+/**
+ * What a claim of a type can be stored in: a property of the same type, and an
+ * integer in a number.
+ */
+const HELD_BY = {
+  string: ["string"],
+  number: ["number"],
+  integer: ["integer", "number"],
+  boolean: ["boolean"],
+} as const satisfies Record<ClaimType, readonly ClaimType[]>;
+
+/**
+ * A parsed value.
+ *
+ * @param value - What was parsed.
+ * @returns The success.
+ */
+function ok<T>(value: T): Parsed<T> {
+  return {
+    ok: true,
+    value,
+  };
+}
+
+/**
+ * Text that does not parse.
+ *
+ * @param problem - What is wrong with it.
+ * @returns The refusal.
+ */
+function refuse<T>(problem: string): Parsed<T> {
+  return {
+    ok: false,
+    problem,
+  };
+}
+
+/**
+ * The values of both lists, each once, in the order met.
+ *
+ * @param lists - The lists.
+ * @returns The union.
+ */
+function union(...lists: ReadonlyArray<readonly string[]>): readonly string[] {
+  return [...new Set(lists.flat())];
+}
+
+/**
+ * The standard's type for a claim OpenID Connect defines.
+ *
+ * @param claim - A claim name.
+ * @returns The type, or `undefined` for a claim the standard does not define or
+ *   one that is no scalar.
+ */
 export function standardClaimType(claim: string): ClaimType | undefined {
-  return STANDARD_CLAIMS.find((standard) => standard.claim === claim)?.type;
+  const type = standardClaim(claim)?.type;
+  return type === "object" ? undefined : type;
 }
 
-/** The scope that makes a provider return a standard claim, or `undefined` for one the standard does not define. */
+/**
+ * The scope that makes a provider return a standard claim.
+ *
+ * @param claim - A claim name.
+ * @returns The scope, or `undefined` for a claim the standard does not define.
+ */
 export function standardClaimScope(claim: string): string | undefined {
-  return STANDARD_CLAIMS.find((standard) => standard.claim === claim)?.scope;
+  return standardClaim(claim)?.scope;
 }
 
-/** A claim name no property is filled from yet, or what already uses it. */
-export function parseUnusedClaim(state: MappingState, value: string): Parsed<string> {
-  const claim = parseClaimName(value);
-  if (!claim.ok) {
-    return claim;
-  }
-  const holder = Object.entries(state.mapping).find(([, used]) => used === claim.value)?.[0];
-  return holder === undefined
-    ? claim
-    : refuse(`${claim.value} already fills ${holder}: a claim fills one property.`);
-}
-
-/** `given_name` as `givenName`: the property a standard claim fills when the names match. */
-function propertyNameOf(claim: string): string {
-  return claim.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-}
-
-/** Whether a value of the claim's type can be stored in a property of the other. */
+/**
+ * Whether a value of the claim's type can be stored in a property of the other.
+ *
+ * @param claim - The claim's type.
+ * @param attribute - The property's type.
+ * @returns Whether the property holds it.
+ */
 export function fits(claim: ClaimType, attribute: ClaimType): boolean {
-  return claim === attribute || (claim === "integer" && attribute === "number");
+  return HELD_BY[claim].some((held: ClaimType) => {
+    return held === attribute;
+  });
 }
 
-function scalarType(type: unknown): ClaimType | undefined {
-  if (typeof type === "string") {
-    return (CLAIM_TYPES as readonly string[]).includes(type) ? (type as ClaimType) : undefined;
-  }
-  if (Array.isArray(type)) {
-    const real = type.filter((one) => one !== "null");
-    return real.length === 1 ? scalarType(real[0]) : undefined;
-  }
-  return undefined;
+/**
+ * `given_name` as `givenName`: the property a standard claim fills when the
+ * names match.
+ *
+ * @param claim - A claim name.
+ * @returns The property name.
+ */
+function propertyNameOf(claim: string): string {
+  return claim.replace(/_([a-z])/g, (_, letter: string) => {
+    return letter.toUpperCase();
+  });
 }
 
-/** The properties a user schema document defines. */
-export function attributesOf(body: Record<string, unknown>): SchemaAttribute[] {
-  const properties = isObject(body.properties) ? body.properties : {};
-  const required = Array.isArray(body.required) ? body.required : [];
-  return Object.entries(properties).map(([name, definition]) => ({
-    name,
-    type: isObject(definition) ? scalarType(definition.type) : undefined,
-    required: required.includes(name),
-    unique: isObject(definition) && typeof definition["x-unique"] === "string",
-  }));
+/**
+ * The one scalar type a property declares.
+ *
+ * @param types - What the property declares; a nullable type lists `null` too.
+ * @returns The type, or `undefined` for none, several, or one that is no scalar.
+ */
+function scalarType(types: readonly string[] | undefined): ClaimType | undefined {
+  const real = (types ?? []).filter((type) => {
+    return type !== "null";
+  });
+  return CLAIM_TYPES.find((type) => {
+    return real.length === 1 && type === real[0];
+  });
 }
 
-/** A claim name as typed: one word, read from the top level of the claims. */
+/**
+ * The properties a user schema defines, as far as a claim can fill them.
+ *
+ * @param schema - The user schema.
+ * @returns Each property, in the order the schema writes them.
+ */
+export function attributesOf(schema: UserSchema): readonly SchemaAttribute[] {
+  const required = new Set(
+    schema.requiredByServer.map((path) => {
+      return path.split(".")[0];
+    }),
+  );
+  return schema.propertyNames.map((name) => {
+    return {
+      name,
+      type: scalarType(schema.findDeclaredTypes(name)),
+      required: required.has(name),
+      unique: schema.isUnique(name),
+    };
+  });
+}
+
+/**
+ * A claim name as typed: one word, read from the top level of the claims.
+ *
+ * @param value - What was typed.
+ * @returns The claim, or what is wrong with it.
+ */
 export function parseClaimName(value: string): Parsed<string> {
   const claim = value.trim();
   if (claim === "") {
@@ -177,26 +382,51 @@ export function parseClaimName(value: string): Parsed<string> {
   return ok(claim);
 }
 
-/** Scopes as typed, separated by spaces or commas. Nothing typed is none. */
-export function parseScopeList(value: string): Parsed<string[]> {
-  return ok([...new Set(value.split(/[\s,]+/).filter((scope) => scope !== ""))]);
+/**
+ * A claim name no property is filled from yet.
+ *
+ * @param state - What is mapped so far.
+ * @param value - What was typed.
+ * @returns The claim, or what is wrong with it, including what already uses it.
+ */
+export function parseUnusedClaim(state: MappingState, value: string): Parsed<string> {
+  const claim = parseClaimName(value);
+  if (!claim.ok) {
+    return claim;
+  }
+  const holder = Object.entries(state.mapping).find(([, used]) => {
+    return used === claim.value;
+  })?.[0];
+  return holder === undefined
+    ? claim
+    : refuse(`${claim.value} already fills ${holder}: a claim fills one property.`);
 }
 
-const TYPE_ALIASES: Readonly<Record<string, ClaimType>> = {
-  int: "integer",
-  long: "integer",
-  bool: "boolean",
-  str: "string",
-  text: "string",
-  float: "number",
-  double: "number",
-  num: "number",
-};
+/**
+ * Scopes as typed, separated by spaces or commas. Nothing typed is none.
+ *
+ * @param value - What was typed.
+ * @returns The scopes, each once.
+ */
+export function parseScopeList(value: string): Parsed<readonly string[]> {
+  return ok(
+    union(
+      value.split(/[\s,]+/).filter((scope) => {
+        return scope !== "";
+      }),
+    ),
+  );
+}
 
 /**
- * What is wrong with a colon-word that nearly spells a type. A namespaced
- * claim (`urn:acme:roles`) also ends in a colon-word, so only a near miss of
- * a type is refused: the wrong case, or a common alias.
+ * What is wrong with a colon-word that nearly spells a type.
+ *
+ * @remarks
+ * A namespaced claim (`urn:acme:roles`) also ends in a colon-word, so only a
+ * near miss of a type is refused: the wrong case, or a common alias.
+ *
+ * @param rest - The claim as typed, after the equals sign.
+ * @returns What to say, or `undefined` when the colon-word is no near miss.
  */
 function suffixMisspelling(rest: string): string | undefined {
   if (rest.startsWith(":") || rest.endsWith(":")) {
@@ -207,15 +437,21 @@ function suffixMisspelling(rest: string): string | undefined {
   const meant =
     word === undefined
       ? undefined
-      : (CLAIM_TYPES as readonly string[]).includes(word)
-        ? word
-        : TYPE_ALIASES[word];
+      : (CLAIM_TYPES.find((type) => {
+          return type === word;
+        }) ?? TYPE_ALIASES[word]);
   return meant === undefined
     ? undefined
     : `:${typed} is not a type here. Did you mean :${meant}? The types are ${CLAIM_TYPES.join(", ")}, in lower case.`;
 }
 
-/** `staffNumber=employee_id:integer`: the property, the claim and, after a colon, the claim's type. */
+/**
+ * `staffNumber=employee_id:integer`: the property, the claim and, after a
+ * colon, the claim's type.
+ *
+ * @param text - What was typed.
+ * @returns The entry, or what is wrong with it.
+ */
 export function parseClaimEntry(text: string): Parsed<ClaimEntry> {
   const at = text.indexOf("=");
   const attribute = at < 1 ? "" : text.slice(0, at).trim();
@@ -234,14 +470,23 @@ export function parseClaimEntry(text: string): Parsed<ClaimEntry> {
   if (!claim.ok) {
     return refuse(`${text}: ${claim.problem}`);
   }
+  const type = CLAIM_TYPES.find((one) => {
+    return one === typed?.[2];
+  });
   return ok({
     attribute,
     claim: claim.value,
-    ...(typed === null ? {} : { type: typed[2] as ClaimType }),
+    ...(type === undefined ? {} : { type }),
   });
 }
 
-/** `contactEmail=email_verified`, or `contactEmail=true` to trust the provider for it. */
+/**
+ * `contactEmail=email_verified`, or `contactEmail=true` to trust the provider
+ * for it.
+ *
+ * @param text - What was typed.
+ * @returns The entry, or what is wrong with it.
+ */
 export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
   const at = text.indexOf("=");
   const attribute = at < 1 ? "" : text.slice(0, at).trim();
@@ -252,7 +497,10 @@ export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
     );
   }
   if (rest === "true") {
-    return ok({ attribute, source: true });
+    return ok({
+      attribute,
+      source: true,
+    });
   }
   if (rest.toLowerCase() === "true" || rest.toLowerCase() === "false") {
     return refuse(
@@ -260,73 +508,71 @@ export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
     );
   }
   const claim = parseClaimName(rest);
-  return claim.ok ? ok({ attribute, source: claim.value }) : refuse(`${text}: ${claim.problem}`);
+  if (!claim.ok) {
+    return refuse(`${text}: ${claim.problem}`);
+  }
+  return ok({
+    attribute,
+    source: claim.value,
+  });
 }
 
-const union = (...lists: ReadonlyArray<readonly string[]>): string[] => [...new Set(lists.flat())];
-
 /**
- * Start from what a connection document already maps, and add the standard
- * claims whose scope it requests and whose name matches a property of the
- * schema, so a schema with `givenName` or `picture` is filled without being asked.
+ * Start from what a connection already maps, and add the standard claims whose
+ * scope it requests and whose name matches a property of the schema, so a
+ * schema with `givenName` or `picture` is filled without being asked.
  *
+ * @remarks
  * A standard claim is only added when the connection already asks for its
  * scope: adding a scope the provider does not know would break its sign-in.
+ *
+ * @param connection - The connection the provider's defaults make.
+ * @param schema - The user schema the connection signs people in to.
+ * @returns The mapping the connection starts from.
  */
-export function seedMapping(
-  document: Record<string, unknown>,
-  attributes: readonly SchemaAttribute[],
-): MappingState {
-  const stringsOf = (value: unknown): Record<string, string> =>
-    isObject(value)
-      ? Object.fromEntries(
-          Object.entries(value).filter(
-            (entry): entry is [string, string] => typeof entry[1] === "string",
-          ),
-        )
-      : {};
-  const oidc = isObject(document.oidc) ? document.oidc : {};
-  const scopes = Array.isArray(oidc.scopes)
-    ? oidc.scopes.filter((scope): scope is string => typeof scope === "string")
-    : [];
-  const existing = stringsOf(document.claim_mapping);
-  const verifiedGiven = isObject(document.verified_claims) ? document.verified_claims : {};
-  const verified: Record<string, string | true> = {};
-  for (const [attribute, source] of Object.entries(verifiedGiven)) {
-    if (typeof source === "string" || source === true) {
-      verified[attribute] = source;
-    }
-  }
-
-  const mapping: Record<string, string> = { ...existing };
-  const used = new Set(Object.values(mapping));
-  for (const standard of STANDARD_CLAIMS) {
-    const attribute = attributes.find((one) => one.name === propertyNameOf(standard.claim));
-    if (
-      attribute !== undefined &&
-      attribute.type !== undefined &&
-      fits(standard.type, attribute.type) &&
+export function seedMapping(connection: Connection, schema: UserSchema): MappingState {
+  const attributes = attributesOf(schema);
+  const scopes = connection.scopes ?? [];
+  const existing = Object.fromEntries(
+    connection.mappings.map(({ property, claim }) => {
+      return [property, claim];
+    }),
+  );
+  const defaults = Object.entries(STANDARD_CLAIMS).flatMap(([claim, standard]) => {
+    const type = standardClaimType(claim);
+    const attribute = attributes.find((one) => {
+      return one.name === propertyNameOf(claim);
+    });
+    const fillable =
+      type !== undefined &&
+      attribute?.type !== undefined &&
+      fits(type, attribute.type) &&
       scopes.includes(standard.scope) &&
-      !(attribute.name in mapping) &&
-      !used.has(standard.claim)
-    ) {
-      mapping[attribute.name] = standard.claim;
-      used.add(standard.claim);
-    }
-  }
-  for (const [attribute, claim] of Object.entries(mapping)) {
-    const verifiedBy = STANDARD_CLAIMS.find((standard) => standard.claim === claim)?.verifiedBy;
-    if (verifiedBy !== undefined && !(attribute in verified)) {
-      verified[attribute] = verifiedBy;
-    }
-  }
+      !Object.hasOwn(existing, attribute.name) &&
+      !Object.values(existing).includes(claim);
+    return fillable ? [[attribute.name, claim] as const] : [];
+  });
+  const mapping = { ...existing, ...Object.fromEntries(defaults) };
+  const given = Object.fromEntries(
+    connection.verifications.flatMap(({ property, claim }) => {
+      return typeof claim === "string" || claim === true ? [[property, claim] as const] : [];
+    }),
+  );
+  const derived = Object.entries(mapping).flatMap(([attribute, claim]) => {
+    const verifiedBy = VERIFIED_BY.get(claim);
+    return verifiedBy === undefined || Object.hasOwn(given, attribute)
+      ? []
+      : [[attribute, verifiedBy] as const];
+  });
   return {
     attributes,
     mapping,
     claimTypes: Object.fromEntries(
-      Object.values(mapping).map((claim) => [claim, standardClaimType(claim) ?? "string"]),
+      Object.values(mapping).map((claim) => {
+        return [claim, standardClaimType(claim) ?? "string"];
+      }),
     ),
-    verified,
+    verified: { ...given, ...Object.fromEntries(derived) },
     scopes,
     explicit: [],
     unverifiedByReplacing: [],
@@ -335,39 +581,33 @@ export function seedMapping(
 }
 
 /**
- * The properties a claim of this type could fill: the empty ones and the ones
- * only the defaults filled, which a request may replace.
+ * The properties no claim fills yet that a claim of this type could fill.
+ *
+ * @param state - What is mapped so far.
+ * @param claimType - The claim's type.
+ * @returns The properties.
  */
-export function fillable(state: MappingState, claimType: ClaimType): SchemaAttribute[] {
-  return state.attributes.filter(
-    (attribute) =>
+export function unmapped(state: MappingState, claimType: ClaimType): readonly SchemaAttribute[] {
+  return state.attributes.filter((attribute) => {
+    return (
       attribute.type !== undefined &&
       fits(claimType, attribute.type) &&
-      !state.explicit.includes(attribute.name),
-  );
-}
-
-/** Whether any property could still take a claim, empty or filled by default. */
-export function hasFillable(state: MappingState): boolean {
-  return state.attributes.some(
-    (attribute) => attribute.type !== undefined && !state.explicit.includes(attribute.name),
-  );
-}
-
-/** The properties no claim fills yet that a claim of this type could fill. */
-export function unmapped(state: MappingState, claimType: ClaimType): SchemaAttribute[] {
-  return state.attributes.filter(
-    (attribute) =>
-      attribute.type !== undefined &&
-      fits(claimType, attribute.type) &&
-      !(attribute.name in state.mapping),
-  );
+      !Object.hasOwn(state.mapping, attribute.name)
+    );
+  });
 }
 
 /**
- * A name for a property the request adds to the user schema. The schema only
- * forbids a dot, but the name is a JSON key and a field in the login flow, so
- * it is held to a plain identifier. It must not already be a property.
+ * A name for a property the request adds to the user schema.
+ *
+ * @remarks
+ * The schema only forbids a dot, but the name is a JSON key and a field in the
+ * login flow, so it is held to a plain identifier. It must not already be a
+ * property.
+ *
+ * @param value - What was typed.
+ * @param taken - The properties the schema already has.
+ * @returns The name, or what is wrong with it.
  */
 export function parseNewAttributeName(value: string, taken: readonly string[]): Parsed<string> {
   const name = value.trim();
@@ -384,8 +624,14 @@ export function parseNewAttributeName(value: string, taken: readonly string[]): 
 
 /**
  * The label the login form shows for an attribute nobody has written text for:
- * the name split at capitals and underscores, in sentence case. The login
- * component does the same (`humaniseFieldName` in `@zitadel/components`).
+ * the name split at capitals and underscores, in sentence case.
+ *
+ * @remarks
+ * The login component does the same (`humaniseFieldName` in
+ * `@zitadel/components`).
+ *
+ * @param name - The attribute's name.
+ * @returns The label.
  */
 export function fieldLabelFor(name: string): string {
   const words = name
@@ -396,35 +642,70 @@ export function fieldLabelFor(name: string): string {
   return words === "" ? words : `${words[0]?.toUpperCase()}${words.slice(1)}`;
 }
 
-const describe = (attribute: SchemaAttribute): string =>
-  `${attribute.name} (${attribute.type ?? "not a string, number, integer or boolean"})`;
+/**
+ * A property as a message names it, with what it can hold.
+ *
+ * @param attribute - The property.
+ * @returns The name and the type.
+ */
+function describe(attribute: SchemaAttribute): string {
+  return `${attribute.name} (${attribute.type ?? "not a string, number, integer or boolean"})`;
+}
 
 /**
  * Map one claim to one property, or say why that is refused: the property is
  * not in the schema or is not a scalar, it is already filled, the claim
  * already fills another, or the claim's type does not fit the property's.
+ *
+ * @remarks
+ * Replacing a default drops what verified the claim it replaced: that claim
+ * said nothing about this one.
+ *
+ * @param state - What is mapped so far.
+ * @param entry - The claim to map.
+ * @returns The mapping with the claim in it, or why it is refused.
  */
 export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<MappingState> {
   if (entry.create === true) {
     const name = parseNewAttributeName(
       entry.attribute,
-      state.attributes.map((one) => one.name),
+      state.attributes.map((one) => {
+        return one.name;
+      }),
     );
     if (!name.ok) {
       return name;
     }
-    const type = entry.type ?? standardClaimType(entry.claim) ?? "string";
-    const added: SchemaAttribute = { name: name.value, type, required: false, unique: false };
+    const added: SchemaAttribute = {
+      name: name.value,
+      type: entry.type ?? standardClaimType(entry.claim) ?? "string",
+      required: false,
+      unique: false,
+    };
     return mapClaim(
-      { ...state, attributes: [...state.attributes, added], created: [...state.created, added] },
-      { attribute: entry.attribute, claim: entry.claim, type: entry.type },
+      {
+        ...state,
+        attributes: [...state.attributes, added],
+        created: [...state.created, added],
+      },
+      {
+        attribute: entry.attribute,
+        claim: entry.claim,
+        type: entry.type,
+      },
     );
   }
-  const attribute = state.attributes.find((one) => one.name === entry.attribute);
+  const attribute = state.attributes.find((one) => {
+    return one.name === entry.attribute;
+  });
   if (attribute === undefined) {
     return refuse(
       `${entry.attribute} is not a property of the user schema, which defines ${
-        state.attributes.map((one) => one.name).join(", ") || "none"
+        state.attributes
+          .map((one) => {
+            return one.name;
+          })
+          .join(", ") || "none"
       }.`,
     );
   }
@@ -439,9 +720,9 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
       `${attribute.name} is already filled from ${filledBy}: a property takes one claim.`,
     );
   }
-  const claimFills = Object.entries(state.mapping).find(
-    ([property, claim]) => claim === entry.claim && property !== attribute.name,
-  )?.[0];
+  const claimFills = Object.entries(state.mapping).find(([property, claim]) => {
+    return claim === entry.claim && property !== attribute.name;
+  })?.[0];
   if (claimFills !== undefined) {
     return refuse(
       `${entry.claim} already fills ${claimFills}: a claim fills one property. To move it, map ${claimFills} to another claim first.`,
@@ -462,24 +743,26 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
     );
   }
   const mapping = { ...state.mapping, [attribute.name]: entry.claim };
-  // Replacing a default drops what verified the claim it replaced: that claim
-  // said nothing about this one.
   const replaced = filledBy !== undefined && filledBy !== entry.claim;
-  const wasVerified = attribute.name in state.verified;
-  const { [attribute.name]: _dropped, ...stillVerified } = state.verified;
-  void _dropped;
+  const wasVerified = Object.hasOwn(state.verified, attribute.name);
   return ok({
     ...state,
     mapping,
     claimTypes: {
       ...Object.fromEntries(
-        Object.entries(state.claimTypes).filter(([claim]) =>
-          Object.values(mapping).includes(claim),
-        ),
+        Object.entries(state.claimTypes).filter(([claim]) => {
+          return Object.values(mapping).includes(claim);
+        }),
       ),
       [entry.claim]: claimType,
     },
-    verified: replaced ? stillVerified : state.verified,
+    verified: replaced
+      ? Object.fromEntries(
+          Object.entries(state.verified).filter(([property]) => {
+            return property !== attribute.name;
+          }),
+        )
+      : state.verified,
     explicit: [...state.explicit, attribute.name],
     unverifiedByReplacing:
       replaced && wasVerified
@@ -490,24 +773,38 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
 
 /**
  * What a person should hear about the state: a property whose default was
- * replaced and has not been given a verification since. Worked out from the
- * state, so verifying the property afterwards takes the note away.
+ * replaced and has not been given a verification since.
+ *
+ * @remarks
+ * Worked out from the state, so verifying the property afterwards takes the
+ * note away.
+ *
+ * @param state - What is mapped.
+ * @param flag - The flag that says how a property is verified, as the command
+ *   spells it.
+ * @returns One note for each such property.
  */
-export function claimNotes(state: MappingState): string[] {
+export function claimNotes(state: MappingState, flag: string): readonly string[] {
   return state.unverifiedByReplacing
-    .filter((attribute) => !(attribute in state.verified))
-    .map(
-      (attribute) =>
-        `${attribute} is now filled from ${state.mapping[attribute]} and is no longer verified, so a user whose ${attribute} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with --verified-claim ${attribute}=<claim> (or =true to trust the provider).`,
-    );
+    .filter((attribute) => {
+      return !Object.hasOwn(state.verified, attribute);
+    })
+    .map((attribute) => {
+      return `${attribute} is now filled from ${state.mapping[attribute]} and is no longer verified, so a user whose ${attribute} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with ${flag} ${attribute}=<claim> (or =true to trust the provider).`;
+    });
 }
 
 /**
  * Say how a mapped property is verified. A property with no mapping has
- * nothing to verify, and `plan` refuses a `verified_claims` key without one.
+ * nothing to verify, and the connection contract refuses a `verified_claims`
+ * key without one.
+ *
+ * @param state - What is mapped so far.
+ * @param entry - The verification.
+ * @returns The mapping with the verification in it, or why it is refused.
  */
 export function verifyAttribute(state: MappingState, entry: VerifiedEntry): Parsed<MappingState> {
-  if (!(entry.attribute in state.mapping)) {
+  if (!Object.hasOwn(state.mapping, entry.attribute)) {
     return refuse(
       `${entry.attribute} has no claim mapping, so there is nothing to verify. Map it first.`,
     );
@@ -515,59 +812,39 @@ export function verifyAttribute(state: MappingState, entry: VerifiedEntry): Pars
   return ok({ ...state, verified: { ...state.verified, [entry.attribute]: entry.source } });
 }
 
-/** Apply a request in order: the mappings, then their scopes, then how they are verified. */
+/**
+ * Apply a request in order: the mappings, then their scopes, then how they are
+ * verified.
+ *
+ * @param state - What the connection maps by default.
+ * @param request - What the developer asked for.
+ * @returns The mapping the request makes, or why it is refused.
+ */
 export function applyRequest(state: MappingState, request: ClaimRequest): Parsed<MappingState> {
-  let current = state;
-  for (const entry of request.entries) {
-    const mapped = mapClaim(current, entry);
-    if (!mapped.ok) {
-      return mapped;
-    }
-    current = mapped.value;
+  const mapped = request.entries.reduce<Parsed<MappingState>>((current, entry) => {
+    return current.ok ? mapClaim(current.value, entry) : current;
+  }, ok(state));
+  if (!mapped.ok) {
+    return mapped;
   }
-  current = { ...current, scopes: union(current.scopes, request.scopes) };
-  for (const entry of request.verified) {
-    const verified = verifyAttribute(current, entry);
-    if (!verified.ok) {
-      return verified;
-    }
-    current = verified.value;
-  }
-  return ok(current);
+  return request.verified.reduce<Parsed<MappingState>>(
+    (current, entry) => {
+      return current.ok ? verifyAttribute(current.value, entry) : current;
+    },
+    ok({ ...mapped.value, scopes: union(mapped.value.scopes, request.scopes) }),
+  );
 }
 
-/** How a command spells the flags that carry a claim request, so a message names the one to fix. */
-export type ClaimFlagNames = {
-  readonly claim: string;
-  readonly scope: string;
-  readonly verified: string;
-};
-
-/** The flags on `auth-method sso enable`. */
-export const ENABLE_CLAIM_FLAGS: ClaimFlagNames = {
-  claim: "--claim",
-  scope: "--claim-scope",
-  verified: "--verified-claim",
-};
-
-/** The flags on `setup`, which carries them for the provider it enables. */
-export const SETUP_CLAIM_FLAGS: ClaimFlagNames = {
-  claim: "--sso-claim",
-  scope: "--sso-claim-scope",
-  verified: "--sso-verified-claim",
-};
-
-/** The flag values a command parsed, before they are read as a request. */
-export type ClaimFlagValues = {
-  readonly claim?: readonly string[];
-  readonly scope?: string;
-  readonly verified?: readonly string[];
-};
-
-/** The value of a parse, or an `E_VALIDATION` that says what to fix. */
-export function claimsOrRefuse<T>(parsed: Parsed<T>, where: string): T {
+/**
+ * The value of a parse, or an `E_VALIDATION` that says what to fix.
+ *
+ * @param parsed - What was parsed.
+ * @returns The value.
+ * @throws {@link ZitadelError} With `E_VALIDATION` when it did not parse.
+ */
+export function claimsOrRefuse<T>(parsed: Parsed<T>): T {
   if (!parsed.ok) {
-    throw new ZitadelError("E_VALIDATION", `${where}${parsed.problem}`, {
+    throw new ZitadelError("E_VALIDATION", parsed.problem, {
       hint: "Fix the claim mapping and run the command again.",
     });
   }
@@ -575,42 +852,82 @@ export function claimsOrRefuse<T>(parsed: Parsed<T>, where: string): T {
 }
 
 /**
- * Read the flags as a request. Each entry is checked for its shape as it is
- * read, naming the flag that carried it; whether it fits the schema is for
- * {@link applyRequest}, which needs the schema.
+ * Read the flags as a request.
+ *
+ * @remarks
+ * Each flag checked its own shape as it was parsed, so what is read here
+ * parses. Whether an entry fits the schema is for {@link applyRequest}, which
+ * needs the schema.
+ *
+ * @param values - What the flags carried.
+ * @returns The request.
  */
-export function claimRequestFromFlags(
-  values: ClaimFlagValues,
-  names: ClaimFlagNames,
-): ClaimRequest {
+export function claimRequestFromFlags(values: ClaimFlagValues): ClaimRequest {
   return {
-    entries: (values.claim ?? []).map((text) =>
-      claimsOrRefuse(parseClaimEntry(text), `${names.claim}: `),
-    ),
-    verified: (values.verified ?? []).map((text) =>
-      claimsOrRefuse(parseVerifiedEntry(text), `${names.verified}: `),
-    ),
-    scopes: claimsOrRefuse(parseScopeList(values.scope ?? ""), `${names.scope}: `),
+    entries: (values.claim ?? []).map((text) => {
+      return validated(parseClaimEntry(text));
+    }),
+    verified: (values.verified ?? []).map((text) => {
+      return validated(parseVerifiedEntry(text));
+    }),
+    scopes: validated(parseScopeList(values.scope ?? "")),
   };
 }
 
-/** Whether a request asks for anything. */
+/**
+ * What a mapping makes of a connection: the claims, how they are verified, the
+ * scopes, the attributes it creates, and what the developer should hear.
+ *
+ * @param state - What is mapped.
+ * @param flag - The flag that says how a property is verified, as the command
+ *   spells it, which the notes name.
+ * @returns What the connection is written with.
+ */
+export function choiceOf(state: MappingState, flag: string): ClaimChoice {
+  return {
+    mapping: state.mapping,
+    verified: state.verified,
+    scopes: state.scopes,
+    created: state.created.map((attribute) => {
+      return {
+        name: attribute.name,
+        type: attribute.type ?? "string",
+      };
+    }),
+    notes: claimNotes(state, flag),
+  };
+}
+
+/**
+ * Whether a request asks for anything.
+ *
+ * @param request - The request.
+ * @returns Whether it has a claim, a verification or a scope.
+ */
 export function asksForClaims(request: ClaimRequest): boolean {
   return request.entries.length + request.verified.length + request.scopes.length > 0;
 }
 
-/** The flags that restate a request, for a command offered as text. */
-export function claimFlagText(request: ClaimRequest, names: ClaimFlagNames): string {
-  return [
-    ...request.entries.map(
-      (entry) =>
-        `${names.claim} ${shellWord(`${entry.attribute}=${entry.claim}${entry.type === undefined ? "" : `:${entry.type}`}`)}`,
-    ),
-    ...request.verified.map(
-      (entry) => `${names.verified} ${shellWord(`${entry.attribute}=${entry.source}`)}`,
-    ),
-    ...(request.scopes.length === 0
-      ? []
-      : [`${names.scope} ${shellWord(request.scopes.join(" "))}`]),
-  ].join(" ");
+/**
+ * The flags that restate a request, for a command offered as text.
+ *
+ * @param request - The request.
+ * @returns What each flag carries, `undefined` for one the request leaves out.
+ */
+export function claimFlagTexts(request: ClaimRequest): ClaimFlagTexts {
+  return {
+    claim:
+      request.entries.length === 0
+        ? undefined
+        : request.entries.map((entry) => {
+            return `${entry.attribute}=${entry.claim}${entry.type === undefined ? "" : `:${entry.type}`}`;
+          }),
+    verifiedClaim:
+      request.verified.length === 0
+        ? undefined
+        : request.verified.map((entry) => {
+            return `${entry.attribute}=${entry.source}`;
+          }),
+    claimScope: request.scopes.length === 0 ? undefined : request.scopes.join(" "),
+  };
 }

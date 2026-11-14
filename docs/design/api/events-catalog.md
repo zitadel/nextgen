@@ -28,7 +28,7 @@ not a `user.*` event, and enrolling a passkey is
 `auth.factor.passkey.enrolled`. A consumer syncing user records filters on
 `user.*` without receiving sign-in or credential traffic; a security consumer
 gets every credential change from `auth.factor.*`. A credential event names
-its user in the payload's `user_id`.
+its user in `user_id`, on the envelope and in the payload.
 
 **Compound transactions:** emit one Path B event per semantic mutation in the
 same TX (shared `request_id`).
@@ -37,9 +37,9 @@ same TX (shared `request_id`).
 
 ## Payload rules
 
-1. **Envelope owns identity** — `entity_type` / `entity_id` / `session_id` /
-   `token_id` / `client_id` / `flow_id` / `request_id` / actor identify the
-   subject. Do **not** put the primary entity id in `payload` again.
+1. **Envelope owns identity** — `entity_type` / `entity_id` / `user_id` /
+   `session_id` / `token_id` / `client_id` / `flow_id` / `request_id` / actor
+   identify the subject. Do **not** put the primary entity id in `payload` again.
    Exceptions: join events (membership) or a **secondary** id (e.g. `user_id`
    on a factor event; `auth_attempt_id` on a check event).
 2. **Create** — full **allowlisted snapshot** of fields the mutate API
@@ -66,11 +66,12 @@ same TX (shared `request_id`).
 | **Project** | `name`, `origins` (full array as stored) | Secrets, key material |
 | **Origin** | `pattern`, `kind` | — |
 | **Team** | `name` | — |
-| **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
+| **Flow definition** | `name`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
 | **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
+| **Application** | `slug`, `name`, `client_ids[]` (the clients the write created), `revision_id` | Application document body, client secrets and their hashes |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
@@ -80,13 +81,13 @@ same TX (shared `request_id`).
 
 `PATCH /projects/{id}` today only renames (`name`). Origins are set on
 **create** and changed only through add/remove (`origin.added` /
-`origin.removed`), never through `patchProject`. Create emits `name` and
+`origin.removed`), never through `updateProject`. Create emits `name` and
 `origins`; update emits `name` when renamed.
 
 ### SIEM join path
 
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
-`client_id`, `token_id`, `actor_id`, `entity_id`.
+`client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`.
 
 Path A `request.api` may also carry observed requestor context on metadata
 (`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
@@ -99,6 +100,38 @@ are not inputs to the live risk evaluator
   not duplicated in attempt payloads).
 - Factors: `entity_id` / payload `factor_id` + shared `request_id` when
   co-committed.
+- Actor: the request's authenticated caller. Three emitters name a user in
+  its place: the `auth.token.issued` of a user's token, a project claim and a
+  personal team's creation. `session.established` does not: its actor is the
+  exchange's caller, the app, and its user is the payload's `user_id`.
+  [events-for-people.md](events-for-people.md#4-the-actor-is-the-authenticated-caller)
+  proposes one rule.
+- Tokens: `token_id` is the credential the request presented, on every event,
+  and never the token an event is about; that one is `entity_id`. An export
+  joins the requests a token authenticates to its `auth.token.issued` by
+  `token_id` ↔ `entity_id`; `GET /events` has no `token_id` filter.
+
+### The user an event concerns
+
+`user_id` is the user an event is about, whoever acted, and a filter of
+`GET /events` that reads its own index. An emitter sets it through
+`EmitSpec.UserID`, for these types and no other:
+
+- The user as a record: `user.created`, `user.updated`, `user.deleted`.
+- A session or a token that belongs to a user: `session.established`,
+  `session.deleted`, `auth.token.issued`, `auth.token.revoked`.
+- A sign-in, once its attempt has resolved a user: `auth.attempt.created`,
+  `auth.attempt.handed_off`, `auth.check.succeeded`, `auth.check.failed`,
+  `auth.sso.authorization.failed`, `auth.sso.exchange.failed`,
+  `auth.sso.exchange.succeeded`.
+- A credential or an identity of a user: `auth.factor.password.set`,
+  `auth.factor.passkey.enrolled`, `idp.identity_link.created`.
+- A grant to a user: `authz.granted`, `authz.revoked`.
+
+An event of these types that concerns no user leaves it empty: an anonymous
+session, a check before the identifier resolved, a grant to a team or a key.
+`TestUserEventsSetUserID` holds the emitters to this list. The payload's
+`user_id` stays where it is.
 
 ## Path A
 
@@ -112,7 +145,12 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`livez` / `readyz`) do not.
+Path A `request.api`. The attempt stores that `flow_id`: the handoff exchange
+is a service call that names no flow, so its `session.established`,
+`auth.token.issued` and `request.api` take `flow_id` from the attempt it
+consumed. The SSO callback arrives without the flow's cookie, so its
+`auth.sso.*` event and `request.api` take it from the attempt too. Probes
+(`livez` / `readyz`) do not.
 
 The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
 `status_class` column, and its `operation_id` with that class to
@@ -150,15 +188,17 @@ tracked below.
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
 | `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
+| Signup challenge issued | `flow.signup_challenge.issued` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
+| Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
-| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Challenge failed (not a sign-up's identifier that matches no account: that lookup asks whether the identifier is free, and counts only toward the challenge's failures) | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | SSO authorization failed (the provider's error response, `access_denied` included, or a callback with no code, including one refused because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.authorization.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived, including a callback refused before the exchange because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange succeeded (`SetSSOCallbackResult`; not a sign-in: the identity may still match no account) | `auth.sso.exchange.succeeded` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user, SSO bind recording the user and SSO factors) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
-| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
+| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |
@@ -167,6 +207,8 @@ tracked below.
 | ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
+| ApplicationService create (new slug) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
+| ApplicationService revise (existing slug) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
@@ -176,6 +218,8 @@ tracked below.
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | `DeleteUserByID` revoking the user's assignments (`RevokeAuthzAssignmentsByPrincipal`; one event per assignment, on its own project) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| InvitationService create, and the new row of a replace | `invitation.created` | `admin` | `invitation` | `type` and its object (`project_member` with `relation`), `journey_id`, `replaces_invitation_id`, `expires_at`; never the metadata or the token |
+| InvitationService cancel of a pending invitation, and the original a replace deletes | `invitation.cancelled` | `admin` | `invitation` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
@@ -204,7 +248,18 @@ every supported deployment; that removal is its own breaking change.
 Types whose API contract is published before their producer lands. Each has
 a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
-producer. None today.
+producer.
+
+Invitation events ([ADR 086 §5](../../adrs/086-invitations.md#5-events)) are
+`admin` category with `entity_type` `invitation`. `type` names the
+invitation's kind, and the object of the same name (`project_member` with
+`relation`, or `team_member` with `team_id` and `role`) says what it grants. No payload
+carries the invitation's metadata or its token.
+
+| `event_type` | Payload | Producer |
+|--------------|---------|----------|
+| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already holds an identical active grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+| `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
 
 ## Deferred
 

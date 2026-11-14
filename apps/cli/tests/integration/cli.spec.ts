@@ -4,8 +4,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp } from "@tests/helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { anApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import {
+  cliVersion,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "@tests/helpers/run-cli";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
 
@@ -50,6 +56,35 @@ async function suggestedCommandIds(): Promise<Set<string>> {
   return commands;
 }
 
+/**
+ * What a project's environment lacks when a deploy runs before setup, as the
+ * envelope says it.
+ */
+const CONSULTED = [
+  "--server",
+  "process environment",
+  ".env.development.local",
+  ".env.local",
+  ".env.development",
+  ".env",
+  ".zitadel/secret",
+];
+
+/**
+ * How the refusal tells the developer to give the project an id.
+ */
+const NOT_SET_UP_HINT = `Consulted, in order: ${CONSULTED.join(", ")}. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment, or run ${expectedPublicCliCommand("env add development")}.`;
+
+/**
+ * What the envelope says of a directory with no local server started in it.
+ */
+const NO_LOCAL_SERVER = {
+  lifecycle: "missing",
+  runtime: { configured: false },
+  docker: { available: true, container_exists: false, container_running: false },
+  health: { healthy: false },
+};
+
 describe("the cli", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -59,7 +94,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
 
@@ -70,7 +119,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
 
@@ -81,7 +144,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
   });
@@ -89,6 +166,28 @@ describe("the cli", () => {
   describe("against a valid server", () => {
     describe("--json", () => {
       it("names the failure when run before setup", async () => {
+        const app = await anApp();
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
+      });
+
+      it("exits as a validation failure does", async () => {
         const app = await anApp();
 
         const result = await app.deploy();
@@ -101,7 +200,7 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toSuggest(expectedPublicCliCommand("setup"));
+        expect(result).toSuggestExactly(`setup --cwd ${app.path}`);
       });
 
       it("has no server of its own when nothing names one", async () => {
@@ -109,7 +208,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("takes the server from ZITADEL_URL in the project's env file", async () => {
@@ -121,7 +241,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://self.example");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "https://self.example",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("ignores the server named in zitadel.json", async () => {
@@ -134,7 +275,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "orphaned-config",
+              project_id: "existing",
+              message: "zitadel.json exists but .zitadel/secret is missing.",
+            },
+            next_actions: [],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --force --cwd ${app.path}`),
+              expectedPublicCliCommand(`doctor --fix --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("only ever suggests commands a user can run", async () => {
@@ -159,12 +321,55 @@ describe("the cli", () => {
 
     describe("global flags", () => {
       it("accepts -v as the short form of --verbose", async () => {
-        const result = await runCliForTest(["resources", "-v", "--json"]);
+        const app = await anApp();
 
-        expect(result).toSucceed();
+        const result = await app.runWithoutServer(["status", "-v", "--json"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("rejects an unrecognised short flag", async () => {
+        const result = await runCliForTest(["resources", "-Z", "--json"]);
+
+        expect(parseJson(result.stdout)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "resources",
+          source: "",
+          code: "E_VALIDATION",
+          message: "Nonexistent flag: -Z",
+          next_commands: [expectedPublicCliCommand("resources --help")],
+          details: {
+            original: {
+              name: "Error",
+              message: "Nonexistent flag: -Z\nSee more help with --help",
+            },
+          },
+        });
+      });
+
+      it("exits as a validation failure does for an unrecognised short flag", async () => {
         const result = await runCliForTest(["resources", "-Z", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
@@ -178,7 +383,7 @@ describe("the cli", () => {
 
       /**
        * Colour itself is not asserted here, and an assertion about it would
-       * mislead: picocolors and consola decide colour when they load, from the
+       * mislead: picocolors decides colour when it loads, from the
        * real process streams, so a run in this harness emits no escape byte
        * whatever the flags say — a check for their absence would hold against
        * any implementation, broken ones included. What a run decides is pinned
@@ -186,23 +391,382 @@ describe("the cli", () => {
        * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
        */
       it("accepts --no-color", async () => {
-        const result = await runCliForTest(["resources", "--no-color", "--json"]);
+        const app = await anApp();
 
-        expect(result).toSucceed();
+        const result = await app.runWithoutServer(["status", "--no-color", "--json"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
     });
 
-    describe("handled by oclif rather than us", () => {
-      it("exits 127 for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+    describe("for a command that does not exist", () => {
+      describe("--json", () => {
+        it("prints one error envelope naming the command and the topic's help", async () => {
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
-        expect(result).toExitWith(127);
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "team:delete",
+            source: "",
+            code: "E_VALIDATION",
+            message: "team delete is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("team --help")],
+          });
+        });
+
+        it("prints one error envelope with the commands it was close to", async () => {
+          const result = await runCliForTest(["variable", "lst", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "variable:lst",
+            source: "",
+            code: "E_VALIDATION",
+            message: "variable lst is not a zitadel command",
+            next_commands: [
+              expectedPublicCliCommand("variable list --help"),
+              expectedPublicCliCommand("variable --help"),
+            ],
+          });
+        });
+
+        it("points at the CLI's help when nothing is close", async () => {
+          const result = await runCliForTest(["frobnicate", "--json"]);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "frobnicate",
+            source: "",
+            code: "E_VALIDATION",
+            message: "frobnicate is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("--help")],
+          });
+        });
+
+        const refusals = [
+          [
+            "a short typo of a subcommand",
+            ["env", "ad"],
+            "env:ad",
+            "env ad is not a zitadel command",
+            ["env add --help", "env --help"],
+            127,
+          ],
+          [
+            "a mistyped subcommand of a command with subcommands",
+            ["env", "ls"],
+            "env:ls",
+            "env ls is not a zitadel command",
+            ["env --help"],
+            127,
+          ],
+          [
+            "a typo only in case",
+            ["DEPLOY"],
+            "DEPLOY",
+            "DEPLOY is not a zitadel command",
+            ["deploy --help"],
+            127,
+          ],
+          [
+            "the plural of a noun alone",
+            ["policies"],
+            "policies",
+            "policies is not a zitadel command",
+            ["policy --help"],
+            127,
+          ],
+          [
+            "a word after a plural that is no command of its noun",
+            ["policies", "lst"],
+            "policy:lst",
+            "policy lst is not a zitadel command",
+            ["policy list --help", "policy --help"],
+            127,
+          ],
+          [
+            "a typo of an alias",
+            ["ejct"],
+            "ejct",
+            "ejct is not a zitadel command",
+            ["eject --help"],
+            127,
+          ],
+          [
+            "flags the command it meant takes",
+            ["--env", "staging", "variable", "lst"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+            127,
+          ],
+          [
+            "a word a real command does not take",
+            ["deploy", "extra"],
+            "deploy",
+            "deploy does not take the argument typed after it",
+            ["deploy --help"],
+            3,
+          ],
+          [
+            "a typo of a hidden subcommand",
+            ["autocomplete:crete"],
+            "autocomplete",
+            "autocomplete does not take the argument typed after it",
+            ["autocomplete --help"],
+            3,
+          ],
+        ] as const;
+
+        it.each(refusals)(
+          "answers %s with one envelope",
+          async (_, argv, command, message, next) => {
+            const result = await runCliForTest([...argv, "--json"]);
+
+            expect(parseJson(result.stdout)).toEqual({
+              status: "error",
+              cli_version: cliVersion.version,
+              command,
+              source: "",
+              code: "E_VALIDATION",
+              message,
+              next_commands: next.map((step) => expectedPublicCliCommand(step)),
+            });
+          },
+        );
+
+        it.each(refusals)("exits %s with its own code", async (_, argv, _c, _m, _n, exitCode) => {
+          const result = await runCliForTest([...argv, "--json"]);
+
+          expect(result).toExitWith(exitCode);
+        });
+
+        it.each([
+          [
+            "a flag before the words",
+            ["--json", "statu"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a flag and its value before the words",
+            ["--cwd", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          ["no words at all", ["--json"], "(default)", "That is not a zitadel command", ["--help"]],
+          [
+            "the value of a flag no command declares",
+            ["--token", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the value of a short flag no command declares",
+            ["-x", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the value of a cluster of short flags no command declares",
+            ["-xy", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a flag with colons in its value",
+            ["--token:secret:credential:frobnicate", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a switch another command declares before the words",
+            ["--plain", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a switch another command declares before a topic",
+            ["--plain", "variable", "lst", "--json"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+          ],
+          [
+            "a short flag no base flag has before --json",
+            ["variable", "lst", "-f", "--json"],
+            "variable:lst",
+            "variable lst is not a zitadel command",
+            ["variable list --help", "variable --help"],
+          ],
+          [
+            "a switch whose own name starts with no-",
+            ["--no-open", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a switch turned off with no-",
+            ["--no-color", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a word of only spaces",
+            [" ", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a flag-like word after a pass-through nothing came before",
+            ["--json", "--", "-x", "SECRET"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a word after a word of only spaces",
+            [" ", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the values of a flag that takes every word after it",
+            ["--origin", "a", "SECRET", "statu", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a word after a pass-through nothing came before",
+            ["--json", "--", "frobnicate"],
+            "frobnicate",
+            "frobnicate is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a short flag cluster that takes the value after it",
+            ["-nc", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+        ])("answers %s by what was typed", async (_, argv, command, message, next) => {
+          const result = await runCliForTest(argv);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command,
+            source: "",
+            code: "E_VALIDATION",
+            message,
+            next_commands: next.map((step) => expectedPublicCliCommand(step)),
+          });
+        });
+
+        it("prints no envelope for a --json typed as another flag's value", async () => {
+          const result = await runCliForTest(["--cwd", "--json", "statu"]);
+
+          expect(result.stdout).toBe("");
+        });
+
+        it("prints no envelope for a --json after the pass-through", async () => {
+          const result = await runCliForTest(["frobnicate", "--", "--json"]);
+
+          expect(result.stdout).toBe("");
+        });
+
+        it("writes nothing to stderr", async () => {
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
+
+          expect(result.stderr).toBe("");
+        });
       });
 
-      it("emits no envelope for a command that does not exist", async () => {
-        const result = await runCliForTest(["bogus", "--json"]);
+      describe("piped", () => {
+        it("prints the error on stderr", async () => {
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
-        expect(result.stdout.trim()).toBe("");
+          expect(result.stderr).toBe(
+            [
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
+              "",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("team --help")}`,
+              "",
+            ].join("\n"),
+          );
+        });
+
+        it("prints nothing on stdout", async () => {
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
+
+          expect(result.stdout).toBe("");
+        });
+      });
+
+      describe("rendered for a terminal", () => {
+        it("prints the error and offers no prompt to run another command", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["team", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
+          );
+
+          expect(result.stderr).toBe(
+            [
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
+              "",
+              "Next:",
+              `  $ ${expectedPublicCliCommand("team --help")}`,
+              "",
+            ].join("\n"),
+          );
+        });
+
+        it("names the command it was close to as one to type", async () => {
+          const result = await asTerminal(() =>
+            runCliForTest(["variable", "lst"], { NO_COLOR: "1" }),
+          );
+
+          expect(result.stderr).toContain(
+            `  $ ${expectedPublicCliCommand("variable list --help")}`,
+          );
+        });
       });
     });
   });

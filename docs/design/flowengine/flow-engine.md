@@ -3,26 +3,26 @@
 > **Status:** Draft
 > **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md)
 >
-> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
+> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flows`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
 
-The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flow/{id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flows/{flow_id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
 It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip the flow engine entirely and drive the auth_attempt primitives (and the Session API) directly.
 
 ## Endpoints
 
 ```
-POST   /flow              Start a flow (creates a session internally)
-GET    /flow/{id}          Get current step (re-render)
-POST   /flow/{id}/submit   Submit step data, advance state machine
+POST   /flows              Start a flow (creates a session internally)
+GET    /flows/{flow_id}          Get current step (re-render)
+POST   /flows/{flow_id}/submit   Submit step data, advance state machine
 ```
 
-The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
+The `{id}` is a flow handle returned by `POST /flows` or the latest `POST /flows/{flow_id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
 
 ## Starting a Flow
 
 ```http
-POST /flow
+POST /flows
 {
   "project_id": "proj_01hexample",
   "purpose": "login",
@@ -50,14 +50,14 @@ POST /flow
 
 The server resolves which flow definition to use:
 
-1. Filter active definitions whose `purposes` map has an entry for the requested purpose.
+1. Filter the definitions the release pins whose `purposes` map has an entry for the requested purpose.
 2. If `hint.user_schema_id` is set, discard definitions for other schemas.
 3. Score the remaining definitions: matching app > matching team > project-wide > a definition scoped to a different app or team.
 4. Pick the highest score; ties go to the newest `created_at`, then the highest ID.
 5. Enter at the step named by `purposes[<purpose>]` in the matched definition.
 
 Project creation provisions the shipped default definition as a normal stored
-definition. `POST /flow` does not synthesize an in-memory fallback when no
+definition. `POST /flows` does not synthesize an in-memory fallback when no
 definition matches; resolution returns `flow_definition.not_found`.
 
 ## Flow Definitions
@@ -67,11 +67,11 @@ A flow definition is a directed graph of steps, managed as an API resource. Each
 ```
 POST   /flow_definitions             Publish a new revision
 GET    /flow_definitions             List, newest first; `name=` narrows to one flow's revisions
-GET    /flow_definitions/{id}        Get one revision
+GET    /flow_definitions/{flow_definition_id}        Get one revision
 
 # planned (not in the shipped spec):
-POST   /flow_definitions/{id}/validate    Check for dead ends, missing transitions
-POST   /flow_definitions/{id}/simulate    Dry-run with mock input
+POST   /flow_definitions/{flow_definition_id}/validate    Check for dead ends, missing transitions
+POST   /flow_definitions/{flow_definition_id}/simulate    Dry-run with mock input
 ```
 
 A definition is an immutable revision: every `POST` assigns a new id, and a
@@ -187,7 +187,6 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 ```json
 {
   "name": "default-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -213,7 +212,7 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 **Frontend interaction:**
 
 ```http
-POST /flow
+POST /flows
 { "project_id": "proj_01hexample", "purpose": "login", "auth_request_id": "oidc-123", "redirect_uri": "https://app.com/cb" }
 ```
 ```json
@@ -238,7 +237,7 @@ POST /flow
 ```
 
 ```http
-POST /flow/flow_1/submit
+POST /flows/flow_1/submit
 { "action": "submit", "fields": { "email": "alice@acme.com", "x-auth-methods#password": "correct-horse" } }
 ```
 ```json
@@ -269,7 +268,6 @@ says to do so.
 ```json
 {
   "name": "default-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [
@@ -307,7 +305,7 @@ User was on the login flow, clicked "Create account" — a `switch` transition
 (direction-only today; see [Flow Pivot](#flow-pivot-cross-flow-navigation)):
 
 ```http
-POST /flow/flow_1/submit
+POST /flows/flow_1/submit
 { "action": "register" }
 ```
 ```json
@@ -332,7 +330,7 @@ POST /flow/flow_1/submit
 ```
 
 ```http
-POST /flow/flow_1/submit
+POST /flows/flow_1/submit
 { "action": "submit", "fields": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
 ```
 ```json
@@ -354,7 +352,7 @@ POST /flow/flow_1/submit
 ```
 
 ```http
-POST /flow/flow_1/submit
+POST /flows/flow_1/submit
 { "action": "submit", "fields": { "x-auth-methods#password": "strong-pass-123!" } }
 ```
 ```json
@@ -383,7 +381,6 @@ A single flow that handles both login and registration using implicit outcomes f
 ```json
 {
   "name": "combined-auth",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "identify", "register": "profile" },
   "steps": [
@@ -456,7 +453,6 @@ an identifier. Login routes a missing user through `user_not_found` to
 ```json
 {
   "name": "sso-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -498,7 +494,7 @@ fires `sso_authenticated` on this step when the IdP returns.
 **Frontend interaction:**
 
 ```http
-POST /flow
+POST /flows
 { "project_id": "proj_01hexample", "purpose": "login", "auth_request_id": "oidc-789" }
 ```
 ```json
@@ -526,7 +522,7 @@ POST /flow
 User clicks "Continue with Google":
 
 ```http
-POST /flow/flow_2/submit
+POST /flows/flow_2/submit
 { "action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com/login?flow=flow_2" }
 ```
 ```json
@@ -557,7 +553,7 @@ The frontend navigates to `redirect_url` and the IdP callback (#1032) returns
 control to the same step:
 
 ```http
-GET /flow/flow_2
+GET /flows/flow_2
 ```
 ```json
 ← 200  (planned SSO callback fires the authored `sso_authenticated` transition)
@@ -587,7 +583,6 @@ GET /flow/flow_2
 ```json
 {
   "name": "protected-register",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "register": "profile" },
   "steps": [
@@ -629,7 +624,7 @@ policy injection are not implemented today.
 When a submission fails validation or proof verification, the flow does **not** advance. The same step is returned with an `error` field:
 
 ```http
-POST /flow/flow_1/submit
+POST /flows/flow_1/submit
 { "action": "submit", "fields": { "x-auth-methods#password": "wrong" } }
 ```
 ```json

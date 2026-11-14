@@ -13,4 +13,13 @@ sends it on its own; a client that is not a browser must capture the
 `Set-Cookie` header and send it back. The flow's `id` can change between
 responses, so always use the one from the latest response.
 
+Until 1.0.0 the server also answers these operations at `/flow`, the
+collection's path before it became `/flows`: `POST /flow`,
+`GET /flow/{flow_id}` and `POST /flow/{flow_id}/submit`. Such a response
+carries a `Deprecation` header ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745))
+with the date `/flows` shipped, and a `Link` with `rel="deprecation"` to this
+page. Move a client that still calls `/flow` to `/flows`: from 1.0.0 the old
+paths answer `404` with `req.not_found`. The login component and the SDKs
+call `/flows` from the release that moved the operations.
+
 <Operations />

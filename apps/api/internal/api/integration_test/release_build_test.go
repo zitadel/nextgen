@@ -96,7 +96,6 @@ func TestBuildRelease(t *testing.T) {
 		// Wire-valid; entry step for login is missing.
 		badFlow := api.FlowDefinition{
 			Name:       "build-bad-flow",
-			Status:     "active",
 			UserSchema: "human-user",
 			Purposes:   map[string]string{"login": "missing-step"},
 			Steps: []api.FlowDefinitionStep{{

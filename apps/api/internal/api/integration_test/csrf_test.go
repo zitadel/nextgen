@@ -198,16 +198,16 @@ func TestSessionCSRF(t *testing.T) {
 
 		patch := &api.PatchMyUserRequest{}
 		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Myself"}}`)))
-		me, err := session.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
+		me, err := session.UpdateMyUser(t.Context(), patch, api.UpdateMyUserParams{})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchMyUserForbidden{}, me, helpers.MustMarshal(t, me))
-		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.PatchMyUserForbidden).Code)
+		require.IsType(t, &api.UpdateMyUserForbidden{}, me, helpers.MustMarshal(t, me))
+		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.UpdateMyUserForbidden).Code)
 
-		claim, err := session.CompleteClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
-			api.CompleteClaimParams{ProjectID: api.ProjectID(home.ID)})
+		claim, err := session.CompleteProjectClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
+			api.CompleteProjectClaimParams{ProjectID: api.ProjectID(home.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.CompleteClaimForbidden{}, claim, helpers.MustMarshal(t, claim))
-		assert.True(t, claim.(*api.CompleteClaimForbidden).IsAuthCsrfInvalid(), helpers.MustMarshal(t, claim))
+		require.IsType(t, &api.CompleteProjectClaimForbidden{}, claim, helpers.MustMarshal(t, claim))
+		assert.True(t, claim.(*api.CompleteProjectClaimForbidden).IsAuthCsrfInvalid(), helpers.MustMarshal(t, claim))
 	})
 
 	t.Run("a project secret needs no token", func(t *testing.T) {

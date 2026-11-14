@@ -30,8 +30,9 @@
 // out to `go generate -run`, so their commands stay declared in one place
 // instead of being copied here.
 //
-// This is why bare `go generate ./...` and `moon run server:generate` both work
-// from a pruned tree: neither of them knows about the cycle.
+// This is why bare `go generate ./...` and
+// `turbo run generate --filter=@zitadel/server` both work from a pruned tree:
+// neither of them knows about the cycle.
 //
 // Paths are calculated relative to this generator's location:
 //   - Domain: ../../../internal/domain
@@ -274,7 +275,7 @@ func main() {
 // operation, for every operation — never a subset. A pass that wrote files for
 // some operations and left others as it found them would produce output that
 // depends on what was already on disk, which is exactly the property
-// server:check-generate-pruned exists to deny.
+// @zitadel/server#check-generate exists to deny.
 //
 // errorFuncsFor supplies the operation's error constructors; the transport and
 // security codes every operation can raise are added here rather than by each
@@ -409,10 +410,12 @@ func writeErrorExamples(errorMapping map[string]errorInfo, openapiBasePath strin
 // generate from at this point.
 //
 // Nothing here is conditional on what is already on disk: both prerequisites
-// are idempotent, and keeping the path single means `moon run server:generate`
-// walks exactly the one `go generate ./...` does, so the standing pruned-tree
-// check (server:check-generate-pruned) covers both. The cost is one redundant
-// enumer run under the Moon runner, on the rare pruned path only.
+// are idempotent, and keeping the path single means
+// `turbo run generate --filter=@zitadel/server` walks exactly the one
+// `go generate ./...` does, so the pruned-tree generation every run starts from
+// (scripts/go-generate.mjs, @zitadel/server#check-generate) covers both. The
+// cost is one redundant enumer run under scripts/go-generate.mjs, which runs
+// enumer before ./api.
 func bootstrapOgenOutput(moduleRoot, apiDir string, writePlaceholderSpec func()) {
 	if os.Getenv(bootstrapGuardEnv) != "" {
 		_, _ = fmt.Fprintf(os.Stderr,
@@ -990,6 +993,8 @@ var remappedErrors = []string{
 	// Attributes failing the user schema answer req.invalid, the way request
 	// validation answers a malformed body.
 	"domain.ErrUserAttributesInvalid",
+	// A finished invitation answers inv.not_found, so its state stays hidden.
+	"domain.ErrInvitationNotPending",
 }
 
 // operationExcludedErrors drops internal sentinels from the generated default
@@ -999,7 +1004,7 @@ var operationExcludedErrors = map[string][]string{
 	// Self-access operations answer any refused session as auth.unauthorized
 	// (requireSelf, #553).
 	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
-	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"updateMyUser":        {"domain.ErrSessionTokenInvalid"},
 	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
 	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
 	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
@@ -1026,15 +1031,15 @@ var operationExcludedErrors = map[string][]string{
 	// The identifier lookup of the flow path turns a bound user schema the
 	// project does not hold into domain.ErrInternal (resolveIdentifier), so
 	// sch.not_found never reaches the response.
-	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
-	// sch.not_found is remapped as for verifyChallengeProof.
-	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
+	"verifyAuthAttemptChallenge": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyAuthAttemptChallenge.
+	"completeUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
 	// Create and revise run the engine's connection parse after the schema
 	// check. The schema already refuses a missing protocol block, scopes
 	// without openid, and a cleartext endpoint as req.invalid, so only the
 	// parse's own rule, the partial endpoint block, reaches the caller; any
 	// other parse refusal is reported as req.invalid.
-	"createIdp": {
+	"publishIdp": {
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",

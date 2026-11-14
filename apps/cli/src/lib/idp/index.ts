@@ -14,66 +14,89 @@
  * the credentials ({@link CredentialPrompt}), and publishing them to the
  * project through a publisher the caller passes in ({@link CredentialDelivery}).
  *
- * **Dependency rule.** No upward imports (`commands/`, `sync/`), none of
+ * **Dependency rule.** No upward imports (`cli/commands/`, `sync/`), none of
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
  * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
+ * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions`), `lib/warnings`
  * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
+
+export { callbackUriFor } from "./callback";
 export {
-  customFlagText,
-  selectionFromFlags,
+  type AddedClaim,
+  ClaimQuestions,
+  type ClaimQuestionsRun,
+  claimTable,
+} from "./claim-questions";
+export {
+  applyRequest,
+  asksForClaims,
+  attributesOf,
+  CLAIM_TYPES,
+  type ClaimEntry,
+  type ClaimFlagTexts,
+  type ClaimFlagValues,
+  type ClaimRequest,
+  type ClaimType,
+  choiceOf,
+  claimFlagTexts,
+  claimNotes,
+  claimRequestFromFlags,
+  claimsOrRefuse,
+  fieldLabelFor,
+  type MappingState,
+  mapClaim,
+  NO_CLAIM_REQUEST,
+  parseClaimEntry,
+  parseClaimName,
+  parseNewAttributeName,
+  parseScopeList,
+  parseUnusedClaim,
+  parseVerifiedEntry,
+  type SchemaAttribute,
+  seedMapping,
+  standardClaimScope,
+  standardClaimType,
+  unmapped,
+  type VerifiedEntry,
+  verifyAttribute,
+} from "./claims";
+export {
+  type CredentialNames,
+  type GivenCredentials,
+  type PublishedCredentials,
+  type PublishState,
+  publishClientId,
+  reportClientIdOutcome,
+  reportSecretOutcome,
+  republishCommand,
+  republishCommands,
+  type SecretOutcome,
+  type SecretPublisher,
+  storeClientSecret,
+  type Unpublished,
+  unpublished,
+} from "./credentials";
+export {
   type CustomFlagNames,
+  type CustomFlagValues,
   checkGivenCustomFlags,
   customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
-  flagText,
-  shellWord,
-  SETUP_FLAG_KEYS,
-  loopbackIssuerWarning,
-  type LoopbackReach,
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
+  type LoopbackReach,
+  loopbackIssuerWarning,
+  SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
-  ssoEnableArgs,
-  type CustomFlagValues,
+  selectionFromFlags,
+  ssoEnableFlags,
 } from "./custom";
-
-export { askClaims } from "./claim-wizard";
-
-export {
-  applyRequest,
-  asksForClaims,
-  claimFlagText,
-  attributesOf,
-  type ClaimFlagNames,
-  type ClaimFlagValues,
-  claimRequestFromFlags,
-  claimsOrRefuse,
-  ENABLE_CLAIM_FLAGS,
-  SETUP_CLAIM_FLAGS,
-  CLAIM_TYPES,
-  claimNotes,
-  type ClaimEntry,
-  type ClaimRequest,
-  type ClaimType,
-  fieldLabelFor,
-  type MappingState,
-  NO_CLAIM_REQUEST,
-  parseClaimEntry,
-  parseScopeList,
-  parseVerifiedEntry,
-  type SchemaAttribute,
-  seedMapping,
-  type VerifiedEntry,
-} from "./claims";
-
-export { callbackUriFor } from "./callback";
-
+export { CredentialDelivery, type DeliveryRun } from "./delivery";
 export { askConnectionEndpoints } from "./endpoints";
-
+export { CredentialPrompt, type PromptRun } from "./prompt";
 export {
   ProviderChoice,
   type ProviderFlags,
@@ -81,23 +104,3 @@ export {
   type ProviderTarget,
   type StoredSettings,
 } from "./provider";
-
-export { CredentialPrompt, type PromptRun } from "./prompt";
-
-export { CredentialDelivery, type DeliveryRun } from "./delivery";
-
-export {
-  type CredentialNames,
-  type GivenCredentials,
-  type PublishedCredentials,
-  publishClientId,
-  type PublishState,
-  reportClientIdOutcome,
-  reportSecretOutcome,
-  republishArgs,
-  republishCommand,
-  republishCommands,
-  type SecretOutcome,
-  type SecretPublisher,
-  storeClientSecret,
-} from "./credentials";

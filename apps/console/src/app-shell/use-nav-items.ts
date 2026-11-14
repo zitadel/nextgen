@@ -1,20 +1,35 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 
+import { usePlatformAccess } from "@/features/platform/access";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
+
+import { SETTINGS_PATH } from "./user-menu";
+
+/** Route prefix of the selected project's Settings, whose pages have a list of their own (D40). */
+export const PROJECT_SETTINGS_PATH = "/project";
 
 export interface NavItem {
   /** Route path. */
   to: string;
   nav: NavMeta;
+  /**
+   * The project the row's screen is drawn for, where that is not the
+   * selection: the reserved platform project, on a row of the root's lists
+   * (D42). The row selects it.
+   */
+  project?: string;
 }
+
+/** A project's home, Overview. The root's home is Projects, so its list leaves this out. */
+const OVERVIEW_PATH = "/";
 
 /**
  * Builds one sidebar's list from `staticData.nav` on the route tree (Console
  * ADR 0001).
  *
- * `view` selects which list. The shell renders three from one route tree, so
+ * `view` selects which list. The shell renders several from one route tree, so
  * an entry belongs to exactly one of them. The list is one level, sorted by
  * `nav.order` so the sidebar matches the design regardless of route
  * registration order.
@@ -41,23 +56,50 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 }
 
 /**
- * The account list as the sidebar draws it (D34): its first row, Projects,
- * then the project's screens, then the account's other rows (Settings). Above
- * every project the account's rows alone left the sidebar nearly empty; with
- * the project's screens it shows what the console holds. Choosing one opens it
- * in the selected project (D36), and asks for a project first when none is
- * (D31).
+ * The root's list as the sidebar draws it (D42): Projects, the spine, then
+ * the reserved platform project's screens for someone who may act on it, then
+ * Settings.
  *
- * Two of the project's rows are left out, as in Vercel. Its landing, `/`
- * (Overview, D35), is the row Projects stands in for up here. A screen named
- * like an account row (the project's own Settings) would name two places
- * alike: up here Settings is the account's.
+ * The platform project is the root, so its screens are a project's own, under
+ * a project's names (Teams, Users, Deployments and the rest), each drawn for
+ * the platform project: the row selects it (`project`). Overview is left out,
+ * since the root's home is Projects, and so is the project's Settings row,
+ * whose pages join the root's Settings list (`useSettingsListItems`). Anyone
+ * else sees Projects and Settings: a customer's project is reached by
+ * choosing it.
+ *
+ * Settings opens a list (D29): with nothing in it the row would open nothing,
+ * so it is left out.
  */
-export function accountListItems(account: NavItem[], project: NavItem[]): NavItem[] {
-  const [home, ...rest] = account;
-  const taken = new Set(account.map((item) => item.nav.label));
-  const screens = project.filter((item) => item.to !== "/" && !taken.has(item.nav.label));
-  return home ? [home, ...screens, ...rest] : screens;
+export function useAccountListItems(): NavItem[] {
+  const account = useNavItems("account");
+  const portal = useNavItems("portal");
+  const settings = useSettingsListItems();
+  const platform = usePlatformAccess();
+
+  const own = platform
+    ? portal
+        .filter(({ to }) => to !== OVERVIEW_PATH && to !== PROJECT_SETTINGS_PATH)
+        .map((item) => ({ ...item, project: platform }))
+    : [];
+  return [
+    ...account.filter((item) => item.to !== SETTINGS_PATH),
+    ...own,
+    ...(settings.length > 0 ? account.filter((item) => item.to === SETTINGS_PATH) : []),
+  ];
+}
+
+/**
+ * The root's Settings list (D29, D42): the platform project's own Settings
+ * pages (General, Admins) for someone who may act on it, each drawn for that
+ * project, then what an add-on adds (the hosted cloud's Billing, Support and
+ * Email).
+ */
+export function useSettingsListItems(): NavItem[] {
+  const addon = useNavItems("settings");
+  const project = useNavItems("project-settings");
+  const platform = usePlatformAccess();
+  return platform ? [...project.map((item) => ({ ...item, project: platform })), ...addon] : addon;
 }
 
 /**

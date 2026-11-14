@@ -163,7 +163,7 @@ func (f *ssoCallbackFixture) submitSSO(t *testing.T, flow ssoFlow) (authorize *u
 	body, err := submission.MarshalJSON()
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.APIBaseURL(t)+"/flow/"+flow.id+"/submit", strings.NewReader(string(body)))
+		harness.APIBaseURL(t)+"/flows/"+flow.id+"/submit", strings.NewReader(string(body)))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", "https://login.example.test")
@@ -249,6 +249,45 @@ func TestSSOCallbackSignsInTheLinkedUser(t *testing.T) {
 	replay := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	assert.Equal(t, http.StatusBadRequest, replay.StatusCode)
 	assert.Equal(t, 1, f.provider.tokenCalls)
+}
+
+// The provider returns the browser without the flow's cookie, so the
+// callback's event takes the flow from the attempt: it is among the login
+// flow's events. The harness binds no request to a flow (it runs without the
+// request audit middleware), so the exchange is the one event here that
+// carries the flow by itself.
+func TestSSOCallbackEventsJoinTheLoginFlow(t *testing.T) {
+	f := newSSOCallbackFixture(t)
+	// A claimed project: its events are listed.
+	harness.SeedOwningTeam(t, f.project.ID, f.team.ID)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
+	flow := f.startFlow(t, nil)
+	authorize, binding := f.submitSSO(t, flow)
+
+	resp := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+
+	listed, err := f.client.ListEvents(t.Context(), api.ListEventsParams{
+		ProjectID: f.projectID(),
+		FlowID:    api.NewOptString(flow.id),
+	})
+	require.NoError(t, err)
+	page, ok := listed.(*api.ListEventsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, listed))
+	var types []string
+	for _, event := range page.Events {
+		raw, err := event.MarshalJSON()
+		require.NoError(t, err)
+		var envelope struct {
+			EventType string `json:"event_type"`
+			FlowID    string `json:"flow_id"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &envelope))
+		assert.Equal(t, flow.id, envelope.FlowID, envelope.EventType)
+		types = append(types, envelope.EventType)
+	}
+	assert.Contains(t, types, "auth.sso.exchange.succeeded")
 }
 
 // The proxy-stripped spelling serves the same ceremony: a scaffolded app's SDK

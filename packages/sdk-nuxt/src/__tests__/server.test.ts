@@ -28,8 +28,8 @@ describe("server entry", () => {
     const app = createApp();
     app.use(createNextgenMiddleware({ url: "" }));
 
-    await toWebHandler(app)(new Request("http://localhost:3000/__nextgen/flow"));
+    await toWebHandler(app)(new Request("http://localhost:3000/__nextgen/flows"));
 
-    expect(upstream).toHaveBeenCalledWith("http://runtime.test/flow", expect.anything());
+    expect(upstream).toHaveBeenCalledWith("http://runtime.test/flows", expect.anything());
   });
 });

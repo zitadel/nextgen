@@ -33,6 +33,9 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	if v, ok := params.ActorID.Get(); ok {
 		req.ActorID = v
 	}
+	if v, ok := params.UserID.Get(); ok {
+		req.UserID = v
+	}
 	if v, ok := params.ClientID.Get(); ok {
 		req.ClientID = v
 	}
@@ -84,14 +87,14 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	}
 
 	resp := &api.ListEventsResponse{
-		Data: make([]api.Event, 0, len(result.Events)),
+		Events: make([]api.Event, 0, len(result.Events)),
 	}
 	for _, e := range result.Events {
 		item, err := eventToAPI(e)
 		if err != nil {
 			return nil, err
 		}
-		resp.Data = append(resp.Data, *item)
+		resp.Events = append(resp.Events, *item)
 	}
 	if result.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
@@ -103,7 +106,7 @@ func (h *Handler) GetEvent(ctx context.Context, params api.GetEventParams) (api.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
 		return nil, err
 	}
-	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.ID, h.eventsPlatformOperator)
+	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.EventID, h.eventsPlatformOperator)
 	if err != nil {
 		return nil, err
 	}

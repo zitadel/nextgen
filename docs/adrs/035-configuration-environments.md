@@ -143,7 +143,7 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 |---                             |---                                                                                                                                                                          |
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
-| `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
+| `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{schema_id}`, `GET /flow_definitions/{flow_definition_id}`, …). |
 
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
 
@@ -545,7 +545,7 @@ An environment either runs the previous release or the new one, never a mixture.
 The [Releases](#releases) table above writes the flow kind as `flow`. The wire
 enum on `POST /releases` spells it **`flow_definition`** instead.
 
-`flow` is ambiguous in the API it ships into: `/flow` is the runtime flow
+`flow` is ambiguous in the API it ships into: `/flows` is the runtime flow
 orchestration resource (tag *Flows*), while the revisions a release pins come
 from `/flow_definitions` (tag *Flow Definitions*), carry `flowdef_` ids, and are
 gated by `flow_definition.read` / `flow_definition.write`. A pointer reading

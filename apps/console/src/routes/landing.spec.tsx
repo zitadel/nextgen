@@ -41,7 +41,7 @@ function overviewReads(projectReads: string[]) {
       return HttpResponse.json({ ...project(id, "Acme"), origins: [], owning_team_id: null });
     }),
     http.get("http://localhost/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
-    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
+    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ events: [] })),
   ];
 }
 
@@ -123,18 +123,36 @@ describe("landing routes", () => {
   });
 
   it("selects the only project on an unscoped screen too", async () => {
-    // `/projects` opened directly agrees with `/`: one project, so it is selected.
+    // System needs no project, and agrees with `/`: one project, so it is selected.
+    server.use(
+      http.get("http://localhost/api/v1/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.get("http://localhost/api/v1/readyz", () => HttpResponse.text("ok")),
+    );
+    const router = await renderAt("/system");
+
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/system");
+  });
+
+  it("holds the root on Projects, never a project, however it is opened", async () => {
+    // Projects is the root's (D44): with one project, or with one carried in
+    // the URL, it holds no selection for someone who may not act on the
+    // platform.
     server.use(
       http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
     );
-    const router = await renderAt("/projects");
+    const router = await renderAt("/projects?project=proj_1");
 
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+      expect(router.state.resolvedLocation?.search).not.toHaveProperty("project"),
     );
-    expect(router.state.resolvedLocation?.pathname).toBe("/projects");
   });
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
@@ -222,18 +240,14 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on the profile from settings", async () => {
-    // Settings has no landing page of its own: the sidebar's row forwards to
-    // the profile, its list's first page.
-    server.use(
-      http.get("http://localhost/api/v1/users/me", () =>
-        HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
-      ),
-    );
+  it("forwards Settings to its list's first page, and says so when it holds none", async () => {
+    // No add-on here, so the root's Settings hold nothing (D42); the person's
+    // profile is the account menu's, at /account.
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
-    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Nothing here is yours to set.")).toBeInTheDocument();
     // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });

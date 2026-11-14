@@ -1,10 +1,11 @@
-import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
 import type { ZodType } from "zod";
 
 import type { Consent } from "@/lib/consent";
-import type { CommandGroup } from "@/lib/oclif/groups";
 import type { Connection } from "@/lib/oclif/environment-command";
+import type { CommandGroup } from "@/lib/oclif/groups";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
+
 import type { References } from "./secrets";
 
 /**
@@ -241,6 +242,12 @@ export type DeleteSpec<Ctx> = Readonly<{
 export type ResourceDescriptor<Ctx> = Readonly<{
   /** Singular noun for messages (`user`). */
   singular: string;
+  /**
+   * Plural noun for messages (`identity providers`). Defaults to the regular
+   * plural of the singular (`policies`), so only a noun that forms its plural
+   * another way names it.
+   */
+  plural?: string;
   /**
    * Group the root help lists this resource's commands under. Generated
    * commands have no file to carry a `static group`, so the table says it.

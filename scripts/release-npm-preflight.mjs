@@ -13,8 +13,9 @@ import { mapAll } from "./map-all.mjs";
 // The preflight asks the npm registry before `release publish --dry-run`
 // returns, so an offline dry run fails closed instead of passing unchecked.
 //
-// ci.yml runs the same check on the version PR and its merge group
-// (`release.mjs check-npm`), so a version it would stop fails there, before
+// CI runs the same check whenever a public package's manifest changes
+// (@zitadel/release#check-npm, `release.mjs check-npm`): the version PR and
+// its merge group among them, so a version it would stop fails there, before
 // the version commit is on main.
 
 /**

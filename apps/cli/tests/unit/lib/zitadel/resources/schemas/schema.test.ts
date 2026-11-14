@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
 import { BrokenFilesError, RefusedEditError, UserSchema } from "@/lib/zitadel";
+import { propertyName } from "@/lib/zitadel/names";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
@@ -511,6 +512,26 @@ describe("UserSchema edits of an external schema", () => {
     });
 
     expect(error).toBeInstanceOf(RefusedEditError);
+  });
+});
+
+describe("UserSchema.isUnique", () => {
+  const schema = UserSchema.of(
+    aFile(
+      "schemas",
+      SCHEMA_FILE,
+      aUserSchema({
+        properties: { email: { "x-unique": "project" }, givenName: { type: "string" } },
+      }),
+    ),
+  );
+
+  it.each([
+    ["a property declared x-unique", "email", true],
+    ["a property that is not", "givenName", false],
+    ["a property the schema does not define", "shoeSize", false],
+  ])("answers for %s", (_what, name, expected) => {
+    expect(schema.isUnique(propertyName(name))).toBe(expected);
   });
 });
 

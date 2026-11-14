@@ -2,18 +2,17 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // The edge spec imports this package's built dist.
+    // The edge spec imports this package's built dist, and the middleware and
+    // edge specs run the cases of @zitadel/server-sdk-contract, whose
+    // typecheck edge puts its source in this task's hash.
     "typecheck": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     },
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
-    "build-release": {
-      "dependsOn": ["@zitadel/sdk-react#build-release"]
-    },
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     },
     // tsup's declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.

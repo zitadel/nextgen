@@ -1,0 +1,92 @@
+import type { BoxAction } from "@/lib/box";
+import { Facts } from "@/lib/ui/layout";
+
+/**
+ * How a command ends. Every command ends the same way: one line saying what
+ * happened, what it produced under that line, and, when there is anything to
+ * do next, one box of steps.
+ *
+ * A command does not print its ending. It returns it, so that the layout is
+ * decided in one place and a command cannot forget to end.
+ */
+
+/**
+ * The heading every list of next steps carries, so a person finds them in the
+ * same words under every command.
+ */
+export const NEXT_LABEL = "Next:";
+
+/** `label   value`, aligned with its neighbours in the same section. */
+export type Fact = readonly [label: string, value: string];
+
+/** A group of facts under an optional heading. */
+export type Section = { readonly heading?: string; readonly facts: readonly Fact[] };
+
+/**
+ * Builds a section.
+ *
+ * @example
+ * section("Project", ["Id", project.id], ["Server", server])
+ */
+export const section = (heading: string | undefined, ...facts: Fact[]): Section => {
+  return {
+    ...(heading === undefined ? {} : { heading }),
+    facts,
+  };
+};
+
+/**
+ * What a command ends on. Every field is read-only: a summary is a value the
+ * command returned and the chain is about to draw, so a later step that wants
+ * a different ending builds a different summary (`{ ...summary, next }`)
+ * rather than reaching into one that has already been handed over.
+ */
+export type Summary = {
+  /**
+   * The one line that closes the chain: what happened, as a sentence, with no
+   * full stop. It is a single line; anything longer belongs in {@link lines}.
+   * Where it ran is {@link ran}, not part of this.
+   */
+  readonly title: string;
+  /** Facts worth stating, such as the project and the file that was written. */
+  readonly sections: readonly Section[];
+  /** Anything the command renders itself, such as a table, under the facts. */
+  readonly lines?: readonly string[];
+  /** What the command adds after its rendering, such as `Resolved now: …`. */
+  readonly extras?: readonly string[];
+  /** What to do next, each step a sentence and the commands it asks for. */
+  readonly next?: readonly BoxAction[];
+  /**
+   * A block under the next steps of a normal command, such as where to find
+   * every command. `status` ends with it, as `setup` and every help page do.
+   */
+  readonly overview?: string;
+  /**
+   * Where the command ran, as the box's last line: the project and the server
+   * it spoke to. Every command that reaches a server states it, in one place,
+   * rather than printing it before the first question.
+   */
+  readonly ran?: string;
+  /** Draw the box even with no steps, for a command whose body is instructions. */
+  readonly boxed?: boolean;
+  /** The box's own title. Defaults to "Summary". */
+  readonly boxTitle?: string;
+  /** The headline is a failure, so it closes the chain in red. */
+  readonly failed?: boolean;
+};
+
+/**
+ * A summary as plain text, for a run nobody is drawing into: the headline, then
+ * what it produced under it. This is what a pipe is given for a command that
+ * states its ending and says nothing else of its own, so the words are the same
+ * ones the terminal ends on and cannot drift from them: the facts are drawn by
+ * the same layout, so a pipe is told what the terminal is. Its fields are already
+ * spelled out where they were read, so none is spelled out again here.
+ */
+export const textOf = (summary: Summary): string => {
+  return [
+    summary.title,
+    ...(summary.sections.length === 0 ? [] : ["", new Facts(summary.sections).render()]),
+    ...(summary.lines === undefined ? [] : ["", ...summary.lines]),
+  ].join("\n");
+};

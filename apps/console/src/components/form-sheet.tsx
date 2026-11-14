@@ -72,7 +72,7 @@ export function FormSheet({
 /**
  * The drawer's title and close, ruled off from the body beneath. 56px with the
  * rule inside it, as the top bar is, so the two rules meet in one line across
- * the drawer's edge. `actions` sit before the close, 8px apart (Logs' event
+ * the drawer's edge. `actions` sit before the close, 8px apart (Events' event
  * panel steps to the previous and next event there).
  */
 export function FormSheetHeader({ title, actions }: { title: string; actions?: ReactNode }) {

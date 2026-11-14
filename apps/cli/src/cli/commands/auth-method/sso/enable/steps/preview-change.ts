@@ -1,0 +1,129 @@
+import {
+  drawMapping,
+  type EnableServices,
+  type Fact,
+  payload,
+} from "@/cli/commands/auth-method/sso/enable/shared";
+import type { PublishedCredentials } from "@/lib/idp";
+import type { CommandResult } from "@/lib/oclif";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { EndStep } from "@/lib/wizard";
+
+/**
+ * Joins a list the way a sentence does: "a, b and c".
+ */
+const CONJUNCTION = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * Nothing sent to the project, as a dry run reports it.
+ */
+const NOTHING_PUBLISHED: PublishedCredentials = {
+  clientId: undefined,
+  secret: undefined,
+};
+
+/**
+ * What the step reads from the steps before it.
+ */
+type Needs = Fact<"flags" | "summary" | "preview" | "delivery" | "claims">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "isJson" | "realRun" | "report">;
+
+/**
+ * Ends a dry run with what would be written and stored, before anything is
+ * asked or read.
+ */
+export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
+  readonly key = "preview";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
+   * Whether the run only previews.
+   *
+   * @param _needs - What was read and decided.
+   * @returns Whether to end here.
+   */
+  when(_needs: Needs): boolean {
+    return this.deps.dryRun;
+  }
+
+  /**
+   * Answer with the dry run's result: what would be written and stored, with
+   * nothing asked or read.
+   *
+   * @remarks
+   * The variables a dry run would store a credential in: a new connection
+   * stores each credential that names a variable, and a credential the file
+   * holds as a value names none, so it is left out. A reuse publishes only the
+   * credentials it is given, and a dry run reads no piped secret, so only a
+   * client id given with `--client-id` is listed.
+   *
+   * @param needs - What was read and decided.
+   * @returns The dry run's result.
+   */
+  async run(needs: Needs): Promise<CommandResult> {
+    const real = await this.deps.realRun();
+    this.deps.report(needs.preview);
+    if (!this.deps.isJson) {
+      drawMapping(needs.preview);
+    }
+    const toStore = !needs.summary.reused
+      ? [needs.delivery.names.clientId, needs.delivery.names.clientSecret].filter((name) => {
+          return name !== undefined;
+        })
+      : needs.flags.clientId !== undefined && needs.delivery.names.clientId !== undefined
+        ? [needs.delivery.names.clientId]
+        : [];
+    const said = [
+      ...needs.preview.changedPaths.map((file) => {
+        return `Would write ${file}`;
+      }),
+      ...(toStore.length > 0 ? [`Would store ${CONJUNCTION.format(toStore)} on the project`] : []),
+    ];
+    const title = escapeControlCharacters(
+      said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,
+    );
+    return {
+      status: "ok",
+      data: {
+        ...payload({
+          summary: needs.summary,
+          change: needs.preview,
+          published: NOTHING_PUBLISHED,
+          names: needs.delivery.names,
+          claims: needs.claims,
+        }),
+        title,
+        would_store: toStore,
+        dry_run: true,
+        next_args: [this.deps.argsOf(real)],
+      },
+      summary: {
+        title,
+        sections: [],
+        lines: said.slice(1).map((line) => {
+          return escapeControlCharacters(line);
+        }),
+      },
+      next: { commands: [real] },
+    };
+  }
+}

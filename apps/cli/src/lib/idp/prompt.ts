@@ -2,23 +2,25 @@ import {
   type ClientId,
   type ClientSecretVariable,
   type ConnectionEndpoints,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   providerOf,
-  type ProviderSelection,
   selectionName,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "@/lib/input";
-import {
-  type EnvironmentSelector,
-  inShell,
-  projectCommand,
-  type SuggestedCommand,
-} from "@/lib/suggestion";
+import { type FillIn, pipedFrom, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import type { Questions } from "@/lib/ui";
 
+import type { ClaimFlagTexts } from "./claims";
 import type { GivenCredentials } from "./credentials";
 import { askConnectionEndpoints } from "./endpoints";
+
+/**
+ * What a suggested retry names where the client id is still to be given: the
+ * one value there that is not a client id, so it is the reader's to replace.
+ */
+const CLIENT_ID_PLACEHOLDER = "<client-id>";
 
 /**
  * What {@link CredentialPrompt} asks about, and how.
@@ -40,9 +42,9 @@ export type PromptRun = {
   readonly secretVariable: ClientSecretVariable | undefined;
 
   /**
-   * How a question is asked: the running command's `input`.
+   * How a question is asked: the running command's `this.ask`.
    */
-  readonly ask: Asker;
+  readonly ask: Questions;
 
   /**
    * Whether this is a development build that may ask where the provider
@@ -51,21 +53,16 @@ export type PromptRun = {
   readonly developmentBuild: boolean;
 
   /**
-   * The run's `--env`/`--env-file`/`--server`, so a suggested retry targets
-   * the same project.
+   * Renders a suggested retry for the run, scope included, so it targets the
+   * same project.
    */
-  readonly selector: EnvironmentSelector;
+  readonly suggest: Suggest;
 
   /**
-   * The running CLI's version, for the public spelling of a suggested retry.
+   * The claims the run was given, which a suggested retry repeats: a rerun
+   * that dropped them would create the connection with the defaults.
    */
-  readonly cliVersion: string;
-
-  /**
-   * Flags a retry repeats, such as the claims the run was given: a rerun that
-   * dropped them would create the connection with the defaults.
-   */
-  readonly retryFlags?: string | undefined;
+  readonly claims?: ClaimFlagTexts | undefined;
 };
 
 /**
@@ -109,40 +106,47 @@ export class CredentialPrompt {
     const provider = providerOf(this.run.selection);
     if (this.run.reused) {
       // Only read so that a rerun can replace a secret the project holds.
-      const secret = await this.run.ask({
-        kind: "secret",
+      const secret = await this.run.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${provider.displayName} OAuth app?`,
         parse: parseClientSecret,
         stdin: true,
         optional: true,
       });
-      return { endpoints: undefined, clientId: givenClientId, secret };
+
+      return {
+        endpoints: undefined,
+        clientId: givenClientId,
+        secret,
+      };
     }
     // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
     // provider may be a local stand-in, and the client is registered with
     // whatever answers. Not asked of a custom connection, whose issuer the
     // developer has already given.
     const endpoints = await this.askEndpoints();
-    const clientId = await this.run.ask({
-      kind: "text",
+    const clientId = await this.run.ask.text({
       name: `client id for ${provider.displayName}`,
       message: `What is the client ID of your ${provider.displayName} OAuth app?`,
       flag: "--client-id",
       parse: parseClientId,
       given: givenClientId,
-      retry: this.retryFor("<client-id>", ""),
+      retry: this.retryFor(CLIENT_ID_PLACEHOLDER, false),
     });
     const secretVariable = this.run.secretVariable;
-    const secret = await this.run.ask({
-      kind: "secret",
+    const secret = await this.run.ask.secret({
       name: `client secret for ${secretVariable}`,
       message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
-      retry: this.retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
+      retry: this.retryFor(clientId, true),
     });
-    return { endpoints, clientId, secret };
+
+    return {
+      endpoints,
+      clientId,
+      secret,
+    };
   }
 
   /**
@@ -155,6 +159,7 @@ export class CredentialPrompt {
     if (selection.kind !== "catalog") {
       return undefined;
     }
+
     return askConnectionEndpoints({
       provider: selection.id,
       developmentBuild: this.run.developmentBuild,
@@ -167,19 +172,23 @@ export class CredentialPrompt {
    * catalog provider: a custom connection needs its settings repeated too.
    *
    * @param clientId - The client id, or a placeholder for it.
-   * @param pipe - What feeds the secret on stdin, if anything.
+   * @param piped - Whether the command reads the secret from `$CLIENT_SECRET` on stdin.
    * @returns The command, or `undefined` for a custom provider.
    */
-  private retryFor(clientId: string, pipe: string): SuggestedCommand | undefined {
+  private retryFor(clientId: ClientId | FillIn, piped: boolean): SuggestedCommand | undefined {
     const selection = this.run.selection;
     if (selection.kind !== "catalog") {
       return undefined;
     }
-    const command = projectCommand(
-      `auth-method sso enable --provider ${selectionName(selection)} --client-id ${clientId}${this.run.retryFlags === undefined || this.run.retryFlags === "" ? "" : ` ${this.run.retryFlags}`}`,
-      this.run.selector,
-      this.run.cliVersion,
-    );
-    return inShell(command, { before: pipe });
+    const command = this.run.suggest({
+      id: "auth-method:sso:enable",
+      flags: {
+        provider: selectionName(selection),
+        clientId,
+        ...this.run.claims,
+      },
+    });
+
+    return piped ? pipedFrom("CLIENT_SECRET", command) : command;
   }
 }

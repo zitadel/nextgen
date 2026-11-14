@@ -1,3 +1,4 @@
+import { SIGN_IN_PREFIX } from "@zitadel/cloud-functions/contract";
 import type { ConsoleAddon } from "@zitadel/console/addon";
 
 import { track } from "./analytics";
@@ -22,7 +23,7 @@ const unreleased = import.meta.env.CLOUD_STAGE !== "production";
 
 // BotID's client loads its challenge from paths only a Vercel deployment
 // serves, so it starts in a preview's build alone. A local production build
-// (`workspace:cloud`) would fail every flow write without the challenge,
+// (`pnpm run cloud`) would fail every flow write without the challenge,
 // while the functions' check answers human outside Vercel anyway.
 if (import.meta.env.CLOUD_STAGE === "preview") startBotCheck();
 
@@ -39,7 +40,7 @@ export const addon: ConsoleAddon = unreleased
       track,
       screens: [billingScreen, supportScreen, emailScreen],
       signedOutScreens: [signUpScreen],
-      signInApiBase: "/cloud/zitadel",
+      signInApiBase: SIGN_IN_PREFIX,
     }
   : {
       Root: CloudRoot,

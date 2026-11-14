@@ -26,13 +26,13 @@ import {
 import {
   type AuthMethodsValue,
   type EnabledMethods,
+  type NewProperty,
   type PropertiesValue,
   type SchemaValue,
   SIGN_IN_METHODS,
   type SignInMethod,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
-import type { NewProperty } from "@/lib/zitadel/resources/schemas/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { isJsonArray, isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
@@ -435,6 +435,20 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
   }
 
   /**
+   * Whether a property is declared `x-unique`, so two users cannot hold the
+   * same value of it.
+   *
+   * @remarks
+   * The contract keeps no `x-unique`, so it is read from the body as written.
+   *
+   * @param property - The property's name.
+   * @returns Whether it is unique.
+   */
+  isUnique(property: PropertyName): boolean {
+    return typeof objectAt(objectAt(this.body, "properties"), property)["x-unique"] === "string";
+  }
+
+  /**
    * Find the JSON types a property declares.
    *
    * @remarks
@@ -585,22 +599,27 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
       return { document: this, changed: false, skipped: [] };
     }
     this.assertMethodsEditable();
-    const body = {
-      ...this.body,
-      properties: {
-        ...properties,
-        ...Object.fromEntries(
-          added.map((property) => {
-            return [
-              property.name,
-              { type: property.type, description: "Filled from an identity provider claim." },
-            ];
-          }),
-        ),
-      },
-    };
     return {
-      document: UserSchema.build({ path: this.path, body }, this.editedStatus),
+      document: UserSchema.build(
+        {
+          path: this.path,
+          body: {
+            ...this.body,
+            properties: {
+              ...properties,
+              ...Object.fromEntries(
+                added.map((property) => {
+                  return [
+                    property.name,
+                    { type: property.type, description: "Filled from an identity provider claim." },
+                  ];
+                }),
+              ),
+            },
+          },
+        },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };
