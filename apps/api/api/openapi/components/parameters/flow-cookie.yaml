@@ -16,3 +16,4 @@ schema:
   # hold. Anything else is `flow.cookie_invalid`, which the fuzzer would
   # otherwise generate as a "valid" request.
   pattern: '^[A-Za-z0-9._-]+$'
+  x-zitadel-pattern-message: "must be the cookie value the server issued: letters, digits, ., _ or -"
