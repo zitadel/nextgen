@@ -234,13 +234,13 @@ function ejected(
   // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
   // can't be auto-reverted, so surface them as manual cleanup steps.
   // package.json is not a config block: Angular has its `dev` script added
-  // outright, while Next and Nuxt keep theirs and only get the dev-server
-  // port pinned into it — one line has to cover both, so it names the
-  // script and both ways setup touches it rather than claiming the script
-  // itself should go.
+  // outright and its serve and build scripts run through zitadel-ng.cjs, which
+  // eject removes, while Next and Nuxt keep theirs and only get the dev-server
+  // port pinned into it — one line has to cover them all, so it names each
+  // way setup touches the scripts rather than claiming one should go.
   const manualSteps = actions.configEdits.map((rel) => {
     if (rel === "package.json" || rel.endsWith("/package.json")) {
-      return `Restore the "dev" script in ${rel} (setup added the script, or pinned its dev-server port)`;
+      return `Restore the scripts in ${rel}: setup added the "dev" script or pinned its dev-server port, and an Angular app's scripts run "node zitadel-ng.cjs" where they ran "ng"`;
     }
     if (rel === "angular.json" || rel.endsWith("/angular.json")) {
       return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;

@@ -8,13 +8,14 @@ import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/
 import {
   devScriptEdit,
   launcherScriptsEdit,
-  launcherScriptsVerdict,
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
+  scriptsSetupCannotMove,
 } from "@/lib/orca/patchers/rule/angular/templates";
 import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
+import { thrownBy } from "@tests/helpers/thrown-value";
 import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { aProxyConfApp, type DevApp } from "@tests/helpers/vite";
@@ -68,19 +69,6 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
       candidate.kind === "write" && candidate.path === path,
   );
   return op?.contents;
-}
-
-function packageJsonEdit(): (source: string | undefined) => string {
-  const op = new AngularPatcher()
-    .plan(ctx())
-    .ops.find(
-      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
-        candidate.kind === "edit" && candidate.path === "package.json",
-    );
-  if (!op) {
-    throw new Error("expected a package.json edit op in the Angular plan");
-  }
-  return op.edit;
 }
 
 function proxyConfigEdit(): (source: string | undefined) => string {
@@ -488,94 +476,81 @@ describe("AngularPatcher.plan", () => {
     });
   });
 
-  it("runs the scripts `ng new` writes that serve or build through the launcher", () => {
-    const scripts = {
-      ng: "ng",
-      start: "ng serve",
-      build: "ng build",
-      watch: "ng build --watch --configuration development",
-      test: "ng test",
-    };
+  it("adds a `dev` script that serves through the launcher, so `npm run dev` works like the other frameworks", () => {
+    const result = JSON.parse(devScriptEdit(`{ "scripts": { "start": "ng serve" } }`));
 
-    const result = JSON.parse(launcherScriptsEdit(JSON.stringify({ scripts })));
-
-    expect(result.scripts).toEqual({
-      ng: "ng",
-      start: "node zitadel-ng.cjs serve",
-      build: "node zitadel-ng.cjs build",
-      watch: "node zitadel-ng.cjs build --watch --configuration development",
-      test: "ng test",
-    });
+    expect(result.scripts.dev).toBe("node zitadel-ng.cjs serve");
   });
 
-  it("moves the scripts that are still as `ng new` or an earlier setup wrote them, and the doctor says so", () => {
-    const source = `{ "scripts": { "dev": "ng serve", "build": "ng build" } }`;
+  it("preserves an existing `dev` script instead of overwriting it", () => {
+    const source = `{ "scripts": { "dev": "vite" } }`;
 
-    expect(launcherScriptsVerdict(source)).toBe("detached");
-    const out = launcherScriptsEdit(source);
-    expect(JSON.parse(out).scripts).toEqual({
-      dev: "node zitadel-ng.cjs serve",
-      build: "node zitadel-ng.cjs build",
-    });
-    expect(launcherScriptsVerdict(out)).toBe("applied");
-  });
-
-  it("leaves a serve or build script the developer changed, and the doctor names it with what to run", () => {
-    const source = `{ "scripts": { "dev": "ng serve --hmr", "both": "concurrently \\"ng build --watch\\" api", "build": "ng build" } }`;
-
-    const out = launcherScriptsEdit(source);
-
-    expect(JSON.parse(out).scripts).toEqual({
-      dev: "ng serve --hmr",
-      both: 'concurrently "ng build --watch" api',
-      build: "node zitadel-ng.cjs build",
-    });
-    expect(launcherScriptsVerdict(out)).toEqual({
-      unknown:
-        'its "dev" script (ng serve --hmr) runs the Angular CLI without zitadel-ng.cjs, so the app gets no project id; ' +
-        'its "both" script (concurrently "ng build --watch" api) runs the Angular CLI without zitadel-ng.cjs, so the app gets no project id: ' +
-        'run "node zitadel-ng.cjs serve …" where it runs "ng serve …", and "node zitadel-ng.cjs build …" for "ng build …"',
-    });
-  });
-
-  it("leaves a script that runs something else alone", () => {
-    const source = `{ "scripts": { "dev": "concurrently api web" } }`;
-    expect(launcherScriptsEdit(source)).toBe(source);
     expect(devScriptEdit(source)).toBe(source);
+  });
+
+  it("fails fast when package.json is absent instead of fabricating one", () => {
+    const refusal = thrownBy(() => devScriptEdit(undefined));
+
+    expect(refusal).toMatchObject({ message: expect.stringMatching(/package\.json is required/) });
+  });
+
+  it.each([
+    ["ng serve", "node zitadel-ng.cjs serve"],
+    ["ng build", "node zitadel-ng.cjs build"],
+    ["ng test", "node zitadel-ng.cjs test"],
+    [
+      "ng build --watch --configuration development",
+      "node zitadel-ng.cjs build --watch --configuration development",
+    ],
+  ])("runs the plain script %s through the launcher", (command, launched) => {
+    const out = launcherScriptsEdit(JSON.stringify({ scripts: { any: command } }));
+
+    expect(JSON.parse(out).scripts.any).toBe(launched);
+  });
+
+  it.each([
+    "ng",
+    "ng lint",
+    "ng s",
+    "ng build && cp -r public dist",
+    'concurrently "ng serve" api',
+  ])("leaves the script %s as it is", (command) => {
+    const source = JSON.stringify({ scripts: { any: command } });
+
+    expect(launcherScriptsEdit(source)).toBe(source);
   });
 
   it("leaves package.json byte for byte once its scripts run through the launcher", () => {
     const once = launcherScriptsEdit(
       `{\n  "name": "a",\n  "scripts": { "build": "ng build" }\n}\n`,
     );
+
     expect(launcherScriptsEdit(once)).toBe(once);
   });
 
-  it("adds a `dev` script that serves through the launcher, so `npm run dev` works like the other frameworks", () => {
-    const result = JSON.parse(devScriptEdit(`{ "scripts": { "start": "ng serve" } }`));
-    expect(result.scripts).toEqual({ start: "ng serve", dev: "node zitadel-ng.cjs serve" });
+  it.each([
+    "ng s --open",
+    "ng b",
+    "ng t",
+    "ng run app:build",
+    'concurrently "ng serve" api',
+    "ng build && echo done",
+  ])("names %s as a script setup cannot run through the launcher", (command) => {
+    const reason = scriptsSetupCannotMove(JSON.stringify({ scripts: { any: command } }));
+
+    expect(reason).toBe(
+      `package.json's "any" (${command}) runs the Angular CLI in a way setup cannot route through zitadel-ng.cjs, which writes the app's project id: run "node zitadel-ng.cjs <command> …" where it runs "ng <command> …"`,
+    );
   });
 
-  it("only warns in the doctor while the `dev` script is missing, and fails while a script serves without the launcher", () => {
-    const wirings = new AngularPatcher()
-      .plan(ctx())
-      .ops.filter(
-        (op): op is Extract<FileOp, { kind: "edit" }> =>
-          op.kind === "edit" && op.path === "package.json",
-      )
-      .map((op) => {
-        return [op.edit, op.wiring];
-      });
+  it.each(["ng serve --port 4300", "ng lint", "ng version", "node zitadel-ng.cjs serve", "vite"])(
+    "finds nothing setup cannot move in the script %s",
+    (command) => {
+      const reason = scriptsSetupCannotMove(JSON.stringify({ scripts: { any: command } }));
 
-    expect(wirings).toEqual([
-      [launcherScriptsEdit, "infrastructure"],
-      [devScriptEdit, "convenience"],
-    ]);
-  });
-
-  it("fails fast when package.json is absent instead of fabricating one", () => {
-    expect(() => packageJsonEdit()(undefined)).toThrowError(/package\.json is required/);
-  });
+      expect(reason).toBeUndefined();
+    },
+  );
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {
     const dep = new AngularPatcher()
@@ -598,6 +573,23 @@ describe("AngularPatcher.artifacts", () => {
       "src/app/app.routes.ts",
       "package.json",
     ]);
+  });
+  it("has eject remove the module the launcher writes, whatever it holds", () => {
+    const artifacts = new AngularPatcher().artifacts({
+      framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+
+    expect(artifacts.rootConfigFiles).toEqual(["zitadel.json", "src/app/zitadel-project.ts"]);
+  });
+
+  it("lists the launcher as an eject-removed managed file", () => {
+    const artifacts = new AngularPatcher().artifacts({
+      framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+
+    expect(artifacts.markedFiles).toContain("zitadel-ng.cjs");
   });
 });
 

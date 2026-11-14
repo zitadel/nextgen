@@ -1,4 +1,7 @@
+import { posix } from "node:path";
+
 import { ZitadelError } from "@/lib/errors";
+import type { GitignoreRule } from "@/lib/gitignore";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { MANAGED_MARKER } from "@/lib/paths";
 import type { PatchContext } from "@/lib/orca/patchers/types";
@@ -21,52 +24,42 @@ import {
 } from "@/lib/orca/patchers/rule/session-cookie";
 import { lfText, withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
 
-/** The managed launcher the app's `ng serve` and `ng build` scripts run through. */
+/** The managed launcher the app's serve, build and test scripts run through. */
 export const LAUNCHER_PATH = "zitadel-ng.cjs";
 
 /**
- * The identifier the app's client code reads its project id from. Angular's
- * CLI reads no environment into client code, so {@link launcherTemplate}
- * defines it at build time.
+ * The module the launcher writes the app's project id into, beside the root
+ * component that imports it. It holds a per-project value, so it is
+ * git-ignored, like the env files.
  */
-const PROJECT_ID_DEFINE = "ZITADEL_PROJECT_ID";
+export const PROJECT_ID_MODULE_PATH = "src/app/zitadel-project.ts";
+
+/** The `.gitignore` rule that keeps {@link PROJECT_ID_MODULE_PATH} out of the repository. */
+export const PROJECT_ID_MODULE_GITIGNORE: GitignoreRule = {
+  path: PROJECT_ID_MODULE_PATH,
+  ignored: true,
+  entry: `/${PROJECT_ID_MODULE_PATH}`,
+};
+
+/** How `src/app/app.ts` imports {@link PROJECT_ID_MODULE_PATH}. */
+const PROJECT_ID_IMPORT = `./${posix.basename(PROJECT_ID_MODULE_PATH, ".ts")}`;
 
 /**
- * The declaration that types {@link PROJECT_ID_DEFINE} in `app.ts`, before the
- * component. It may be undefined: `ng test` cannot define it, since Angular's
- * unit-test builder takes no `define` of its own.
+ * The text of {@link PROJECT_ID_MODULE_PATH} for `projectId`, as setup writes
+ * it and as the launcher does, which builds the same text at run time.
  */
-const PROJECT_ID_DECLARATION = `// The project id: ${LAUNCHER_PATH}, which the dev and build scripts run,
-// defines it from ZITADEL_PROJECT_ID in the environment or in .env.local.
-// Without it (ng test, a plain ng build) the login widget says it has none.
-declare const ${PROJECT_ID_DEFINE}: string | undefined;
-`;
-
-/**
- * What a plain `ng serve` or production `ng build` stops with: the value
- * `angular.json` defines {@link PROJECT_ID_DEFINE} to, which is no JavaScript
- * literal, so the build refuses it and prints it. The launcher's `--define`
- * replaces it.
- */
-export const PROJECT_ID_GUARD = {
-  name: PROJECT_ID_DEFINE,
-  message: `${PROJECT_ID_DEFINE} is defined by ${LAUNCHER_PATH}: run the app with npm run dev and build it with npm run build`,
-} as const;
-
-/**
- * The line of `app.ts` that reads {@link PROJECT_ID_DEFINE}. The define
- * replaces the identifier inside `typeof` too, so a defined id is used as is.
- */
-const PROJECT_ID_LINE = `    projectId: typeof ${PROJECT_ID_DEFINE} === "string" ? ${PROJECT_ID_DEFINE} : "",\n`;
+export function projectIdModule(projectId: string): string {
+  return `// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\nexport const ZITADEL_PROJECT_ID = ${JSON.stringify(projectId)};\n`;
+}
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
- * project id (public, not secret) is {@link PROJECT_ID_DEFINE}, which
- * {@link launcherTemplate} defines from the environment, so the file names no
- * project; the dev proxy in `proxy.conf.cjs` attaches the project service-key
- * secret as the bearer server-side only to `POST /sessions/exchange` (read
- * from `.env.local`), and no secret reaches the browser.
+ * project id (public, not secret) comes from {@link PROJECT_ID_MODULE_PATH},
+ * which the launcher writes, so the file names no project; the dev proxy in `proxy.conf.cjs`
+ * attaches the project service-key secret as the bearer server-side only to
+ * `POST /sessions/exchange` (read from `.env.local`), and no secret reaches
+ * the browser.
  *
  * Projects set up with the business use case additionally expose the SDK's
  * `businessLocales` overlay as a class property, which `app.html` binds to the
@@ -99,8 +92,9 @@ export function appComponentTemplate(ctx: PatchContext): string {
   return `${MANAGED_MARKER}
 import { Component, OnInit } from "@angular/core";
 import {${importNames}} from "@zitadel/sdk-angular";
+// ${LAUNCHER_PATH} writes this module from ZITADEL_PROJECT_ID: npm run dev, build and test run it.
+import { ZITADEL_PROJECT_ID } from "${PROJECT_ID_IMPORT}";
 
-${PROJECT_ID_DECLARATION}
 @Component({
   selector: "app-root",
   standalone: true,
@@ -109,7 +103,8 @@ ${PROJECT_ID_DECLARATION}
 })
 export class App implements OnInit {
   protected readonly project = configureZitadel({
-${PROJECT_ID_LINE}    proxyPath: "${PROXY_PATH}",
+    projectId: ZITADEL_PROJECT_ID,
+    proxyPath: "${PROXY_PATH}",
   });
   protected readonly path = window.location.pathname;${localesProperty}
 
@@ -122,103 +117,47 @@ ${PROJECT_ID_LINE}    proxyPath: "${PROXY_PATH}",
 `;
 }
 
-/** The line of `app.ts` that names `projectId` as setup wrote it before it read the id from the environment. */
-function literalProjectIdLine(projectId: string): string {
-  return `    projectId: ${JSON.stringify(projectId)},\n`;
-}
-
-const COMPONENT_DECORATOR = "\n@Component({";
-
-/** Whether `text` (LF line ends) is the managed `app.ts` an earlier CLI wrote, naming `projectId` as a literal. */
-function namesProjectLiterally(text: string, projectId: string): boolean {
-  return (
-    text.includes(MANAGED_MARKER) &&
-    text.includes(literalProjectIdLine(projectId)) &&
-    text.includes(COMPONENT_DECORATOR) &&
-    !text.includes(PROJECT_ID_DECLARATION)
-  );
-}
-
 /**
- * Moves the managed `app.ts` an earlier CLI wrote, which named the project it
- * was set up against as a literal, onto {@link PROJECT_ID_DEFINE}: the exact
- * `projectId` line is replaced and the declaration goes before the component.
- * A file that reads the define already, an unmanaged one, and a managed one
- * whose line was changed by hand are left as they are;
- * {@link appComponentProjectIdVerdict} tells the doctor which it is. Line ends
- * are the file's own. Writes the managed component when it is absent.
- */
-export function appComponentProjectIdEdit(
-  ctx: PatchContext,
-): (source: string | undefined) => string {
-  return (source) => {
-    if (source === undefined) {
-      return appComponentTemplate(ctx);
-    }
-    return withLfLineEnds(source, (text) => {
-      return namesProjectLiterally(text, ctx.project.id)
-        ? text
-            .replace(literalProjectIdLine(ctx.project.id), PROJECT_ID_LINE)
-            .replace(COMPONENT_DECORATOR, `\n${PROJECT_ID_DECLARATION}${COMPONENT_DECORATOR}`)
-        : text;
-    });
-  };
-}
-
-/**
- * Whether `app.ts` reads its project id from {@link PROJECT_ID_DEFINE}, for
- * the doctor. The managed file an earlier CLI wrote, naming project
- * `projectId`, is `detached` (`doctor --fix` moves it). A managed file that
- * still names it but was changed by hand is `unknown`: only the developer can
- * move it. A file without the literal, or one the developer adopted, is theirs.
- */
-export function appComponentProjectIdVerdict(projectId: string): (source: string) => WiringVerdict {
-  return (source) => {
-    const text = lfText(source);
-    if (!text.includes(MANAGED_MARKER) || !text.includes(JSON.stringify(projectId))) {
-      return "applied";
-    }
-    if (namesProjectLiterally(text, projectId)) {
-      return "detached";
-    }
-    return {
-      unknown: `it names project ${projectId} and was changed since zitadel setup wrote it, so it must read ${PROJECT_ID_DEFINE} (which ${LAUNCHER_PATH} defines) by hand`,
-    };
-  };
-}
-
-/**
- * The managed launcher `zitadel-ng.cjs`, which the app's `ng serve` and
- * `ng build` scripts run instead of `ng`. Angular's CLI reads no environment
- * into client code (its `define` takes literals in `angular.json`, and a
- * shell to expand one on the command line), so this file reads
- * `ZITADEL_PROJECT_ID` from the environment, else from `.env.local`, which
- * `zitadel setup` writes, and runs the Angular CLI in this process with
- * `--define` for {@link PROJECT_ID_DEFINE}. A value in the environment wins,
- * as it does in `proxy.conf.cjs`, so a production build sets it there.
+ * The managed launcher `zitadel-ng.cjs`, which the app's serve, build and test
+ * scripts run instead of `ng`. Angular's CLI reads no environment into client
+ * code, so this file reads `ZITADEL_PROJECT_ID` from the environment, else from
+ * `.env.local`, which `zitadel setup` writes, writes it into
+ * {@link PROJECT_ID_MODULE_PATH} when that file does not already hold it (so a
+ * running watcher is not woken), and runs the Angular CLI in this process with
+ * the arguments it was given. A value in the environment wins, as it does in
+ * `proxy.conf.cjs`. `process.loadEnvFile` needs Node.js 20.12 or newer.
  */
 export function launcherTemplate(): string {
   return `${MANAGED_MARKER}
-// Runs the Angular CLI with the project id defined for the app's client code
-// (${PROJECT_ID_DEFINE} in src/app/app.ts). The id comes from the environment,
-// else from .env.local, which zitadel setup writes and .gitignore excludes.
-const { existsSync } = require("node:fs");
+// Writes the project id into ${PROJECT_ID_MODULE_PATH}, which .gitignore
+// excludes, then runs the Angular CLI with the arguments it was given. The id
+// comes from the environment, else from .env.local, which zitadel setup writes.
+const { existsSync, readFileSync, writeFileSync } = require("node:fs");
 
+if (typeof process.loadEnvFile !== "function") {
+  throw new Error(\`\${__filename} needs Node.js 20.12 or newer, which can read .env.local.\`);
+}
 if (existsSync(".env.local")) {
   process.loadEnvFile(".env.local");
 }
 const projectId = process.env.ZITADEL_PROJECT_ID;
 if (!projectId) {
-  throw new Error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it) or to the environment.");
+  throw new Error("ZITADEL_PROJECT_ID is not set: add it to .env.local (zitadel setup writes it) or to the environment.");
 }
-process.argv.push("--define", \`${PROJECT_ID_DEFINE}=\${JSON.stringify(projectId)}\`);
+const path = "${PROJECT_ID_MODULE_PATH}";
+const contents = \`// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\\nexport const ZITADEL_PROJECT_ID = \${JSON.stringify(projectId)};\\n\`;
+if (!existsSync(path) || readFileSync(path, "utf8") !== contents) {
+  writeFileSync(path, contents);
+}
 require("@angular/cli/bin/ng.js");
 `;
 }
 
-/** Writes the managed launcher when it is absent, and leaves one that exists as it is. */
-export function launcherEdit(source: string | undefined): string {
-  return source ?? launcherTemplate();
+/** Writes {@link PROJECT_ID_MODULE_PATH} for `projectId` when it is absent; the launcher keeps it current. */
+export function projectIdModuleEdit(projectId: string): (source: string | undefined) => string {
+  return (source) => {
+    return source ?? projectIdModule(projectId);
+  };
 }
 
 /** `source`, a `package.json`, and its scripts; throws when there is none to edit. */
@@ -251,24 +190,56 @@ function withScripts(
 }
 
 /**
- * The serve and build scripts as `ng new` writes them (`start`, `build`,
- * `watch`) and as earlier setups added `dev`, each run through the launcher.
+ * A script that runs the Angular CLI's serve, build or test, in any spelling
+ * the CLI accepts (`ng serve`, `ng s`, `ng dev`, `ng build`, `ng b`, `ng test`,
+ * `ng t`, `ng run <project>:<target>`), alone or within a longer command.
  */
-const LAUNCHED_SCRIPTS: Readonly<Record<string, string>> = {
-  "ng serve": `node ${LAUNCHER_PATH} serve`,
-  "ng build": `node ${LAUNCHER_PATH} build`,
-  "ng build --watch --configuration development": `node ${LAUNCHER_PATH} build --watch --configuration development`,
-};
-
-/** A script that runs the Angular CLI's `serve` or `build`. */
-const SERVES_OR_BUILDS = /\bng (serve|build)\b/;
+const RUNS_THE_APP =
+  /(?:^|[\s;&|("'])(?:npx\s+)?ng\s+(?:serve|s|dev|build|b|test|t|run\s+\S*:(?:serve|build|test))(?=$|[\s;&|)"'])/;
 
 /**
- * Runs the app's serve and build scripts through the launcher, so the client
- * code gets its project id: each script that is still exactly as `ng new` or
- * an earlier setup wrote it. A script the developer changed, and one that runs
- * another command (`ng test`), are left as they are;
- * {@link launcherScriptsVerdict} tells the doctor which ones need moving by hand.
+ * A script setup moves onto the launcher: `ng serve …`, `ng build …` or
+ * `ng test …` with no shell operators, where replacing `ng` with
+ * `node zitadel-ng.cjs` changes nothing the Angular CLI receives.
+ */
+const PLAIN_NG = /^ng (?:serve|build|test)(?: [^&|;<>`$()\n]*)?$/;
+
+/**
+ * Why setup cannot run every script of `source`, a `package.json`, that
+ * serves, builds or tests the app through the launcher: those that do it in a
+ * form {@link launcherScriptsEdit} does not move, named with what to run
+ * instead, or `undefined` when there are none or no `package.json` (whose
+ * edits say so).
+ */
+export function scriptsSetupCannotMove(source: string | undefined): string | undefined {
+  if (source === undefined) {
+    return undefined;
+  }
+  const unmovable = Object.entries(packageJson(source).scripts).filter(
+    (entry): entry is [string, string] => {
+      return (
+        typeof entry[1] === "string" && RUNS_THE_APP.test(entry[1]) && !PLAIN_NG.test(entry[1])
+      );
+    },
+  );
+  if (unmovable.length === 0) {
+    return undefined;
+  }
+  const names = unmovable
+    .map(([name, command]) => {
+      return `"${name}" (${command})`;
+    })
+    .join(", ");
+  return `package.json's ${names} run${unmovable.length === 1 ? "s" : ""} the Angular CLI in a way setup cannot route through ${LAUNCHER_PATH}, which writes the app's project id: run "node ${LAUNCHER_PATH} <command> …" where ${unmovable.length === 1 ? "it runs" : "they run"} "ng <command> …"`;
+}
+
+/**
+ * Runs the app's plain serve, build and test scripts through the launcher, so
+ * the module it imports holds the project id: each `ng serve …`, `ng build …`
+ * or `ng test …` without shell operators. The launcher passes the arguments
+ * on unchanged, so a script moved in an app that does not import the module
+ * runs as before. Setup refuses before it writes anything when another script
+ * serves, builds or tests the app ({@link scriptsSetupCannotMove}).
  */
 export function launcherScriptsEdit(source: string | undefined): string {
   const pkg = packageJson(source);
@@ -276,42 +247,15 @@ export function launcherScriptsEdit(source: string | undefined): string {
     pkg,
     Object.fromEntries(
       Object.entries(pkg.scripts).map(([name, command]) => {
-        return [name, (typeof command === "string" && LAUNCHED_SCRIPTS[command]) || command];
+        return [
+          name,
+          typeof command === "string" && PLAIN_NG.test(command)
+            ? `node ${LAUNCHER_PATH} ${command.slice("ng ".length)}`
+            : command,
+        ];
       }),
     ),
   );
-}
-
-/**
- * Whether the app's serve and build scripts run through the launcher, for the
- * doctor. A script still as `ng new` or an earlier setup wrote it is
- * `detached` (`doctor --fix` moves it). One the developer changed that still
- * runs `ng serve` or `ng build` is `unknown`, named with what to run instead.
- */
-export function launcherScriptsVerdict(source: string): WiringVerdict {
-  const { scripts } = packageJson(source);
-  const commands = Object.entries(scripts).filter((entry): entry is [string, string] => {
-    return typeof entry[1] === "string";
-  });
-  const changed = commands.filter(([, command]) => {
-    return LAUNCHED_SCRIPTS[command] === undefined && SERVES_OR_BUILDS.test(command);
-  });
-  if (changed.length > 0) {
-    return {
-      unknown: `${changed
-        .map(([name, command]) => {
-          return `its "${name}" script (${command}) runs the Angular CLI without ${LAUNCHER_PATH}, so the app gets no project id`;
-        })
-        .join(
-          "; ",
-        )}: run "node ${LAUNCHER_PATH} serve …" where it runs "ng serve …", and "node ${LAUNCHER_PATH} build …" for "ng build …"`,
-    };
-  }
-  return commands.some(([, command]) => {
-    return LAUNCHED_SCRIPTS[command] !== undefined;
-  })
-    ? "detached"
-    : "applied";
 }
 
 /**

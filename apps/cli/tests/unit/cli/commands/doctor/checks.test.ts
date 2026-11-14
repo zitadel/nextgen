@@ -21,11 +21,7 @@ import {
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
 import { createOrca } from "@/lib/orca";
-import {
-  launcherTemplate,
-  PROJECT_ID_GUARD,
-  proxyConfTemplate,
-} from "@/lib/orca/patchers/rule/angular/templates";
+import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { hashScaffoldFile } from "@/lib/scaffold-manifest";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
@@ -303,7 +299,7 @@ async function anAngularProject(dir: string): Promise<void> {
   await write(dir, {
     "package.json": JSON.stringify({
       name: "demo",
-      scripts: { dev: "node zitadel-ng.cjs serve" },
+      scripts: { dev: "ng serve" },
       dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
     }),
     "zitadel.json": JSON.stringify({
@@ -314,17 +310,7 @@ async function anAngularProject(dir: string): Promise<void> {
     ".env.local": "ZITADEL_ISSUER=http://localhost:4200\n",
     "angular.json": JSON.stringify({
       projects: {
-        demo: {
-          architect: {
-            serve: {
-              options: {
-                proxyConfig: ANGULAR_PROXY,
-                port: 4200,
-                define: { [PROJECT_ID_GUARD.name]: PROJECT_ID_GUARD.message },
-              },
-            },
-          },
-        },
+        demo: { architect: { serve: { options: { proxyConfig: ANGULAR_PROXY, port: 4200 } } } },
       },
     }),
     "src/app/app.routes.ts": [
@@ -340,7 +326,6 @@ async function anAngularProject(dir: string): Promise<void> {
     "src/app/app.ts": `${MANAGED_MARKER}\nexport class App {}\n`,
     "src/app/app.html": `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`,
     [ANGULAR_PROXY]: proxyConfTemplate(),
-    "zitadel-ng.cjs": launcherTemplate(),
   });
   await writeSecret(dir, SECRET);
 }
@@ -1594,9 +1579,7 @@ describe("ManagedFilesCheck", () => {
       expect(outcome.status).toBe("warn");
     });
 
-    it("warns, rather than failing, when only the convenience dev script is missing", async ({
-      dir,
-    }) => {
+    it("passes an Angular app without a dev script, which only setup adds", async ({ dir }) => {
       await anAngularProject(dir);
       await write(dir, {
         "package.json": JSON.stringify({
@@ -1607,10 +1590,7 @@ describe("ManagedFilesCheck", () => {
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
-      expect(outcome).toMatchObject({
-        status: "warn",
-        message: expect.stringContaining("unapplied managed config edit(s): package.json"),
-      });
+      expect(outcome.status).toBe("pass");
     });
   });
 

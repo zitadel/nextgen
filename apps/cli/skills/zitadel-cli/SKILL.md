@@ -1066,26 +1066,26 @@ server, and it warns about a proxy changed by hand or a target set on purpose
 without touching either. Angular's `proxy.conf.cjs` reads the process
 environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
 
-An Angular app's `src/app/app.ts` reads its project id from
-`ZITADEL_PROJECT_ID`, which `zitadel-ng.cjs` defines: `setup` runs the app's
-serve and build scripts through it (`dev` is `node zitadel-ng.cjs serve`,
-`build` is `node zitadel-ng.cjs build`). It takes the id from the process
-environment, then `.env.local`, and stops when neither sets it, so a
-production build on a machine without `.env.local` needs `ZITADEL_PROJECT_ID`
-exported. A plain `ng serve` or production `ng build` stops with
-`Invalid define value … ZITADEL_PROJECT_ID is defined by zitadel-ng.cjs: run
-the app with npm run dev and build it with npm run build`; `ng test` builds
-without the id, and the login widget shows that it requires one. An app an
-older CLI set up names its project as a literal in `app.ts` and runs
-`ng serve`/`ng build` directly: `doctor` fails (`managed-files`, `detached
-managed config wiring: zitadel-ng.cjs, package.json`), and its
-`details.config_wiring` lists `src/app/app.ts` and the `angular.json` guard as
-detached convenience wirings. `doctor --fix`, which `upgrade` runs, writes
-`zitadel-ng.cjs`, adds the guard, and moves the `projectId` line and the
-scripts still as `ng new` or setup wrote them. A script changed by hand that
-runs `ng serve` or `ng build` is unverifiable and named in the warning with
-what to run instead; an `app.ts` whose line was changed by hand is
-unverifiable too. Both must be moved by hand.
+The `src/app/app.ts` `setup` writes into an Angular app imports its project id
+from `src/app/zitadel-project.ts`, a git-ignored module setup writes once and
+`zitadel-ng.cjs` keeps current: the launcher takes `ZITADEL_PROJECT_ID` from the
+process environment, then `.env.local` (Node.js 20.12 or newer), writes the
+module, and runs `ng` with its arguments unchanged. `setup` runs each plain
+`ng serve …`, `ng build …` or `ng test …` script through it (`dev` is
+`node zitadel-ng.cjs serve`, `build` is `node zitadel-ng.cjs build`) and refuses
+with `E_CONFLICT`, naming the script and what to run, when another script
+serves, builds or tests the app. Run the app through its npm scripts: a CI job
+or hosting preset that runs `ng build` must run `npm run build`, with
+`ZITADEL_PROJECT_ID` exported where there is no `.env.local`, and the launcher
+stops when neither sets it. A plain `ng` command fails to compile on a clean
+checkout, the module missing, and after an `npm run` reuses the id that run
+wrote; a local `npm run build` puts `.env.local`'s id into the bundle. An app an
+earlier CLI set up keeps the project id its `app.ts` names and its `ng` scripts:
+`doctor` passes it, and `doctor --fix` moves no script and writes neither
+`app.ts` nor the launcher into it. When its `managed-files` check does not pass
+(a missing `app.ts`), the repair `doctor --fix` runs adds the module, which that
+app never imports, and its `.gitignore` line; the missing `app.ts` stays
+missing.
 
 ## Testing the app
 
