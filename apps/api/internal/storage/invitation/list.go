@@ -18,14 +18,19 @@ func NewestFirst() database.OrderBy[domain.InvitationField] {
 	}
 }
 
-// ListOptions lists a project's invitations newest first. A non-nil status or
-// type narrows it; pending and expired are told apart by expires_at at now.
-func ListOptions(projectID string, status *domain.InvitationStatus, typ *domain.InvitationType, now time.Time, limit uint32) *database.ListOptions[domain.InvitationField] {
+// ListOptions lists a project's invitations newest first. Statuses narrow it
+// to any of them, and a non-nil type to that type; pending and expired are
+// told apart by expires_at at now.
+func ListOptions(projectID string, statuses []domain.InvitationStatus, typ *domain.InvitationType, now time.Time, limit uint32) *database.ListOptions[domain.InvitationField] {
 	filters := []database.Filter[domain.InvitationField]{
 		database.Equal(database.Col(domain.InvitationFieldProjectID), projectID),
 	}
-	if status != nil {
-		filters = append(filters, StatusAt(*status, now))
+	if len(statuses) > 0 {
+		anyOf := make([]database.Filter[domain.InvitationField], 0, len(statuses))
+		for _, status := range statuses {
+			anyOf = append(anyOf, StatusAt(status, now))
+		}
+		filters = append(filters, database.Or(anyOf...))
 	}
 	if typ != nil {
 		filters = append(filters, database.Equal(database.Col(domain.InvitationFieldType), string(*typ)))

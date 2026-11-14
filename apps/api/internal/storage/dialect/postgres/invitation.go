@@ -14,20 +14,22 @@ import (
 )
 
 const (
-	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, accepted_by, accepted_at, token_hash`
+	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, responded_by, responded_at, token_hash`
 	createInvitationStmt = `INSERT INTO zitadel_nextgen.invitations` +
 		` (project_id, id, type, payload, metadata, created_by, created_by_type, expires_at, journey_id, token_hash)` +
 		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING created_at`
 	invitationQuery              = `SELECT ` + invitationColumns + ` FROM zitadel_nextgen.invitations`
 	getInvitationByTokenHashStmt = invitationQuery + ` WHERE token_hash = $1`
-	changeInvitationStatusStmt   = `UPDATE zitadel_nextgen.invitations` +
-		` SET status = $3, accepted_by = $4, accepted_at = $5, metadata = NULL` +
-		` WHERE project_id = $1 AND id = $2 AND status = 'pending' AND expires_at > $6` +
+	// Accept clears the metadata; a decline keeps it for the administrators.
+	changeInvitationStatusStmt = `UPDATE zitadel_nextgen.invitations` +
+		` SET status = $3, responded_by = $4, responded_at = $5,` +
+		` metadata = CASE WHEN $3 = 'accepted' THEN NULL ELSE metadata END` +
+		` WHERE project_id = $1 AND id = $2 AND status = 'pending' AND expires_at > $5` +
 		` RETURNING ` + invitationColumns
 	deleteUnacceptedInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
 		` WHERE project_id = $1 AND id = $2 AND status <> 'accepted'`
-	deletePendingInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
-		` WHERE project_id = $1 AND id = $2 AND status = 'pending' AND expires_at > $3`
+	deleteCancellableInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
+		` WHERE project_id = $1 AND id = $2 AND (status = 'rejected' OR (status = 'pending' AND expires_at > $3))`
 	countPendingInvitationsStmt = `SELECT count(*) FROM zitadel_nextgen.invitations` +
 		` WHERE project_id = $1 AND status = 'pending' AND expires_at > $2`
 )
@@ -110,12 +112,11 @@ func (s invitationStatements) ListInvitations(ctx context.Context, filter *datab
 }
 
 // ChangeInvitationStatus implements [service.InvitationStatements].
-func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
-	acceptedAt, err := invitation.StatusChange(status, acceptedBy, now)
-	if err != nil {
+func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
+	if err := invitation.StatusChange(status, respondedBy); err != nil {
 		return nil, err
 	}
-	return s.queryOne(ctx, changeInvitationStatusStmt, projectID, id, string(status), acceptedBy, acceptedAt, now)
+	return s.queryOne(ctx, changeInvitationStatusStmt, projectID, id, string(status), respondedBy, now)
 }
 
 // DeleteUnacceptedInvitation implements [service.InvitationStatements].
@@ -123,9 +124,9 @@ func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, pr
 	return s.execOne(ctx, deleteUnacceptedInvitationStmt, projectID, id)
 }
 
-// DeletePendingInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.execOne(ctx, deletePendingInvitationStmt, projectID, id, now)
+// DeleteCancellableInvitation implements [service.InvitationStatements].
+func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
+	return s.execOne(ctx, deleteCancellableInvitationStmt, projectID, id, now)
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].
@@ -174,8 +175,8 @@ func scanInvitation(row pgx.CollectableRow) (*domain.Invitation, error) {
 		&scanned.CreatedAt,
 		&scanned.ExpiresAt,
 		&scanned.JourneyID,
-		&scanned.AcceptedBy,
-		&scanned.AcceptedAt,
+		&scanned.RespondedBy,
+		&scanned.RespondedAt,
 		&scanned.TokenHash,
 	); err != nil {
 		return nil, err

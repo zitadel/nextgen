@@ -15,26 +15,28 @@ import (
 
 const (
 	invitationTable      = "invitations"
-	invitationColumnList = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, accepted_by, accepted_at, token_hash`
+	invitationColumnList = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, responded_by, responded_at, token_hash`
 	createInvitationStmt = `INSERT INTO invitations` +
 		` (project_id, id, type, payload, metadata, created_by, created_by_type, expires_at, journey_id, token_hash)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10) THEN RETURN created_at`
 	invitationQuery              = `SELECT ` + invitationColumnList + ` FROM invitations`
 	getInvitationByTokenHashStmt = invitationQuery + ` WHERE token_hash = @p1`
-	changeInvitationStatusStmt   = `UPDATE invitations SET status = @p3, accepted_by = @p4, accepted_at = @p5, metadata = NULL` +
-		` WHERE project_id = @p1 AND id = @p2 AND status = 'pending' AND expires_at > @p6` +
+	// Accept clears the metadata; a decline keeps it for the administrators.
+	changeInvitationStatusStmt = `UPDATE invitations SET status = @p3, responded_by = @p4, responded_at = @p5,` +
+		` metadata = CASE WHEN @p3 = 'accepted' THEN NULL ELSE metadata END` +
+		` WHERE project_id = @p1 AND id = @p2 AND status = 'pending' AND expires_at > @p5` +
 		` THEN RETURN ` + invitationColumnList
 	deleteUnacceptedInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = @p1 AND id = @p2 AND status <> 'accepted'`
-	deletePendingInvitationStmt = `DELETE FROM invitations` +
-		` WHERE project_id = @p1 AND id = @p2 AND status = 'pending' AND expires_at > @p3`
+	deleteCancellableInvitationStmt = `DELETE FROM invitations` +
+		` WHERE project_id = @p1 AND id = @p2 AND (status = 'rejected' OR (status = 'pending' AND expires_at > @p3))`
 	countPendingInvitationsStmt = `SELECT COUNT(*) FROM invitations` +
 		` WHERE project_id = @p1 AND status = 'pending' AND expires_at > @p2`
 )
 
 var invitationColumns = []string{
 	"project_id", "id", "type", "payload", "metadata", "status", "created_by", "created_by_type",
-	"created_at", "expires_at", "journey_id", "accepted_by", "accepted_at", "token_hash",
+	"created_at", "expires_at", "journey_id", "responded_by", "responded_at", "token_hash",
 }
 
 type invitationStatements struct{ statement }
@@ -120,13 +122,12 @@ func (s invitationStatements) ListInvitations(ctx context.Context, filter *datab
 }
 
 // ChangeInvitationStatus implements [service.InvitationStatements].
-func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
-	acceptedAt, err := invitation.StatusChange(status, acceptedBy, now)
-	if err != nil {
+func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error) {
+	if err := invitation.StatusChange(status, respondedBy); err != nil {
 		return nil, err
 	}
 	stmt := buildStatement(changeInvitationStatusStmt,
-		projectID, id, string(status), spannerNullString(acceptedBy), spannerNullTime(acceptedAt), now,
+		projectID, id, string(status), respondedBy, now,
 	).statement()
 	var entity *domain.Invitation
 	if err := s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
@@ -144,9 +145,9 @@ func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, pr
 	return s.updateOne(ctx, buildStatement(deleteUnacceptedInvitationStmt, projectID, id).statement())
 }
 
-// DeletePendingInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.updateOne(ctx, buildStatement(deletePendingInvitationStmt, projectID, id, now).statement())
+// DeleteCancellableInvitation implements [service.InvitationStatements].
+func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
+	return s.updateOne(ctx, buildStatement(deleteCancellableInvitationStmt, projectID, id, now).statement())
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].
@@ -195,8 +196,8 @@ func scanInvitation(row *spanner.Row) (*domain.Invitation, error) {
 		metadata      spanner.NullString
 		createdBy     spanner.NullString
 		createdByType spanner.NullString
-		acceptedBy    spanner.NullString
-		acceptedAt    spanner.NullTime
+		respondedBy   spanner.NullString
+		respondedAt   spanner.NullTime
 	)
 	if err := row.Columns(
 		&scanned.ProjectID,
@@ -210,8 +211,8 @@ func scanInvitation(row *spanner.Row) (*domain.Invitation, error) {
 		&scanned.CreatedAt,
 		&scanned.ExpiresAt,
 		&scanned.JourneyID,
-		&acceptedBy,
-		&acceptedAt,
+		&respondedBy,
+		&respondedAt,
 		&scanned.TokenHash,
 	); err != nil {
 		return nil, err
@@ -224,9 +225,9 @@ func scanInvitation(row *spanner.Row) (*domain.Invitation, error) {
 	scanned.EncryptedMetadata = spannerNullStringPtr(metadata)
 	scanned.CreatedBy = spannerNullStringPtr(createdBy)
 	scanned.CreatedByType = spannerNullStringPtr(createdByType)
-	scanned.AcceptedBy = spannerNullStringPtr(acceptedBy)
-	if acceptedAt.Valid {
-		scanned.AcceptedAt = &acceptedAt.Time
+	scanned.RespondedBy = spannerNullStringPtr(respondedBy)
+	if respondedAt.Valid {
+		scanned.RespondedAt = &respondedAt.Time
 	}
 	return invitation.ToDomain(scanned)
 }

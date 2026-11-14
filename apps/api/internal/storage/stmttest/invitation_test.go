@@ -80,8 +80,8 @@ func TestInvitationStatements_Create(t *testing.T) {
 				assert.Equal(t, entity.CreatedAt, got.CreatedAt)
 				assert.Equal(t, expiresAt, got.ExpiresAt)
 				assert.Equal(t, entity.JourneyID, got.JourneyID)
-				assert.Nil(t, got.AcceptedBy)
-				assert.Nil(t, got.AcceptedAt)
+				assert.Nil(t, got.RespondedBy)
+				assert.Nil(t, got.RespondedAt)
 				assert.Equal(t, entity.TokenHash, got.TokenHash)
 			}
 		})
@@ -144,16 +144,16 @@ func TestInvitationStatements_List(t *testing.T) {
 		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
 		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, new("user_1"), now)
+		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, "user_1", now)
 		require.NoError(t, err)
 		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, "user_2", now)
 		require.NoError(t, err)
 		createInvitation(t, d.stmts, otherProject, now.Add(time.Hour))
 
-		list := func(status *domain.InvitationStatus, typ *domain.InvitationType) []string {
+		list := func(statuses []domain.InvitationStatus, typ *domain.InvitationType) []string {
 			t.Helper()
-			result, err := d.stmts.ListInvitations(t.Context(), invitation.ListOptions(projectID, status, typ, now, 50))
+			result, err := d.stmts.ListInvitations(t.Context(), invitation.ListOptions(projectID, statuses, typ, now, 50))
 			require.NoError(t, err)
 			return invitationIDs(result.Items)
 		}
@@ -168,10 +168,17 @@ func TestInvitationStatements_List(t *testing.T) {
 		})
 
 		t.Run("by_status", func(t *testing.T) {
-			assert.Equal(t, []string{pending.ID}, list(new(domain.InvitationStatusPending), nil))
-			assert.Equal(t, []string{expired.ID}, list(new(domain.InvitationStatusExpired), nil))
-			assert.Equal(t, []string{accepted.ID}, list(new(domain.InvitationStatusAccepted), nil))
-			assert.Equal(t, []string{rejected.ID}, list(new(domain.InvitationStatusRejected), nil))
+			assert.Equal(t, []string{pending.ID}, list([]domain.InvitationStatus{domain.InvitationStatusPending}, nil))
+			assert.Equal(t, []string{expired.ID}, list([]domain.InvitationStatus{domain.InvitationStatusExpired}, nil))
+			assert.Equal(t, []string{accepted.ID}, list([]domain.InvitationStatus{domain.InvitationStatusAccepted}, nil))
+			assert.Equal(t, []string{rejected.ID}, list([]domain.InvitationStatus{domain.InvitationStatusRejected}, nil))
+		})
+
+		t.Run("by_any_of_several_statuses", func(t *testing.T) {
+			got := list([]domain.InvitationStatus{
+				domain.InvitationStatusPending, domain.InvitationStatusExpired, domain.InvitationStatusRejected,
+			}, nil)
+			assert.ElementsMatch(t, []string{pending.ID, expired.ID, rejected.ID}, got)
 		})
 
 		t.Run("by_type", func(t *testing.T) {
@@ -188,11 +195,11 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			now := invitationNow()
 			entity := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 
-			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, new("user_2"), now)
+			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, "user_2", now)
 			require.NoError(t, err)
 			assert.Equal(t, domain.InvitationStatusAccepted, got.Status)
-			assert.Equal(t, "user_2", *got.AcceptedBy)
-			assert.Equal(t, now, *got.AcceptedAt)
+			assert.Equal(t, "user_2", *got.RespondedBy)
+			assert.Equal(t, now, *got.RespondedAt)
 			assert.Nil(t, got.EncryptedMetadata)
 
 			read, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
@@ -205,12 +212,17 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			now := invitationNow()
 			entity := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 
-			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusRejected, nil, now)
+			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusRejected, "user_2", now)
 			require.NoError(t, err)
 			assert.Equal(t, domain.InvitationStatusRejected, got.Status)
-			assert.Nil(t, got.AcceptedBy)
-			assert.Nil(t, got.AcceptedAt)
-			assert.Nil(t, got.EncryptedMetadata)
+			assert.Equal(t, "user_2", *got.RespondedBy)
+			assert.Equal(t, now, *got.RespondedAt)
+			// The administrators still see who a declined link was for.
+			assert.Equal(t, "ciphertext", *got.EncryptedMetadata)
+
+			read, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
+			require.NoError(t, err)
+			assert.Equal(t, got, read)
 		})
 
 		// All statuses but pending are final, so the second of two racing
@@ -219,10 +231,10 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			now := invitationNow()
 			entity := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusRejected, nil, now)
+			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusRejected, "user_2", now)
 			require.NoError(t, err)
 
-			_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, new("user_2"), now)
+			_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, "user_2", now)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
@@ -231,13 +243,13 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			now := invitationNow()
 			entity := createInvitation(t, d.stmts, projectID, now)
 
-			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, new("user_2"), now)
+			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, "user_2", now)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
 		t.Run("unknown_returns_NoRowFoundError", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, "inv_does_not_exist", domain.InvitationStatusRejected, nil, invitationNow())
+			_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, "inv_does_not_exist", domain.InvitationStatusRejected, "user_2", invitationNow())
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
@@ -246,15 +258,15 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			now := invitationNow()
 			entity := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 			for _, change := range []struct {
-				status     domain.InvitationStatus
-				acceptedBy *string
+				status      domain.InvitationStatus
+				respondedBy string
 			}{
-				{domain.InvitationStatusAccepted, nil},
-				{domain.InvitationStatusRejected, new("user_2")},
-				{domain.InvitationStatusPending, nil},
-				{domain.InvitationStatusExpired, nil},
+				{domain.InvitationStatusAccepted, ""},
+				{domain.InvitationStatusRejected, ""},
+				{domain.InvitationStatusPending, "user_2"},
+				{domain.InvitationStatusExpired, "user_2"},
 			} {
-				_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, change.status, change.acceptedBy, now)
+				_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, change.status, change.respondedBy, now)
 				assert.ErrorIs(t, err, domain.ErrInternal(nil), "status %q", change.status)
 			}
 		})
@@ -269,7 +281,7 @@ func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
 		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
+		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, "user_2", now)
 		require.NoError(t, err)
 		for _, id := range []string{pending.ID, expired.ID, rejected.ID} {
 			require.NoError(t, d.stmts.DeleteUnacceptedInvitation(t.Context(), projectID, id))
@@ -279,7 +291,7 @@ func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 
 		// An accepted invitation keeps its row.
 		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, new("user_1"), now)
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, "user_1", now)
 		require.NoError(t, err)
 		err = d.stmts.DeleteUnacceptedInvitation(t.Context(), projectID, accepted.ID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -291,26 +303,31 @@ func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 	})
 }
 
-func TestInvitationStatements_DeletePending(t *testing.T) {
+func TestInvitationStatements_DeleteCancellable(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		now := invitationNow()
 
 		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		require.NoError(t, d.stmts.DeletePendingInvitation(t.Context(), projectID, pending.ID, now))
-		_, err := d.stmts.GetInvitationByID(t.Context(), projectID, pending.ID)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-
-		// An expired or finished invitation keeps its row.
-		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
 		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
+		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, "user_2", now)
 		require.NoError(t, err)
-		for _, id := range []string{expired.ID, rejected.ID, pending.ID} {
-			err := d.stmts.DeletePendingInvitation(t.Context(), projectID, id, now)
+		for _, id := range []string{pending.ID, rejected.ID} {
+			require.NoError(t, d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now))
+			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		}
-		for _, id := range []string{expired.ID, rejected.ID} {
+
+		// An expired or accepted invitation keeps its row.
+		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
+		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, "user_1", now)
+		require.NoError(t, err)
+		for _, id := range []string{expired.ID, accepted.ID, pending.ID} {
+			err := d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		}
+		for _, id := range []string{expired.ID, accepted.ID} {
 			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
 			assert.NoError(t, err)
 		}
@@ -331,7 +348,7 @@ func TestInvitationStatements_CountPending(t *testing.T) {
 		createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
 		createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
 		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, "user_2", now)
 		require.NoError(t, err)
 		createInvitation(t, d.stmts, otherProject, now.Add(time.Hour))
 

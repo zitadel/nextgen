@@ -817,16 +817,16 @@ type InvitationStatements interface {
 	// project, status and type filters.
 	ListInvitations(ctx context.Context, filter *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error)
 	// ChangeInvitationStatus moves a pending, unexpired invitation to
-	// accepted, recording acceptedBy and now, or to rejected with a nil
-	// acceptedBy, and nulls its metadata. Any other invitation returns a
+	// accepted, nulling its metadata, or to rejected, recording respondedBy
+	// and now either way. Any other invitation returns a
 	// [database.NoRowFoundError].
-	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
+	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, respondedBy string, now time.Time) (*domain.Invitation, error)
 	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
 	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
 	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error
-	// DeletePendingInvitation removes a pending, unexpired invitation. Any
-	// other invitation returns a [database.NoRowFoundError].
-	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error
+	// DeleteCancellableInvitation removes a pending, unexpired invitation or
+	// a rejected one. Any other invitation returns a [database.NoRowFoundError].
+	DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error
 	// CountPendingInvitations counts the project's pending, unexpired
 	// invitations. The cap holds only when the count and the create run in
 	// one transaction under LockProject.
