@@ -14,7 +14,7 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/cli/commands/setup/prompts", async (importOriginal) => {
+vi.mock("@/cli/commands/setup/shared", async (importOriginal) => {
   return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
 });
 
@@ -25,19 +25,17 @@ vi.mock("@/lib/scaffold-manifest", async (importOriginal) => {
 
 import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
 
-import Setup, {
-  buildSummary,
-  localServerHostsPlatform,
-  portInUseWarning,
+import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "@/cli/commands/setup";
+import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
+import {
   readCredentialEnvFiles,
-  refuseUnusableFlags,
   restoreCredentialEnvFiles,
-  retryOptionsFromFlags,
-  type SetupFlagsToCheck,
-  setupRetryFlags,
-  ssoFromFlags,
-} from "@/cli/commands/setup";
-import { askCustomSettings } from "@/cli/commands/setup/prompts";
+} from "@/cli/commands/setup/steps/patch-app";
+import { buildSummary } from "@/cli/commands/setup/steps/show-result";
+import { portInUseWarning } from "@/cli/commands/setup/steps/settle-answers";
+import { localServerHostsPlatform } from "@/cli/commands/setup/steps/claim-ownership";
+import { ssoFromFlags } from "@/cli/commands/setup/steps/read-sso-flags";
+import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";

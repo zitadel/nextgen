@@ -123,6 +123,12 @@
     `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
+  - A command that runs as a wizard (`setup`, `auth-method sso enable`) keeps one class per
+    step under its own `steps/`, built on `WizardStep` (`src/lib/wizard`); a helper only one
+    step uses lives in that step's file, and one two steps use is a module beside the command.
+  - A step never imports another step; the command keeps its flags, refusals and telemetry, and
+    hands the steps what they need as services. A step reads the command's modules (`retry`,
+    `preflight`, `port`), never its `index.ts` for a value.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders

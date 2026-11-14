@@ -4,7 +4,7 @@ import {
   afterInstallScriptFor,
   installDependenciesForSetup,
   type SetupInstallInput,
-} from "@/cli/commands/setup/install";
+} from "@/cli/commands/setup/steps/install-dependencies";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { installLogSink } from "@/lib/log";

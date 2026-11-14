@@ -1,12 +1,11 @@
 import { describe, expect } from "vitest";
 
+import { relativeDisplayPath, signInOf } from "@/cli/commands/setup/shared";
 import {
   detectProjectFacts,
   formatFrameworkLine,
-  relativeDisplayPath,
-  signInOf,
   summarySections,
-} from "@/cli/commands/setup/summary";
+} from "@/cli/commands/setup/steps/show-result";
 import type { ScaffoldedProvider } from "@/lib/zitadel";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";

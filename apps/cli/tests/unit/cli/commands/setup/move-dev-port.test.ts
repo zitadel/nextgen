@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { moveDevPort } from "@/cli/commands/setup/move-dev-port";
+import { moveDevPort } from "@/cli/commands/setup/steps/move-app-port";
 import { ZitadelError } from "@/lib/errors";
 import { createOrca } from "@/lib/orca";
 import { readZitadelSecret } from "@/lib/project";

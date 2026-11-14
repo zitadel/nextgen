@@ -5,11 +5,11 @@ import { describe, expect, vi } from "vitest";
 
 import {
   ensureInitialCommit,
-  gitReport,
   INITIAL_COMMIT_SUBJECT,
-  inspectWorktree,
   unavailableWarning,
-} from "@/cli/commands/setup/initial-commit";
+} from "@/cli/commands/setup/steps/make-initial-commit";
+import { inspectWorktree } from "@/cli/commands/setup/shared";
+import { gitReport } from "@/cli/commands/setup/steps/show-result";
 import { it } from "@tests/helpers/fixtures";
 import {
   commitAll,
