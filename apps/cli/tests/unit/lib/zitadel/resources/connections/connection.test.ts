@@ -665,6 +665,23 @@ describe("Connection.withClaims", () => {
     expect(edit.document.body).not.toHaveProperty("verified_claims");
   });
 
+  it("writes no scopes over a connection that had none when no scope is given", () => {
+    const withoutScopes = Connection.create(
+      aFile("connections", "acme-sso.json", {
+        ...anOidcConnection({ slug: "acme-sso" }),
+        oidc: {
+          issuer: "https://sso.acme.example",
+          client_id: "client",
+          client_secret: "${{ ACME_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    const edit = withoutScopes.withClaims({ mapping: { email: "mail" }, verified: {}, scopes: [] });
+
+    expect(edit.document.body.oidc).not.toHaveProperty("scopes");
+  });
+
   it("leaves both blocks out when nothing is mapped", () => {
     const edit = acme().withClaims({ mapping: {}, verified: {}, scopes: ["openid"] });
 

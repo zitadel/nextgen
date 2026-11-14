@@ -496,7 +496,14 @@ export class Connection extends ConfigDocument<ConnectionValue> {
       ...(Object.keys(claims.verified).length > 0
         ? { verified_claims: { ...claims.verified } }
         : {}),
-      oidc: { ...objectAt(this.body, "oidc"), scopes: [...claims.scopes] },
+      oidc: {
+        ...Object.fromEntries(
+          Object.entries(objectAt(this.body, "oidc")).filter(([key]) => {
+            return key !== "scopes";
+          }),
+        ),
+        ...(claims.scopes.length > 0 ? { scopes: [...claims.scopes] } : {}),
+      },
     };
     return {
       document: Connection.build({ path: this.path, body }, this.editedStatus),
