@@ -61,8 +61,9 @@ export class ContractSummary {
     const tested = this.runs.reduce((sum, run) => {
       return sum + run.accounting.tested;
     }, 0);
+    const timing = this.timing();
     if (problems.length === 0) {
-      return `## API contract: passed\n\n${String(tested)} operations match the spec.\n`;
+      return `## API contract: passed\n\n${String(tested)} operations match the spec.\n\n${timing}`;
     }
     const lines = [
       "## API contract: broken",
@@ -85,8 +86,38 @@ export class ContractSummary {
       "- A new failure means the server or the spec is wrong: fix one of them. Do not add the failure to `known-failures.json`.",
       "- A listed failure that stopped happening: delete its line from `e2e/api-contract/known-failures.json`.",
       "",
+      timing,
     );
     return lines.join("\n");
+  }
+
+  /**
+   * How long each family took, which is where a slow run spends its time.
+   *
+   * @returns a Markdown table.
+   */
+  timing(): string {
+    const rows = this.runs.map((run) => {
+      return `| ${run.family} | ${String(run.accounting.tested)} | ${String(run.seconds)}s |`;
+    });
+    const total = this.runs.reduce((sum, run) => {
+      return sum + run.seconds;
+    }, 0);
+    const slowest = Math.max(
+      ...this.runs.map((run) => {
+        return run.seconds;
+      }),
+    );
+    return [
+      "### Time",
+      "",
+      "| Family | Operations | Took |",
+      "| --- | --- | --- |",
+      ...rows,
+      `| sum of all | | ${String(Math.round(total * 10) / 10)}s |`,
+      `| slowest (the families run at the same time) | | ${String(slowest)}s |`,
+      "",
+    ].join("\n");
   }
 
   /**
