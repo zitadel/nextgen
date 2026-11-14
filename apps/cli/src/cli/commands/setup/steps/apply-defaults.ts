@@ -1,13 +1,6 @@
-import {
-  DEFAULT_SETUP_PRESET,
-  DEFAULT_SETUP_USE_CASE,
-  SETUP_PRESETS,
-  SETUP_USE_CASES,
-} from "@zitadel/config/defaults";
-
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact } from "@/cli/commands/setup/shared";
+import { type Fact, variantOf } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -55,14 +48,7 @@ export class ApplyDefaults extends WizardStep<"defaults", Fact<"app" | "answers"
       answers: {
         server: preflight.server.value,
         devPort: app.devPort,
-        preset:
-          SETUP_PRESETS.find((preset) => {
-            return preset === flags.preset;
-          }) ?? DEFAULT_SETUP_PRESET,
-        useCase:
-          SETUP_USE_CASES.find((useCase) => {
-            return useCase === flags.useCase;
-          }) ?? DEFAULT_SETUP_USE_CASE,
+        ...variantOf(flags),
         sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
         passwordMinLength: flags.passwordMinLength,
       },

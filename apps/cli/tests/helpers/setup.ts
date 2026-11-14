@@ -45,22 +45,23 @@ export function suggestedCommands(stdout: string): string[] {
 }
 
 /**
- * What the wizard's prompt steps are constructed with: an interactive run in
+ * What the wizard's question steps are constructed with: an interactive run in
  * the app directory, as setup builds it.
  *
  * @param cwd - The project's directory.
  * @returns The services those steps take.
  */
-export function aPromptDeps(
+export function aQuestionDeps(
   cwd = "/tmp/app",
 ): Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "developmentBuild" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
 > {
   const audience = { interactive: true, force: false };
   return {
     ask: asker(audience),
     cwd,
+    developmentBuild: false,
     dryRun: false,
     nonInteractive: false,
     serverFlag: undefined,

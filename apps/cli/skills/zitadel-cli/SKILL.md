@@ -934,8 +934,28 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   output, `--dry-run` included, prints a notice saying which claim fills each user
   attribute, which attributes no claim fills (marked required or optional) and
   which schemas sign in through the connection; `--json` carries the same in
-  `data.connection` as `claim_mapping`, `verified_claims`, `scopes`, `unmapped`
-  and `used_by`.
+  `data.connection` as `claim_mapping`, `verified_claims`, `scopes`, `unmapped`,
+  `new_attributes` and `used_by`.
+  The standard OpenID Connect claims whose names match a property of the user
+  schema (`email`, `givenName` from `given_name`, `familyName`, `picture`, ...)
+  are mapped by default. To fill another property, repeat `--claim
+  <property>=<claim>`; a claim the provider returns as a number, integer or
+  boolean says so after a colon (`--claim staffNumber=employee_id:integer`),
+  because the type decides which properties it may fill and `string` is the
+  default. A claim you give replaces the default for its property (`--claim
+  email=mail`), and the replaced default is no longer verified until you say
+  how with `--verified-claim`. A claim fills one property and a property takes
+  one claim, and a claim's type must fit the property's; the command refuses
+  otherwise, before it asks for a secret or writes a file. `--claim-scope` adds
+  scopes the claims need, and `--verified-claim <property>=<claim>` (or
+  `<property>=true` to trust the provider) says how a unique property is
+  verified. `setup` takes the same as `--sso-claim`, `--sso-claim-scope` and
+  `--sso-verified-claim`, and never asks about claims. Interactively, with none of
+  these given, `auth-method sso enable` lists what is mapped and asks for more
+  claims until the person continues; a claim can fill an attribute with no claim yet, or a new
+  attribute, which is added to the user schema and the register steps of the
+  login flow (`new_attributes` lists them). A connection that already exists
+  keeps the mapping in its file; edit `claim_mapping` there.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless

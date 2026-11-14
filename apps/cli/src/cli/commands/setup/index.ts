@@ -21,11 +21,15 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { errorMessage } from "@/lib/errors";
 import {
   customExample,
   customFlagValues,
   givenCustomFlags,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
@@ -95,6 +99,14 @@ const DESIGN_REMOVED_REFUSAL = {
  */
 const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
+  hint: "Name the provider with --sso, e.g. --sso google.",
+} as const satisfies Refusal;
+
+/**
+ * How the claim flags without `--sso` are refused.
+ */
+const CLAIMS_NEED_SSO_REFUSAL = {
+  message: "{flags} needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
 } as const satisfies Refusal;
 
@@ -299,6 +311,26 @@ export default class Setup extends Destructive(BaseCommand) {
     })({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
+    "sso-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry),
+    })({
+      description:
+        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. The standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "sso-verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry),
+    })({
+      description:
+        "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+    }),
+    "sso-claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList),
+    })({
+      description:
+        "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+    }),
     [SETUP_FLAG_KEYS.slug]: Flags.custom<string>({
       parse: accepts((value) => {
         return parseConnectionSlug(value, RESERVED_SLUGS);
@@ -368,11 +400,10 @@ export default class Setup extends Destructive(BaseCommand) {
    *
    * @remarks
    * The steps are built when this runs, not when the file loads, so a step may
-   * import what it needs from this file. Every step that may ask the person
-   * takes the same services, held once as `prompting`. Every step is built
-   * before the first one runs, so nothing handed to a step may read the server
-   * from `this.meta.source`: the preconditions settle it, and later steps read
-   * it from their `preflight`.
+   * import what it needs from this file. Every step is built before the first
+   * one runs, so nothing handed to a step may read the server from
+   * `this.meta.source`: the preconditions settle it, and later steps read it
+   * from their `preflight`.
    *
    * @param admitted - What the command admitted.
    * @param admitted.flags - The flags.
@@ -380,16 +411,6 @@ export default class Setup extends Destructive(BaseCommand) {
    */
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
-
-    const prompting = {
-      ask: this.ask,
-      cwd: this.cwd,
-      dryRun: this.dryRun,
-      nonInteractive: this.nonInteractive,
-      serverFlag: this.meta.serverFlag,
-      suggest: this.suggest,
-      ui: this.ui,
-    };
 
     return this.emit(
       await Wizard.named<Fact<"flags">, CommandResult>("setup")
@@ -463,13 +484,61 @@ export default class Setup extends Destructive(BaseCommand) {
           },
         )
         .step(new ApplyDefaults())
-        .step(new ConfirmFramework(prompting))
-        .step(new ChooseServer(prompting))
-        .step(new ChooseDevPort(prompting))
-        .step(new ChooseUseCase(prompting))
-        .step(new ChooseSignIn(prompting))
-        .step(new SetPasswordPolicy(prompting))
-        .step(new ChooseSocialSignIn(prompting))
+        .step(
+          new ConfirmFramework({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseServer({
+            ask: this.ask,
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            serverFlag: this.meta.serverFlag,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new ChooseDevPort({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseUseCase({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseSignIn({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new SetPasswordPolicy({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+          }),
+        )
+        .step(
+          new ChooseSocialSignIn({
+            ask: this.ask,
+            developmentBuild: isDevelopmentBuild(),
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
         .step(
           new SettleAnswers({
             dryRun: this.dryRun,
@@ -663,7 +732,15 @@ export type SetupFlagsToCheck = Readonly<
   Partial<
     Pick<
       SetupFlags,
-      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
+      | "design"
+      | "sso"
+      | "ssoSlug"
+      | "ssoDisplayName"
+      | "ssoIssuer"
+      | "ssoScopes"
+      | "ssoClaim"
+      | "ssoVerifiedClaim"
+      | "ssoClaimScope"
     > & {
       ssoClientId: string;
     }
@@ -692,6 +769,14 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
   }
   const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
   if (flags.sso === undefined) {
+    const claimFlags = [
+      ...(flags.ssoClaim === undefined ? [] : ["--sso-claim"]),
+      ...(flags.ssoVerifiedClaim === undefined ? [] : ["--sso-verified-claim"]),
+      ...(flags.ssoClaimScope === undefined ? [] : ["--sso-claim-scope"]),
+    ];
+    if (claimFlags.length > 0) {
+      throw refusalError(CLAIMS_NEED_SSO_REFUSAL, { flags: claimFlags.join(", ") });
+    }
     if (given[0] !== undefined) {
       throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
         flag: given[0],

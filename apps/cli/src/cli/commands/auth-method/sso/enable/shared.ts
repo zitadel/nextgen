@@ -4,11 +4,11 @@ import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command
 import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import type { Origins } from "@/lib/backend";
 import type {
-  CredentialDelivery,
+  ClaimRequest,
   CredentialNames,
-  CredentialPrompt,
+  CustomFlagValues,
   GivenCredentials,
-  ProviderChoice,
+  MappingState,
   PublishedCredentials,
 } from "@/lib/idp";
 import { log } from "@/lib/log";
@@ -17,7 +17,12 @@ import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions } from "@/lib/ui";
-import type { Change, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
+import type { Change, ClaimChoice, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
+
+/**
+ * How `--verified-claim` is spelled, for the note about a replaced default.
+ */
+export const VERIFIED_FLAG = "--verified-claim";
 
 /**
  * Joins a list the way a sentence does: "a, b and c".
@@ -93,7 +98,18 @@ export type EnableFacts = Readonly<{
   /**
    * How the flags choose a provider.
    */
-  choice: ProviderChoice;
+  choice: Readonly<{
+    /**
+     * The provider, or `undefined` for a custom connection a person will be
+     * asked to finish.
+     */
+    selection: ProviderSelection | undefined;
+
+    /**
+     * The custom connection's settings the flags gave.
+     */
+    values: CustomFlagValues;
+  }>;
 
   /**
    * The origin the app serves from, which every callback URI is built on.
@@ -131,7 +147,31 @@ export type EnableFacts = Readonly<{
   options: SsoOptions;
 
   /**
-   * The connection the provider's defaults make.
+   * What the flags asked for beyond the provider's claim mapping defaults.
+   */
+  claimRequest: ClaimRequest;
+
+  /**
+   * What the connection maps before anything is asked, or `undefined` when the
+   * connection already exists and keeps its own mapping.
+   */
+  mapping: MappingState | undefined;
+
+  /**
+   * What the connection is written with once the flags are applied, or
+   * `undefined` for a connection that already exists.
+   */
+  claims: ClaimChoice | undefined;
+
+  /**
+   * What the connection is written with once the person has been asked, which
+   * is {@link EnableFacts.claims} when nothing was asked.
+   */
+  answered: ClaimChoice | undefined;
+
+  /**
+   * The connection the provider's defaults make, with the claims the flags
+   * mapped.
    */
   candidate: Connection;
 
@@ -141,14 +181,9 @@ export type EnableFacts = Readonly<{
   preview: DocumentChange<Connection>;
 
   /**
-   * Where the credentials go, and how that is reported.
+   * The project variables the connection reads its credentials from.
    */
-  delivery: CredentialDelivery;
-
-  /**
-   * The questions that ask for the credentials.
-   */
-  prompt: CredentialPrompt;
+  names: CredentialNames;
 
   /**
    * What the run says about the connection.
@@ -308,7 +343,7 @@ export type EnableServices = Readonly<{
  * @param value - The value.
  * @returns The value, safe to print on one line.
  */
-function plain(value: string): string {
+export function plain(value: string): string {
   return escapeControlCharacters(value, { keepLayout: false });
 }
 
@@ -325,6 +360,8 @@ function plain(value: string): string {
  * @param input.change - The change that adds the connection.
  * @param input.published - What became of each credential.
  * @param input.names - The variables the credentials go to.
+ * @param input.claims - What the claim mapping makes of the connection, or
+ *   `undefined` for one the project already had.
  * @returns The result's data.
  */
 export function payload(
@@ -333,6 +370,7 @@ export function payload(
     change: DocumentChange<Connection>;
     published: PublishedCredentials;
     names: CredentialNames;
+    claims: ClaimChoice | undefined;
   }>,
 ) {
   const mapped = input.change.after.connections.summarize(input.change.document);
@@ -349,6 +387,9 @@ export function payload(
           return [property, claim];
         }),
       ),
+      new_attributes: (input.claims?.created ?? []).map((property) => {
+        return property.name;
+      }),
       verified_claims: Object.fromEntries(
         mapped.verifications.map(({ property, claim }) => {
           return [property, claim];

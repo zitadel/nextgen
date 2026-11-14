@@ -11,6 +11,7 @@ import type { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 import type { ClaimName, PropertyName } from "@/lib/zitadel/names";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { ContractValue } from "@/lib/zitadel/resources/document";
+import type { NewProperty } from "@/lib/zitadel/resources/schemas/types";
 import type { CONFIG_DIRECTORIES, JsonObject } from "@/lib/zitadel/types";
 import { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
 
@@ -226,6 +227,12 @@ export type SsoOptions = LookupOptions & {
    * said as what would happen.
    */
   readonly dryRun?: boolean | undefined;
+
+  /**
+   * Properties a claim mapping creates, which join the schema and the steps of
+   * the flows that ask a person for their details.
+   */
+  readonly attributes?: readonly NewProperty[] | undefined;
 };
 
 /**

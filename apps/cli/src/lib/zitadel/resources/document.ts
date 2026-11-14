@@ -135,6 +135,12 @@ export type SkippedRegion =
        * Why it was left alone.
        */
       readonly reason: "hand-edited";
+
+      /**
+       * The fields the step would have been asked for, which the developer adds
+       * by hand; left out when the step was left alone for another reason.
+       */
+      readonly fields?: readonly string[];
     }
   | {
       /**

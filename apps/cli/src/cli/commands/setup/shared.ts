@@ -33,17 +33,24 @@ import type { InitialDeployment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { Repository } from "@/lib/git";
 import {
+  applyRequest,
+  type ClaimRequest,
+  choiceOf,
+  claimFlagTexts,
+  claimRequestFromFlags,
+  claimsOrRefuse,
   type CustomFlagValues,
   customFlagValues,
+  NO_CLAIM_REQUEST,
   type PublishState,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   type SecretOutcome,
+  seedMapping,
   selectionFromFlags,
-  ssoEnableFlags,
 } from "@/lib/idp";
 import type { GlobalOptions } from "@/lib/oclif/types";
-import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
+import type { FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { isLocalRuntimePath } from "@/lib/secret-paths";
@@ -52,9 +59,10 @@ import { path as stylePath } from "@/lib/style";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { tryCatch } from "@/lib/try-catch";
-import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
+import type { Questions, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
+  Connection,
   ConnectionExistsError,
   DiskStore,
   FileExistsError,
@@ -74,7 +82,6 @@ import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
 import { z } from "zod";
 import { type Refused, whole } from "@/lib/oclif/flags";
-import { isDevelopmentBuild } from "@/lib/build-channel";
 
 /**
  * The name of the README setup writes into each configuration directory.
@@ -85,6 +92,11 @@ export const README = "README.md";
  * The renderer setup draws the widgets with when `--renderer` names none.
  */
 export const DEFAULT_RENDERER = "react";
+
+/**
+ * How `--sso-verified-claim` is spelled, for the note about a replaced default.
+ */
+const VERIFIED_FLAG = "--sso-verified-claim";
 
 /**
  * A short noun phrase for what each file the patcher writes is for, by its
@@ -128,6 +140,32 @@ const SENTENCE_BY_PATH: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The lowest TCP port a server can listen on.
+ */
+const MIN_PORT = 1;
+
+/**
+ * The highest TCP port a server can listen on.
+ */
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+export const PORT = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+} as const satisfies Refused<number>;
+
+/**
  * A social provider chosen during setup, with whatever of its application's
  * credentials is known so far.
  *
@@ -154,6 +192,12 @@ export type SsoDraft = Readonly<{
    * up locally; see `ChooseSocialSignIn`.
    */
   endpoints?: ConnectionEndpoints;
+
+  /**
+   * What the connection maps beyond the provider's defaults: given with
+   * `--sso-claim`. Left out, the defaults stand.
+   */
+  claimRequest?: ClaimRequest;
 }>;
 
 /**
@@ -229,6 +273,164 @@ type App = Readonly<{
    */
   devPort: number;
 }>;
+
+/**
+ * The parts of a setup invocation that a retry suggestion must reproduce.
+ * Suggested retries are followed verbatim (especially by agents), so dropping
+ * a flag here silently changes what the retry scaffolds.
+ */
+export type SetupRetryOptions = Readonly<{
+  /**
+   * The framework as `--framework` named it.
+   */
+  framework?: string;
+
+  /**
+   * The sign-in preset.
+   */
+  preset?: SetupPreset;
+
+  /**
+   * The use case.
+   */
+  useCase?: SetupUseCase;
+
+  /**
+   * The renderer.
+   */
+  renderer?: string;
+
+  /**
+   * The dev-server port.
+   */
+  devPort?: number;
+
+  /**
+   * The `--sso` flags as typed, when they could not be resolved to a provider
+   * yet: a custom connection described in part, which the wizard completes.
+   * Dropping them would send the developer back without what they typed.
+   */
+  ssoTyped?: Readonly<{
+    /**
+     * The provider, as typed.
+     */
+    sso: string;
+
+    /**
+     * The name of the connection.
+     */
+    ssoSlug?: string;
+
+    /**
+     * The name shown on the sign-in button.
+     */
+    ssoDisplayName?: string;
+
+    /**
+     * The provider's issuer URL.
+     */
+    ssoIssuer?: string;
+
+    /**
+     * The scopes to request.
+     */
+    ssoScopes?: string;
+  }>;
+
+  /**
+   * The social provider and its client id. The secret is deliberately absent:
+   * a retry asks for it again, or takes it on stdin, because putting a
+   * credential in suggested command text is exactly what piping the secret
+   * exists to avoid. It never reaches the filesystem either way — the value
+   * goes to the project's variables, which is where the engine resolves the
+   * connection's `${{ NAME }}` from.
+   */
+  sso?: readonly ProviderSelection[];
+
+  /**
+   * The claims asked for with `--sso-claim`. They are not credentials, so they
+   * travel in the command.
+   */
+  ssoClaims?: ClaimRequest;
+
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
+
+  /**
+   * The server as the developer typed it. Left out, a retry pins the local
+   * server; `null` leaves it to the default, as a run that typed none did.
+   */
+  server?: string | null;
+}>;
+
+/**
+ * The sign-in configuration setup's answers add up to, as `data.sign_in`
+ * reports it. Read off the schema setup renders rather than inferred from the
+ * preset's name: `password-first` enables passkeys too, and a use case's
+ * profile fields are optional. It describes what is configured, not that
+ * sign-in works: an enabled method is not a credential a user has registered.
+ */
+export type SignIn = Readonly<{
+  /**
+   * The method the login flow's entry step offers.
+   */
+  starts_with: "password" | "passkey";
+
+  /**
+   * The methods the user schema enables: the one sign-in starts with, the
+   * other, then `sso` when a provider is on.
+   */
+  methods: readonly string[];
+
+  /**
+   * What registration asks for, in order, and whether each is required.
+   */
+  fields: ReadonlyArray<
+    Readonly<{
+      name: string;
+      required: boolean;
+    }>
+  >;
+
+  /**
+   * `null` when passwords have no minimum length.
+   */
+  password_min_length: number | null;
+
+  /**
+   * The external providers' slugs, in the order they were chosen.
+   */
+  providers: readonly string[];
+}>;
+
+/**
+ * What the git working tree of a project holds, as setup needs to know before
+ * it writes.
+ */
+export type WorktreeState =
+  | Readonly<{
+      kind: "no-repository";
+    }>
+  | Readonly<{
+      kind: "unknown";
+      reason: string;
+    }>
+  | Readonly<{
+      kind: "blocked";
+      blocked: string;
+    }>
+  | Readonly<{
+      kind: "dirty";
+      modified: readonly string[];
+      untracked: readonly string[];
+    }>
+  | Readonly<{
+      kind: "clean";
+    }>;
 
 /**
  * Everything a run of `setup` comes to know, by the name each fact is read by.
@@ -523,6 +725,11 @@ export type SetupServices = Readonly<{
   isJson: boolean;
 
   /**
+   * Whether this is a development build that may ask where a provider answers.
+   */
+  developmentBuild: boolean;
+
+  /**
    * The server as the developer typed it, when they did.
    */
   serverFlag: string | undefined;
@@ -568,215 +775,6 @@ export type SetupServices = Readonly<{
 }>;
 
 /**
- * Read-only facts a question may need.
- */
-export type PromptContext = Readonly<{
-  /**
-   * How a prompt asks its question: the typed questions every other command
-   * asks through, so every question the wizard asks behaves like every other
-   * question the CLI asks. It cannot ask a destructive `confirm`, so
-   * setup's `--force`, which means "overwrite files", never answers one of its
-   * questions.
-   */
-  ask: Questions;
-
-  /**
-   * Something the person must read or go and do outside the terminal, such as
-   * registering an OAuth application, as the one boxed thing a prompt draws.
-   * It goes through the UI package for the same reason `ask` does: a prompt
-   * that drew its own box would draw one that matches nothing else.
-   */
-  note: (title: string, lines: readonly string[]) => void;
-
-  /**
-   * One line in the chain that is not a question, such as what happens now
-   * that a provider was skipped.
-   */
-  say: (text: string) => void;
-
-  /**
-   * A spinner for a probe that takes long enough to need saying so, stopped or
-   * cleared by the prompt that started it. It draws nothing when nobody is
-   * watching, so a prompt never tests for a terminal.
-   */
-  spinner: (label: string, options?: Readonly<{ guide?: boolean }>) => Spinner;
-
-  /**
-   * The framework of the app setup integrates: its id and the name a question
-   * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
-   * asks, because setup creates it once it has every answer.
-   */
-  framework: FrameworkChoice;
-
-  /**
-   * A command for this app's project, for a question that names what to run
-   * once setup is done, such as adding a skipped provider. It carries the
-   * selector setup's own recovery commands carry, so it reaches the project
-   * setup creates and not one the shell's environment names.
-   */
-  suggest: Suggest;
-
-  /**
-   * The app directory setup runs in. `ChooseServer` reads the local runtime
-   * metadata (`.zitadel/local/runtime.json`) under it to detect a managed local
-   * server started here.
-   */
-  cwd: string;
-
-  /**
-   * Whether the developer already named the framework: picked it to scaffold
-   * an empty directory, or passed `--framework`. Then `ConfirmFramework` has
-   * nothing left to confirm and skips itself.
-   */
-  frameworkChosen?: boolean;
-
-  /**
-   * The raw `--server` flag value as the user passed it, or `undefined` when
-   * not provided.
-   *
-   * @remarks
-   * Prompts use this to skip themselves when the flag already pinned the answer
-   * (a step returns unchanged answers in that case). It is distinct from
-   * `answers.server`, which the base command's server resolution always
-   * populates, so that alone cannot tell "user passed a flag" from "we fell
-   * back to the cloud default".
-   */
-  serverFlag?: string;
-
-  /**
-   * Whether `--dev-port` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseDevPort` skips itself so an interactive answer
-   * cannot override a scripted or flagged port.
-   */
-  devPortFromFlag?: boolean;
-
-  /**
-   * Whether `--preset` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseSignIn` skips itself.
-   */
-  presetFromFlag?: boolean;
-
-  /**
-   * Whether `--use-case` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseUseCase` skips itself.
-   */
-  useCaseFromFlag?: boolean;
-
-  /**
-   * Whether `--sso` was passed explicitly. When set, the flag answers the
-   * provider question and `ChooseSocialSignIn` does not ask it.
-   *
-   * @remarks
-   * The credential questions are a separate matter: the prompt still asks for
-   * a client id or secret the invocation did not supply, because a connection
-   * missing either is one that cannot work. Only a `--non-interactive` run has
-   * nobody to ask, and that one is refused rather than left incomplete.
-   */
-  ssoFromFlag?: boolean;
-
-  /**
-   * Whether `--password-min-length` was passed explicitly. When set, the flag
-   * is authoritative and `SetPasswordPolicy` skips itself.
-   */
-  passwordMinLengthFromFlag?: boolean;
-
-  /**
-   * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
-   * development run asks where a provider's endpoints are; see
-   * `ChooseSocialSignIn`. Passed in rather than read from the bundle so a test
-   * can drive both answers.
-   */
-  developmentBuild?: boolean;
-}>;
-
-/**
- * The parts of a setup invocation that a retry suggestion must reproduce.
- * Suggested retries are followed verbatim (especially by agents), so dropping
- * a flag here silently changes what the retry scaffolds.
- */
-export type SetupRetryOptions = Readonly<{
-  /**
-   * The framework as `--framework` named it.
-   */
-  framework?: string;
-
-  /**
-   * The sign-in preset.
-   */
-  preset?: SetupPreset;
-
-  /**
-   * The use case.
-   */
-  useCase?: SetupUseCase;
-
-  /**
-   * The renderer.
-   */
-  renderer?: string;
-
-  /**
-   * The dev-server port.
-   */
-  devPort?: number;
-
-  /**
-   * The `--sso` flags as typed, when they could not be resolved to a provider
-   * yet: a custom connection described in part, which the wizard completes.
-   * Dropping them would send the developer back without what they typed.
-   */
-  ssoTyped?: Readonly<{
-    /**
-     * The provider, as typed.
-     */
-    sso: string;
-
-    /**
-     * The name of the connection.
-     */
-    ssoSlug?: string;
-
-    /**
-     * The name shown on the sign-in button.
-     */
-    ssoDisplayName?: string;
-
-    /**
-     * The provider's issuer URL.
-     */
-    ssoIssuer?: string;
-
-    /**
-     * The scopes to request.
-     */
-    ssoScopes?: string;
-  }>;
-
-  /**
-   * The social provider and its client id. The secret is deliberately absent:
-   * a retry asks for it again, or takes it on stdin, because putting a
-   * credential in suggested command text is exactly what piping the secret
-   * exists to avoid. It never reaches the filesystem either way — the value
-   * goes to the project's variables, which is where the engine resolves the
-   * connection's `${{ NAME }}` from.
-   */
-  sso?: readonly ProviderSelection[];
-
-  /**
-   * The minimum password length the run was given: a number, or `null` for
-   * an explicit "none", carried as `--password-min-length 0` so a kept policy
-   * file still loses its minimum on the retry.
-   */
-  passwordMinLength?: PasswordMinLength;
-
-  /**
-   * The server as the developer typed it. Left out, a retry pins the local
-   * server; `null` leaves it to the default, as a run that typed none did.
-   */
-  server?: string | null;
-}>;
-
-/**
  * The default configuration setup scaffolds into a project, planned against
  * the files the project already has.
  *
@@ -811,7 +809,7 @@ export async function scaffoldOf(
   force: boolean,
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
   signupPolicy = true,
-): Promise<Scaffold<SsoDraft>> {
+): Promise<Scaffold<SsoDraft & ScaffoldedProvider>> {
   try {
     return (
       await ZitadelConfig.loadKinds(new DiskStore(cwd), [
@@ -823,7 +821,26 @@ export async function scaffoldOf(
     ).scaffold({
       preset: answers.preset,
       useCase: answers.useCase,
-      sso: answers.sso,
+      sso: answers.sso.map((draft): SsoDraft & ScaffoldedProvider => {
+        return {
+          ...draft,
+          claims: (connection, template) => {
+            return choiceOf(
+              claimsOrRefuse(
+                applyRequest(
+                  seedMapping(
+                    connection,
+                    template,
+                    (draft.claimRequest ?? NO_CLAIM_REQUEST).scopes,
+                  ),
+                  draft.claimRequest ?? NO_CLAIM_REQUEST,
+                ),
+              ),
+              VERIFIED_FLAG,
+            );
+          },
+        };
+      }),
       passwordMinLength: answers.passwordMinLength,
       signupPolicy,
       force,
@@ -831,6 +848,60 @@ export async function scaffoldOf(
   } catch (error) {
     throw setupRefusal(error, []);
   }
+}
+
+/**
+ * The preset and use case a run settles on from its flags, the defaults where
+ * a flag is left out.
+ *
+ * @param flags - The flags the invocation was given.
+ * @returns The preset and use case that decide the schema.
+ */
+export function variantOf(
+  flags: Readonly<Pick<SetupFlags, "preset" | "useCase">>,
+): Pick<SetupAnswers, "preset" | "useCase"> {
+  return {
+    preset:
+      SETUP_PRESETS.find((preset) => {
+        return preset === flags.preset;
+      }) ?? DEFAULT_SETUP_PRESET,
+    useCase:
+      SETUP_USE_CASES.find((useCase) => {
+        return useCase === flags.useCase;
+      }) ?? DEFAULT_SETUP_USE_CASE,
+  };
+}
+
+/**
+ * Refuses the claims a provider was asked to map when the schema the run will
+ * scaffold cannot take them.
+ *
+ * @remarks
+ * Called before the provider's credentials are asked for or read, so a mistake
+ * in `--sso-claim` or `--sso-verified-claim` costs no secret. The mapping is
+ * read the way {@link scaffoldOf} reads it, against the default schema of the
+ * preset and use case.
+ *
+ * @param draft - The provider and what it was asked to map.
+ * @param variant - The preset and use case that decide the schema.
+ * @throws {@link ZitadelError} With `E_VALIDATION` when a claim does not fit
+ *   the schema.
+ */
+export function refuseUnmappableClaims(
+  draft: Pick<SsoDraft, "selection" | "endpoints" | "claimRequest">,
+  variant: Pick<SetupAnswers, "preset" | "useCase">,
+): void {
+  const template = ZitadelConfig.defaultSchema(variant.preset, variant.useCase);
+  claimsOrRefuse(
+    applyRequest(
+      seedMapping(
+        Connection.forProvider(providerOf(draft.selection), template, draft.endpoints),
+        template,
+        (draft.claimRequest ?? NO_CLAIM_REQUEST).scopes,
+      ),
+      draft.claimRequest ?? NO_CLAIM_REQUEST,
+    ),
+  );
 }
 
 /**
@@ -920,8 +991,8 @@ function connectionRefusal(path: string, selection: ProviderSelection): ZitadelE
  * A given value goes through the same parser as a typed one, so every setting
  * comes back checked against the contract the server enforces on apply, and a
  * name or issuer it would refuse is refused. The command line's own mistakes
- * are named under their flag before this runs (`checkGivenCustomFlags`), so a
- * given value that gets here has already passed.
+ * are named under their flag as the flags are parsed, so a given value that gets
+ * here has already passed.
  *
  * The display name comes first so the slug can be suggested from it: "Acme SSO"
  * offers "acme-sso", which the developer accepts or edits. The settings carry
@@ -995,46 +1066,6 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
       : absolute
   ).replaceAll("\\", "/");
 }
-
-/**
- * The sign-in configuration setup's answers add up to, as `data.sign_in`
- * reports it. Read off the schema setup renders rather than inferred from the
- * preset's name: `password-first` enables passkeys too, and a use case's
- * profile fields are optional. It describes what is configured, not that
- * sign-in works: an enabled method is not a credential a user has registered.
- */
-export type SignIn = Readonly<{
-  /**
-   * The method the login flow's entry step offers.
-   */
-  starts_with: "password" | "passkey";
-
-  /**
-   * The methods the user schema enables: the one sign-in starts with, the
-   * other, then `sso` when a provider is on.
-   */
-  methods: readonly string[];
-
-  /**
-   * What registration asks for, in order, and whether each is required.
-   */
-  fields: ReadonlyArray<
-    Readonly<{
-      name: string;
-      required: boolean;
-    }>
-  >;
-
-  /**
-   * `null` when passwords have no minimum length.
-   */
-  password_min_length: number | null;
-
-  /**
-   * The external providers' slugs, in the order they were chosen.
-   */
-  providers: readonly string[];
-}>;
 
 /**
  * The sign-in configuration setup's answers add up to, read off the
@@ -1133,31 +1164,6 @@ export function describeWrittenFile(relPath: string, dryRun: boolean): string | 
 }
 
 /**
- * What the git working tree of a project holds, as setup needs to know before
- * it writes.
- */
-export type WorktreeState =
-  | Readonly<{
-      kind: "no-repository";
-    }>
-  | Readonly<{
-      kind: "unknown";
-      reason: string;
-    }>
-  | Readonly<{
-      kind: "blocked";
-      blocked: string;
-    }>
-  | Readonly<{
-      kind: "dirty";
-      modified: readonly string[];
-      untracked: readonly string[];
-    }>
-  | Readonly<{
-      kind: "clean";
-    }>;
-
-/**
  * Reports what the repository of a project holds, before setup writes a single
  * file.
  *
@@ -1245,6 +1251,50 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
 }
 
 /**
+ * The flags `auth-method sso enable` takes to add `selection` to a project: the
+ * provider, and for a custom connection the settings that describe it. None
+ * of them is a credential: the client id is asked for, as the secret is.
+ *
+ * @param selection - The provider.
+ * @returns The flags, in the order the command line takes them.
+ */
+export function ssoEnableFlags(
+  selection: ProviderSelection,
+): SuggestFlags<"auth-method:sso:enable"> {
+  if (selection.kind !== "custom") {
+    return {
+      provider: selectionName(selection),
+    };
+  }
+  const { slug, displayName, issuer, scopes } = selection.connection;
+
+  return {
+    provider: selectionName(selection),
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
+}
+
+/**
+ * The `--sso-claim` flags that restate a claim request.
+ *
+ * @param request - The claims asked for, if any.
+ * @returns The flags, each left out when the request does not use it.
+ */
+export function ssoClaimFlags(
+  request: ClaimRequest | undefined,
+): Pick<SuggestFlags<"setup">, "ssoClaim" | "ssoVerifiedClaim" | "ssoClaimScope"> {
+  const texts = claimFlagTexts(request ?? NO_CLAIM_REQUEST);
+  return {
+    ssoClaim: texts.claim,
+    ssoVerifiedClaim: texts.verifiedClaim,
+    ssoClaimScope: texts.claimScope,
+  };
+}
+
+/**
  * The flags of the current invocation for retry guidance, ending in
  * `--server local` unless the run named a server.
  *
@@ -1281,6 +1331,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
     renderer: opts.renderer === DEFAULT_RENDERER ? undefined : opts.renderer,
     devPort: opts.devPort,
     passwordMinLength: opts.passwordMinLength === null ? 0 : opts.passwordMinLength,
+    ...ssoClaimFlags(opts.ssoClaims),
     ...(firstSso === undefined
       ? opts.ssoTyped
       : {
@@ -1335,6 +1386,9 @@ export function retryOptionsFromFlags(
     ssoDisplayName?: string;
     ssoIssuer?: string;
     ssoScopes?: string;
+    ssoClaim?: readonly string[];
+    ssoVerifiedClaim?: readonly string[];
+    ssoClaimScope?: string;
   }>,
 ): SetupRetryOptions {
   const [, selection] = tryCatch(() => {
@@ -1375,6 +1429,11 @@ export function retryOptionsFromFlags(
     devPort: flags.devPort,
     passwordMinLength: flags.passwordMinLength,
     sso: selection === undefined ? undefined : [selection],
+    ssoClaims: claimRequestFromFlags({
+      claim: flags.ssoClaim,
+      scope: flags.ssoClaimScope,
+      verified: flags.ssoVerifiedClaim,
+    }),
   };
 }
 
@@ -1432,71 +1491,5 @@ export function ssoRecovery(
         },
       });
     }),
-  };
-}
-
-/**
- * The lowest TCP port a server can listen on.
- */
-const MIN_PORT = 1;
-
-/**
- * The highest TCP port a server can listen on.
- */
-const MAX_PORT = 65_535;
-
-/**
- * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
- * port a server can listen on.
- */
-export const PORT = {
-  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
-  refusal: {
-    message: "{value} is not a TCP port",
-    hint: "Use a TCP port from {min} to {max}.",
-  },
-  values: {
-    min: MIN_PORT,
-    max: MAX_PORT,
-  },
-} as const satisfies Refused<number>;
-
-/**
- * What a question is given, from what is known and what the command gives its step.
- *
- * @param needs - The flags, the app and the framework the run settled on.
- * @param deps - The questions, the project's directory, the suggestion builder and the screen.
- * @returns The context the question asks with.
- */
-export function promptContext(
-  needs: Fact<"flags" | "orca" | "app" | "scaffoldedFramework">,
-  deps: Pick<SetupServices, "ask" | "cwd" | "serverFlag" | "suggest" | "ui">,
-): PromptContext {
-  const { app, flags, orca, scaffoldedFramework } = needs;
-  return {
-    ask: deps.ask,
-    note: (title, lines) => {
-      deps.ui.note(title, lines);
-    },
-    say: (text) => {
-      deps.ui.say(text);
-    },
-    spinner: (label, options) => {
-      return deps.ui.spinner(label, options);
-    },
-    framework: {
-      id: app.framework,
-      displayName: orca.displayName(app.framework),
-    },
-    suggest: deps.suggest,
-    cwd: deps.cwd,
-    frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-    serverFlag: deps.serverFlag,
-    devPortFromFlag: flags.devPort !== undefined,
-    presetFromFlag: flags.preset !== undefined,
-    useCaseFromFlag: flags.useCase !== undefined,
-    ssoFromFlag: flags.sso !== undefined,
-    passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-    developmentBuild: isDevelopmentBuild(),
   };
 }

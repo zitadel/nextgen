@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
 import { BrokenFilesError, RefusedEditError, UserSchema } from "@/lib/zitadel";
+import { propertyName } from "@/lib/zitadel/names";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
@@ -508,6 +509,82 @@ describe("UserSchema edits of an external schema", () => {
   ])("$method refuses it", ({ edit }) => {
     const error = thrownBy(() => {
       return edit(external);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+  });
+});
+
+describe("UserSchema.isUnique", () => {
+  const schema = UserSchema.of(
+    aFile(
+      "schemas",
+      SCHEMA_FILE,
+      aUserSchema({
+        properties: { email: { "x-unique": "project" }, givenName: { type: "string" } },
+      }),
+    ),
+  );
+
+  it.each([
+    ["a property declared x-unique", "email", true],
+    ["a property that is not", "givenName", false],
+    ["a property the schema does not define", "shoeSize", false],
+  ])("answers for %s", (_what, name, expected) => {
+    expect(schema.isUnique(propertyName(name))).toBe(expected);
+  });
+});
+
+describe("UserSchema.withProperties", () => {
+  const schema = () => {
+    return UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, aUserSchema({ properties: { email: { type: "string" } } })),
+    );
+  };
+
+  it("adds a property typed to hold what fills it", () => {
+    const edit = schema().withProperties([{ name: "employeeNumber", type: "integer" }]);
+
+    expect({
+      changed: edit.changed,
+      property: objectAt(edit.document.body, "properties").employeeNumber,
+    }).toEqual({
+      changed: true,
+      property: { type: "integer", description: "Filled from an identity provider claim." },
+    });
+  });
+
+  it("keeps a property the schema defines already as it is", () => {
+    const original = schema();
+
+    const edit = original.withProperties([{ name: "email", type: "integer" }]);
+
+    expect({ changed: edit.changed, same: edit.document === original }).toEqual({
+      changed: false,
+      same: true,
+    });
+  });
+
+  it("adds a property named like one every object has", () => {
+    const edit = schema().withProperties([{ name: "constructor", type: "string" }]);
+
+    expect(Object.hasOwn(objectAt(edit.document.body, "properties"), "constructor")).toBe(true);
+  });
+
+  it("changes nothing when there is nothing to add", () => {
+    expect(schema().withProperties([]).changed).toBe(false);
+  });
+
+  it("refuses a schema that points at an external schema", () => {
+    const external = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        kind: "schema-url",
+        url: "https://schemas.test.invalid/remote.json",
+      }),
+    );
+
+    const error = thrownBy(() => {
+      return external.withProperties([{ name: "employeeNumber", type: "string" }]);
     });
 
     expect(error).toBeInstanceOf(RefusedEditError);

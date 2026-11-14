@@ -2,8 +2,7 @@ import { SETUP_USE_CASES } from "@zitadel/config/defaults";
 
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { promptContext } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -13,10 +12,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
 
 /**
  * "Which fields should registration collect?" — picks the use case,
@@ -45,24 +41,8 @@ export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, Needs>
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * Ask which fields registration collects.
+   * Ask which fields registration collects, or leave the answers as they are when nothing can be
+   * asked.
    *
    * @remarks
    * The labels are the field sets themselves, so all three stay comparable whichever option is
@@ -72,31 +52,35 @@ export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, Needs>
    * of truth — and stays short enough for one line of an 80-column terminal. That every set
    * includes email, the labels already say.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
+   * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the use case settled.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.useCaseFromFlag) {
-      return answers;
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers, flags } = needs;
+    if (this.deps.nonInteractive || this.deps.dryRun || flags.useCase !== undefined) {
+      return {
+        answers,
+      };
     }
     return {
-      ...answers,
-      useCase: await ctx.ask.select({
-        name: "use case",
-        message: "Which fields should registration collect? You can change them later.",
-        initialValue: answers.useCase,
-        options: SETUP_USE_CASES.map((useCase) => {
-          return {
-            value: useCase,
-            label: {
-              minimal: "Email only",
-              consumer: "Email, first name and last name",
-              business: "Email, first name, last name and company name",
-            }[useCase],
-          };
+      answers: {
+        ...answers,
+        useCase: await this.deps.ask.select({
+          name: "use case",
+          message: "Which fields should registration collect? You can change them later.",
+          initialValue: answers.useCase,
+          options: SETUP_USE_CASES.map((useCase) => {
+            return {
+              value: useCase,
+              label: {
+                minimal: "Email only",
+                consumer: "Email, first name and last name",
+                business: "Email, first name, last name and company name",
+              }[useCase],
+            };
+          }),
         }),
-      }),
+      },
     };
   }
 }

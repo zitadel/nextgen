@@ -2693,6 +2693,82 @@ describe("setup", () => {
     });
   });
 
+  describe("with a custom provider and claim mappings", () => {
+    const BUSINESS = ["--use-case", "business"];
+
+    /**
+     * A dry run with the custom provider and the claim flags given.
+     *
+     * @param dir - The app's directory.
+     * @param flags - The claim flags.
+     * @returns What the run printed and how it ended.
+     */
+    async function previewWith(dir: string, ...flags: string[]) {
+      await aNextApp(dir);
+      return runCliForTest(
+        onTheCloud(
+          dir,
+          ...DRY_RUN_NEXT,
+          ...BUSINESS,
+          ...ACME,
+          "--sso-client-id",
+          "acme-client-id",
+          ...flags,
+        ),
+      );
+    }
+
+    it("maps the standard claims whose names the schema has", async ({ dir }) => {
+      const res = await previewWith(dir);
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: { sso: [{ claim_mapping: { givenName: "given_name", familyName: "family_name" } }] },
+      });
+    });
+
+    it("fills a property from the claim it is given", async ({ dir }) => {
+      const res = await previewWith(dir, "--sso-claim", "companyName=organization");
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: { sso: [{ claim_mapping: { companyName: "organization" } }] },
+      });
+    });
+
+    it("asks for the scopes the claims need", async ({ dir }) => {
+      const res = await previewWith(
+        dir,
+        "--sso-claim",
+        "companyName=organization",
+        "--sso-claim-scope",
+        "organization",
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        data: { sso: [{ scopes: ["openid", "profile", "email", "organization"] }] },
+      });
+    });
+
+    it("reports no new attributes, which only the questions can create", async ({ dir }) => {
+      const res = await previewWith(dir, "--sso-claim", "companyName=organization");
+
+      expect(parseJson(res.stdout)).toMatchObject({ data: { sso: [{ new_attributes: [] }] } });
+    });
+
+    it.for([
+      ["a property the schema does not define", "shoeSize=shoe", "shoeSize is not a property"],
+      [
+        "a claim that already fills a property",
+        "companyName=given_name",
+        "given_name already fills",
+      ],
+    ] as const)("refuses %s before anything is created", async ([, claim, said], { dir }) => {
+      const res = await previewWith(dir, "--sso-claim", claim);
+
+      expect(res).toFailWith("E_VALIDATION");
+      expect(parseJson(res.stdout)).toMatchObject({ message: expect.stringContaining(said) });
+    });
+  });
+
   describe("with a custom provider described in part", () => {
     it("refuses with E_VALIDATION when the run cannot ask, whatever the server is doing", async ({
       dir,
@@ -3557,6 +3633,27 @@ describe("refuseUnusableFlags", () => {
       refusal: { message: "--sso-scopes needs --sso custom" },
     },
     {
+      situation: "--sso-claim with no provider",
+      flags: { ssoClaim: ["companyName=organization"] },
+      scripted: false,
+      refusal: {
+        message: "--sso-claim needs --sso",
+        hint: "Name the provider with --sso, e.g. --sso google.",
+      },
+    },
+    {
+      situation: "every claim flag with no provider, naming each",
+      flags: {
+        ssoClaim: ["companyName=organization"],
+        ssoVerifiedClaim: ["companyName=true"],
+        ssoClaimScope: "organization",
+      },
+      scripted: false,
+      refusal: {
+        message: "--sso-claim, --sso-verified-claim, --sso-claim-scope needs --sso",
+      },
+    },
+    {
       situation: "custom connection settings beside a catalog provider, naming and listing each",
       flags: { sso: "google", ssoIssuer: "https://x", ssoSlug: "x" },
       scripted: false,
@@ -3812,6 +3909,21 @@ describe("setupRetryFlags", () => {
         ssoIssuer: "https://sso.acme.example",
       },
       carried: { ssoIssuer: "https://sso.acme.example" },
+    },
+    {
+      situation: "the claims asked for, which are no credentials",
+      flags: {
+        sso: "custom",
+        ssoSlug: "acme-sso",
+        ssoClaim: ["companyName=organization"],
+        ssoVerifiedClaim: ["companyName=true"],
+        ssoClaimScope: "organization",
+      },
+      carried: {
+        ssoClaim: ["companyName=organization"],
+        ssoVerifiedClaim: ["companyName=true"],
+        ssoClaimScope: "organization",
+      },
     },
     {
       situation: "the minimum password length",

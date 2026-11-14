@@ -2,8 +2,7 @@ import { LocalServer } from "@/lib/local-server/server";
 import { DEFAULT_SERVER } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { promptContext } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * The value the choice select returns when the person picks "Custom URL".
@@ -23,10 +22,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<
-  SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
->;
+type Deps = Pick<SetupServices, "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "ui">;
 
 /**
  * "Which Zitadel server should your app use?" — Zitadel Cloud, the managed
@@ -64,24 +60,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * Ask which server the app uses.
+   * Ask which server the app uses, or leave the answers as they are when nothing can be asked.
    *
    * @remarks
    * `--server <url>` overrides the wizard entirely. The command already validated and resolved the
@@ -93,18 +72,20 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
    * clears instead of leaving a line behind, because the options it decides already say what it
    * found, and it draws no guide line of its own, which clearing would leave behind.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
+   * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the server settled.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.serverFlag) {
-      return answers;
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers } = needs;
+    if (this.deps.nonInteractive || this.deps.dryRun || this.deps.serverFlag) {
+      return {
+        answers,
+      };
     }
-    const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
-    const detected = await LocalServer.detectUrl(ctx.cwd);
+    const probing = this.deps.ui.spinner("Checking for a local Zitadel server", { guide: false });
+    const detected = await LocalServer.detectUrl(this.deps.cwd);
     probing.clear();
-    const choice = await ctx.ask.select({
+    const choice = await this.deps.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
       options: [
@@ -132,26 +113,28 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
     });
     return {
-      ...answers,
-      server:
-        choice === CUSTOM
-          ? await ctx.ask.text({
-              name: "server URL",
-              message: "What is the URL of your Zitadel server?",
-              placeholder: "https://zitadel.internal",
-              parse: (value) => {
-                return URL.canParse(value)
-                  ? {
-                      ok: true,
-                      value,
-                    }
-                  : {
-                      ok: false,
-                      problem: "Must be a valid URL",
-                    };
-              },
-            })
-          : choice,
+      answers: {
+        ...answers,
+        server:
+          choice === CUSTOM
+            ? await this.deps.ask.text({
+                name: "server URL",
+                message: "What is the URL of your Zitadel server?",
+                placeholder: "https://zitadel.internal",
+                parse: (value) => {
+                  return URL.canParse(value)
+                    ? {
+                        ok: true,
+                        value,
+                      }
+                    : {
+                        ok: false,
+                        problem: "Must be a valid URL",
+                      };
+                },
+              })
+            : choice,
+      },
     };
   }
 }

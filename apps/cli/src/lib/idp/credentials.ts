@@ -6,11 +6,6 @@ import type {
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
 
-import { log } from "@/lib/log";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
-
 /**
  * The project variable a connection reads one of its credentials from.
  */
@@ -156,41 +151,9 @@ async function publishSecret(
     await publish(name, value, { secret });
 
     return "stored";
-  } catch (error) {
-    log.debug(`Publishing ${name} to the project failed`, error);
+  } catch {
     return "failed";
   }
-}
-
-/**
- * The command that puts a credential the project never received where the
- * connection looks for it.
- *
- * @remarks
- * Without `--preview` the write takes the platform's default: a client id,
- * which is not secret, is stored for both kinds, and a client secret for the
- * primary kind only. The engine resolves a connection's `${{ NAME }}` from the
- * project's own variables.
- *
- * Shared so the warning printed to a terminal and the `next_commands` a JSON
- * run reports cannot drift apart — a JSON run prints no warnings at all, so
- * that list is the only place the recovery step appears.
- *
- * @param name - The variable.
- * @param secret - Whether it is a secret one.
- * @param suggest - Renders the command for the run, scope included.
- * @returns The command.
- */
-export function republishCommand(
-  name: CredentialVariable,
-  secret: boolean,
-  suggest: Suggest,
-): SuggestedCommand {
-  if (secret) {
-    return suggest({ id: "variable:set", args: { name }, flags: { secret: true } });
-  }
-
-  return suggest({ id: "variable:set", args: { name } });
 }
 
 /**
@@ -215,8 +178,7 @@ export type CredentialRecovery = {
  *
  * @remarks
  * Typed, not rendered, for a caller that reports each as a command and as
- * `next_args`: it builds both from the same `variable set` input, which is
- * what {@link republishCommands} does for the commands.
+ * `next_args`: it builds both from the same `variable set` input.
  *
  * @param credentials - Each credential of the run and what became of it.
  * @returns One entry per credential the project lacks.
@@ -249,105 +211,6 @@ export type Unpublished = {
    */
   readonly secret: boolean;
 };
-
-/**
- * {@link unpublished} as commands to run.
- *
- * @remarks
- * Built for a run that prints nothing: with `--json` narration is disabled, so
- * the warnings above never appear and this list is the only place the recovery
- * step is stated.
- *
- * @param credentials - Each credential of the run and what became of it.
- * @param suggest - Renders each command for the run, scope included.
- * @returns One command per credential the project lacks.
- */
-export function republishCommands(
-  credentials: readonly CredentialRecovery[],
-  suggest: Suggest,
-): readonly SuggestedCommand[] {
-  return unpublished(credentials).map((missing) => {
-    return republishCommand(missing.name, missing.secret, suggest);
-  });
-}
-
-/**
- * Say whether the project received a credential, and how to retry when it did
- * not.
- *
- * @remarks
- * Shared by both credentials, because the project is the destination that
- * decides whether sign-in works and the wording should not drift between them.
- * `noValue` separates the two ways a publish can be deferred: nothing was
- * supplied, or there was no project to publish to. They read the same to the
- * code and call for different things from the developer.
- *
- * @param name - The variable.
- * @param state - What became of it.
- * @param republish - The command that publishes it.
- * @param noValue - Whether a deferral means no value was given.
- */
-function reportPublished(
-  name: CredentialVariable,
-  state: PublishState,
-  republish: SuggestedCommand,
-  noValue: boolean,
-): void {
-  switch (state) {
-    case "stored": {
-      log.done(`Published ${escapeControlCharacters(name)} to the project`);
-      return;
-    }
-    case "deferred": {
-      if (noValue) {
-        reportWarning(`${name} has no value yet. Publish it with: ${republish}`);
-        return;
-      }
-      reportWarning(`${name} was not published to the project. Publish it with: ${republish}`);
-      return;
-    }
-    case "failed": {
-      reportWarning(`${name} could not be published. Sign-in fails until it is: ${republish}`);
-      return;
-    }
-  }
-}
-
-/**
- * Tell the developer what became of the secret.
- *
- * @param outcome - Where the secret ended up.
- * @param noValue - Whether a deferral means no value was given.
- * @param suggest - Renders the command that publishes it, for the run.
- */
-export function reportSecretOutcome(
-  outcome: SecretOutcome,
-  noValue: boolean,
-  suggest: Suggest,
-): void {
-  const republish = republishCommand(outcome.name, true, suggest);
-  reportPublished(outcome.name, outcome.published, republish, noValue);
-}
-
-/**
- * Tell the developer what became of the client id.
- *
- * @remarks
- * A missing one is never "no value yet": the command refuses without a client
- * id, so the only way here is a project it could not reach.
- *
- * @param name - The variable.
- * @param state - What became of it.
- * @param suggest - Renders the command that publishes it, for the run.
- */
-export function reportClientIdOutcome(
-  name: ClientIdVariable,
-  state: PublishState,
-  suggest: Suggest,
-): void {
-  const republish = republishCommand(name, false, suggest);
-  reportPublished(name, state, republish, false);
-}
 
 /**
  * The project variables a connection reads its credentials from.

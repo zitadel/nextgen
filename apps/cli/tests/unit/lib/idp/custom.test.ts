@@ -4,7 +4,6 @@ import { ZitadelError } from "@/lib/errors";
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import Setup from "@/cli/commands/setup";
 import {
-  checkGivenCustomFlags,
   customExample,
   ENABLE_FLAG_KEYS,
   SETUP_FLAG_KEYS,
@@ -206,27 +205,6 @@ describe("givenCustomFlags", () => {
       "--sso-slug",
       "--sso-scopes",
     ]);
-  });
-});
-
-describe("checkGivenCustomFlags", () => {
-  it("accepts settings that are valid and ignores those that were not given", () => {
-    expect(() => checkGivenCustomFlags({ slug: "acme-sso" }, flag)).not.toThrow();
-  });
-
-  it.each([
-    ["slug", { slug: "Acme" }, "--slug"],
-    ["display name", { displayName: "  " }, "--display-name"],
-    ["issuer", { issuer: "http://sso.acme.example" }, "--issuer"],
-    ["scopes", { scopes: "profile" }, "--scopes"],
-  ])("names the flag of an invalid %s", (_setting, values, expected) => {
-    const error = refusal(() => checkGivenCustomFlags(values, flag));
-
-    expect(error.message).toContain(expected);
-  });
-
-  it("does not insist on the settings it was not given", () => {
-    expect(() => checkGivenCustomFlags({}, flag)).not.toThrow();
   });
 });
 

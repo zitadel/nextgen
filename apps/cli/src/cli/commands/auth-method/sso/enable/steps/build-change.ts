@@ -6,7 +6,9 @@ import { WizardStep } from "@/lib/wizard";
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"target" | "candidate" | "preview" | "options" | "summary" | "given">;
+type Needs = Fact<
+  "target" | "candidate" | "preview" | "options" | "summary" | "given" | "claims" | "answered"
+>;
 
 /**
  * Settles the change to write, and checks that saving it would be accepted.
@@ -23,8 +25,10 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
    *
    * @remarks
    * The change is the preview, or the same change made again with the endpoints
-   * a development run answered. The endpoints change only a new connection's
-   * body, never which files the change writes.
+   * a development run answered, or the claims the person chose when the flags
+   * mapped none. The endpoints change only a new connection's body, never which
+   * files the change writes; the claims can add properties to the schema and
+   * fields to the login flow.
    *
    * The credentials go before the files: saving writes the connection first, so
    * a write that then fails would leave a connection on disk whose credentials
@@ -38,13 +42,22 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
    * @throws {@link ZitadelError} When saving the change would be refused.
    */
   async run(needs: Needs): Promise<Fact<"change">> {
+    const claimed =
+      needs.answered === undefined
+        ? needs.candidate
+        : needs.candidate.withClaims(needs.answered).document;
     const change =
-      needs.given.endpoints === undefined
+      needs.given.endpoints === undefined && needs.answered === needs.claims
         ? needs.preview
         : needs.target.config.connections.enable(
             needs.target.schema,
-            needs.candidate.withEndpoints(needs.given.endpoints).document,
-            needs.options,
+            needs.given.endpoints === undefined
+              ? claimed
+              : claimed.withEndpoints(needs.given.endpoints).document,
+            {
+              ...needs.options,
+              attributes: needs.answered?.created,
+            },
           );
     if (needs.summary.reused) {
       log.done(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);

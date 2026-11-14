@@ -3,6 +3,8 @@ import {
   DEFAULT_SCHEMA_CONFIG_PATH,
   getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
+  type SetupPreset,
+  type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { providerOf } from "@zitadel/config/idp";
 
@@ -15,6 +17,7 @@ import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
   BrokenFilesError,
   ConfigError,
+  ConflictError,
   ConnectionExistsError,
   FileExistsError,
 } from "@/lib/zitadel/errors";
@@ -492,7 +495,8 @@ export class ZitadelConfig {
    * @throws {@link FileExistsError} Without `force`, when the default schema,
    *   flow, password policy or sign-up policy file is already there.
    * @throws {@link ConflictError} When a chosen provider's connection would
-   *   collide with another connection, by file name, slug or variables.
+   *   collide with another connection, by file name, slug or variables, or when
+   *   two providers would create the same property as different types.
    * @throws {@link ConfigError} When `force` keeps a password or sign-up
    *   policy file that is not a sound policy of its operation.
    */
@@ -500,13 +504,57 @@ export class ZitadelConfig {
     const variant = { preset: options.preset, useCase: options.useCase };
     // The defaults are typed by the API's generated models, so each enters the
     // library through the one JSON check.
-    const schemaBody = toJsonObject(getDefaultHumanUserSchemaBody(variant), "The default schema");
     const flowBody = toJsonObject(getDefaultLoginFlow(variant), "The default login flow");
-    const template = UserSchema.create({ path: DEFAULT_SCHEMA_CONFIG_PATH, body: schemaBody });
+    const template = ZitadelConfig.defaultSchema(options.preset, options.useCase);
     const connections = options.sso.map((chosen) => {
-      const provider = providerOf(chosen.selection);
-      return { chosen, connection: Connection.forProvider(provider, template, chosen.endpoints) };
+      const plain = Connection.forProvider(
+        providerOf(chosen.selection),
+        template,
+        chosen.endpoints,
+      );
+      const claims = chosen.claims?.(plain, template);
+      return {
+        chosen,
+        connection: claims === undefined ? plain : plain.withClaims(claims).document,
+        created: claims?.created ?? [],
+        notes: claims?.notes ?? [],
+      };
     });
+    const proposed = connections.flatMap((scaffolded) => {
+      return scaffolded.created;
+    });
+    const clashing = proposed.find((property) => {
+      return proposed.some((other) => {
+        return other.name === property.name && other.type !== property.type;
+      });
+    });
+    if (clashing !== undefined) {
+      const types = [
+        ...new Set(
+          proposed
+            .filter((property) => {
+              return property.name === clashing.name;
+            })
+            .map((property) => {
+              return property.type;
+            }),
+        ),
+      ];
+      throw new ConflictError(
+        `Two providers would create ${clashing.name} in the user schema as different types: ${types.join(" and ")}`,
+        {
+          hint: "Give the property one type for both providers, or map the claims to different property names.",
+          details: { property: clashing.name, types },
+        },
+      );
+    }
+    const created = [
+      ...new Map(
+        proposed.map((property) => {
+          return [property.name, property] as const;
+        }),
+      ).values(),
+    ];
     for (const scaffolded of connections) {
       const connection = scaffolded.connection;
       // `resolveExisting` refuses any connection file at the path, so only a
@@ -537,11 +585,15 @@ export class ZitadelConfig {
     // that names every chosen provider.
     const schema = slugs.reduce((document, slug) => {
       return document.withProvider(slug).document;
-    }, template);
+    }, template.withProperties(created).document);
     // The conflict step a provider needs can only offer what this schema
     // enables, so the methods are read off the composed schema rather than
     // inferred from the preset.
-    const login = Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowBody });
+    const login = Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowBody }).withFields(
+      created.map((property) => {
+        return property.name;
+      }),
+    ).document;
     const flow = slugs.reduce((document, slug) => {
       return document.withProvider(slug, schema.enabledMethods).document;
     }, login);
@@ -566,6 +618,25 @@ export class ZitadelConfig {
       policy,
       signupPolicy,
     };
+  }
+
+  /**
+   * The default user schema for a preset and use case, as a scaffold starts
+   * from it.
+   *
+   * @remarks
+   * What a developer's claim mapping is read against before the schema file
+   * exists.
+   *
+   * @param preset - The sign-in preset.
+   * @param useCase - The use case.
+   * @returns The schema, at the default schema's path.
+   */
+  static defaultSchema(preset: SetupPreset, useCase: SetupUseCase): UserSchema {
+    return UserSchema.create({
+      path: DEFAULT_SCHEMA_CONFIG_PATH,
+      body: toJsonObject(getDefaultHumanUserSchemaBody({ preset, useCase }), "The default schema"),
+    });
   }
 
   /**

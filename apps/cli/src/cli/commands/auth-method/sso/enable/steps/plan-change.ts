@@ -1,12 +1,7 @@
-import { providerOf, selectionName } from "@zitadel/config/idp";
+import { credentialVariables, providerOf, selectionName } from "@zitadel/config/idp";
 
-import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import {
-  callbackUriFor,
-  CredentialDelivery,
-  CredentialPrompt,
-  loopbackIssuerWarning,
-} from "@/lib/idp";
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
@@ -16,13 +11,8 @@ import { Connection } from "@/lib/zitadel";
  * What the step reads from what is known.
  */
 type Needs = Fact<
-  "target" | "remote" | "origins" | "issuer" | "selection" | "provider" | "options"
+  "target" | "remote" | "origins" | "issuer" | "selection" | "provider" | "options" | "claims"
 >;
-
-/**
- * What the step is given by the command.
- */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -31,26 +21,13 @@ type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
  */
 export class PlanChange extends WizardStep<
   "plan",
-  Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">,
+  Fact<"candidate" | "preview" | "names" | "summary">,
   Needs
 > {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
   readonly key = "plan";
-
-  /**
-   * What the command gives the step.
-   */
-  private readonly deps: Deps;
-
-  /**
-   * @param deps - What the command gives the step.
-   */
-  constructor(deps: Deps) {
-    super();
-    this.deps = deps;
-  }
 
   /**
    * Make the candidate connection and the change it would make, and say what
@@ -64,19 +41,21 @@ export class PlanChange extends WizardStep<
    * listed once. A deployed URI that equals the development one, and a preview
    * URI that equals either, is left out of its list.
    *
+   * The credentials go to the project variables the connection references. A
+   * connection with no `oidc` block leaves both to the variables its slug
+   * derives, and a credential it holds as a value names none.
+   *
    * @param needs - What was read and decided.
    * @returns The plan.
    * @throws {@link ZitadelError} When the change would be refused.
    */
-  async run(
-    needs: Needs,
-  ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
-    const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-    const preview = needs.target.config.connections.enable(
-      needs.target.schema,
-      candidate,
-      needs.options,
-    );
+  async run(needs: Needs): Promise<Fact<"candidate" | "preview" | "names" | "summary">> {
+    const plain = Connection.forProvider(needs.provider, needs.target.schema);
+    const candidate = needs.claims === undefined ? plain : plain.withClaims(needs.claims).document;
+    const preview = needs.target.config.connections.enable(needs.target.schema, candidate, {
+      ...needs.options,
+      attributes: needs.claims?.created,
+    });
     const loopback = loopbackIssuerWarning(
       needs.selection,
       await loopbackReach(needs.target.cwd, needs.remote.server),
@@ -86,11 +65,18 @@ export class PlanChange extends WizardStep<
     }
     const connection = preview.document;
     const reused = !preview.created;
-    const delivery = new CredentialDelivery({
-      connection,
-      reused,
-      suggest: this.deps.suggest,
-    });
+    const credentials = connection.credentials;
+    const names =
+      credentials === undefined
+        ? credentialVariables(connection.slug)
+        : {
+            clientId:
+              credentials.clientId.kind === "literal" ? undefined : credentials.clientId.variable,
+            clientSecret:
+              credentials.clientSecret.kind === "literal"
+                ? undefined
+                : credentials.clientSecret.variable,
+          };
     const callbackUri = callbackUriFor(needs.issuer, connection.slug);
     const deployedCallbackUris = [
       ...new Set(
@@ -104,15 +90,7 @@ export class PlanChange extends WizardStep<
     return {
       candidate,
       preview,
-      delivery,
-      prompt: new CredentialPrompt({
-        selection: needs.selection,
-        reused,
-        secretVariable: delivery.names.clientSecret,
-        ask: this.deps.ask,
-        developmentBuild: this.deps.developmentBuild,
-        suggest: this.deps.suggest,
-      }),
+      names,
       summary: {
         projectId: needs.remote.projectId,
         provider: selectionName(needs.selection),

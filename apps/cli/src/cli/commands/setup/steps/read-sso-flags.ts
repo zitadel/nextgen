@@ -1,7 +1,15 @@
 import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 
-import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
 import {
+  askCustomSettings,
+  type Fact,
+  refuseUnmappableClaims,
+  type SetupServices,
+  ssoClaimFlags,
+  variantOf,
+} from "@/cli/commands/setup/shared";
+import {
+  claimRequestFromFlags,
   customExample,
   customFlagValues,
   loopbackIssuerWarning,
@@ -80,6 +88,10 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
    * terminal on stdin means nothing was piped, and reading it would block forever, so that case is
    * treated as "not supplied".
    *
+   * The claims the flags map are held to the schema the run will scaffold before the secret is
+   * read, when nobody can be asked which preset or use case it is; an interactive run holds them to
+   * it once those are answered, in `ChooseSocialSignIn`.
+   *
    * Described before the credentials are asked for, and before a project is created: a name or
    * issuer the server would refuse is a mistake in the command line. An interactive run asks for
    * the custom settings it was not given, the way it asks for a client id: `--sso` skips the
@@ -108,6 +120,11 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: undefined,
       };
     }
+    const claimRequest = claimRequestFromFlags({
+      claim: flags.ssoClaim,
+      scope: flags.ssoClaimScope,
+      verified: flags.ssoVerifiedClaim,
+    });
     const selection = selectionFromFlags(
       flags.sso,
       flags.sso === CUSTOM_PROVIDER && !this.deps.nonInteractive
@@ -116,6 +133,9 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
       SETUP_FLAG_NAMES,
       SSO_CUSTOM_EXAMPLE,
     );
+    if (this.deps.nonInteractive) {
+      refuseUnmappableClaims({ selection, claimRequest }, variantOf(flags));
+    }
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       reportWarning(loopback);
@@ -125,6 +145,7 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: {
           selection,
           credentials: {},
+          claimRequest,
         },
       };
     }
@@ -133,12 +154,14 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
         ssoFromCommandLine: {
           selection,
           credentials: { clientId: flags.ssoClientId },
+          claimRequest,
         },
       };
     }
     return {
       ssoFromCommandLine: {
         selection,
+        claimRequest,
         credentials: {
           clientId: flags.ssoClientId,
           secret: await this.deps.ask.secret({
@@ -154,6 +177,7 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
                   flags: {
                     sso: flags.sso,
                     ssoClientId: ID_TO_FILL_IN,
+                    ...ssoClaimFlags(claimRequest),
                   },
                 }),
               ),
