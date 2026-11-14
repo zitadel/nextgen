@@ -8,6 +8,8 @@
 - `command-reference.json` is the docs site's CLI reference, generated from
   `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
   rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+- `README.md`'s command reference is `oclif readme` output: after adding, renaming or removing a
+  command, run `turbo run readme --filter=@zitadel/cli`; `tests/unit/docs/readme.test.ts` gates it.
 - Running git, and why every call goes through one module:
   [`src/lib/git/AGENTS.md`](src/lib/git/AGENTS.md).
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
@@ -120,7 +122,16 @@
   - Annotate one only where its `next` would make the type circular;
     `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
-  command.
+  command, with one exception: a command that runs as a wizard.
+  - A wizard command (`setup`, `auth-method sso enable`) keeps one class per step under its own
+    `steps/`, built on `WizardStep` (`src/lib/wizard`), named for what it does
+    (`publish-credentials`, `make-initial-commit`). Beside `index.ts` it may have one `shared.ts`,
+    for the types the steps are wired with and for what two or more steps use; whatever one step
+    uses lives in that step's file.
+  - A step never imports another step or a value from the command's `index.ts`. It takes what it
+    needs through its constructor, which the command's `execute` fills when it builds the wizard,
+    and the command keeps its flags, refusals and telemetry (recorded through the observer given
+    to `.step(...)`) and emits the one result the wizard returns.
 - Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
   `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
