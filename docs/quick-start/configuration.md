@@ -209,7 +209,7 @@ instrumentation:
 | `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                           |
 | `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`        |
 | `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http`    |
-| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent    |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | `5s`    | Longest wait before buffered spans are sent    |
 | `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced     |
 | `instrumentation.trace.trust_remote_spans`      | `NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS`      | `false` | Continue the caller's trace from `traceparent` |
 
@@ -222,9 +222,6 @@ instrumentation:
 - `auto` reads the standard OpenTelemetry environment variables
   (`OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and the others). When
   none of them is set, no spans are exported.
-- Always set `exporter.batch_duration` together with an exporter. Left unset,
-  it is zero, and the exporter keeps one CPU core busy even when the server
-  is idle.
 - A traced request keeps all of its spans, including one span per database
   statement. On PostgreSQL each query on the wire has a `pgx.query` span of
   its own, with the first word of the statement (`SELECT`, `INSERT`, `BEGIN`,
