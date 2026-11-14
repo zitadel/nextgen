@@ -991,8 +991,8 @@ function connectionRefusal(path: string, selection: ProviderSelection): ZitadelE
  * A given value goes through the same parser as a typed one, so every setting
  * comes back checked against the contract the server enforces on apply, and a
  * name or issuer it would refuse is refused. The command line's own mistakes
- * are named under their flag before this runs (`checkGivenCustomFlags`), so a
- * given value that gets here has already passed.
+ * are named under their flag as the flags are parsed, so a given value that gets
+ * here has already passed.
  *
  * The display name comes first so the slug can be suggested from it: "Acme SSO"
  * offers "acme-sso", which the developer accepts or edits. The settings carry
