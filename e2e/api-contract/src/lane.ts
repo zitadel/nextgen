@@ -45,7 +45,7 @@ const SHARD_FROM = 30;
  */
 const SHARDS = Math.max(
   1,
-  Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || Math.min(4, availableParallelism()),
+  Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || Math.min(12, availableParallelism()),
 );
 
 /**
