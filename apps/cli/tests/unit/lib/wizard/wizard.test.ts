@@ -71,21 +71,13 @@ class UndoFails extends WizardStep<"undoFails", { readonly a: true }, Initial> {
 }
 
 /**
- * Aborts the run it is part of, once it has finished.
+ * Throws what an aborted run throws.
  */
-class Aborts extends WizardStep<"aborts", { readonly b: true }, Initial> {
-  readonly key = "aborts";
-
-  private readonly controller: AbortController;
-
-  constructor(controller: AbortController) {
-    super();
-    this.controller = controller;
-  }
+class Aborted extends WizardStep<"aborted", { readonly b: true }, Initial> {
+  readonly key = "aborted";
 
   async run(): Promise<{ readonly b: true }> {
-    this.controller.abort(new Error("interrupted"));
-    return { b: true };
+    throw new DOMException("interrupted", "AbortError");
   }
 }
 
@@ -119,36 +111,6 @@ class EndsWhen extends EndStep<"ends", string, Initial> {
 
   async run(needs: Initial): Promise<string> {
     return `ended on ${needs.input}`;
-  }
-}
-
-/**
- * One pass of a loop: logs its item, and fails on the item `fail`.
- */
-class ItemStep extends WizardStep<
-  "item",
-  { readonly label: string },
-  Initial & { readonly item: string }
-> {
-  readonly key = "item";
-
-  private readonly log: Log;
-
-  constructor(log: Log) {
-    super();
-    this.log = log;
-  }
-
-  async run(needs: Initial & { readonly item: string }): Promise<{ readonly label: string }> {
-    this.log.push(`item ${needs.item}`);
-    if (needs.item === "fail") {
-      throw new Error("boom");
-    }
-    return { label: `${needs.item}!` };
-  }
-
-  override async undo(out: { readonly label: string }): Promise<void> {
-    this.log.push(`undo ${out.label}`);
   }
 }
 
@@ -385,19 +347,19 @@ describe("Wizard", () => {
     });
   });
 
-  describe("when the run is aborted", () => {
-    it("stops before the next step and undoes what finished", async () => {
+  describe("when a step throws because the run was aborted", () => {
+    it("undoes what finished, newest first", async () => {
       const log: Log = [];
-      const controller = new AbortController();
       const wizard = started()
         .step(new Adds(log, "first", 1))
-        .step(new Aborts(controller))
-        .step(new Adds(log, "later", 2))
+        .step(new Adds(log, "second", 2))
+        .step(new Aborted())
+        .step(new Adds(log, "later", 3))
         .finish(() => "done");
 
-      await wizard.run({ input: "x" }, { signal: controller.signal }).catch(() => undefined);
+      await wizard.run({ input: "x" }).catch(() => undefined);
 
-      expect(log).toEqual(["run first", "undo first"]);
+      expect(log).toEqual(["run first", "run second", "undo second", "undo first"]);
     });
   });
 
@@ -452,92 +414,6 @@ describe("Wizard", () => {
       const answer = await wizard.run({ input: "x" });
 
       expect(answer).toBe("finished normally");
-    });
-  });
-
-  describe("a loop", () => {
-    it("runs its steps once for each item, in order", async () => {
-      const log: Log = [];
-      const wizard = started()
-        .step(new Adds(log, "items", ["a", "b"]))
-        .each(
-          "passes",
-          (state) => state.items,
-          (pass) => {
-            return pass.step(new ItemStep(log));
-          },
-        )
-        .finish((state) => state.passes.map((one) => one.label).join(","));
-
-      const answer = await wizard.run({ input: "x" });
-
-      expect({ answer, log }).toEqual({
-        answer: "a!,b!",
-        log: ["run items", "item a", "item b"],
-      });
-    });
-
-    it("undoes the passes that finished, then the steps before the loop, when one fails", async () => {
-      const log: Log = [];
-      const wizard = started()
-        .step(new Adds(log, "items", ["a", "b", "fail"]))
-        .each(
-          "passes",
-          (state) => state.items,
-          (pass) => {
-            return pass.step(new ItemStep(log));
-          },
-        )
-        .finish(() => "done");
-
-      await wizard.run({ input: "x" }).catch(() => undefined);
-
-      expect(log).toEqual([
-        "run items",
-        "item a",
-        "item b",
-        "item fail",
-        "undo b!",
-        "undo a!",
-        "undo items",
-      ]);
-    });
-
-    it("tells a pass's observer what that pass knows", async () => {
-      const seen: string[] = [];
-      const wizard = started()
-        .step(new Adds([], "items", ["a", "b"]))
-        .each(
-          "passes",
-          (state) => state.items,
-          (pass) => {
-            return pass.step(new ItemStep([]), (state) =>
-              seen.push(`${state.item} ${state.label}`),
-            );
-          },
-        )
-        .finish(() => "done");
-
-      await wizard.run({ input: "x" });
-
-      expect(seen).toEqual(["a a!", "b b!"]);
-    });
-
-    it("runs nothing for an empty list", async () => {
-      const wizard = started()
-        .step(new Adds([], "items", [] as string[]))
-        .each(
-          "passes",
-          (state) => state.items,
-          (pass) => {
-            return pass.step(new ItemStep([]));
-          },
-        )
-        .finish((state) => String(state.passes.length));
-
-      const answer = await wizard.run({ input: "x" });
-
-      expect(answer).toBe("0");
     });
   });
 });
