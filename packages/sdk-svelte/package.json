@@ -43,12 +43,12 @@
     "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0"
+    "svelte": "^5.57.3"
   },
   "devDependencies": {
     "@edge-runtime/vm": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@testing-library/svelte": "^5.3.1",
+    "@testing-library/svelte": "^5.4.2",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
@@ -56,9 +56,9 @@
     "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
-    "svelte2tsx": "^0.7.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "svelte2tsx": "^0.7.63",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
