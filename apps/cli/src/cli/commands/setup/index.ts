@@ -1,4 +1,4 @@
-import type { SetupAnswer, SetupInput } from "@/cli/commands/setup/shared";
+import type { Fact } from "@/cli/commands/setup/shared";
 import { accepts, parses, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { errorMessage } from "@/lib/errors";
 import { reportWarning } from "@/lib/warnings";
@@ -37,6 +37,7 @@ import {
   type Admitted,
   BaseCommand,
   CommandGroups,
+  type CommandResult,
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
@@ -196,44 +197,23 @@ const PORT = {
 } as const satisfies Refused<number>;
 
 /**
+ * The flags the command admitted, which every step reads what it needs from.
+ */
+export type SetupFlags = Admitted<typeof Setup>["flags"];
+
+/**
  * The flags {@link refuseUnusableFlags} reads, as a command reads them.
  */
-export type SetupFlagsToCheck = Readonly<{
-  /**
-   * The removed `--design`.
-   */
-  design?: string;
-
-  /**
-   * The provider.
-   */
-  sso?: string;
-
-  /**
-   * The client id of the provider's application.
-   */
-  ssoClientId?: string;
-
-  /**
-   * The name of a custom connection.
-   */
-  ssoSlug?: string;
-
-  /**
-   * The name a custom connection's button shows.
-   */
-  ssoDisplayName?: string;
-
-  /**
-   * A custom connection's issuer URL.
-   */
-  ssoIssuer?: string;
-
-  /**
-   * The scopes a custom connection requests.
-   */
-  ssoScopes?: string;
-}>;
+export type SetupFlagsToCheck = Readonly<
+  Partial<
+    Pick<
+      SetupFlags,
+      "design" | "sso" | "ssoSlug" | "ssoDisplayName" | "ssoIssuer" | "ssoScopes"
+    > & {
+      ssoClientId: string;
+    }
+  >
+>;
 
 /**
  * Refuses a command line setup cannot act on, before anything is detected,
@@ -301,11 +281,6 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
     });
   }
 }
-
-/**
- * The flags the command admitted, which every step reads what it needs from.
- */
-export type SetupFlags = Admitted<typeof Setup>["flags"];
 
 /**
  * `zitadel setup` — create a Zitadel project and scaffold local auth.
@@ -495,7 +470,16 @@ export default class Setup extends Destructive(BaseCommand) {
   }
 
   /**
-   * Refuses a command line setup cannot act on, then runs the wizard.
+   * Refuses a command line setup cannot act on, then runs the steps of `setup`
+   * in the order they run: end early for an app that is already set up, work out
+   * what the run is about and what to write, create the app and the project,
+   * patch and configure them, and finish with the credentials, the install, the
+   * commit and the first deploy.
+   *
+   * @remarks
+   * The steps are built when this runs, not when the file loads, so a step may
+   * import what it needs from this file. Every step that may ask the person
+   * takes the same services, held once as `prompting`.
    *
    * @param admitted - What the command admitted.
    * @param admitted.flags - The flags.
@@ -504,348 +488,273 @@ export default class Setup extends Destructive(BaseCommand) {
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
-    return this.emit(
-      await this.wizard().run(
-        { flags },
-        {
-          signal: this.signal,
-          onUndoError: (key, error) => {
-            reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
-          },
-        },
-      ),
-    );
-  }
+    const prompting = {
+      ask: this.ask,
+      cwd: this.cwd,
+      dryRun: this.dryRun,
+      nonInteractive: this.nonInteractive,
+      serverFlag: this.meta.serverFlag,
+      suggest: this.suggest,
+      ui: this.ui,
+    };
 
-  /**
-   * The steps of `setup`, in the order they run: end early for an app that is
-   * already set up, work out what the run is about and what to write, create
-   * the app and the project, patch and configure them, and finish with the
-   * credentials, the install, the commit and the first deploy.
-   *
-   * @remarks
-   * Built when it runs, not when the file loads, so a step may import what it
-   * needs from this file.
-   *
-   * @returns The wizard, ready to run.
-   */
-  private wizard() {
-    return Wizard.named<SetupInput, SetupAnswer>("setup")
-      .step(
-        new CheckPreconditions({
-          meta: this.meta,
-          suggest: this.suggest,
-          useServer: (server) => {
-            this.meta = {
-              ...this.meta,
-              source: server,
-            };
-          },
-        }),
-      )
-      .endWhen(
-        new MoveAppPort({
-          cliVersion: this.cliVersion,
-          consent: (gate) => {
-            return this.consent(gate);
-          },
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          realRun: () => {
-            return this.realRun();
-          },
-          recoverAt: (server) => {
-            this.recoveryServer = server;
-          },
-          signal: this.signal,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .endWhen(
-        new ReportAlreadySetUp({
-          dryRun: this.dryRun,
-        }),
-      )
-      .step(
-        new ReadSsoFlags({
-          ask: this.ask,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          suggest: this.suggest,
-        }),
-      )
-      .step(
-        new DetectFramework({
-          ask: this.ask,
-          cwd: this.cwd,
-          env: this.env,
-          force: this.force,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          ui: this.ui,
-        }),
-        ({ flags, found, scaffoldedFramework }) => {
-          this.recordTelemetry({
-            framework: found.app.framework,
-            renderer: flags.renderer ?? "react",
-            scaffolded_skeleton: scaffoldedFramework,
-            skip_install: Boolean(flags.skipInstall),
-            dev_port_explicit: flags.devPort !== undefined,
-            preset: flags.preset ?? DEFAULT_SETUP_PRESET,
-            use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
-            sso: flags.sso ?? "none",
-            password_policy: flags.passwordMinLength === null ? "empty" : "set",
-            step: "framework_resolved",
-          });
-        },
-      )
-      .step(new ApplyDefaults())
-      .step(
-        new ConfirmFramework({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ChooseServer({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ChooseDevPort({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ChooseUseCase({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ChooseSignIn({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new SetPasswordPolicy({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ChooseSocialSignIn({
-          ask: this.ask,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          serverFlag: this.meta.serverFlag,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new SettleAnswers({
-          dryRun: this.dryRun,
-          nonInteractive: this.nonInteractive,
-          suggest: this.suggest,
-        }),
-        ({ answers }) => {
-          this.recordTelemetry({
-            preset: answers.preset,
-            use_case: answers.useCase,
-            sso:
-              answers.sso.length > 1
-                ? "multiple"
-                : (answers.sso.map((draft) => {
-                    return selectionName(draft.selection);
-                  })[0] ?? "none"),
-            password_policy: answers.passwordMinLength === null ? "empty" : "set",
-          });
-        },
-      )
-      .step(
-        new PlanConfiguration({
-          cliVersion: this.cliVersion,
-          cwd: this.cwd,
-          force: this.force,
-        }),
-      )
-      .step(
-        new ScaffoldApp({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          env: this.env,
-          force: this.force,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new CheckPatch({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          force: this.force,
-        }),
-      )
-      .step(
-        new CreateProject({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          signal: this.signal,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-        () => {
-          this.recordTelemetry({ step: "project_created" });
-        },
-      )
-      .step(
-        new PatchApp({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          force: this.force,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new WriteConfiguration({
-          cliVersion: this.cliVersion,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          force: this.force,
-          serverFlag: this.meta.serverFlag,
-          signal: this.signal,
-          suggest: this.suggest,
-        }),
-      )
-      .step(
-        new KeepChanges({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-        }),
-        ({ allFilesWritten, scaffolded }) => {
-          this.recordTelemetry({
-            step: "files_patched",
-            files_written_count: allFilesWritten.length,
-          });
-          if (!this.dryRun) {
+    return this.emit(
+      await Wizard.named<Fact<"flags">, CommandResult>("setup")
+        .step(
+          new CheckPreconditions({
+            meta: this.meta,
+            suggest: this.suggest,
+            useServer: (server) => {
+              this.meta = {
+                ...this.meta,
+                source: server,
+              };
+            },
+          }),
+        )
+        .endWhen(
+          new MoveAppPort({
+            cliVersion: this.cliVersion,
+            consent: (gate) => {
+              return this.consent(gate);
+            },
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            realRun: () => {
+              return this.realRun();
+            },
+            recoverAt: (server) => {
+              this.recoveryServer = server;
+            },
+            signal: this.signal,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
+        .endWhen(
+          new ReportAlreadySetUp({
+            dryRun: this.dryRun,
+          }),
+        )
+        .step(
+          new ReadSsoFlags({
+            ask: this.ask,
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            suggest: this.suggest,
+          }),
+        )
+        .step(
+          new DetectFramework({
+            ask: this.ask,
+            cwd: this.cwd,
+            env: this.env,
+            force: this.force,
+            nonInteractive: this.nonInteractive,
+            serverFlag: this.meta.serverFlag,
+            ui: this.ui,
+          }),
+          ({ flags, found, scaffoldedFramework }) => {
             this.recordTelemetry({
-              password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
+              framework: found.app.framework,
+              renderer: flags.renderer ?? "react",
+              scaffolded_skeleton: scaffoldedFramework,
+              skip_install: Boolean(flags.skipInstall),
+              dev_port_explicit: flags.devPort !== undefined,
+              preset: flags.preset ?? DEFAULT_SETUP_PRESET,
+              use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
+              sso: flags.sso ?? "none",
+              password_policy: flags.passwordMinLength === null ? "empty" : "set",
+              step: "framework_resolved",
             });
-          }
-        },
-      )
-      .commit()
-      .step(
-        new PublishCredentials({
-          dryRun: this.dryRun,
-          signal: this.signal,
-          suggest: this.suggest,
-        }),
-      )
-      .step(
-        new WriteManifest({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-        }),
-      )
-      .step(
-        new InstallDependencies({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          env: this.env,
-          isJson: this.isJson,
-          signal: this.signal,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-        ({ installOutcome }) => {
-          this.recordTelemetry({
-            step: "dependencies_installed",
-            package_manager: installOutcome.install.package_manager,
-          });
-        },
-      )
-      .step(
-        new MakeInitialCommit({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new DoInitialDeploy({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          env: this.env,
-          isColored: this.isColored,
-          isJson: this.isJson,
-          narrate: (notices) => {
-            this.narrate(notices);
           },
-          signal: this.signal,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ClaimOwnership({
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          signal: this.signal,
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .step(
-        new ShowResult({
-          cliVersion: this.cliVersion,
-          cwd: this.cwd,
-          dryRun: this.dryRun,
-          isJson: this.isJson,
-          realRun: () => {
-            return this.realRun();
+        )
+        .step(new ApplyDefaults())
+        .step(new ConfirmFramework(prompting))
+        .step(new ChooseServer(prompting))
+        .step(new ChooseDevPort(prompting))
+        .step(new ChooseUseCase(prompting))
+        .step(new ChooseSignIn(prompting))
+        .step(new SetPasswordPolicy(prompting))
+        .step(new ChooseSocialSignIn(prompting))
+        .step(
+          new SettleAnswers({
+            dryRun: this.dryRun,
+            nonInteractive: this.nonInteractive,
+            suggest: this.suggest,
+          }),
+          ({ answers }) => {
+            this.recordTelemetry({
+              preset: answers.preset,
+              use_case: answers.useCase,
+              sso:
+                answers.sso.length > 1
+                  ? "multiple"
+                  : (answers.sso.map((draft) => {
+                      return selectionName(draft.selection);
+                    })[0] ?? "none"),
+              password_policy: answers.passwordMinLength === null ? "empty" : "set",
+            });
           },
-          suggest: this.suggest,
-          ui: this.ui,
-        }),
-      )
-      .finish((state) => {
-        return state.answer;
-      });
+        )
+        .step(
+          new PlanConfiguration({
+            cliVersion: this.cliVersion,
+            cwd: this.cwd,
+            force: this.force,
+          }),
+        )
+        .step(
+          new ScaffoldApp({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            env: this.env,
+            force: this.force,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new CheckPatch({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            force: this.force,
+          }),
+        )
+        .step(
+          new CreateProject({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            signal: this.signal,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+          () => {
+            this.recordTelemetry({ step: "project_created" });
+          },
+        )
+        .step(
+          new PatchApp({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            force: this.force,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new WriteConfiguration({
+            cliVersion: this.cliVersion,
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            force: this.force,
+            serverFlag: this.meta.serverFlag,
+            signal: this.signal,
+            suggest: this.suggest,
+          }),
+        )
+        .step(
+          new KeepChanges({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+          }),
+          ({ allFilesWritten, scaffolded }) => {
+            this.recordTelemetry({
+              step: "files_patched",
+              files_written_count: allFilesWritten.length,
+            });
+            if (!this.dryRun) {
+              this.recordTelemetry({
+                password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
+              });
+            }
+          },
+        )
+        .commit()
+        .step(
+          new PublishCredentials({
+            dryRun: this.dryRun,
+            signal: this.signal,
+            suggest: this.suggest,
+          }),
+        )
+        .step(
+          new WriteManifest({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+          }),
+        )
+        .step(
+          new InstallDependencies({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            env: this.env,
+            isJson: this.isJson,
+            signal: this.signal,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+          ({ installOutcome }) => {
+            this.recordTelemetry({
+              step: "dependencies_installed",
+              package_manager: installOutcome.install.package_manager,
+            });
+          },
+        )
+        .step(
+          new MakeInitialCommit({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new DoInitialDeploy({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            env: this.env,
+            isColored: this.isColored,
+            isJson: this.isJson,
+            narrate: (notices) => {
+              this.narrate(notices);
+            },
+            signal: this.signal,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new ClaimOwnership({
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            signal: this.signal,
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
+        .step(
+          new ShowResult({
+            cliVersion: this.cliVersion,
+            cwd: this.cwd,
+            dryRun: this.dryRun,
+            isJson: this.isJson,
+            realRun: () => {
+              return this.realRun();
+            },
+            suggest: this.suggest,
+            ui: this.ui,
+          }),
+        )
+        .finish((state) => {
+          return state.answer;
+        })
+        .run(
+          { flags },
+          {
+            signal: this.signal,
+            onUndoError: (key, error) => {
+              reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+            },
+          },
+        ),
+    );
   }
 }
