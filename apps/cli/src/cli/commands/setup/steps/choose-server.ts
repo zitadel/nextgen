@@ -42,13 +42,19 @@ type Deps = Pick<
  * picking "Custom URL" still asks for a validated URL.
  */
 export class ChooseServer extends WizardStep<"server", Fact<"answers">, QuestionNeeds> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "server";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -58,7 +64,6 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Question
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
   async run(needs: QuestionNeeds): Promise<Fact<"answers">> {

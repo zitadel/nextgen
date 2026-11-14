@@ -53,7 +53,6 @@ export class PlanConfiguration extends WizardStep<
    * embeddable cards inside its own layout (ADR 044).
    *
    * @param needs - The flags, the app and the answers.
-   * @param this.deps - What the command provides.
    * @returns What the later steps patch and write by.
    * @throws {@link ZitadelError} When a file setup will not replace is there.
    */

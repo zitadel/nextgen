@@ -75,13 +75,19 @@ type Deps = Pick<
  * no other. A flagged provider cannot be dropped: the command line asked for it.
  */
 export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers">, QuestionNeeds> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "socialSignIn";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -91,7 +97,6 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
   async run(needs: QuestionNeeds): Promise<Fact<"answers">> {

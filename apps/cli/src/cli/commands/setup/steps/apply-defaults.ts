@@ -19,6 +19,9 @@ type Needs = Fact<"flags" | "found" | "ssoFromCommandLine" | "preflight">;
  * whether to ask.
  */
 export class ApplyDefaults extends WizardStep<"defaults", Fact<"app" | "answers">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "defaults";
 
   /**
@@ -32,7 +35,6 @@ export class ApplyDefaults extends WizardStep<"defaults", Fact<"app" | "answers"
    * that pin (or remove it) if the origin check rejects requests.
    *
    * @param needs - The flags, what detection found and the provider asked for.
-   * @param this.deps - What the command provides.
    * @returns The app with the port the run uses, and the answers so far.
    */
   async run(needs: Needs): Promise<Fact<"app" | "answers">> {

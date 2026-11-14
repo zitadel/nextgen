@@ -33,13 +33,19 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "signal" | "suggest" | "ui">;
  * deploy publishes them.
  */
 export class CreateProject extends WizardStep<"project", Fact<"project" | "retry">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "project";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -62,7 +68,6 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
    * name. A refusal carries the hint to start a local server first and the commands to retry.
    *
    * @param needs - The flags, the app and the answers.
-   * @param this.deps - What the command provides.
    * @returns The project, and what a retry has to carry.
    * @throws {@link ZitadelError} When the server refuses to create the project.
    */

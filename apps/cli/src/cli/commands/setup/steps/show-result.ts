@@ -1,12 +1,10 @@
-import type { SetupFacts, SetupServices } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import {
   pickWrittenFile,
   relativeDisplayPath as relativeDisplay,
-  type SignIn,
 } from "@/cli/commands/setup/shared";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { credentialVariables, providerOf, selectionName } from "@zitadel/config/idp";
-import type { CreatedProject } from "@/lib/backend";
 import {
   claimAction,
   claimBoxAction,
@@ -22,26 +20,33 @@ import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/st
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
-import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
-import { CONFIG_DIRECTORIES, PasswordPolicy, type ScaffoldedConnection } from "@/lib/zitadel";
+import { type Fact as SummaryFact, section } from "@/lib/ui";
+import { CONFIG_DIRECTORIES, PasswordPolicy } from "@/lib/zitadel";
 
 import type { CommandResult } from "@/lib/oclif";
 import { WizardStep } from "@/lib/wizard";
-import type { InitialCommitOutcome } from "@/cli/commands/setup/steps/make-initial-commit";
 import { basename, join } from "node:path";
 import semver from "semver";
 
 import { pathExists } from "@/lib/fs";
 import { readPackageJson } from "@/lib/npm";
 import { detectors } from "@/lib/orca/detectors";
-import type { Detector } from "@/lib/orca/detectors/types";
-import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { detectPackageManager } from "@/lib/package-manager";
 
-/** The line a finished setup closes on. */
+/**
+ * The line a finished setup closes on.
+ */
 const SET_UP_TITLE = "Set up Zitadel in this app";
 
-/** The line a dry run closes on. */
+/**
+ * The line a dry run closes on.
+ */
 const WOULD_SET_UP_TITLE = "Would set up Zitadel in this app (dry run)";
+
+/**
+ * Joins a list of names the way a sentence does.
+ */
+const CONJUNCTION = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * The rows of the "Installed" section that name a file by the suffix of its
@@ -86,6 +91,29 @@ const CUSTOMIZE_FILES = [
 ] as const;
 
 /**
+ * What the step reads from what is known.
+ */
+type Needs = Fact<
+  | "allFilesWritten"
+  | "answers"
+  | "app"
+  | "commit"
+  | "deployment"
+  | "found"
+  | "hostsPlatform"
+  | "installOutcome"
+  | "isLocal"
+  | "issuer"
+  | "ownedByLocalAdmin"
+  | "patched"
+  | "planned"
+  | "project"
+  | "scaffoldedFramework"
+  | "signIn"
+  | "ssoOutcomes"
+>;
+
+/**
  * What the step is given by the command.
  */
 type Deps = Pick<
@@ -97,11 +125,7 @@ type Deps = Pick<
  * Words what the run did as the command's result: the summary, the next steps
  * and the envelope.
  */
-export class ShowResult extends WizardStep<
-  "result",
-  Readonly<{ answer: CommandResult }>,
-  SetupFacts
-> {
+export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandResult }>, Needs> {
   readonly key = "result";
 
   /**
@@ -124,7 +148,7 @@ export class ShowResult extends WizardStep<
    * The claim nudge rides both surfaces from one decision: the box for humans,
    * the envelope for agents. It joins `boxActions` rather than being held back
    * from it. That list is journey-staged by omission (customize/publish is
-   * absent until login works, see `install.ts`), and this is not part of that
+   * absent until login works), and this is not part of that
    * journey: attaching a team is orthogonal to whether login works yet, exactly
    * as in `status`. Position in the list carries no staging meaning, so
    * appending is not a way of deferring it.
@@ -161,6 +185,31 @@ export class ShowResult extends WizardStep<
    * nothing is drawn live. The ending is only what sits under the closing line,
    * so the headline is added to it.
    *
+   * The summary is one section per fact group, drawn through the layout every other
+   * command's box uses: a heading, then `label   value` rows it aligns. A row's secondary is
+   * already styled (a path, a url), and the palette spells out whatever it is given, so only the
+   * brackets are dimmed: dimming the whole would print the styling's own escape as the text
+   * `\\x1b[36m`. A section without rows is dropped.
+   *
+   * Each provider gets its own "Social sign-in" row because each has its own
+   * connection file, and a developer scanning the summary for where to edit
+   * needs the path that belongs to the provider they are looking at. A scripted
+   * `--sso` run asks nothing, so the prompt that announces the redirect URI never
+   * shows; the summary is where it reaches the developer then. The Vite config
+   * merge carries the `/__nextgen` dev proxy, and its file name varies
+   * (ts/js/mts/mjs), so it cannot ride the suffix table. The sign-in section says
+   * what a user meets at sign-in, so a preset's name is not the only record of
+   * it: `password-first` enables passkeys too, and profile fields are optional.
+   *
+   * The framework line reads the on-disk markers (lock file, tsconfig, framework dependency
+   * version) without any platform call. A missing or unreadable package.json leaves the version
+   * out, which is the same as the user not having declared the framework dependency yet. The
+   * version is the lowest one the declared range admits, so `^15.0.0`, `>= 15.0.0`, `=15.0.0`
+   * and `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads `20.1.0`. A spec that is not a
+   * valid semver range (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`)
+   * or names no version (`*`) shows none, because printing it as the framework version would be
+   * wrong.
+   *
    * The envelope's `files` holds typed per-artifact rows for the scaffolded app
    * files (the configuration files continue to report through `files_written`):
    * one row per touched path with kind (file or dir) and action (create or
@@ -173,7 +222,8 @@ export class ShowResult extends WizardStep<
    * registers at the provider: the connection's own route, as
    * `auth-method sso enable` reports it. `deployment` is what setup's first
    * deploy published, or null when there was none: a dry run, or a deploy that
-   * failed, which is a warning.
+   * failed, which is a warning. `git` says whether setup ran `git init`, even if the commit then
+   * failed, and the commit, or null.
    *
    * A JSON run prints no warnings, so a credential the project never received
    * would otherwise appear only as a `published` status with nothing to act on:
@@ -181,10 +231,9 @@ export class ShowResult extends WizardStep<
    * next steps, so the base command does not repeat them.
    *
    * @param needs - Everything the run came to know.
-   * @param this.deps - What the command provides.
    * @returns The result the command answers with.
    */
-  async run(needs: SetupFacts): Promise<Readonly<{ answer: CommandResult }>> {
+  async run(needs: Needs): Promise<Readonly<{ answer: CommandResult }>> {
     const {
       allFilesWritten,
       answers,
@@ -291,7 +340,34 @@ export class ShowResult extends WizardStep<
     }
     const projectFacts = this.deps.isJson
       ? undefined
-      : await detectProjectFacts(this.deps.cwd, app.framework);
+      : await Promise.all([
+          pathExists(join(this.deps.cwd, "tsconfig.json")),
+          detectPackageManager(this.deps.cwd),
+          readPackageJson(this.deps.cwd).catch(() => {
+            return undefined;
+          }),
+        ]).then(([typescript, packageManager, packageJson]) => {
+          return {
+            typescript,
+            packageManager,
+            packageJson,
+          };
+        });
+    const detector = detectors.find((candidate) => {
+      return candidate.framework === app.framework;
+    });
+    const dependency = detector?.versionPackage ?? app.framework;
+    const range =
+      projectFacts?.packageJson?.dependencies?.[dependency] ??
+      projectFacts?.packageJson?.devDependencies?.[dependency];
+    const version =
+      range && /\d/.test(range) && semver.validRange(range) !== null
+        ? semver.minVersion(range)?.version
+        : undefined;
+    const written = allFilesWritten.map((file) => {
+      return relativeDisplay(this.deps.cwd, file);
+    });
+    const packageJsonHit = pickWrittenFile(written, "package.json");
     const nextActions = [
       ...deployStep.boxActions,
       ...installOutcome.boxActions,
@@ -343,7 +419,7 @@ export class ShowResult extends WizardStep<
         scopes.length === 0
           ? []
           : [
-              `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
+              `Zitadel asks ${text(connection.displayName)} for these scopes: ${CONJUNCTION.format(scopes.map(text))}.`,
             ],
         unmapped.length === 0
           ? []
@@ -361,18 +437,18 @@ export class ShowResult extends WizardStep<
         usedBy.length === 0
           ? []
           : [
-              `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+              `This connection is used by ${CONJUNCTION.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
             ],
         [
           `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
         ],
-      ].filter((section) => {
-        return section.length > 0;
+      ].filter((lines) => {
+        return lines.length > 0;
       });
       return [
         "",
-        ...sections.flatMap((section, at) => {
-          return at === 0 ? section : ["", ...section];
+        ...sections.flatMap((lines, at) => {
+          return at === 0 ? lines : ["", ...lines];
         }),
       ];
     });
@@ -384,22 +460,99 @@ export class ShowResult extends WizardStep<
           }
         : {
             title,
-            sections: summarySections(
-              buildSummary({
-                projectFacts,
-                writtenRel: allFilesWritten.map((file) => {
-                  return relativeDisplay(this.deps.cwd, file);
+            sections: [
+              section(
+                "Detected",
+                [
+                  "Framework",
+                  [
+                    version
+                      ? `${detector?.displayName ?? app.framework} ${version}`
+                      : (detector?.displayName ?? app.framework),
+                    ...(projectFacts.typescript ? ["TypeScript"] : []),
+                    projectFacts.packageManager,
+                  ].join(` ${dim("·")} `),
+                ],
+                ...(scaffoldedFramework
+                  ? [
+                      [
+                        "Scaffold",
+                        found.scaffoldedBesideFiles
+                          ? "new project over existing files (--force)"
+                          : "new project",
+                      ] as const,
+                    ]
+                  : []),
+              ),
+              section(
+                "Installed",
+                ...(packageJsonHit && result.depsAdded.length > 0
+                  ? [
+                      [
+                        "Package",
+                        `${result.depsAdded.join(", ")} ${dim("(")}${stylePath(basename(packageJsonHit))}${dim(")")}`,
+                      ] as const,
+                    ]
+                  : []),
+                ...INSTALLED_FILES.flatMap(([label, suffix]): ReadonlyArray<SummaryFact> => {
+                  const hit = pickWrittenFile(written, suffix);
+                  return hit ? [[label, stylePath(hit)]] : [];
                 }),
-                depsAdded: result.depsAdded,
-                project,
-                server: answers.server,
-                issuer,
-                scaffoldedFramework,
-                scaffoldedBesideFiles: found.scaffoldedBesideFiles,
-                connections: planned.connections,
-                signIn,
-              }),
-            ),
+                ...written
+                  .filter((file) => {
+                    return /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file);
+                  })
+                  .slice(0, 1)
+                  .map((file): SummaryFact => {
+                    return ["Dev proxy", stylePath(file)];
+                  }),
+              ),
+              section(
+                "Sign-in",
+                ["Starts with", signIn.starts_with],
+                ["Methods", signIn.methods.join(", ")],
+                [
+                  "Registration",
+                  signIn.fields
+                    .map((field) => {
+                      return `${field.name}${field.required ? "" : " (optional)"}`;
+                    })
+                    .join(", "),
+                ],
+                [
+                  "Passwords",
+                  signIn.password_min_length === null
+                    ? "no minimum length"
+                    : `at least ${signIn.password_min_length} characters`,
+                ],
+              ),
+              section(
+                "Customize",
+                ...CUSTOMIZE_FILES.flatMap(([label, suffix, dir]): ReadonlyArray<SummaryFact> => {
+                  return pickWrittenFile(written, suffix)
+                    ? [[label, `${stylePath(`${dir}/`)} ${dim("(")}see its README.md${dim(")")}`]]
+                    : [];
+                }),
+                ...planned.connections.flatMap((entry): ReadonlyArray<SummaryFact> => {
+                  const provider = providerOf(entry.chosen.selection);
+                  return [
+                    [
+                      "Social sign-in",
+                      `${provider.displayName} ${dim("(")}${stylePath(entry.connection.path)}${dim(")")}`,
+                    ],
+                    ["Redirect URI", styleUrl(callbackUriFor(issuer, provider.slug))],
+                  ];
+                }),
+              ),
+              section(
+                "Project",
+                ["Project id", styleId(project.id)],
+                ["Server", styleUrl(answers.server)],
+                ["App will run", styleUrl(issuer)],
+              ),
+            ].filter((drawn) => {
+              return drawn.facts.length > 0;
+            }),
             lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
             next: nextActions,
             boxed: true,
@@ -439,9 +592,7 @@ export class ShowResult extends WizardStep<
           },
           framework: app.framework,
           server: answers.server,
-          files_written: allFilesWritten.map((file) => {
-            return relativeDisplay(this.deps.cwd, file);
-          }),
+          files_written: written,
           files: result.files.map((file) => {
             return {
               path: relativeDisplay(this.deps.cwd, file.path),
@@ -453,7 +604,12 @@ export class ShowResult extends WizardStep<
             return relativeDisplay(this.deps.cwd, file);
           }),
           install: installOutcome.install,
-          git: gitReport(commit),
+          git: {
+            initialized:
+              commit.kind === "created" ||
+              (commit.kind === "unavailable" && commit.createdRepository),
+            commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
+          },
           sign_in: signIn,
           sso: planned.connections.map((entry) => {
             const slug = providerOf(entry.chosen.selection).slug;
@@ -545,390 +701,4 @@ export class ShowResult extends WizardStep<
       },
     };
   }
-}
-
-/**
- * Builds the section list driving {@link summarySections} for the setup command.
- * Exported so its wording is unit-tested.
- *
- * @remarks
- * Each provider gets its own "Social sign-in" row because each has its own
- * connection file, and a developer scanning the summary for where to edit
- * needs the path that belongs to the provider they are looking at. A scripted
- * `--sso` run asks nothing, so the prompt that announces the redirect URI never
- * shows; the summary is where it reaches the developer then. The Vite config
- * merge carries the `/__nextgen` dev proxy, and its file name varies
- * (ts/js/mts/mjs), so it cannot ride the suffix table. The sign-in section says
- * what a user meets at sign-in, so a preset's name is not the only record of
- * it: `password-first` enables passkeys too, and profile fields are optional.
- *
- * @param opts - What the summary words.
- * @returns The sections, in the order the box draws them.
- */
-export function buildSummary(opts: {
-  projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
-  writtenRel: string[];
-  depsAdded: ReadonlyArray<string>;
-  project: CreatedProject;
-  server: string;
-  issuer: string;
-  scaffoldedFramework: boolean;
-  scaffoldedBesideFiles: boolean;
-  connections: readonly ScaffoldedConnection[];
-  signIn: SignIn;
-}): Section[] {
-  const {
-    projectFacts,
-    writtenRel,
-    depsAdded,
-    project,
-    server,
-    issuer,
-    scaffoldedFramework,
-    connections,
-    signIn,
-  } = opts;
-  const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
-
-  return [
-    {
-      title: "Detected",
-      rows: [
-        {
-          label: "Framework",
-          value: formatFrameworkLine(projectFacts),
-        },
-        ...(scaffoldedFramework
-          ? [
-              {
-                label: "Scaffold",
-                value: opts.scaffoldedBesideFiles
-                  ? "new project over existing files (--force)"
-                  : "new project",
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      title: "Installed",
-      rows: [
-        ...(packageJsonHit && depsAdded.length > 0
-          ? [
-              {
-                label: "Package",
-                value: depsAdded.join(", "),
-                secondary: stylePath(fileNameOf(packageJsonHit)),
-              },
-            ]
-          : []),
-        ...INSTALLED_FILES.flatMap(([label, suffix]): Row[] => {
-          const hit = pickWrittenFile(writtenRel, suffix);
-          return hit
-            ? [
-                {
-                  label,
-                  value: stylePath(hit),
-                },
-              ]
-            : [];
-        }),
-        ...writtenRel
-          .filter((file) => {
-            return /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file);
-          })
-          .slice(0, 1)
-          .map((file) => {
-            return {
-              label: "Dev proxy",
-              value: stylePath(file),
-            };
-          }),
-      ],
-    },
-    {
-      title: "Sign-in",
-      rows: [
-        {
-          label: "Starts with",
-          value: signIn.starts_with,
-        },
-        {
-          label: "Methods",
-          value: signIn.methods.join(", "),
-        },
-        {
-          label: "Registration",
-          value: signIn.fields
-            .map((field) => {
-              return `${field.name}${field.required ? "" : " (optional)"}`;
-            })
-            .join(", "),
-        },
-        {
-          label: "Passwords",
-          value:
-            signIn.password_min_length === null
-              ? "no minimum length"
-              : `at least ${signIn.password_min_length} characters`,
-        },
-      ],
-    },
-    {
-      title: "Customize",
-      rows: [
-        ...CUSTOMIZE_FILES.flatMap(([label, suffix, dir]): Row[] => {
-          return pickWrittenFile(writtenRel, suffix)
-            ? [
-                {
-                  label,
-                  value: stylePath(`${dir}/`),
-                  secondary: "see its README.md",
-                },
-              ]
-            : [];
-        }),
-        ...connections.flatMap((entry): Row[] => {
-          const provider = providerOf(entry.chosen.selection);
-          return [
-            {
-              label: "Social sign-in",
-              value: provider.displayName,
-              secondary: stylePath(entry.connection.path),
-            },
-            {
-              label: "Redirect URI",
-              value: styleUrl(callbackUriFor(issuer, provider.slug)),
-            },
-          ];
-        }),
-      ],
-    },
-    {
-      title: "Project",
-      rows: [
-        {
-          label: "Project id",
-          value: styleId(project.id),
-        },
-        {
-          label: "Server",
-          value: styleUrl(server),
-        },
-        {
-          label: "App will run",
-          value: styleUrl(issuer),
-        },
-      ],
-    },
-  ];
-}
-
-/**
- * Structured end-of-command summary: one row per fact, grouped under a
- * heading. Each {@link Row} carries the label, the primary value (already
- * styled by the caller), and an optional `secondary` — where to look next for
- * that row, said in the value rather than in a column of its own, because a
- * second column only lines up when every value in the group is the same width.
- */
-export type Row = {
-  label: string;
-  value: string;
-  secondary?: string;
-};
-
-/** A heading and the {@link Row}s grouped under it. */
-export type Section = {
-  title: string;
-  rows: Row[];
-};
-
-/**
- * The section list as the facts every other command's box states: a heading,
- * then `label   value` rows the shared layout aligns ({@link UiSection}).
- *
- * @remarks
- * Drawing them through the one layout is what makes setup's ending comparable
- * with every other command's at a glance. A row's secondary is already styled
- * (a path, a url), and the palette spells out whatever it is given, so only the
- * brackets are dimmed: dimming the whole would print the styling's own escape
- * as the text `\\x1b[36m`.
- *
- * @param sections - The sections to draw; those without rows are dropped.
- * @returns The sections in the shared layout's shape.
- */
-export function summarySections(sections: Section[]): UiSection[] {
-  return sections
-    .filter((section) => {
-      return section.rows.length > 0;
-    })
-    .map((section) => {
-      return uiSection(
-        section.title,
-        ...section.rows.map((row): Fact => {
-          return [
-            row.label,
-            row.secondary === undefined
-              ? row.value
-              : `${row.value} ${dim("(")}${row.secondary}${dim(")")}`,
-          ];
-        }),
-      );
-    });
-}
-
-/**
- * Detected facts about the user's project, surfaced in the `DETECTED`
- * section. {@link detectProjectFacts} reads the on-disk markers (lock
- * file, tsconfig, framework dep version) without any platform call.
- */
-export type ProjectFacts = {
-  framework: string;
-  frameworkVersion?: string;
-  typescript: boolean;
-  packageManager: PackageManager;
-};
-
-/**
- * Reads the project root to identify the framework version, TS presence,
- * and which package manager the user runs.
- *
- * @remarks
- * Returns safe defaults (npm fallback, no version) on any error so summary
- * rendering can always proceed. A missing or unreadable package.json leaves
- * the version undefined; the renderer skips that segment, which is the same as
- * the user not having declared the framework dep yet.
- *
- * @param cwd - The project root.
- * @param frameworkId - The framework the app was set up for.
- * @returns What was found about the project.
- */
-export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
-  const facts: ProjectFacts = {
-    framework: frameworkId,
-    typescript: await pathExists(join(cwd, "tsconfig.json")),
-    packageManager: await detectPackageManager(cwd),
-  };
-  const pj = await readPackageJson(cwd).catch(() => {
-    return undefined;
-  });
-  const depPkg = depFromFramework(frameworkId);
-  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
-  const version = range ? stripRange(range) : undefined;
-  return version
-    ? {
-        ...facts,
-        frameworkVersion: version,
-      }
-    : facts;
-}
-
-/**
- * Formats the project facts as the "Next.js 15 · TypeScript · npm" string the mock shows.
- *
- * @param facts - What was found about the project.
- * @returns The framework line.
- */
-export function formatFrameworkLine(facts: ProjectFacts): string {
-  const pretty = prettyFramework(facts.framework);
-  return [
-    facts.frameworkVersion ? `${pretty} ${facts.frameworkVersion}` : pretty,
-    ...(facts.typescript ? ["TypeScript"] : []),
-    facts.packageManager,
-  ].join(` ${dim("·")} `);
-}
-
-/**
- * The detector for a framework.
- *
- * @param framework - The framework id.
- * @returns Its detector, or undefined for a framework none knows.
- */
-function detectorFor(framework: string): Detector | undefined {
-  return detectors.find((detector) => {
-    return detector.framework === framework;
-  });
-}
-
-/**
- * The npm package whose version the framework is known by.
- *
- * @param framework - The framework id.
- * @returns The package name, or the id itself when the detector names none.
- */
-function depFromFramework(framework: string): string {
-  return detectorFor(framework)?.versionPackage ?? framework;
-}
-
-/**
- * The framework as a person names it.
- *
- * @param framework - The framework id.
- * @returns Its display name, or the id itself when none is known.
- */
-function prettyFramework(framework: string): string {
-  return detectorFor(framework)?.displayName ?? framework;
-}
-
-/**
- * Reduces a declared npm range to the version the summary shows: the lowest
- * version it admits (`semver.minVersion`), so `^15.0.0`, `>= 15.0.0`,
- * `=15.0.0`, `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads
- * `20.1.0`. Returns `undefined` when the spec is not a valid semver range
- * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
- * names no version (`*`), because printing that as the framework version would
- * be wrong.
- *
- * @param range - The range as declared in package.json.
- * @returns The lowest version it admits, if it names one.
- */
-function stripRange(range: string): string | undefined {
-  if (!/\d/.test(range) || semver.validRange(range) === null) {
-    return undefined;
-  }
-  return semver.minVersion(range)?.version;
-}
-
-/**
- * Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows.
- *
- * @param p - The relative path.
- * @returns The file name.
- */
-export function fileNameOf(p: string): string {
-  return basename(p);
-}
-
-/**
- * What `setup --json` reports under `git`: whether setup ran `git init`, even if the commit then failed, and the commit, or null.
- *
- * @param outcome - What the initial commit came to.
- * @returns Whether a repository was initialized and the commit it made.
- */
-export function gitReport(outcome: InitialCommitOutcome): {
-  readonly initialized: boolean;
-  readonly commit: string | null;
-} {
-  if (outcome.kind === "created") {
-    return {
-      initialized: true,
-      commit: outcome.sha,
-    };
-  }
-  if (outcome.kind === "committed") {
-    return {
-      initialized: false,
-      commit: outcome.sha,
-    };
-  }
-  if (outcome.kind === "unavailable") {
-    return {
-      initialized: outcome.createdRepository,
-      commit: null,
-    };
-  }
-  return {
-    initialized: false,
-    commit: null,
-  };
 }

@@ -48,7 +48,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
    * issuer and the registered origin (both derived from `answers.devPort`).
    *
    * @param needs - What detection found and what was answered.
-   * @param this.deps - What the command provides.
    * @returns The new app, and the app the patch works on.
    */
   async run(needs: Needs): Promise<Fact<"newApp" | "framework">> {
@@ -100,7 +99,6 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
    *
    * @param out - The new app.
    * @param _needs - What was known when the step ran.
-   * @param this.deps - What the command provides.
    * @returns Once it is removed.
    */
   override async undo(out: Fact<"newApp" | "framework">): Promise<void> {

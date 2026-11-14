@@ -38,13 +38,19 @@ type Deps = Pick<
  * leaves the deploy one command away.
  */
 export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "deploy";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -55,7 +61,6 @@ export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Ne
    * would, and say what happened.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns The deployment, or nothing when there was none.
    */
   async run(needs: Needs): Promise<Fact<"deployment">> {

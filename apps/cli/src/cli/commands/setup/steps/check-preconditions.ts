@@ -81,16 +81,6 @@ const SERVER_VERSION_REFUSAL = {
 type Needs = Fact<"flags">;
 
 /**
- * The plural suffix for a count of things.
- *
- * @param list - The things counted.
- * @returns `""` for one, otherwise `"s"`.
- */
-function plural(list: readonly unknown[]): string {
-  return new Intl.PluralRules("en").select(list.length) === "one" ? "" : "s";
-}
-
-/**
  * What the step is given by the command.
  */
 type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
@@ -104,13 +94,19 @@ type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
  * after this one reads the resolved one.
  */
 export class CheckPreconditions extends WizardStep<"preconditions", Fact<"preflight">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "preconditions";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -141,7 +137,6 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
    * `--cwd` is not added to it.
    *
    * @param needs - The flags.
-   * @param this.deps - What the command provides.
    * @returns What was settled about the run.
    * @throws {@link ZitadelError} When the directory, the server or git cannot be used.
    */
@@ -205,15 +200,21 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         throw refusalError(WORKTREE_DIRTY_REFUSAL, {
           parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
             [
-              state.modified.length > 0
-                ? `${state.modified.length} uncommitted change${plural(state.modified)}`
-                : undefined,
-              state.untracked.length > 0
-                ? `${state.untracked.length} untracked file${plural(state.untracked)}`
-                : undefined,
-            ].filter((part) => {
-              return part !== undefined;
-            }),
+              {
+                noun: "uncommitted change",
+                files: state.modified,
+              },
+              {
+                noun: "untracked file",
+                files: state.untracked,
+              },
+            ]
+              .filter(({ files }) => {
+                return files.length > 0;
+              })
+              .map(({ files, noun }) => {
+                return `${files.length} ${noun}${new Intl.PluralRules("en").select(files.length) === "one" ? "" : "s"}`;
+              }),
           ),
           modified: state.modified,
           untracked: state.untracked,

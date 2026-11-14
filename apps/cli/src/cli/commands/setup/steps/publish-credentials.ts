@@ -71,7 +71,6 @@ export class PublishCredentials extends WizardStep<
    * has been claimed yet, so there is no owner for the developer to name.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials.
    * @throws {Error} When a provider reaches here without the credentials the wizard collects.
    */
@@ -146,14 +145,15 @@ export class PublishCredentials extends WizardStep<
    *
    * @param answers - The providers still to publish.
    * @param publish - How the credentials reach the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials, by slug.
    */
   private async publishEach(
-    answers: readonly SsoAnswer[],
+    answers: ReadonlyArray<SsoAnswer>,
     publish: SecretPublisher | undefined,
   ): Promise<
-    ReadonlyArray<readonly [ConnectionSlug, { clientId: PublishState; secret: SecretOutcome }]>
+    ReadonlyArray<
+      readonly [ConnectionSlug, Readonly<{ clientId: PublishState; secret: SecretOutcome }>]
+    >
   > {
     const [answer, ...rest] = answers;
     if (answer === undefined) {

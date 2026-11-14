@@ -1,4 +1,3 @@
-import type { Questions } from "@/lib/ui";
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
 
@@ -34,13 +33,19 @@ export class DetectFramework extends WizardStep<
   Fact<"orca" | "found" | "scaffoldedFramework">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "detect";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -63,8 +68,11 @@ export class DetectFramework extends WizardStep<
    * pointing at a prompt it can't see, and for a local server hands over the exact rerun. Only
    * then: `setupRetryFlags` pins `--server local`.
    *
+   * The framework is asked about in the only prompt outside the main wizard: it runs at the
+   * empty-directory branch, before any other detection, and its choices are
+   * `Orca.availableFrameworks`.
+   *
    * @param needs - The flags.
-   * @param this.deps - What the command provides.
    * @returns What was found.
    * @throws {@link ZitadelError} When no framework is found and the directory
    *   cannot be scaffolded into, or no framework was chosen.
@@ -124,7 +132,7 @@ export class DetectFramework extends WizardStep<
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
         if (!flags.framework && this.deps.nonInteractive) {
-          const choices = orca.availableFrameworks().map((choice) => {
+          const choices: readonly string[] = orca.availableFrameworks().map((choice) => {
             return choice.id;
           });
           const suggested = choices.includes("next") ? "next" : choices[0];
@@ -152,7 +160,16 @@ export class DetectFramework extends WizardStep<
           app: await orca.planScaffold(
             this.deps.cwd,
             flags.framework ||
-              (await new PickFrameworkPrompt().ask(orca.availableFrameworks(), this.deps.ask)),
+              (await this.deps.ask.select({
+                name: "framework",
+                message: "Which framework would you like to scaffold?",
+                options: orca.availableFrameworks().map((choice) => {
+                  return {
+                    value: choice.id,
+                    label: choice.displayName,
+                  };
+                }),
+              })),
           ),
           detected: undefined,
           scaffoldedBesideFiles: !target.scaffoldable,
@@ -164,35 +181,5 @@ export class DetectFramework extends WizardStep<
       found,
       scaffoldedFramework,
     };
-  }
-}
-
-/**
- * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.
- * Runs at the empty-directory branch (before any other detection). Returns the chosen framework id; choices come from
- * `Orca.availableFrameworks`.
- */
-export class PickFrameworkPrompt {
-  /**
-   * Ask which framework to scaffold.
-   *
-   * @param choices - The frameworks that can be scaffolded.
-   * @param ask - How questions are asked.
-   * @returns The id of the chosen framework.
-   */
-  async ask(
-    choices: ReadonlyArray<{ id: string; displayName: string }>,
-    ask: Questions,
-  ): Promise<string> {
-    return ask.select({
-      name: "framework",
-      message: "Which framework would you like to scaffold?",
-      options: choices.map((choice) => {
-        return {
-          value: choice.id,
-          label: choice.displayName,
-        };
-      }),
-    });
   }
 }

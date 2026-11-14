@@ -87,7 +87,6 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
    * file, and it does not cover a connection under `.zitadel/idps/`, which is the developer's.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns The absolute paths written and the minimum password length the policy holds.
    * @throws {@link ZitadelError} When a file cannot be written: with `E_CONFLICT` when a file setup
    *   will not replace is there, or `E_VALIDATION` when a policy `--force` keeps is not valid.

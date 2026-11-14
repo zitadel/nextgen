@@ -49,7 +49,6 @@ export class KeepChanges extends WizardStep<"keep", Fact<"allFilesWritten" | "si
    * much as the answers do.
    *
    * @param needs - What the patch and the configuration did.
-   * @param this.deps - What the command provides.
    * @returns Every file written, and what sign-in is configured to do.
    */
   async run(needs: Needs): Promise<Fact<"allFilesWritten" | "signIn">> {

@@ -43,7 +43,6 @@ export class WriteManifest extends WizardStep<"manifest", object, Needs> {
    * Write the manifest.
    *
    * @param needs - What the patch did.
-   * @param this.deps - What the command provides.
    * @returns Nothing is added.
    */
   async run(needs: Needs): Promise<object> {

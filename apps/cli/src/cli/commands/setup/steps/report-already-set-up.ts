@@ -46,8 +46,8 @@ export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, N
    *
    * @remarks
    * The result for a directory that is already set up and has nothing to move.
+   *
    * @param needs - What was settled before the first step.
-   * @param this.deps - What the command provides.
    * @returns The result.
    */
   async run(needs: Needs): Promise<CommandResult> {

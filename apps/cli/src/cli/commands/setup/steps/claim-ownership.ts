@@ -12,6 +12,11 @@ import { WizardStep } from "@/lib/wizard";
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
+ * How long to wait for the runtime document that says whether the server hosts the platform.
+ */
+const PLATFORM_RUNTIME_TIMEOUT_MS = 1500;
+
+/**
  * What the step reads from what is known.
  */
 type Needs = Fact<"answers" | "project">;
@@ -38,13 +43,19 @@ export class ClaimOwnership extends WizardStep<
   Fact<"ownedByLocalAdmin" | "hostsPlatform" | "isLocal">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "ownership";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -60,6 +71,14 @@ export class ClaimOwnership extends WizardStep<
    * Reading the admin belongs inside the guard for the same reason: a malformed
    * `admin.json` must not fail a setup that already wrote the app.
    *
+   * Whether the server hosts the platform plane, which is whether a claim started against it can
+   * complete: `platform.bootstrap_project` pins the deployment's default project to the well-known
+   * proj_platform, and the console runtime document publishes that resolution, so one public GET
+   * answers the question. It fails closed: an unreadable, absent, or hanging document means no
+   * nudge, never a nudge into a flow that would 401 at claim/complete. The timeout mirrors
+   * checkLocalServerHealth so a socket that accepts and stalls cannot hang setup after the real
+   * work is done.
+   *
    * The console lists only projects the signed-in person can manage, so an unattached project is
    * one the local admin never sees. A server started by hand has no local admin anywhere, hence the
    * "if".
@@ -68,14 +87,15 @@ export class ClaimOwnership extends WizardStep<
    * membership, which need not be the team its bootstrap document named.
    *
    * @param needs - The answers and the project.
-   * @param this.deps - What the command provides.
    * @returns Whom the project belongs to, and what kind of server it is on.
    */
   async run(needs: Needs): Promise<Fact<"ownedByLocalAdmin" | "hostsPlatform" | "isLocal">> {
     const { answers, project } = needs;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
-      !this.deps.dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
+      !this.deps.dryRun && isLocal
+        ? Boolean(await readPlatformRuntime(answers.server, PLATFORM_RUNTIME_TIMEOUT_MS))
+        : false;
     if (!hostsPlatform) {
       return {
         ownedByLocalAdmin: undefined,
@@ -135,26 +155,4 @@ export class ClaimOwnership extends WizardStep<
       };
     }
   }
-}
-
-/**
- * Whether a local server hosts the platform plane, i.e. whether a claim
- * started against it can actually complete.
- *
- * @remarks
- * `platform.bootstrap_project` pins the deployment's default project to the
- * well-known proj_platform, and the console runtime document publishes that
- * resolution, so one public GET answers the question. Fail closed: an
- * unreadable, absent, or hanging document means no nudge, never a nudge into a
- * flow that would 401 at claim/complete. The timeout mirrors
- * checkLocalServerHealth so a socket that accepts and stalls cannot hang setup
- * after the real work is done. Exported so the fail-closed behavior is testable
- * without a live server.
- *
- * @param server - The server's base URL.
- * @param timeoutMs - How long to wait for the document.
- * @returns True when the document names the platform project.
- */
-export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
-  return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
