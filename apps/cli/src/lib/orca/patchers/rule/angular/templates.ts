@@ -128,24 +128,36 @@ export class App implements OnInit {
  * it, so a running watcher is not woken, and runs the Angular CLI in this
  * process with the arguments it was given. Both paths are the app's, from
  * `__dirname`, wherever it is run from. Only reading `.env.local` needs
- * Node.js 20.12 or newer; an id from the environment needs nothing more.
+ * Node.js 20.12 or newer; an id from the environment needs nothing more. It
+ * reads each file once and never checks a path before it uses it, which a
+ * file-system-race scan (CodeQL's `js/file-system-race`) reports in the app.
  */
 export function launcherTemplate(): string {
   return `${MANAGED_MARKER}
 // Writes the project id into ${PROJECT_ID_MODULE_PATH}, which .gitignore
 // excludes, then runs the Angular CLI with the arguments it was given. The id
 // comes from the environment, else from .env.local, which zitadel setup writes.
-const { existsSync, readFileSync, writeFileSync } = require("node:fs");
+const { readFileSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
 const util = require("node:util");
 
+// The text of file, or undefined when there is none to read: one read, so
+// nothing can change the file between a check and its use.
+function read(file) {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
 function fromEnvLocal() {
-  const file = join(__dirname, ".env.local");
-  if (!existsSync(file)) return undefined;
+  const text = read(join(__dirname, ".env.local"));
+  if (text === undefined) return undefined;
   if (typeof util.parseEnv !== "function") {
     throw new Error("Reading .env.local needs Node.js 20.12 or newer; or set ZITADEL_PROJECT_ID in the environment.");
   }
-  return util.parseEnv(readFileSync(file, "utf8")).ZITADEL_PROJECT_ID;
+  return util.parseEnv(text).ZITADEL_PROJECT_ID;
 }
 
 const projectId = process.env.ZITADEL_PROJECT_ID || fromEnvLocal();
@@ -154,7 +166,7 @@ if (!projectId) {
 }
 const path = join(__dirname, "${PROJECT_ID_MODULE_PATH}");
 const contents = \`// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\\nexport const ZITADEL_PROJECT_ID = \${JSON.stringify(projectId)};\\n\`;
-if (!existsSync(path) || readFileSync(path, "utf8") !== contents) {
+if (read(path) !== contents) {
   writeFileSync(path, contents);
 }
 require("@angular/cli/bin/ng.js");

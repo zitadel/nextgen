@@ -195,6 +195,13 @@ supportedArchitectures:
 # Fail the install on an unmet or conflicting peer dependency instead of warning.
 strictPeerDependencies: true
 
+# Hoist every package but server-only. @solidjs/start imports it undeclared and
+# expects its Vite plugin to stub it; with sdk-next's real copy hoisted, Node
+# loads that instead and every SSR request is a 500. Next.js bundles its own.
+hoistPattern:
+  - "*"
+  - "!server-only"
+
 # pnpm 12 no longer reads the "pnpm" field of package.json.
 allowBuilds:
   "esbuild": true
