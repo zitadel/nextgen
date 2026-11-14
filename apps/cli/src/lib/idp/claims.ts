@@ -216,6 +216,12 @@ const VERIFIED_BY: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
+ * One scope token as RFC 6749 section 3.3 spells it: printable ASCII without
+ * the space, the double quote and the backslash.
+ */
+const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
+
+/**
  * What a person might type for a type, and the type it means.
  */
 const TYPE_ALIASES: Readonly<Partial<Record<string, ClaimType>>> = {
@@ -412,17 +418,25 @@ export function parseUnusedClaim(state: MappingState, value: string): Parsed<str
 /**
  * Scopes as typed, separated by spaces or commas. Nothing typed is none.
  *
+ * @remarks
+ * A scope is sent to the provider in the authorization request, so each one
+ * must be a token of the OAuth scope grammar.
+ *
  * @param value - What was typed.
- * @returns The scopes, each once.
+ * @returns The scopes, each once, or the first that is no scope token.
  */
 export function parseScopeList(value: string): Parsed<readonly string[]> {
-  return ok(
-    union(
-      value.split(/[\s,]+/).filter((scope) => {
-        return scope !== "";
-      }),
-    ),
-  );
+  const typed = value.split(/[\s,]+/).filter((scope) => {
+    return scope !== "";
+  });
+  const invalid = typed.find((scope) => {
+    return !SCOPE_TOKEN.test(scope);
+  });
+  return invalid === undefined
+    ? ok(union(typed))
+    : refuse(
+        `${escapeControlCharacters(invalid, { keepLayout: false })} is not a valid scope: a scope is printable ASCII without quotes or backslashes.`,
+      );
 }
 
 /**
