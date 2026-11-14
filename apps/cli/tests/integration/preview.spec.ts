@@ -146,6 +146,29 @@ describe("preview", () => {
         });
       });
 
+      it("still pins the release when it cannot read when the previews expire", async () => {
+        const app = await anAppAdmittingPreviews();
+        platform.cannotListPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "ok",
+          cli_version: expect.any(String),
+          command: "preview",
+          source: "http://mock.zitadel.test",
+          data: {
+            title: expect.stringMatching(/^Previewed sha256:[0-9a-f]{64} on 1 URL$/),
+            release_id: expect.stringMatching(/^rel_/),
+            content_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+            deployment_id: expect.stringMatching(/^dep_/),
+            previews: [{ url: PREVIEW_URL, expires_at: null }],
+            release_env: expect.stringMatching(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/),
+          },
+          warnings: [expect.stringContaining("Could not read when the previews expire")],
+        });
+      });
+
       it("deploys to every URL it is given", async () => {
         const app = await anAppAdmittingPreviews();
 

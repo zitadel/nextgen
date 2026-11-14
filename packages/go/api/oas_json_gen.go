@@ -39468,17 +39468,10 @@ func (s *DeploymentTarget) encodeFields(e *jx.Encoder) {
 		e.FieldStart("origin")
 		s.Origin.Encode(e)
 	}
-	{
-		if s.ExpiresAt.Set {
-			e.FieldStart("expires_at")
-			s.ExpiresAt.Encode(e, json.EncodeDateTime)
-		}
-	}
 }
 
-var jsonFieldsNameOfDeploymentTarget = [2]string{
+var jsonFieldsNameOfDeploymentTarget = [1]string{
 	0: "origin",
-	1: "expires_at",
 }
 
 // Decode decodes DeploymentTarget from json.
@@ -39499,16 +39492,6 @@ func (s *DeploymentTarget) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"origin\"")
-			}
-		case "expires_at":
-			if err := func() error {
-				s.ExpiresAt.Reset()
-				if err := s.ExpiresAt.Decode(d, json.DecodeDateTime); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
 		default:
 			return d.Skip()

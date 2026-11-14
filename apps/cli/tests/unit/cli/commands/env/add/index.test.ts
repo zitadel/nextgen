@@ -730,10 +730,7 @@ describe("env add asked on a terminal", () => {
         HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
       ),
       http.post(`${SERVER}/api/v1/deployments`, () =>
-        HttpResponse.json(
-          { id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }] },
-          { status: 201 },
-        ),
+        HttpResponse.json({ id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN }] }, { status: 201 }),
       ),
     );
   }

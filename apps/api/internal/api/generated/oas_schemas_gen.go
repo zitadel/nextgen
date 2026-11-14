@@ -25659,8 +25659,6 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 // Ref: #
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
-	// Preview URLs only: the expiry this deployment set. A later deployment to the URL records its own.
-	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
 // GetOrigin returns the value of Origin.
@@ -25668,19 +25666,9 @@ func (s *DeploymentTarget) GetOrigin() Origin {
 	return s.Origin
 }
 
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *DeploymentTarget) GetExpiresAt() OptDateTime {
-	return s.ExpiresAt
-}
-
 // SetOrigin sets the value of Origin.
 func (s *DeploymentTarget) SetOrigin(val Origin) {
 	s.Origin = val
-}
-
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
-	s.ExpiresAt = val
 }
 
 // Where the release goes live: `primary`, every primary origin of the project, or a list of preview

@@ -101,7 +101,7 @@ describe("deployment list at a terminal", () => {
   const deployment = (id: string) => ({
     id,
     release_id: "rel_1",
-    targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
+    targets: [{ origin: PRIMARY_ORIGIN }],
     metadata: { reason: "deploy" },
     deployed_at: "2026-01-01T00:00:00.000Z",
   });

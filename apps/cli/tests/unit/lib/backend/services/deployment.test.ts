@@ -17,14 +17,14 @@ const CANCEL_SERVER = "http://localhost:8080";
 /** A deployment record as the API answers one, with only what a test varies. */
 function record(
   id: string,
-  targets: readonly { origin: string; expires_at?: string }[],
-  extra: { reason?: "deploy" | "rollback" } = {},
+  targets: readonly { origin: string }[],
+  extra: { reason?: "deploy" | "rollback"; kind?: "primary" | "preview" } = {},
 ): ListDeployments200DeploymentsItem {
   return {
     id,
     project_id: "proj_1",
     release_id: "rel_1",
-    kind: targets.every((target) => target.expires_at === undefined) ? "primary" : "preview",
+    kind: extra.kind ?? "primary",
     status: "live",
     deployed_at: "2026-01-01T00:00:00Z",
     targets,
@@ -34,17 +34,17 @@ function record(
   };
 }
 
-/** A deployment on a primary origin, whose target never expires. */
+/** A deployment on a primary origin. */
 function primary(id: string, origin = PRIMARY_ORIGIN): ListDeployments200DeploymentsItem {
   return record(id, [{ origin }]);
 }
 
-/** A deployment on a preview URL, whose target expires. */
+/** A deployment on a preview URL. */
 function preview(
   id: string,
   origin = "https://pr-7.preview.acme.com",
 ): ListDeployments200DeploymentsItem {
-  return record(id, [{ origin, expires_at: "2030-01-01T00:00:00Z" }]);
+  return record(id, [{ origin }], { kind: "preview" });
 }
 
 /** A service whose listing answers `deployments`, plus anything else a test stubs. */
