@@ -1,3 +1,6 @@
+import { rmSync } from "node:fs";
+import { join } from "node:path";
+
 import { defineConfig } from "@playwright/test";
 import { conformanceConfig } from "@zitadel/conformance/config";
 import type { AppEnvTemplate } from "@zitadel/testing/playwright";
@@ -13,5 +16,13 @@ const angularAppEnv: AppEnvTemplate = {
   ZITADEL_PROJECT_ID: "projectId",
   ZITADEL_PROJECT_SECRET: "projectSecret",
 };
+
+// `ng serve` prebundles the linked SDK into .angular/cache and reuses that
+// after the SDK's dist is rebuilt. Start each run without it, as CI does
+// (Angular prebundles nothing when CI is set). Workers load this file again
+// while the server runs, so only the runner clears it.
+if (process.env.TEST_WORKER_INDEX === undefined) {
+  rmSync(join(import.meta.dirname, ".angular"), { recursive: true, force: true });
+}
 
 export default defineConfig(conformanceConfig({ configDir: import.meta.dirname, env: angularAppEnv }));
