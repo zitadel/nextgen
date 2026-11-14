@@ -343,7 +343,7 @@ export type EnableServices = Readonly<{
  * @param value - The value.
  * @returns The value, safe to print on one line.
  */
-function plain(value: string): string {
+export function plain(value: string): string {
   return escapeControlCharacters(value, { keepLayout: false });
 }
 

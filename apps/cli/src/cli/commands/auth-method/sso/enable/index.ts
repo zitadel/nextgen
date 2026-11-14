@@ -69,9 +69,19 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  * history, a process listing, or CI logs.
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
+  /**
+   * What `--help` says the command does.
+   */
   static override description = "Add an identity provider to a user schema.";
+
+  /**
+   * The group the command index lists it under.
+   */
   static override group = CommandGroups.authentication;
 
+  /**
+   * The examples `--help` shows.
+   */
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -79,10 +89,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
+  /**
+   * The flags every `auth-method` command takes, and the environment's.
+   */
   static override baseFlags = {
     ...AuthMethodCommand.baseFlags,
     ...environmentFlags,
   };
+  /**
+   * The flags the command takes.
+   */
   static override flags = {
     provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -147,6 +163,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }),
   };
 
+  /**
+   * That the command resolves the server and the environment before it runs.
+   */
   static override meta = {
     resolveServer: true,
     environment: true,
@@ -161,8 +180,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * work out the whole change and refuse what cannot be done, preview it or ask
    * for the credentials, then store them and write the files.
    *
-   * @param input.flags - The provider, its settings, the schema and the environment flags.
-   * @returns The result.
+   * @param admitted - What the command admitted.
+   * @param admitted.flags - The provider, its settings, the schema and the environment flags.
+   * @returns The envelope the run answers with.
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */

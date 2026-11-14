@@ -11,6 +11,11 @@ import {
 import { WizardStep } from "@/lib/wizard";
 
 /**
+ * What the step reads from what is known.
+ */
+type Needs = Fact<"flags">;
+
+/**
  * What the step is given by the command.
  */
 type Deps = Pick<EnableServices, "dryRun" | "nonInteractive">;
@@ -18,7 +23,7 @@ type Deps = Pick<EnableServices, "dryRun" | "nonInteractive">;
 /**
  * Works out how the flags choose a provider, before anything is read or asked.
  */
-export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Fact<"flags">> {
+export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Needs> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -56,7 +61,7 @@ export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Fact<"f
    *   accompanies a catalog provider, or a script leaves out a custom
    *   connection's setting.
    */
-  async run(needs: Fact<"flags">): Promise<Fact<"choice">> {
+  async run(needs: Needs): Promise<Fact<"choice">> {
     const provider = String(needs.flags.provider);
     const values = customFlagValues(needs.flags, ENABLE_FLAG_KEYS);
     const complete =

@@ -3,6 +3,7 @@ import type { Parsed } from "@zitadel/config/idp";
 import {
   type EnableServices,
   type Fact,
+  plain,
   VERIFIED_FLAG,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
@@ -27,24 +28,8 @@ import {
   type VerifiedEntry,
 } from "@/lib/idp";
 import { log } from "@/lib/log";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-/**
- * What the step reads from what is known.
- */
-type Needs = Fact<"provider" | "claimRequest" | "mapping" | "claims">;
-
-/**
- * What the step is given by the command.
- */
-type Deps = Pick<EnableServices, "ask" | "nonInteractive">;
-
-/**
- * How a claim is verified, as the question offers it.
- */
-type Verification = "none" | "claim" | "trust";
 
 /**
  * How a type is named to a person, not to a schema.
@@ -63,15 +48,19 @@ const TYPE_LABELS: Readonly<Record<ClaimType, string>> = {
 const CREATE = Symbol("create a new attribute");
 
 /**
- * Escapes a value that came from a file or a provider, newlines included, so it
- * cannot drive the terminal or forge a line of what is shown.
- *
- * @param value - The value.
- * @returns The value, safe to print on one line.
+ * What the step reads from what is known.
  */
-function plain(value: string): string {
-  return escapeControlCharacters(value, { keepLayout: false });
-}
+type Needs = Fact<"provider" | "claimRequest" | "mapping" | "claims">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "ask" | "nonInteractive">;
+
+/**
+ * How a claim is verified, as the question offers it.
+ */
+type Verification = "none" | "claim" | "trust";
 
 /**
  * Escapes what is wrong with an answer, which names a property or a scope that

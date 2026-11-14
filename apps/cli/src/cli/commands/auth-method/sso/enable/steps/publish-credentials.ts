@@ -76,16 +76,16 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
    * @returns What became of each credential.
    */
   async run(needs: Needs): Promise<Fact<"published">> {
-    const variableService =
+    const variables =
       this.deps.source === "mock"
         ? undefined
         : new VariableService(needs.remote.client, needs.remote.projectId);
     const publish: SecretPublisher | undefined =
-      variableService === undefined
+      variables === undefined
         ? undefined
         : async (name, value, options) => {
             try {
-              await variableService.set(
+              await variables.set(
                 name,
                 value,
                 VariableWrite.of({
