@@ -127,20 +127,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }),
     claim: Flags.custom<string>({
       multiple: true,
-      parse: accepts(parseClaimEntry, { empty: AS_REFUSED }),
+      parse: accepts(parseClaimEntry, { blankAsValue: true }),
     })({
       description:
         "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
     }),
     "verified-claim": Flags.custom<string>({
       multiple: true,
-      parse: accepts(parseVerifiedEntry, { empty: AS_REFUSED }),
+      parse: accepts(parseVerifiedEntry, { blankAsValue: true }),
     })({
       description:
         "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
     }),
     "claim-scope": Flags.custom<string>({
-      parse: accepts(parseScopeList, { empty: AS_REFUSED }),
+      parse: accepts(parseScopeList, { blankAsValue: true }),
     })({
       description:
         "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
