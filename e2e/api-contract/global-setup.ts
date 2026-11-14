@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm } from "node:fs/promises";
+import { appendFile, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,6 +10,7 @@ import { Credentials } from "./src/credentials";
 import { Lane, type FamilyRun } from "./src/lane";
 import { Schemathesis } from "./src/schemathesis";
 import { OpenApiSpec } from "./src/spec";
+import { ContractSummary } from "./src/summary";
 
 /**
  * Where the resource API lives on a deployment's host (ADR 077). The served
@@ -23,6 +24,26 @@ const workspaceRoot = join(import.meta.dirname, "..", "..");
 declare module "vitest" {
   export interface ProvidedContext {
     contractRuns: FamilyRun[];
+  }
+}
+
+/**
+ * Puts the verdict where a person looks first: a file beside the raw reports,
+ * the job summary and error annotations when run by GitHub Actions.
+ */
+async function publish(summary: ContractSummary): Promise<void> {
+  const page = summary.markdown();
+  const directory = join(import.meta.dirname, "test-output");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "summary.md"), page);
+  console.info(`\n${page}`);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${page}\n`);
+  }
+  if (process.env.GITHUB_ACTIONS) {
+    for (const line of summary.annotations()) {
+      console.info(line);
+    }
   }
 }
 
@@ -88,6 +109,9 @@ export default async function setup({ provide }: TestProject): Promise<() => Pro
       );
     }
 
+    await publish(
+      new ContractSummary(runs, new Baseline(join(import.meta.dirname, "known-failures.json"))),
+    );
     provide("contractRuns", runs);
   } catch (error) {
     await teardown();

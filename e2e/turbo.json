@@ -242,7 +242,7 @@
         "!**/AGENTS.md"
       ],
       "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
-      "cache": false,
+      "outputs": ["api-contract/test-output/**"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "demo-nuxt-mock": {
