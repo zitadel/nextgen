@@ -25660,6 +25660,8 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
 	// Preview URLs only: the expiry this deployment set. A later deployment to the URL records its own.
+	// Absent on a preview deployment that a later one to the same URL replaced before expiries were
+	// recorded.
 	ExpiresAt OptDateTime `json:"expires_at"`
 }
 

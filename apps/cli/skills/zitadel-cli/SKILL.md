@@ -475,6 +475,14 @@ Each invocation prints one JSON object:
   is not necessarily the one the live deployment serves, so also check that
   the deployment went through (`deployment list --live`). Never treat `ok` as
   proof that the change is what you meant to publish.
+- `deployment list` and `deployment get` print `kind` (`primary` or `preview`)
+  and, for a preview deployment, `expires`: the expiry that deployment set, also
+  in `--json` as `targets[].expires_at`. In `deployment list` they are the last
+  two columns, after `deployed_at`. A later deploy to the same URL does not
+  change it, and `preview list` shows the one the preview has now. A preview
+  deployment that a later one to the same URL replaced before the server
+  recorded expiries has a blank `expires`: read `kind`, never a missing expiry,
+  to tell a preview deployment from a primary one.
 - `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
   `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules

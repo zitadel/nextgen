@@ -844,6 +844,27 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		assert.WithinDuration(t, deployed.DeployedAt.Add(90*time.Minute), got.ExpiresAt, time.Second)
 	})
 
+	t.Run("each target reports the expiry its deployment set", func(t *testing.T) {
+		shortLived := preview(t, &api.CreateDeploymentRequest{
+			Targets: previewTargets(previewOrigin),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(3 * time.Minute)),
+		})
+		longLived := preview(t, &api.CreateDeploymentRequest{
+			Targets: previewTargets(previewOrigin),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(7 * 24 * time.Hour)),
+		})
+		expiry := func(t *testing.T, targets []api.DeploymentTarget) time.Time {
+			t.Helper()
+			require.Len(t, targets, 1)
+			require.True(t, targets[0].ExpiresAt.Set, "a preview target carries its expiry")
+			return targets[0].ExpiresAt.Value
+		}
+		assert.WithinDuration(t, shortLived.DeployedAt.Add(3*time.Minute), expiry(t, shortLived.Targets), time.Second)
+		assert.WithinDuration(t, shortLived.DeployedAt.Add(3*time.Minute), expiry(t, get(t, shortLived.ID).Targets), time.Second,
+			"the later deployment renewed the preview, not this one")
+		assert.WithinDuration(t, longLived.DeployedAt.Add(7*24*time.Hour), expiry(t, get(t, longLived.ID).Targets), time.Second)
+	})
+
 	t.Run("a ttl above the maximum writes nothing", func(t *testing.T) {
 		before, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
 		require.NoError(t, err)

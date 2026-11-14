@@ -97,7 +97,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 func AttachTargets(items []*domain.Deployment, rows []domain.OriginDeployment) {
 	byID := make(map[string][]domain.DeploymentTarget, len(items))
 	for _, row := range rows {
-		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin})
+		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin, ExpiresAt: row.ExpiresAt})
 	}
 	for _, item := range items {
 		targets := byID[item.ID]

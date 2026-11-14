@@ -96,13 +96,15 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         lines: [
           ...this.tabulateDetail(
             undefined,
-            ["id", "release_id", "reason", "origins", "deployed_at"],
+            ["id", "release_id", "reason", "origins", "deployed_at", "kind", "expires"],
             {
               id: deployment.id,
               release_id: deployment.release_id,
               reason: deployment.reason ?? "deploy",
               origins: deployment.origins.join(", "),
               deployed_at: deployment.deployed_at,
+              kind: deployment.kind,
+              expires: deployment.expiresAt,
             },
           ).split("\n"),
           ...(frozen === undefined ? [] : ["", ...frozen]),

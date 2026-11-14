@@ -169,16 +169,43 @@ export class Deployment {
   }
 
   /**
-   * Whether this deployment serves a primary origin. A preview deployment's
-   * targets carry an expiry; it is never the baseline, the guard or the thing a
-   * bare rollback undoes.
+   * Whether this deployment went to the primary origins. A preview deployment
+   * is never the baseline, the guard or the thing a bare rollback undoes, and
+   * it says so by its kind, not by carrying an expiry: one made before the
+   * server recorded expiries has none.
    *
-   * @returns True when at least one target never expires.
+   * @returns True when its kind is primary.
    */
   get servesPrimary(): boolean {
-    return this.targets.some((target) => {
-      return target.expires_at == null;
-    });
+    return this.kind === "primary";
+  }
+
+  /**
+   * Whether this deployment went to the project's primary origins or to
+   * preview URLs.
+   *
+   * @returns The kind the API recorded, which it always records.
+   */
+  get kind(): ListDeployments200DeploymentsItem["kind"] {
+    return this.record.kind;
+  }
+
+  /**
+   * When the preview this deployment made expires: the expiry the deployment
+   * set on its targets, which a later deployment to the same URL does not
+   * change.
+   *
+   * @returns The first expiry its targets carry (a deployment the server
+   *   made after it recorded expiries has the same one on all of them), or
+   *   null for a deployment that has none: a primary one, or an older preview
+   *   one.
+   */
+  get expiresAt(): string | null {
+    return (
+      this.targets.find((target) => {
+        return target.expires_at != null;
+      })?.expires_at ?? null
+    );
   }
 
   /**

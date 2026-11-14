@@ -30,12 +30,21 @@ const LIMIT = {
   },
 } as const satisfies Refused<number>;
 
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+const COLUMNS = [
+  "id",
+  "release_id",
+  "reason",
+  "origins",
+  "deployed_at",
+  "kind",
+  "expires",
+] as const;
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
- * Newest first: what went live where, and when. `--origin` narrows it to one
+ * Newest first: what went live where, and when, whether to the primary
+ * origins or to preview URLs, and when a preview expires. `--origin` narrows it to one
  * origin's history; `--live` shows what each target serves now instead of the
  * full history. Like every list verb it fetches one page and reports
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
@@ -97,6 +106,8 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         reason: deployment.reason ?? "deploy",
         origins: deployment.origins.join(", "),
         deployed_at: deployment.deployed_at,
+        kind: deployment.kind,
+        expires: deployment.expiresAt,
       };
     });
     const columns = COLUMNS;

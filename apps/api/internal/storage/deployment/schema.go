@@ -10,7 +10,7 @@ import (
 // OriginsSelect selects deployment_origins rows aliased t, in the column order
 // the dialects scan.
 func OriginsSelect(originsTable string) string {
-	return `SELECT t.origin, t.deployment_id, t.release_id, t.origin_kind, t.deployed_at, t.seq FROM ` + originsTable + ` t`
+	return `SELECT t.origin, t.deployment_id, t.release_id, t.origin_kind, t.deployed_at, t.seq, t.expires_at FROM ` + originsTable + ` t`
 }
 
 // NewerOriginRowExists holds when the origin of row t has a row with a higher

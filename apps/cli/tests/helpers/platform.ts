@@ -467,7 +467,7 @@ export function usePlatformMock(): PlatformMock {
           id,
           project_id: "proj_1",
           release_id: "rel_1",
-          kind: "deploy",
+          kind: "primary",
           status: "live",
           deployed_at: "2026-01-01T00:00:00Z",
           metadata: { reason: "deploy" },

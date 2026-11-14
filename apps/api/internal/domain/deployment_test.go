@@ -81,6 +81,26 @@ func TestNewDeploymentValidates(t *testing.T) {
 
 var t0 = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
 
+func TestDeploymentStampExpiry(t *testing.T) {
+	deployedAt := time.Date(2026, 10, 2, 14, 10, 0, 0, time.UTC)
+
+	preview, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPreview, []string{"https://b.vercel.app", "https://a.vercel.app"}, DeploymentMetadata{})
+	require.NoError(t, err)
+	preview.StampExpiry(deployedAt, 3*time.Minute)
+	want := deployedAt.Add(3 * time.Minute)
+	require.Len(t, preview.Targets, 2)
+	for _, target := range preview.Targets {
+		require.NotNil(t, target.ExpiresAt)
+		assert.True(t, want.Equal(*target.ExpiresAt))
+	}
+
+	primary, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{"https://app.acme.com"}, DeploymentMetadata{})
+	require.NoError(t, err)
+	primary.StampExpiry(deployedAt, 3*time.Minute)
+	require.Len(t, primary.Targets, 1)
+	assert.Nil(t, primary.Targets[0].ExpiresAt, "a primary deployment sets no expiry")
+}
+
 func TestNewestOriginDeploymentBreaksTiesOnID(t *testing.T) {
 	assert.Nil(t, NewestOriginDeployment(nil))
 	newest := NewestOriginDeployment([]OriginDeployment{

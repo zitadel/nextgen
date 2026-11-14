@@ -108,6 +108,25 @@ describe("deployment get", () => {
     expect(res.stdout).not.toMatch(/^release {2,}/m);
   });
 
+  it("ends the facts with its kind and, for a preview, the expiry it set", async () => {
+    const cwd = await aProject();
+    server.use(
+      http.get(`${SERVER}/api/v1/deployments/dep_1`, () =>
+        HttpResponse.json({
+          ...DEPLOYMENT,
+          kind: "preview",
+          targets: [{ origin: PRIMARY_ORIGIN, expires_at: "2030-01-01T00:00:00Z" }],
+        }),
+      ),
+    );
+
+    const res = await asTerminal(() => read(cwd));
+
+    expect(res.stdout).toMatch(
+      /^deployed_at {2,}\S+\n^kind {2,}preview\n^expires {2,}2030-01-01T00:00:00Z$/m,
+    );
+  });
+
   it("tables the set the deployment froze under the fields, a secret masked", async () => {
     const cwd = await aProject();
 

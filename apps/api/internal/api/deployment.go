@@ -320,6 +320,9 @@ func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api
 	}
 	for i, target := range entity.Targets {
 		resp.Targets[i] = api.DeploymentTarget{Origin: api.Origin(target.Origin)}
+		if target.ExpiresAt != nil {
+			resp.Targets[i].ExpiresAt = api.NewOptDateTime(*target.ExpiresAt)
+		}
 	}
 	m := entity.Metadata
 	if m.Message != nil {

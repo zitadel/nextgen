@@ -240,6 +240,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
+                kind: "primary",
                 targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
@@ -252,6 +253,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
               {
                 id: "dep_preview",
                 release_id: "rel_preview",
+                kind: "preview",
                 targets: [
                   { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
                 ],

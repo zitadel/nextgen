@@ -32,7 +32,7 @@ var (
 	deploymentSchema = deployment.NewSchema(deploymentTables)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
-	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
+	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq", "expires_at"}
 
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
@@ -54,7 +54,7 @@ func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment, previewTTL time.Duration) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -83,10 +83,12 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		// so one mutation applies them at commit.
 		origins := entity.Origins()
 		seqs := deployment.NextSeqs(origins, read)
+		entity.StampExpiry(stamped, previewTTL)
 		mutations := make([]*spanner.Mutation, 0, len(origins))
 		for i, origin := range origins {
 			mutations = append(mutations, spanner.Insert(originsTable, originColumns, []any{
 				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
+				spannerNullTime(entity.Targets[i].ExpiresAt),
 			}))
 		}
 		if _, err := tx.BufferWrite(ctx, mutations); err != nil {
@@ -219,11 +221,15 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			var (
 				scanned domain.OriginDeployment
 				kind    string
+				expires spanner.NullTime
 			)
-			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
+			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq, &expires); err != nil {
 				return scanned, err
 			}
 			scanned.DeployedAt = scanned.DeployedAt.UTC()
+			if expires.Valid {
+				scanned.ExpiresAt = database.UTCOrNil(&expires.Time)
+			}
 			return deployment.WithKind(scanned, kind)
 		})
 		return err

@@ -312,7 +312,7 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 
 		// A copy per attempt: each one mints its own id and stamp.
 		written := *entity
-		if err := stmts.CreateDeployment(ctx, &written, read); err != nil {
+		if err := stmts.CreateDeployment(ctx, &written, read, input.PreviewTTL); err != nil {
 			// The release was read above, so the only reference left to
 			// trip is the project.
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
@@ -324,8 +324,10 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 			return err
 		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
+			// The instant the statement stamped on the targets, derived by the
+			// same function, so the service never reads it back out of the entity.
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
-				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+				domain.PreviewExpiry(written.DeployedAt, input.PreviewTTL), written.DeployedAt); err != nil {
 				return err
 			}
 		}
