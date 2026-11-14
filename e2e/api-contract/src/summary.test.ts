@@ -16,6 +16,7 @@ function run(failures: FamilyRun["failures"]): FamilyRun {
     stopReason: "",
     errors: [],
     failures,
+    seconds: 1,
   };
 }
 
