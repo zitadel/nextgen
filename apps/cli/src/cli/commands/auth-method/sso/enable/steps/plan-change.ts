@@ -1,22 +1,22 @@
+import type { IdpProvider, ProviderSelection } from "@zitadel/config/idp";
 import { providerOf, selectionName } from "@zitadel/config/idp";
+
+import type { SchemaTarget } from "@/cli/commands/auth-method/command";
+import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { Origins } from "@/lib/backend";
 import {
   callbackUriFor,
   CredentialDelivery,
   CredentialPrompt,
   loopbackIssuerWarning,
 } from "@/lib/idp";
-
-import type { IdpProvider, ProviderSelection } from "@zitadel/config/idp";
-
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { Origins } from "@/lib/backend";
 import { loopbackReach } from "@/lib/local-server/runtime";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
+import type { Suggest } from "@/lib/suggestion";
+import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 import { Connection, type DocumentChange, type SsoOptions } from "@/lib/zitadel";
-
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -64,7 +64,22 @@ type Planned = Readonly<{
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
+type Deps = Readonly<{
+  /**
+   * The questions the run may ask a person.
+   */
+  ask: Questions;
+
+  /**
+   * Whether this is a development build that may ask where a provider answers.
+   */
+  developmentBuild: boolean;
+
+  /**
+   * Builds the commands the run suggests.
+   */
+  suggest: Suggest;
+}>;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -75,10 +90,13 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
   readonly key = "plan";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -97,7 +115,6 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
    * URI that equals either, is left out of its list.
    *
    * @param needs - What was read and decided.
-   * @param this.deps - What the command provides.
    * @returns The plan.
    * @throws {@link ZitadelError} When the change would be refused.
    */
@@ -108,17 +125,19 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
       candidate,
       needs.options,
     );
-    const reach = await loopbackReach(needs.target.cwd, needs.remote.server);
-    const loopback = loopbackIssuerWarning(needs.selection, reach);
+    const loopback = loopbackIssuerWarning(
+      needs.selection,
+      await loopbackReach(needs.target.cwd, needs.remote.server),
+    );
     if (loopback !== undefined) {
       reportWarning(loopback);
     }
+    const connection = preview.document;
     const delivery = new CredentialDelivery({
-      connection: preview.document,
+      connection,
       reused: !preview.created,
       suggest: this.deps.suggest,
     });
-    const connection = preview.document;
     const callbackUri = callbackUriFor(needs.issuer, connection.slug);
     const deployedCallbackUris = [
       ...new Set(

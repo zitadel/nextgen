@@ -1,11 +1,10 @@
 import type { SchemaTarget } from "@/cli/commands/auth-method/command";
+import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { GivenCredentials } from "@/lib/idp";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 import type { Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
-
-import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -46,7 +45,6 @@ export class BuildChange extends WizardStep<
    * too.
    *
    * @param needs - What was read and decided.
-   * @param _services - What the command provides.
    * @returns The change.
    * @throws {@link ZitadelError} When saving the change would be refused.
    */

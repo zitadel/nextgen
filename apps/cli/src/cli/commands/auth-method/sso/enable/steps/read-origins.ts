@@ -2,8 +2,6 @@ import { isCancelled, Origins, OriginService } from "@/lib/backend";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { WizardStep } from "@/lib/wizard";
 
-import type { EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
-
 /**
  * What the run learned about the project it addresses.
  */
@@ -22,7 +20,14 @@ type Remote = Readonly<{
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "connect">;
+type Deps = Readonly<{
+  /**
+   * Resolves the project and server the run addresses.
+   *
+   * @returns The connection to them.
+   */
+  connect(): Promise<RemoteConnection>;
+}>;
 
 /**
  * Resolves the project and server before anything else is asked for: being
@@ -32,10 +37,13 @@ export class ReadOrigins extends WizardStep<"remote", Remote, object> {
   readonly key = "remote";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -50,22 +58,20 @@ export class ReadOrigins extends WizardStep<"remote", Remote, object> {
    * instead, as `OriginService.remove` does.
    *
    * @param _needs - Nothing from earlier steps.
-   * @param this.deps - What the command provides.
    * @returns The connection and the origins.
    */
   async run(_needs: object): Promise<Remote> {
     const remote = await this.deps.connect();
-    const origins = await new OriginService(remote.client, remote.projectId)
-      .list()
-      .catch((cause: unknown) => {
-        if (isCancelled(remote.client)) {
-          throw cause;
-        }
-        return Origins.wrap([]);
-      });
     return {
       remote,
-      origins,
+      origins: await new OriginService(remote.client, remote.projectId)
+        .list()
+        .catch((cause: unknown) => {
+          if (isCancelled(remote.client)) {
+            throw cause;
+          }
+          return Origins.wrap([]);
+        }),
     };
   }
 }

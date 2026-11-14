@@ -1,15 +1,12 @@
-import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { CommandResult } from "@/lib/oclif";
-import type { Connection as RemoteConnection } from "@/lib/oclif/types";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
-import type { Questions } from "@/lib/ui";
-import type { Change, Connection, ConnectionSummary, DocumentChange } from "@/lib/zitadel";
-
-import type { EnableFlags } from "@/cli/commands/auth-method/sso/enable";
 import type { ProviderName } from "@zitadel/config/idp";
+import type { ReadonlyDeep } from "type-fest";
+
+import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import type { CredentialNames, PublishedCredentials, PublishState } from "@/lib/idp";
 import { log } from "@/lib/log";
+import type { Admitted } from "@/lib/oclif";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import type { Change, Connection, ConnectionSummary, DocumentChange } from "@/lib/zitadel";
 
 /**
  * What a run of `auth-method sso enable` starts from.
@@ -18,218 +15,106 @@ export type EnableInput = Readonly<{
   /**
    * The flags the command admitted.
    */
-  flags: EnableFlags;
-}>;
-
-/**
- * What the run answers: the command's envelope.
- */
-export type EnableAnswer = CommandResult;
-
-/**
- * What the command provides every step: the run's facts, and the parts of the
- * command that read the project, draw and answer, which stay in the command.
- */
-export type EnableServices = Readonly<{
-  /**
-   * The project's directory.
-   */
-  cwd: string;
-
-  /**
-   * The run's environment variables.
-   */
-  env: NodeJS.ProcessEnv;
-
-  /**
-   * The questions the run may ask a person.
-   */
-  ask: Questions;
-
-  /**
-   * Builds the commands the run suggests.
-   */
-  suggest: Suggest;
-
-  /**
-   * Whether the run only previews.
-   */
-  dryRun: boolean;
-
-  /**
-   * Whether the run may not ask anything.
-   */
-  nonInteractive: boolean;
-
-  /**
-   * Whether this is a development build that may ask where a provider answers.
-   */
-  developmentBuild: boolean;
-
-  /**
-   * Reads the schema the run changes and everything around it.
-   *
-   * @param flags - The flags the command admitted.
-   * @returns What the run read.
-   */
-  loadSchemaTarget(flags: EnableFlags): Promise<SchemaTarget>;
-
-  /**
-   * Resolves the project and server the run addresses.
-   *
-   * @returns The connection to them.
-   */
-  connect(): Promise<RemoteConnection>;
-
-  /**
-   * The run again without `--dry-run`, as the developer typed it.
-   *
-   * @returns The command.
-   */
-  realRun(): Promise<SuggestedCommand>;
-
-  /**
-   * Writes the change to the project's files.
-   *
-   * @param target - What the run read.
-   * @param change - The change.
-   * @returns The files written.
-   */
-  write(target: SchemaTarget, change: Change): Promise<readonly string[]>;
-
-  /**
-   * Whether the run answers with JSON.
-   */
-  isJson: boolean;
-
-  /**
-   * The server the run addresses.
-   */
-  source: string;
-
-  /**
-   * Says what a configuration change did, and what else the developer would not
-   * otherwise see.
-   *
-   * @param change - The change.
-   */
-  report(change: Change): void;
-
-  /**
-   * The arguments a suggested command is run with.
-   *
-   * @param command - The command.
-   * @returns Its arguments.
-   */
-  argsOf(command: SuggestedCommand): readonly string[];
-
-  /**
-   * The commands to run after a change: what leads, then deploy when a file changed.
-   *
-   * @param changed - Whether a file changed.
-   * @param leading - What comes first.
-   * @returns The commands, and their arguments.
-   */
-  followUps(changed: boolean, leading?: readonly SuggestedCommand[]): FollowUps;
+  flags: Admitted<typeof AuthMethodSsoEnable>["flags"];
 }>;
 
 /**
  * What a run says about the connection it adds, before any credential is
  * asked for.
  */
-export type Summary = {
+export type Summary = Readonly<{
   /**
    * The Project the run addresses. `--json` suppresses the console line that
    * otherwise carries it, and a result that names only the schema does not
    * say which Project was changed.
    */
-  readonly projectId: string;
+  projectId: string;
 
   /**
    * The provider, as a command line names it.
    */
-  readonly provider: ProviderName;
+  provider: ProviderName;
 
   /**
    * The name a sign-in button and every message show for the provider.
    */
-  readonly displayName: string;
+  displayName: string;
 
   /**
    * The schema the provider is added to.
    */
-  readonly schema: string;
+  schema: string;
 
   /**
    * The connection the schema lists: the one created, or the one reused.
    */
-  readonly connection: Connection;
+  connection: Connection;
 
   /**
    * Whether the connection was already in the project.
    */
-  readonly reused: boolean;
+  reused: boolean;
 
   /**
    * The redirect URI to register with the provider, on the Project's
    * development issuer.
    */
-  readonly callbackUri: string;
+  callbackUri: string;
 
   /**
    * The redirect URI on each primary origin, where a deploy lands the app.
    */
-  readonly deployedCallbackUris: readonly string[];
+  deployedCallbackUris: readonly string[];
 
   /**
    * The redirect URI pattern for each preview origin. A preview URL is one
    * pull-request build of the same app, so each needs its own entry at the
    * provider, and a wildcard pattern cannot be registered as one.
    */
-  readonly previewCallbackUris: readonly string[];
-};
+  previewCallbackUris: readonly string[];
+}>;
 
 /**
  * A credential's variable, and whether the project holds its value.
  */
-type PublishedVariable = {
-  readonly variable: string;
-  readonly published: PublishState;
-};
+type PublishedVariable = Readonly<{
+  variable: string;
+  published: PublishState;
+}>;
 
 /**
  * What `payload` words the result's data from.
  */
-type PayloadInput = {
-  readonly summary: Summary;
-  readonly change: DocumentChange<Connection>;
-  readonly published: PublishedCredentials;
-  readonly names: CredentialNames;
-};
+type PayloadInput = Readonly<{
+  summary: Summary;
+  change: DocumentChange<Connection>;
+  published: PublishedCredentials;
+  names: CredentialNames;
+}>;
 
 /**
  * The machine-readable result. Never the secret, only whether it is held.
  */
-type Payload = {
-  readonly project_id: string;
-  readonly provider: ProviderName;
-  readonly schema: string;
-  readonly connection: {
-    readonly action: "reuse" | "create";
-    readonly slug: string;
-    readonly file: string;
-    readonly claim_mapping: Readonly<Record<string, string>>;
-    readonly verified_claims: Readonly<Record<string, string | boolean>>;
-    readonly scopes: readonly string[];
-    readonly unmapped: ConnectionSummary["unmapped"];
-    readonly used_by: readonly string[];
+type Payload = ReadonlyDeep<{
+  project_id: string;
+  provider: ProviderName;
+  schema: string;
+  connection: {
+    action: "reuse" | "create";
+    slug: string;
+    file: string;
+    claim_mapping: Record<string, string>;
+    verified_claims: Record<string, string | boolean>;
+    scopes: string[];
+    unmapped: ConnectionSummary["unmapped"];
+    used_by: string[];
   };
-  readonly callback_uri: string;
-  readonly changed: readonly string[];
-  readonly notices: Change["notices"];
-  readonly client_id: PublishedVariable | null;
-  readonly secret: PublishedVariable | null;
-};
+  callback_uri: string;
+  changed: string[];
+  notices: Change["notices"];
+  client_id: PublishedVariable | null;
+  secret: PublishedVariable | null;
+}>;
 
 /**
  * The machine-readable result. Never the secret, only whether it is held.
@@ -315,52 +200,52 @@ export function drawMapping(change: DocumentChange<Connection>): void {
       return [];
     }),
   );
-  const sections = [
-    mappings.length === 0
-      ? []
-      : [
-          createsUsers
-            ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
-            : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
-          ...mappings.map(({ property, claim }) => {
-            const verified = verifiedBy.get(property) ?? "is not treated as verified";
-            return [
-              `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-              `  It ${verified}.`,
-            ].join("\n");
-          }),
-        ],
-    scopes.length === 0
-      ? []
-      : [
-          `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
-        ],
-    unmapped.length === 0
-      ? []
-      : [
-          "These attributes have no claim yet:",
-          ...unmapped.map(({ property, required }) => {
-            if (!required) {
-              return `- ${text(property)} is optional, so it can stay empty.`;
-            }
-            return createsUsers
-              ? `- ${text(property)} is required, so sign-up will have to ask for it.`
-              : `- ${text(property)} is required, but this connection does not create users.`;
-          }),
-        ],
-    usedBy.length === 0
-      ? []
-      : [
-          `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
-        ],
-    [
-      `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
-    ],
-  ].filter((section) => {
-    return section.length > 0;
-  });
   log.info(
-    sections
+    [
+      mappings.length === 0
+        ? []
+        : [
+            createsUsers
+              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+            ...mappings.map(({ property, claim }) => {
+              const verified = verifiedBy.get(property) ?? "is not treated as verified";
+              return [
+                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                `  It ${verified}.`,
+              ].join("\n");
+            }),
+          ],
+      scopes.length === 0
+        ? []
+        : [
+            `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
+          ],
+      unmapped.length === 0
+        ? []
+        : [
+            "These attributes have no claim yet:",
+            ...unmapped.map(({ property, required }) => {
+              if (!required) {
+                return `- ${text(property)} is optional, so it can stay empty.`;
+              }
+              return createsUsers
+                ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                : `- ${text(property)} is required, but this connection does not create users.`;
+            }),
+          ],
+      usedBy.length === 0
+        ? []
+        : [
+            `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+          ],
+      [
+        `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+      ],
+    ]
+      .filter((section) => {
+        return section.length > 0;
+      })
       .flatMap((section, at) => {
         return at === 0 ? section : ["", ...section];
       })

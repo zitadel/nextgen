@@ -1,12 +1,11 @@
-import { payload, drawMapping } from "@/cli/commands/auth-method/sso/enable/shared";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-
-import type { CommandResult } from "@/lib/oclif";
+import type { FollowUps } from "@/cli/commands/auth-method/command";
+import { drawMapping, payload, type Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { CredentialDelivery, PublishedCredentials } from "@/lib/idp";
+import type { CommandResult } from "@/lib/oclif";
+import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 import type { Connection, DocumentChange } from "@/lib/zitadel";
-
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -22,7 +21,26 @@ type Needs = Readonly<{
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "followUps" | "isJson" | "suggest">;
+type Deps = Readonly<{
+  /**
+   * The commands to run after a change: what leads, then deploy when a file changed.
+   *
+   * @param changed - Whether a file changed.
+   * @param leading - What comes first.
+   * @returns The commands, and their arguments.
+   */
+  followUps(changed: boolean, leading?: readonly SuggestedCommand[]): FollowUps;
+
+  /**
+   * Whether the run answers with JSON.
+   */
+  isJson: boolean;
+
+  /**
+   * Builds the commands the run suggests.
+   */
+  suggest: Suggest;
+}>;
 
 /**
  * Words what the run did as the command's result.
@@ -31,10 +49,13 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
   readonly key = "result";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -50,7 +71,6 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
    * connection was reused and no file was written.
    *
    * @param needs - What the run did.
-   * @param this.deps - What the command provides.
    * @returns The result the command answers with.
    */
   async run(needs: Needs): Promise<Readonly<{ answer: CommandResult }>> {

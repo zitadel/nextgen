@@ -1,13 +1,12 @@
-import { drawMapping, payload } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { ClientId } from "@zitadel/config/idp";
+
+import { drawMapping, payload, type Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 import type { CredentialDelivery, PublishedCredentials } from "@/lib/idp";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-
 import type { CommandResult } from "@/lib/oclif";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { EndStep } from "@/lib/wizard";
-import type { Connection, DocumentChange } from "@/lib/zitadel";
-
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { Change, Connection, DocumentChange } from "@/lib/zitadel";
 
 /**
  * Nothing sent to the project, as a dry run reports it.
@@ -30,7 +29,40 @@ type Needs = Readonly<{
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "argsOf" | "dryRun" | "isJson" | "realRun" | "report">;
+type Deps = Readonly<{
+  /**
+   * The arguments a suggested command is run with.
+   *
+   * @param command - The command.
+   * @returns Its arguments.
+   */
+  argsOf(command: SuggestedCommand): readonly string[];
+
+  /**
+   * Whether the run only previews.
+   */
+  dryRun: boolean;
+
+  /**
+   * Whether the run answers with JSON.
+   */
+  isJson: boolean;
+
+  /**
+   * The run again without `--dry-run`, as the developer typed it.
+   *
+   * @returns The command.
+   */
+  realRun(): Promise<SuggestedCommand>;
+
+  /**
+   * Says what a configuration change did, and what else the developer would not
+   * otherwise see.
+   *
+   * @param change - The change.
+   */
+  report(change: Change): void;
+}>;
 
 /**
  * Ends a dry run with what would be written and stored, before anything is
@@ -40,10 +72,13 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
   readonly key = "preview";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -53,7 +88,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
    * Whether the run only previews.
    *
    * @param _needs - What was read and decided.
-   * @param this.deps - What the command provides.
    * @returns Whether to end here.
    */
   when(_needs: Needs): boolean {
@@ -72,7 +106,6 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
    * client id given with `--client-id` is listed.
    *
    * @param needs - What was read and decided.
-   * @param this.deps - What the command provides.
    * @returns The dry run's result.
    */
   async run(needs: Needs): Promise<CommandResult> {

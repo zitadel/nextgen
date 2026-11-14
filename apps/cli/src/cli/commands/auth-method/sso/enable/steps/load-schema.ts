@@ -1,12 +1,19 @@
 import type { SchemaTarget } from "@/cli/commands/auth-method/command";
+import type { EnableInput } from "@/cli/commands/auth-method/sso/enable/shared";
 import { WizardStep } from "@/lib/wizard";
-
-import type { EnableInput, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "loadSchemaTarget">;
+type Deps = Readonly<{
+  /**
+   * Reads the schema the run changes and everything around it.
+   *
+   * @param flags - The flags the command admitted.
+   * @returns What the run read.
+   */
+  loadSchemaTarget(flags: EnableInput["flags"]): Promise<SchemaTarget>;
+}>;
 
 /**
  * Reads the schema the provider is added to, and refuses one no flow offers a
@@ -20,10 +27,13 @@ export class LoadSchema extends WizardStep<
   readonly key = "target";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -37,7 +47,6 @@ export class LoadSchema extends WizardStep<
    * button however well everything else goes.
    *
    * @param needs - What the run starts from.
-   * @param this.deps - What the command provides.
    * @returns What the run read.
    * @throws {@link ZitadelError} When the schema cannot be chosen, or no flow
    *   can offer the provider.

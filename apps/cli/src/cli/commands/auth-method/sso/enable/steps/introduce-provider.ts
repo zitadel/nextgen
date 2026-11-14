@@ -1,12 +1,10 @@
-import { log } from "@/lib/log";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-
 import type { IdpProvider } from "@zitadel/config/idp";
 
 import type { SchemaTarget } from "@/cli/commands/auth-method/command";
-import { WizardStep } from "@/lib/wizard";
-
 import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
+import { log } from "@/lib/log";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { WizardStep } from "@/lib/wizard";
 
 /**
  * What the step reads from the steps before it.
@@ -31,7 +29,6 @@ export class IntroduceProvider extends WizardStep<"introduce", object, Needs> {
    * the issuer they gave is the only address known.
    *
    * @param needs - What was read and decided.
-   * @param _services - What the command provides.
    * @returns Nothing is added.
    */
   async run(needs: Needs): Promise<object> {

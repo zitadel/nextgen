@@ -1,10 +1,7 @@
 import { VariableService, VariableWrite } from "@/lib/backend";
 import type { CredentialDelivery, GivenCredentials, PublishedCredentials } from "@/lib/idp";
-
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { WizardStep } from "@/lib/wizard";
-
-import type { EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -18,7 +15,12 @@ type Needs = Readonly<{
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "source">;
+type Deps = Readonly<{
+  /**
+   * The server the run addresses.
+   */
+  source: string;
+}>;
 
 /**
  * Stores the credentials in the project's variables, where the engine resolves
@@ -37,10 +39,13 @@ export class PublishCredentials extends WizardStep<
   readonly key = "publish";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -56,7 +61,6 @@ export class PublishCredentials extends WizardStep<
    * answers from fixtures and has no variables to write.
    *
    * @param needs - The delivery, the credentials and the project.
-   * @param this.deps - What the command provides.
    * @returns What became of each credential.
    */
   async run(needs: Needs): Promise<Readonly<{ published: PublishedCredentials }>> {

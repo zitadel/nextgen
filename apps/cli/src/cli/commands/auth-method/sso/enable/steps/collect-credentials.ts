@@ -26,7 +26,6 @@ export class CollectCredentials extends WizardStep<
    * Ask, or take what the flags and the pipe gave.
    *
    * @param needs - The flags and the prompt.
-   * @param _services - What the command provides.
    * @returns The credentials, and the endpoints a development run answered.
    */
   async run(needs: Needs): Promise<Readonly<{ given: GivenCredentials }>> {

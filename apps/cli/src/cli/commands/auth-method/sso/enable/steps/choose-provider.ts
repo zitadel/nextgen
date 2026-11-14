@@ -1,12 +1,21 @@
+import type { EnableInput } from "@/cli/commands/auth-method/sso/enable/shared";
 import { ProviderChoice } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
-
-import type { EnableInput, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "dryRun" | "nonInteractive">;
+type Deps = Readonly<{
+  /**
+   * Whether the run only previews.
+   */
+  dryRun: boolean;
+
+  /**
+   * Whether the run may not ask anything.
+   */
+  nonInteractive: boolean;
+}>;
 
 /**
  * Works out how the flags choose a provider, before anything is read or asked.
@@ -19,10 +28,13 @@ export class ChooseProvider extends WizardStep<
   readonly key = "choice";
 
   /**
-   * @param deps - What the command gives the step.
+   * What the command gives the step.
    */
   private readonly deps: Deps;
 
+  /**
+   * @param deps - What the command gives the step.
+   */
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -32,7 +44,6 @@ export class ChooseProvider extends WizardStep<
    * Read the flags that name the provider and describe a custom one.
    *
    * @param needs - What the run starts from.
-   * @param this.deps - What the command provides.
    * @returns How the flags choose a provider.
    */
   async run(needs: EnableInput): Promise<Readonly<{ choice: ProviderChoice }>> {
