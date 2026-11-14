@@ -16,7 +16,13 @@ import {
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { isDevelopmentBuild } from "@/lib/build-channel";
-import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
+import {
+  customExample,
+  ENABLE_FLAG_NAMES,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
+} from "@/lib/idp";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { accepts, AS_REFUSED, filled, reads, type Refused } from "@/lib/oclif/flags";
@@ -24,6 +30,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { Wizard } from "@/lib/wizard";
 
+import { AskClaims } from "./steps/ask-claims";
 import { BuildChange } from "./steps/build-change";
 import { ChooseProvider } from "./steps/choose-provider";
 import { CollectCredentials } from "./steps/collect-credentials";
@@ -32,6 +39,7 @@ import { IntroduceProvider } from "./steps/introduce-provider";
 import { PlanChange } from "./steps/plan-change";
 import { PreviewChange } from "./steps/preview-change";
 import { PublishCredentials } from "./steps/publish-credentials";
+import { ReadClaims } from "./steps/read-claims";
 import { ReadOrigins } from "./steps/read-origins";
 import { ShowResult } from "./steps/show-result";
 import { SelectConnection } from "./steps/select-connection";
@@ -135,6 +143,26 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     })({
       description: "Client id of the application registered with the provider.",
     }),
+    claim: Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseClaimEntry, { empty: AS_REFUSED }),
+    })({
+      description:
+        "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "verified-claim": Flags.custom<string>({
+      multiple: true,
+      parse: accepts(parseVerifiedEntry, { empty: AS_REFUSED }),
+    })({
+      description:
+        "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+    }),
+    "claim-scope": Flags.custom<string>({
+      parse: accepts(parseScopeList, { empty: AS_REFUSED }),
+    })({
+      description:
+        "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
+    }),
   };
 
   static override meta = {
@@ -210,6 +238,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           dryRun: this.dryRun,
         }),
       )
+      .step(new ReadClaims())
       .step(
         new PlanChange({
           ask: this.ask,
@@ -234,6 +263,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }),
       )
       .step(new CollectCredentials())
+      .step(
+        new AskClaims({
+          ask: this.ask,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
       .step(new BuildChange())
       .step(
         new PublishCredentials({

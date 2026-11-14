@@ -5,7 +5,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import type { CommandResult } from "@/lib/oclif";
 import { EndStep } from "@/lib/wizard";
-import type { Connection, DocumentChange } from "@/lib/zitadel";
+import type { ClaimChoice, Connection, DocumentChange } from "@/lib/zitadel";
 
 import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
@@ -25,6 +25,7 @@ type Needs = Readonly<{
   summary: Summary;
   preview: DocumentChange<Connection>;
   delivery: CredentialDelivery;
+  claims: ClaimChoice | undefined;
 }>;
 
 /**
@@ -109,6 +110,7 @@ export class PreviewChange extends EndStep<"preview", CommandResult, Needs> {
           change: needs.preview,
           published: NOTHING_PUBLISHED,
           names: needs.delivery.names,
+          claims: needs.claims,
         }),
         title,
         would_store: toStore,

@@ -4,7 +4,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { CommandResult } from "@/lib/oclif";
 import type { CredentialDelivery, PublishedCredentials } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
-import type { Connection, DocumentChange } from "@/lib/zitadel";
+import type { ClaimChoice, Connection, DocumentChange } from "@/lib/zitadel";
 
 import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
@@ -17,6 +17,7 @@ type Needs = Readonly<{
   written: readonly string[];
   published: PublishedCredentials;
   delivery: CredentialDelivery;
+  answered: ClaimChoice | undefined;
 }>;
 
 /**
@@ -82,6 +83,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             change: needs.change,
             published: needs.published,
             names: needs.delivery.names,
+            claims: needs.answered,
           }),
           next_args: followUps.args,
         },

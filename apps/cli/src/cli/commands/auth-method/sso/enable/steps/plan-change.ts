@@ -1,6 +1,8 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 import {
   callbackUriFor,
+  type ClaimRequest,
+  claimFlagTexts,
   CredentialDelivery,
   CredentialPrompt,
   loopbackIssuerWarning,
@@ -14,7 +16,7 @@ import { loopbackReach } from "@/lib/local-server/runtime";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-import { Connection, type DocumentChange, type SsoOptions } from "@/lib/zitadel";
+import { type ClaimChoice, Connection, type DocumentChange, type SsoOptions } from "@/lib/zitadel";
 
 import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
@@ -29,6 +31,8 @@ type Needs = Readonly<{
   selection: ProviderSelection;
   provider: IdpProvider;
   options: SsoOptions;
+  claimRequest: ClaimRequest;
+  claims: ClaimChoice | undefined;
 }>;
 
 /**
@@ -36,7 +40,8 @@ type Needs = Readonly<{
  */
 type Planned = Readonly<{
   /**
-   * The connection the provider's defaults make.
+   * The connection the provider's defaults make, with the claims the flags
+   * mapped.
    */
   candidate: Connection;
 
@@ -102,12 +107,12 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
    * @throws {@link ZitadelError} When the change would be refused.
    */
   async run(needs: Needs): Promise<Planned> {
-    const candidate = Connection.forProvider(needs.provider, needs.target.schema);
-    const preview = needs.target.config.connections.enable(
-      needs.target.schema,
-      candidate,
-      needs.options,
-    );
+    const plain = Connection.forProvider(needs.provider, needs.target.schema);
+    const candidate = needs.claims === undefined ? plain : plain.withClaims(needs.claims).document;
+    const preview = needs.target.config.connections.enable(needs.target.schema, candidate, {
+      ...needs.options,
+      attributes: needs.claims?.created,
+    });
     const reach = await loopbackReach(needs.target.cwd, needs.remote.server);
     const loopback = loopbackIssuerWarning(needs.selection, reach);
     if (loopback !== undefined) {
@@ -140,6 +145,7 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
         ask: this.deps.ask,
         developmentBuild: this.deps.developmentBuild,
         suggest: this.deps.suggest,
+        claims: claimFlagTexts(needs.claimRequest),
       }),
       summary: {
         projectId: needs.remote.projectId,

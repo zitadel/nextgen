@@ -3,7 +3,13 @@ import type { CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
-import type { Change, Connection, ConnectionSummary, DocumentChange } from "@/lib/zitadel";
+import type {
+  Change,
+  ClaimChoice,
+  Connection,
+  ConnectionSummary,
+  DocumentChange,
+} from "@/lib/zitadel";
 
 import type { EnableFlags } from "@/cli/commands/auth-method/sso/enable";
 import type { ProviderName } from "@zitadel/config/idp";
@@ -205,6 +211,12 @@ type PayloadInput = {
   readonly change: DocumentChange<Connection>;
   readonly published: PublishedCredentials;
   readonly names: CredentialNames;
+
+  /**
+   * What the claim mapping makes of the connection, or `undefined` for one the
+   * project already had.
+   */
+  readonly claims: ClaimChoice | undefined;
 };
 
 /**
@@ -219,6 +231,7 @@ type Payload = {
     readonly slug: string;
     readonly file: string;
     readonly claim_mapping: Readonly<Record<string, string>>;
+    readonly new_attributes: readonly string[];
     readonly verified_claims: Readonly<Record<string, string | boolean>>;
     readonly scopes: readonly string[];
     readonly unmapped: ConnectionSummary["unmapped"];
@@ -257,6 +270,9 @@ export function payload(input: PayloadInput): Payload {
           return [property, claim];
         }),
       ),
+      new_attributes: (input.claims?.created ?? []).map((property) => {
+        return property.name;
+      }),
       verified_claims: Object.fromEntries(
         mapped.verifications.map(({ property, claim }) => {
           return [property, claim];
