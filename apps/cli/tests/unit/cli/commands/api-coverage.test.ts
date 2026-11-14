@@ -125,7 +125,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
     "WebAuthn registration needs an authenticator, which a terminal is not",
 
   // ADR 063's revision routes. The CLI has no grammar for a sub-resource
-  // listing (`idps revisions <id>`) and inventing verbs for one resource is
+  // listing (`idp revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
   // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
@@ -134,7 +134,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevision: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
-    "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
+    "a dry run `policy test` sends per case from commands/policy/test.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -246,7 +246,7 @@ const PIPELINE_SOURCES: readonly string[] = [
 
 /**
  * The client operations each standalone command calls, read from its source
- * and keyed by its command (`variables set`). The registry's evidence is which
+ * and keyed by its command (`variable set`). The registry's evidence is which
  * client properties its verbs touch; a `client.<operation>(` call site, or a
  * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment
@@ -322,7 +322,7 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
 const standaloneOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await standaloneCommandOperations()).values()].flatMap((called) => [...called]));
 
-/** The client operations each registry verb invokes, keyed by its command (`teams deactivate`). */
+/** The client operations each registry verb invokes, keyed by its command (`team deactivate`). */
 const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
   const operations = new Map<string, ReadonlySet<string>>();
 
@@ -362,6 +362,40 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
 /** The client operations the registry's verbs actually invoke. */
 const calledOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await verbOperations()).values()].flatMap((called) => [...called]));
+
+/**
+ * The collections each registry topic's verbs reach, from the operations they
+ * call. A topic is a command's noun, in the singular (`user`), and a
+ * collection is a URL's, in the plural (`users`), so the two are matched by
+ * what the commands call, never by spelling.
+ */
+const topicCollections = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
+  const operations = clientOperations();
+  const collections = new Map<string, Set<string>>();
+  for (const [command, called] of await verbOperations()) {
+    const topic = command.split(" ")[0] ?? "";
+    const reached = collections.get(topic) ?? new Set<string>();
+    for (const operation of called) {
+      const collection = operations.get(operation);
+      if (collection !== undefined) reached.add(collection);
+    }
+    collections.set(topic, reached);
+  }
+  return collections;
+};
+
+/** The collections the registry's commands reach. */
+const registryCollections = async (): Promise<ReadonlySet<string>> =>
+  new Set([...(await topicCollections()).values()].flatMap((reached) => [...reached]));
+
+/**
+ * Topics spelled like the collection they read, and why. A command's noun is
+ * singular (`zitadel user list`, docs/design/glossary.md §11), so a topic that
+ * matches its collection's plural is a resource named the old way.
+ */
+const SAME_AS_ITS_COLLECTION: Readonly<Record<string, string>> = {
+  branding: "a mass noun: a project has branding, not brandings",
+};
 
 const SPEC_ENDPOINTS = join(
   import.meta.dirname,
@@ -420,10 +454,10 @@ describe("the CLI covers the API client", () => {
   });
 
   it("has a registry entry, or a reason, for every collection", async () => {
-    const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
+    const reached = await registryCollections();
     const unaccounted = [...new Set(clientOperations().values())].filter(
       (collection) =>
-        !topics.has(collection) && !(collection in NOT_RESOURCES) && !(collection in STANDALONE),
+        !reached.has(collection) && !(collection in NOT_RESOURCES) && !(collection in STANDALONE),
     );
 
     expect(
@@ -433,15 +467,15 @@ describe("the CLI covers the API client", () => {
     ).toEqual([]);
   });
 
-  it("exposes every collection the API itself calls a resource", () => {
+  it("exposes every collection the API itself calls a resource", async () => {
     // A query endpoint is the API declaring this to be a resource (ADR 031),
     // so unlike the checks above this one accepts no reason: the answer is not
     // a judgement, and a new resource that follows the convention is detected
     // without anyone having to classify it.
     const operations = clientOperations();
-    const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
+    const reached = await registryCollections();
     const missing = [...queryCollections(operations)].filter(
-      (collection) => !topics.has(collection),
+      (collection) => !reached.has(collection),
     );
 
     expect(
@@ -458,6 +492,22 @@ describe("the CLI covers the API client", () => {
         `"${collection}" has a query endpoint, so it cannot be listed in NOT_RESOURCES`,
       ).toBe(false);
     }
+  });
+
+  it("names every resource in the singular", async () => {
+    const plural = [...(await topicCollections())]
+      .filter(([topic, reached]) => reached.has(topic.replaceAll("-", "_")))
+      .map(([topic]) => topic);
+
+    expect(
+      plural.filter((topic) => !(topic in SAME_AS_ITS_COLLECTION)),
+      "A resource command names its noun in the singular (`zitadel user list`, docs/design/glossary.md §11). " +
+        "Rename the registry entry, or add it to SAME_AS_ITS_COLLECTION with the reason its noun has no singular.",
+    ).toEqual([]);
+    expect(
+      Object.keys(SAME_AS_ITS_COLLECTION).filter((topic) => !plural.includes(topic)),
+      "SAME_AS_ITS_COLLECTION lists a topic that no longer matches its collection — delete the entry",
+    ).toEqual([]);
   });
 
   it("calls nothing the client does not offer", async () => {
@@ -504,13 +554,13 @@ describe("the CLI covers the API client", () => {
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
   // Reads the project to resolve the preview URLs it deploys to; the deploy
   // itself is `POST /deployments`, which names `deployment create`.
-  "preview index": "projects get",
+  "preview index": "project get",
   // Builds a release from `.zitadel/` exactly as `deploy` does, without
   // deploying it, so `POST /releases/build` names `deploy`.
   "release create": "deploy",
-  // Reads the project to report its origin patterns; `projects get` is the
+  // Reads the project to report its origin patterns; `project get` is the
   // command the reference shows for `GET /projects/{id}`.
-  "origin list": "projects get",
+  "origin list": "project get",
 };
 
 describe("the spec names the command behind each operation", () => {

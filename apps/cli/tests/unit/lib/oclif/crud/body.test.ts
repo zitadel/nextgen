@@ -8,7 +8,7 @@ import { readRawBody } from "@/lib/oclif/crud/body";
 
 describe("readRawBody", () => {
   it("parses --data", async () => {
-    await expect(readRawBody({ data: '{"name":"x"}' }, "teams create")).resolves.toEqual({
+    await expect(readRawBody({ data: '{"name":"x"}' }, "team create")).resolves.toEqual({
       name: "x",
     });
   });
@@ -17,25 +17,25 @@ describe("readRawBody", () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-body-"));
     const file = join(dir, "team.json");
     await writeFile(file, '{"name":"from-file"}');
-    await expect(readRawBody({ file }, "teams create")).resolves.toEqual({ name: "from-file" });
+    await expect(readRawBody({ file }, "team create")).resolves.toEqual({ name: "from-file" });
   });
 
   it("rejects a non-object body", async () => {
-    await expect(readRawBody({ data: "[1]" }, "teams create")).rejects.toThrow();
+    await expect(readRawBody({ data: "[1]" }, "team create")).rejects.toThrow();
   });
 
   it("returns undefined when no source was given, leaving that call to the command", async () => {
-    await expect(readRawBody({}, "teams create")).resolves.toBeUndefined();
+    await expect(readRawBody({}, "team create")).resolves.toBeUndefined();
   });
 
   it("refuses `--file -` when stdin is a terminal, rather than waiting on it", async () => {
     const tty = process.stdin.isTTY;
     Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
     try {
-      await expect(readRawBody({ file: "-" }, "users create")).rejects.toMatchObject({
+      await expect(readRawBody({ file: "-" }, "user create")).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "--file - reads the body from a pipe, but nothing is piped in",
-        hint: expect.stringContaining("cat body.json | zitadel users create"),
+        hint: expect.stringContaining("cat body.json | zitadel user create"),
       });
     } finally {
       Object.defineProperty(process.stdin, "isTTY", { value: tty, configurable: true });
@@ -49,7 +49,7 @@ describe("the body as it arrives", () => {
     // field flags and `--set`, against the schema that says what each value
     // is; reading it judges nothing.
     await expect(
-      readRawBody({ data: '{"attributes":{"password":"hunter2"}}' }, "users create"),
+      readRawBody({ data: '{"attributes":{"password":"hunter2"}}' }, "user create"),
     ).resolves.toEqual({ attributes: { password: "hunter2" } });
   });
 
@@ -57,7 +57,7 @@ describe("the body as it arrives", () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-secret-"));
     const file = join(dir, "body.json");
     await writeFile(file, '{"attributes":{"password":"hunter2"}}');
-    await expect(readRawBody({ file }, "users create")).resolves.toEqual({
+    await expect(readRawBody({ file }, "user create")).resolves.toEqual({
       attributes: { password: "hunter2" },
     });
   });

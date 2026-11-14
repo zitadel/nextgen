@@ -1,6 +1,6 @@
 get:
   operationId: getGrant
-  x-zitadel-cli: grants get
+  x-zitadel-cli: grant get
   summary: Get a grant by ID
   # Grants are not registered in `resource_scope_index`, which is why the
   # project scope is required on the query, as it is for events.
@@ -74,7 +74,7 @@ get:
 
 delete:
   operationId: deleteGrant
-  x-zitadel-cli: grants delete
+  x-zitadel-cli: grant delete
   summary: Revoke a grant
   description: |
     Revokes a grant this API manages and emits `authz.revoked`.

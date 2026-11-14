@@ -147,7 +147,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * question. See {@link Presentation}.
    *
    * {@link Presentation} names the one that sets it, `setup`. A command that merely
-   * *does* something — `variable rm`, `users delete` — is not one of them,
+   * *does* something — `variable rm`, `user delete` — is not one of them,
    * however much it asks on the way.
    */
   static wizard?: boolean;

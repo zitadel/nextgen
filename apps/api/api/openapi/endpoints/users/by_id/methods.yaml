@@ -1,6 +1,6 @@
 get:
   operationId: getUser
-  x-zitadel-cli: users get
+  x-zitadel-cli: user get
   summary: Get a user by ID
   description: |
     Returns a user by ID, with the attributes its schema defines.
@@ -67,7 +67,7 @@ get:
 
 patch:
   operationId: updateUser
-  x-zitadel-cli: users update
+  x-zitadel-cli: user update
   summary: Update a user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally
@@ -166,7 +166,7 @@ patch:
 
 delete:
     operationId: deleteUser
-    x-zitadel-cli: users delete
+    x-zitadel-cli: user delete
     summary: Delete a user by ID
     description: |
       Deletes a user, removes them from every team they belong to, and revokes

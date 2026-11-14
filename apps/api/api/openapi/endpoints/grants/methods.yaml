@@ -1,6 +1,6 @@
 post:
   operationId: createGrant
-  x-zitadel-cli: grants create
+  x-zitadel-cli: grant create
   summary: Create a grant
   description: |
     Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.

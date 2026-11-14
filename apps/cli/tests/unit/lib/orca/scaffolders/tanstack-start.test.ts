@@ -65,6 +65,10 @@ describe("TanStackStartScaffolder", () => {
     refused: [],
   });
 
+  it("names the template's generate-routes script as its after-install script", () => {
+    expect(new TanStackStartScaffolder().afterInstallScript).toBe("generate-routes");
+  });
+
   it("only supports tanstack-start", () => {
     const scaffolder = new TanStackStartScaffolder();
     expect(scaffolder.canScaffold("tanstack-start")).toBe(true);

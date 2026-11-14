@@ -1579,9 +1579,7 @@ describe("ManagedFilesCheck", () => {
       expect(outcome.status).toBe("warn");
     });
 
-    it("warns, rather than failing, when only the convenience dev script is missing", async ({
-      dir,
-    }) => {
+    it("passes an Angular app without a dev script, which only setup adds", async ({ dir }) => {
       await anAngularProject(dir);
       await write(dir, {
         "package.json": JSON.stringify({
@@ -1592,10 +1590,7 @@ describe("ManagedFilesCheck", () => {
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
-      expect(outcome).toMatchObject({
-        status: "warn",
-        message: expect.stringContaining("unapplied managed config edit(s): package.json"),
-      });
+      expect(outcome.status).toBe("pass");
     });
   });
 

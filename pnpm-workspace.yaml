@@ -13,7 +13,20 @@ packages:
 
 catalog:
   "@arethetypeswrong/cli": ^0.18.5
+  # One Angular for sdk-angular and its conformance fixture, whose packages peer
+  # on each other's exact version: bump these together.
+  "@angular/build": ^22.2.3
+  # Exact: only the Angular fixture declares it, so a range would take the newest.
+  "@angular/cli": 22.2.3
+  "@angular/common": ^22.2.3
+  "@angular/compiler": ^22.2.3
+  "@angular/compiler-cli": ^22.2.3
+  "@angular/core": ^22.2.3
+  # Exact, for the same reason as @angular/cli.
+  "@angular/forms": 22.2.3
+  "@angular/platform-browser": ^22.2.3
   "@angular/platform-server": ^22.2.3
+  "@angular/router": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
   # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
   # its graph, and it pairs their required @babel/core peer with the newest
@@ -61,6 +74,7 @@ catalog:
   "@tanstack/react-devtools": ^0.10.2
   "@tanstack/react-router": ^1.170.46
   "@tanstack/react-router-devtools": ^1.167.2
+  "@tanstack/react-start": ^1.169.5
   "@tanstack/router-plugin": ^1.168.48
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
@@ -180,6 +194,13 @@ supportedArchitectures:
 
 # Fail the install on an unmet or conflicting peer dependency instead of warning.
 strictPeerDependencies: true
+
+# Hoist every package but server-only. @solidjs/start imports it undeclared and
+# expects its Vite plugin to stub it; with sdk-next's real copy hoisted, Node
+# loads that instead and every SSR request is a 500. Next.js bundles its own.
+hoistPattern:
+  - "*"
+  - "!server-only"
 
 # pnpm 12 no longer reads the "pnpm" field of package.json.
 allowBuilds:

@@ -151,7 +151,7 @@ describe("resource registry", () => {
       }),
     );
 
-    const res = await run(cwd, ["teams", "list", "--env-file", file]);
+    const res = await run(cwd, ["team", "list", "--env-file", file]);
 
     expect(res.exitCode).toBe(0);
     expect(seen.at(-1)).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
@@ -160,8 +160,8 @@ describe("resource registry", () => {
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
   it.each([
-    ["a read verb", ["users", "list", "--environment", "prod"]],
-    ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
+    ["a read verb", ["user", "list", "--environment", "prod"]],
+    ["a write verb", ["team", "create", "--name", "t", "--environment", "production"]],
   ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();
 
@@ -267,7 +267,7 @@ describe("filter grammar", () => {
   });
 });
 
-describe("users list", () => {
+describe("user list", () => {
   it("sends filters and sorting in the query body and returns a page", async ({ server }) => {
     const cwd = await makeProject();
     const bodies: unknown[] = [];
@@ -283,7 +283,7 @@ describe("users list", () => {
     );
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "list",
       "--filter",
       "status=active",
@@ -310,7 +310,7 @@ describe("users list", () => {
       data: { items: Array<{ id: string }>; count: number; next_page_token: string | null };
     };
     expect(json.status).toBe("ok");
-    expect(json.command).toBe("users:list");
+    expect(json.command).toBe("user:list");
     expect(json.data.count).toBe(2);
     expect(json.data.items.map((u) => u.id)).toEqual(["user_1", "user_2"]);
     expect(json.data.next_page_token).toBe("p2");
@@ -329,7 +329,7 @@ describe("users list", () => {
       }),
     );
 
-    const res = await run(cwd, ["users", "list", "--all"]);
+    const res = await run(cwd, ["user", "list", "--all"]);
     expect(res.exitCode).toBe(0);
     expect(tokens).toEqual([null, "p2"]);
     const json = parseJson(res.stdout) as { data: { count: number; next_page_token: null } };
@@ -353,7 +353,7 @@ describe("users list", () => {
       ),
     );
 
-    await run(cwd, ["users", "list", "--all"]);
+    await run(cwd, ["user", "list", "--all"]);
 
     expect(tokens).toEqual([null, "p\u001b2"]);
   });
@@ -374,7 +374,7 @@ describe("users list", () => {
       }),
     );
 
-    await run(cwd, ["events", "list", "--all"]);
+    await run(cwd, ["event", "list", "--all"]);
 
     expect(tokens).toEqual([null, "p\u001b2"]);
   });
@@ -392,7 +392,7 @@ describe("users list", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list"]);
+    const res = await run(cwd, ["user", "list"]);
 
     // The bytes are what a terminal reads, and the serialiser spells a control
     // character out in them, so printing the output cannot drive the terminal.
@@ -406,7 +406,7 @@ describe("users list", () => {
 
   it("rejects an unknown filter field before any request", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "list", "--filter", "email=a@b.c"]);
+    const res = await run(cwd, ["user", "list", "--filter", "email=a@b.c"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
     expect(json.status).toBe("error");
@@ -422,7 +422,7 @@ describe("users list", () => {
       ),
     );
     const res = await runCliForTest([
-      "users",
+      "user",
       "list",
       "--cwd",
       cwd,
@@ -453,7 +453,7 @@ describe("users list", () => {
       ),
     );
     const res = await runCliForTest([
-      "users",
+      "user",
       "list",
       "--plain",
       "--cwd",
@@ -484,7 +484,7 @@ describe("get rendering", () => {
 
     const res = await asTerminal(() =>
       runCliForTest([
-        "users",
+        "user",
         "get",
         "user_1",
         "--cwd",
@@ -507,7 +507,7 @@ describe("get rendering", () => {
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await runCliForTest([
-      "users",
+      "user",
       "get",
       "user_1",
       "--cwd",
@@ -527,7 +527,7 @@ describe("get rendering", () => {
 
     const res = await asTerminal(() =>
       runCliForTest([
-        "users",
+        "user",
         "get",
         "user_1",
         "--fields",
@@ -562,7 +562,7 @@ describe("get rendering", () => {
 
     const res = await asTerminal(() =>
       runCliForTest([
-        "policies",
+        "policy",
         "get",
         "pol_1",
         "--cwd",
@@ -595,7 +595,7 @@ describe("get rendering", () => {
 
     const res = await asTerminal(() =>
       runCliForTest([
-        "policies",
+        "policy",
         "get",
         "pol_1",
         "--cwd",
@@ -611,7 +611,7 @@ describe("get rendering", () => {
   });
 });
 
-describe("policies", () => {
+describe("policy", () => {
   const policy = {
     id: "pol_1",
     revision_id: "polrev_1",
@@ -631,7 +631,7 @@ describe("policies", () => {
       }),
     );
 
-    const res = await run(cwd, ["policies", "get", "pol_1"]);
+    const res = await run(cwd, ["policy", "get", "pol_1"]);
 
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
@@ -647,7 +647,7 @@ describe("policies", () => {
       }),
     );
 
-    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+    const res = await run(cwd, ["policy", "get", "auth.factor.password.set"]);
 
     expect(res.exitCode).toBe(0);
     expect(queries.at(-1)?.get("operation")).toBe("auth.factor.password.set");
@@ -662,7 +662,7 @@ describe("policies", () => {
       ),
     );
 
-    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+    const res = await run(cwd, ["policy", "get", "auth.factor.password.set"]);
 
     expect(res.exitCode).toBe(4);
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
@@ -671,7 +671,7 @@ describe("policies", () => {
   it("answers E_NOT_FOUND for a name that is neither an id nor an operation, without a request", async () => {
     const cwd = await makeProject();
 
-    const res = await run(cwd, ["policies", "get", "password"]);
+    const res = await run(cwd, ["policy", "get", "password"]);
 
     expect(res.exitCode).toBe(4);
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
@@ -688,7 +688,7 @@ describe("policies", () => {
     );
 
     const res = await run(cwd, [
-      "policies",
+      "policy",
       "list",
       "--filter",
       "operation=auth.factor.password.set",
@@ -700,11 +700,11 @@ describe("policies", () => {
   });
 });
 
-describe("users get / create / update / delete", () => {
+describe("user get / create / update / delete", () => {
   it("gets one user by id", async ({ server }) => {
     const cwd = await makeProject();
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
-    const res = await run(cwd, ["users", "get", "user_1"]);
+    const res = await run(cwd, ["user", "get", "user_1"]);
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe("user_1");
@@ -717,7 +717,7 @@ describe("users get / create / update / delete", () => {
         HttpResponse.json({ code: "user.not_found", message: "no such user" }, { status: 404 }),
       ),
     );
-    const res = await run(cwd, ["users", "get", "user_missing"]);
+    const res = await run(cwd, ["user", "get", "user_missing"]);
     expect(res.exitCode).toBe(4);
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
   });
@@ -736,7 +736,7 @@ describe("users get / create / update / delete", () => {
       }),
     );
     const res = await run(cwd, [
-      "users",
+      "user",
       "create",
       "--data",
       JSON.stringify({ schema: "sch_default", attributes: { email: "new@example.com" } }),
@@ -749,7 +749,7 @@ describe("users get / create / update / delete", () => {
     });
     const json = parseJson(res.stdout) as { data: { id: string; next_commands: string[] } };
     expect(json.data.id).toBe("user_new");
-    expect(json.data.next_commands[0]).toContain("users get user_new");
+    expect(json.data.next_commands[0]).toContain("user get user_new");
   });
 
   it("creates from --file", async ({ server }) => {
@@ -761,14 +761,14 @@ describe("users get / create / update / delete", () => {
         HttpResponse.json(user("user_file"), { status: 201 }),
       ),
     );
-    const res = await run(cwd, ["users", "create", "--file", file]);
+    const res = await run(cwd, ["user", "create", "--file", file]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("user_file");
   });
 
   it("rejects a body whose field has the wrong type, without calling the API", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["teams", "create", "--data", JSON.stringify({ name: 42 })]);
+    const res = await run(cwd, ["team", "create", "--data", JSON.stringify({ name: 42 })]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as {
       code: string;
@@ -782,17 +782,17 @@ describe("users get / create / update / delete", () => {
 
   it("names the missing field when --data omits a required one", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "create", "--data", JSON.stringify({ attributes: {} })]);
+    const res = await run(cwd, ["user", "create", "--data", JSON.stringify({ attributes: {} })]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; details: { missing: string[] } };
-    expect(json.message).toBe("users create is missing required field: --schema");
+    expect(json.message).toBe("user create is missing required field: --schema");
     expect(json.details.missing).toEqual(["schema"]);
   });
 
   it("previews a create with --dry-run", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, [
-      "users",
+      "user",
       "create",
       "--dry-run",
       "--data",
@@ -800,7 +800,7 @@ describe("users get / create / update / delete", () => {
     ]);
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { dry_run: boolean; verb: string } };
-    expect(json.data).toMatchObject({ dry_run: true, verb: "create", topic: "users" });
+    expect(json.data).toMatchObject({ dry_run: true, verb: "create", topic: "user" });
   });
 
   it("patches a user", async ({ server }) => {
@@ -813,7 +813,7 @@ describe("users get / create / update / delete", () => {
       }),
     );
     const res = await run(cwd, [
-      "users",
+      "user",
       "update",
       "user_1",
       "--data",
@@ -832,7 +832,7 @@ describe("users get / create / update / delete", () => {
         return HttpResponse.json(user("user_1"));
       }),
     );
-    const update = ["users", "update", "user_1", "--set", "attributes.givenName=Ada"];
+    const update = ["user", "update", "user_1", "--set", "attributes.givenName=Ada"];
 
     const res = await run(cwd, [...update, "--dry-run"]);
     await run(cwd, update);
@@ -864,7 +864,7 @@ describe("users get / create / update / delete", () => {
     );
 
     await run(cwd, [
-      "users",
+      "user",
       "update",
       "user_1",
       "--set",
@@ -894,7 +894,7 @@ describe("users get / create / update / delete", () => {
     );
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "update",
       "user_1",
       "--set",
@@ -910,11 +910,11 @@ describe("users get / create / update / delete", () => {
 
   it("requires --force to delete non-interactively", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "delete", "user_1"]);
+    const res = await run(cwd, ["user", "delete", "user_1"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
     expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
-    expect(json.next_commands[0]).toContain("users delete user_1 --force");
+    expect(json.next_commands[0]).toContain("user delete user_1 --force");
   });
 
   it("deletes with --force", async ({ server }) => {
@@ -926,7 +926,7 @@ describe("users get / create / update / delete", () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
+    const res = await run(cwd, ["user", "delete", "user_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect(hits.length > 0).toBe(true);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
@@ -943,7 +943,7 @@ describe("--file -", () => {
     const tty = process.stdin.isTTY;
     Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
     try {
-      const res = await run(cwd, ["users", "create", "--file", "-"]);
+      const res = await run(cwd, ["user", "create", "--file", "-"]);
       expect(res.exitCode).toBe(3);
       const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
@@ -967,7 +967,7 @@ describe("piped output", () => {
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
     // the same condition a pipe or a redirect creates.
     const res = await runCliForTest([
-      "users",
+      "user",
       "list",
       "--cwd",
       cwd,
@@ -1002,7 +1002,7 @@ describe("the drain spinner", () => {
       // Human mode on purpose: `--json` silences the spinner, so a run with it
       // would prove nothing.
       const res = await runCliForTest([
-        "users",
+        "user",
         "list",
         "--all",
         "--cwd",
@@ -1024,7 +1024,7 @@ describe("field validation is independent of the data", () => {
   it("refuses an unknown path before any request is made", async () => {
     const cwd = await makeProject();
     // No handler is registered: reaching the server would fail the test.
-    const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
+    const res = await run(cwd, ["user", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; details: { available: string[] } };
     expect(json.message).toContain("No such column: emial");
@@ -1037,7 +1037,7 @@ describe("field validation is independent of the data", () => {
     const cwd = await makeProject();
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
-    const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
+    const res = await run(cwd, ["user", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
     expect((parseJson(res.stdout) as { message: string }).message).toContain(
       "No such column: emial",
@@ -1052,7 +1052,7 @@ describe("field validation is independent of the data", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
+    const res = await run(cwd, ["user", "list", "--fields", "id,attributes.email"]);
     expect(res.exitCode).toBe(0);
   });
 });
@@ -1066,14 +1066,14 @@ describe("chosen columns", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
+    const res = await run(cwd, ["user", "list", "--fields", "id,attributes.email"]);
     expect(res.exitCode).toBe(0);
     // --json is unaffected by --fields; the rows are the human rendering.
     const json = parseJson(res.stdout) as { data: { items: Array<{ schema: string }> } };
     expect(json.data.items[0]?.schema).toBe("sch_default");
 
     const rows = await runCliForTest([
-      "users",
+      "user",
       "list",
       "--fields",
       "id,attributes.email",
@@ -1094,7 +1094,7 @@ describe("chosen columns", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list", "--fields", "id,nope"]);
+    const res = await run(cwd, ["user", "list", "--fields", "id,nope"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as {
       code: string;
@@ -1114,7 +1114,7 @@ describe("chosen columns", () => {
     const cwd = await makeProject();
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
-    const res = await run(cwd, ["users", "get", "user_1", "--fields", "nope"]);
+    const res = await run(cwd, ["user", "get", "user_1", "--fields", "nope"]);
     expect(res.exitCode).toBe(3);
     expect((parseJson(res.stdout) as { message: string }).message).toContain(
       "No such column: nope",
@@ -1128,7 +1128,7 @@ describe("chosen columns", () => {
         HttpResponse.json({ users: [user("user_1")] }),
       ),
     );
-    const res = await run(cwd, ["users", "list", "--fields", " , "]);
+    const res = await run(cwd, ["user", "list", "--fields", " , "]);
     expect(res.exitCode).toBe(3);
     expect((parseJson(res.stdout) as { message: string }).message).toContain(
       "At least one column is needed",
@@ -1146,7 +1146,7 @@ describe("next page suggestion", () => {
     );
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "list",
       "--limit",
       "1",
@@ -1160,7 +1160,7 @@ describe("next page suggestion", () => {
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands).toHaveLength(1);
     expect(json.data.next_commands[0]).toContain(
-      "users list --limit 1 --sort created_at:asc --filter status=active --page-token p2 --json",
+      "user list --limit 1 --sort created_at:asc --filter status=active --page-token p2 --json",
     );
   });
 
@@ -1173,7 +1173,7 @@ describe("next page suggestion", () => {
     );
 
     const res = await run(cwd, [
-      "events",
+      "event",
       "list",
       "--filter",
       "category=entity",
@@ -1186,7 +1186,7 @@ describe("next page suggestion", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain(
-      "events list --filter category=entity --filter category=auth --limit 1 --page-token p2 --json",
+      "event list --filter category=entity --filter category=auth --limit 1 --page-token p2 --json",
     );
   });
 
@@ -1198,7 +1198,7 @@ describe("next page suggestion", () => {
       ),
     );
 
-    const res = await run(cwd, ["teams", "list", "--filter", "name=contains:two words"]);
+    const res = await run(cwd, ["team", "list", "--filter", "name=contains:two words"]);
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain("--filter 'name=contains:two words'");
@@ -1212,7 +1212,7 @@ describe("next page suggestion", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list"]);
+    const res = await run(cwd, ["user", "list"]);
     const json = parseJson(res.stdout) as {
       data: { next_page_token: null; next_commands?: string[] };
     };
@@ -1231,7 +1231,7 @@ describe("next page suggestion", () => {
       }),
     );
 
-    const res = await run(cwd, ["users", "list", "--all"]);
+    const res = await run(cwd, ["user", "list", "--all"]);
     const json = parseJson(res.stdout) as { data: { next_commands?: string[] } };
     expect(json.data.next_commands).toBeUndefined();
   });
@@ -1249,7 +1249,7 @@ describe("body field flags", () => {
       }),
     );
 
-    const res = await run(cwd, ["teams", "create", "--name", "platform"]);
+    const res = await run(cwd, ["team", "create", "--name", "platform"]);
     expect(res.exitCode).toBe(0);
     expect(bodies.at(-1)).toEqual({ name: "platform" });
   });
@@ -1265,7 +1265,7 @@ describe("body field flags", () => {
     );
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "create",
       "--schema",
       "sch_default",
@@ -1292,7 +1292,7 @@ describe("body field flags", () => {
     );
 
     const res = await run(cwd, [
-      "teams",
+      "team",
       "create",
       "--data",
       JSON.stringify({ name: "from-data" }),
@@ -1306,7 +1306,7 @@ describe("body field flags", () => {
   it("rejects a value outside a field's allowed set before any request", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, [
-      "grants",
+      "grant",
       "create",
       "--relation",
       "robot",
@@ -1324,7 +1324,7 @@ describe("body field flags", () => {
     // The locator (`user`/`team`) is a nested object, so it rides in --data;
     // `relation` is the only required scalar flag the framework knows about.
     const res = await run(cwd, [
-      "grants",
+      "grant",
       "create",
       "--data",
       JSON.stringify({ user: { user_id: "user_1" } }),
@@ -1337,7 +1337,7 @@ describe("body field flags", () => {
       details: { missing: string[] };
     };
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toBe("grants create is missing required field: --relation");
+    expect(json.message).toBe("grant create is missing required field: --relation");
     expect(json.hint).toContain("--relation");
     expect(json.details.missing).toEqual(["relation"]);
   });
@@ -1353,7 +1353,7 @@ describe("body field flags", () => {
     );
 
     const res = await run(cwd, [
-      "grants",
+      "grant",
       "create",
       "--data",
       JSON.stringify({ user: { user_id: "user_1" }, relation: "viewer" }),
@@ -1364,34 +1364,34 @@ describe("body field flags", () => {
 
   it("reports a single missing field in the singular", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "create", "--attributes", "email=a@b.c"]);
+    const res = await run(cwd, ["user", "create", "--attributes", "email=a@b.c"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
-    expect(json.message).toBe("users create is missing required field: --schema");
+    expect(json.message).toBe("user create is missing required field: --schema");
     expect(json.hint).toContain("include it in --data");
   });
 
   it("points a write missing a field at its help", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["users", "create", "--attributes", "email=a@b.c"]);
+    const res = await run(cwd, ["user", "create", "--attributes", "email=a@b.c"]);
     const json = parseJson(res.stdout) as { next_commands: string[] };
-    expect(json.next_commands).toEqual([expectedPublicCliCommand("users create --help")]);
+    expect(json.next_commands).toEqual([expectedPublicCliCommand("user create --help")]);
   });
 
   it("points at both input modes when no body is given at all", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["teams", "create"]);
+    const res = await run(cwd, ["team", "create"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
-    expect(json.message).toBe("teams create needs a body");
+    expect(json.message).toBe("team create needs a body");
     expect(json.hint).toContain("--data");
   });
 
   it("points a write without a body at its help", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["teams", "create"]);
+    const res = await run(cwd, ["team", "create"]);
     const json = parseJson(res.stdout) as { next_commands: string[] };
-    expect(json.next_commands).toEqual([expectedPublicCliCommand("teams create --help")]);
+    expect(json.next_commands).toEqual([expectedPublicCliCommand("team create --help")]);
   });
 
   it("updates through field flags too", async ({ server }) => {
@@ -1404,7 +1404,7 @@ describe("body field flags", () => {
       }),
     );
 
-    const res = await run(cwd, ["teams", "update", "team_1", "--name", "renamed"]);
+    const res = await run(cwd, ["team", "update", "team_1", "--name", "renamed"]);
     expect(res.exitCode).toBe(0);
     expect(bodies.at(-1)).toEqual({ name: "renamed" });
   });
@@ -1457,7 +1457,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
     const seen = capturingIdps(server);
 
-    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS]);
+    const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS]);
 
     expect(res.exitCode).toBe(0);
     expect(seen.at(-1)?.idp).toMatchObject(connection);
@@ -1467,7 +1467,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
     const seen = capturingIdps(server);
 
-    const res = await run(cwd, ["idps", "create", "--data", JSON.stringify(connection)]);
+    const res = await run(cwd, ["idp", "create", "--data", JSON.stringify(connection)]);
 
     expect(res.exitCode).toBe(0);
     expect(seen.at(-1)?.idp).toMatchObject(connection);
@@ -1479,7 +1479,7 @@ describe("nested bodies", () => {
       arg === "${{ ACME_SSO_CLIENT_SECRET }}" ? "hunter2" : arg,
     );
 
-    const res = await run(cwd, ["idps", "create", ...literal]);
+    const res = await run(cwd, ["idp", "create", ...literal]);
 
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
@@ -1494,7 +1494,7 @@ describe("nested bodies", () => {
     const seen = capturingIdps(server);
 
     const res = await run(cwd, [
-      "idps",
+      "idp",
       "create",
       ...CONNECTION_FLAGS,
       "--set",
@@ -1511,7 +1511,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
 
     const res = await run(cwd, [
-      "idps",
+      "idp",
       "create",
       "--slug",
       "a",
@@ -1526,7 +1526,7 @@ describe("nested bodies", () => {
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; details: { missing: string[] } };
     expect(json.message).toBe(
-      "idps create is missing required fields: --oidc-issuer, --oidc-client-secret",
+      "idp create is missing required fields: --oidc-issuer, --oidc-client-secret",
     );
     expect(json.details.missing).toEqual(["oidc.issuer", "oidc.client_secret"]);
   });
@@ -1534,7 +1534,7 @@ describe("nested bodies", () => {
   it("refuses a --set path the connection does not have", async () => {
     const cwd = await makeProject();
 
-    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
+    const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
 
     expect(res.exitCode).toBe(3);
     expect((parseJson(res.stdout) as { message: string }).message).toContain(
@@ -1561,7 +1561,7 @@ describe("nested bodies", () => {
     );
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "create",
       "--file",
       file,
@@ -1580,7 +1580,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
 
     const res = await run(cwd, [
-      "users",
+      "user",
       "create",
       "--data",
       JSON.stringify({
@@ -1606,7 +1606,7 @@ describe("nested bodies", () => {
     );
 
     const res = await run(cwd, [
-      "projects",
+      "project",
       "update",
       "prj_1",
       "--password-hash-algorithm",
@@ -1622,7 +1622,7 @@ describe("nested bodies", () => {
   it("previews a connection with its reference and its fixed values shown", async () => {
     const cwd = await makeProject();
 
-    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--dry-run"]);
+    const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS, "--dry-run"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("«redacted»");
@@ -1635,16 +1635,16 @@ describe("nested bodies", () => {
 describe("dry runs", () => {
   it("previews a delete without --force, since it sends nothing", async () => {
     const cwd = await makeProject();
-    const res = await run(cwd, ["teams", "deactivate", "team_1", "--dry-run"]);
+    const res = await run(cwd, ["team", "deactivate", "team_1", "--dry-run"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       dry_run: true,
       title: "Would deactivate team team_1 (dry run)",
       verb: "deactivate",
-      topic: "teams",
+      topic: "team",
       id: "team_1",
       next_commands: [
-        expectedPublicCliCommand(`teams deactivate team_1 --server ${SERVER} --cwd ${cwd}`),
+        expectedPublicCliCommand(`team deactivate team_1 --server ${SERVER} --cwd ${cwd}`),
       ],
     });
   });
@@ -1657,7 +1657,7 @@ describe("dry runs", () => {
       JSON.stringify({ schema: "sch_default", attributes: { password: "hunter2" } }),
     );
 
-    const res = await run(cwd, ["users", "create", "--file", file, "--dry-run"]);
+    const res = await run(cwd, ["user", "create", "--file", file, "--dry-run"]);
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("hunter2");
     expect(res.stdout).toContain("«redacted»");
@@ -1670,7 +1670,7 @@ describe("an empty list writes nothing", () => {
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await runCliForTest([
-      "users",
+      "user",
       "list",
       "--cwd",
       cwd,
@@ -1687,7 +1687,7 @@ describe("an empty list writes nothing", () => {
     const cwd = await makeProject();
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
-    const res = await run(cwd, ["users", "list"]);
+    const res = await run(cwd, ["user", "list"]);
     expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(0);
   });
 });
@@ -1699,7 +1699,7 @@ describe("delete outcomes", () => {
       http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
-    const res = await run(cwd, ["teams", "deactivate", "team_1", "--force"]);
+    const res = await run(cwd, ["team", "deactivate", "team_1", "--force"]);
     expect(res.exitCode).toBe(0);
     // ADR 024: the API deactivates the team and leaves it readable.
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
@@ -1715,7 +1715,7 @@ describe("delete outcomes", () => {
       http.delete(`${SERVER}/api/v1/users/user_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
-    const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
+    const res = await run(cwd, ["user", "delete", "user_1", "--force"]);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       title: "Deleted user user_1",
       id: "user_1",
@@ -1733,14 +1733,14 @@ describe("page tokens are opaque", () => {
       ),
     );
 
-    const res = await run(cwd, ["users", "list"]);
+    const res = await run(cwd, ["user", "list"]);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain("--page-token 'tok en;rm -rf /'");
   });
 });
 
 describe("other resources", () => {
-  it("sessions revoke terminates the session and says so", async ({ server }) => {
+  it("session revoke terminates the session and says so", async ({ server }) => {
     const cwd = await makeProject();
     server.use(
       http.delete(
@@ -1748,7 +1748,7 @@ describe("other resources", () => {
         () => new HttpResponse(null, { status: 204 }),
       ),
     );
-    const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
+    const res = await run(cwd, ["session", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       title: "Revoked session sess_1",
@@ -1757,7 +1757,7 @@ describe("other resources", () => {
     });
   });
 
-  it("teams list scopes the query by project_id", async ({ server }) => {
+  it("team list scopes the query by project_id", async ({ server }) => {
     const cwd = await makeProject();
     const urls: string[] = [];
     server.use(
@@ -1766,12 +1766,12 @@ describe("other resources", () => {
         return HttpResponse.json({ teams: [] });
       }),
     );
-    const res = await run(cwd, ["teams", "list"]);
+    const res = await run(cwd, ["team", "list"]);
     expect(res.exitCode).toBe(0);
     expect(new URL(urls.at(-1) ?? "").searchParams.get("project_id")).toBe("proj_test");
   });
 
-  it("events list sends the shared filter grammar as query parameters", async ({ server }) => {
+  it("event list sends the shared filter grammar as query parameters", async ({ server }) => {
     const cwd = await makeProject();
     const urls: string[] = [];
     server.use(
@@ -1785,7 +1785,7 @@ describe("other resources", () => {
     // The caller writes the same grammar as every other list; the registry
     // maps each operation onto the query parameter the endpoint spells it as.
     const res = await run(cwd, [
-      "events",
+      "event",
       "list",
       "--filter",
       "category=entity",
@@ -1814,7 +1814,7 @@ describe("other resources", () => {
     expect(json.data.items[0]?.id).toBe("evt_1");
   });
 
-  it("events list maps --sort direction onto the order query parameter", async ({ server }) => {
+  it("event list maps --sort direction onto the order query parameter", async ({ server }) => {
     const cwd = await makeProject();
     const urls: string[] = [];
     server.use(
@@ -1827,7 +1827,7 @@ describe("other resources", () => {
     // `--sort <field>:<direction>` grammar reaches `GET /events` as the flat
     // `order` parameter the endpoint spells its direction as — a newest-first
     // audit view is `--sort occurred_at:desc`.
-    const res = await run(cwd, ["events", "list", "--sort", "occurred_at:desc"]);
+    const res = await run(cwd, ["event", "list", "--sort", "occurred_at:desc"]);
     expect(res.exitCode).toBe(0);
     expect(new URL(urls.at(-1) ?? "").searchParams.get("order")).toBe("desc");
   });
@@ -1835,7 +1835,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "release", "flow-definitions", "branding"]) {
+    for (const topic of ["schema", "release", "flow-definition", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1865,7 +1865,7 @@ describe("configuration resources are read-only", () => {
     );
 
     const res = await run(cwd, [
-      "schemas",
+      "schema",
       "list",
       "--filter",
       "object_type=human-user",
@@ -1907,9 +1907,9 @@ describe("configuration resources are read-only", () => {
   });
 });
 
-describe("schemas list shows the current schemas, not the history", () => {
+describe("schema list shows the current schemas, not the history", () => {
   // Editing a schema mints a new revision, so the unfiltered list is a history
-  // of the same object types repeated. `schemas list` asks the endpoint for
+  // of the same object types repeated. `schema list` asks the endpoint for
   // the latest of each instead, which is what the console shows.
   it("sends revisions=latest when the caller does not say", async ({ server }) => {
     const cwd = await makeProject();
@@ -1934,7 +1934,7 @@ describe("schemas list shows the current schemas, not the history", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "list"]);
+    const res = await run(cwd, ["schema", "list"]);
 
     expect(res.exitCode).toBe(0);
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
@@ -1953,7 +1953,7 @@ describe("schemas list shows the current schemas, not the history", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "list", "--filter", "revisions=all"]);
+    const res = await run(cwd, ["schema", "list", "--filter", "revisions=all"]);
 
     expect(res.exitCode).toBe(0);
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("all");
@@ -1969,8 +1969,8 @@ describe("schemas list shows the current schemas, not the history", () => {
       }),
     );
 
-    await run(cwd, ["schemas", "list", "--filter", "revisions=latest"]);
-    await run(cwd, ["schemas", "list", "--filter", "object_type=human-user"]);
+    await run(cwd, ["schema", "list", "--filter", "revisions=latest"]);
+    await run(cwd, ["schema", "list", "--filter", "object_type=human-user"]);
 
     // Naming it wins; naming a different field leaves the default in place.
     expect(seen).toEqual(["latest", "latest"]);
@@ -1988,7 +1988,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "get", "sch_04"]);
+    const res = await run(cwd, ["schema", "get", "sch_04"]);
 
     expect(res.exitCode).toBe(0);
     expect(paths.at(-1)).toBe("/api/v1/schemas/sch_04");
@@ -2008,7 +2008,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "get", id]);
+    const res = await run(cwd, ["schema", "get", id]);
 
     expect(res.exitCode).toBe(0);
     expect(paths.at(-1)).toBe(`/api/v1/schemas/${encodeURIComponent(id)}`);
@@ -2028,7 +2028,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "get", "urn:example:human"]);
+    const res = await run(cwd, ["schema", "get", "urn:example:human"]);
 
     expect(res.exitCode).toBe(0);
     expect(paths.at(-1)).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
@@ -2047,7 +2047,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "get", "human-user"]);
+    const res = await run(cwd, ["schema", "get", "human-user"]);
 
     expect(res.exitCode).toBe(0);
     expect(urls.at(-1)?.searchParams.get("object_type")).toBe("human-user");
@@ -2063,7 +2063,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       http.get(`${SERVER}/api/v1/schemas`, () => HttpResponse.json({ schemas: [] })),
     );
 
-    const res = await run(cwd, ["schemas", "get", "nonexistent"]);
+    const res = await run(cwd, ["schema", "get", "nonexistent"]);
 
     expect(res.exitCode).not.toBe(0);
     const json = parseJson(res.stdout) as { code: string; message: string };
@@ -2084,7 +2084,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["schemas", "get", "human-user"]);
+    const res = await run(cwd, ["schema", "get", "human-user"]);
 
     expect(res.exitCode).not.toBe(0);
     expect(hits.length > 0).toBe(false);
@@ -2104,7 +2104,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
       }),
     );
 
-    const res = await run(cwd, ["flow-definitions", "get", "default-login"]);
+    const res = await run(cwd, ["flow-definition", "get", "default-login"]);
 
     expect(res.exitCode).toBe(0);
     expect(urls.at(-1)?.searchParams.get("name")).toBe("default-login");
@@ -2126,7 +2126,7 @@ describe("flow definitions list the current flows", () => {
       }),
     );
 
-    const res = await run(cwd, ["flow-definitions", "list"]);
+    const res = await run(cwd, ["flow-definition", "list"]);
 
     expect(res.exitCode).toBe(0);
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
@@ -2142,7 +2142,7 @@ describe("flow definitions list the current flows", () => {
       }),
     );
 
-    await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
+    await run(cwd, ["flow-definition", "list", "--filter", "revisions=all"]);
 
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("all");
   });
@@ -2191,12 +2191,12 @@ describe("the release resource", () => {
 
 describe("the query resources' filters", () => {
   it.each([
-    ["users", QueryUsersBodyFilterItemOperation],
-    ["teams", QueryTeamsBodyFilterItemOperation],
-    ["sessions", QuerySessionsBodyFilterItemOperation],
-    ["grants", QueryGrantsBodyFilterItemOperation],
-    ["idps", QueryIdpsBodyFilterItemOperation],
-    ["projects", QueryProjectsBodyFilterItemOperation],
+    ["user", QueryUsersBodyFilterItemOperation],
+    ["team", QueryTeamsBodyFilterItemOperation],
+    ["session", QuerySessionsBodyFilterItemOperation],
+    ["grant", QueryGrantsBodyFilterItemOperation],
+    ["idp", QueryIdpsBodyFilterItemOperation],
+    ["project", QueryProjectsBodyFilterItemOperation],
   ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
     const offered = new Set<string>(
       (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
@@ -2217,7 +2217,7 @@ describe("the query resources' filters", () => {
         .map((filter) => `${topic}.${filter.field}`),
     );
 
-    expect(fields).toEqual(["users.identifier"]);
+    expect(fields).toEqual(["user.identifier"]);
   });
 });
 
@@ -2568,7 +2568,7 @@ describe("the registry builders", () => {
   });
 
   it("sends each operation of the events' created_at range as its own parameter", () => {
-    expect(RESOURCES.events.list?.filters?.find((f) => f.field === "created_at")).toMatchObject({
+    expect(RESOURCES.event.list?.filters?.find((f) => f.field === "created_at")).toMatchObject({
       operations: ["greater_than_or_equal", "less_than"],
       params: { greater_than_or_equal: "created_after", less_than: "created_before" },
     });
@@ -2619,7 +2619,7 @@ describe("the registry builders", () => {
   it("refuses an entry resource() did not check", () => {
     const registry = {
       // @ts-expect-error a plain descriptor skips every check above
-      users: {
+      user: {
         singular: "user",
         idField: "id",
         columns: ["id"],
@@ -2630,19 +2630,19 @@ describe("the registry builders", () => {
       },
     } satisfies CheckedRegistry;
 
-    expect(Object.keys(registry)).toEqual(["users"]);
+    expect(Object.keys(registry)).toEqual(["user"]);
   });
 });
 
 describe("the paged resources' lists", () => {
   it.each([
-    ["users", pagedFunctions.queryUsers],
-    ["teams", pagedFunctions.queryTeams],
-    ["sessions", pagedFunctions.querySessions],
-    ["events", pagedFunctions.listEvents],
-    ["grants", pagedFunctions.queryGrants],
-    ["idps", pagedFunctions.queryIdps],
-    ["projects", pagedFunctions.queryProjects],
+    ["user", pagedFunctions.queryUsers],
+    ["team", pagedFunctions.queryTeams],
+    ["session", pagedFunctions.querySessions],
+    ["event", pagedFunctions.listEvents],
+    ["grant", pagedFunctions.queryGrants],
+    ["idp", pagedFunctions.queryIdps],
+    ["project", pagedFunctions.queryProjects],
     ["release", pagedFunctions.listReleases],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
@@ -2653,8 +2653,8 @@ describe("the paged resources' lists", () => {
 
 describe("the id of a resource whose id has a format", () => {
   const IDS = {
-    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a user"],
-    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a session"],
+    user: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a user"],
+    session: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a session"],
     release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "a release"],
   } as const;
   const TOPICS = Object.keys(IDS) as Array<keyof typeof IDS>;

@@ -35,17 +35,20 @@ const DROPPED_DIRS = ["node_modules", ".zitadel", ".vscode"];
 const DROPPED_FILES = new Set([
   "package-lock.json",
   ".npmrc",
+  ".editorconfig",
   "zitadel.json",
   "AGENTS.md",
   "README.md",
 ]);
 
 /**
- * Tooling nothing a fixture keeps would load (only the generated scripts it
- * drops, `lint`, `build` and `preview`, or an editor), and its config files.
+ * Tooling that costs installs or moves another package's resolution, with
+ * its config files. Nothing a fixture keeps loads it (only the generated
+ * scripts it drops, `lint`, `build`, `preview` and `test`, or an editor).
  * Kept, it installs packages nothing in the lane runs, which pnpm also hands
- * other workspace packages as their optional peers. Add a name here when a
- * generator writes another; a fixture has no list of its own.
+ * other workspace packages as their optional peers. Test tooling the catalog
+ * holds (`vitest`, `jsdom`) costs neither and stays, with its files. Add a
+ * name here when a generator writes another; a fixture has no list of its own.
  */
 const UNLOADED_DEPENDENCIES = new Set([
   "@eslint/js",
@@ -64,6 +67,7 @@ const UNLOADED_FILES = new Set([
   "eslint.config.mjs",
   ".oxlintrc.json",
   ".prettierignore",
+  ".prettierrc",
 ]);
 
 function isDropped(path) {
@@ -200,8 +204,10 @@ async function normalizeManifest(text, settings, name) {
     private: _private,
     version,
     // The workspace's pnpm runs every fixture; a generator's own pin (`ng
-    // new` writes npm) makes corepack refuse `pnpm run dev`.
+    // new` writes npm) makes corepack refuse `pnpm run dev`, and pnpm 12
+    // ignores a package's `pnpm` field (the TanStack CLI writes one).
     packageManager: _packageManager,
+    pnpm: _pnpm,
     scripts = {},
     dependencies,
     devDependencies,
