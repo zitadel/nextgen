@@ -14,3 +14,5 @@ type Events = {
 export function trackEvent<E extends keyof Events>(event: E, properties: Events[E]): void {
   addon.track?.(event, properties);
 }
+
+// probe
