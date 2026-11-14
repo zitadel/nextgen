@@ -200,8 +200,10 @@ async function normalizeManifest(text, settings, name) {
     private: _private,
     version,
     // The workspace's pnpm runs every fixture; a generator's own pin (`ng
-    // new` writes npm) makes corepack refuse `pnpm run dev`.
+    // new` writes npm) makes corepack refuse `pnpm run dev`, and pnpm 12
+    // ignores a package's `pnpm` field (the TanStack CLI writes one).
     packageManager: _packageManager,
+    pnpm: _pnpm,
     scripts = {},
     dependencies,
     devDependencies,
