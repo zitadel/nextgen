@@ -20,7 +20,7 @@ import {
   seedMapping,
   standardClaimScope,
   standardClaimType,
-  unmapped,
+  fillable,
   verifyAttribute,
 } from "@/lib/idp";
 import { Connection, type JsonObject, UserSchema } from "@/lib/zitadel";
@@ -647,17 +647,23 @@ describe("fieldLabelFor", () => {
   });
 });
 
-describe("unmapped", () => {
+describe("fillable", () => {
   it("lists an attribute that has no claim yet and could hold the type", () => {
-    expect(namesOf(unmapped(seeded(), "string"))).toContain("phoneNumber");
+    expect(namesOf(fillable(seeded(), "string"))).toContain("phoneNumber");
   });
 
-  it("leaves out an attribute a default fills", () => {
-    expect(namesOf(unmapped(seeded(), "string"))).not.toContain("givenName");
+  it("lists an attribute only a default fills, which the claim would replace", () => {
+    expect(namesOf(fillable(seeded(), "string"))).toContain("givenName");
+  });
+
+  it("leaves out an attribute an earlier claim of the request mapped", () => {
+    const state = value(mapClaim(seeded(), { attribute: "givenName", claim: "first_name" }));
+
+    expect(namesOf(fillable(state, "string"))).not.toContain("givenName");
   });
 
   it("leaves out an attribute that could not hold the type", () => {
-    expect(namesOf(unmapped(seeded(), "string"))).not.toContain("staffNumber");
+    expect(namesOf(fillable(seeded(), "string"))).not.toContain("staffNumber");
   });
 });
 

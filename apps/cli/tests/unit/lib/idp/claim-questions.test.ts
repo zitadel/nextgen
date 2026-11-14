@@ -124,3 +124,27 @@ describe("ClaimQuestions.ask with hostile text", () => {
     expect(talk.options()[3]).toContain(`bad${SPELLED}`);
   });
 });
+
+describe("ClaimQuestions.ask on a schema whose only property a default fills", () => {
+  it("lets a claim replace the default instead of forcing a new attribute", async () => {
+    answering("Yes, map another claim", "mail", "Text", "email", "", "No, keep these");
+
+    const request = await asTerminal(() => {
+      return new ClaimQuestions({
+        ask: asker({ interactive: true, force: false }),
+        show: () => undefined,
+        say: () => undefined,
+      }).ask(
+        {
+          ...STATE,
+          attributes: [{ name: "email", type: "string", required: true, unique: false }],
+          mapping: { email: "email" },
+          verified: {},
+        },
+        "Acme SSO",
+      );
+    });
+
+    expect(request.entries).toEqual([{ attribute: "email", claim: "mail" }]);
+  });
+});

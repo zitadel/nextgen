@@ -19,7 +19,7 @@ import {
   parseUnusedClaim,
   standardClaimScope,
   standardClaimType,
-  unmapped,
+  fillable,
   type VerifiedEntry,
 } from "./claims";
 
@@ -249,7 +249,7 @@ export class ClaimQuestions {
         }),
         initialValue: "string",
       }));
-    const candidates = unmapped(before, type);
+    const candidates = fillable(before, type);
     const chosen =
       candidates.length === 0
         ? CREATE
@@ -263,6 +263,9 @@ export class ClaimQuestions {
                   label: plain(one.name),
                   hint: [
                     one.type,
+                    Object.hasOwn(before.mapping, one.name)
+                      ? `replaces ${plain(before.mapping[one.name] ?? "")}`
+                      : undefined,
                     one.required ? "required" : undefined,
                     one.unique ? "unique" : undefined,
                   ]

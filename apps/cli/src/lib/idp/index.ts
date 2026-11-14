@@ -58,7 +58,7 @@ export {
   seedMapping,
   standardClaimScope,
   standardClaimType,
-  unmapped,
+  fillable,
   type VerifiedEntry,
   verifyAttribute,
 } from "./claims";

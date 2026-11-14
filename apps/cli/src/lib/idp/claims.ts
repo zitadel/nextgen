@@ -602,18 +602,22 @@ export function seedMapping(connection: Connection, schema: UserSchema): Mapping
 }
 
 /**
- * The properties no claim fills yet that a claim of this type could fill.
+ * The properties a claim of this type could fill: those no claim fills yet and
+ * those only a default fills, which the claim would replace.
+ *
+ * @remarks
+ * A property a request has already mapped is settled for it, so it is left out.
  *
  * @param state - What is mapped so far.
  * @param claimType - The claim's type.
  * @returns The properties.
  */
-export function unmapped(state: MappingState, claimType: ClaimType): readonly SchemaAttribute[] {
+export function fillable(state: MappingState, claimType: ClaimType): readonly SchemaAttribute[] {
   return state.attributes.filter((attribute) => {
     return (
       attribute.type !== undefined &&
       fits(claimType, attribute.type) &&
-      !Object.hasOwn(state.mapping, attribute.name)
+      !state.explicit.includes(attribute.name)
     );
   });
 }
