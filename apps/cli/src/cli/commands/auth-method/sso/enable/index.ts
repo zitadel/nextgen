@@ -208,8 +208,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(new ReadClaims())
         .step(
           new PlanChange({
-            ask: this.ask,
-            developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
             suggest: this.suggest,
           }),
         )
@@ -229,7 +227,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             },
           }),
         )
-        .step(new CollectCredentials())
+        .step(
+          new CollectCredentials({
+            ask: this.ask,
+            developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+            suggest: this.suggest,
+          }),
+        )
         .step(
           new AskClaims({
             ask: this.ask,

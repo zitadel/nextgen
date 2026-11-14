@@ -9,17 +9,14 @@
  * from is the provider classes in `@zitadel/config/idp`. Adding a provider to
  * the configuration, and finding the connection one already has, is
  * `lib/zitadel`'s (`config.connections.enable`). This module owns only what the
- * command line needs around it: choosing the provider from flags and answers
- * ({@link ProviderChoice}), the callback URI, asking for endpoints, asking for
- * the credentials ({@link CredentialPrompt}), and publishing them to the
- * project through a publisher the caller passes in ({@link CredentialDelivery}).
+ * command line needs around it: choosing the provider from flags, the callback
+ * URI, and publishing the credentials to the project through a publisher the
+ * caller passes in ({@link CredentialDelivery}).
  *
  * **Dependency rule.** No upward imports (`cli/commands/`, `sync/`), none of
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
- * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions`), `lib/warnings`
- * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
+ * added to) and shared utilities under `apps/cli/src/lib/`.
  */
 
 export { callbackUriFor } from "./callback";
@@ -88,8 +85,6 @@ export {
   ssoEnableFlags,
 } from "./custom";
 export { CredentialDelivery, type DeliveryRun } from "./delivery";
-export { askConnectionEndpoints } from "./endpoints";
-export { CredentialPrompt, type PromptRun } from "./prompt";
 export {
   ProviderChoice,
   type ProviderFlags,

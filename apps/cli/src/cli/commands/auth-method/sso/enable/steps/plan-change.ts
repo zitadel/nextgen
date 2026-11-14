@@ -1,13 +1,7 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import {
-  callbackUriFor,
-  claimFlagTexts,
-  CredentialDelivery,
-  CredentialPrompt,
-  loopbackIssuerWarning,
-} from "@/lib/idp";
+import { callbackUriFor, CredentialDelivery, loopbackIssuerWarning } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
@@ -17,21 +11,13 @@ import { Connection } from "@/lib/zitadel";
  * What the step reads from what is known.
  */
 type Needs = Fact<
-  | "target"
-  | "remote"
-  | "origins"
-  | "issuer"
-  | "selection"
-  | "provider"
-  | "options"
-  | "claimRequest"
-  | "claims"
+  "target" | "remote" | "origins" | "issuer" | "selection" | "provider" | "options" | "claims"
 >;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
+type Deps = Pick<EnableServices, "suggest">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -40,7 +26,7 @@ type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
  */
 export class PlanChange extends WizardStep<
   "plan",
-  Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">,
+  Fact<"candidate" | "preview" | "delivery" | "summary">,
   Needs
 > {
   /**
@@ -77,9 +63,7 @@ export class PlanChange extends WizardStep<
    * @returns The plan.
    * @throws {@link ZitadelError} When the change would be refused.
    */
-  async run(
-    needs: Needs,
-  ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
+  async run(needs: Needs): Promise<Fact<"candidate" | "preview" | "delivery" | "summary">> {
     const plain = Connection.forProvider(needs.provider, needs.target.schema);
     const candidate = needs.claims === undefined ? plain : plain.withClaims(needs.claims).document;
     const preview = needs.target.config.connections.enable(needs.target.schema, candidate, {
@@ -114,15 +98,6 @@ export class PlanChange extends WizardStep<
       candidate,
       preview,
       delivery,
-      prompt: new CredentialPrompt({
-        selection: needs.selection,
-        reused,
-        secretVariable: delivery.names.clientSecret,
-        ask: this.deps.ask,
-        developmentBuild: this.deps.developmentBuild,
-        suggest: this.deps.suggest,
-        claims: claimFlagTexts(needs.claimRequest),
-      }),
       summary: {
         projectId: needs.remote.projectId,
         provider: selectionName(needs.selection),

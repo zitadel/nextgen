@@ -7,7 +7,6 @@ import type {
   ClaimRequest,
   CredentialDelivery,
   CredentialNames,
-  CredentialPrompt,
   GivenCredentials,
   MappingState,
   ProviderChoice,
@@ -175,11 +174,6 @@ export type EnableFacts = Readonly<{
    * Where the credentials go, and how that is reported.
    */
   delivery: CredentialDelivery;
-
-  /**
-   * The questions that ask for the credentials.
-   */
-  prompt: CredentialPrompt;
 
   /**
    * What the run says about the connection.

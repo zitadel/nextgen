@@ -1,5 +1,6 @@
 import {
   type ClientId,
+  type ConnectionEndpoints,
   credentialVariables,
   CUSTOM_PROVIDER,
   IDP_PROVIDERS,
@@ -19,12 +20,7 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import {
-  askConnectionEndpoints,
-  callbackUriFor,
-  loopbackIssuerWarning,
-  ssoEnableFlags,
-} from "@/lib/idp";
+import { callbackUriFor, loopbackIssuerWarning, ssoEnableFlags } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
 import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
@@ -160,7 +156,11 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    *
    * The endpoints are asked before the announcement, which names the vendor's console: on a
    * development run (ZITADEL_CLI_DEV) the provider may not be the vendor at all. They are not asked
-   * of a custom connection, whose issuer was just given.
+   * of a custom connection, whose issuer was just given. Only the issuer is asked for and only the
+   * issuer is written: the engine accepts a connection that names every endpoint or none at all, so
+   * naming two of the four it needs is rejected as `idp.endpoints_partial`. It is validated against
+   * the connection contract rather than merely parsed, because `new URL` accepts `file:///tmp/idp`,
+   * which would be written to a connection that then fails on apply.
    *
    * The announcement says what to register and where. The redirect URI is settled by now, because
    * the port question runs before this one and the issuer derives from it, so it can be shown
@@ -215,15 +215,20 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       reportWarning(loopback);
     }
     const entry = providerOf(selection);
-    const endpoints =
+    const endpoints: ConnectionEndpoints | undefined =
       selection.kind === "custom"
         ? undefined
         : (flagged?.endpoints ??
-          (await askConnectionEndpoints({
-            provider: selection.id,
-            developmentBuild: ctx.developmentBuild === true,
-            ask: ctx.ask,
-          })));
+          (ctx.developmentBuild === true
+            ? {
+                issuer: await ctx.ask.text({
+                  name: "issuer",
+                  message: "What is the issuer URL of the provider?",
+                  parse: parseIssuer,
+                  initialValue: idpProvider(selection.id).issuer,
+                }),
+              }
+            : undefined));
     ctx.note(`${entry.displayName} sign-in`, [
       ...(endpoints?.issuer === undefined
         ? [
