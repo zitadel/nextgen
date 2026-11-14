@@ -58,13 +58,6 @@ const REFUSED_SETTING = {
 } as const satisfies Refusal;
 
 /**
- * Passed as {@link ParserOptions.empty}, it refuses a blank value with the
- * flag's own refusal, the reason being that it was given an empty value,
- * instead of with {@link BLANK_VALUE}.
- */
-export const AS_REFUSED = "as-refused";
-
-/**
  * How a flag or argument given a blank value is refused.
  */
 const EMPTY_VALUE_REFUSAL = {
@@ -339,10 +332,18 @@ type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = Readonl
   refusal?: R & ReadAlone<R>;
 
   /**
-   * What a blank value is refused with, asking only for what `read` fills, or
-   * {@link AS_REFUSED}. {@link BLANK_VALUE} when it is left out.
+   * What a blank value is refused with, asking only for what `read` fills.
+   * {@link BLANK_VALUE} when it is left out. Ignored when
+   * {@link ParserOptions.blankAsValue} is set.
    */
-  empty?: (Empty & ReadAlone<Empty>) | typeof AS_REFUSED;
+  empty?: Empty & ReadAlone<Empty>;
+
+  /**
+   * Refuses a blank value as it refuses any other value the parser refuses, with
+   * `refusal`, the reason being that it was given an empty value, instead of
+   * with its own wording.
+   */
+  blankAsValue?: boolean;
 }>;
 
 /**
@@ -359,17 +360,19 @@ type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = Readonl
  * @param pick - What the flag yields.
  * @param refusal - What the parser's refusal is worded with, or `undefined`.
  * @param empty - What a blank value is refused with, or `undefined`.
+ * @param blankAsValue - Whether a blank value is refused with `refusal` too.
  * @returns The `parse`.
  */
 function parsing<T, V>(
   parse: (value: string) => Outcome<T>,
   pick: (text: string, made: T) => V,
   refusal: ParseRefusal | undefined,
-  empty: ParseRefusal | typeof AS_REFUSED | undefined,
+  empty: ParseRefusal | undefined,
+  blankAsValue: boolean | undefined,
 ): Parse<V> {
   const refusing: ParseRefusal = refusal ?? REFUSED_SETTING;
   const declared: Refused<V> = {
-    schema: filled.transform((text, ctx) => {
+    schema: (blankAsValue === true ? filled : z.string().trim()).transform((text, ctx) => {
       const outcome = parse(text);
       if (!outcome.ok) {
         ctx.addIssue({
@@ -385,7 +388,7 @@ function parsing<T, V>(
     refusal: refusing,
   };
   const value = reads(declared);
-  if (empty === AS_REFUSED) {
+  if (blankAsValue === true) {
     return value;
   }
   const emptied: ParseRefusal = empty ?? BLANK_VALUE;
@@ -430,6 +433,7 @@ export function parses<
     },
     options?.refusal,
     options?.empty,
+    options?.blankAsValue,
   );
 }
 
@@ -455,6 +459,7 @@ export function accepts<
     },
     options?.refusal,
     options?.empty,
+    options?.blankAsValue,
   );
 }
 

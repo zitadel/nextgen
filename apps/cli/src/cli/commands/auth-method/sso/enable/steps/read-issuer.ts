@@ -17,7 +17,7 @@ const NO_ISSUER_REFUSAL = {
  * run reads its issuer from.
  */
 type Needs = Readonly<{
-  flags: Partial<Pick<Fact<"flags">["flags"], "server" | "env" | "envFile">>;
+  flags: Pick<Fact<"flags">["flags"], "server" | "env" | "envFile">;
 }>;
 
 /**

@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import {
   accepts,
-  AS_REFUSED,
   filled,
   parses,
   type ReadAlone,
@@ -383,7 +382,7 @@ describe("a flag that is its parser", () => {
   });
 
   it("words a blank value as the flag's own refusal when told to", async () => {
-    const asked = Flags.custom<number>({ parse: parses(digits, { empty: AS_REFUSED }) });
+    const asked = Flags.custom<number>({ parse: parses(digits, { blankAsValue: true }) });
 
     await expect(parseFlag(asked({}), "  ", "count")).rejects.toMatchObject({
       message: "--count: it was given an empty value",
