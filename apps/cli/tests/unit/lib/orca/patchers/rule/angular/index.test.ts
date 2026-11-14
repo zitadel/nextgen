@@ -1,21 +1,28 @@
+import { readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
-  devScriptEdit,
-  launcherScriptsEdit,
+  appComponentTemplate,
+  appTemplateHtml,
+  LAUNCHER_PATH,
+  launcherTemplate,
+  PROJECT_ID_MODULE_PATH,
+  projectIdModule,
   proxyConfApiPrefixEdit,
   proxyConfApiPrefixVerdict,
-  scriptsSetupCannotMove,
+  proxyConfTemplate,
 } from "@/lib/orca/patchers/rule/angular/templates";
 import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
-import type { PatchContext } from "@/lib/orca/patchers/types";
+import type { PatchContext, PatchExecOptions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
-import { thrownBy } from "@tests/helpers/thrown-value";
+import { it } from "@tests/helpers/fixtures";
+import { write } from "@tests/helpers/git-repo";
 import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { aProxyConfApp, type DevApp } from "@tests/helpers/vite";
@@ -46,12 +53,12 @@ function setBearer(proxyReq) {
   }
 }`;
 
-function ctx(): PatchContext {
+function ctx(projectId = "proj-1"): PatchContext {
   return {
     framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
     project: {
-      id: "proj-1",
+      id: projectId,
       project_secret: "sk_full",
       preview_secret: "sk_preview",
       origins: [],
@@ -187,6 +194,14 @@ function previousProxyConf(): string {
 }
 
 describe("AngularPatcher.plan", () => {
+  it("writes the same managed app files for setups against two projects", () => {
+    const a = managedAppFiles(ctx("proj_aaaaaaaa"));
+
+    const b = managedAppFiles(ctx("proj_bbbbbbbb"));
+
+    expect(b).toEqual(a);
+  });
+
   it("wires the business copy overlay for business-use-case projects", () => {
     // Minimal scaffolds keep the widget's neutral built-in copy.
     const minimal = new AngularPatcher().plan(ctx());
@@ -476,87 +491,310 @@ describe("AngularPatcher.plan", () => {
     });
   });
 
-  it("adds a `dev` script that serves through the launcher, so `npm run dev` works like the other frameworks", () => {
-    const result = JSON.parse(devScriptEdit(`{ "scripts": { "start": "ng serve" } }`));
-
-    expect(result.scripts.dev).toBe("node zitadel-ng.cjs serve");
-  });
-
-  it("preserves an existing `dev` script instead of overwriting it", () => {
-    const source = `{ "scripts": { "dev": "vite" } }`;
-
-    expect(devScriptEdit(source)).toBe(source);
-  });
-
-  it("fails fast when package.json is absent instead of fabricating one", () => {
-    const refusal = thrownBy(() => devScriptEdit(undefined));
-
-    expect(refusal).toMatchObject({ message: expect.stringMatching(/package\.json is required/) });
-  });
-
-  it.each([
-    ["ng serve", "node zitadel-ng.cjs serve"],
-    ["ng build", "node zitadel-ng.cjs build"],
-    ["ng test", "node zitadel-ng.cjs test"],
-    [
-      "ng build --watch --configuration development",
-      "node zitadel-ng.cjs build --watch --configuration development",
-    ],
-  ])("runs the plain script %s through the launcher", (command, launched) => {
-    const out = launcherScriptsEdit(JSON.stringify({ scripts: { any: command } }));
-
-    expect(JSON.parse(out).scripts.any).toBe(launched);
-  });
-
-  it.each([
-    "ng",
-    "ng lint",
-    "ng s",
-    "ng build && cp -r public dist",
-    'concurrently "ng serve" api',
-  ])("leaves the script %s as it is", (command) => {
-    const source = JSON.stringify({ scripts: { any: command } });
-
-    expect(launcherScriptsEdit(source)).toBe(source);
-  });
-
-  it("leaves package.json byte for byte once its scripts run through the launcher", () => {
-    const once = launcherScriptsEdit(
-      `{\n  "name": "a",\n  "scripts": { "build": "ng build" }\n}\n`,
-    );
-
-    expect(launcherScriptsEdit(once)).toBe(once);
-  });
-
-  it.each([
-    "ng s --open",
-    "ng b",
-    "ng t",
-    "ng run app:build",
-    'concurrently "ng serve" api',
-    "ng build && echo done",
-  ])("names %s as a script setup cannot run through the launcher", (command) => {
-    const reason = scriptsSetupCannotMove(JSON.stringify({ scripts: { any: command } }));
-
-    expect(reason).toBe(
-      `package.json's "any" (${command}) runs the Angular CLI in a way setup cannot route through zitadel-ng.cjs, which writes the app's project id: run "node zitadel-ng.cjs <command> …" where it runs "ng <command> …"`,
-    );
-  });
-
-  it.each(["ng serve --port 4300", "ng lint", "ng version", "node zitadel-ng.cjs serve", "vite"])(
-    "finds nothing setup cannot move in the script %s",
-    (command) => {
-      const reason = scriptsSetupCannotMove(JSON.stringify({ scripts: { any: command } }));
-
-      expect(reason).toBeUndefined();
-    },
-  );
-
   it("adds the SDK dependency at the CLI's prerelease tag", () => {
     const dep = new AngularPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "0.1.0-alpha.0" });
+  });
+});
+
+/** Each managed app file the plan writes, as a fresh setup writes it. */
+function managedAppFiles(c: PatchContext): Record<string, string | undefined> {
+  const patcher = new AngularPatcher();
+  const plan = patcher.plan(c);
+  const files = patcher.artifacts({ framework: c.framework, rendererId: c.rendererId }).markedFiles;
+  return Object.fromEntries(
+    files.map((path) => {
+      const op = plan.ops.find(
+        (candidate): candidate is Extract<FileOp, { kind: "write" }> =>
+          candidate.kind === "write" && candidate.path === path,
+      );
+      return [
+        path,
+        op?.contents ?? (path === "proxy.conf.cjs" ? proxyConfigEdit()(undefined) : undefined),
+      ];
+    }),
+  );
+}
+
+/** The managed `src/app/app.ts` an earlier CLI wrote for project `proj-1`, naming it as a literal. */
+const LITERAL_APP_COMPONENT = `// zitadel-cli: managed-file v1
+import { Component, OnInit } from "@angular/core";
+import {
+  ZitadelLoginComponent,
+  ZitadelSessionComponent,
+  configureZitadel,
+} from "@zitadel/sdk-angular";
+
+@Component({
+  selector: "app-root",
+  standalone: true,
+  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
+  templateUrl: "./app.html",
+})
+export class App implements OnInit {
+  protected readonly project = configureZitadel({
+    projectId: "proj-1",
+    proxyPath: "/__nextgen",
+  });
+  protected readonly path = window.location.pathname;
+
+  ngOnInit(): void {
+    if (this.path === "/") {
+      window.location.replace("/login");
+    }
+  }
+}
+`;
+
+/** The scripts `ng new` writes. */
+const NG_NEW_SCRIPTS = {
+  ng: "ng",
+  start: "ng serve",
+  build: "ng build",
+  watch: "ng build --watch --configuration development",
+  test: "ng test",
+};
+
+/** An Angular app `ng new` created, its root component moved to `src/app/app.ts`'s import, not yet set up. */
+async function anAppNgNewCreated(dir: string): Promise<void> {
+  await write(dir, {
+    "package.json": `${JSON.stringify(
+      { name: "app", scripts: NG_NEW_SCRIPTS, dependencies: { "@angular/core": "^22.2.0" } },
+      null,
+      2,
+    )}\n`,
+    "angular.json": `${JSON.stringify(
+      { projects: { app: { architect: { build: {}, serve: { options: {} } } } } },
+      null,
+      2,
+    )}\n`,
+    "src/main.ts":
+      'import { bootstrapApplication } from "@angular/platform-browser";\nimport { App } from "./app/app";\n\nbootstrapApplication(App);\n',
+    "src/app/app.routes.ts":
+      'import { Routes } from "@angular/router";\n\nexport const routes: Routes = [];\n',
+  });
+}
+
+/** An Angular app an earlier CLI set up: `app.ts` names its project, and its scripts run `ng`. */
+async function anEarlierSetUpApp(dir: string): Promise<void> {
+  await anAppNgNewCreated(dir);
+  await write(dir, {
+    "package.json": `${JSON.stringify(
+      {
+        name: "app",
+        scripts: { ...NG_NEW_SCRIPTS, dev: "ng serve" },
+        dependencies: { "@angular/core": "^20.3.0", "@zitadel/sdk-angular": "^0.6.0" },
+      },
+      null,
+      2,
+    )}\n`,
+    "angular.json": `${JSON.stringify(
+      {
+        projects: {
+          app: {
+            architect: {
+              build: {},
+              serve: { options: { proxyConfig: "proxy.conf.cjs", port: 3000 } },
+            },
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "src/app/app.routes.ts":
+      'import { Routes } from "@angular/router";\n\nexport const routes: Routes = [\n  { path: "login", children: [] },\n  { path: "register", children: [] },\n  { path: "profile", children: [] },\n];\n',
+    "src/app/app.ts": LITERAL_APP_COMPONENT,
+    "src/app/app.html": appTemplateHtml(ctx()),
+    "proxy.conf.cjs": proxyConfTemplate(),
+  });
+}
+
+/** The same app with its `app.ts` deleted. */
+async function anEarlierSetUpAppWithoutAppTs(dir: string): Promise<void> {
+  await anEarlierSetUpApp(dir);
+  await rm(join(dir, "src/app/app.ts"));
+}
+
+/** An app this CLI set up, whose scripts run the launcher, with the launcher deleted. */
+async function aLaunchedAppWithoutTheLauncher(dir: string): Promise<void> {
+  await anEarlierSetUpApp(dir);
+  await write(dir, {
+    "src/app/app.ts": appComponentTemplate(ctx()),
+    "package.json": `${JSON.stringify({
+      name: "app",
+      scripts: { build: "node zitadel-ng.cjs build", dev: "node zitadel-ng.cjs serve" },
+      dependencies: { "@angular/core": "^22.2.0", "@zitadel/sdk-angular": "^0.6.0" },
+    })}\n`,
+  });
+}
+
+/** The scripts, `app.ts`, launcher and module of the app in `dir`, as a repair might change them. */
+async function launchFiles(dir: string): Promise<Record<string, string | undefined>> {
+  const read = (path: string) => {
+    return readFile(join(dir, path), "utf8").catch(() => {
+      return undefined;
+    });
+  };
+  return {
+    scripts: JSON.stringify(JSON.parse((await read("package.json")) ?? "{}").scripts),
+    "src/app/app.ts": await read("src/app/app.ts"),
+    [LAUNCHER_PATH]: await read(LAUNCHER_PATH),
+    [PROJECT_ID_MODULE_PATH]: await read(PROJECT_ID_MODULE_PATH),
+    ".gitignore": await read(".gitignore"),
+  };
+}
+
+/** How `doctor --fix` runs a repair in `dir`. */
+const missingOnlyIn = (dir: string): PatchExecOptions => {
+  return { cwd: dir, dryRun: false, force: false, missingOnly: true };
+};
+
+/** How setup patches `dir`. */
+const setUpIn = (dir: string): PatchExecOptions => {
+  return { cwd: dir, dryRun: false, force: false };
+};
+
+describe("AngularPatcher.patch", () => {
+  describe("with an app ng new created", () => {
+    it("runs its serve, build and test scripts through the launcher, and adds `dev`", async ({
+      dir,
+    }) => {
+      await anAppNgNewCreated(dir);
+
+      await new AngularPatcher().patch(ctx(), setUpIn(dir));
+
+      expect(JSON.parse(await readFile(join(dir, "package.json"), "utf8")).scripts).toEqual({
+        ng: "ng",
+        start: "node zitadel-ng.cjs serve",
+        build: "node zitadel-ng.cjs build",
+        watch: "node zitadel-ng.cjs build --watch --configuration development",
+        test: "node zitadel-ng.cjs test",
+        dev: "node zitadel-ng.cjs serve",
+      });
+    });
+
+    it("writes the module for the project it sets the app up for", async ({ dir }) => {
+      await anAppNgNewCreated(dir);
+
+      await new AngularPatcher().patch(ctx("proj_setup"), setUpIn(dir));
+
+      expect(await readFile(join(dir, PROJECT_ID_MODULE_PATH), "utf8")).toBe(
+        projectIdModule("proj_setup"),
+      );
+    });
+
+    it("has git ignore the module", async ({ dir }) => {
+      await anAppNgNewCreated(dir);
+
+      await new AngularPatcher().patch(ctx(), setUpIn(dir));
+
+      expect(await readFile(join(dir, ".gitignore"), "utf8")).toContain(
+        `/${PROJECT_ID_MODULE_PATH}\n`,
+      );
+    });
+
+    it("reports what it changed after the plan", async ({ dir }) => {
+      await anAppNgNewCreated(dir);
+
+      const result = await new AngularPatcher().patch(ctx(), setUpIn(dir));
+
+      expect(result.filesWritten).toContain(join(dir, PROJECT_ID_MODULE_PATH));
+    });
+
+    it("reports each file once", async ({ dir }) => {
+      await anAppNgNewCreated(dir);
+
+      const result = await new AngularPatcher().patch(ctx(), setUpIn(dir));
+
+      const paths = result.files.map((file) => file.path);
+      expect(paths).toEqual([...new Set(paths)]);
+    });
+  });
+
+  describe("with a module setup wrote before, for another project", () => {
+    it("leaves it to the launcher, which keeps it current", async ({ dir }) => {
+      await anAppNgNewCreated(dir);
+      await write(dir, { [PROJECT_ID_MODULE_PATH]: projectIdModule("proj_before") });
+
+      await new AngularPatcher().patch(ctx("proj_setup"), setUpIn(dir));
+
+      expect(await readFile(join(dir, PROJECT_ID_MODULE_PATH), "utf8")).toBe(
+        projectIdModule("proj_before"),
+      );
+    });
+  });
+});
+
+describe("AngularPatcher.repair", () => {
+  describe("with an app an earlier CLI set up", () => {
+    it("leaves its scripts and app.ts as they are, and adds no launcher, module or ignore rule", async ({
+      dir,
+    }) => {
+      await anEarlierSetUpApp(dir);
+      const before = await launchFiles(dir);
+
+      await new AngularPatcher().repair(ctx(), missingOnlyIn(dir));
+
+      expect(await launchFiles(dir)).toEqual({ ...before, ".gitignore": expect.any(String) });
+    });
+
+    it("adds no ignore rule for a module the app never imports", async ({ dir }) => {
+      await anEarlierSetUpApp(dir);
+
+      await new AngularPatcher().repair(ctx(), missingOnlyIn(dir));
+
+      expect(await readFile(join(dir, ".gitignore"), "utf8")).not.toContain(PROJECT_ID_MODULE_PATH);
+    });
+
+    it("restores no app.ts that imports the module", async ({ dir }) => {
+      await anEarlierSetUpAppWithoutAppTs(dir);
+      const before = await launchFiles(dir);
+
+      await new AngularPatcher().repair(ctx(), missingOnlyIn(dir));
+
+      expect(await launchFiles(dir)).toEqual({ ...before, ".gitignore": expect.any(String) });
+    });
+  });
+
+  describe("with an app whose scripts run the launcher", () => {
+    it("restores the launcher", async ({ dir }) => {
+      await aLaunchedAppWithoutTheLauncher(dir);
+
+      await new AngularPatcher().repair(ctx(), missingOnlyIn(dir));
+
+      expect(await readFile(join(dir, LAUNCHER_PATH), "utf8")).toBe(launcherTemplate());
+    });
+  });
+});
+
+describe("AngularPatcher.verify", () => {
+  describe("with an app an earlier CLI set up", () => {
+    it("finds every wiring applied", async ({ dir }) => {
+      await anEarlierSetUpApp(dir);
+
+      const statuses = await new AngularPatcher().verify(ctx(), { cwd: dir });
+
+      expect(statuses.filter((status) => status.state !== "applied")).toEqual([]);
+    });
+
+    it("says what to do about a missing app.ts, which the repair leaves missing", async ({
+      dir,
+    }) => {
+      await anEarlierSetUpAppWithoutAppTs(dir);
+
+      const statuses = await new AngularPatcher().verify(ctx(), { cwd: dir });
+
+      expect(statuses).toContainEqual({
+        path: "src/app/app.ts",
+        wiring: "convenience",
+        state: "unknown",
+        reason:
+          'doctor --fix writes it only into an app whose serve, build and test scripts run zitadel-ng.cjs: restore it from version control, or run those scripts as "node zitadel-ng.cjs …" and run doctor --fix again',
+      });
+    });
   });
 });
 
@@ -574,6 +812,15 @@ describe("AngularPatcher.artifacts", () => {
       "package.json",
     ]);
   });
+  it("classes the launcher as infrastructure, which the doctor fails on when it is missing", () => {
+    const artifacts = new AngularPatcher().artifacts({
+      framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+
+    expect(artifacts.fileClasses?.[LAUNCHER_PATH]).toBe("infrastructure");
+  });
+
   it("has eject remove the module the launcher writes, whatever it holds", () => {
     const artifacts = new AngularPatcher().artifacts({
       framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },

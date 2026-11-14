@@ -120,12 +120,15 @@ export class App implements OnInit {
 /**
  * The managed launcher `zitadel-ng.cjs`, which the app's serve, build and test
  * scripts run instead of `ng`. Angular's CLI reads no environment into client
- * code, so this file reads `ZITADEL_PROJECT_ID` from the environment, else from
- * `.env.local`, which `zitadel setup` writes, writes it into
- * {@link PROJECT_ID_MODULE_PATH} when that file does not already hold it (so a
- * running watcher is not woken), and runs the Angular CLI in this process with
- * the arguments it was given. A value in the environment wins, as it does in
- * `proxy.conf.cjs`. `process.loadEnvFile` needs Node.js 20.12 or newer.
+ * code, so this file takes `ZITADEL_PROJECT_ID` from the environment, else from
+ * `.env.local` (which `zitadel setup` writes), parsed with Node's
+ * `util.parseEnv` for that one variable, so the rest of the file, the project
+ * secret included, stays out of the Angular CLI's environment. It writes the
+ * id into {@link PROJECT_ID_MODULE_PATH} when that file does not already hold
+ * it, so a running watcher is not woken, and runs the Angular CLI in this
+ * process with the arguments it was given. Both paths are the app's, from
+ * `__dirname`, wherever it is run from. Only reading `.env.local` needs
+ * Node.js 20.12 or newer; an id from the environment needs nothing more.
  */
 export function launcherTemplate(): string {
   return `${MANAGED_MARKER}
@@ -133,18 +136,23 @@ export function launcherTemplate(): string {
 // excludes, then runs the Angular CLI with the arguments it was given. The id
 // comes from the environment, else from .env.local, which zitadel setup writes.
 const { existsSync, readFileSync, writeFileSync } = require("node:fs");
+const { join } = require("node:path");
+const util = require("node:util");
 
-if (typeof process.loadEnvFile !== "function") {
-  throw new Error(\`\${__filename} needs Node.js 20.12 or newer, which can read .env.local.\`);
+function fromEnvLocal() {
+  const file = join(__dirname, ".env.local");
+  if (!existsSync(file)) return undefined;
+  if (typeof util.parseEnv !== "function") {
+    throw new Error("Reading .env.local needs Node.js 20.12 or newer; or set ZITADEL_PROJECT_ID in the environment.");
+  }
+  return util.parseEnv(readFileSync(file, "utf8")).ZITADEL_PROJECT_ID;
 }
-if (existsSync(".env.local")) {
-  process.loadEnvFile(".env.local");
-}
-const projectId = process.env.ZITADEL_PROJECT_ID;
+
+const projectId = process.env.ZITADEL_PROJECT_ID || fromEnvLocal();
 if (!projectId) {
   throw new Error("ZITADEL_PROJECT_ID is not set: add it to .env.local (zitadel setup writes it) or to the environment.");
 }
-const path = "${PROJECT_ID_MODULE_PATH}";
+const path = join(__dirname, "${PROJECT_ID_MODULE_PATH}");
 const contents = \`// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\\nexport const ZITADEL_PROJECT_ID = \${JSON.stringify(projectId)};\\n\`;
 if (!existsSync(path) || readFileSync(path, "utf8") !== contents) {
   writeFileSync(path, contents);
@@ -190,14 +198,6 @@ function withScripts(
 }
 
 /**
- * A script that runs the Angular CLI's serve, build or test, in any spelling
- * the CLI accepts (`ng serve`, `ng s`, `ng dev`, `ng build`, `ng b`, `ng test`,
- * `ng t`, `ng run <project>:<target>`), alone or within a longer command.
- */
-const RUNS_THE_APP =
-  /(?:^|[\s;&|("'])(?:npx\s+)?ng\s+(?:serve|s|dev|build|b|test|t|run\s+\S*:(?:serve|build|test))(?=$|[\s;&|)"'])/;
-
-/**
  * A script setup moves onto the launcher: `ng serve …`, `ng build …` or
  * `ng test …` with no shell operators, where replacing `ng` with
  * `node zitadel-ng.cjs` changes nothing the Angular CLI receives.
@@ -205,41 +205,12 @@ const RUNS_THE_APP =
 const PLAIN_NG = /^ng (?:serve|build|test)(?: [^&|;<>`$()\n]*)?$/;
 
 /**
- * Why setup cannot run every script of `source`, a `package.json`, that
- * serves, builds or tests the app through the launcher: those that do it in a
- * form {@link launcherScriptsEdit} does not move, named with what to run
- * instead, or `undefined` when there are none or no `package.json` (whose
- * edits say so).
- */
-export function scriptsSetupCannotMove(source: string | undefined): string | undefined {
-  if (source === undefined) {
-    return undefined;
-  }
-  const unmovable = Object.entries(packageJson(source).scripts).filter(
-    (entry): entry is [string, string] => {
-      return (
-        typeof entry[1] === "string" && RUNS_THE_APP.test(entry[1]) && !PLAIN_NG.test(entry[1])
-      );
-    },
-  );
-  if (unmovable.length === 0) {
-    return undefined;
-  }
-  const names = unmovable
-    .map(([name, command]) => {
-      return `"${name}" (${command})`;
-    })
-    .join(", ");
-  return `package.json's ${names} run${unmovable.length === 1 ? "s" : ""} the Angular CLI in a way setup cannot route through ${LAUNCHER_PATH}, which writes the app's project id: run "node ${LAUNCHER_PATH} <command> …" where ${unmovable.length === 1 ? "it runs" : "they run"} "ng <command> …"`;
-}
-
-/**
  * Runs the app's plain serve, build and test scripts through the launcher, so
  * the module it imports holds the project id: each `ng serve …`, `ng build …`
  * or `ng test …` without shell operators. The launcher passes the arguments
  * on unchanged, so a script moved in an app that does not import the module
- * runs as before. Setup refuses before it writes anything when another script
- * serves, builds or tests the app ({@link scriptsSetupCannotMove}).
+ * runs as before. A script in another form stays on `ng`: it works while the
+ * module exists, and fails to compile at the import on a clean checkout.
  */
 export function launcherScriptsEdit(source: string | undefined): string {
   const pkg = packageJson(source);

@@ -1069,23 +1069,23 @@ environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
 The `src/app/app.ts` `setup` writes into an Angular app imports its project id
 from `src/app/zitadel-project.ts`, a git-ignored module setup writes once and
 `zitadel-ng.cjs` keeps current: the launcher takes `ZITADEL_PROJECT_ID` from the
-process environment, then `.env.local` (Node.js 20.12 or newer), writes the
-module, and runs `ng` with its arguments unchanged. `setup` runs each plain
-`ng serve …`, `ng build …` or `ng test …` script through it (`dev` is
-`node zitadel-ng.cjs serve`, `build` is `node zitadel-ng.cjs build`) and refuses
-with `E_CONFLICT`, naming the script and what to run, when another script
-serves, builds or tests the app. Run the app through its npm scripts: a CI job
-or hosting preset that runs `ng build` must run `npm run build`, with
-`ZITADEL_PROJECT_ID` exported where there is no `.env.local`, and the launcher
-stops when neither sets it. A plain `ng` command fails to compile on a clean
-checkout, the module missing, and after an `npm run` reuses the id that run
-wrote; a local `npm run build` puts `.env.local`'s id into the bundle. An app an
-earlier CLI set up keeps the project id its `app.ts` names and its `ng` scripts:
-`doctor` passes it, and `doctor --fix` moves no script and writes neither
-`app.ts` nor the launcher into it. When its `managed-files` check does not pass
-(a missing `app.ts`), the repair `doctor --fix` runs adds the module, which that
-app never imports, and its `.gitignore` line; the missing `app.ts` stays
-missing.
+process environment, then `.env.local`, writes the module, and runs `ng` with
+its arguments unchanged. `setup` runs each plain `ng serve …`, `ng build …` or
+`ng test …` script through it (`dev` is `node zitadel-ng.cjs serve`, `build` is
+`node zitadel-ng.cjs build`); a script in another form stays on `ng`. Run the
+app through its npm scripts: a CI job or hosting preset that runs `ng build`
+must run `npm run build`, with `ZITADEL_PROJECT_ID` exported where there is no
+`.env.local`, and the launcher stops when neither sets it. A plain `ng` command
+fails to compile on a clean checkout, the module missing, and after an
+`npm run` reuses the id that run wrote; every run writes the same module, so a
+build for another project reloads a running dev server with it, and a local
+`npm run build` puts `.env.local`'s id into the bundle. An app an earlier CLI
+set up keeps the project id its `app.ts` names and its `ng` scripts: `doctor`
+passes it, and `doctor --fix` writes none of these files into it. If its
+`app.ts` is missing, `doctor` warns (`managed-files`, unverifiable wiring
+`src/app/app.ts`) that `doctor --fix` writes it only into an app whose scripts
+run `zitadel-ng.cjs`: restore it from version control, or run those scripts as
+`node zitadel-ng.cjs …` and run `doctor --fix` again.
 
 ## Testing the app
 

@@ -36,7 +36,7 @@ const BACKED_UP = [
  * The step eject leaves to the developer, since it edits no `package.json`.
  */
 const MANUAL_STEP =
-  'Restore the scripts in package.json: setup added the "dev" script or pinned its dev-server port, and an Angular app\'s scripts run "node zitadel-ng.cjs" where they ran "ng"';
+  'Restore the "dev" script in package.json (setup added the script, or pinned its dev-server port)';
 
 /**
  * The steps eject leaves to the developer.
