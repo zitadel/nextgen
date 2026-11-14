@@ -246,7 +246,10 @@ const HELD_BY = {
  * @returns The success.
  */
 function ok<T>(value: T): Parsed<T> {
-  return { ok: true, value };
+  return {
+    ok: true,
+    value,
+  };
 }
 
 /**
@@ -256,7 +259,10 @@ function ok<T>(value: T): Parsed<T> {
  * @returns The refusal.
  */
 function refuse<T>(problem: string): Parsed<T> {
-  return { ok: false, problem };
+  return {
+    ok: false,
+    problem,
+  };
 }
 
 /**
@@ -491,7 +497,10 @@ export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
     );
   }
   if (rest === "true") {
-    return ok({ attribute, source: true });
+    return ok({
+      attribute,
+      source: true,
+    });
   }
   if (rest.toLowerCase() === "true" || rest.toLowerCase() === "false") {
     return refuse(
@@ -499,7 +508,13 @@ export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
     );
   }
   const claim = parseClaimName(rest);
-  return claim.ok ? ok({ attribute, source: claim.value }) : refuse(`${text}: ${claim.problem}`);
+  if (!claim.ok) {
+    return refuse(`${text}: ${claim.problem}`);
+  }
+  return ok({
+    attribute,
+    source: claim.value,
+  });
 }
 
 /**
@@ -673,7 +688,11 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
         attributes: [...state.attributes, added],
         created: [...state.created, added],
       },
-      { attribute: entry.attribute, claim: entry.claim, type: entry.type },
+      {
+        attribute: entry.attribute,
+        claim: entry.claim,
+        type: entry.type,
+      },
     );
   }
   const attribute = state.attributes.find((one) => {
@@ -870,7 +889,10 @@ export function choiceOf(state: MappingState, flag: string): ClaimChoice {
     verified: state.verified,
     scopes: state.scopes,
     created: state.created.map((attribute) => {
-      return { name: attribute.name, type: attribute.type ?? "string" };
+      return {
+        name: attribute.name,
+        type: attribute.type ?? "string",
+      };
     }),
     notes: claimNotes(state, flag),
   };

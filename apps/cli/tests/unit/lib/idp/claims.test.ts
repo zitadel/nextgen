@@ -23,7 +23,7 @@ import {
   unmapped,
   verifyAttribute,
 } from "@/lib/idp";
-import { Connection, UserSchema } from "@/lib/zitadel";
+import { Connection, type JsonObject, UserSchema } from "@/lib/zitadel";
 import { aFile, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -59,7 +59,7 @@ const PROPERTIES = {
  * @param properties - The properties, by name.
  * @returns The schema.
  */
-function aSchemaOf(properties: Record<string, object>): UserSchema {
+function aSchemaOf(properties: JsonObject): UserSchema {
   return UserSchema.create(
     aFile("schemas", "default-human-user.json", aUserSchema({ required: ["email"], properties })),
   );
@@ -73,7 +73,7 @@ function aSchemaOf(properties: Record<string, object>): UserSchema {
  * @returns The connection.
  */
 function aConnection(
-  overrides: Record<string, object> = {},
+  overrides: JsonObject = {},
   scopes: readonly string[] = DEFAULT_SCOPES,
 ): Connection {
   return Connection.create(

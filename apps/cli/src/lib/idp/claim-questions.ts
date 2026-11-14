@@ -179,8 +179,14 @@ export class ClaimQuestions {
       name: "whether to map another claim",
       message: `Should any other claims be mapped from "${provider}"?`,
       options: [
-        { value: false, label: "No, keep these" },
-        { value: true, label: "Yes, map another claim" },
+        {
+          value: false,
+          label: "No, keep these",
+        },
+        {
+          value: true,
+          label: "Yes, map another claim",
+        },
       ],
       initialValue: false,
     });
@@ -220,7 +226,10 @@ export class ClaimQuestions {
         name: "claim type",
         message: "What type of value is it?",
         options: CLAIM_TYPES.map((one) => {
-          return { value: one, label: TYPE_LABELS[one] };
+          return {
+            value: one,
+            label: TYPE_LABELS[one],
+          };
         }),
         initialValue: "string",
       }));
@@ -287,10 +296,18 @@ export class ClaimQuestions {
       ...(chosen === CREATE ? { create: true } : {}),
     };
     const mapped = claimsOrRefuse(mapClaim(before, entry));
-    const verified =
-      chosen !== CREATE && candidates.find((one) => one.name === attribute)?.unique === true
-        ? await this.askVerification(before, { attribute, claim, provider })
-        : [];
+    const unique =
+      chosen !== CREATE &&
+      candidates.some((one) => {
+        return one.name === attribute && one.unique;
+      });
+    const verified = unique
+      ? await this.askVerification(before, {
+          attribute,
+          claim,
+          provider,
+        })
+      : [];
     this.run.say(
       `"${claim}" now maps to "${attribute}"${chosen === CREATE ? ", a new attribute in your user schema" : ""}.`,
     );
@@ -300,7 +317,10 @@ export class ClaimQuestions {
       );
     }
     return {
-      state: { ...mapped, scopes: [...new Set([...mapped.scopes, ...extra])] },
+      state: {
+        ...mapped,
+        scopes: [...new Set([...mapped.scopes, ...extra])],
+      },
       entry,
       verified,
       scopes: extra,
@@ -330,14 +350,29 @@ export class ClaimQuestions {
       name: "verification",
       message: `Does "${provider}" confirm that ${attribute} is verified?`,
       options: [
-        { value: "none", label: "No", hint: "new users confirm it themselves" },
-        { value: "claim", label: "Yes, a claim says so" },
-        { value: "trust", label: "Yes, trust the provider" },
+        {
+          value: "none",
+          label: "No",
+          hint: "new users confirm it themselves",
+        },
+        {
+          value: "claim",
+          label: "Yes, a claim says so",
+        },
+        {
+          value: "trust",
+          label: "Yes, trust the provider",
+        },
       ],
       initialValue: "none",
     });
     if (how === "trust") {
-      return [{ attribute, source: true }];
+      return [
+        {
+          attribute,
+          source: true,
+        },
+      ];
     }
     if (how === "none") {
       return [];

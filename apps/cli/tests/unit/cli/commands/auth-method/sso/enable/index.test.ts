@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
-import { isJsonObject, type JsonObject } from "@/lib/zitadel";
+import { isJsonObject, isJsonValue, type JsonObject } from "@/lib/zitadel";
 import { answering } from "@tests/helpers/keyboard";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
 import {
@@ -1100,6 +1100,7 @@ describe("auth-method sso enable with claims", () => {
   function connectionOf(stdout: string): JsonObject {
     const result = parseJson(stdout);
     if (
+      !isJsonValue(result) ||
       !isJsonObject(result) ||
       !isJsonObject(result.data) ||
       !isJsonObject(result.data.connection)
