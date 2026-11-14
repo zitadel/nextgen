@@ -22,6 +22,11 @@ import type { Questions } from "@/lib/ui";
 import type { Change, ClaimChoice, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
 
 /**
+ * How `--verified-claim` is spelled, for the note about a replaced default.
+ */
+export const VERIFIED_FLAG = "--verified-claim";
+
+/**
  * Joins a list the way a sentence does: "a, b and c".
  */
 const CONJUNCTION = new Intl.ListFormat("en", { type: "conjunction" });

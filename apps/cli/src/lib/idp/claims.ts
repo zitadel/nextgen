@@ -467,6 +467,21 @@ function suffixMisspelling(rest: string): string | undefined {
 }
 
 /**
+ * The two sides of the first equals sign of a flag's value, each trimmed.
+ *
+ * @param text - What was typed.
+ * @returns The property and what follows the sign; both empty when there is no
+ *   sign or nothing before it.
+ */
+function splitAtEquals(text: string): { readonly attribute: string; readonly rest: string } {
+  const at = text.indexOf("=");
+  return {
+    attribute: at < 1 ? "" : text.slice(0, at).trim(),
+    rest: at < 1 ? "" : text.slice(at + 1).trim(),
+  };
+}
+
+/**
  * `staffNumber=employee_id:integer`: the property, the claim and, after a
  * colon, the claim's type.
  *
@@ -474,9 +489,7 @@ function suffixMisspelling(rest: string): string | undefined {
  * @returns The entry, or what is wrong with it.
  */
 export function parseClaimEntry(text: string): Parsed<ClaimEntry> {
-  const at = text.indexOf("=");
-  const attribute = at < 1 ? "" : text.slice(0, at).trim();
-  const rest = at < 1 ? "" : text.slice(at + 1).trim();
+  const { attribute, rest } = splitAtEquals(text);
   if (attribute === "" || rest === "") {
     return refuse(
       `"${text}" is not <property>=<claim>, e.g. staffNumber=employee_id:integer or contactEmail=mail.`,
@@ -509,9 +522,7 @@ export function parseClaimEntry(text: string): Parsed<ClaimEntry> {
  * @returns The entry, or what is wrong with it.
  */
 export function parseVerifiedEntry(text: string): Parsed<VerifiedEntry> {
-  const at = text.indexOf("=");
-  const attribute = at < 1 ? "" : text.slice(0, at).trim();
-  const rest = at < 1 ? "" : text.slice(at + 1).trim();
+  const { attribute, rest } = splitAtEquals(text);
   if (attribute === "" || rest === "") {
     return refuse(
       `"${text}" is not <property>=<claim> or <property>=true, e.g. contactEmail=email_verified.`,

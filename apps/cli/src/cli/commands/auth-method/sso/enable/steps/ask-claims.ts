@@ -1,13 +1,12 @@
-import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import {
+  type EnableServices,
+  type Fact,
+  VERIFIED_FLAG,
+} from "@/cli/commands/auth-method/sso/enable/shared";
 import { applyRequest, asksForClaims, choiceOf, ClaimQuestions, claimsOrRefuse } from "@/lib/idp";
 import { log } from "@/lib/log";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-/**
- * How `--verified-claim` is spelled, for the note about a replaced default.
- */
-const VERIFIED_FLAG = "--verified-claim";
 
 /**
  * What the step reads from what is known.

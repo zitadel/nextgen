@@ -1,4 +1,4 @@
-import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
+import { type Fact, VERIFIED_FLAG } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   applyRequest,
   asksForClaims,
@@ -10,11 +10,6 @@ import {
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";
-
-/**
- * How `--verified-claim` is spelled, for the note about a replaced default.
- */
-const VERIFIED_FLAG = "--verified-claim";
 
 /**
  * What the step reads from what is known.
@@ -42,8 +37,9 @@ export class ReadClaims extends WizardStep<
    * Apply the flags to what the provider maps by default.
    *
    * @remarks
-   * Whether the connection is new is known only by planning the change, since
-   * the project may hold one for the provider already.
+   * Whether the connection is new is known only by looking for the one the
+   * project may hold for the provider already; the change is planned once, by
+   * `PlanChange`.
    *
    * @param needs - The flags, the schema, the provider and the options.
    * @returns What the flags asked for, and the mapping it makes.
@@ -57,15 +53,11 @@ export class ReadClaims extends WizardStep<
       verified: needs.flags.verifiedClaim,
     });
     const plain = Connection.forProvider(needs.provider, needs.target.schema);
-    const planned = needs.target.config.connections.enable(
-      needs.target.schema,
-      plain,
-      needs.options,
-    );
-    if (!planned.created) {
+    const existing = needs.target.config.connections.resolveExisting(plain, needs.options);
+    if (existing !== undefined) {
       if (asksForClaims(claimRequest)) {
         reportWarning(
-          `${planned.document.path} already exists, so the claims you gave were not applied. Edit claim_mapping in the file to change them.`,
+          `${existing.path} already exists, so the claims you gave were not applied. Edit claim_mapping in the file to change them.`,
         );
       }
       return {
