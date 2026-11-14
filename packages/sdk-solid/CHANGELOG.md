@@ -1,5 +1,18 @@
 # @zitadel/sdk-solid
 
+## 0.7.0
+
+### Minor Changes
+
+- [#3054](https://github.com/zitadel/nextgen/pull/3054) [`95e3594`](https://github.com/zitadel/nextgen/commit/95e359410545820646d25649a79faeaa2ea2f86f) - The SDK READMEs and the `zitadel` CLI's agent skill now point at `@zitadel/testing`, the test kit that runs your app's end-to-end tests against a real local Zitadel server. A new guide shows how to sign seeded users in, start tests signed in and test passkeys: https://preview.zitadel.com/docs/guides/test-your-app
+
+### Patch Changes
+
+- Updated dependencies [[`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4), [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259), [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb), [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a), [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32), [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab), [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4), [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e), [`d74c989`](https://github.com/zitadel/nextgen/commit/d74c989193ff87eca616365a0d5c66d1f5c3466c), [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696), [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469), [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/api@0.7.0
+  - @zitadel/components@0.7.0
+  - @zitadel/sdk-core@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

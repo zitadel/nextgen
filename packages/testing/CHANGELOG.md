@@ -1,5 +1,34 @@
 # @zitadel/testing
 
+## 0.7.0
+
+### Minor Changes
+
+- [#3107](https://github.com/zitadel/nextgen/pull/3107) [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32) - The flow operations now live under `/flows`, plural as every other collection:
+  `POST /flows`, `GET /flows/{flow_id}` and `POST /flows/{flow_id}/submit`
+  ([API reference](https://preview.zitadel.com/docs/reference/api/flows)).
+  `/flow` keeps answering until 1.0.0, with a `Deprecation` header and a `Link`
+  to that page.
+  
+  **Breaking:** `@zitadel/api`, the Go client, `<zitadel-login>`, the SDKs, the
+  CLI and `@zitadel/testing` of this version call `/flows`, which an earlier
+  server answers with `404`: upgrade a self-hosted server before the apps that
+  use them. If you call the HTTP API yourself, change `/flow` to `/flows` in the
+  three paths; nothing else in a request or a response changes. From 1.0.0 the
+  old paths answer `404` with `req.not_found`.
+
+- [#3082](https://github.com/zitadel/nextgen/pull/3082) [`a958163`](https://github.com/zitadel/nextgen/commit/a958163f9b7939bed707bc6f211f3a2468ce99ca) - Add `viteAppEnv`, the env template for a React, Vue, Solid, Svelte or Qwik app `zitadel setup` wired, from `@zitadel/testing` and `@zitadel/testing/playwright`: https://preview.zitadel.com/docs/guides/test-your-app#other-frameworks
+
+- [#3053](https://github.com/zitadel/nextgen/pull/3053) [`080c937`](https://github.com/zitadel/nextgen/commit/080c937d824d36c31fa8c7a33e43dd0cea1eb679) - `@zitadel/testing/vitest` runs backend tests against a real local instance without Playwright: `zitadelGlobalSetup()` boots an instance for the Vitest project that lists it and stops it when the run ends or is interrupted, and `injectZitadel()` gives each test the same seeding surface as `connectZitadel()`, including `seedSession()` for calling your API with a real session. See the [package README](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme).
+
+### Patch Changes
+
+- [#2881](https://github.com/zitadel/nextgen/pull/2881) [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6) - The package READMEs, the test kit's hints for running inside this repository, and the CLI skill's login-UI reference name the repository's Turborepo commands instead of moon's.
+- Updated dependencies [[`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4), [`4e35e73`](https://github.com/zitadel/nextgen/commit/4e35e73b7de0d186634833ca6b36b32c347db857), [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259), [`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462), [`bce4a0a`](https://github.com/zitadel/nextgen/commit/bce4a0a90da02219ec834783ab2c1e67f0d1a3fa), [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be), [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`d5fc33d`](https://github.com/zitadel/nextgen/commit/d5fc33d02ac7123ccdd983f695d877103c543c8d), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`ebf146d`](https://github.com/zitadel/nextgen/commit/ebf146d0459409c837c35cac4d8b702119999e54), [`c21a99e`](https://github.com/zitadel/nextgen/commit/c21a99e07aa58eeb9c14d7cf3ed5b09cdd669f69), [`3d773d7`](https://github.com/zitadel/nextgen/commit/3d773d7467bb5c498720a7968216e70752228cca), [`02c5ece`](https://github.com/zitadel/nextgen/commit/02c5ecec3885e958838b509ad7068a0d1509cea7), [`999040c`](https://github.com/zitadel/nextgen/commit/999040c0fbfd5b1998f3d768f22c7f507b86d064), [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79), [`b4250a0`](https://github.com/zitadel/nextgen/commit/b4250a0f3e6df4cdcc00ae28fe40157267c6355d), [`d3f1cc3`](https://github.com/zitadel/nextgen/commit/d3f1cc312f6595875e87f326bf34cb35cce53903), [`edfbdf6`](https://github.com/zitadel/nextgen/commit/edfbdf67ff1d5ecfb3925bcad4069f755cd6d524), [`dba0293`](https://github.com/zitadel/nextgen/commit/dba029359521c837befd220ca33b7460399745d4), [`a958163`](https://github.com/zitadel/nextgen/commit/a958163f9b7939bed707bc6f211f3a2468ce99ca), [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be), [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb), [`4e35e73`](https://github.com/zitadel/nextgen/commit/4e35e73b7de0d186634833ca6b36b32c347db857), [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a), [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32), [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab), [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4), [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e), [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696), [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469), [`7adc978`](https://github.com/zitadel/nextgen/commit/7adc9786b1361b5dad97c7fea9900dee162761e5), [`95e3594`](https://github.com/zitadel/nextgen/commit/95e359410545820646d25649a79faeaa2ea2f86f), [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/api@0.7.0
+  - @zitadel/cli@0.7.0
+  - @zitadel/config@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

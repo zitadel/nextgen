@@ -1,5 +1,41 @@
 # @zitadel/components
 
+## 0.7.0
+
+### Minor Changes
+
+- [#3107](https://github.com/zitadel/nextgen/pull/3107) [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32) - The flow operations now live under `/flows`, plural as every other collection:
+  `POST /flows`, `GET /flows/{flow_id}` and `POST /flows/{flow_id}/submit`
+  ([API reference](https://preview.zitadel.com/docs/reference/api/flows)).
+  `/flow` keeps answering until 1.0.0, with a `Deprecation` header and a `Link`
+  to that page.
+  
+  **Breaking:** `@zitadel/api`, the Go client, `<zitadel-login>`, the SDKs, the
+  CLI and `@zitadel/testing` of this version call `/flows`, which an earlier
+  server answers with `404`: upgrade a self-hosted server before the apps that
+  use them. If you call the HTTP API yourself, change `/flow` to `/flows` in the
+  three paths; nothing else in a request or a response changes. From 1.0.0 the
+  old paths answer `404` with `req.not_found`.
+
+- [#2626](https://github.com/zitadel/nextgen/pull/2626) [`d74c989`](https://github.com/zitadel/nextgen/commit/d74c989193ff87eca616365a0d5c66d1f5c3466c) - Protect Flow API password and passkey signup with built-in PBKDF2 proof of
+  work, a browser solver, single-use proofs and per-flow retry limits.
+  `<zitadel-login>` solves it, and `solveSignupPow` from `@zitadel/components`
+  solves it for a signup client of your own.
+  
+  **Breaking:** the server refuses a password signup, or a passkey registration
+  that creates the user, without a proof (`403 flow.proof_invalid`).
+  `<zitadel-login>` 0.5.0 and older sends none, so upgrade `@zitadel/components`,
+  or the SDK that pins it, together with the server. A custom or headless signup
+  client fetches the current step, solves `step.gates.signup_pow` and submits the
+  result as `gate_proofs.signup_pow`, with the password or with the passkey's
+  attestation.
+
+### Patch Changes
+
+- [#2881](https://github.com/zitadel/nextgen/pull/2881) [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6) - The package READMEs, the test kit's hints for running inside this repository, and the CLI skill's login-UI reference name the repository's Turborepo commands instead of moon's.
+- Updated dependencies [[`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/config@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
