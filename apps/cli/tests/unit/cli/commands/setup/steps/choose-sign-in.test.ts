@@ -14,19 +14,12 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
 import { isCancel, select } from "@clack/prompts";
 
 import { ChooseSignIn } from "@/cli/commands/setup/steps/choose-sign-in";
+import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
-import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { aPromptDeps } from "@tests/helpers/setup";
-
-/**
- * The framework setup detected.
- */
-const FRAMEWORK = { id: "next", displayName: "Next.js" };
+import { aQuestionDeps } from "@tests/helpers/setup";
 
 /**
  * The hosted cloud, the server a run falls back to.
@@ -34,45 +27,9 @@ const FRAMEWORK = { id: "next", displayName: "Next.js" };
 const CLOUD = "https://preview.zitadel.com";
 
 /**
- * The app directory setup runs in.
- */
-const APP_DIR = "/tmp/app";
-
-/**
  * What a cancelled prompt answers.
  */
 const CANCEL = Symbol("cancel");
-
-/**
- * How the wizard asks: interactively, without `--force`.
- */
-const ask = asker({ interactive: true, force: false });
-
-/**
- * The boxes a prompt drew, as setup's own context would have drawn them.
- */
-const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
-
-/**
- * The lines a prompt said, as setup's own context would have said them.
- */
-const said = vi.fn<(text: string) => void>();
-
-/**
- * What every prompt is given, as setup builds it: its suggestions are aimed
- * at the project setup creates.
- */
-const CONTEXT: PromptContext = {
-  ask,
-  note: noted,
-  say: said,
-  spinner: () => {
-    return { message: vi.fn(), stop: vi.fn(), clear: vi.fn() };
-  },
-  framework: FRAMEWORK,
-  cwd: APP_DIR,
-  suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
-};
 
 /**
  * The answers setup has gathered for a passkey-first, minimal app on the
@@ -92,6 +49,26 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+/**
+ * The step, run for an interactive setup that was given `options`.
+ *
+ * @param answers - The answers so far.
+ * @param options - The flags the command line carried.
+ * @param options.flags - The flags the command line carried.
+ * @returns The answers the step settled.
+ */
+async function signInFor(
+  answers: SetupAnswers,
+  options: { flags?: Partial<SetupFlags> } = {},
+): Promise<SetupAnswers> {
+  return (
+    await new ChooseSignIn(aQuestionDeps()).run({
+      flags: (options.flags ?? {}) as SetupFlags,
+      answers,
+    } as Parameters<ChooseSignIn["run"]>[0])
+  ).answers;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
@@ -103,10 +80,7 @@ describe("ChooseSignIn", () => {
   it("writes the selected preset into the answers", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    const answers = await new ChooseSignIn(aPromptDeps()).ask(
-      setupAnswers({ preset: "password-first" }),
-      CONTEXT,
-    );
+    const answers = await signInFor(setupAnswers({ preset: "password-first" }));
 
     expect(answers.preset).toBe("passkey-first");
   });
@@ -114,7 +88,7 @@ describe("ChooseSignIn", () => {
   it("preselects the preset already answered", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await signInFor(setupAnswers({ preset: "password-first" }));
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "password-first" });
   });
@@ -122,7 +96,7 @@ describe("ChooseSignIn", () => {
   it("says what users see first and what is secondary, which both presets enable", async () => {
     vi.mocked(select).mockResolvedValueOnce("password-first");
 
-    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await signInFor(setupAnswers({ preset: "password-first" }));
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which sign-in method would you like your users to see first?",
@@ -141,21 +115,16 @@ describe("ChooseSignIn", () => {
 
   describe("with --preset", () => {
     it("keeps the flagged preset", async () => {
-      const answers = await new ChooseSignIn(aPromptDeps()).ask(
-        setupAnswers({ preset: "passkey-first" }),
-        {
-          ...CONTEXT,
-          presetFromFlag: true,
-        },
-      );
+      const answers = await signInFor(setupAnswers({ preset: "passkey-first" }), {
+        flags: { preset: "passkey-first" },
+      });
 
       expect(answers.preset).toBe("passkey-first");
     });
 
     it("does not ask", async () => {
-      await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "passkey-first" }), {
-        ...CONTEXT,
-        presetFromFlag: true,
+      await signInFor(setupAnswers({ preset: "passkey-first" }), {
+        flags: { preset: "passkey-first" },
       });
 
       expect(select).not.toHaveBeenCalled();
@@ -167,10 +136,7 @@ describe("ChooseSignIn", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseSignIn(aPromptDeps()).ask(
-        setupAnswers({ preset: "password-first" }),
-        CONTEXT,
-      );
+      return signInFor(setupAnswers({ preset: "password-first" }));
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

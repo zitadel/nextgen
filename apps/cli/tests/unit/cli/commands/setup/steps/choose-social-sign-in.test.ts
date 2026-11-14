@@ -16,31 +16,22 @@ import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { ChooseSocialSignIn } from "@/cli/commands/setup/steps/choose-social-sign-in";
+import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import type { PromptContext } from "@/cli/commands/setup/shared";
+import type { Ui } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
 import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { takeReportedWarnings } from "@/lib/warnings";
-import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
+import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { aPromptDeps } from "@tests/helpers/setup";
-
-/**
- * The framework setup detected.
- */
-const FRAMEWORK = { id: "next", displayName: "Next.js" };
+import { aQuestionDeps } from "@tests/helpers/setup";
 
 /**
  * The hosted cloud, the server a run falls back to.
  */
 const CLOUD = "https://preview.zitadel.com";
-
-/**
- * The app directory setup runs in.
- */
-const APP_DIR = "/tmp/app";
 
 /**
  * What a cancelled prompt answers.
@@ -93,12 +84,12 @@ const QUESTIONS = {
 const ask = asker({ interactive: true, force: false });
 
 /**
- * The boxes a prompt drew, as setup's own context would have drawn them.
+ * The boxes the step drew.
  */
 const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
 
 /**
- * The lines a prompt said, as setup's own context would have said them.
+ * The lines the step said.
  */
 const said = vi.fn<(text: string) => void>();
 
@@ -114,20 +105,16 @@ function noteShown(call = 0): { title?: string; body: string } {
 }
 
 /**
- * What every prompt is given, as setup builds it: its suggestions are aimed
- * at the project setup creates.
+ * What the step prints through: the boxes and lines it draws are recorded, and the spinner draws
+ * nothing.
  */
-const CONTEXT: PromptContext = {
-  ask,
+const UI = {
   note: noted,
   say: said,
   spinner: () => {
     return { message: vi.fn(), stop: vi.fn(), clear: vi.fn() };
   },
-  framework: FRAMEWORK,
-  cwd: APP_DIR,
-  suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
-};
+} as unknown as Ui;
 
 /**
  * The answers setup has gathered for a passkey-first, minimal app on the
@@ -196,6 +183,32 @@ async function answerFromEverything({ message }: { message: string }): Promise<s
   );
 }
 
+/**
+ * The step, run for an interactive setup that was given `options`.
+ *
+ * @param answers - The answers so far.
+ * @param options - What the run was given.
+ * @param options.flags - The flags the command line carried.
+ * @param options.developmentBuild - Whether this is a development run.
+ * @returns The answers the step settled.
+ */
+async function socialFor(
+  answers: SetupAnswers,
+  options: { flags?: Partial<SetupFlags>; developmentBuild?: boolean } = {},
+): Promise<SetupAnswers> {
+  vi.stubEnv("ZITADEL_CLI_DEV", options.developmentBuild === true ? "1" : "");
+  return (
+    await new ChooseSocialSignIn({
+      ...aQuestionDeps(),
+      suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
+      ui: UI,
+    }).run({
+      flags: (options.flags ?? {}) as SetupFlags,
+      answers,
+    } as Parameters<ChooseSocialSignIn["run"]>[0])
+  ).answers;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
@@ -209,7 +222,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await socialFor(setupAnswers());
 
       expect(answers.sso).toEqual([]);
     });
@@ -218,7 +231,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
         message: "Would you like to continue without setting up SSO?",
@@ -230,7 +243,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(multiselect)).toHaveBeenCalledTimes(2);
     });
@@ -242,7 +255,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(prompt).not.toHaveBeenCalled();
     });
@@ -252,7 +265,7 @@ describe("ChooseSocialSignIn", () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
     vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+    await socialFor(setupAnswers());
 
     expect(
       vi.mocked(multiselect).mock.calls[0]?.[0].options.map((option) => {
@@ -265,7 +278,7 @@ describe("ChooseSocialSignIn", () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
     vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+    await socialFor(setupAnswers());
 
     expect(vi.mocked(multiselect).mock.calls[0]?.[0].message).toBe(
       "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
@@ -276,7 +289,7 @@ describe("ChooseSocialSignIn", () => {
     vi.mocked(multiselect).mockResolvedValueOnce([]);
     vi.mocked(confirm).mockResolvedValueOnce(true);
 
-    await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+    await socialFor(setupAnswers());
 
     expect(
       vi.mocked(multiselect).mock.calls[0]?.[0].options.map((option) => {
@@ -294,7 +307,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  ");
       vi.mocked(password).mockResolvedValueOnce("  s3cret  ");
 
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await socialFor(setupAnswers());
 
       expect(answers.sso).toEqual([
         {
@@ -311,7 +324,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
       vi.mocked(password).mockResolvedValueOnce("s3cret");
 
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await socialFor(setupAnswers());
 
       expect(answers.sso).toEqual([
         {
@@ -327,7 +340,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(text).mockResolvedValueOnce("1234-abc.apps.googleusercontent.com");
       vi.mocked(password).mockResolvedValueOnce("s3cret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+      await socialFor(setupAnswers({ devPort: 4321 }));
 
       expect(noteShown().body).toContain(GOOGLE_CALLBACK);
     });
@@ -337,7 +350,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(text).mockResolvedValueOnce("client-id");
       vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(password).mock.calls[0]?.[0].message).toBe(
         "What is the client secret of your Google OAuth app? It will be stored on the project as GOOGLE_CLIENT_SECRET.",
@@ -351,7 +364,7 @@ describe("ChooseSocialSignIn", () => {
         vi.mocked(text).mockResolvedValueOnce("client-id");
         vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        await socialFor(setupAnswers());
 
         expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])(secret)).toBeTruthy();
       },
@@ -362,7 +375,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(text).mockResolvedValueOnce("client-id");
       vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])("a-secret")).toBeUndefined();
     });
@@ -374,10 +387,7 @@ describe("ChooseSocialSignIn", () => {
         .mockResolvedValueOnce("client-id");
       vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), {
-        ...CONTEXT,
-        developmentBuild: true,
-      });
+      const answers = await socialFor(setupAnswers(), { developmentBuild: true });
 
       expect(answers.sso[0]?.endpoints).toEqual({ issuer: "http://localhost:9100" });
     });
@@ -388,10 +398,7 @@ describe("ChooseSocialSignIn", () => {
         vi.mocked(text).mockResolvedValueOnce("client-id");
         vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-        const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), {
-          ...CONTEXT,
-          developmentBuild: false,
-        });
+        const answers = await socialFor(setupAnswers(), { developmentBuild: false });
 
         expect(answers.sso[0]?.endpoints).toBeUndefined();
       });
@@ -401,10 +408,7 @@ describe("ChooseSocialSignIn", () => {
         vi.mocked(text).mockResolvedValueOnce("client-id");
         vi.mocked(password).mockResolvedValueOnce("the-secret");
 
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), {
-          ...CONTEXT,
-          developmentBuild: false,
-        });
+        await socialFor(setupAnswers(), { developmentBuild: false });
 
         expect(text).toHaveBeenCalledTimes(1);
       });
@@ -418,19 +422,19 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("drops the provider", async () => {
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await socialFor(setupAnswers());
 
       expect(answers.sso).toEqual([]);
     });
 
     it("does not ask for its secret", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(password).not.toHaveBeenCalled();
     });
 
     it("says the client id may be left empty to skip", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
         "What is the client ID of your Google OAuth app? Leave it empty to skip.",
@@ -438,7 +442,7 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("says how to add it later", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(said).toHaveBeenCalledWith(
         [
@@ -454,7 +458,7 @@ describe("ChooseSocialSignIn", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([]);
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(multiselect).mock.calls[0]?.[0].options.at(-1)).toMatchObject({
         value: "custom",
@@ -467,7 +471,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await socialFor(setupAnswers());
 
       expect(answers.sso).toEqual([
         {
@@ -492,7 +496,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme({ issuer: "http://localhost:9100" });
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(takeReportedWarnings().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
     });
@@ -503,7 +507,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(takeReportedWarnings()).toEqual([]);
     });
@@ -513,7 +517,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(vi.mocked(password).mock.calls.at(-1)?.[0].message).toContain(
         "ACME_SSO_CLIENT_SECRET",
@@ -525,7 +529,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+      await socialFor(setupAnswers({ devPort: 4321 }));
 
       expect(noteShown().body).toContain(shown);
     });
@@ -535,7 +539,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+      await socialFor(setupAnswers({ devPort: 4321 }));
 
       expect(noteShown().body).not.toContain("undefined");
     });
@@ -545,7 +549,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers({ devPort: 4321 }), CONTEXT);
+      await socialFor(setupAnswers({ devPort: 4321 }));
 
       expect(noteShown().title).toBe("Acme SSO sign-in");
     });
@@ -556,10 +560,7 @@ describe("ChooseSocialSignIn", () => {
         describesAcme();
         vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), {
-          ...CONTEXT,
-          developmentBuild: true,
-        });
+        await socialFor(setupAnswers(), { developmentBuild: true });
 
         expect(text).toHaveBeenCalledTimes(5);
       });
@@ -569,10 +570,7 @@ describe("ChooseSocialSignIn", () => {
         describesAcme();
         vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-        const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), {
-          ...CONTEXT,
-          developmentBuild: true,
-        });
+        const answers = await socialFor(setupAnswers(), { developmentBuild: true });
 
         expect(answers.sso[0]?.endpoints).toBeUndefined();
       });
@@ -589,7 +587,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(validatorOf(vi.mocked(text).mock.calls[QUESTION[question]]?.[0])(value)).toContain(
         says,
@@ -605,7 +603,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(
         validatorOf(vi.mocked(text).mock.calls[QUESTION[question]]?.[0])(value),
@@ -619,7 +617,7 @@ describe("ChooseSocialSignIn", () => {
         describesAcme();
         vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        await socialFor(setupAnswers());
 
         expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])(secret)).toBeTruthy();
       },
@@ -630,7 +628,7 @@ describe("ChooseSocialSignIn", () => {
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
-      await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      await socialFor(setupAnswers());
 
       expect(validatorOf(vi.mocked(password).mock.calls.at(-1)?.[0])("something")).toBeUndefined();
     });
@@ -642,19 +640,19 @@ describe("ChooseSocialSignIn", () => {
       });
 
       it("drops the connection", async () => {
-        const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        const answers = await socialFor(setupAnswers());
 
         expect(answers.sso).toEqual([]);
       });
 
       it("does not ask for its secret", async () => {
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        await socialFor(setupAnswers());
 
         expect(password).not.toHaveBeenCalled();
       });
 
       it("names the command that adds the connection as described later", async () => {
-        await new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+        await socialFor(setupAnswers());
 
         expect(said.mock.calls[0]?.[0]).toContain(
           "npx @zitadel/cli@1.2.3 auth-method sso enable --provider custom --slug acme-sso",
@@ -669,18 +667,17 @@ describe("ChooseSocialSignIn", () => {
       });
 
       it("asks only for the client id", async () => {
-        await new ChooseSocialSignIn(aPromptDeps()).ask(
-          setupAnswers({ sso: [{ selection: acmeSelection, credentials: {} }] }),
-          { ...CONTEXT, ssoFromFlag: true },
-        );
+        await socialFor(setupAnswers({ sso: [{ selection: acmeSelection, credentials: {} }] }), {
+          flags: { sso: "google" },
+        });
 
         expect(text).toHaveBeenCalledTimes(1);
       });
 
       it("uses the description from the flags", async () => {
-        const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(
+        const answers = await socialFor(
           setupAnswers({ sso: [{ selection: acmeSelection, credentials: {} }] }),
-          { ...CONTEXT, ssoFromFlag: true },
+          { flags: { sso: "google" } },
         );
 
         expect(answers.sso[0]?.selection).toEqual(acmeSelection);
@@ -694,52 +691,52 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("does not ask which provider", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
+      await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(multiselect).not.toHaveBeenCalled();
     });
 
     it("does not ask for the client id", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
+      await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(text).not.toHaveBeenCalled();
     });
 
     it("keeps the provider", async () => {
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(
+      const answers = await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(answers.sso[0]?.selection).toEqual(googleSelection);
     });
 
     it("keeps the client id", async () => {
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(
+      const answers = await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
@@ -747,7 +744,7 @@ describe("ChooseSocialSignIn", () => {
 
     it("refuses a claim the schema cannot take without asking for the secret", async () => {
       const error = await rejectionOf(() => {
-        return new ChooseSocialSignIn(aPromptDeps()).ask(
+        return socialFor(
           setupAnswers({
             sso: [
               {
@@ -761,7 +758,7 @@ describe("ChooseSocialSignIn", () => {
               },
             ],
           }),
-          { ...CONTEXT, ssoFromFlag: true },
+          { flags: { sso: "google" } },
         );
       });
 
@@ -770,26 +767,26 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("still asks once for the secret, which is never a flag", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
+      await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(password).toHaveBeenCalledOnce();
     });
 
     it("keeps the secret typed after the flag", async () => {
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(
+      const answers = await socialFor(
         setupAnswers({
           sso: [
             { selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(answers.sso[0]?.credentials.secret).toBe("typed-after-the-flag");
@@ -803,10 +800,9 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("asks for the client id without offering to skip", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
-        setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }),
-        { ...CONTEXT, ssoFromFlag: true },
-      );
+      await socialFor(setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }), {
+        flags: { sso: "google" },
+      });
 
       expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
         "What is the client ID of your Google OAuth app?",
@@ -814,10 +810,9 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("does not let the provider be dropped with an empty client id", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
-        setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }),
-        { ...CONTEXT, ssoFromFlag: true },
-      );
+      await socialFor(setupAnswers({ sso: [{ selection: googleSelection, credentials: {} }] }), {
+        flags: { sso: "google" },
+      });
 
       expect(validatorOf(vi.mocked(text).mock.calls[0]?.[0])("")).toBeTruthy();
     });
@@ -825,7 +820,7 @@ describe("ChooseSocialSignIn", () => {
 
   describe("with a secret already piped in", () => {
     it("does not ask again", async () => {
-      await new ChooseSocialSignIn(aPromptDeps()).ask(
+      await socialFor(
         setupAnswers({
           sso: [
             {
@@ -834,14 +829,14 @@ describe("ChooseSocialSignIn", () => {
             },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(password).not.toHaveBeenCalled();
     });
 
     it("keeps it", async () => {
-      const answers = await new ChooseSocialSignIn(aPromptDeps()).ask(
+      const answers = await socialFor(
         setupAnswers({
           sso: [
             {
@@ -850,7 +845,7 @@ describe("ChooseSocialSignIn", () => {
             },
           ],
         }),
-        { ...CONTEXT, ssoFromFlag: true },
+        { flags: { sso: "google" } },
       );
 
       expect(answers.sso[0]?.credentials.secret).toBe("piped");
@@ -862,7 +857,7 @@ describe("ChooseSocialSignIn", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseSocialSignIn(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      return socialFor(setupAnswers());
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

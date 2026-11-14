@@ -14,58 +14,15 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
 import { isCancel, text } from "@clack/prompts";
 
 import { ChooseDevPort } from "@/cli/commands/setup/steps/choose-dev-port";
+import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import type { PromptContext } from "@/cli/commands/setup/shared";
-import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
-import { aSuggest } from "@tests/helpers/suggestions";
-import { aPromptDeps } from "@tests/helpers/setup";
-
-/**
- * The framework setup detected.
- */
-const FRAMEWORK = { id: "next", displayName: "Next.js" };
+import { aQuestionDeps } from "@tests/helpers/setup";
 
 /**
  * The hosted cloud, the server a run falls back to.
  */
 const CLOUD = "https://preview.zitadel.com";
-
-/**
- * The app directory setup runs in.
- */
-const APP_DIR = "/tmp/app";
-
-/**
- * How the wizard asks: interactively, without `--force`.
- */
-const ask = asker({ interactive: true, force: false });
-
-/**
- * The boxes a prompt drew, as setup's own context would have drawn them.
- */
-const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
-
-/**
- * The lines a prompt said, as setup's own context would have said them.
- */
-const said = vi.fn<(text: string) => void>();
-
-/**
- * What every prompt is given, as setup builds it: its suggestions are aimed
- * at the project setup creates.
- */
-const CONTEXT: PromptContext = {
-  ask,
-  note: noted,
-  say: said,
-  spinner: () => {
-    return { message: vi.fn(), stop: vi.fn(), clear: vi.fn() };
-  },
-  framework: FRAMEWORK,
-  cwd: APP_DIR,
-  suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
-};
 
 /**
  * The answers setup has gathered for a passkey-first, minimal app on the
@@ -85,6 +42,25 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
+/**
+ * The step, run for an interactive setup that was given `flags`.
+ *
+ * @param answers - The answers so far.
+ * @param flags - The flags the command line carried.
+ * @returns The answers the step settled.
+ */
+async function devPortFor(
+  answers: SetupAnswers,
+  flags: Partial<SetupFlags> = {},
+): Promise<SetupAnswers> {
+  return (
+    await new ChooseDevPort(aQuestionDeps()).run({
+      flags: flags as SetupFlags,
+      answers,
+    } as Parameters<ChooseDevPort["run"]>[0])
+  ).answers;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isCancel).mockReturnValue(false);
@@ -95,22 +71,19 @@ beforeEach(() => {
 describe("ChooseDevPort", () => {
   describe("when the detected port is free", () => {
     it("checks the detected port", async () => {
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      await devPortFor(setupAnswers({ devPort: 3000 }));
 
       expect(LocalServer.isPortFree).toHaveBeenCalledWith(3000);
     });
 
     it("keeps the detected port", async () => {
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(
-        setupAnswers({ devPort: 3000 }),
-        CONTEXT,
-      );
+      const answers = await devPortFor(setupAnswers({ devPort: 3000 }));
 
       expect(answers.devPort).toBe(3000);
     });
 
     it("does not ask", async () => {
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      await devPortFor(setupAnswers({ devPort: 3000 }));
 
       expect(text).not.toHaveBeenCalled();
     });
@@ -127,7 +100,7 @@ describe("ChooseDevPort", () => {
     it("parses the entered text into a number", async () => {
       vi.mocked(text).mockResolvedValueOnce("4000");
 
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers(), CONTEXT);
+      const answers = await devPortFor(setupAnswers());
 
       expect(answers.devPort).toBe(4000);
     });
@@ -135,7 +108,7 @@ describe("ChooseDevPort", () => {
     it("looks for the next free port after it", async () => {
       vi.mocked(text).mockResolvedValueOnce("5174");
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await devPortFor(setupAnswers({ devPort: 5173 }));
 
       expect(LocalServer.nextFreePort).toHaveBeenCalledWith(5173);
     });
@@ -143,7 +116,7 @@ describe("ChooseDevPort", () => {
     it("says the port is in use and suggests the next free one", async () => {
       vi.mocked(text).mockResolvedValueOnce("5174");
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await devPortFor(setupAnswers({ devPort: 5173 }));
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
         message: "Port 5173 is in use. Which port should your app run on?",
@@ -155,7 +128,7 @@ describe("ChooseDevPort", () => {
       vi.mocked(LocalServer.nextFreePort).mockResolvedValue(undefined);
       vi.mocked(text).mockResolvedValueOnce("5173");
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await devPortFor(setupAnswers({ devPort: 5173 }));
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ initialValue: "5173" });
     });
@@ -165,10 +138,7 @@ describe("ChooseDevPort", () => {
     it("keeps the flagged port", async () => {
       vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
 
-      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
-        ...CONTEXT,
-        devPortFromFlag: true,
-      });
+      const answers = await devPortFor(setupAnswers({ devPort: 5000 }), { devPort: 5000 });
 
       expect(answers.devPort).toBe(5000);
     });
@@ -176,10 +146,7 @@ describe("ChooseDevPort", () => {
     it("does not ask", async () => {
       vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
 
-      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
-        ...CONTEXT,
-        devPortFromFlag: true,
-      });
+      await devPortFor(setupAnswers({ devPort: 5000 }), { devPort: 5000 });
 
       expect(text).not.toHaveBeenCalled();
     });

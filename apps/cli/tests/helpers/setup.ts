@@ -45,13 +45,13 @@ export function suggestedCommands(stdout: string): string[] {
 }
 
 /**
- * What the wizard's prompt steps are constructed with: an interactive run in
+ * What the wizard's question steps are constructed with: an interactive run in
  * the app directory, as setup builds it.
  *
  * @param cwd - The project's directory.
  * @returns The services those steps take.
  */
-export function aPromptDeps(
+export function aQuestionDeps(
   cwd = "/tmp/app",
 ): Pick<
   SetupServices,
