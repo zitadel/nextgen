@@ -7,21 +7,19 @@ import {
   IDP_PROVIDERS,
   parseClientId,
   parseConnectionSlug,
-  type Parsed,
   parseDisplayName,
   parseIssuer,
   parseScopes,
   RESERVED_SLUGS,
   validated,
 } from "@zitadel/config/idp";
-import { z } from "zod";
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
-import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { accepts, AS_REFUSED, filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { Wizard } from "@/lib/wizard";
@@ -37,7 +35,7 @@ import { PublishCredentials } from "./steps/publish-credentials";
 import { ReadOrigins } from "./steps/read-origins";
 import { ShowResult } from "./steps/show-result";
 import { SelectConnection } from "./steps/select-connection";
-import type { EnableAnswer, EnableInput, EnableServices } from "./shared";
+import type { EnableAnswer, EnableInput } from "./shared";
 import { LoadSchema } from "./steps/load-schema";
 import { WriteFiles } from "./steps/write-files";
 
@@ -74,44 +72,6 @@ export { developmentIssuer };
 export type EnableFlags = Admitted<typeof AuthMethodSsoEnable>["flags"];
 
 /**
- * One of the settings that describe a custom connection, refused with what
- * the platform's own parser found wrong with it.
- *
- * @remarks
- * The flag names itself in the refusal, because a run gives four of them and
- * the complaint belongs to one. `setup` declares the same settings under its
- * own `--sso-*` names.
- *
- * @param flag - The flag, as the command spells it.
- * @param parse - The platform's parser for the setting.
- * @returns The flag's definition, waiting for its description.
- */
-function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
-  return Flags.custom<string>({
-    parse: reads({
-      schema: filled.transform((value, ctx) => {
-        const parsed = parse(value);
-        if (!parsed.ok) {
-          ctx.addIssue({
-            code: "custom",
-            message: parsed.problem,
-          });
-          return z.NEVER;
-        }
-        return value;
-      }),
-      refusal: {
-        message: `${flag}: {problem}`,
-        hint: `Fix ${flag} and run the command again.`,
-        details: {
-          flag,
-        },
-      },
-    }),
-  });
-}
-
-/**
  * `zitadel auth-method sso enable` — add a provider to a Project's sign-in
  * methods.
  *
@@ -144,27 +104,29 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
       description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for a custom OpenID Connect (OIDC) provider.`,
     }),
-    slug: settingFlag("--slug", (value) => {
-      return parseConnectionSlug(value, RESERVED_SLUGS);
+    slug: Flags.custom<string>({
+      parse: accepts(
+        (value) => {
+          return parseConnectionSlug(value, RESERVED_SLUGS);
+        },
+        { empty: AS_REFUSED },
+      ),
     })({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
     }),
-    "display-name": settingFlag(
-      "--display-name",
-      parseDisplayName,
-    )({
+    "display-name": Flags.custom<string>({
+      parse: accepts(parseDisplayName, { empty: AS_REFUSED }),
+    })({
       description: "Name shown on the custom connection's sign-in button.",
     }),
-    issuer: settingFlag(
-      "--issuer",
-      parseIssuer,
-    )({
+    issuer: Flags.custom<string>({
+      parse: accepts(parseIssuer, { empty: AS_REFUSED }),
+    })({
       description: "Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.",
     }),
-    scopes: settingFlag(
-      "--scopes",
-      parseScopes,
-    )({
+    scopes: Flags.custom<string>({
+      parse: accepts(parseScopes, { empty: AS_REFUSED }),
+    })({
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
@@ -194,15 +156,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
 
-    return this.wizard().run(
-      this.services(),
-      { flags },
-      {
-        signal: this.signal,
-        onUndoError: (key, error) => {
-          reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+    return this.emit(
+      await this.wizard().run(
+        { flags },
+        {
+          signal: this.signal,
+          onUndoError: (key, error) => {
+            reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+          },
         },
-      },
+      ),
     );
   }
 
@@ -214,66 +177,90 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @returns The wizard, ready to run.
    */
   private wizard() {
-    return Wizard.named<EnableServices, EnableInput, EnableAnswer>("auth-method sso enable")
-      .step(new ChooseProvider())
-      .step(new ReadIssuer())
-      .step(new LoadSchema())
-      .step(new ReadOrigins())
-      .step(new SelectConnection())
-      .step(new PlanChange())
+    return Wizard.named<EnableInput, EnableAnswer>("auth-method sso enable")
+      .step(
+        new ChooseProvider({
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+        }),
+      )
+      .step(
+        new ReadIssuer({
+          cwd: this.cwd,
+          env: this.env,
+        }),
+      )
+      .step(
+        new LoadSchema({
+          loadSchemaTarget: (flags) => {
+            return this.loadSchemaTarget(flags);
+          },
+        }),
+      )
+      .step(
+        new ReadOrigins({
+          connect: () => {
+            return this.connect();
+          },
+        }),
+      )
+      .step(
+        new SelectConnection({
+          ask: this.ask,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new PlanChange({
+          ask: this.ask,
+          developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+          suggest: this.suggest,
+        }),
+      )
       .step(new IntroduceProvider())
-      .endWhen(new PreviewChange())
+      .endWhen(
+        new PreviewChange({
+          argsOf: (command) => {
+            return this.argsOf(command);
+          },
+          dryRun: this.dryRun,
+          isJson: this.isJson,
+          realRun: () => {
+            return this.realRun();
+          },
+          report: (change) => {
+            this.report(change);
+          },
+        }),
+      )
       .step(new CollectCredentials())
       .step(new BuildChange())
-      .step(new PublishCredentials())
-      .step(new WriteFiles())
-      .step(new ShowResult())
+      .step(
+        new PublishCredentials({
+          source: this.meta.source,
+        }),
+      )
+      .step(
+        new WriteFiles({
+          report: (change) => {
+            this.report(change);
+          },
+          write: (target, change) => {
+            return this.write(target, change, undefined);
+          },
+        }),
+      )
+      .step(
+        new ShowResult({
+          followUps: (changed, leading) => {
+            return this.followUps(changed, leading);
+          },
+          isJson: this.isJson,
+          suggest: this.suggest,
+        }),
+      )
       .finish((state) => {
         return state.answer;
       });
-  }
-
-  /**
-   * What every step is given: the run's facts, and the parts of this command
-   * that read the project, draw and answer.
-   *
-   * @returns The services.
-   */
-  private services(): EnableServices {
-    return {
-      cwd: this.cwd,
-      env: this.env,
-      ask: this.ask,
-      suggest: this.suggest,
-      dryRun: this.dryRun,
-      isJson: this.isJson,
-      source: this.meta.source,
-      report: (change) => {
-        this.report(change);
-      },
-      emit: (result) => {
-        return this.emit(result);
-      },
-      argsOf: (command) => {
-        return this.argsOf(command);
-      },
-      followUps: (changed, leading) => {
-        return this.followUps(changed, leading);
-      },
-      nonInteractive: this.nonInteractive,
-      developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-      loadSchemaTarget: (flags) => {
-        return this.loadSchemaTarget(flags);
-      },
-      connect: () => {
-        return this.connect();
-      },
-      realRun: () => {
-        return this.realRun();
-      },
-      write: (target, change) => {
-        return this.write(target, change, undefined);
-      },
-    };
   }
 }

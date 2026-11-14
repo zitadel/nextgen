@@ -1,5 +1,3 @@
-import type { ConnectionEndpoints } from "@zitadel/config/idp";
-
 import type { SchemaTarget } from "@/cli/commands/auth-method/command";
 import type { GivenCredentials } from "@/lib/idp";
 import { log } from "@/lib/log";
@@ -7,7 +5,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 import type { Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
 
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -27,8 +25,7 @@ type Needs = Readonly<{
 export class BuildChange extends WizardStep<
   "change",
   Readonly<{ change: DocumentChange<Connection> }>,
-  Needs,
-  EnableServices
+  Needs
 > {
   readonly key = "change";
 
@@ -37,6 +34,10 @@ export class BuildChange extends WizardStep<
    * check it.
    *
    * @remarks
+   * The change is the preview, or the same change made again with the endpoints
+   * a development run answered. The endpoints change only a new connection's
+   * body, never which files the change writes.
+   *
    * The credentials go before the files: saving writes the connection first, so
    * a write that then fails would leave a connection on disk whose credentials
    * were never stored, and the rerun would take it as reused and not ask for
@@ -49,11 +50,15 @@ export class BuildChange extends WizardStep<
    * @returns The change.
    * @throws {@link ZitadelError} When saving the change would be refused.
    */
-  async run(
-    needs: Needs,
-    _services: EnableServices,
-  ): Promise<Readonly<{ change: DocumentChange<Connection> }>> {
-    const change = this.withEndpoints(needs, needs.given.endpoints);
+  async run(needs: Needs): Promise<Readonly<{ change: DocumentChange<Connection> }>> {
+    const change =
+      needs.given.endpoints === undefined
+        ? needs.preview
+        : needs.target.config.connections.enable(
+            needs.target.schema,
+            needs.candidate.withEndpoints(needs.given.endpoints).document,
+            needs.options,
+          );
     if (needs.summary.reused) {
       log.done(`Reusing ${escapeControlCharacters(needs.summary.connection.path)}`);
     }
@@ -61,28 +66,5 @@ export class BuildChange extends WizardStep<
     return {
       change,
     };
-  }
-
-  /**
-   * The change to write: the preview, or the same change made again with the
-   * endpoints a development run answered.
-   *
-   * @remarks
-   * The endpoints change only a new connection's body, never which files the
-   * change writes.
-   *
-   * @param needs - What was read and decided.
-   * @param endpoints - The endpoints a development run answered, if any.
-   * @returns The change.
-   */
-  private withEndpoints(
-    needs: Needs,
-    endpoints: ConnectionEndpoints | undefined,
-  ): DocumentChange<Connection> {
-    if (endpoints === undefined) {
-      return needs.preview;
-    }
-    const located = needs.candidate.withEndpoints(endpoints).document;
-    return needs.target.config.connections.enable(needs.target.schema, located, needs.options);
   }
 }

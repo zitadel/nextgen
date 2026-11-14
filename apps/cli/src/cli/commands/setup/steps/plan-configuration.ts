@@ -1,18 +1,22 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { scaffoldOf } from "@/cli/commands/setup/shared";
 
+import type { FrameworkFacts } from "@/lib/orca";
 import { issuerFromPort } from "@/lib/orca";
 import { derivePosture } from "@/lib/orca/patchers/posture";
-import type { FrameworkFacts } from "@/lib/orca";
 import type { CreatedProject } from "@/lib/backend";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
  */
 type Needs = Fact<"flags" | "orca" | "app" | "answers" | "scaffoldedFramework">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "cliVersion" | "cwd" | "force">;
 
 /**
  * Works out what the run will write, before anything is created.
@@ -27,56 +31,59 @@ type Needs = Fact<"flags" | "orca" | "app" | "answers" | "scaffoldedFramework">;
 export class PlanConfiguration extends WizardStep<
   "plan",
   Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">,
-  Needs,
-  SetupServices
+  Needs
 > {
   readonly key = "plan";
 
   /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
    * Plan the configuration.
-   *
    *
    * @remarks
    * Fresh scaffolds keep the widgets' full-page chrome; a pre-existing route-based app gets
    * embeddable cards inside its own layout (ADR 044).
    *
    * @param needs - The flags, the app and the answers.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What the later steps patch and write by.
    * @throws {@link ZitadelError} When a file setup will not replace is there.
    */
   async run(
     needs: Needs,
-    services: SetupServices,
   ): Promise<Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">> {
     const { answers, app, flags, orca, scaffoldedFramework } = needs;
     const issuer = issuerFromPort(answers.devPort);
     const rendererId = flags.renderer ?? "react";
-
     const posture = derivePosture(app.framework, scaffoldedFramework);
-    const patchContext = (framework: FrameworkFacts, project: CreatedProject): PatchContext => {
-      return {
-        framework,
-        rendererId,
-        project,
-        issuer,
-        server: answers.server,
-        cliVersion: services.cliVersion,
-        scaffoldedFramework,
-        posture,
-        preset: answers.preset,
-        useCase: answers.useCase,
-      };
-    };
-    const patcher = orca.patcherFor(app.framework);
-    const planned = await scaffoldOf(services.cwd, services.force, answers);
     return {
       issuer,
       rendererId,
       posture,
-      patcher,
-      patchContext,
-      planned,
+      patcher: orca.patcherFor(app.framework),
+      patchContext: (framework: FrameworkFacts, project: CreatedProject): PatchContext => {
+        return {
+          framework,
+          rendererId,
+          project,
+          issuer,
+          server: answers.server,
+          cliVersion: this.deps.cliVersion,
+          scaffoldedFramework,
+          posture,
+          preset: answers.preset,
+          useCase: answers.useCase,
+        };
+      },
+      planned: await scaffoldOf(this.deps.cwd, this.deps.force, answers),
     };
   }
 }

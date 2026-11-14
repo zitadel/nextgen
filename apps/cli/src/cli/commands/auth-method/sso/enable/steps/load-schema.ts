@@ -4,16 +4,30 @@ import { WizardStep } from "@/lib/wizard";
 import type { EnableInput, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "loadSchemaTarget">;
+
+/**
  * Reads the schema the provider is added to, and refuses one no flow offers a
  * sign-in button on.
  */
 export class LoadSchema extends WizardStep<
   "target",
   Readonly<{ target: SchemaTarget }>,
-  EnableInput,
-  EnableServices
+  EnableInput
 > {
   readonly key = "target";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Load the schema and its flows.
@@ -23,16 +37,13 @@ export class LoadSchema extends WizardStep<
    * button however well everything else goes.
    *
    * @param needs - What the run starts from.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What the run read.
    * @throws {@link ZitadelError} When the schema cannot be chosen, or no flow
    *   can offer the provider.
    */
-  async run(
-    needs: EnableInput,
-    services: EnableServices,
-  ): Promise<Readonly<{ target: SchemaTarget }>> {
-    const target = await services.loadSchemaTarget(needs.flags);
+  async run(needs: EnableInput): Promise<Readonly<{ target: SchemaTarget }>> {
+    const target = await this.deps.loadSchemaTarget(needs.flags);
     target.config.flows.resolveForSso(target.schema);
     return {
       target,

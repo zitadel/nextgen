@@ -1,23 +1,20 @@
 import { WizardStep } from "@/lib/wizard";
 
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import {
-  retryOptionsOf,
+  inspectWorktree,
+  retryOptionsFromFlags,
   setupRetryFlags,
   ssoRecovery,
-  inspectWorktree,
-  type WorktreeState,
 } from "@/cli/commands/setup/shared";
 import semver from "semver";
 import { toZitadelError } from "@/lib/errors";
 import { readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import type { GlobalOptions } from "@/lib/oclif/types";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { hasZitadelConfig, hasZitadelSecret } from "@/lib/project";
-import { type ResolvedServer, resolveServer } from "@/lib/server";
-import type { NextOf, Suggest } from "@/lib/suggestion";
-import type { Fact, SetupPreflight, SetupServices } from "@/cli/commands/setup/shared";
+import { resolveServer } from "@/lib/server";
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
@@ -84,6 +81,21 @@ const SERVER_VERSION_REFUSAL = {
 type Needs = Fact<"flags">;
 
 /**
+ * The plural suffix for a count of things.
+ *
+ * @param list - The things counted.
+ * @returns `""` for one, otherwise `"s"`.
+ */
+function plural(list: readonly unknown[]): string {
+  return new Intl.PluralRules("en").select(list.length) === "one" ? "" : "s";
+}
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
+
+/**
  * Checks everything that does not depend on an answer before anything is
  * detected, asked or written, and settles the server the run is about.
  *
@@ -91,221 +103,171 @@ type Needs = Fact<"flags">;
  * The server the run addresses is pinned on the command here, so every step
  * after this one reads the resolved one.
  */
-export class CheckPreconditions extends WizardStep<
-  "preconditions",
-  Fact<"preflight">,
-  Needs,
-  SetupServices
-> {
+export class CheckPreconditions extends WizardStep<"preconditions", Fact<"preflight">, Needs> {
   readonly key = "preconditions";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Refuse what cannot be done, and say what the run is about.
    *
+   * @remarks
+   * Everything setup checks before it detects, creates or writes anything: the server it is about,
+   * that the directory can hold an app, that a half-removed project is not sitting there, and that
+   * git is in a state setup may commit in. A directory already set up skips the git and
+   * server-version checks, which are about making a project rather than changing one.
+   *
+   * The server is `--server` or the cloud default. `--server local` with nothing running is
+   * refused, saying how to start it and how to rerun setup against it once it is.
+   *
+   * A repository setup must not commit in is refused. One snapshot answers all three questions:
+   * git is asked once, not once per refusal.
+   *
+   * A local server another CLI release started is refused. `start` restarts such a server, but one
+   * left running stays that release's until `start` runs again, and its API is that release's:
+   * setup would create the project, then fail deploying the default schema and flow, and `--force`
+   * would not help. Only a binary runtime records the version it runs, and only release versions
+   * are compared: an override records `override`, which says nothing about its API. An unreadable
+   * `runtime.json` is doctor's to report, not setup's. The version check compares against the
+   * server this run is about. The start command names the server's own directory, so the typed
+   * `--cwd` is not added to it.
+   *
    * @param needs - The flags.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What was settled about the run.
    * @throws {@link ZitadelError} When the directory, the server or git cannot be used.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"preflight">> {
-    const preflight = await setupPreflight(needs.flags, services.meta, services.suggest);
-    services.useServer(preflight.server.value);
-    return {
-      preflight,
-    };
-  }
-}
-
-/** The flags setup's preflight reads. */
-type PreflightFlags = Readonly<{
-  git?: boolean;
-  [flag: string]: unknown;
-}>;
-
-function plural(list: readonly unknown[]): string {
-  return new Intl.PluralRules("en").select(list.length) === "one" ? "" : "s";
-}
-
-/**
- * The server setup is about, from `--server` or the cloud default. Refuses
- * `--server local` with nothing running, and says how to start it and how to
- * rerun setup against it once it is.
- */
-async function resolveSetupServer(
-  flags: PreflightFlags,
-  meta: GlobalOptions,
-  suggest: Suggest,
-): Promise<ResolvedServer> {
-  try {
-    return await resolveServer({
+  async run(needs: Needs): Promise<Fact<"preflight">> {
+    const { flags } = needs;
+    const { meta, suggest } = this.deps;
+    const server = await resolveServer({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
-    });
-  } catch (error) {
-    const normalized = toZitadelError(error);
-    if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
-      throw error;
-    }
-    const retry = retryOptionsOf(flags);
-    const recovery = ssoRecovery(retry, suggest);
-    throw refusalError(
-      NO_LOCAL_SERVER_REFUSAL,
-      {
-        reason: normalized.hint ? `${normalized.hint} ` : "",
-        scripting:
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "",
-        recovery:
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint,
-      },
-      {
-        setup: {
-          id: "setup",
-          flags: setupRetryFlags(retry),
+    }).catch((error: unknown) => {
+      const normalized = toZitadelError(error);
+      if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+        throw error;
+      }
+      const retry = retryOptionsFromFlags(flags);
+      const recovery = ssoRecovery(retry, suggest);
+      throw refusalError(
+        NO_LOCAL_SERVER_REFUSAL,
+        {
+          reason: normalized.hint ? `${normalized.hint} ` : "",
+          scripting:
+            retry.sso && retry.sso.length > 0
+              ? "The rerun asks for the client id and secret, because a command carries neither. " +
+                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+              : "",
+          recovery:
+            recovery.commands.length > 0
+              ? `${recovery.hint}${recovery.commands.join(" ")} `
+              : recovery.hint,
         },
-      },
-    );
-  }
-}
-
-/**
- * Refuses a repository setup must not commit in. One snapshot answers all
- * three questions: git is asked once, not once per refusal.
- */
-function refuseWorktree(state: WorktreeState): void {
-  if (state.kind === "unknown") {
-    throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
-      reason: state.reason,
+        {
+          setup: {
+            id: "setup",
+            flags: setupRetryFlags(retry),
+          },
+        },
+      );
     });
-  }
-  if (state.kind === "blocked") {
-    throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
-      blocked: state.blocked,
-    });
-  }
-  if (state.kind !== "dirty") {
-    return;
-  }
-  const parts = [
-    state.modified.length > 0
-      ? `${state.modified.length} uncommitted change${plural(state.modified)}`
-      : undefined,
-    state.untracked.length > 0
-      ? `${state.untracked.length} untracked file${plural(state.untracked)}`
-      : undefined,
-  ].filter((part) => {
-    return part !== undefined;
-  });
-  throw refusalError(WORKTREE_DIRTY_REFUSAL, {
-    parts: new Intl.ListFormat("en", { type: "conjunction" }).format(parts),
-    modified: state.modified,
-    untracked: state.untracked,
-  });
-}
-
-/**
- * Refuses a local server another CLI release started. `start` restarts such a
- * server, but one left running stays that release's until `start` runs again,
- * and its API is that release's: setup would create the project, then fail
- * deploying the default schema and flow, and `--force` would not help.
- *
- * Only a binary runtime records the version it runs, and only release versions
- * are compared: an override records `override`, which says nothing about its
- * API. An unreadable `runtime.json` is doctor's to report, not setup's.
- */
-async function refuseOtherReleasesServer(
-  flags: PreflightFlags,
-  meta: GlobalOptions,
-): Promise<void> {
-  const nearest = await readNearestRuntimeMetadata(meta.cwd).catch(() => {
-    return undefined;
-  });
-  const runtime = nearest?.runtime;
-  if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== meta.source) {
-    return;
-  }
-  const expected = LocalServer.bundledVersion();
-  if (
-    expected === undefined ||
-    !semver.valid(expected) ||
-    !semver.valid(runtime.server_version) ||
-    runtime.server_version === expected
-  ) {
-    return;
-  }
-  // The start command names the server's own directory, so the typed --cwd is not added.
-  const start: NextOf<"start"> =
-    nearest.dir === meta.cwd
-      ? { id: "start" }
-      : {
-          id: "start",
-          flags: { cwd: nearest.dir },
-        };
-  throw refusalError(
-    SERVER_VERSION_REFUSAL,
-    {
-      running: runtime.server_version,
-      expected,
-      serverUrl: runtime.server_url,
-      where:
-        nearest.dir === meta.cwd
-          ? ""
-          : `Run start in ${nearest.dir}, where the server was started. `,
-    },
-    {
-      start,
-      setup: {
-        id: "setup",
-        flags: setupRetryFlags(retryOptionsOf(flags)),
-      },
-    },
-  );
-}
-
-/**
- * Everything setup checks before it detects, creates or writes anything: the
- * server it is about, that the directory can hold an app, that a half-removed
- * project is not sitting there, and that git is in a state setup may commit
- * in. A directory already set up skips the git and server-version checks,
- * which are about making a project rather than changing one.
- */
-async function setupPreflight(
-  flags: PreflightFlags,
-  meta: GlobalOptions,
-  suggest: Suggest,
-): Promise<SetupPreflight> {
-  const server = await resolveSetupServer(flags, meta, suggest);
-  if (!(await isDirectoryOrMissing(meta.cwd))) {
-    throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
-      cwd: meta.cwd,
-    });
-  }
-  // The version check compares against the server this run is about, so the
-  // rest of the preflight sees the resolved one.
-  const resolved: GlobalOptions = {
-    ...meta,
-    source: server.value,
-  };
-  const configured = await hasZitadelConfig(meta.cwd);
-  if (!configured && (await hasZitadelSecret(meta.cwd))) {
-    throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
-  }
-  if (configured) {
+    if (!(await isDirectoryOrMissing(meta.cwd))) {
+      throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
+        cwd: meta.cwd,
+      });
+    }
+    const configured = await hasZitadelConfig(meta.cwd);
+    if (!configured && (await hasZitadelSecret(meta.cwd))) {
+      throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
+    }
+    if (!configured && flags.git !== false) {
+      const state = await inspectWorktree(meta.cwd);
+      if (state.kind === "unknown") {
+        throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
+          reason: state.reason,
+        });
+      }
+      if (state.kind === "blocked") {
+        throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
+          blocked: state.blocked,
+        });
+      }
+      if (state.kind === "dirty") {
+        throw refusalError(WORKTREE_DIRTY_REFUSAL, {
+          parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
+            [
+              state.modified.length > 0
+                ? `${state.modified.length} uncommitted change${plural(state.modified)}`
+                : undefined,
+              state.untracked.length > 0
+                ? `${state.untracked.length} untracked file${plural(state.untracked)}`
+                : undefined,
+            ].filter((part) => {
+              return part !== undefined;
+            }),
+          ),
+          modified: state.modified,
+          untracked: state.untracked,
+        });
+      }
+    }
+    const nearest = configured
+      ? undefined
+      : await readNearestRuntimeMetadata(meta.cwd).catch(() => {
+          return undefined;
+        });
+    const runtime = nearest?.runtime;
+    const expected = LocalServer.bundledVersion();
+    if (
+      nearest &&
+      runtime?.backend === "binary" &&
+      runtime.server_url === server.value &&
+      expected !== undefined &&
+      semver.valid(expected) &&
+      semver.valid(runtime.server_version) &&
+      runtime.server_version !== expected
+    ) {
+      throw refusalError(
+        SERVER_VERSION_REFUSAL,
+        {
+          running: runtime.server_version,
+          expected,
+          serverUrl: runtime.server_url,
+          where:
+            nearest.dir === meta.cwd
+              ? ""
+              : `Run start in ${nearest.dir}, where the server was started. `,
+        },
+        {
+          start:
+            nearest.dir === meta.cwd
+              ? { id: "start" }
+              : {
+                  id: "start",
+                  flags: { cwd: nearest.dir },
+                },
+          setup: {
+            id: "setup",
+            flags: setupRetryFlags(retryOptionsFromFlags(flags)),
+          },
+        },
+      );
+    }
+    this.deps.useServer(server.value);
     return {
-      server,
-      configured,
+      preflight: {
+        server,
+        configured,
+      },
     };
   }
-  if (flags.git !== false) {
-    refuseWorktree(await inspectWorktree(meta.cwd));
-  }
-  await refuseOtherReleasesServer(flags, resolved);
-  return {
-    server,
-    configured,
-  };
 }

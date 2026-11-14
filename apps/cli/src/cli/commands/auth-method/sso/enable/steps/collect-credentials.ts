@@ -3,8 +3,6 @@ import type { ClientId } from "@zitadel/config/idp";
 import type { CredentialPrompt, GivenCredentials } from "@/lib/idp";
 import { WizardStep } from "@/lib/wizard";
 
-import type { EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
-
 /**
  * What the step reads from the steps before it.
  */
@@ -20,8 +18,7 @@ type Needs = Readonly<{
 export class CollectCredentials extends WizardStep<
   "credentials",
   Readonly<{ given: GivenCredentials }>,
-  Needs,
-  EnableServices
+  Needs
 > {
   readonly key = "credentials";
 
@@ -32,10 +29,7 @@ export class CollectCredentials extends WizardStep<
    * @param _services - What the command provides.
    * @returns The credentials, and the endpoints a development run answered.
    */
-  async run(
-    needs: Needs,
-    _services: EnableServices,
-  ): Promise<Readonly<{ given: GivenCredentials }>> {
+  async run(needs: Needs): Promise<Readonly<{ given: GivenCredentials }>> {
     return {
       given: await needs.prompt.ask(needs.flags.clientId),
     };

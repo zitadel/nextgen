@@ -28,36 +28,49 @@ type Selected = Readonly<{
 }>;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "ask" | "dryRun">;
+
+/**
  * Settles which provider the run adds, asking for what the flags left out of a
  * custom one.
  */
 export class SelectConnection extends WizardStep<
   "selection",
   Selected,
-  EnableInput & Readonly<{ choice: ProviderChoice; target: SchemaTarget }>,
-  EnableServices
+  EnableInput & Readonly<{ choice: ProviderChoice; target: SchemaTarget }>
 > {
   readonly key = "selection";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Resolve the provider.
    *
    * @param needs - The flags, how they choose a provider, and what was read.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The provider and the options the edit is made with.
    */
   async run(
     needs: EnableInput & Readonly<{ choice: ProviderChoice; target: SchemaTarget }>,
-    services: EnableServices,
   ): Promise<Selected> {
-    const selection = await needs.choice.resolve(needs.target, services.ask);
+    const selection = await needs.choice.resolve(needs.target, this.deps.ask);
     return {
       selection,
       provider: providerOf(selection),
       options: {
         clientId: needs.flags.clientId,
         given: needs.choice.givenSettings(selection),
-        dryRun: services.dryRun,
+        dryRun: this.deps.dryRun,
       },
     };
   }

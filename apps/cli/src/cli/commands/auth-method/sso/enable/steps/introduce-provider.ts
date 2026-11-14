@@ -6,7 +6,7 @@ import type { IdpProvider } from "@zitadel/config/idp";
 import type { SchemaTarget } from "@/cli/commands/auth-method/command";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Summary, EnableServices } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
 
 /**
  * What the step reads from the steps before it.
@@ -19,18 +19,22 @@ type Needs = Readonly<{ target: SchemaTarget; provider: IdpProvider; summary: Su
  * @remarks
  * Said before a dry run returns, so a preview is enough to register the client.
  */
-export class IntroduceProvider extends WizardStep<"introduce", object, Needs, EnableServices> {
+export class IntroduceProvider extends WizardStep<"introduce", object, Needs> {
   readonly key = "introduce";
 
   /**
-   * Print the introduction.
+   * Print the introduction: what the run addresses and what to register with
+   * the provider.
    *
+   * @remarks
+   * A custom provider has no console to send the developer to: it is theirs, and
+   * the issuer they gave is the only address known.
    *
-   * Say what the run addresses and what to register with the provider.
    * @param needs - What was read and decided.
+   * @param _services - What the command provides.
    * @returns Nothing is added.
    */
-  async run(needs: Needs, _services: EnableServices): Promise<object> {
+  async run(needs: Needs): Promise<object> {
     log.info(
       `Editing ${escapeControlCharacters(needs.target.schema.path)}${needs.target.schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(needs.target.schema.methods.join(", "))}` : ""}`,
     );
@@ -53,8 +57,6 @@ export class IntroduceProvider extends WizardStep<"introduce", object, Needs, En
         log.info(`  ${escapeControlCharacters(uri, { keepLayout: false })}`);
       }
     }
-    // A custom provider has no console to send the developer to: it is
-    // theirs, and the issuer they gave is the only address known.
     if (!needs.summary.reused && needs.provider.consoleUrl === undefined) {
       log.info(
         `Register it as a client at ${escapeControlCharacters(needs.provider.issuer)}, with the callback URI above.`,

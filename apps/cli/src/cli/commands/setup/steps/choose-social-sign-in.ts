@@ -1,23 +1,27 @@
+import type {
+  Fact,
+  PromptContext,
+  SetupAnswers,
+  SetupServices,
+  SsoDraft,
+} from "@/cli/commands/setup/shared";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import {
   type ClientId,
-  CUSTOM_PROVIDER,
-  type CustomOidcInput,
   credentialVariables,
+  CUSTOM_PROVIDER,
   IDP_PROVIDERS,
-  type IdpProvider,
-  type Issuer,
   idpProvider,
-  type Parsed,
-  type ProviderName,
-  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
+  type Parsed,
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  type ProviderName,
   providerOf,
+  type ProviderSelection,
   RESERVED_SLUGS,
   selectionName,
   validated,
@@ -32,16 +36,21 @@ import {
 import { issuerFromPort } from "@/lib/orca";
 import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
-
-import type {
-  Fact,
-  PromptContext,
-  SetupServices,
-  SetupAnswers,
-  SsoDraft,
-} from "@/cli/commands/setup/shared";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
+
+/**
+ * What the step reads from what is known.
+ */
+type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+>;
 
 /**
  * "Which external sign-in providers would you like to add?" — the one
@@ -65,48 +74,53 @@ import { WizardStep } from "@/lib/wizard";
  * — is still asked for it here, the way `--preset` skips its own question and
  * no other. A flagged provider cannot be dropped: the command line asked for it.
  */
-export class ChooseSocialSignIn extends WizardStep<
-  "socialSignIn",
-  Fact<"answers">,
-  QuestionNeeds,
-  SetupServices
-> {
+export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers">, QuestionNeeds> {
   readonly key = "socialSignIn";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds, services: SetupServices): Promise<Fact<"answers">> {
+  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
-    if (services.nonInteractive || services.dryRun) {
+    if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
       answers: await this.ask(needs.answers, {
-        ask: services.ask,
+        ask: this.deps.ask,
         note: (title, lines) => {
-          services.ui.note(title, lines);
+          this.deps.ui.note(title, lines);
         },
         say: (text) => {
-          services.ui.say(text);
+          this.deps.ui.say(text);
         },
         spinner: (label, options) => {
-          return services.ui.spinner(label, options);
+          return this.deps.ui.spinner(label, options);
         },
         framework: {
           id: app.framework,
           displayName: orca.displayName(app.framework),
         },
-        suggest: services.suggest,
-        cwd: services.cwd,
+        suggest: this.deps.suggest,
+        cwd: this.deps.cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: services.serverFlag,
+        serverFlag: this.deps.serverFlag,
         devPortFromFlag: flags.devPort !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags.useCase !== undefined,
@@ -120,21 +134,14 @@ export class ChooseSocialSignIn extends WizardStep<
   /**
    * `--sso` names the set; the wizard asks for it only when no flag did.
    *
+   * @remarks
    * Asked per provider rather than once: each registers its own OAuth application, so each has its
    * own console, its own client id and its own secret. A flagged run still gets asked for whatever
    * the flags left out.
    *
-   * A custom connection is described before anything else about it can be said: the announcement
-   * names its issuer, and its slug names the secret.
-   *
-   * A custom connection typed in here has not been through the flag checks.
-   *
-   * Before the announcement, which names the vendor's console: on a development run
-   * (ZITADEL_CLI_DEV) the provider may not be the vendor at all. Not asked of a custom connection,
-   * whose issuer was just given.
-   *
-   * "To skip", not "to add it later": the line after it names the command that adds it, and the
-   * shorter question fits an 80-column terminal.
+   * @param answers - The answers so far.
+   * @param ctx - What the questions may need to know.
+   * @returns The answers, with the chosen providers and their credentials.
    */
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     const chosen = ctx.ssoFromFlag
@@ -164,6 +171,24 @@ export class ChooseSocialSignIn extends WizardStep<
    * answers one question at a time, so the rest are collected by the call that
    * follows.
    *
+   * A custom connection is described before anything else about it can be said: the announcement
+   * names its issuer, and its slug names the secret. One typed in here has not been through the
+   * flag checks, and is described from scratch because nothing was given on the command line.
+   *
+   * The endpoints are asked before the announcement, which names the vendor's console: on a
+   * development run (ZITADEL_CLI_DEV) the provider may not be the vendor at all. They are not asked
+   * of a custom connection, whose issuer was just given.
+   *
+   * The announcement says what to register and where. The redirect URI is settled by now, because
+   * the port question runs before this one and the issuer derives from it, so it can be shown
+   * rather than left for the developer to work out, which matters because the vendor matches it
+   * literally.
+   *
+   * The question says "to skip", not "to add it later": the line after it names the command that
+   * adds it, and the shorter question fits an 80-column terminal. An empty client id drops the
+   * provider, because a blank id is never a credential: the provider is either configured with both
+   * values or not at all.
+   *
    * @param names - The providers still to ask about.
    * @param answers - The answers so far.
    * @param ctx - What the questions may need to know.
@@ -186,7 +211,14 @@ export class ChooseSocialSignIn extends WizardStep<
       (name === CUSTOM_PROVIDER
         ? {
             kind: "custom",
-            connection: await this.askCustom(ctx.ask),
+            connection: await askCustomSettings({}, ctx.ask).then((values) => {
+              return {
+                slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
+                displayName: validated(parseDisplayName(values.displayName)),
+                issuer: validated(parseIssuer(values.issuer)),
+                scopes: validated(parseScopes(values.scopes)),
+              };
+            }),
           }
         : {
             kind: "catalog",
@@ -206,7 +238,19 @@ export class ChooseSocialSignIn extends WizardStep<
             developmentBuild: ctx.developmentBuild === true,
             ask: ctx.ask,
           })));
-    this.announce(ctx, entry, answers.devPort, endpoints?.issuer);
+    ctx.note(`${entry.displayName} sign-in`, [
+      ...(endpoints?.issuer === undefined
+        ? [
+            entry.consoleUrl === undefined
+              ? `Register a client at ${entry.issuer}, as an OAuth application:`
+              : "Register an OAuth application at:",
+            ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+          ]
+        : ["Register a client with the provider at:", endpoints.issuer]),
+      "",
+      "Redirect URI:",
+      callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
+    ]);
 
     const clientId = await ctx.ask.text({
       name: "client id",
@@ -214,7 +258,17 @@ export class ChooseSocialSignIn extends WizardStep<
         flagged === undefined
           ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to skip.`
           : `What is the client ID of your ${entry.displayName} OAuth app?`,
-      parse: flagged === undefined ? clientIdOrSkip : parseClientId,
+      parse:
+        flagged === undefined
+          ? (value: string): Parsed<ClientId | undefined> => {
+              return value.trim() === ""
+                ? {
+                    ok: true,
+                    value: undefined,
+                  }
+                : parseClientId(value);
+            }
+          : parseClientId,
       given: flagged?.credentials.clientId,
     });
     if (clientId === undefined) {
@@ -233,7 +287,7 @@ export class ChooseSocialSignIn extends WizardStep<
       flagged?.credentials.secret ??
       (await ctx.ask.secret({
         name: "client secret",
-        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(entry.slug).clientSecret}.`,
         parse: parseClientSecret,
       }));
     return [
@@ -252,97 +306,46 @@ export class ChooseSocialSignIn extends WizardStep<
   /**
    * The providers to enable, empty when the developer wants none.
    *
+   * @remarks
    * A multi-select rather than one choice: a project may offer several at
    * once, and the schema and flow already carry `sso_providers` as a list.
    * Space ticks a provider and Enter continues, so Enter on an empty list is
    * not a silent skip: it asks whether to go on without SSO, where No goes back
-   * to the list, and only a Yes returns none.
+   * to the list by asking again, and only a Yes returns none.
+   *
+   * Nothing is preselected, and declining costs nothing: `auth-method sso enable`
+   * performs this journey on an existing Project later.
+   *
+   * @param ask - The questions.
+   * @returns The providers chosen.
    */
   private async chooseProviders(ask: Questions): Promise<readonly ProviderName[]> {
-    for (;;) {
-      // Nothing preselected, and declining costs nothing:
-      // `auth-method sso enable` performs this journey on an existing Project
-      // later.
-      const chosen: readonly ProviderName[] = await ask.multiselect({
-        name: "external sign-in providers",
-        message:
-          "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
-        required: false,
-        options: [
-          ...IDP_PROVIDERS.map((provider) => {
-            return {
-              value: provider as ProviderName,
-              label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
-            };
-          }),
-          {
-            value: CUSTOM_PROVIDER as ProviderName,
-            label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
-          },
-        ],
-      });
-      if (chosen.length > 0) {
-        return chosen;
-      }
-      const continueWithout = await ask.yesNo({
-        name: "continue without SSO",
-        message: "Would you like to continue without setting up SSO?",
-        initialValue: false,
-      });
-      if (continueWithout) {
-        return [];
-      }
+    const chosen: readonly ProviderName[] = await ask.multiselect({
+      name: "external sign-in providers",
+      message:
+        "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
+      required: false,
+      options: [
+        ...IDP_PROVIDERS.map((provider) => {
+          return {
+            value: provider as ProviderName,
+            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+          };
+        }),
+        {
+          value: CUSTOM_PROVIDER as ProviderName,
+          label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
+        },
+      ],
+    });
+    if (chosen.length > 0) {
+      return chosen;
     }
-  }
-
-  /**
-   * Say what to register and where. The redirect URI is settled by now — the
-   * port question runs before this one and the issuer derives from it — so it
-   * can be shown rather than left for the developer to work out, which
-   * matters because the vendor matches it literally.
-   */
-  private announce(ctx: PromptContext, entry: IdpProvider, devPort: number, issuer?: Issuer): void {
-    const registration =
-      issuer === undefined
-        ? [
-            entry.consoleUrl === undefined
-              ? `Register a client at ${entry.issuer}, as an OAuth application:`
-              : "Register an OAuth application at:",
-            ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
-          ]
-        : ["Register a client with the provider at:", issuer];
-    ctx.note(`${entry.displayName} sign-in`, [
-      ...registration,
-      "",
-      "Redirect URI:",
-      callbackUriFor(issuerFromPort(devPort), entry.slug),
-    ]);
-  }
-
-  /** Describe a custom connection from scratch: nothing was given on the command line. */
-  private async askCustom(ask: Questions): Promise<CustomOidcInput> {
-    const values = await askCustomSettings({}, ask);
-    return {
-      slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
-      displayName: validated(parseDisplayName(values.displayName)),
-      issuer: validated(parseIssuer(values.issuer)),
-      scopes: validated(parseScopes(values.scopes)),
-    };
+    const continueWithout = await ask.yesNo({
+      name: "continue without SSO",
+      message: "Would you like to continue without setting up SSO?",
+      initialValue: false,
+    });
+    return continueWithout ? [] : this.chooseProviders(ask);
   }
 }
-
-/**
- * A client id typed into the wizard, or `undefined` for an empty answer, which
- * drops the provider. A blank id is never a credential: the provider is
- * either configured with both values or not at all.
- */
-function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
-  return value.trim() === ""
-    ? {
-        ok: true,
-        value: undefined,
-      }
-    : parseClientId(value);
-}
-
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;

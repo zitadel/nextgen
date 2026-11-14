@@ -5,7 +5,7 @@ import { WizardStep } from "@/lib/wizard";
 /**
  * A step that leaves {@link WizardStep.undo} as it is.
  */
-class Plain extends WizardStep<"plain", { readonly done: true }, object, undefined> {
+class Plain extends WizardStep<"plain", { readonly done: true }, object> {
   readonly key = "plain";
 
   async run(): Promise<{ readonly done: true }> {
@@ -18,7 +18,7 @@ describe("WizardStep", () => {
     it("does nothing unless the step says how", async () => {
       const step = new Plain();
 
-      const undone = step.undo({ done: true }, {}, undefined);
+      const undone = step.undo({ done: true });
 
       await expect(undone).resolves.toBeUndefined();
     });

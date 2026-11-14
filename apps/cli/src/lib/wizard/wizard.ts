@@ -6,23 +6,13 @@ import type { EndStep, WizardStep } from "./step";
 type Undo = () => Promise<void>;
 
 /**
- * What a step's progress is reported as.
+ * Told what is known right after a step finished, for a caller that reacts to
+ * what a step produced without the step knowing.
  */
-export type StepEvent = {
-  /**
-   * The step's key.
-   */
-  readonly key: string;
-
-  /**
-   * Whether the step started, finished, or was undone because a later one
-   * failed.
-   */
-  readonly phase: "started" | "completed" | "undone";
-};
+export type Observer<Known extends object> = (known: Known) => void;
 
 /**
- * How one run behaves beyond its services.
+ * How one run behaves.
  */
 export type RunOptions = {
   /**
@@ -30,12 +20,6 @@ export type RunOptions = {
    * What had finished is undone first.
    */
   readonly signal?: AbortSignal;
-
-  /**
-   * Told as each step starts, finishes, and is undone, for progress and
-   * telemetry.
-   */
-  readonly onStep?: (event: StepEvent) => void;
 
   /**
    * Told when a step's undo itself failed. The run goes on undoing the steps
@@ -64,8 +48,7 @@ type Progress<State extends object, Result> =
 /**
  * Runs the steps added so far.
  */
-type Runner<Services, Initial extends object, State extends object, Result> = (
-  services: Services,
+type Runner<Initial extends object, State extends object, Result> = (
   initial: Initial,
   options: RunOptions,
 ) => Promise<Progress<State, Result>>;
@@ -106,7 +89,6 @@ function nothingToUndo(): Promise<void> {
 async function undoQuietly(key: string, work: Undo, options: RunOptions): Promise<void> {
   try {
     await work();
-    options.onStep?.({ key, phase: "undone" });
   } catch (error) {
     options.onUndoError?.(key, error);
   }
@@ -142,22 +124,21 @@ function withLoopResults<State extends object, Key extends string, Inner extends
  * was, so a wizard can be shared and extended.
  *
  * ```ts
- * const flow = Wizard.named<Services, Input, Report>("setup")
- *   .endWhen(new AlreadySetUp())
- *   .step(new Detect())
- *   .step(new DevPort())
+ * const flow = Wizard.named<Input, Report>("setup")
+ *   .endWhen(new AlreadySetUp(terminal))
+ *   .step(new Detect(terminal), (state) => terminal.say(state.framework))
+ *   .step(new DevPort(terminal))
  *   .each("connections", (state) => state.providers, (provider) => {
- *     return provider.step(new ClientId()).step(new ClientSecret());
+ *     return provider.step(new ClientId(terminal)).step(new ClientSecret(terminal));
  *   })
  *   .finish((state) => report(state));
  * ```
  *
- * @typeParam Services - What the run provides every step.
  * @typeParam Initial - What the run starts from.
  * @typeParam State - Everything known after the steps added so far.
  * @typeParam Result - What the wizard answers.
  */
-export class Wizard<Services, Initial extends object, State extends object, Result> {
+export class Wizard<Initial extends object, State extends object, Result> {
   /**
    * The wizard's name, for the errors that say how it is wrong.
    */
@@ -165,7 +146,7 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
 
   private readonly keys: ReadonlySet<string>;
 
-  private readonly runner: Runner<Services, Initial, State, Result>;
+  private readonly runner: Runner<Initial, State, Result>;
 
   /**
    * Hold the steps added so far.
@@ -177,7 +158,7 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
   private constructor(
     name: string,
     keys: ReadonlySet<string>,
-    runner: Runner<Services, Initial, State, Result>,
+    runner: Runner<Initial, State, Result>,
   ) {
     this.name = name;
     this.keys = keys;
@@ -187,22 +168,17 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
   /**
    * Start a wizard with no steps, knowing only what the run starts from.
    *
-   * @typeParam Services - What the run provides every step.
    * @typeParam Initial - What the run starts from.
    * @typeParam Result - What the wizard answers.
    * @param name - The wizard's name.
    * @returns The empty wizard.
    */
-  static named<Services, Initial extends object, Result = never>(
+  static named<Initial extends object, Result = never>(
     name: string,
-  ): Wizard<Services, Initial, Initial, Result> {
-    return new Wizard<Services, Initial, Initial, Result>(
-      name,
-      new Set<string>(),
-      (_services, initial) => {
-        return Promise.resolve({ kind: "continue", state: initial, undo: nothingToUndo });
-      },
-    );
+  ): Wizard<Initial, Initial, Result> {
+    return new Wizard<Initial, Initial, Result>(name, new Set<string>(), (initial) => {
+      return Promise.resolve({ kind: "continue", state: initial, undo: nothingToUndo });
+    });
   }
 
   /**
@@ -212,49 +188,61 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
    * It does not compile when the step reads something no earlier step gives;
    * the argument it then asks for names what is missing.
    *
+   * The observer is told what is known, with what the step added, right after
+   * the step finished. It is not told of a step that failed. If it throws, the
+   * step is undone with the ones before it and the error is thrown.
+   *
    * @param step - The step.
-   * @param _unmet - Present only when the step needs what is not known.
+   * @param rest - The observer, if any; or, only when the step needs what is
+   *   not known, the argument that names what is missing.
    * @returns The wizard with the step added, knowing what it adds.
    * @throws {@link WizardDefinitionError} When a step already has its name.
    */
   step<Out extends object, Needs extends object>(
-    step: WizardStep<string, Out, Needs, Services>,
-    ..._unmet: State extends Needs ? [] : [Unmet<Needs, State>]
-  ): Wizard<Services, Initial, State & Out, Result> {
+    step: WizardStep<string, Out, Needs>,
+    ...rest: State extends Needs ? [observe?: Observer<State & Out>] : [Unmet<Needs, State>]
+  ): Wizard<Initial, State & Out, Result>;
+  step<Out extends object, Needs extends object>(
+    step: WizardStep<string, Out, Needs>,
+    argument?: Observer<State & Out> | Unmet<Needs, State>,
+  ): Wizard<Initial, State & Out, Result> {
     const keys = this.claim(step.key);
     const previous = this.runner;
-    const reader: WizardStep<string, Out, object, Services> = step;
-    const runner: Runner<Services, Initial, State & Out, Result> = async (
-      services,
-      initial,
-      options,
-    ) => {
-      const before = await previous(services, initial, options);
+    const reader: WizardStep<string, Out, object> = step;
+    const observe = typeof argument === "function" ? argument : undefined;
+    const runner: Runner<Initial, State & Out, Result> = async (initial, options) => {
+      const before = await previous(initial, options);
       if (before.kind === "end") {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
         options.signal?.throwIfAborted();
-        options.onStep?.({ key: step.key, phase: "started" });
-        const out = await reader.run(before.state, services);
-        options.onStep?.({ key: step.key, phase: "completed" });
-        const state = { ...before.state, ...out };
+        const out = await reader.run(before.state);
         const undo = async (): Promise<void> => {
           await undoQuietly(
             step.key,
             () => {
-              return reader.undo(out, before.state, services);
+              return reader.undo(out);
             },
             options,
           );
           await before.undo();
         };
-        return { kind: "continue", state, undo };
+        return { kind: "continue", state: { ...before.state, ...out }, undo };
       };
-      return attempt().catch(async (error: unknown) => {
+      const finished = await attempt().catch(async (error: unknown) => {
         await before.undo();
         throw error;
       });
+      if (finished.kind === "continue") {
+        try {
+          observe?.(finished.state);
+        } catch (error) {
+          await finished.undo();
+          throw error;
+        }
+      }
+      return finished;
     };
     return new Wizard(this.name, keys, runner);
   }
@@ -268,26 +256,24 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
    * @throws {@link WizardDefinitionError} When a step already has its name.
    */
   endWhen<Needs extends object>(
-    step: EndStep<string, Result, Needs, Services>,
+    step: EndStep<string, Result, Needs>,
     ..._unmet: State extends Needs ? [] : [Unmet<Needs, State>]
-  ): Wizard<Services, Initial, State, Result> {
+  ): Wizard<Initial, State, Result> {
     const keys = this.claim(step.key);
     const previous = this.runner;
-    const reader: EndStep<string, Result, object, Services> = step;
-    const runner: Runner<Services, Initial, State, Result> = async (services, initial, options) => {
-      const before = await previous(services, initial, options);
+    const reader: EndStep<string, Result, object> = step;
+    const runner: Runner<Initial, State, Result> = async (initial, options) => {
+      const before = await previous(initial, options);
       if (before.kind === "end") {
         return before;
       }
       const attempt = async (): Promise<Progress<State, Result>> => {
         options.signal?.throwIfAborted();
-        const ends = await reader.when(before.state, services);
+        const ends = await reader.when(before.state);
         if (!ends) {
           return before;
         }
-        options.onStep?.({ key: step.key, phase: "started" });
-        const result = await reader.run(before.state, services);
-        options.onStep?.({ key: step.key, phase: "completed" });
+        const result = await reader.run(before.state);
         return { kind: "end", result, undo: before.undo };
       };
       return attempt().catch(async (error: unknown) => {
@@ -318,26 +304,20 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
     key: Key,
     source: (state: State) => readonly Item[],
     build: (
-      pass: Wizard<
-        Services,
-        State & { readonly item: Item },
-        State & { readonly item: Item },
-        never
-      >,
-    ) => Wizard<Services, State & { readonly item: Item }, Inner, never>,
-  ): Wizard<Services, Initial, State & { readonly [K in Key]: readonly Inner[] }, Result> {
+      pass: Wizard<State & { readonly item: Item }, State & { readonly item: Item }, never>,
+    ) => Wizard<State & { readonly item: Item }, Inner, never>,
+  ): Wizard<Initial, State & { readonly [K in Key]: readonly Inner[] }, Result> {
     const keys = this.claim(key);
     const previous = this.runner;
     const pass = build(
-      Wizard.named<Services, State & { readonly item: Item }, never>(`${this.name}.${key}`),
+      Wizard.named<State & { readonly item: Item }, never>(`${this.name}.${key}`),
     ).runner;
     const runner: Runner<
-      Services,
       Initial,
       State & { readonly [K in Key]: readonly Inner[] },
       Result
-    > = async (services, initial, options) => {
-      const before = await previous(services, initial, options);
+    > = async (initial, options) => {
+      const before = await previous(initial, options);
       if (before.kind === "end") {
         return before;
       }
@@ -346,7 +326,7 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
       >(
         async (accumulated, item) => {
           const soFar = await accumulated;
-          const progress = await pass(services, { ...before.state, item }, options).catch(
+          const progress = await pass({ ...before.state, item }, options).catch(
             async (error: unknown) => {
               await soFar.undo();
               throw error;
@@ -398,10 +378,10 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
    *
    * @returns The wizard with the mark added.
    */
-  commit(): Wizard<Services, Initial, State, Result> {
+  commit(): Wizard<Initial, State, Result> {
     const previous = this.runner;
-    return new Wizard(this.name, this.keys, async (services, initial, options) => {
-      const before = await previous(services, initial, options);
+    return new Wizard(this.name, this.keys, async (initial, options) => {
+      const before = await previous(initial, options);
       if (before.kind === "end") {
         return before;
       }
@@ -416,10 +396,10 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
    * @param answer - Builds the answer from everything the steps settled.
    * @returns The wizard, ready to run.
    */
-  finish(answer: (state: State) => Result): ReadyWizard<Services, Initial, Result> {
+  finish(answer: (state: State) => Result): ReadyWizard<Initial, Result> {
     const runner = this.runner;
-    return new ReadyWizard(this.name, async (services, initial, options) => {
-      const progress = await runner(services, initial, options);
+    return new ReadyWizard(this.name, async (initial, options) => {
+      const progress = await runner(initial, options);
       if (progress.kind === "end") {
         return progress.result;
       }
@@ -450,21 +430,16 @@ export class Wizard<Services, Initial extends object, State extends object, Resu
 /**
  * A wizard that has said what it answers, and so can run.
  *
- * @typeParam Services - What the run provides every step.
  * @typeParam Initial - What the run starts from.
  * @typeParam Result - What the wizard answers.
  */
-export class ReadyWizard<Services, Initial extends object, Result> {
+export class ReadyWizard<Initial extends object, Result> {
   /**
    * The wizard's name.
    */
   readonly name: string;
 
-  private readonly execute: (
-    services: Services,
-    initial: Initial,
-    options: RunOptions,
-  ) => Promise<Result>;
+  private readonly execute: (initial: Initial, options: RunOptions) => Promise<Result>;
 
   /**
    * Hold what runs the wizard.
@@ -472,10 +447,7 @@ export class ReadyWizard<Services, Initial extends object, Result> {
    * @param name - The wizard's name.
    * @param execute - Runs the steps and answers.
    */
-  constructor(
-    name: string,
-    execute: (services: Services, initial: Initial, options: RunOptions) => Promise<Result>,
-  ) {
+  constructor(name: string, execute: (initial: Initial, options: RunOptions) => Promise<Result>) {
     this.name = name;
     this.execute = execute;
   }
@@ -487,13 +459,12 @@ export class ReadyWizard<Services, Initial extends object, Result> {
    * When a step fails, or the signal aborts, what had finished is undone, newest
    * first, and the error that stopped the run is thrown.
    *
-   * @param services - What every step is given.
    * @param initial - What the run starts from.
    * @param options - How the run behaves.
    * @returns What the wizard answers.
    * @throws Whatever stopped the run.
    */
-  run(services: Services, initial: Initial, options: RunOptions = {}): Promise<Result> {
-    return this.execute(services, initial, options);
+  run(initial: Initial, options: RunOptions = {}): Promise<Result> {
+    return this.execute(initial, options);
   }
 }

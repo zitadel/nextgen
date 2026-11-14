@@ -237,6 +237,196 @@ export const whole = z
     z.number().int("it is not a whole number").safe("it is larger than a whole number can hold"),
   );
 
+/**
+ * What a parser that may refuse a value answers: the value it made, or what is
+ * wrong with the text. Structurally the platform's own `Parsed<T>`, so a
+ * parser a prompt already uses can be handed to {@link parses} and
+ * {@link accepts} as it is.
+ *
+ * @typeParam T - What the text parses to.
+ */
+export type Outcome<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly problem: string };
+
+/**
+ * How a blank value is refused when a flag's refusal does not say: what to do
+ * about an empty value is to pass one or leave the flag out, which is not what
+ * to do about a value the parser would reject, so the two are worded apart.
+ */
+export const BLANK_VALUE = {
+  message: "the value is empty",
+  hint: "Pass a value for {input}, or omit it entirely.",
+} as const satisfies Refusal;
+
+/**
+ * How a value a parser refused is worded when a flag's refusal does not say:
+ * the flag, then the parser's own reason.
+ */
+export const REFUSED_SETTING = {
+  message: "{input}: {problem}",
+  hint: "Fix {input} and run the command again.",
+  details: {
+    flag: "{input}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * Passed as {@link ParserOptions.empty}, it refuses a blank value with the
+ * flag's own refusal, the reason being that it was given an empty value,
+ * instead of with {@link BLANK_VALUE}.
+ */
+export const AS_REFUSED = "as-refused";
+
+/**
+ * What {@link parses} and {@link accepts} may be told besides the parser.
+ *
+ * @typeParam R - The refusal for a value the parser refuses, as it is written.
+ * @typeParam Empty - The refusal for a blank value, as it is written.
+ */
+export type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = Readonly<{
+  /**
+   * What a value the parser refuses is refused with, asking only for what
+   * {@link read} fills ({@link ReadAlone}). {@link REFUSED_SETTING} when it is
+   * left out.
+   */
+  refusal?: R & ReadAlone<R>;
+
+  /**
+   * What a blank value is refused with, asking only for what `read` fills, or
+   * {@link AS_REFUSED}. {@link BLANK_VALUE} when it is left out.
+   */
+  empty?: (Empty & ReadAlone<Empty>) | typeof AS_REFUSED;
+}>;
+
+/**
+ * The schema of a trimmed, non-blank value a parser accepts.
+ *
+ * @remarks
+ * The parser's `problem` becomes the schema's message, so a flag and the prompt
+ * that asks the same thing cannot word a refusal differently.
+ *
+ * @typeParam T - What the parser makes of the text.
+ * @typeParam V - What the schema yields.
+ * @param parse - The parser.
+ * @param pick - What the schema yields, given the trimmed text and what the
+ *   parser made of it.
+ * @returns The schema.
+ */
+function acceptedBy<T, V>(
+  parse: (value: string) => Outcome<T>,
+  pick: (text: string, made: T) => V,
+) {
+  return filled.transform((text, ctx) => {
+    const outcome = parse(text);
+    if (!outcome.ok) {
+      ctx.addIssue({
+        code: "custom",
+        message: outcome.problem,
+      });
+      return z.NEVER;
+    }
+    return pick(text, outcome.value);
+  });
+}
+
+/**
+ * The `parse` of a flag that refuses a blank value, then whatever its parser
+ * refuses, and yields what `pick` makes of the rest.
+ *
+ * @typeParam T - What the parser makes of the text.
+ * @typeParam V - What the flag yields.
+ * @param parse - The parser.
+ * @param pick - What the flag yields.
+ * @param refusal - What the parser's refusal is worded with, or `undefined`.
+ * @param empty - What a blank value is refused with, or `undefined`.
+ * @returns The `parse`.
+ */
+function parsing<T, V>(
+  parse: (value: string) => Outcome<T>,
+  pick: (text: string, made: T) => V,
+  refusal: ParseRefusal | undefined,
+  empty: ParseRefusal | typeof AS_REFUSED | undefined,
+): Parse<V> {
+  const refusing: ParseRefusal = refusal ?? REFUSED_SETTING;
+  const declared: Refused<V> = {
+    schema: acceptedBy(parse, pick),
+    refusal: refusing,
+  };
+  const value = reads(declared);
+  if (empty === AS_REFUSED) {
+    return value;
+  }
+  const emptied: ParseRefusal = empty ?? BLANK_VALUE;
+  const blank = reads({
+    schema: filled,
+    refusal: emptied,
+  });
+  return async (given, command, definition) => {
+    await blank(given, command, definition);
+    return value(given, command, definition);
+  };
+}
+
+/**
+ * The `parse` of a flag whose value is what a parser makes of the trimmed text,
+ * so the flag is its parser and nothing else:
+ *
+ * ```ts
+ * const clientId = Flags.custom<ClientId>({ parse: parses(parseClientId) });
+ * ```
+ *
+ * @remarks
+ * A blank value is refused first, as {@link nonBlankString} refuses one; the
+ * parser then refuses what it cannot make. Both read the flag as `{input}`.
+ *
+ * @typeParam T - What the parser makes of the text.
+ * @typeParam R - The parser refusal, as it is written.
+ * @typeParam Empty - The blank-value refusal, as it is written.
+ * @param parse - The parser, which answers with an {@link Outcome}.
+ * @param options - How the two refusals are worded; see {@link ParserOptions}.
+ * @returns The `parse`.
+ */
+export function parses<
+  T,
+  const R extends ParseRefusal = typeof REFUSED_SETTING,
+  const Empty extends ParseRefusal = typeof BLANK_VALUE,
+>(parse: (value: string) => Outcome<T>, options?: ParserOptions<R, Empty>): Parse<T> {
+  return parsing(
+    parse,
+    (_text, made) => {
+      return made;
+    },
+    options?.refusal,
+    options?.empty,
+  );
+}
+
+/**
+ * The `parse` of a flag whose parser only checks the text: the flag keeps the
+ * trimmed text as it was typed, not what the parser made of it. See
+ * {@link parses}.
+ *
+ * @typeParam R - The parser refusal, as it is written.
+ * @typeParam Empty - The blank-value refusal, as it is written.
+ * @param parse - The parser, which answers with an {@link Outcome}.
+ * @param options - How the two refusals are worded; see {@link ParserOptions}.
+ * @returns The `parse`.
+ */
+export function accepts<
+  const R extends ParseRefusal = typeof REFUSED_SETTING,
+  const Empty extends ParseRefusal = typeof BLANK_VALUE,
+>(parse: (value: string) => Outcome<unknown>, options?: ParserOptions<R, Empty>): Parse<string> {
+  return parsing(
+    parse,
+    (text) => {
+      return text;
+    },
+    options?.refusal,
+    options?.empty,
+  );
+}
+
 /** A string flag whose value must not be blank. See {@link filled}. */
 export const nonBlankString = Flags.custom<string>({
   parse: reads({

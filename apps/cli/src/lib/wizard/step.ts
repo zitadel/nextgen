@@ -6,8 +6,8 @@
  * A step knows nothing about the other steps. It names the shape of what it
  * reads in `Needs`, never another step's class, so the wizard can check at
  * compile time that something earlier provides it. What a step needs from the
- * run (a terminal, a client, the command's flags) comes in as `Services`, which
- * the wizard hands to every step unchanged.
+ * outside (a terminal, a client, the command's flags) it takes in its own
+ * constructor, so the wizard carries nothing for it.
  *
  * Every step runs, so what it adds is always there for the steps after it. A
  * step with nothing to do on this run adds the facts that say so, such as
@@ -20,17 +20,10 @@
  * @typeParam Key - The step's name, unique within a wizard.
  * @typeParam Out - The facts the step adds to what is known.
  * @typeParam Needs - The shape of what the step reads from what is known.
- * @typeParam Services - What the run provides every step.
  */
-export abstract class WizardStep<
-  Key extends string,
-  Out extends object,
-  Needs extends object,
-  Services,
-> {
+export abstract class WizardStep<Key extends string, Out extends object, Needs extends object> {
   /**
-   * The step's name, which a wizard refuses to hold twice and which the run
-   * reports its progress by.
+   * The step's name, which a wizard refuses to hold twice.
    */
   abstract readonly key: Key;
 
@@ -38,20 +31,17 @@ export abstract class WizardStep<
    * Do the step's work.
    *
    * @param needs - What earlier steps settled.
-   * @param services - What the run provides.
    * @returns The facts the step adds.
    */
-  abstract run(needs: Needs, services: Services): Promise<Out>;
+  abstract run(needs: Needs): Promise<Out>;
 
   /**
    * Take back what {@link WizardStep.run} did, because a later step failed.
    *
    * @param _out - What the step added when it ran.
-   * @param _needs - What earlier steps had settled when it ran.
-   * @param _services - What the run provides.
    * @returns Once it is undone.
    */
-  undo(_out: Out, _needs: Needs, _services: Services): Promise<void> {
+  undo(_out: Out): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -68,9 +58,8 @@ export abstract class WizardStep<
  * @typeParam Key - The step's name, unique within a wizard.
  * @typeParam Result - What the wizard answers when this step ends it.
  * @typeParam Needs - The shape of what the step reads from what is known.
- * @typeParam Services - What the run provides every step.
  */
-export abstract class EndStep<Key extends string, Result, Needs extends object, Services> {
+export abstract class EndStep<Key extends string, Result, Needs extends object> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -80,17 +69,15 @@ export abstract class EndStep<Key extends string, Result, Needs extends object, 
    * Whether this step ends the wizard, given what is known.
    *
    * @param needs - What earlier steps settled.
-   * @param services - What the run provides.
    * @returns Whether to end the wizard here.
    */
-  abstract when(needs: Needs, services: Services): boolean | Promise<boolean>;
+  abstract when(needs: Needs): boolean | Promise<boolean>;
 
   /**
    * What the wizard answers.
    *
    * @param needs - What earlier steps settled.
-   * @param services - What the run provides.
    * @returns The wizard's answer.
    */
-  abstract run(needs: Needs, services: Services): Promise<Result>;
+  abstract run(needs: Needs): Promise<Result>;
 }

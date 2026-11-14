@@ -1,11 +1,13 @@
 import {
   customExample,
+  customFlagValues,
   loopbackIssuerWarning,
-  SETUP_FLAG_NAMES,
   selectionFromFlags,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
 } from "@/lib/idp";
-import type { SsoDraft, Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { customSettingsOf, askCustomSettings } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices, SsoDraft } from "@/cli/commands/setup/shared";
+import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { type ClientId, CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 import { andTheRest, pipedFrom, type Suggest } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
@@ -29,6 +31,11 @@ const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
 type Needs = Fact<"flags">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive" | "suggest">;
+
+/**
  * Reads the provider the command line asked for.
  *
  * @remarks
@@ -38,29 +45,34 @@ type Needs = Fact<"flags">;
  * a `confirm`, so setup's `--force`, which permits overwriting files, never
  * answers one of its questions.
  */
-export class ReadSsoFlags extends WizardStep<
-  "ssoFlags",
-  Fact<"ssoFromCommandLine">,
-  Needs,
-  SetupServices
-> {
+export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLine">, Needs> {
   readonly key = "ssoFlags";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Read the `--sso` flags.
    *
    * @param needs - The flags.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The provider, when one was asked for.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"ssoFromCommandLine">> {
+  async run(needs: Needs): Promise<Fact<"ssoFromCommandLine">> {
     return {
       ssoFromCommandLine: await ssoFromFlags(
         needs.flags,
-        services.nonInteractive,
-        services.dryRun,
-        services.ask,
-        services.suggest,
+        this.deps.nonInteractive,
+        this.deps.dryRun,
+        this.deps.ask,
+        this.deps.suggest,
       ),
     };
   }
@@ -95,6 +107,16 @@ export class ReadSsoFlags extends WizardStep<
  * Required, not optional: scaffolding the connection without it writes a sign-in button that fails
  * at the provider with `invalid_client`, long after setup reports success. It is never a flag —
  * that would put it in shell history, a process listing and CI logs.
+ *
+ * The secret's retry is a concrete rerun for an agent, never carrying the value: the secret is
+ * piped from the caller's own environment.
+ *
+ * @param flags - The `--sso` flags.
+ * @param nonInteractive - Whether nothing can be asked.
+ * @param dryRun - Whether the run only previews.
+ * @param ask - How questions are asked.
+ * @param suggest - Renders the suggested rerun.
+ * @returns The provider and the credentials collected so far, or `undefined` when none was asked for.
  */
 export async function ssoFromFlags(
   flags: {
@@ -110,7 +132,7 @@ export async function ssoFromFlags(
   ask: Questions,
   suggest: Suggest,
 ): Promise<SsoDraft | undefined> {
-  const customValues = customSettingsOf(flags);
+  const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
     return undefined;
   }
@@ -138,31 +160,28 @@ export async function ssoFromFlags(
       credentials: { clientId: flags.ssoClientId },
     };
   }
-  const secret = await ask.secret({
-    name: "client secret",
-    message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
-    parse: parseClientSecret,
-    stdin: true,
-    // A concrete rerun for an agent, never carrying the value: the secret is
-    // piped from the caller's own environment.
-    retry: pipedFrom(
-      "CLIENT_SECRET",
-      andTheRest(
-        suggest({
-          id: "setup",
-          flags: {
-            sso: flags.sso,
-            ssoClientId: ID_TO_FILL_IN,
-          },
-        }),
-      ),
-    ),
-  });
   return {
     selection,
     credentials: {
       clientId: flags.ssoClientId,
-      secret,
+      secret: await ask.secret({
+        name: "client secret",
+        message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
+        parse: parseClientSecret,
+        stdin: true,
+        retry: pipedFrom(
+          "CLIENT_SECRET",
+          andTheRest(
+            suggest({
+              id: "setup",
+              flags: {
+                sso: flags.sso,
+                ssoClientId: ID_TO_FILL_IN,
+              },
+            }),
+          ),
+        ),
+      }),
     },
   };
 }

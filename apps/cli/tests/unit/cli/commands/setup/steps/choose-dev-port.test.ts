@@ -19,6 +19,7 @@ import type { PromptContext } from "@/cli/commands/setup/shared";
 import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
+import { aPromptDeps } from "@tests/helpers/setup";
 
 /**
  * The framework setup detected.
@@ -94,19 +95,22 @@ beforeEach(() => {
 describe("ChooseDevPort", () => {
   describe("when the detected port is free", () => {
     it("checks the detected port", async () => {
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
 
       expect(LocalServer.isPortFree).toHaveBeenCalledWith(3000);
     });
 
     it("keeps the detected port", async () => {
-      const answers = await new ChooseDevPort().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      const answers = await new ChooseDevPort(aPromptDeps()).ask(
+        setupAnswers({ devPort: 3000 }),
+        CONTEXT,
+      );
 
       expect(answers.devPort).toBe(3000);
     });
 
     it("does not ask", async () => {
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 3000 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 3000 }), CONTEXT);
 
       expect(text).not.toHaveBeenCalled();
     });
@@ -123,7 +127,7 @@ describe("ChooseDevPort", () => {
     it("parses the entered text into a number", async () => {
       vi.mocked(text).mockResolvedValueOnce("4000");
 
-      const answers = await new ChooseDevPort().ask(setupAnswers(), CONTEXT);
+      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
       expect(answers.devPort).toBe(4000);
     });
@@ -131,7 +135,7 @@ describe("ChooseDevPort", () => {
     it("looks for the next free port after it", async () => {
       vi.mocked(text).mockResolvedValueOnce("5174");
 
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
 
       expect(LocalServer.nextFreePort).toHaveBeenCalledWith(5173);
     });
@@ -139,7 +143,7 @@ describe("ChooseDevPort", () => {
     it("says the port is in use and suggests the next free one", async () => {
       vi.mocked(text).mockResolvedValueOnce("5174");
 
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
         message: "Port 5173 is in use. Which port should your app run on?",
@@ -151,7 +155,7 @@ describe("ChooseDevPort", () => {
       vi.mocked(LocalServer.nextFreePort).mockResolvedValue(undefined);
       vi.mocked(text).mockResolvedValueOnce("5173");
 
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 5173 }), CONTEXT);
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5173 }), CONTEXT);
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ initialValue: "5173" });
     });
@@ -161,7 +165,7 @@ describe("ChooseDevPort", () => {
     it("keeps the flagged port", async () => {
       vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
 
-      const answers = await new ChooseDevPort().ask(setupAnswers({ devPort: 5000 }), {
+      const answers = await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
         ...CONTEXT,
         devPortFromFlag: true,
       });
@@ -172,7 +176,7 @@ describe("ChooseDevPort", () => {
     it("does not ask", async () => {
       vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
 
-      await new ChooseDevPort().ask(setupAnswers({ devPort: 5000 }), {
+      await new ChooseDevPort(aPromptDeps()).ask(setupAnswers({ devPort: 5000 }), {
         ...CONTEXT,
         devPortFromFlag: true,
       });

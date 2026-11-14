@@ -19,6 +19,7 @@ import type { PromptContext } from "@/cli/commands/setup/shared";
 import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
+import { aPromptDeps } from "@tests/helpers/setup";
 
 /**
  * The framework setup detected.
@@ -95,7 +96,7 @@ describe("SetPasswordPolicy", () => {
   it("records the chosen minimum", async () => {
     vi.mocked(select).mockResolvedValueOnce(15);
 
-    const answers = await new SetPasswordPolicy().ask(setupAnswers(), CONTEXT);
+    const answers = await new SetPasswordPolicy(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
     expect(answers.passwordMinLength).toBe(15);
   });
@@ -103,7 +104,7 @@ describe("SetPasswordPolicy", () => {
   it("offers 15, 8 or none, with 15 preselected as the recommendation", async () => {
     vi.mocked(select).mockResolvedValueOnce(15);
 
-    await new SetPasswordPolicy().ask(setupAnswers(), CONTEXT);
+    await new SetPasswordPolicy(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which minimum length should passwords have? You can change it later.",
@@ -119,23 +120,26 @@ describe("SetPasswordPolicy", () => {
   it("records no minimum as none", async () => {
     vi.mocked(select).mockResolvedValueOnce(null);
 
-    const answers = await new SetPasswordPolicy().ask(setupAnswers(), CONTEXT);
+    const answers = await new SetPasswordPolicy(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
     expect(answers.passwordMinLength).toBeNull();
   });
 
   describe("with --password-min-length", () => {
     it("keeps the flagged minimum", async () => {
-      const answers = await new SetPasswordPolicy().ask(setupAnswers({ passwordMinLength: 10 }), {
-        ...CONTEXT,
-        passwordMinLengthFromFlag: true,
-      });
+      const answers = await new SetPasswordPolicy(aPromptDeps()).ask(
+        setupAnswers({ passwordMinLength: 10 }),
+        {
+          ...CONTEXT,
+          passwordMinLengthFromFlag: true,
+        },
+      );
 
       expect(answers.passwordMinLength).toBe(10);
     });
 
     it("does not ask", async () => {
-      await new SetPasswordPolicy().ask(setupAnswers({ passwordMinLength: 10 }), {
+      await new SetPasswordPolicy(aPromptDeps()).ask(setupAnswers({ passwordMinLength: 10 }), {
         ...CONTEXT,
         passwordMinLengthFromFlag: true,
       });

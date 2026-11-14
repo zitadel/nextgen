@@ -21,6 +21,14 @@ const INITIAL_DEPLOY_MESSAGE = "Initial deployment from setup";
 type Needs = Fact<"answers" | "project">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  "cwd" | "dryRun" | "env" | "isColored" | "isJson" | "narrate" | "signal" | "suggest" | "ui"
+>;
+
+/**
  * Publishes what setup scaffolded, after the commit so the release records it,
  * so the sign-in setup asks the developer to verify next is served that release
  * rather than the newest stored revisions.
@@ -29,67 +37,76 @@ type Needs = Fact<"answers" | "project">;
  * Narrated but never fatal: the app is scaffolded and committed, and a failure
  * leaves the deploy one command away.
  */
-export class DoInitialDeploy extends WizardStep<
-  "deploy",
-  Fact<"deployment">,
-  Needs,
-  SetupServices
-> {
+export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Needs> {
   readonly key = "deploy";
 
   /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
    * Deploy `.zitadel/` to the project's primary origin, or say what a dry run
-   * would.
+   * would, and say what happened.
    *
-   *
-   * Make the deploy, and say what happened.
    * @param needs - The answers and the project.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The deployment, or nothing when there was none.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"deployment">> {
-    if (services.dryRun) {
-      services.ui
+  async run(needs: Needs): Promise<Fact<"deployment">> {
+    if (this.deps.dryRun) {
+      this.deps.ui
         .begin("Deploying .zitadel/ to the project (dry run)")
         .done("Would deploy .zitadel/ to the project (dry run)");
-      return { deployment: await undefined };
+      return {
+        deployment: undefined,
+      };
     }
-    const deploying = services.ui.begin("Deploying .zitadel/ to the project");
+    const deploying = this.deps.ui.begin("Deploying .zitadel/ to the project");
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
           userAgent: userAgent(),
           baseUrl: needs.answers.server,
           token: needs.project.project_secret,
-          signal: services.signal,
+          signal: this.deps.signal,
         }),
         projectId: needs.project.id,
-        cwd: services.cwd,
-        env: services.env,
-        json: services.isJson,
-        color: services.isColored,
+        cwd: this.deps.cwd,
+        env: this.deps.env,
+        json: this.deps.isJson,
+        color: this.deps.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
-        narrate: services.narrate,
-        suggest: services.suggest,
+        narrate: this.deps.narrate,
+        suggest: this.deps.suggest,
       });
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
-      return { deployment: await deployment };
+      return {
+        deployment,
+      };
     } catch (error) {
-      if (isCancellation(error) || services.signal.aborted) {
+      if (isCancellation(error) || this.deps.signal.aborted) {
         throw error;
       }
       deploying.done("Left .zitadel/ undeployed");
       reportWarning(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${services.suggest(
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.deps.suggest(
           {
             id: "deploy",
             flags: { message: WHAT_CHANGED },
           },
         )} to publish .zitadel/.`,
       );
-      return { deployment: await undefined };
+      return {
+        deployment: undefined,
+      };
     }
   }
 }

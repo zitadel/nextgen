@@ -51,26 +51,36 @@ export async function developmentIssuer(
 }
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "cwd" | "env">;
+
+/**
  * Reads the origin the app serves from, which every callback URI is built on.
  */
-export class ReadIssuer extends WizardStep<
-  "issuer",
-  Readonly<{ issuer: string }>,
-  EnableInput,
-  EnableServices
-> {
+export class ReadIssuer extends WizardStep<"issuer", Readonly<{ issuer: string }>, EnableInput> {
   readonly key = "issuer";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Read the issuer from the run's environment.
    *
    * @param needs - What the run starts from.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The issuer.
    */
-  async run(needs: EnableInput, services: EnableServices): Promise<Readonly<{ issuer: string }>> {
+  async run(needs: EnableInput): Promise<Readonly<{ issuer: string }>> {
     return {
-      issuer: await developmentIssuer(services.cwd, needs.flags, services.env),
+      issuer: await developmentIssuer(this.deps.cwd, needs.flags, this.deps.env),
     };
   }
 }

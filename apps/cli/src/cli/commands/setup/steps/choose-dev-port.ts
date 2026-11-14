@@ -3,7 +3,7 @@ import { z } from "zod";
 import { type Refused, whole } from "@/lib/oclif/flags";
 import { LocalServer } from "@/lib/local-server/server";
 
-import type { Fact, PromptContext, SetupServices, SetupAnswers } from "@/cli/commands/setup/shared";
+import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
 
@@ -34,6 +34,19 @@ const PORT = {
 } as const satisfies Refused<number>;
 
 /**
+ * What the step reads from what is known.
+ */
+type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+>;
+
+/**
  * "Port 3000 is in use. Which port should your app run on?" — asked only when
  * something already holds the detected port. A free one is nearly always the
  * answer, and a question whose answer is Enter is one more step for nothing:
@@ -48,48 +61,53 @@ const PORT = {
  * validated answer becomes the issuer URL (`http://localhost:<port>`) via
  * `issuerFromPort`.
  */
-export class ChooseDevPort extends WizardStep<
-  "devPort",
-  Fact<"answers">,
-  QuestionNeeds,
-  SetupServices
-> {
+export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, QuestionNeeds> {
   readonly key = "devPort";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds, services: SetupServices): Promise<Fact<"answers">> {
+  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
-    if (services.nonInteractive || services.dryRun) {
+    if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
       answers: await this.ask(needs.answers, {
-        ask: services.ask,
+        ask: this.deps.ask,
         note: (title, lines) => {
-          services.ui.note(title, lines);
+          this.deps.ui.note(title, lines);
         },
         say: (text) => {
-          services.ui.say(text);
+          this.deps.ui.say(text);
         },
         spinner: (label, options) => {
-          return services.ui.spinner(label, options);
+          return this.deps.ui.spinner(label, options);
         },
         framework: {
           id: app.framework,
           displayName: orca.displayName(app.framework),
         },
-        suggest: services.suggest,
-        cwd: services.cwd,
+        suggest: this.deps.suggest,
+        cwd: this.deps.cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: services.serverFlag,
+        serverFlag: this.deps.serverFlag,
         devPortFromFlag: flags.devPort !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags.useCase !== undefined,
@@ -101,26 +119,32 @@ export class ChooseDevPort extends WizardStep<
   }
 
   /**
+   * Ask which port the app runs on, when the detected one is taken.
+   *
+   * @remarks
    * `--dev-port <n>` is authoritative: skip the prompt so an interactive answer can't override the
    * explicit flag (the base command already folded it into answers.devPort).
    *
    * With the next ones all taken too, the detected port is still the best guess.
+   *
+   * @param answers - The answers so far.
+   * @param ctx - What the question needs to ask.
+   * @returns The answers, with the port settled.
    */
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     if (ctx.devPortFromFlag || (await LocalServer.isPortFree(answers.devPort))) {
       return answers;
     }
     const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
-    const devPort = await ctx.ask.text({
-      name: "dev server port",
-      message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
-      placeholder: suggested,
-      initialValue: suggested,
-      parse: readPort,
-    });
     return {
       ...answers,
-      devPort,
+      devPort: await ctx.ask.text({
+        name: "dev server port",
+        message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
+        placeholder: suggested,
+        initialValue: suggested,
+        parse: readPort,
+      }),
     };
   }
 }
@@ -128,6 +152,9 @@ export class ChooseDevPort extends WizardStep<
 /**
  * The port a value names, for the dev-port prompt, so a port typed at the
  * prompt and one passed as `--dev-port` are held to the same rule.
+ *
+ * @param value - What was typed.
+ * @returns The port, or what is wrong with the value.
  */
 export function readPort(value: string): Parsed<number> {
   const parsed = PORT.schema.safeParse(value);
@@ -141,5 +168,3 @@ export function readPort(value: string): Parsed<number> {
         problem: "Must be a port number",
       };
 }
-
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;

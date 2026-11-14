@@ -1,8 +1,7 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { inspectWorktree } from "@/cli/commands/setup/shared";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { errorMessage } from "@/lib/errors";
 import { Repository, RepositoryError } from "@/lib/git";
 import { isSecretPath } from "@/lib/secret-paths";
@@ -20,6 +19,11 @@ export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with Zitadel 
 type Needs = Fact<"flags">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "cwd" | "dryRun" | "ui">;
+
+/**
  * Commits what setup wrote, so the release a later `deploy` builds records the
  * commit it came from; without it that deploy has no baseline and the one after
  * it can show no diff.
@@ -28,47 +32,57 @@ type Needs = Fact<"flags">;
  * Narrated but never fatal: without the commit the first release simply
  * records no provenance, which is what setup did before.
  */
-export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Needs, SetupServices> {
+export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Needs> {
   readonly key = "commit";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Put the scaffolded project under version control, unless it already is or
    * `--no-git` said not to.
    *
+   * @remarks
+   * Makes the commit, and says what happened. git guesses an author from the machine when none is
+   * configured and commits anyway, so the commit then exists but carries a name the developer did
+   * not choose. That is said out loud, with the one command that fixes it.
    *
-   * Make the commit, and say what happened.
    * @param needs - The flags.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What was done.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"commit">> {
+  async run(needs: Needs): Promise<Fact<"commit">> {
     if (!needs.flags.git !== false) {
       return {
-        commit: await {
+        commit: {
           kind: "skipped",
         },
       };
     }
-    if (services.dryRun) {
-      services.ui
+    if (this.deps.dryRun) {
+      this.deps.ui
         .begin("Committing the scaffolded project (dry run)")
         .done("Would initialise a git repository and commit the project (dry run)");
       return {
-        commit: await {
+        commit: {
           kind: "skipped",
         },
       };
     }
-    const committing = services.ui.begin("Committing the scaffolded project");
-    const outcome = await ensureInitialCommit(services.cwd);
+    const committing = this.deps.ui.begin("Committing the scaffolded project");
+    const outcome = await ensureInitialCommit(this.deps.cwd);
     if (outcome.kind !== "created" && outcome.kind !== "committed") {
       committing.done("Left the project uncommitted");
     }
     if (outcome.kind === "created" || outcome.kind === "committed") {
       committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
-      // git guesses an author from the machine when none is configured and
-      // commits anyway, so the commit exists but carries a name the developer
-      // did not choose. Said out loud, with the one command that fixes it.
       if (outcome.invented) {
         reportWarning(
           "git could build no author identity on this machine, so the commit was made as " +
@@ -86,7 +100,9 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
     if (outcome.kind === "unavailable") {
       reportWarning(unavailableWarning(outcome));
     }
-    return { commit: await outcome };
+    return {
+      commit: outcome,
+    };
   }
 }
 
@@ -107,7 +123,9 @@ export type InitialCommitOutcome =
       readonly invented: boolean;
     }
   /** `--no-git`, or a dry run. */
-  | { readonly kind: "skipped" }
+  | {
+      readonly kind: "skipped";
+    }
   /**
    * No commit: git is missing, or init/add/commit failed, or a secret would have been committed.
    * `createdRepository` says whether setup ran `git init` before it failed.
@@ -117,13 +135,6 @@ export type InitialCommitOutcome =
       readonly reason: string;
       readonly createdRepository: boolean;
     };
-
-/**
- * Last resort, used only where git can build no identity of its own: a bare
- * CI container has no configured identity and often no passwd entry or
- * hostname to guess from, and there git refuses to commit. No commit means no
- * `git_sha`, and the next deploy has nothing to diff against.
- */
 
 /**
  * Give the scaffolded project a git repository with one commit, so the release
@@ -140,6 +151,14 @@ export type InitialCommitOutcome =
  * failure is fatal: the worst case is the first release carrying no commit,
  * which a later deploy reports as having no baseline. When the commit fails after
  * setup ran `git init`, the outcome says so, since the repository now exists.
+ *
+ * The fallback author is a last resort, used only where git can build no identity of its own: a
+ * bare CI container has no configured identity and often no passwd entry or hostname to guess
+ * from, and there git refuses to commit. No commit means no `git_sha`, and the next deploy has
+ * nothing to diff against.
+ *
+ * @param cwd - The project directory.
+ * @returns What was done, never a failure.
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
   try {
@@ -166,20 +185,11 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
         createdRepository: existing === null,
       };
     }
-    const commit = {
+    return {
+      kind: existing === null ? "created" : "committed",
       sha: outcome.sha,
       guessedIdentity: outcome.author !== "yours",
       invented: outcome.author === "fallback",
-    };
-    if (existing === null) {
-      return {
-        kind: "created",
-        ...commit,
-      };
-    }
-    return {
-      kind: "committed",
-      ...commit,
     };
   } catch (error) {
     return {
@@ -190,7 +200,12 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
   }
 }
 
-/** The one line that says why the commit failed, since it goes into a one-line warning. */
+/**
+ * The one line that says why the commit failed, since it goes into a one-line warning.
+ *
+ * @param error - What stopped the commit.
+ * @returns The first line of its message.
+ */
 function firstLineOf(error: unknown): string {
   if (error instanceof RepositoryError) {
     return error.headline();
@@ -198,7 +213,13 @@ function firstLineOf(error: unknown): string {
   return errorMessage(error).split("\n")[0] ?? "";
 }
 
-/** The warning for a commit that could not be made, saying so when setup left a new, empty repository behind. */
+/**
+ * The warning for a commit that could not be made, saying so when setup left a new, empty
+ * repository behind.
+ *
+ * @param outcome - Why there was no commit, and whether setup created the repository.
+ * @returns The warning to show.
+ */
 export function unavailableWarning(outcome: {
   readonly reason: string;
   readonly createdRepository: boolean;

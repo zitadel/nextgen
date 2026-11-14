@@ -11,7 +11,6 @@ import {
   devCommandFor,
   inDirectory,
   installCommandFor,
-  type PackageCommand,
   runPackageCommand,
   runScriptCommandFor,
 } from "@/lib/package-manager";
@@ -27,44 +26,52 @@ const QUOTED_OUTPUT_LINES = 20;
 type Needs = Fact<"flags" | "orca" | "app" | "patched" | "scaffoldedFramework" | "issuer">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "cwd" | "dryRun" | "env" | "isJson" | "signal" | "suggest" | "ui">;
+
+/**
  * Installs the dependencies the patch added to the app.
  */
-export class InstallDependencies extends WizardStep<
-  "install",
-  Fact<"installOutcome">,
-  Needs,
-  SetupServices
-> {
+export class InstallDependencies extends WizardStep<"install", Fact<"installOutcome">, Needs> {
   readonly key = "install";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Install, or say what a dry run would.
    *
    * @param needs - The flags, the app and what the patch added.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What installing did.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"installOutcome">> {
+  async run(needs: Needs): Promise<Fact<"installOutcome">> {
     const { app, flags, issuer, orca, patched, scaffoldedFramework } = needs;
     const installOutcome = await installDependenciesForSetup({
-      cwd: services.cwd,
+      cwd: this.deps.cwd,
       ...(flags.cwd === undefined ? {} : { cwdFlag: flags.cwd }),
       depsAdded: patched.depsAdded,
-      dryRun: services.dryRun,
-      env: services.env,
+      dryRun: this.deps.dryRun,
+      env: this.deps.env,
       issuer,
-      json: services.isJson,
-      suggest: services.suggest,
+      json: this.deps.isJson,
+      suggest: this.deps.suggest,
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
       afterInstallScript: afterInstallScriptFor(orca, app.framework, scaffoldedFramework),
-      signal: services.signal,
+      signal: this.deps.signal,
       task: (label, work, done) => {
-        return services.ui.task(label, work, done);
+        return this.deps.ui.task(label, work, done);
       },
     });
-
-    services.dependenciesInstalled(installOutcome.install.package_manager);
     return {
       installOutcome,
     };
@@ -137,6 +144,20 @@ export type SetupInstallInput = {
  *
  * @remarks
  * What the reader runs, from the shell's directory; setup itself runs the plain commands in `cwd`.
+ *
+ * The after-install script runs as one step, its output kept back (a production build's log,
+ * whose last line reads like a next step) and quoted only when it fails. A failure is a warning:
+ * the app works without what the script writes, and the framework writes that on its first dev
+ * run. Ctrl-C is not a failure: it stops setup before its commit.
+ *
+ * The box carries the install command only when the install did not run, and the dev server holds
+ * the terminal it starts in, and every later command reads `.zitadel/` from this directory. The
+ * status command is in the box's steps, so a script gets it too.
+ *
+ * @param input - What the run knows and how it draws.
+ * @returns What installing did, and what the reader runs next.
+ * @throws {@link ZitadelError} When the install fails, or the run is cancelled during the
+ *   after-install script.
  */
 export async function installDependenciesForSetup(
   input: SetupInstallInput,
@@ -156,114 +177,85 @@ export async function installDependenciesForSetup(
     json: input.json,
     task: input.task,
     failed: (error, installCommand) => {
-      return installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+      return new ZitadelError(
+        "E_VALIDATION",
+        `Dependency install failed: ${installCommand.display}`,
+        {
+          hint: `Run ${installCommand.display} in ${input.cwd}, then start the app with ${devCommand.display}.`,
+          nextCommands: [shownInstall],
+          details: {
+            command: installCommand.display,
+            cwd: input.cwd,
+            original:
+              error instanceof Error
+                ? {
+                    name: error.name,
+                    message: error.message,
+                    code: (error as NodeJS.ErrnoException).code,
+                  }
+                : {
+                    message: String(error),
+                  },
+          },
+        },
+      );
     },
     ...(input.run === undefined ? {} : { run: input.run }),
   });
   if (install.status === "completed" && input.afterInstallScript !== undefined) {
-    await runAfterInstallScript(
-      runScriptCommandFor(packageManager, input.afterInstallScript),
-      input,
-    );
-  }
-
-  return outcome({
-    install,
-    devCommand: shownDev,
-    installCommand: shownInstall,
-    issuer: input.issuer,
-    suggest: input.suggest,
-    includeInstallCommand: install.status === "would-run" || install.status === "skipped",
-  });
-}
-
-/**
- * The after-install script setup runs for an app: the one its scaffolder names
- * when setup scaffolded it, and none for an app that was already there, whose
- * scripts setup does not know.
- */
-export function afterInstallScriptFor(
-  orca: Pick<Orca, "scaffolderFor">,
-  framework: string,
-  scaffolded: boolean,
-): string | undefined {
-  return scaffolded ? orca.scaffolderFor(framework).afterInstallScript : undefined;
-}
-
-/**
- * Runs the new app's after-install script as one step, its output kept back
- * (a production build's log, whose last line reads like a next step) and
- * quoted only when it fails. A failure is a warning: the app works without
- * what the script writes, and the framework writes that on its first dev run.
- * Ctrl-C is not a failure: it stops setup before its commit.
- */
-async function runAfterInstallScript(
-  command: PackageCommand,
-  input: SetupInstallInput,
-): Promise<void> {
-  try {
-    await input.task(
-      `Running ${command.display}`,
-      async () => {
-        await (input.run ?? runPackageCommand)(command, {
-          cwd: input.cwd,
-          env: input.env,
-          captureOutput: true,
-        });
-      },
-      () => {
-        return `Ran ${command.display}`;
-      },
-    );
-  } catch (error) {
-    if (input.signal.aborted) {
-      throw input.signal.reason;
+    const command = runScriptCommandFor(packageManager, input.afterInstallScript);
+    try {
+      await input.task(
+        `Running ${command.display}`,
+        async () => {
+          await (input.run ?? runPackageCommand)(command, {
+            cwd: input.cwd,
+            env: input.env,
+            captureOutput: true,
+          });
+        },
+        () => {
+          return `Ran ${command.display}`;
+        },
+      );
+    } catch (error) {
+      if (input.signal.aborted) {
+        throw input.signal.reason;
+      }
+      const output = (error as { output?: unknown }).output;
+      reportWarning(
+        `${suggestedCommandOf(inDirectory(command, input.cwdFlag, input.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
+          typeof output === "string" && output.trim() !== ""
+            ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
+            : ""
+        }`,
+      );
     }
-    const shown = suggestedCommandOf(inDirectory(command, input.cwdFlag, input.cwd));
-    const output = (error as { output?: unknown }).output;
-    const quoted =
-      typeof output === "string" && output.trim() !== ""
-        ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
-        : "";
-    reportWarning(
-      `${shown} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${quoted}`,
-    );
   }
-}
 
-function outcome(input: {
-  install: SetupInstall;
-  devCommand: SuggestedCommand;
-  /** {@link SetupInstall.command} as the reader runs it. */
-  installCommand: SuggestedCommand;
-  issuer: string;
-  suggest: Suggest;
-  includeInstallCommand: boolean;
-}): SetupInstallOutcome {
+  const includeInstallCommand = install.status === "would-run" || install.status === "skipped";
   const planCommand = input.suggest({
     id: "deploy",
     flags: { dryRun: true },
   });
   const statusCommand = input.suggest({ id: "status" });
   return {
-    install: input.install,
-    devCommand: input.devCommand,
+    install,
+    devCommand: shownDev,
     boxActions: [
-      ...(input.includeInstallCommand
+      ...(includeInstallCommand
         ? [
             {
               text: "Setup did not install the new dependencies, so install them first:",
-              command: input.installCommand,
+              command: shownInstall,
             },
           ]
         : []),
       {
         text: `Start your project (then open ${input.issuer}/register):`,
-        command: input.devCommand,
+        command: shownDev,
       },
       { text: verifyLoginAction() },
-      // The dev server holds the terminal it starts in, and every later command
-      // reads `.zitadel/` from this directory.
       {
         text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
       },
@@ -275,46 +267,32 @@ function outcome(input: {
     ],
     nextActions: [
       ...[
-        ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
-        `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
+        ...(includeInstallCommand ? [`Install dependencies: ${shownInstall}`] : []),
+        `Start your project: ${shownDev} (then open ${input.issuer}/register)`,
         verifyLoginAction(),
       ],
       ...customizeAndPublishActions(input.suggest),
     ],
-    // The status command is in the box's steps, so a script gets it too.
-    nextCommands: input.includeInstallCommand
-      ? [input.installCommand, input.devCommand, planCommand, statusCommand]
-      : [input.devCommand, planCommand, statusCommand],
+    nextCommands: includeInstallCommand
+      ? [shownInstall, shownDev, planCommand, statusCommand]
+      : [shownDev, planCommand, statusCommand],
   };
 }
 
-function installFailed(
-  error: unknown,
-  installCommand: PackageCommand,
-  devCommand: PackageCommand,
-  shownInstall: SuggestedCommand,
-  cwd: string,
-): ZitadelError {
-  return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
-    hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
-    nextCommands: [shownInstall],
-    details: {
-      command: installCommand.display,
-      cwd,
-      original: errorShape(error),
-    },
-  });
-}
-
-function errorShape(error: unknown): Record<string, unknown> {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      code: (error as NodeJS.ErrnoException).code,
-    };
-  }
-  return {
-    message: String(error),
-  };
+/**
+ * The after-install script setup runs for an app: the one its scaffolder names
+ * when setup scaffolded it, and none for an app that was already there, whose
+ * scripts setup does not know.
+ *
+ * @param orca - What knows the scaffolders.
+ * @param framework - The app's framework.
+ * @param scaffolded - Whether setup scaffolded the app.
+ * @returns The script, or `undefined` when there is none to run.
+ */
+export function afterInstallScriptFor(
+  orca: Pick<Orca, "scaffolderFor">,
+  framework: string,
+  scaffolded: boolean,
+): string | undefined {
+  return scaffolded ? orca.scaffolderFor(framework).afterInstallScript : undefined;
 }

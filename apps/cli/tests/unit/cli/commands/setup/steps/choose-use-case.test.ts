@@ -21,6 +21,7 @@ import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { aPromptDeps } from "@tests/helpers/setup";
 
 /**
  * The framework setup detected.
@@ -102,7 +103,10 @@ describe("ChooseUseCase", () => {
   it("writes the selected use case into the answers", async () => {
     vi.mocked(select).mockResolvedValueOnce("business");
 
-    const answers = await new ChooseUseCase().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    const answers = await new ChooseUseCase(aPromptDeps()).ask(
+      setupAnswers({ useCase: "minimal" }),
+      CONTEXT,
+    );
 
     expect(answers.useCase).toBe("business");
   });
@@ -110,7 +114,7 @@ describe("ChooseUseCase", () => {
   it("preselects the use case already answered", async () => {
     vi.mocked(select).mockResolvedValueOnce("business");
 
-    await new ChooseUseCase().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "minimal" });
   });
@@ -118,7 +122,7 @@ describe("ChooseUseCase", () => {
   it("asks which registration fields to collect, with every field set in its label", async () => {
     vi.mocked(select).mockResolvedValueOnce("minimal");
 
-    await new ChooseUseCase().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+    await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which fields should registration collect? You can change them later.",
@@ -132,16 +136,19 @@ describe("ChooseUseCase", () => {
 
   describe("with --use-case", () => {
     it("keeps the flagged use case", async () => {
-      const answers = await new ChooseUseCase().ask(setupAnswers({ useCase: "consumer" }), {
-        ...CONTEXT,
-        useCaseFromFlag: true,
-      });
+      const answers = await new ChooseUseCase(aPromptDeps()).ask(
+        setupAnswers({ useCase: "consumer" }),
+        {
+          ...CONTEXT,
+          useCaseFromFlag: true,
+        },
+      );
 
       expect(answers.useCase).toBe("consumer");
     });
 
     it("does not ask", async () => {
-      await new ChooseUseCase().ask(setupAnswers({ useCase: "consumer" }), {
+      await new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "consumer" }), {
         ...CONTEXT,
         useCaseFromFlag: true,
       });
@@ -155,7 +162,7 @@ describe("ChooseUseCase", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseUseCase().ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
+      return new ChooseUseCase(aPromptDeps()).ask(setupAnswers({ useCase: "minimal" }), CONTEXT);
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

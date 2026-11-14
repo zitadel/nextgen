@@ -20,11 +20,26 @@ type Remote = Readonly<{
 }>;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "connect">;
+
+/**
  * Resolves the project and server before anything else is asked for: being
  * turned away after typing a secret would mean typing it again.
  */
-export class ReadOrigins extends WizardStep<"remote", Remote, object, EnableServices> {
+export class ReadOrigins extends WizardStep<"remote", Remote, object> {
   readonly key = "remote";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Connect, and list the origins.
@@ -35,11 +50,11 @@ export class ReadOrigins extends WizardStep<"remote", Remote, object, EnableServ
    * instead, as `OriginService.remove` does.
    *
    * @param _needs - Nothing from earlier steps.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The connection and the origins.
    */
-  async run(_needs: object, services: EnableServices): Promise<Remote> {
-    const remote = await services.connect();
+  async run(_needs: object): Promise<Remote> {
+    const remote = await this.deps.connect();
     const origins = await new OriginService(remote.client, remote.projectId)
       .list()
       .catch((cause: unknown) => {

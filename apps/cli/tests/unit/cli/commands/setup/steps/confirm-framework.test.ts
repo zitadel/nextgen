@@ -21,6 +21,7 @@ import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { aPromptDeps } from "@tests/helpers/setup";
 
 /**
  * The framework setup detected.
@@ -103,7 +104,7 @@ describe("ConfirmFramework", () => {
     it("returns the answers unchanged", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      const answers = await new ConfirmFramework().ask(setupAnswers(), CONTEXT);
+      const answers = await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
       expect(answers).toEqual(setupAnswers());
     });
@@ -111,7 +112,7 @@ describe("ConfirmFramework", () => {
     it("asks whether to set up Zitadel in the detected app", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(true);
 
-      await new ConfirmFramework().ask(setupAnswers(), CONTEXT);
+      await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
 
       expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
         message: "Would you like to set up Zitadel in this Next.js app?",
@@ -121,7 +122,7 @@ describe("ConfirmFramework", () => {
 
   describe("when the developer already chose the framework", () => {
     it("returns the answers unchanged", async () => {
-      const answers = await new ConfirmFramework().ask(setupAnswers(), {
+      const answers = await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), {
         ...CONTEXT,
         frameworkChosen: true,
       });
@@ -130,7 +131,10 @@ describe("ConfirmFramework", () => {
     });
 
     it("does not ask", async () => {
-      await new ConfirmFramework().ask(setupAnswers(), { ...CONTEXT, frameworkChosen: true });
+      await new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), {
+        ...CONTEXT,
+        frameworkChosen: true,
+      });
 
       expect(confirm).not.toHaveBeenCalled();
     });
@@ -141,7 +145,7 @@ describe("ConfirmFramework", () => {
       vi.mocked(confirm).mockResolvedValueOnce(false);
 
       const error = await rejectionOf(() => {
-        return new ConfirmFramework().ask(setupAnswers(), CONTEXT);
+        return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -152,7 +156,7 @@ describe("ConfirmFramework", () => {
       vi.mocked(confirm).mockResolvedValueOnce(false);
 
       const error = await rejectionOf(() => {
-        return new ConfirmFramework().ask(setupAnswers(), CONTEXT);
+        return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
       });
 
       expect(error).toBeInstanceOf(ZitadelError);
@@ -168,7 +172,7 @@ describe("ConfirmFramework", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ConfirmFramework().ask(setupAnswers(), CONTEXT);
+      return new ConfirmFramework(aPromptDeps()).ask(setupAnswers(), CONTEXT);
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

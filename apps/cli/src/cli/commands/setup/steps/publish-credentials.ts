@@ -1,55 +1,30 @@
-import {
-  type CreatedProject,
-  createZitadelClient,
-  VariableService,
-  VariableWrite,
-} from "@/lib/backend";
+import { createZitadelClient, VariableService, VariableWrite } from "@/lib/backend";
 import type { SecretPublisher } from "@/lib/idp";
-import { userAgent } from "@/lib/user-agent";
-
-import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
-
 import {
-  type PublishState,
   publishClientId,
+  type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
   type SecretOutcome,
   storeClientSecret,
 } from "@/lib/idp";
+import { userAgent } from "@/lib/user-agent";
+
+import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, SsoAnswer, SsoDraft, SetupServices } from "@/cli/commands/setup/shared";
-
-/**
- * The drafts as answers, for a run that goes on to publish credentials.
- *
- * The wizard asks for whatever a flag left out, and a scripted run refuses
- * before this point without the client id or the secret on stdin, so a draft
- * that reaches here without one is a bug in setup and not something to ask
- * the developer about.
- */
-function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
-  return drafts.map((draft) => {
-    const { clientId, secret } = draft.credentials;
-    if (clientId === undefined || secret === undefined) {
-      throw new Error(`no credentials were collected for ${providerOf(draft.selection).slug}`);
-    }
-    return {
-      ...draft,
-      credentials: {
-        clientId,
-        secret,
-      },
-    };
-  });
-}
+import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
  */
 type Needs = Fact<"answers" | "project">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "dryRun" | "signal" | "suggest">;
 
 /**
  * Stores each provider's client id and secret in the project's variables.
@@ -68,31 +43,87 @@ type Needs = Fact<"answers" | "project">;
 export class PublishCredentials extends WizardStep<
   "publishCredentials",
   Fact<"ssoOutcomes">,
-  Needs,
-  SetupServices
+  Needs
 > {
   readonly key = "publishCredentials";
 
   /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
    * Publish the credentials of every provider.
    *
+   * @remarks
+   * The drafts become answers here: the wizard asks for whatever a flag left out, and a scripted
+   * run refuses before this point without the client id or the secret on stdin, so a draft that
+   * reaches here without one is a bug in setup and not something to ask the developer about.
+   *
+   * The credentials reach the project through its variables, and there is none when there is no
+   * project behind the run: `--server mock` answers from fixtures and has no variables to write.
+   * The freshly minted project credentials are used directly: setup has them in hand and nothing
+   * has been claimed yet, so there is no owner for the developer to name.
+   *
    * @param needs - The answers and the project.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials.
+   * @throws {Error} When a provider reaches here without the credentials the wizard collects.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"ssoOutcomes">> {
+  async run(needs: Needs): Promise<Fact<"ssoOutcomes">> {
     const { answers, project } = needs;
-    if (answers.sso.length === 0 || services.dryRun) {
+    if (answers.sso.length === 0 || this.deps.dryRun) {
       return {
         ssoOutcomes: new Map(),
       };
     }
+    const variables =
+      answers.server === "mock"
+        ? undefined
+        : new VariableService(
+            createZitadelClient({
+              userAgent: userAgent(),
+              baseUrl: answers.server,
+              token: project.project_secret,
+              signal: this.deps.signal,
+            }),
+            project.id,
+          );
     return {
       ssoOutcomes: new Map(
         await this.publishEach(
-          completeSso(answers.sso),
-          ssoCredentialPublisher(answers.server, project, services.signal),
-          services,
+          answers.sso.map((draft) => {
+            const { clientId, secret } = draft.credentials;
+            if (clientId === undefined || secret === undefined) {
+              throw new Error(
+                `no credentials were collected for ${providerOf(draft.selection).slug}`,
+              );
+            }
+            return {
+              ...draft,
+              credentials: {
+                clientId,
+                secret,
+              },
+            };
+          }),
+          variables === undefined
+            ? undefined
+            : async (name, value, { secret }) => {
+                await variables.set(
+                  name,
+                  value,
+                  VariableWrite.of({
+                    secret,
+                    preview: false,
+                  }),
+                );
+              },
         ),
       ),
     };
@@ -104,15 +135,23 @@ export class PublishCredentials extends WizardStep<
    * @remarks
    * Only here do both credentials have to exist, and the type says so.
    *
+   * A publish that failed because of Ctrl-C reads as a refusal below, so the cancellation is
+   * raised before reporting instead of being reported as one.
+   *
+   * A connection pointing somewhere other than the vendor is said out loud: it is not what the
+   * developer will want in the end, and nothing else in the summary would show it.
+   *
+   * The wizard refuses an empty secret, so a deferred publish here only ever means there was no
+   * project to publish to.
+   *
    * @param answers - The providers still to publish.
    * @param publish - How the credentials reach the project.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What became of each provider's credentials, by slug.
    */
   private async publishEach(
     answers: readonly SsoAnswer[],
-    publish: ReturnType<typeof ssoCredentialPublisher>,
-    services: SetupServices,
+    publish: SecretPublisher | undefined,
   ): Promise<
     ReadonlyArray<readonly [ConnectionSlug, { clientId: PublishState; secret: SecretOutcome }]>
   > {
@@ -132,22 +171,15 @@ export class PublishCredentials extends WizardStep<
       value: answer.credentials.secret,
       publish,
     });
-    // A publish that failed because of Ctrl-C reads as a refusal below, so
-    // the cancellation is raised here instead of being reported as one.
-    services.signal.throwIfAborted();
+    this.deps.signal.throwIfAborted();
     if (answer.endpoints?.issuer !== undefined) {
-      // Said out loud: a connection pointing somewhere other than the
-      // vendor is not what the developer will want in the end, and nothing
-      // else in the summary would show it.
       reportWarning(
         `${providerOf(answer.selection).displayName} points at ` +
           `${answer.endpoints.issuer}, not the provider`,
       );
     }
-    reportClientIdOutcome(idVariable, clientId, services.suggest);
-    // The wizard refuses an empty secret, so a deferred publish here only
-    // ever means there was no project to publish to.
-    reportSecretOutcome(secret, false, services.suggest);
+    reportClientIdOutcome(idVariable, clientId, this.deps.suggest);
+    reportSecretOutcome(secret, false, this.deps.suggest);
     return [
       [
         slug,
@@ -156,42 +188,7 @@ export class PublishCredentials extends WizardStep<
           secret,
         },
       ],
-      ...(await this.publishEach(rest, publish, services)),
+      ...(await this.publishEach(rest, publish)),
     ];
   }
-}
-
-/**
- * How the connection's credentials reach the project just created.
- *
- * `undefined` when there is no project behind the run — `--server mock`
- * answers from fixtures and has no variables to write. The freshly minted
- * project credentials are used directly: setup has them in hand and nothing
- * has been claimed yet, so there is no owner for the developer to name.
- */
-function ssoCredentialPublisher(
-  server: string,
-  project: CreatedProject,
-  signal: AbortSignal,
-): SecretPublisher | undefined {
-  if (server === "mock") {
-    return undefined;
-  }
-  const client = createZitadelClient({
-    userAgent: userAgent(),
-    baseUrl: server,
-    token: project.project_secret,
-    signal,
-  });
-  const variableService = new VariableService(client, project.id);
-  return async (name, value, { secret }) => {
-    await variableService.set(
-      name,
-      value,
-      VariableWrite.of({
-        secret,
-        preview: false,
-      }),
-    );
-  };
 }

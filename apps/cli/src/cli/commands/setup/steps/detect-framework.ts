@@ -1,22 +1,24 @@
 import type { Questions } from "@/lib/ui";
-import {
-  type SetupRetryOptions,
-  retryOptionsOf,
-  setupRetryFlags,
-} from "@/cli/commands/setup/shared";
-import type { Orca, ScaffoldTarget } from "@/lib/orca";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
 
 import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
 import { ZitadelError } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-
 /**
  * What the step reads from what is known.
  */
 type Needs = Fact<"flags">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  "ask" | "cwd" | "env" | "force" | "nonInteractive" | "serverFlag" | "ui"
+>;
 
 /**
  * Finds the app the questions are about: the one detected here, or else a new
@@ -30,35 +32,56 @@ type Needs = Fact<"flags">;
 export class DetectFramework extends WizardStep<
   "detect",
   Fact<"orca" | "found" | "scaffoldedFramework">,
-  Needs,
-  SetupServices
+  Needs
 > {
   readonly key = "detect";
 
   /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
    * Detect the framework, or plan the one to scaffold.
    *
-   *
    * @remarks
-   * A new app, created below, or on a dry run only previewed.
+   * A new app is created later, or on a dry run only previewed.
+   *
+   * The path is shown with the user's `$HOME` as `~` for compact terminal output, falling back to
+   * the raw path when `HOME` isn't set or doesn't match. The environment is the run's, not the
+   * process's, so a run told what its environment is reads the same one everywhere.
+   *
+   * When no framework is detected and the directory cannot be scaffolded into, the error says so.
+   * The framework to scaffold is the explicit `--framework`, else the prompt, else a hard error in
+   * non-interactive mode: an agent must pass `--framework`. That error is most often met by a
+   * coding agent or CI: no terminal, and no flag saying so. So it names every choice instead of
+   * pointing at a prompt it can't see, and for a local server hands over the exact rerun. Only
+   * then: `setupRetryFlags` pins `--server local`.
    *
    * @param needs - The flags.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What was found.
    * @throws {@link ZitadelError} When no framework is found and the directory
    *   cannot be scaffolded into, or no framework was chosen.
    */
-  async run(
-    needs: Needs,
-    services: SetupServices,
-  ): Promise<Fact<"orca" | "found" | "scaffoldedFramework">> {
+  async run(needs: Needs): Promise<Fact<"orca" | "found" | "scaffoldedFramework">> {
     const flags = needs.flags;
     const orca = createOrca();
-    const detecting = services.ui.begin(
-      `Detecting framework in ${escapeControlCharacters(shortPath(services.cwd, services.env))}`,
+    const home = this.deps.env.HOME;
+    const detecting = this.deps.ui.begin(
+      `Detecting framework in ${escapeControlCharacters(
+        home && this.deps.cwd.startsWith(home)
+          ? `~${this.deps.cwd.slice(home.length)}`
+          : this.deps.cwd,
+      )}`,
     );
     const found = await orca
-      .detect(services.cwd, flags.framework)
+      .detect(this.deps.cwd, flags.framework)
       .then((facts) => {
         detecting.done(
           `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
@@ -77,35 +100,65 @@ export class DetectFramework extends WizardStep<
           detecting.fail();
           throw error;
         }
-        const target = await inspectScaffoldTarget(services.cwd);
-        if (!target.scaffoldable && !services.force) {
+        const target = await inspectScaffoldTarget(this.deps.cwd);
+        if (!target.scaffoldable && !this.deps.force) {
           detecting.fail();
-          throw frameworkDetectionWithScaffoldTarget(error, services.cwd, target);
+          throw new ZitadelError(
+            error.code,
+            "Could not detect a supported app framework, and this directory is not empty",
+            {
+              hint:
+                `${target.reason ?? "Directory is not empty."} ` +
+                "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
+              details: {
+                cwd: this.deps.cwd,
+                entries: target.entries,
+                reason: target.reason,
+              },
+            },
+          );
         }
         detecting.done(
           target.scaffoldable
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
+        if (!flags.framework && this.deps.nonInteractive) {
+          const choices = orca.availableFrameworks().map((choice) => {
+            return choice.id;
+          });
+          const suggested = choices.includes("next") ? "next" : choices[0];
+          throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
+            hint: (
+              "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
+              `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
+            ).trimEnd(),
+            nextCommands:
+              this.deps.serverFlag === "local" && suggested
+                ? [
+                    {
+                      id: "setup",
+                      flags: setupRetryFlags({
+                        ...retryOptionsFromFlags(flags),
+                        framework: suggested,
+                      }),
+                    },
+                  ]
+                : [],
+            details: { frameworks: choices },
+          });
+        }
         return {
           app: await orca.planScaffold(
-            services.cwd,
-            await resolveScaffoldFramework(flags.framework, services.nonInteractive, orca, {
-              retry: retryOptionsOf(flags),
-              serverFlag: services.serverFlag,
-              ask: services.ask,
-            }),
+            this.deps.cwd,
+            flags.framework ||
+              (await new PickFrameworkPrompt().ask(orca.availableFrameworks(), this.deps.ask)),
           ),
           detected: undefined,
           scaffoldedBesideFiles: !target.scaffoldable,
         };
       });
     const scaffoldedFramework = found.detected === undefined;
-    services.frameworkResolved({
-      flags,
-      found,
-      scaffoldedFramework,
-    });
     return {
       orca,
       found,
@@ -114,79 +167,19 @@ export class DetectFramework extends WizardStep<
   }
 }
 
-function frameworkDetectionWithScaffoldTarget(
-  error: ZitadelError,
-  cwd: string,
-  target: ScaffoldTarget,
-): ZitadelError {
-  return new ZitadelError(
-    error.code,
-    "Could not detect a supported app framework, and this directory is not empty",
-    {
-      hint:
-        `${target.reason ?? "Directory is not empty."} ` +
-        "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
-      details: {
-        cwd,
-        entries: target.entries,
-        reason: target.reason,
-      },
-    },
-  );
-}
-
-/**
- * Resolves which framework to scaffold into an empty directory: the explicit
- * `--framework`, else PickFrameworkPrompt, else a hard error in non-interactive
- * mode (an agent must pass `--framework`).
- */
-async function resolveScaffoldFramework(
-  framework: string | undefined,
-  nonInteractive: boolean,
-  orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; ask: Questions },
-): Promise<string> {
-  if (framework) {
-    return framework;
-  }
-  if (nonInteractive) {
-    // Most often a coding agent or CI: no terminal, and no flag saying so. So
-    // the error names every choice instead of pointing at a prompt it can't
-    // see, and for a local server hands over the exact rerun. Only then:
-    // `setupRetryFlags` pins `--server local`.
-    const choices = orca.availableFrameworks().map((choice) => {
-      return choice.id;
-    });
-    const suggested = choices.includes("next") ? "next" : choices[0];
-    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: (
-        "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
-      ).trimEnd(),
-      nextCommands:
-        guidance.serverFlag === "local" && suggested
-          ? [
-              {
-                id: "setup",
-                flags: setupRetryFlags({
-                  ...guidance.retry,
-                  framework: suggested,
-                }),
-              },
-            ]
-          : [],
-      details: { frameworks: choices },
-    });
-  }
-  return new PickFrameworkPrompt().ask(orca.availableFrameworks(), guidance.ask);
-}
-
 /**
  * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.
  * Runs at the empty-directory branch (before any other detection). Returns the chosen framework id; choices come from
  * `Orca.availableFrameworks`.
  */
 export class PickFrameworkPrompt {
+  /**
+   * Ask which framework to scaffold.
+   *
+   * @param choices - The frameworks that can be scaffolded.
+   * @param ask - How questions are asked.
+   * @returns The id of the chosen framework.
+   */
   async ask(
     choices: ReadonlyArray<{ id: string; displayName: string }>,
     ask: Questions,
@@ -202,18 +195,4 @@ export class PickFrameworkPrompt {
       }),
     });
   }
-}
-
-/**
- * Replaces the user's `$HOME` with `~` in a path for compact terminal output.
- * Falls back to the raw path when `HOME` isn't set or doesn't match. The
- * environment is the run's, not the process's, so a run told what its
- * environment is reads the same one everywhere.
- */
-function shortPath(absolute: string, env: NodeJS.ProcessEnv): string {
-  const home = env.HOME;
-  if (home && absolute.startsWith(home)) {
-    return `~${absolute.slice(home.length)}`;
-  }
-  return absolute;
 }

@@ -1,5 +1,5 @@
 import { access } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { basename, join } from "node:path";
 import { callbackUriFor } from "@/lib/idp";
 import { createOrca, issuerFromPort, type Orca } from "@/lib/orca";
 import {
@@ -11,12 +11,11 @@ import {
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { relativeDisplayPath as relativeDisplay } from "@/cli/commands/setup/shared";
 
-import type { JsonEnvelope } from "@/lib/oclif";
+import type { CommandResult } from "@/lib/oclif";
 import { EndStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
 import {
@@ -52,11 +51,37 @@ export const RECOVERY_ENV_FILE = ".env.development.local";
 type Needs = Fact<"flags" | "preflight">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  | "cliVersion"
+  | "consent"
+  | "cwd"
+  | "dryRun"
+  | "realRun"
+  | "recoverAt"
+  | "signal"
+  | "suggest"
+  | "ui"
+>;
+
+/**
  * Ends the run for an app already set up that was asked for another port, which
  * is how it moves: there is nothing left to scaffold.
  */
-export class MoveAppPort extends EndStep<"moveDevPort", JsonEnvelope, Needs, SetupServices> {
+export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
   readonly key = "moveDevPort";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Whether the directory is set up and an explicit `--dev-port` came with it.
@@ -65,86 +90,89 @@ export class MoveAppPort extends EndStep<"moveDevPort", JsonEnvelope, Needs, Set
    * @param _services - What the command provides.
    * @returns Whether to end here.
    */
-  when(needs: Needs, _services: SetupServices): boolean {
+  when(needs: Needs): boolean {
     return needs.preflight.configured && needs.flags.devPort !== undefined;
   }
 
   /**
    * Move the app to the new port.
    *
-   *
+   * @remarks
    * `setup --dev-port <n>` on an app setup already patched: moves the app to
    * the new port (see {@link moveDevPort}) instead of skipping the directory.
+   * The spinner ends before the consent question, which it would draw over. A
+   * step ends once, so a failure says nothing more when `filesMoved` ended it.
+   *
+   * The recovery is pinned to the project just moved, as the other recoveries
+   * are: its env file, or the server the move used for a project setup gave
+   * none, never what the shell has exported. The cleanup is not setup again:
+   * the app is on the new port by now, so a rerun moves nothing and never
+   * reaches the old origin. The new origin serves nothing until a deployment
+   * names it, hence the deploy warning.
+   *
    * @param needs - The flags and what was settled before the first step.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The result.
    */
-  async run(needs: Needs, services: SetupServices): Promise<JsonEnvelope> {
-    const config = await readZitadelConfig(services.cwd);
+  async run(needs: Needs): Promise<CommandResult> {
+    const config = await readZitadelConfig(this.deps.cwd);
     const server = readProjectServer(config);
-    const moving = services.ui.begin(
-      `Moving the app to ${issuerFromPort(needs.flags.devPort ?? 0)}${services.dryRun ? " (dry run)" : ""}`,
+    const moving = this.deps.ui.begin(
+      `Moving the app to ${issuerFromPort(needs.flags.devPort ?? 0)}${this.deps.dryRun ? " (dry run)" : ""}`,
     );
     const move = await moveDevPort({
-      cwd: services.cwd,
+      cwd: this.deps.cwd,
       devPort: needs.flags.devPort ?? 0,
       source: server,
       orca: createOrca(),
-      cliVersion: services.cliVersion,
-      dryRun: services.dryRun,
-      signal: services.signal,
+      cliVersion: this.deps.cliVersion,
+      dryRun: this.deps.dryRun,
+      signal: this.deps.signal,
       consent: (gate) => {
-        return services.consent(gate);
+        return this.deps.consent(gate);
       },
       filesMoved: (moved) => {
         for (const file of moved.result.filesWritten) {
           moving.detail(
-            `${services.dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(services.cwd, file))}`,
+            `${this.deps.dryRun ? "Would update" : "Updated"} ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))}`,
           );
         }
-        // Ended before the consent question, which a spinner would draw over.
         if (moved.previousIssuer === moved.issuer) {
           moving.done(`Already on ${moved.issuer}`);
         } else {
           moving.done(
-            `${services.dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
+            `${this.deps.dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
           );
         }
       },
     }).catch((error: unknown) => {
-      // A step ends once, so this says nothing more when `filesMoved` ended it.
       moving.fail();
       throw error;
     });
-    // Pinned to the project just moved, as the other recoveries are: its env
-    // file, or the server the move used for a project setup gave none, never
-    // what the shell has exported.
-    const hasEnvFile = await access(join(services.cwd, RECOVERY_ENV_FILE)).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    );
-    if (!hasEnvFile) {
-      services.recoverAt(server);
+    if (
+      !(await access(join(this.deps.cwd, RECOVERY_ENV_FILE)).then(
+        () => {
+          return true;
+        },
+        () => {
+          return false;
+        },
+      ))
+    ) {
+      this.deps.recoverAt(server);
     }
-    // Not setup again: the app is on the new port by now, so a rerun moves
-    // nothing and never reaches the old origin.
     const cleanup =
       move.refused && move.staleOrigin !== undefined
-        ? services.suggest({
+        ? this.deps.suggest({
             id: "origin:rm",
             args: { pattern: move.staleOrigin },
             flags: { force: true },
           })
         : undefined;
-    // The new origin serves nothing until a deployment names it.
     const deploy =
       move.undeployed === undefined
         ? undefined
-        : services.suggest({
+        : this.deps.suggest({
             id: "deploy",
             flags: { message: WHAT_CHANGED },
           });
@@ -165,21 +193,21 @@ export class MoveAppPort extends EndStep<"moveDevPort", JsonEnvelope, Needs, Set
     }
     const moved = move.previousIssuer !== move.issuer;
     const headline = moved
-      ? `${services.dryRun ? "Would move" : "Moved"} the app to ${move.issuer}`
+      ? `${this.deps.dryRun ? "Would move" : "Moved"} the app to ${move.issuer}`
       : `The app is already on ${move.issuer}`;
-    const title = services.dryRun ? `${headline} (dry run)` : headline;
+    const title = this.deps.dryRun ? `${headline} (dry run)` : headline;
 
-    return services.emit({
+    return {
       status: "ok",
       data: {
         title,
-        ...(services.dryRun ? { dry_run: true } : {}),
+        ...(this.deps.dryRun ? { dry_run: true } : {}),
         moved,
         previous_issuer: move.previousIssuer,
         issuer: move.issuer,
         dev_port: needs.flags.devPort ?? 0,
         files_written: move.result.filesWritten.map((file) => {
-          return relativeDisplay(services.cwd, file);
+          return relativeDisplay(this.deps.cwd, file);
         }),
         deployment_id: move.deploymentId ?? null,
       },
@@ -189,20 +217,20 @@ export class MoveAppPort extends EndStep<"moveDevPort", JsonEnvelope, Needs, Set
         boxed: true,
       },
       next: {
-        actions: services.dryRun ? [] : [`Restart the dev server and open ${move.issuer}/login.`],
-        ...(deploy === undefined && cleanup === undefined && !services.dryRun
+        actions: this.deps.dryRun ? [] : [`Restart the dev server and open ${move.issuer}/login.`],
+        ...(deploy === undefined && cleanup === undefined && !this.deps.dryRun
           ? {}
           : {
               commands: [
                 deploy,
                 cleanup,
-                services.dryRun ? await services.realRun() : undefined,
+                this.deps.dryRun ? await this.deps.realRun() : undefined,
               ].filter((command) => {
                 return command !== undefined;
               }),
             }),
       },
-    });
+    };
   }
 }
 
@@ -238,6 +266,19 @@ export type DevPortMove = Readonly<{
  * `consent`: one that is refused, declined or fails is reported, not thrown,
  * because the app already works on the new port and the old pattern only
  * admits a port nothing serves any more.
+ *
+ * @remarks
+ * The configuration is read before anything changes, so one that cannot be read
+ * stops the move rather than leaving it half made. The app's own origin is
+ * primary, so the move rewrites that list; an older secret that still carries
+ * the issuer as a preview pattern is rewritten too, so the stale URL is not
+ * left behind either way. A refusal for want of `--force` leaves the origin
+ * behind and says so; anything else the request for consent throws (Ctrl-C, a
+ * bug) stops the run.
+ *
+ * @param opts - Where, to which port, and how to ask and report.
+ * @returns What the move changed and what it left behind.
+ * @throws {ZitadelError} When the server refuses the new origin.
  */
 export async function moveDevPort(opts: {
   cwd: string;
@@ -259,8 +300,6 @@ export async function moveDevPort(opts: {
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
-  // Read before anything changes, so a configuration that cannot be read
-  // stops the move rather than leaving it half made.
   const ssoProviders = moving ? await connectionSlugs(cwd) : [];
 
   const client = createZitadelClient({
@@ -299,9 +338,6 @@ export async function moveDevPort(opts: {
   });
 
   if (!dryRun) {
-    // The app's own origin is primary, so the move rewrites that list. An
-    // older secret that still carries the issuer as a preview pattern is
-    // rewritten too, so the stale URL is not left behind either way.
     const rewrite = (patterns: string[]): string[] => {
       return replaceOrigin(patterns, previousIssuer, issuer).filter((pattern) => {
         return typeof pattern === "string";
@@ -328,9 +364,6 @@ export async function moveDevPort(opts: {
     result,
   });
   const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
-  // A refusal for want of --force leaves the origin behind and says so;
-  // anything else the request for consent throws (Ctrl-C, a bug) stops
-  // the run.
   const consent = replacing
     ? await opts
         .consent({
@@ -345,7 +378,6 @@ export async function moveDevPort(opts: {
           throw error;
         })
     : undefined;
-  const refused = consent === "refused" ? true : undefined;
   const originService =
     consent === undefined || consent === "refused"
       ? undefined
@@ -373,7 +405,7 @@ export async function moveDevPort(opts: {
     result,
     ssoProviders,
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
-    ...(refused === undefined ? {} : { refused }),
+    ...(consent === "refused" ? { refused: true as const } : {}),
     ...served,
   };
 }
@@ -382,6 +414,13 @@ export async function moveDevPort(opts: {
  * Deploys the project's newest primary release again so `issuer`, a primary
  * origin added since, serves it too: the deployment it made, or why the new
  * origin serves nothing yet. Only a cancellation is thrown.
+ *
+ * @param client - The client of the project's server.
+ * @param projectId - The project.
+ * @param issuer - The origin added since.
+ * @param devPort - The port the app moved to.
+ * @returns The deployment it made, or why there is none.
+ * @throws The cancellation, when the run was interrupted.
  */
 async function serveNewOrigin(
   client: ZitadelClient,
@@ -441,7 +480,7 @@ async function serveNewOrigin(
  */
 async function connectionSlugs(cwd: string): Promise<readonly string[]> {
   const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), ["connections"]);
-  return [
+  const connections = [
     ...config.connections.all.map((connection) => {
       return {
         path: connection.path,
@@ -458,7 +497,8 @@ async function connectionSlugs(cwd: string): Promise<readonly string[]> {
           name: basename(file.path, ".json"),
         };
       }),
-  ]
+  ];
+  return [...connections]
     .sort((left, right) => {
       return left.path.localeCompare(right.path);
     })

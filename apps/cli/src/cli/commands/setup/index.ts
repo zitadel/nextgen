@@ -1,19 +1,5 @@
-import type {
-  SetupAnswer,
-  SetupAnswers,
-  SetupFacts,
-  SetupInput,
-  SetupServices,
-} from "@/cli/commands/setup/shared";
-import {
-  whole,
-  type Declaration,
-  filled,
-  type ParseRefusal,
-  type ReadAlone,
-  type Refused,
-  reads,
-} from "@/lib/oclif/flags";
+import type { SetupAnswer, SetupInput } from "@/cli/commands/setup/shared";
+import { accepts, parses, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { errorMessage } from "@/lib/errors";
 import { reportWarning } from "@/lib/warnings";
 import { Flags } from "@oclif/core";
@@ -28,7 +14,6 @@ import {
   type ClientId,
   CUSTOM_PROVIDER,
   IDP_PROVIDERS,
-  type Parsed,
   parseClientId,
   parseConnectionSlug,
   parseDisplayName,
@@ -41,8 +26,20 @@ import {
 } from "@zitadel/config/idp";
 import { z } from "zod";
 
-import { customExample, SETUP_FLAG_KEYS, SETUP_FLAG_NAMES } from "@/lib/idp";
-import { type Admitted, BaseCommand, CommandGroups, nonBlankString } from "@/lib/oclif";
+import {
+  customExample,
+  customFlagValues,
+  givenCustomFlags,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
+} from "@/lib/idp";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -52,7 +49,7 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { PAGE_LAYOUT_HINT, PasswordPolicy } from "@/lib/zitadel";
+import { PAGE_LAYOUT_HINT, PasswordPolicy, type PasswordMinLength } from "@/lib/zitadel";
 
 import { Wizard } from "@/lib/wizard";
 
@@ -83,52 +80,36 @@ import { PublishCredentials } from "./steps/publish-credentials";
 import { ShowResult } from "./steps/show-result";
 import { ScaffoldApp } from "./steps/scaffold-app";
 import { ReadSsoFlags } from "./steps/read-sso-flags";
+import { CheckPreconditions } from "./steps/check-preconditions";
 
-import { CheckPreconditions } from "@/cli/commands/setup/steps/check-preconditions";
-import type { PasswordMinLength } from "@/lib/zitadel";
-
-import type { JsonEnvelope } from "@/lib/oclif";
-
-/** The `--sso-*` flags that describe a custom connection, and whether one is needed. */
-const CUSTOM_SETTINGS = [
-  {
-    name: "ssoSlug",
-    flag: "--sso-slug",
-    needed: true,
-  },
-  {
-    name: "ssoDisplayName",
-    flag: "--sso-display-name",
-    needed: true,
-  },
-  {
-    name: "ssoIssuer",
-    flag: "--sso-issuer",
-    needed: true,
-  },
-  {
-    name: "ssoScopes",
-    flag: "--sso-scopes",
-    needed: false,
-  },
-] as const;
-
+/**
+ * The refusal for `--design`, which setup no longer takes.
+ */
 const DESIGN_REMOVED_REFUSAL = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
   next: [{ id: "branding:eject" }],
 } as const satisfies Refusal;
 
+/**
+ * The refusal for `--sso-client-id` without `--sso`.
+ */
 const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
 } as const satisfies Refusal;
 
+/**
+ * The refusal for a custom connection's setting without `--sso`.
+ */
 const SETTING_NEEDS_SSO_REFUSAL = {
   message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
   hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
 } as const satisfies Refusal;
 
+/**
+ * The refusal for a custom connection's settings given with another provider.
+ */
 const SETTINGS_NEED_CUSTOM_REFUSAL = {
   message: "{names} only applies to a custom connection",
   hint: `Add --sso ${CUSTOM_PROVIDER}, or remove {them}.`,
@@ -137,6 +118,9 @@ const SETTINGS_NEED_CUSTOM_REFUSAL = {
   },
 } as const satisfies Refusal;
 
+/**
+ * The refusal for a custom connection that a script left incomplete.
+ */
 const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   message: "A custom connection needs {list}",
   hint: `Describe the connection, e.g. ${customExample(SETUP_FLAG_NAMES)}`,
@@ -145,19 +129,12 @@ const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   },
 } as const satisfies Refusal;
 
+/**
+ * The refusal for a provider that a script gave no client id.
+ */
 const SSO_NEEDS_CLIENT_ID_REFUSAL = {
   message: "--sso {sso} needs --sso-client-id",
   hint: "Register {registration} and pass its client id.",
-} as const satisfies Refusal;
-
-/**
- * How a setting that holds nothing is refused: what to do about an empty value
- * is to pass one or leave the flag out, which is not what to do about a value
- * the provider would reject, so the two are worded apart.
- */
-const EMPTY_SETTING = {
-  message: "the value is empty",
-  hint: "Pass a value for {input}, or omit it entirely.",
 } as const satisfies Refusal;
 
 /**
@@ -184,6 +161,9 @@ const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => {
   return !AVAILABLE_RENDERER_IDS.includes(id);
 });
 
+/**
+ * What `--renderer` says about the renderers there are.
+ */
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
@@ -215,33 +195,58 @@ const PORT = {
   },
 } as const satisfies Refused<number>;
 
-/** The flags {@link refuseUnusableFlags} reads, as a command reads them. */
+/**
+ * The flags {@link refuseUnusableFlags} reads, as a command reads them.
+ */
 export type SetupFlagsToCheck = Readonly<{
+  /**
+   * The removed `--design`.
+   */
   design?: string;
+
+  /**
+   * The provider.
+   */
   sso?: string;
+
+  /**
+   * The client id of the provider's application.
+   */
   ssoClientId?: string;
+
+  /**
+   * The name of a custom connection.
+   */
   ssoSlug?: string;
+
+  /**
+   * The name a custom connection's button shows.
+   */
   ssoDisplayName?: string;
+
+  /**
+   * A custom connection's issuer URL.
+   */
   ssoIssuer?: string;
+
+  /**
+   * The scopes a custom connection requests.
+   */
   ssoScopes?: string;
 }>;
-
-/** Where an application for `provider` is registered, for the hint to name. */
-function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
-  const entry = provider === CUSTOM_PROVIDER ? undefined : parseProviderSelection(provider);
-  const catalog = entry === undefined ? undefined : providerOf(entry);
-  if (catalog?.consoleUrl !== undefined) {
-    return `an OAuth application at ${catalog.consoleUrl}`;
-  }
-  return `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`;
-}
 
 /**
  * Refuses a command line setup cannot act on, before anything is detected,
  * created or written: a removed flag, and a set of `--sso` flags that
- * contradict each other or leaves out what nobody can be asked for. `scripted`
- * says nobody can be asked; a person at a terminal is asked for what is
- * missing instead.
+ * contradict each other or leaves out what nobody can be asked for.
+ *
+ * @remarks
+ * `scripted` says nobody can be asked; a person at a terminal is asked for what
+ * is missing instead.
+ *
+ * @param flags - The flags the command was given.
+ * @param scripted - Whether nobody can be asked.
+ * @throws A refusal for the first flag that cannot be acted on.
  */
 export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
   if (flags.design !== undefined) {
@@ -250,43 +255,32 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
   if (flags.ssoClientId !== undefined && flags.sso === undefined) {
     throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
   }
+  const given = givenCustomFlags(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES);
   if (flags.sso === undefined) {
-    const orphan = CUSTOM_SETTINGS.find((setting) => {
-      return flags[setting.name] !== undefined;
-    });
-    if (orphan !== undefined) {
+    if (given[0] !== undefined) {
       throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
-        flag: orphan.flag,
+        flag: given[0],
       });
     }
     return;
   }
-  if (flags.sso !== CUSTOM_PROVIDER) {
-    const given = CUSTOM_SETTINGS.filter((setting) => {
-      return flags[setting.name] !== undefined;
+  if (flags.sso !== CUSTOM_PROVIDER && given.length > 0) {
+    throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
+      names: given.join(", "),
+      them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
+      flags: given,
     });
-    if (given.length > 0) {
-      throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
-        names: given
-          .map((setting) => {
-            return setting.flag;
-          })
-          .join(", "),
-        them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
-        flags: given.map((setting) => {
-          return setting.flag;
-        }),
-      });
-    }
   }
   if (!scripted) {
     return;
   }
   if (flags.sso === CUSTOM_PROVIDER) {
-    const missing = CUSTOM_SETTINGS.filter((setting) => {
-      return setting.needed && flags[setting.name] === undefined;
-    }).map((setting) => {
-      return setting.flag;
+    const missing = [
+      SETUP_FLAG_NAMES.slug,
+      SETUP_FLAG_NAMES.displayName,
+      SETUP_FLAG_NAMES.issuer,
+    ].filter((name) => {
+      return !given.includes(name);
     });
     if (missing.length > 0) {
       throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
@@ -296,99 +290,16 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
     }
   }
   if (flags.ssoClientId === undefined) {
+    const entry = flags.sso === CUSTOM_PROVIDER ? undefined : parseProviderSelection(flags.sso);
+    const catalog = entry === undefined ? undefined : providerOf(entry);
     throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
       sso: flags.sso,
-      registration: whereToRegister(flags, flags.sso),
+      registration:
+        catalog?.consoleUrl === undefined
+          ? `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`
+          : `an OAuth application at ${catalog.consoleUrl}`,
     });
   }
-}
-
-/**
- * A trimmed value one of the platform's own parsers accepts, kept as it was
- * typed. The parser's `problem` becomes the schema's message, so a flag and the
- * prompt that asks the same thing cannot word a refusal differently.
- */
-function accepted(parse: (value: string) => Parsed<unknown>) {
-  return filled.transform((value, ctx) => {
-    const parsed = parse(value);
-    if (!parsed.ok) {
-      ctx.addIssue({
-        code: "custom",
-        message: parsed.problem,
-      });
-      return z.NEVER;
-    }
-    return value;
-  });
-}
-
-/** What one of those parsers makes of a trimmed value. See {@link accepted}. */
-function made<T>(parse: (value: string) => Parsed<T>) {
-  return filled.transform((value, ctx) => {
-    const parsed = parse(value);
-    if (!parsed.ok) {
-      ctx.addIssue({
-        code: "custom",
-        message: parsed.problem,
-      });
-      return z.NEVER;
-    }
-    return parsed.value;
-  });
-}
-
-/**
- * The `parse` of a flag that refuses an empty value as any flag does, and
- * everything else as `refused` words it. It takes the declaration as
- * {@link reads} does, so the wording is checked where the flag is declared.
- *
- * @typeParam T - What the value parses to.
- * @typeParam R - The declaration's refusal, as it is written.
- * @typeParam Declared - The declaration, as it is written.
- * @typeParam Empty - The refusal for an empty value, as it is written. It
- *   has no `values`, so it may ask only for what the parse fills
- *   ({@link ReadAlone}).
- * @param refused - What a value that is not empty is refused for.
- * @param empty - What an empty value is refused with; {@link EMPTY_SETTING}
- *   when it is left out.
- * @returns The `parse`.
- */
-function readsFilled<
-  T,
-  const R extends ParseRefusal,
-  const Declared extends Refused<T>,
-  const Empty extends ParseRefusal = typeof EMPTY_SETTING,
->(refused: Declaration<T, R, Declared>, empty?: Empty & ReadAlone<Empty>) {
-  const emptied: ParseRefusal = empty ?? EMPTY_SETTING;
-  const blank = reads({
-    schema: filled,
-    refusal: emptied,
-  });
-  const declared: Refused<T> = refused;
-  const value = reads(declared);
-  return async (given: string, command: unknown, definition: { name: string }): Promise<T> => {
-    await blank(given, command, definition);
-    return value(given, command, definition);
-  };
-}
-
-/**
- * A custom connection's setting, refused with what the platform's own parser
- * found wrong with it.
- */
-function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
-  return Flags.custom<string>({
-    parse: readsFilled({
-      schema: accepted(parse),
-      refusal: {
-        message: `${flag}: {problem}`,
-        hint: `Fix ${flag} and run the command again.`,
-        details: {
-          flag,
-        },
-      },
-    }),
-  });
 }
 
 /**
@@ -399,24 +310,54 @@ export type SetupFlags = Admitted<typeof Setup>["flags"];
 /**
  * `zitadel setup` — create a Zitadel project and scaffold local auth.
  *
+ * @remarks
  * Runs as a wizard of steps (see `wizard()`): detect the app, ask what the
  * flags left open, create the project, patch the app and write the editable
  * `.zitadel/**` configuration, then publish credentials, install, commit and
  * deploy. An interactive setup ends with a note about the Zitadel agent skills,
  * shown once per machine; set `NO_SKILLS_PROMPT=1` to hide it.
+ *
+ * `--design` is hidden so scripts and agents passing it get a targeted error
+ * pointing at `branding eject` instead of oclif's unknown-flag error.
  */
 export default class Setup extends Destructive(BaseCommand) {
+  /**
+   * What `--help` says the command does.
+   */
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
+
+  /**
+   * The group the command index lists it under.
+   */
   static override group = CommandGroups.gettingStarted;
+
+  /**
+   * Where it sits in its group.
+   */
   static override groupOrder = 1;
+
+  /**
+   * The heading its help carries.
+   */
   static override heading = "Setting up Zitadel";
+
+  /**
+   * That it draws as a wizard.
+   */
   static override wizard = true;
 
+  /**
+   * The examples `--help` shows.
+   */
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
+
+  /**
+   * The flags setup takes.
+   */
   static override flags = {
     force: Flags.boolean({
       char: "f",
@@ -456,26 +397,21 @@ export default class Setup extends Destructive(BaseCommand) {
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
     }),
-    // Hidden so scripts and agents passing it get a targeted error pointing
-    // at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
     "password-min-length": Flags.custom<PasswordMinLength>({
-      parse: readsFilled(
-        {
-          schema: made(PasswordPolicy.parseMinLength),
-          refusal: {
-            message: "{problem}",
-            hint: "Pass a whole number for {input}, or 0 for none.",
-            details: {
-              argument: "{input}",
-            },
+      parse: parses(PasswordPolicy.parseMinLength, {
+        refusal: {
+          message: "{problem}",
+          hint: "Pass a whole number for {input}, or 0 for none.",
+          details: {
+            argument: "{input}",
           },
         },
-        {
+        empty: {
           message: "{input} was given an empty value",
           hint: "Pass a value for {input}, or omit it entirely.",
         },
-      ),
+      }),
     })({
       description:
         "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
@@ -486,46 +422,47 @@ export default class Setup extends Destructive(BaseCommand) {
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
     }),
     "sso-client-id": Flags.custom<ClientId>({
-      parse: readsFilled({
-        schema: made(parseClientId),
+      parse: parses(parseClientId, {
         refusal: {
-          message: "--sso-client-id: {problem}",
-          hint: "Fix --sso-client-id and run the command again.",
+          message: "{input}: {problem}",
+          hint: "Fix {input} and run the command again.",
           details: {
-            argument: "--sso-client-id",
+            argument: "{input}",
           },
         },
       }),
     })({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
-    [SETUP_FLAG_KEYS.slug]: settingFlag("--sso-slug", (value) => {
-      return parseConnectionSlug(value, RESERVED_SLUGS);
+    [SETUP_FLAG_KEYS.slug]: Flags.custom<string>({
+      parse: accepts((value) => {
+        return parseConnectionSlug(value, RESERVED_SLUGS);
+      }),
     })({
       description: "With --sso custom: the name of the connection. Schemas and flows refer to it.",
     }),
-    [SETUP_FLAG_KEYS.displayName]: settingFlag(
-      "--sso-display-name",
-      parseDisplayName,
-    )({
+    [SETUP_FLAG_KEYS.displayName]: Flags.custom<string>({
+      parse: accepts(parseDisplayName),
+    })({
       description: "With --sso custom: the name shown on the sign-in button.",
     }),
-    [SETUP_FLAG_KEYS.issuer]: settingFlag(
-      "--sso-issuer",
-      parseIssuer,
-    )({
+    [SETUP_FLAG_KEYS.issuer]: Flags.custom<string>({
+      parse: accepts(parseIssuer),
+    })({
       description:
         "With --sso custom: the provider's issuer URL. Its endpoints come from OIDC discovery.",
     }),
-    [SETUP_FLAG_KEYS.scopes]: settingFlag(
-      "--sso-scopes",
-      parseScopes,
-    )({
+    [SETUP_FLAG_KEYS.scopes]: Flags.custom<string>({
+      parse: accepts(parseScopes),
+    })({
       description:
         "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
   };
 
+  /**
+   * That setup resolves its own server, in the preconditions.
+   */
   static override meta = {
     resolveServer: false,
   };
@@ -557,18 +494,26 @@ export default class Setup extends Destructive(BaseCommand) {
     };
   }
 
+  /**
+   * Refuses a command line setup cannot act on, then runs the wizard.
+   *
+   * @param admitted - What the command admitted.
+   * @param admitted.flags - The flags.
+   * @returns The envelope the run answers with.
+   */
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
 
-    return this.wizard().run(
-      this.services(),
-      { flags },
-      {
-        signal: this.signal,
-        onUndoError: (key, error) => {
-          reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+    return this.emit(
+      await this.wizard().run(
+        { flags },
+        {
+          signal: this.signal,
+          onUndoError: (key, error) => {
+            reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+          },
         },
-      },
+      ),
     );
   }
 
@@ -585,185 +530,322 @@ export default class Setup extends Destructive(BaseCommand) {
    * @returns The wizard, ready to run.
    */
   private wizard() {
-    return Wizard.named<SetupServices, SetupInput, SetupAnswer>("setup")
-      .step(new CheckPreconditions())
-      .endWhen(new MoveAppPort())
-      .endWhen(new ReportAlreadySetUp())
-      .step(new ReadSsoFlags())
-      .step(new DetectFramework())
+    return Wizard.named<SetupInput, SetupAnswer>("setup")
+      .step(
+        new CheckPreconditions({
+          meta: this.meta,
+          suggest: this.suggest,
+          useServer: (server) => {
+            this.meta = {
+              ...this.meta,
+              source: server,
+            };
+          },
+        }),
+      )
+      .endWhen(
+        new MoveAppPort({
+          cliVersion: this.cliVersion,
+          consent: (gate) => {
+            return this.consent(gate);
+          },
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          realRun: () => {
+            return this.realRun();
+          },
+          recoverAt: (server) => {
+            this.recoveryServer = server;
+          },
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .endWhen(
+        new ReportAlreadySetUp({
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new ReadSsoFlags({
+          ask: this.ask,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new DetectFramework({
+          ask: this.ask,
+          cwd: this.cwd,
+          env: this.env,
+          force: this.force,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          ui: this.ui,
+        }),
+        ({ flags, found, scaffoldedFramework }) => {
+          this.recordTelemetry({
+            framework: found.app.framework,
+            renderer: flags.renderer ?? "react",
+            scaffolded_skeleton: scaffoldedFramework,
+            skip_install: Boolean(flags.skipInstall),
+            dev_port_explicit: flags.devPort !== undefined,
+            preset: flags.preset ?? DEFAULT_SETUP_PRESET,
+            use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
+            sso: flags.sso ?? "none",
+            password_policy: flags.passwordMinLength === null ? "empty" : "set",
+            step: "framework_resolved",
+          });
+        },
+      )
       .step(new ApplyDefaults())
-      .step(new ConfirmFramework())
-      .step(new ChooseServer())
-      .step(new ChooseDevPort())
-      .step(new ChooseUseCase())
-      .step(new ChooseSignIn())
-      .step(new SetPasswordPolicy())
-      .step(new ChooseSocialSignIn())
-      .step(new SettleAnswers())
-      .step(new PlanConfiguration())
-      .step(new ScaffoldApp())
-      .step(new CheckPatch())
-      .step(new CreateProject())
-      .step(new PatchApp())
-      .step(new WriteConfiguration())
-      .step(new KeepChanges())
+      .step(
+        new ConfirmFramework({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ChooseServer({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ChooseDevPort({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ChooseUseCase({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ChooseSignIn({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new SetPasswordPolicy({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ChooseSocialSignIn({
+          ask: this.ask,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          serverFlag: this.meta.serverFlag,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new SettleAnswers({
+          dryRun: this.dryRun,
+          nonInteractive: this.nonInteractive,
+          suggest: this.suggest,
+        }),
+        ({ answers }) => {
+          this.recordTelemetry({
+            preset: answers.preset,
+            use_case: answers.useCase,
+            sso:
+              answers.sso.length > 1
+                ? "multiple"
+                : (answers.sso.map((draft) => {
+                    return selectionName(draft.selection);
+                  })[0] ?? "none"),
+            password_policy: answers.passwordMinLength === null ? "empty" : "set",
+          });
+        },
+      )
+      .step(
+        new PlanConfiguration({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          force: this.force,
+        }),
+      )
+      .step(
+        new ScaffoldApp({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          force: this.force,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new CheckPatch({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+        }),
+      )
+      .step(
+        new CreateProject({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+        () => {
+          this.recordTelemetry({ step: "project_created" });
+        },
+      )
+      .step(
+        new PatchApp({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new WriteConfiguration({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          force: this.force,
+          serverFlag: this.meta.serverFlag,
+          signal: this.signal,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new KeepChanges({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+        }),
+        ({ allFilesWritten, scaffolded }) => {
+          this.recordTelemetry({
+            step: "files_patched",
+            files_written_count: allFilesWritten.length,
+          });
+          if (!this.dryRun) {
+            this.recordTelemetry({
+              password_policy: scaffolded.passwordMinLength === null ? "empty" : "set",
+            });
+          }
+        },
+      )
       .commit()
-      .step(new PublishCredentials())
-      .step(new WriteManifest())
-      .step(new InstallDependencies())
-      .step(new MakeInitialCommit())
-      .step(new DoInitialDeploy())
-      .step(new ClaimOwnership())
-      .step(new ShowResult())
+      .step(
+        new PublishCredentials({
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+        }),
+      )
+      .step(
+        new WriteManifest({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+        }),
+      )
+      .step(
+        new InstallDependencies({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          isJson: this.isJson,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+        ({ installOutcome }) => {
+          this.recordTelemetry({
+            step: "dependencies_installed",
+            package_manager: installOutcome.install.package_manager,
+          });
+        },
+      )
+      .step(
+        new MakeInitialCommit({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new DoInitialDeploy({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          env: this.env,
+          isColored: this.isColored,
+          isJson: this.isJson,
+          narrate: (notices) => {
+            this.narrate(notices);
+          },
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ClaimOwnership({
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          signal: this.signal,
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
+      .step(
+        new ShowResult({
+          cliVersion: this.cliVersion,
+          cwd: this.cwd,
+          dryRun: this.dryRun,
+          isJson: this.isJson,
+          realRun: () => {
+            return this.realRun();
+          },
+          suggest: this.suggest,
+          ui: this.ui,
+        }),
+      )
       .finish((state) => {
         return state.answer;
       });
-  }
-
-  /**
-   * What every step is given: the run's facts, and the parts of this command
-   * that write the configuration, draw and answer.
-   *
-   * @returns The services.
-   */
-  private services(): SetupServices {
-    const meta = () => {
-      return this.meta;
-    };
-    return {
-      meta: this.meta,
-      useServer: (server) => {
-        this.meta = {
-          ...this.meta,
-          source: server,
-        };
-      },
-      cwd: this.cwd,
-      env: this.env,
-      ask: this.ask,
-      ui: this.ui,
-      suggest: this.suggest,
-      signal: this.signal,
-      cliVersion: this.cliVersion,
-      dryRun: this.dryRun,
-      force: this.force,
-      nonInteractive: this.nonInteractive,
-      isJson: this.isJson,
-      consent: (gate) => {
-        return this.consent(gate);
-      },
-      emit: (result) => {
-        return this.emit(result);
-      },
-      realRun: () => {
-        return this.realRun();
-      },
-      recoverAt: (server) => {
-        this.recoveryServer = server;
-      },
-      isColored: this.isColored,
-      narrate: (notices) => {
-        this.narrate(notices);
-      },
-      serverFlag: this.meta.serverFlag,
-      get source() {
-        return meta().source;
-      },
-      frameworkResolved: (input) => {
-        this.frameworkResolved(input);
-      },
-      answersSettled: (answers) => {
-        this.answersSettled(answers);
-      },
-      projectCreated: () => {
-        this.recordTelemetry({ step: "project_created" });
-      },
-      filesPatched: (count, passwordMinLength) => {
-        this.filesPatched(count, passwordMinLength);
-      },
-      dependenciesInstalled: (packageManager) => {
-        this.recordTelemetry({
-          step: "dependencies_installed",
-          package_manager: packageManager,
-        });
-      },
-    };
-  }
-
-  /**
-   * Record which framework the run settled on, and how it was asked for.
-   *
-   * @param input - The flags, what detection found, and whether the app is new.
-   */
-  private frameworkResolved(
-    input: Pick<SetupFacts, "flags" | "found" | "scaffoldedFramework">,
-  ): void {
-    const { flags, found, scaffoldedFramework } = input;
-    this.recordTelemetry({
-      framework: found.app.framework,
-      renderer: flags.renderer ?? "react",
-      scaffolded_skeleton: scaffoldedFramework,
-      skip_install: Boolean(flags.skipInstall),
-      dev_port_explicit: flags.devPort !== undefined,
-      preset: flags.preset ?? DEFAULT_SETUP_PRESET,
-      use_case: flags.useCase ?? DEFAULT_SETUP_USE_CASE,
-      sso: flags.sso ?? "none",
-      password_policy: flags.passwordMinLength === null ? "empty" : "set",
-      step: "framework_resolved",
-    });
-  }
-
-  /**
-   * Record what the answers settled.
-   *
-   * @remarks
-   * The interactive prompts can override the flag or default preset and use case
-   * recorded at `framework_resolved`, so they are recorded again: telemetry
-   * carries the values that actually scaffold. One slug, "none", or "multiple",
-   * never a joined set: a dimension's value space has to stay enumerable.
-   *
-   * @param answers - What was decided.
-   */
-  private answersSettled(answers: SetupAnswers): void {
-    const ssoDimension =
-      answers.sso.length > 1
-        ? "multiple"
-        : answers.sso[0]
-          ? selectionName(answers.sso[0].selection)
-          : "none";
-    this.recordTelemetry({
-      preset: answers.preset,
-      use_case: answers.useCase,
-      sso: ssoDimension,
-      // Whether a minimum goes into the password policy, never the value. None
-      // given is the recommended one (`PasswordPolicy.initial`), unless `--force`
-      // keeps a policy file: `files_patched` records what was published.
-      password_policy: answers.passwordMinLength === null ? "empty" : "set",
-    });
-  }
-
-  /**
-   * Record how many files were written, and what was published for the password
-   * policy.
-   *
-   * @param count - The files written.
-   * @param passwordMinLength - The minimum the published policy holds.
-   */
-  private filesPatched(
-    count: number,
-    passwordMinLength: SetupFacts["scaffolded"]["passwordMinLength"],
-  ): void {
-    this.recordTelemetry({
-      step: "files_patched",
-      files_written_count: count,
-    });
-    if (!this.dryRun) {
-      // What was actually published, which a policy file `--force` keeps decides
-      // as much as the answers recorded before. A dry run publishes nothing and
-      // keeps those.
-      this.recordTelemetry({
-        password_policy: passwordMinLength === null ? "empty" : "set",
-      });
-    }
   }
 }

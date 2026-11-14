@@ -7,28 +7,22 @@ import {
 
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import type { Fact } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
  */
-type Needs = Fact<"flags" | "found" | "ssoFromCommandLine">;
+type Needs = Fact<"flags" | "found" | "ssoFromCommandLine" | "preflight">;
 
 /**
  * Seeds the answers from the flags and the defaults, so each question can decide
  * whether to ask.
  */
-export class ApplyDefaults extends WizardStep<
-  "defaults",
-  Fact<"app" | "answers">,
-  Needs,
-  SetupServices
-> {
+export class ApplyDefaults extends WizardStep<"defaults", Fact<"app" | "answers">, Needs> {
   readonly key = "defaults";
 
   /**
    * Take what the flags answered and the defaults for the rest.
-   *
    *
    * @remarks
    * An explicit --dev-port overrides the detected port for the whole run, so the issuer and the
@@ -38,10 +32,10 @@ export class ApplyDefaults extends WizardStep<
    * that pin (or remove it) if the origin check rejects requests.
    *
    * @param needs - The flags, what detection found and the provider asked for.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The app with the port the run uses, and the answers so far.
    */
-  async run(needs: Needs, services: SetupServices): Promise<Fact<"app" | "answers">> {
+  async run(needs: Needs): Promise<Fact<"app" | "answers">> {
     const { flags, found, ssoFromCommandLine } = needs;
     const app =
       flags.devPort === undefined
@@ -53,7 +47,7 @@ export class ApplyDefaults extends WizardStep<
     return {
       app,
       answers: {
-        server: services.source,
+        server: needs.preflight.server.value,
         devPort: app.devPort,
         preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
         useCase: (flags.useCase as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,

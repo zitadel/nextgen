@@ -1,5 +1,5 @@
 import type { FollowUps, SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { CommandResult, JsonEnvelope } from "@/lib/oclif";
+import type { CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
@@ -7,17 +7,9 @@ import type { Change, Connection, ConnectionSummary, DocumentChange } from "@/li
 
 import type { EnableFlags } from "@/cli/commands/auth-method/sso/enable";
 import type { ProviderName } from "@zitadel/config/idp";
-import type { CredentialNames, PublishedCredentials, PublishState, SecretOutcome } from "@/lib/idp";
+import type { CredentialNames, PublishedCredentials, PublishState } from "@/lib/idp";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-
-/**
- * Nothing sent to the project, as a dry run reports it.
- */
-export const NOTHING_PUBLISHED: PublishedCredentials = {
-  clientId: undefined,
-  secret: undefined,
-};
 
 /**
  * What a run of `auth-method sso enable` starts from.
@@ -32,7 +24,7 @@ export type EnableInput = Readonly<{
 /**
  * What the run answers: the command's envelope.
  */
-export type EnableAnswer = JsonEnvelope;
+export type EnableAnswer = CommandResult;
 
 /**
  * What the command provides every step: the run's facts, and the parts of the
@@ -122,14 +114,6 @@ export type EnableServices = Readonly<{
    * @param change - The change.
    */
   report(change: Change): void;
-
-  /**
-   * Answers with a result.
-   *
-   * @param result - The result to answer with.
-   * @returns The envelope the command answers with.
-   */
-  emit(result: CommandResult): JsonEnvelope;
 
   /**
    * The arguments a suggested command is run with.
@@ -248,60 +232,26 @@ type Payload = {
 };
 
 /**
- * The client id's variable and what became of it, for the result.
- *
- * @param names - The connection's variables.
- * @param published - What became of the client id, if it was sent.
- * @returns Both, or `null` when it was not sent or has no variable.
- */
-function publishedClientId(
-  names: CredentialNames,
-  published: PublishState | undefined,
-): PublishedVariable | null {
-  if (published === undefined || names.clientId === undefined) {
-    return null;
-  }
-  return {
-    variable: names.clientId,
-    published,
-  };
-}
-
-/**
- * The client secret's variable and where it ended up, for the result.
- *
- * @param secret - Where the secret ended up, if it was sent.
- * @returns Both, or `null` when it was not sent.
- */
-function storedSecret(secret: SecretOutcome | undefined): PublishedVariable | null {
-  if (secret === undefined) {
-    return null;
-  }
-  return {
-    variable: secret.name,
-    published: secret.published,
-  };
-}
-
-/**
  * The machine-readable result. Never the secret, only whether it is held.
+ *
+ * @remarks
+ * The client id appears only when it was sent and has a variable, and the secret
+ * only when it was sent.
  *
  * @param input - The summary, the change, what became of each credential,
  *   and the variables they go to.
  * @returns The result's data.
  */
 export function payload(input: PayloadInput): Payload {
-  const summary = input.summary;
-  const action = summary.reused ? "reuse" : "create";
   const mapped = input.change.after.connections.summarize(input.change.document);
   return {
-    project_id: summary.projectId,
-    provider: summary.provider,
-    schema: summary.schema,
+    project_id: input.summary.projectId,
+    provider: input.summary.provider,
+    schema: input.summary.schema,
     connection: {
-      action,
-      slug: summary.connection.slug,
-      file: summary.connection.path,
+      action: input.summary.reused ? "reuse" : "create",
+      slug: input.summary.connection.slug,
+      file: input.summary.connection.path,
       claim_mapping: Object.fromEntries(
         mapped.mappings.map(({ property, claim }) => {
           return [property, claim];
@@ -316,11 +266,23 @@ export function payload(input: PayloadInput): Payload {
       unmapped: mapped.unmapped,
       used_by: mapped.usedBy,
     },
-    callback_uri: summary.callbackUri,
+    callback_uri: input.summary.callbackUri,
     changed: [...input.change.changedPaths],
     notices: input.change.notices,
-    client_id: publishedClientId(input.names, input.published.clientId),
-    secret: storedSecret(input.published.secret),
+    client_id:
+      input.published.clientId === undefined || input.names.clientId === undefined
+        ? null
+        : {
+            variable: input.names.clientId,
+            published: input.published.clientId,
+          },
+    secret:
+      input.published.secret === undefined
+        ? null
+        : {
+            variable: input.published.secret.name,
+            published: input.published.secret.published,
+          },
   };
 }
 

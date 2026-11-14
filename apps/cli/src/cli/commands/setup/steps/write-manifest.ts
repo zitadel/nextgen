@@ -13,6 +13,11 @@ type Needs = Fact<
 >;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "cwd" | "dryRun">;
+
+/**
  * Records what was actually scaffolded, so `doctor` can later verify the app
  * files without guessing from current templates (missing vs edited vs
  * user-adopted) and `doctor --fix` can restore exactly the missing ones.
@@ -21,22 +26,32 @@ type Needs = Fact<
  * Best-effort: a failure here only degrades doctor to its template-derived
  * fallback, it never breaks setup.
  */
-export class WriteManifest extends WizardStep<"manifest", object, Needs, SetupServices> {
+export class WriteManifest extends WizardStep<"manifest", object, Needs> {
   readonly key = "manifest";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Write the manifest.
    *
    * @param needs - What the patch did.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns Nothing is added.
    */
-  async run(needs: Needs, services: SetupServices): Promise<object> {
+  async run(needs: Needs): Promise<object> {
     const { answers, framework, orca, patched, posture, rendererId, scaffoldedFramework } = needs;
-    if (framework !== undefined && !services.dryRun) {
+    if (framework !== undefined && !this.deps.dryRun) {
       try {
         await writeScaffoldManifest({
-          cwd: services.cwd,
+          cwd: this.deps.cwd,
           actions: orca.patcherFor(framework.id).artifacts({
             framework,
             rendererId,

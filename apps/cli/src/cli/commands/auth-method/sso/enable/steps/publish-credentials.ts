@@ -1,10 +1,5 @@
-import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backend";
-import type {
-  SecretPublisher,
-  CredentialDelivery,
-  GivenCredentials,
-  PublishedCredentials,
-} from "@/lib/idp";
+import { VariableService, VariableWrite } from "@/lib/backend";
+import type { CredentialDelivery, GivenCredentials, PublishedCredentials } from "@/lib/idp";
 
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { WizardStep } from "@/lib/wizard";
@@ -21,6 +16,11 @@ type Needs = Readonly<{
 }>;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<EnableServices, "source">;
+
+/**
  * Stores the credentials in the project's variables, where the engine resolves
  * a connection's `${{ NAME }}` references from.
  *
@@ -32,57 +32,54 @@ type Needs = Readonly<{
 export class PublishCredentials extends WizardStep<
   "publish",
   Readonly<{ published: PublishedCredentials }>,
-  Needs,
-  EnableServices
+  Needs
 > {
   readonly key = "publish";
 
   /**
-   * Publish what was given.
-   *
-   * @param needs - The delivery, the credentials and the project.
-   * @param services - What the command provides.
-   * @returns What became of each credential.
+   * @param deps - What the command gives the step.
    */
-  async run(
-    needs: Needs,
-    services: EnableServices,
-  ): Promise<Readonly<{ published: PublishedCredentials }>> {
-    return {
-      published: await needs.delivery.publish(
-        needs.given,
-        this.publisher(services, needs.remote.client, needs.remote.projectId),
-      ),
-    };
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
   }
 
   /**
-   * How the connection's credentials reach the project.
+   * Publish what was given.
    *
    * @remarks
-   * It writes to the project's own variables, which is where the engine
-   * resolves a connection's `${{ NAME }}` references from.
+   * The credentials reach the project through its own variables, which is where
+   * the engine resolves a connection's `${{ NAME }}` references from. There is
+   * no publisher when there is no project behind the run: `--source mock`
+   * answers from fixtures and has no variables to write.
    *
-   * @param client - The client every call goes through.
-   * @param projectId - The project.
-   * @returns The publisher, or `undefined` when there is no project behind this
-   *   run: `--source mock` answers from fixtures and has no variables to write.
+   * @param needs - The delivery, the credentials and the project.
+   * @param this.deps - What the command provides.
+   * @returns What became of each credential.
    */
-  private publisher(
-    services: EnableServices,
-    client: ZitadelClient,
-    projectId: string,
-  ): SecretPublisher | undefined {
-    if (services.source === "mock") {
-      return undefined;
-    }
-    const variableService = new VariableService(client, projectId);
-    return async (name, value, options) => {
-      const write = VariableWrite.of({
-        secret: options.secret,
-        preview: false,
-      });
-      await variableService.set(name, value, write);
+  async run(needs: Needs): Promise<Readonly<{ published: PublishedCredentials }>> {
+    const variableService =
+      this.deps.source === "mock"
+        ? undefined
+        : new VariableService(needs.remote.client, needs.remote.projectId);
+    return {
+      published: await needs.delivery.publish(
+        needs.given,
+        variableService === undefined
+          ? undefined
+          : async (name, value, options) => {
+              await variableService.set(
+                name,
+                value,
+                VariableWrite.of({
+                  secret: options.secret,
+                  preview: false,
+                }),
+              );
+            },
+      ),
     };
   }
 }

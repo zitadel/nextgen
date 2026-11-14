@@ -1,8 +1,21 @@
 import { ZitadelError } from "@/lib/errors";
 
-import type { Fact, PromptContext, SetupServices, SetupAnswers } from "@/cli/commands/setup/shared";
+import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
+
+/**
+ * What the step reads from what is known.
+ */
+type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+
+/**
+ * What the step is given by the command.
+ */
+type Deps = Pick<
+  SetupServices,
+  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+>;
 
 /**
  * "Would you like to set up Zitadel in this `<framework>` app?" — the
@@ -21,45 +34,54 @@ import { WizardStep } from "@/lib/wizard";
 export class ConfirmFramework extends WizardStep<
   "frameworkConfirm",
   Fact<"answers">,
-  QuestionNeeds,
-  SetupServices
+  QuestionNeeds
 > {
   readonly key = "frameworkConfirm";
+
+  /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
 
   /**
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds, services: SetupServices): Promise<Fact<"answers">> {
+  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
-    if (services.nonInteractive || services.dryRun) {
+    if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
       answers: await this.ask(needs.answers, {
-        ask: services.ask,
+        ask: this.deps.ask,
         note: (title, lines) => {
-          services.ui.note(title, lines);
+          this.deps.ui.note(title, lines);
         },
         say: (text) => {
-          services.ui.say(text);
+          this.deps.ui.say(text);
         },
         spinner: (label, options) => {
-          return services.ui.spinner(label, options);
+          return this.deps.ui.spinner(label, options);
         },
         framework: {
           id: app.framework,
           displayName: orca.displayName(app.framework),
         },
-        suggest: services.suggest,
-        cwd: services.cwd,
+        suggest: this.deps.suggest,
+        cwd: this.deps.cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: services.serverFlag,
+        serverFlag: this.deps.serverFlag,
         devPortFromFlag: flags.devPort !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags.useCase !== undefined,
@@ -70,16 +92,25 @@ export class ConfirmFramework extends WizardStep<
     };
   }
 
+  /**
+   * Ask whether to set up Zitadel in the detected app.
+   *
+   * @param answers - The answers so far.
+   * @param ctx - What the question needs to ask.
+   * @returns The answers, unchanged.
+   * @throws {@link ZitadelError} When the developer declines.
+   */
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     if (ctx.frameworkChosen) {
       return answers;
     }
-    const ack = await ctx.ask.yesNo({
-      name: "confirm the framework",
-      message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
-      initialValue: true,
-    });
-    if (ack === false) {
+    if (
+      (await ctx.ask.yesNo({
+        name: "confirm the framework",
+        message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
+        initialValue: true,
+      })) === false
+    ) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
         `Setup stopped before changing this ${ctx.framework.displayName} app`,
@@ -91,5 +122,3 @@ export class ConfirmFramework extends WizardStep<
     return answers;
   }
 }
-
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;

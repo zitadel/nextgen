@@ -21,6 +21,7 @@ import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { aPromptDeps } from "@tests/helpers/setup";
 
 /**
  * The framework setup detected.
@@ -102,7 +103,7 @@ describe("ChooseSignIn", () => {
   it("writes the selected preset into the answers", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    const answers = await new ChooseSignIn().ask(
+    const answers = await new ChooseSignIn(aPromptDeps()).ask(
       setupAnswers({ preset: "password-first" }),
       CONTEXT,
     );
@@ -113,7 +114,7 @@ describe("ChooseSignIn", () => {
   it("preselects the preset already answered", async () => {
     vi.mocked(select).mockResolvedValueOnce("passkey-first");
 
-    await new ChooseSignIn().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "password-first" });
   });
@@ -121,7 +122,7 @@ describe("ChooseSignIn", () => {
   it("says what users see first and what is secondary, which both presets enable", async () => {
     vi.mocked(select).mockResolvedValueOnce("password-first");
 
-    await new ChooseSignIn().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+    await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "password-first" }), CONTEXT);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message: "Which sign-in method would you like your users to see first?",
@@ -140,16 +141,19 @@ describe("ChooseSignIn", () => {
 
   describe("with --preset", () => {
     it("keeps the flagged preset", async () => {
-      const answers = await new ChooseSignIn().ask(setupAnswers({ preset: "passkey-first" }), {
-        ...CONTEXT,
-        presetFromFlag: true,
-      });
+      const answers = await new ChooseSignIn(aPromptDeps()).ask(
+        setupAnswers({ preset: "passkey-first" }),
+        {
+          ...CONTEXT,
+          presetFromFlag: true,
+        },
+      );
 
       expect(answers.preset).toBe("passkey-first");
     });
 
     it("does not ask", async () => {
-      await new ChooseSignIn().ask(setupAnswers({ preset: "passkey-first" }), {
+      await new ChooseSignIn(aPromptDeps()).ask(setupAnswers({ preset: "passkey-first" }), {
         ...CONTEXT,
         presetFromFlag: true,
       });
@@ -163,7 +167,10 @@ describe("ChooseSignIn", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
-      return new ChooseSignIn().ask(setupAnswers({ preset: "password-first" }), CONTEXT);
+      return new ChooseSignIn(aPromptDeps()).ask(
+        setupAnswers({ preset: "password-first" }),
+        CONTEXT,
+      );
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

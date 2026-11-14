@@ -1,3 +1,4 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import {
   describeWrittenFile,
   relativeDisplayPath as relativeDisplay,
@@ -9,8 +10,6 @@ import { reportWarning } from "@/lib/warnings";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * The env files the patch merges a project's id and secrets into: `.env.local`
@@ -25,6 +24,11 @@ const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
 type Needs = Fact<"patcher" | "patchContext" | "framework" | "project">;
 
 /**
+ * What the step is given by the command.
+ */
+type Deps = Pick<SetupServices, "cwd" | "dryRun" | "force" | "ui">;
+
+/**
  * Patches the app's files to use the project.
  *
  * @remarks
@@ -37,39 +41,47 @@ type Needs = Fact<"patcher" | "patchContext" | "framework" | "project">;
 export class PatchApp extends WizardStep<
   "patch",
   Fact<"patched" | "envFilesBefore" | "patching">,
-  Needs,
-  SetupServices
+  Needs
 > {
   readonly key = "patch";
 
   /**
+   * @param deps - What the command gives the step.
+   */
+  private readonly deps: Deps;
+
+  constructor(deps: Deps) {
+    super();
+    this.deps = deps;
+  }
+
+  /**
    * Patch the files, or say what a dry run would.
    *
-   *
    * @remarks
-   * `.env.local` as it is before the patch merges this project's id and secret into it, so a
-   * failure below can put it back.
+   * The credential files are read as they are before the patch merges this project's id and secret
+   * into them, so a failure below can put them back. What the patch writes depends on the files the
+   * scaffold creates.
    *
-   * What the patch writes depends on the files the scaffold creates.
+   * The dry run before this step already ruled out conflicts, so a failure of the patch is an I/O
+   * failure partway through. It removes the setup markers and puts `.env.local` back, so a rerun
+   * starts over.
    *
    * @param needs - The patcher, the app and the project.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns What was patched, what the credential files held before, and the
    *   spinner the rest of the files are reported under.
    */
-  async run(
-    needs: Needs,
-    services: SetupServices,
-  ): Promise<Fact<"patched" | "envFilesBefore" | "patching">> {
+  async run(needs: Needs): Promise<Fact<"patched" | "envFilesBefore" | "patching">> {
     const { framework, patchContext, patcher, project } = needs;
-    const envFilesBefore = await readCredentialEnvFiles(services.cwd);
+    const envFilesBefore = await readCredentialEnvFiles(this.deps.cwd);
     if (framework === undefined) {
-      services.ui
+      this.deps.ui
         .begin("Patching project files (dry run)")
         .done("Would patch the new project (dry run): its files come from the scaffold");
       return {
         patched: {
-          dryRun: services.dryRun,
+          dryRun: this.deps.dryRun,
           files: [],
           filesWritten: [],
           filesSkipped: [],
@@ -79,35 +91,32 @@ export class PatchApp extends WizardStep<
         patching: undefined,
       };
     }
-    const patching = services.ui.begin(
-      `Patching project files${services.dryRun ? " (dry run)" : ""}`,
+    const patching = this.deps.ui.begin(
+      `Patching project files${this.deps.dryRun ? " (dry run)" : ""}`,
     );
     const patched = await patcher
       .patch(patchContext(framework, project), {
-        cwd: services.cwd,
-        dryRun: services.dryRun,
-        force: services.force,
+        cwd: this.deps.cwd,
+        dryRun: this.deps.dryRun,
+        force: this.deps.force,
       })
       .catch(async (error: unknown) => {
-        // The dry run before it already ruled out conflicts, so this is an I/O
-        // failure partway through. Remove the setup markers and put
-        // `.env.local` back, so a rerun starts over.
-        if (!services.dryRun) {
-          await removeSetupMarkers(services.cwd);
-          await restoreCredentialEnvFiles(services.cwd, envFilesBefore);
+        if (!this.deps.dryRun) {
+          await removeSetupMarkers(this.deps.cwd);
+          await restoreCredentialEnvFiles(this.deps.cwd, envFilesBefore);
         }
         patching.fail();
         throw error;
       });
     for (const file of patched.filesWritten) {
-      const sentence = describeWrittenFile(relativeDisplay(services.cwd, file), services.dryRun);
+      const sentence = describeWrittenFile(relativeDisplay(this.deps.cwd, file), this.deps.dryRun);
       if (sentence) {
         patching.detail(sentence);
       }
     }
     for (const file of patched.filesSkipped) {
       patching.detail(
-        `Left ${escapeControlCharacters(relativeDisplay(services.cwd, file))} unchanged (already matches target)`,
+        `Left ${escapeControlCharacters(relativeDisplay(this.deps.cwd, file))} unchanged (already matches target)`,
       );
     }
     return {
@@ -122,17 +131,13 @@ export class PatchApp extends WizardStep<
    *
    * @param out - What the patch did, and what the credential files held before.
    * @param _needs - What was known when the step ran.
-   * @param services - What the command provides.
+   * @param this.deps - What the command provides.
    * @returns Once they are removed.
    */
-  override async undo(
-    out: Fact<"patched" | "envFilesBefore" | "patching">,
-    _needs: Needs,
-    services: SetupServices,
-  ): Promise<void> {
-    if (!services.dryRun) {
-      await removeSetupMarkers(services.cwd);
-      await restoreCredentialEnvFiles(services.cwd, out.envFilesBefore);
+  override async undo(out: Fact<"patched" | "envFilesBefore" | "patching">): Promise<void> {
+    if (!this.deps.dryRun) {
+      await removeSetupMarkers(this.deps.cwd);
+      await restoreCredentialEnvFiles(this.deps.cwd, out.envFilesBefore);
     }
   }
 }
@@ -155,18 +160,20 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 export async function readCredentialEnvFiles(
   cwd: string,
 ): Promise<Map<string, Buffer | undefined>> {
-  const before = new Map<string, Buffer | undefined>();
-  for (const file of CREDENTIAL_ENV_FILES) {
-    try {
-      before.set(file, await readFile(join(cwd, file)));
-    } catch (error) {
-      if (!isErrno(error, "ENOENT")) {
-        throw error;
-      }
-      before.set(file, undefined);
-    }
-  }
-  return before;
+  return new Map(
+    await Promise.all(
+      CREDENTIAL_ENV_FILES.map(async (file): Promise<readonly [string, Buffer | undefined]> => {
+        try {
+          return [file, await readFile(join(cwd, file))];
+        } catch (error) {
+          if (!isErrno(error, "ENOENT")) {
+            throw error;
+          }
+          return [file, undefined];
+        }
+      }),
+    ),
+  );
 }
 
 /**
