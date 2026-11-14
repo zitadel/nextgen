@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { setupServer } from "msw/node";
 import { test as base } from "vitest";
 
+import { atTerminal, type Terminal } from "./keyboard";
+import { recordLog } from "./log";
 import { nextPort } from "./ports";
 
 /** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
@@ -91,6 +93,55 @@ export const test = base.extend<{
   },
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   port: ({}, use) => use(nextPort()),
+});
+
+/**
+ * `test` with the terminal the run is at: stdout and stdin are patched for every test, exactly as
+ * {@link atTerminal} does it, and given back when the test ends.
+ *
+ * - `screen` is that terminal, to read what was drawn.
+ */
+export const atScreen = test.extend<{ screen: Terminal }>({
+  screen: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      await use(atTerminal());
+    },
+    { auto: true },
+  ],
+});
+
+/**
+ * Records what is said through `log` for the length of a test, and stops when it ends.
+ *
+ * @param use - Runs the test with the sink.
+ */
+async function withRecordedLog(use: (sink: ReturnType<typeof recordLog>) => Promise<void>) {
+  const sink = recordLog();
+  await use(sink);
+  sink.stop();
+}
+
+/**
+ * `test` that records what is said through `log` in every test, and stops recording when it ends.
+ *
+ * - `recorded` is the {@link recordLog} sink, to read the lines or to stop it early.
+ */
+export const recording = test.extend<{ recorded: ReturnType<typeof recordLog> }>({
+  recorded: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    ({}, use) => withRecordedLog(use),
+    { auto: true },
+  ],
+});
+
+/** `atScreen` with `recorded` as well: the terminal the run is at, and what is said through `log`. */
+export const atScreenRecording = atScreen.extend<{ recorded: ReturnType<typeof recordLog> }>({
+  recorded: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    ({}, use) => withRecordedLog(use),
+    { auto: true },
+  ],
 });
 
 export { test as it };

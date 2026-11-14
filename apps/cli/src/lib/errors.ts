@@ -470,24 +470,17 @@ function listedInDetails(
  * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
  * reports missing. Those are appended the same way.
  */
-function rejectedResources(body: unknown): string[] {
-  const lines: string[] = [];
-  let node: unknown = body;
-  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>).resources;
-    if (Array.isArray(listed)) {
-      for (const item of listed) {
-        const line = resourceLine(item);
-        if (line !== undefined) {
-          lines.push(line);
-        }
-      }
-      break;
-    }
-    node = (node as { details?: unknown }).details;
+function rejectedResources(body: unknown, depth = 0): readonly string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [];
   }
-
-  return lines;
+  const listed = (body as Record<string, unknown>).resources;
+  if (Array.isArray(listed)) {
+    return listed.flatMap((item) => {
+      return resourceLine(item) ?? [];
+    });
+  }
+  return rejectedResources((body as { details?: unknown }).details, depth + 1);
 }
 
 function resourceLine(item: unknown): string | undefined {

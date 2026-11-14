@@ -21,7 +21,7 @@ func TestErrorCodesDecode(t *testing.T) {
 			return new(api.SubmitFlowStepErrorResponse).Decode(jx.DecodeStr(fmt.Sprintf(`{"code":%q,"message":"m"}`, code)))
 		},
 		OpGetUser: func(code string) error {
-			return new(api.GetUserByIDErrorResponse).Decode(jx.DecodeStr(fmt.Sprintf(`{"code":%q,"message":"m"}`, code)))
+			return new(api.GetUserErrorResponse).Decode(jx.DecodeStr(fmt.Sprintf(`{"code":%q,"message":"m"}`, code)))
 		},
 	}
 	decoders[OpSubmitPassword] = decoders[OpSubmitIdent]

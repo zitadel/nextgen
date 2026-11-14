@@ -19,8 +19,8 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
  * pinned so that it only ever shrinks.
  */
 const STILL_DRAWING_THEMSELVES = [
-  "commands/logs/index.ts: writes to process.stdout",
-  "hooks/version-notice.ts: writes to process.stderr",
+  "cli/commands/logs/index.ts: writes to process.stdout",
+  "cli/hooks/version-notice.ts: writes to process.stderr",
   "lib/input.ts: imports @clack/prompts",
   "lib/oclif/base.ts: writes to process.stderr",
   "lib/telemetry/sink.ts: writes to process.stderr",
@@ -37,10 +37,14 @@ const WIZARDS = ["setup/index.ts"];
 describe("which shape a command draws", () => {
   it("is declared by `setup` alone, the one command that walks a person through several stages", async () => {
     const declared: string[] = [];
-    for (const file of await sourceFiles(join(SRC, "commands"))) {
+    for (const file of await sourceFiles(join(SRC, "cli", "commands"))) {
       const source = await readFile(file, "utf8");
       if (/static override wizard = true/.test(source)) {
-        declared.push(relative(join(SRC, "commands"), file).split(sep).join("/"));
+        declared.push(
+          relative(join(SRC, "cli", "commands"), file)
+            .split(sep)
+            .join("/"),
+        );
       }
     }
 

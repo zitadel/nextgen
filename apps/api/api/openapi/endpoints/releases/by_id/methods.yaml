@@ -1,5 +1,5 @@
 get:
-  operationId: getReleaseById
+  operationId: getRelease
   x-zitadel-cli: release get
   summary: Get a release by ID
   description: |
@@ -107,4 +107,4 @@ get:
                     handle: default
                     revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
     default:
-      $ref: getReleaseById-error-response.yaml
+      $ref: getRelease-error-response.yaml

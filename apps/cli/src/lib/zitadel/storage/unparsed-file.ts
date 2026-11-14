@@ -125,6 +125,7 @@ export class UnparsedFile {
    *   no error or cannot follow the text.
    */
   private static placeParserFinds(text: string): string | undefined {
+    // biome-ignore lint/plugin: first error wins inside a visitor callback
     let place: string | undefined;
     try {
       visit(

@@ -659,7 +659,7 @@ describe("deploy", () => {
           },
           warnings: [
             expect.stringContaining(
-              `users update '<user_id>' --schema '<revision_id>' --set 'attributes.email=<value>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              `user update '<user_id>' --schema '<revision_id>' --set 'attributes.email=<value>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
             ),
           ],
         });

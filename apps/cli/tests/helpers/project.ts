@@ -45,6 +45,7 @@ export type InterruptedRun = Readonly<{
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -541,6 +542,39 @@ export class ScaffoldedApp {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * The paths the next commit of everything would take: those under version
+   * control, and those outside it that no ignore rule keeps out. Read from git,
+   * which decides it, without committing.
+   */
+  async committableFiles(): Promise<string[]> {
+    const { stdout } = await execFileAsync(
+      "git",
+      [
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "-z",
+      ],
+      { cwd: this.path },
+    );
+    return stdout.split("\0").filter((line) => line !== "");
+  }
+
+  /**
+   * Puts an app set up without git in the state a setup before this CLI left a
+   * SvelteKit app in: `gitignore` as its `.gitignore`, and everything it does
+   * not ignore committed, so `.env.example`, which it ignores, never was.
+   */
+  async leftByAnOlderSetup(gitignore: string): Promise<void> {
+    await this.replaceGitignore(gitignore);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await this.commitEverything();
   }
 
   /** Commits everything outstanding, as the developer would before deploying. */
@@ -1585,16 +1619,16 @@ export class ScaffoldedApp {
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
-    return this.listed<RegisteredIdp>("idps");
+    return this.listed<RegisteredIdp>("idp");
   }
 
   /** The policies the platform holds, each at its newest revision. */
   publishedPolicies(): Promise<PublishedPolicy[]> {
-    return this.listed<PublishedPolicy>("policies");
+    return this.listed<PublishedPolicy>("policy");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
-    return this.listed<PublishedSchema>("schemas");
+    return this.listed<PublishedSchema>("schema");
   }
 
   /** The one schema a scaffolded project publishes. */
@@ -1603,7 +1637,7 @@ export class ScaffoldedApp {
   }
 
   publishedFlows(): Promise<PublishedFlow[]> {
-    return this.listed<PublishedFlow>("flow-definitions");
+    return this.listed<PublishedFlow>("flow-definition");
   }
 
   /** The one login flow a scaffolded project publishes. */
@@ -1639,7 +1673,7 @@ export class ScaffoldedApp {
   }
 
   /**
-   * The auth methods the published user schema names, as `schemas list`
+   * The auth methods the published user schema names, as `schema list`
    * reports them.
    *
    * @returns The schema's `x-auth-methods`, empty when it names none.
@@ -1904,6 +1938,20 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Gives the app `contents` as its `.gitignore`, as its framework's generator or the developer left it. */
+  replaceGitignore(contents: string): Promise<void> {
+    return this.writeProjectFile(".gitignore", contents);
+  }
+
+  /**
+   * Gives the Vite app's dev proxy the target setup fixed in it, the server it
+   * ran against, before the proxy read `ZITADEL_URL`.
+   */
+  async fixesItsServerAddress(): Promise<void> {
+    const config = await this.readProjectFile(VITE_CONFIG);
+    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, MOCK_SERVER_URL));
+  }
+
   /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
   async hasInstalled(name: string, version: string): Promise<void> {
     await mkdir(join(this.path, "node_modules", name), { recursive: true });
@@ -2051,9 +2099,9 @@ export class ScaffoldedApp {
     );
   }
 
-  /** Runs `zitadel policies test` with `args`. */
+  /** Runs `zitadel policy test` with `args`. */
   testPolicies(args: string[] = []): Promise<CliResult> {
-    return this.run(["policies", "test", "--non-interactive", ...args]);
+    return this.run(["policy", "test", "--non-interactive", ...args]);
   }
 
   /** Removes the committed password policy file, as the developer owning it would. */
@@ -2758,6 +2806,51 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
+}
+
+/** A Vite app's config, into which setup merges the dev proxy. */
+const VITE_CONFIG = "vite.config.ts";
+
+/** A React app as create-vite's react-ts template leaves it, before setup. */
+export async function aReactApp(): Promise<ScaffoldedApp> {
+  const path = await mkdtemp(join(tmpdir(), "zitadel-react-"));
+  await mkdir(join(path, "src"), { recursive: true });
+  const files = {
+    "package.json": JSON.stringify(
+      {
+        name: "demo-react-app",
+        private: true,
+        type: "module",
+        scripts: { dev: "vite" },
+        dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" },
+        devDependencies: { vite: "^8.0.0" },
+      },
+      null,
+      2,
+    ),
+    ".gitignore": "node_modules\n",
+    "index.html":
+      '<!doctype html>\n<html>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>\n',
+    "src/main.tsx":
+      'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\n\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
+    "src/App.tsx": "export default function App() {\n  return null;\n}\n",
+    [VITE_CONFIG]: BARE_VITE_CONFIG,
+  };
+  for (const [relativePath, contents] of Object.entries(files)) {
+    await writeFile(join(path, relativePath), contents);
+  }
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * A React app already through `setup`, for specs about its dev proxy. Setup
+ * replaces create-vite's own `src/App.tsx` only when forced.
+ */
+export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
+  const app = await aReactApp();
+  const result = await app.setup(["--no-git", "--force", "--framework", "react"]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
 }
 
 /**

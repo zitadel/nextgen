@@ -68,6 +68,11 @@ through any wrapping.
 - `TestEveryGatedResourceIsClassedForThePlatformProject` fails until a new
   resource is classed as configuration or as the platform project's own.
 
+## Tracing
+
+- Never start a Server-kind span in a handler: every request already has one
+  (`middleware.WithServerSpan`). Name it through `middleware.ServerSpan`.
+
 ## Format before push
 
 Run `turbo run format --filter=@zitadel/server` before pushing Go changes. It

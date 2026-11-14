@@ -199,7 +199,7 @@ oneOf:
     description: |
       A token was revoked. Deleting a session revokes its tokens too. Those
       events have an `entity.id` of `null`; the session's ID is `session_id`
-      of the event that `getEvent` (`GET /events/{id}`) returns.
+      of the event that `getEvent` (`GET /events/{event_id}`) returns.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -410,8 +410,8 @@ oneOf:
     description: |
       An invitation was accepted. The grant events the acceptance writes
       share its `request_id`, which is on the event that `getEvent` (`GET
-      /events/{id}`) returns; there are none when the user already holds an
-      identical active grant.
+      /events/{event_id}`) returns; there are none when the user already
+      holds an identical active grant.
 
       Not sent yet: the contract is published ahead of the code that sends
       it.
@@ -638,8 +638,8 @@ oneOf:
       An API request in the project completed. One event per request; the
       health, liveness, and readiness probes send none. The requester's IP,
       user agent and origin are in `metadata.client` of the event that
-      `getEvent` (`GET /events/{id}`) returns, and its `request_id` joins
-      the other events of the same request to it.
+      `getEvent` (`GET /events/{event_id}`) returns, and its `request_id`
+      joins the other events of the same request to it.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object

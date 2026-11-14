@@ -1,6 +1,6 @@
 get:
   operationId: getPolicy
-  x-zitadel-cli: policies get
+  x-zitadel-cli: policy get
   summary: Get a policy by ID
   description: |
     Returns a policy as its newest revision. A revision applies once a deployed

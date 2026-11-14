@@ -268,7 +268,7 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // The one piece of state the check keeps: the read, once it is started.
+  // biome-ignore lint/plugin: the memoised read, started on first use
   let listed: Promise<Listing | undefined> | undefined;
   return () => {
     listed ??= objectTypes(ctx).catch(() => {
@@ -489,7 +489,7 @@ async function lookupWarnings(
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
       const fix = ctx.suggest({
-        id: "users:update",
+        id: "user:update",
         args: { id: "<user_id>" },
         flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
       });

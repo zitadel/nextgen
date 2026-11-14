@@ -206,7 +206,7 @@ describe("optionArgs", () => {
  * line, which is also why a failure's line number is the one in the file.
  */
 describe("the CLI names itself once in human output", () => {
-  const COMMANDS = join(import.meta.dirname, "../../../src/commands");
+  const COMMANDS = join(import.meta.dirname, "../../../src/cli/commands");
 
   /**
    * The source with every comment blanked, keeping each line where it was.

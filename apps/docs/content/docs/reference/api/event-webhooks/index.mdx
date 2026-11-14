@@ -41,7 +41,7 @@ these seven fields, always all of them:
 
 - Tell events apart by `type`. The event webhook's page lists every type: select
   one in its request body to read what happened and what `data` holds.
-- `data` is the event's `payload` as `getEvent` (`GET /events/{id}`) returns
+- `data` is the event's `payload` as `getEvent` (`GET /events/{event_id}`) returns
   it, redacted the same way. It is `{}` for a type with no payload. It is not
   the resource: `user.created` lists the attribute keys written, not the user.
 - `actor` and `entity` are `null` when the event has neither a type nor an ID

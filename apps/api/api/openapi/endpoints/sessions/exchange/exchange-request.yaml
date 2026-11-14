@@ -6,8 +6,8 @@ properties:
   handoff_token:
     type: string
     description: |
-      The one-time handoff token that `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`)
-      (`POST /auth_attempts/{id}/handoff`) returns as `handoff_token`.
+      The one-time handoff token that `createAuthAttemptHandoff`
+      (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token`.
       It is single-use. Replaying it after a successful exchange returns `400`
       with `sess.invalid_handoff_token`, the same answer as for an unknown or
       expired token.

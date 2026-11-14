@@ -127,7 +127,7 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 - `data` is the event's payload as stored, already redacted
   ([ADR 048](048-wide-events-internal-audit-primitive.md)), `{}` when empty.
   It is not the resource. A receiver that needs more reads the resource by
-  `entity.id`, or the whole event with `GET /events/{id}`.
+  `entity.id`, or the whole event with `GET /events/{event_id}`.
 - The spec describes the envelope once and types `data` per event type from
   the payload schemas `GET /events` uses.
 - The operator's sinks are not this: they keep receiving the event as
@@ -231,11 +231,11 @@ may be added, and a receiver ignores what it does not know.
 | Operation | Request | Permission |
 |---|---|---|
 | List | `GET /webhooks` | `webhook.read` |
-| Get | `GET /webhooks/{id}` | `webhook.read` |
+| Get | `GET /webhooks/{webhook_id}` | `webhook.read` |
 | Create | `POST /webhooks` | `webhook.write` |
-| Update | `PATCH /webhooks/{id}` | `webhook.write` |
-| Delete | `DELETE /webhooks/{id}` | `webhook.delete` |
-| Rotate the secret | `POST /webhooks/{id}/rotate_secret` | `webhook.write` |
+| Update | `PATCH /webhooks/{webhook_id}` | `webhook.write` |
+| Delete | `DELETE /webhooks/{webhook_id}` | `webhook.delete` |
+| Rotate the secret | `POST /webhooks/{webhook_id}/rotate_secret` | `webhook.write` |
 
 - The paths are flat and name the project as `/invitations`, `/idps`,
   `/policies` and `/variables` do. `/projects/{project_id}/…` holds only a

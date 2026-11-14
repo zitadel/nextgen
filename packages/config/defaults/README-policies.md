@@ -81,7 +81,7 @@ brings it back.
 ## Testing a policy
 
 `auth.factor.password.set.test.json` beside the policy holds cases you write:
-an input, and the decision you expect. `zitadel policies test` sends each case
+an input, and the decision you expect. `zitadel policy test` sends each case
 to Zitadel, which evaluates it exactly as a real password set would, and
 reports the ones that do not hold. Your editor validates the file against
 `.zitadel/meta/policy-test.json`, and `zitadel deploy` never carries it.
@@ -122,7 +122,7 @@ reports the ones that do not hold. Your editor validates the file against
 - A test of the sign-up policy, `user.create.test.json`, names the challenge
   each sign-up solved: `"input": { "solved_challenge": "zitadel_pow" }`.
 
-`zitadel policies test --release <id>` runs the same cases against the policy a
+`zitadel policy test --release <id>` runs the same cases against the policy a
 release pins. Test the files before `zitadel preview` or `deploy`: a pull
 request's `preview` applies its policy on that pull request's preview URLs, and
 `deploy` on your app and for your backend. In CI, run the test in the
