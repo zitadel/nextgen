@@ -85,10 +85,3 @@ export {
   ssoEnableFlags,
 } from "./custom";
 export { CredentialDelivery, type DeliveryRun } from "./delivery";
-export {
-  ProviderChoice,
-  type ProviderFlags,
-  type ProviderRun,
-  type ProviderTarget,
-  type StoredSettings,
-} from "./provider";

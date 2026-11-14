@@ -7,9 +7,9 @@ import type {
   ClaimRequest,
   CredentialDelivery,
   CredentialNames,
+  CustomFlagValues,
   GivenCredentials,
   MappingState,
-  ProviderChoice,
   PublishedCredentials,
 } from "@/lib/idp";
 import { log } from "@/lib/log";
@@ -99,7 +99,18 @@ export type EnableFacts = Readonly<{
   /**
    * How the flags choose a provider.
    */
-  choice: ProviderChoice;
+  choice: Readonly<{
+    /**
+     * The provider, or `undefined` for a custom connection a person will be
+     * asked to finish.
+     */
+    selection: ProviderSelection | undefined;
+
+    /**
+     * The custom connection's settings the flags gave.
+     */
+    values: CustomFlagValues;
+  }>;
 
   /**
    * The origin the app serves from, which every callback URI is built on.
