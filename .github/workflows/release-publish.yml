@@ -55,7 +55,7 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
@@ -67,12 +67,12 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         with:
           run_install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         with:
           node-version-file: .nvmrc
@@ -85,7 +85,7 @@ jobs:
       - name: Open or update version PR
         id: version-pr
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           version: corepack pnpm exec changeset version
@@ -120,12 +120,12 @@ jobs:
       TURBO_CACHE: "local:,remote:"
       TURBO_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
           cache: true
@@ -136,11 +136,11 @@ jobs:
             tools/oidc-mock/go.sum
             go.work.sum
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           registry-url: "https://registry.npmjs.org"
