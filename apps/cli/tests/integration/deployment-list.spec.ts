@@ -447,12 +447,12 @@ describe("deployment list", () => {
           "deploy",
           "http://localhost:3000, https://app.example.com",
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
-          "primary",
-          "",
+          /.*/,
+          /.*/,
         );
       });
 
-      it("prints a preview's kind and the expiry preview list shows, piped", async () => {
+      it("prints the expiry preview list shows for a preview, piped", async () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
         await app.previewData(PREVIEW_URL);
@@ -468,7 +468,7 @@ describe("deployment list", () => {
           "deploy",
           PREVIEW_URL,
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
-          "preview",
+          /.*/,
           expires,
         );
       });

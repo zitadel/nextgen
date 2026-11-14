@@ -111,9 +111,19 @@ type DeploymentMetadata struct {
 	DeployedByType *EventActorType `json:"deployed_by_type"`
 }
 
+// PreviewExpiry is the instant a preview deployment made at deployedAt expires.
+// It is the one place the expiry is derived, for the targets' stamp and for
+// the preview's own row alike.
+func PreviewExpiry(deployedAt time.Time, ttl time.Duration) time.Time {
+	return deployedAt.Add(ttl).UTC()
+}
+
 // DeploymentTarget is one origin a deployment covered. ExpiresAt is the expiry
 // a preview deployment set on its URL, fixed when it is made; a later
-// deployment to the URL does not change it. It is nil on a primary deployment.
+// deployment to the URL does not change it. It is nil on a primary deployment,
+// and on a preview target the server made before it recorded expiries; of
+// those, only the newest deployment to a URL was given one when they were
+// backfilled, so the targets of an older multi-origin deployment can disagree.
 type DeploymentTarget struct {
 	Origin    string     `json:"origin"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
@@ -140,7 +150,7 @@ func (d *Deployment) StampExpiry(deployedAt time.Time, ttl time.Duration) {
 	for i := range d.Targets {
 		d.Targets[i].ExpiresAt = nil
 		if d.OriginKind == DeploymentOriginKindPreview {
-			expiresAt := deployedAt.Add(ttl).UTC()
+			expiresAt := PreviewExpiry(deployedAt, ttl)
 			d.Targets[i].ExpiresAt = &expiresAt
 		}
 	}

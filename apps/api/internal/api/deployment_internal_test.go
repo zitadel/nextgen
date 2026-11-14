@@ -81,6 +81,25 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
+// A preview target carries the expiry its deployment set; a primary one has none.
+func TestToAPIDeploymentCarriesTheTargetExpiry(t *testing.T) {
+	expires := time.Date(2026, 10, 9, 14, 52, 0, 0, time.UTC)
+	entity := &domain.Deployment{
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Targets: []domain.DeploymentTarget{
+			{Origin: "https://pr-1.acme.dev", ExpiresAt: &expires},
+			{Origin: "https://pr-2.acme.dev"},
+		},
+	}
+
+	resp := toAPIDeployment(entity, api.DeploymentStatusLive)
+
+	assert.Equal(t, []api.DeploymentTarget{
+		{Origin: "https://pr-1.acme.dev", ExpiresAt: api.NewOptDateTime(expires)},
+		{Origin: "https://pr-2.acme.dev"},
+	}, resp.Targets)
+}
+
 // A revoked release is the other member of the 409 union.
 func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 	resp, ok := deploymentConflictResponse(t.Context(), domain.ErrReleaseRevoked())

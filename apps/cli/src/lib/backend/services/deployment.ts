@@ -195,9 +195,10 @@ export class Deployment {
    * set on its targets, which a later deployment to the same URL does not
    * change.
    *
-   * @returns The expiry its targets carry, all of them the same, or null for
-   *   a deployment that has none: a primary one, or a preview one the server
-   *   made before it recorded expiries.
+   * @returns The first expiry its targets carry (a deployment the server
+   *   made after it recorded expiries has the same one on all of them), or
+   *   null for a deployment that has none: a primary one, or an older preview
+   *   one.
    */
   get expiresAt(): string | null {
     return (

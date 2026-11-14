@@ -12,10 +12,6 @@ SET expires_at = (
 )
 WHERE origin_kind = 'preview'
   AND expires_at IS NULL
-  AND EXISTS (
-      SELECT 1 FROM previews p
-      WHERE p.project_id = deployment_origins.project_id AND p.origin = deployment_origins.origin
-  )
   AND NOT EXISTS (
       SELECT 1 FROM deployment_origins newer
       WHERE newer.project_id = deployment_origins.project_id
