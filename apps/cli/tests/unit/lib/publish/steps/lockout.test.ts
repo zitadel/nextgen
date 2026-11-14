@@ -432,7 +432,7 @@ describe("lockoutStep", () => {
 
       expect(said).toEqual([
         expect.stringContaining(
-          "users update '<user_id>' --schema '<revision_id>' --set 'attributes.username=<value>'",
+          "user update '<user_id>' --schema '<revision_id>' --set 'attributes.username=<value>'",
         ),
       ]);
     });

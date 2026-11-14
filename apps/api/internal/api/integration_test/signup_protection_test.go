@@ -25,7 +25,7 @@ func signupProofs(t *testing.T, step api.FlowStep) api.OptFlowSubmitRequestGateP
 }
 func currentSignupProofs(t *testing.T, client *helpers.ApiClient, id, cookie string) api.OptFlowSubmitRequestGateProofs {
 	t.Helper()
-	resp, err := client.GetFlowStep(t.Context(), api.GetFlowStepParams{ID: id, Zflow: cookie})
+	resp, err := client.GetFlowStep(t.Context(), api.GetFlowStepParams{FlowID: id, Zflow: cookie})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	return signupProofs(t, resp.(*api.FlowResponseHeaders).Response.Step)
@@ -37,7 +37,7 @@ func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
-	def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
+	def, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, def)
 	deployPrimary(t, project.ID)
@@ -56,7 +56,7 @@ func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	require.False(t, gate.Challenge.IsSet(), "Submit announces the gate; GET issues the puzzle")
 	cookie := mustExtractZflow(t, step.SetCookie)
 	req := &api.FlowSubmitRequest{Action: "submit", Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"x-auth-methods#password": jx.Raw(`"correct-horse-battery-staple"`)})}
-	params := api.SubmitFlowStepParams{ID: start.Response.ID, Zflow: cookie}
+	params := api.SubmitFlowStepParams{FlowID: start.Response.ID, Zflow: cookie}
 	missing, err := client.SubmitFlowStep(t.Context(), req, params)
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepErrorResponseStatusCode{}, missing)

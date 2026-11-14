@@ -9,8 +9,8 @@ import type { FileOp, ScaffoldPlan } from "./file-writer/types";
  * The subset of a patcher plan's operations that `doctor --fix` re-applies:
  * env merges, gitignore entries, dependency additions, marker-bearing managed
  * files (framework routes/middleware), and the `edit` transforms — the
- * `/__nextgen` dev proxy merged into `vite.config`/`nuxt.config`/`angular.json`
- * and the Angular `dev` script added to `package.json`. Every `edit` transform
+ * `/__nextgen` dev proxy merged into `vite.config`/`nuxt.config`/`angular.json`.
+ * Every `edit` transform
  * is idempotent and only adds what is missing (an existing value is left as-is,
  * the transform returning the source unchanged), so replaying one restores a
  * removed managed block without clobbering the user's own edits. Deliberately

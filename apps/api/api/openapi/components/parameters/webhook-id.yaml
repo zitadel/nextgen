@@ -1,4 +1,4 @@
-name: id
+name: webhook_id
 in: path
 required: true
 description: |

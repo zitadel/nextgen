@@ -82,7 +82,7 @@ export type ConfigDirectory = (typeof CONFIG_DIRECTORIES)[ConfigKind];
  * @remarks
  * The files the bundle reads: the `*.json` files at the top of the policies
  * directory, never its `README.md` or a subdirectory, and never the test
- * files beside the policies, which `zitadel policies test` runs.
+ * files beside the policies, which `zitadel policy test` runs.
  */
 export const RELEASE_POLICY_GLOBS = {
   /**

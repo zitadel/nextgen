@@ -319,45 +319,63 @@ export class Lifecycle<R extends ServerRecord> {
     if (previous) {
       await this.terminate(previous);
     }
-    // A port race retries on the next port, so both move with each attempt.
-    let preferred = previous?.port ?? this.options.previousPort;
-    for (let attempt = 0; ; attempt++) {
-      const claim = await claimFreePort(
-        this.deps.ports,
-        requested,
-        preferred,
-        this.options.firstPort,
-      );
-      try {
-        const record = await this.launchAndWait(claim.port).catch(async (error: unknown) => {
-          // Someone else took the port between claiming it and binding it (a
-          // process outside our claims, or a Docker publish that failed). The
-          // choice was automatic, so the next port is tried. A server that failed
-          // with its port still free crashed, and says so instead of being retried.
-          if (
-            requested === undefined &&
-            attempt < PORT_RACE_RETRIES &&
-            !(error instanceof ServerStopError) &&
-            (error instanceof ServerStartError ? error.reason === "exited" : true) &&
-            !(await this.deps.ports.isFree(claim.port))
-          ) {
-            return undefined;
-          }
-          throw error;
-        });
-        if (record === undefined) {
-          preferred = claim.port + 1;
-          continue;
+    const record = await this.launchOnFreePort(
+      requested,
+      previous?.port ?? this.options.previousPort,
+    );
+    return { record, alreadyRunning: false };
+  }
+
+  /**
+   * Claims a free port and launches the server on it, moving to the next port
+   * when another process takes the claimed one first.
+   *
+   * @param requested - The port the user asked for, when they did.
+   * @param preferred - The port to try first; it moves with each attempt.
+   * @param attempt - The attempt this is, from zero.
+   * @returns The launched server, once it answers.
+   * @throws The launch failure, when the port was not lost to a race or the
+   *   retries are spent.
+   */
+  private async launchOnFreePort(
+    requested: number | undefined,
+    preferred: number | undefined,
+    attempt = 0,
+  ): Promise<Launched<R>> {
+    const claim = await claimFreePort(
+      this.deps.ports,
+      requested,
+      preferred,
+      this.options.firstPort,
+    );
+    const record = await this.launchAndWait(claim.port)
+      .catch(async (error: unknown) => {
+        // Someone else took the port between claiming it and binding it (a
+        // process outside our claims, or a Docker publish that failed). The
+        // choice was automatic, so the next port is tried. A server that failed
+        // with its port still free crashed, and says so instead of being retried.
+        if (
+          requested === undefined &&
+          attempt < PORT_RACE_RETRIES &&
+          !(error instanceof ServerStopError) &&
+          (error instanceof ServerStartError ? error.reason === "exited" : true) &&
+          !(await this.deps.ports.isFree(claim.port))
+        ) {
+          return undefined;
         }
-        return { record, alreadyRunning: false };
-      } finally {
+        throw error;
+      })
+      .finally(async () => {
         // A claim that cannot be removed is a file whose owner is gone, which
         // the next start takes over; it must not hide how this start ended.
         await claim.release().catch(() => {
           return undefined;
         });
-      }
+      });
+    if (record === undefined) {
+      return this.launchOnFreePort(requested, claim.port + 1, attempt + 1);
     }
+    return record;
   }
 
   /**

@@ -1,7 +1,7 @@
 name: challenge_id
 in: path
 required: true
-description: The `challenge_id` that `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.
+description: The `challenge_id` that `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.
 schema:
   $ref: '../schemas/challenge-id.yaml'
 example: ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

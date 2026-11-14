@@ -7,7 +7,7 @@ type: object
 description: |
   The fields of every request to a project's webhook, each always present.
   `type` says which event type it is, and with it what `data` holds: the
-  event's `payload` as `getEvent` (`GET /events/{id}`) returns it, redacted
+  event's `payload` as `getEvent` (`GET /events/{event_id}`) returns it, redacted
   the same way, and `{}` when the event type has none. `data` is what the
   event recorded, not the resource.
 required:
@@ -22,7 +22,7 @@ properties:
     type: string
     description: |
       The event ID, in the form `evt_<opaque>`. It is the same on every
-      retry, and the `id` that `getEvent` (`GET /events/{id}`) takes.
+      retry, and the `id` that `getEvent` (`GET /events/{event_id}`) takes.
     example: evt_01HZYABCDEFGHJKMNPQRSTVWXY
   type:
     type: string

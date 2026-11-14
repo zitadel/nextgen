@@ -73,7 +73,7 @@ adopted — a Next 15→16 upgrade converges instead of failing forever.
 Beyond whole files, the check verifies the managed *config wirings* — the
 merges the CLI applies into user-owned config files (the Vite and Nuxt
 dev-proxy/runtime merges, Angular's `angular.json` `proxyConfig` and auth
-routes, the Angular `dev` script). Each merging transform is idempotent by
+routes). Each merging transform is idempotent by
 contract (it only adds what is missing), so running it against the current
 content is a structural probe: a changed output means the wiring is absent.
 Verification is total — every labelled wiring gets a verdict: `applied`,

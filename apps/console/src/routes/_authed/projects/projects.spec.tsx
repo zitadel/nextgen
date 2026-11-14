@@ -700,7 +700,7 @@ describe("project picker", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({ projects: [listed("proj_1", "River"), listed("proj_2", "Delta")] }),
       ),
-      http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
+      http.get("http://localhost/api/v1/events", () => HttpResponse.json({ events: [] })),
     );
     const router = await renderProjects(TO_EVENTS);
 

@@ -100,15 +100,15 @@ describe("FlagsOf", () => {
 
 describe("NextTable", () => {
   it("names a generated resource command under each verb its descriptor has", () => {
-    expectTypeOf<"users:get">().toExtend<SuggestionId>();
+    expectTypeOf<"user:get">().toExtend<SuggestionId>();
     expectTypeOf<"release:list">().toExtend<SuggestionId>();
-    expectTypeOf<"sessions:revoke">().toExtend<SuggestionId>();
-    expectTypeOf<"teams:deactivate">().toExtend<SuggestionId>();
+    expectTypeOf<"session:revoke">().toExtend<SuggestionId>();
+    expectTypeOf<"team:deactivate">().toExtend<SuggestionId>();
   });
 
   it("names no generated command for a verb its descriptor lacks", () => {
-    expectTypeOf<"events:create">().not.toExtend<SuggestionId>();
-    expectTypeOf<"sessions:delete">().not.toExtend<SuggestionId>();
+    expectTypeOf<"event:create">().not.toExtend<SuggestionId>();
+    expectTypeOf<"session:delete">().not.toExtend<SuggestionId>();
   });
 });
 
@@ -191,8 +191,8 @@ describe("a suggestion", () => {
     checked({ id: "deplyo" });
     // @ts-expect-error a suggestion names its target by id, never as a command line
     checked({ id: "deploy --dry-run" });
-    // @ts-expect-error the generated `events` resource has no create
-    checked({ id: "events:create" });
+    // @ts-expect-error the generated `event` resource has no create
+    checked({ id: "event:create" });
   });
 
   it("is not a command line until a run renders it", () => {
@@ -547,36 +547,36 @@ describe("suggestionWords, for a target only known at run time", () => {
 
   it("refuses a flag the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { args: { id: "1" } }, LIST, {});
-    }).toThrow("users:list requires --kind");
+      return suggestionWords("user:list", { args: { id: "1" } }, LIST, {});
+    }).toThrow("user:list requires --kind");
   });
 
   it("refuses two flags the target declares exclusive", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", all: true, pageToken: "t" } },
         LIST,
         {},
       );
-    }).toThrow("users:list refuses --all with --page-token");
+    }).toThrow("user:list refuses --all with --page-token");
   });
 
   it("refuses a flag whose dependsOn is left out", () => {
     expect(() => {
       return suggestionWords(
-        "users:list",
+        "user:list",
         { args: { id: "1" }, flags: { kind: "k", force: true } },
         LIST,
         {},
       );
-    }).toThrow("users:list takes --force only with --fix");
+    }).toThrow("user:list takes --force only with --fix");
   });
 
   it("refuses an argument the target requires, left out", () => {
     expect(() => {
-      return suggestionWords("users:list", { flags: { kind: "k" } }, LIST, {});
-    }).toThrow("users:list requires its id");
+      return suggestionWords("user:list", { flags: { kind: "k" } }, LIST, {});
+    }).toThrow("user:list requires its id");
   });
 });
 

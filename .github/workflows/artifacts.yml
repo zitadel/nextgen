@@ -18,7 +18,7 @@ name: artifacts
 #   after the npm publish waits, in each install, for its platform packages
 #   to reach the registry.
 #
-# The start, published and target jobs run the scripts without an install:
+# The start, published, target and report jobs run the scripts without an install:
 # they and the modules they import take only Node built-ins.
 #
 # Jobs:
@@ -32,6 +32,9 @@ name: artifacts
 #   upgrade from the latest published release (//#smoke-upgrade).
 # - published (published only): the release's container image, and the
 #   upgrade from the release before it.
+# - report (a failed nightly or release run only): opens an issue, or
+#   comments on the one already open (scripts/artifacts-failure-issue.mjs).
+#   A pull request or a dispatch has someone watching it.
 on:
   workflow_dispatch:
     inputs:
@@ -46,6 +49,7 @@ on:
     paths:
       - .github/workflows/artifacts.yml
       - scripts/artifacts-target.mjs
+      - scripts/artifacts-failure-issue.mjs
       - scripts/smoke-server.mjs
       - scripts/smoke-upgrade.mjs
       - scripts/smoke-container.mjs
@@ -203,3 +207,30 @@ jobs:
       - name: Upgrade from the release before it
         if: ${{ !cancelled() }}
         run: node scripts/smoke-upgrade.mjs --to "$VERSION"
+
+  report:
+    needs: [target, binaries, start, linux, published]
+    # A job that timed out ends `cancelled`.
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'release') && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Open or update the issue for this failed run
+        run: node scripts/artifacts-failure-issue.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          NEEDS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Who a red night goes to.
+          ASSIGNEE: fforootd

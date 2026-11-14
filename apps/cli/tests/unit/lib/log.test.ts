@@ -1,17 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import { installLogSink, log } from "@/lib/log";
 
 import { recordLog } from "@tests/helpers/log";
-
-let stops: Array<() => void> = [];
-
-afterEach(() => {
-  for (const stop of stops.splice(0).reverse()) {
-    stop();
-  }
-  stops = [];
-});
 
 describe("log", () => {
   it("writes a line plainly when no command has installed a sink, so code outside a command is heard", () => {
@@ -53,7 +44,7 @@ describe("log", () => {
     ["debug", () => log.debug("a")],
   ])("hands a %s line to the sink with its level", (level, say) => {
     const recorded = recordLog();
-    stops.push(recorded.stop);
+    onTestFinished(recorded.stop);
 
     say();
 
@@ -62,7 +53,7 @@ describe("log", () => {
 
   it("formats the arguments the way console does", () => {
     const recorded = recordLog();
-    stops.push(recorded.stop);
+    onTestFinished(recorded.stop);
 
     log.debug("asset probe failed:", new Error("boom").message, 3);
 

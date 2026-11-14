@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { recording } from "@tests/helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 const homedir = vi.hoisted(() => vi.fn<() => string>());
@@ -15,7 +15,6 @@ vi.mock("node:os", async (importOriginal) => {
 });
 
 import { installLogSink } from "@/lib/log";
-import { recordLog } from "@tests/helpers/log";
 import { claimSkills, eligibleForSkills, showSkillsHint } from "@/lib/skills-hint";
 import { aSuggest } from "@tests/helpers/suggestions";
 
@@ -26,16 +25,22 @@ const skillsAdd = aSuggest({}, "1.2.3")({ id: "skills:add" });
 /** The environment of a user whose config home is `dir`. */
 const envIn = (dir: string): NodeJS.ProcessEnv => ({ XDG_CONFIG_HOME: dir });
 
-let recorded = recordLog();
-const said = (): string[] => recorded.said.map((line) => line.text);
+/** `it` with what was said through `log`, which every test records. */
+const it = recording.extend<{ said: () => string[] }>({
+  said: ({ recorded }, use) => {
+    return use(() => {
+      return recorded.said.map((line) => {
+        return line.text;
+      });
+    });
+  },
+});
 
 beforeEach(() => {
   rosie.agents.mockResolvedValue([CLAUDE]);
-  recorded = recordLog();
 });
 
 afterEach(() => {
-  recorded.stop();
   vi.clearAllMocks();
 });
 
@@ -44,6 +49,7 @@ const shownFile = (dir: string) => join(dir, "zitadel", "cli", "skills-hint.json
 describe("showSkillsHint", () => {
   it("names the command to run and that it is optional, without running anything", async ({
     dir,
+    said,
   }) => {
     await showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
 
@@ -53,7 +59,10 @@ describe("showSkillsHint", () => {
     expect(message).toContain("Optional. You can continue without installing skills.");
   });
 
-  it("does not name the agents it detected or mention the opt-out variable", async ({ dir }) => {
+  it("does not name the agents it detected or mention the opt-out variable", async ({
+    dir,
+    said,
+  }) => {
     await showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
 
     const message = said()[0] ?? "";
@@ -62,14 +71,12 @@ describe("showSkillsHint", () => {
     expect(message).not.toContain("NO_SKILLS_PROMPT");
   });
 
-  it("is not counted as shown when showing it fails", async ({ dir }) => {
+  it("is not counted as shown when showing it fails", async ({ dir, recorded }) => {
     recorded.stop();
-    let first = true;
     const calls: string[] = [];
     const stop = installLogSink((_level, text) => {
       calls.push(text);
-      if (first) {
-        first = false;
+      if (calls.length === 1) {
         throw new Error("closed stream");
       }
     });
@@ -82,7 +89,7 @@ describe("showSkillsHint", () => {
     expect(existsSync(shownFile(dir))).toBe(true);
   });
 
-  it("shows once", async ({ dir }) => {
+  it("shows once", async ({ dir, said }) => {
     await showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
     await showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
 
@@ -93,14 +100,14 @@ describe("showSkillsHint", () => {
     ["is not interactive", { interactive: false }],
     ["runs in CI", { interactive: true, extra: { CI: "true" } }],
     ["has NO_SKILLS_PROMPT set", { interactive: true, extra: { NO_SKILLS_PROMPT: "1" } }],
-  ])("stays silent when it %s", async ([_name, { interactive, extra }], { dir }) => {
+  ])("stays silent when it %s", async ([_name, { interactive, extra }], { dir, said }) => {
     await showSkillsHint({ env: { ...envIn(dir), ...extra }, interactive, skillsAdd });
 
     expect(said()).toEqual([]);
     expect(existsSync(shownFile(dir))).toBe(false);
   });
 
-  it("stays silent when no coding agent is detected", async ({ dir }) => {
+  it("stays silent when no coding agent is detected", async ({ dir, said }) => {
     rosie.agents.mockResolvedValue([{ ...CLAUDE, detected: false }]);
 
     await showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
@@ -108,7 +115,7 @@ describe("showSkillsHint", () => {
     expect(said()).toEqual([]);
   });
 
-  it("shows once even when two first runs race for the marker", async ({ dir }) => {
+  it("shows once even when two first runs race for the marker", async ({ dir, said }) => {
     const first = showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
     const second = showSkillsHint({ env: envIn(dir), interactive: true, skillsAdd });
     await Promise.all([first, second]);
@@ -116,7 +123,7 @@ describe("showSkillsHint", () => {
     expect(said()).toHaveLength(1);
   });
 
-  it("stays silent when the home directory cannot be determined", async () => {
+  it("stays silent when the home directory cannot be determined", async ({ said }) => {
     homedir.mockImplementation(() => {
       throw new Error("no home directory");
     });
@@ -179,11 +186,11 @@ describe("eligibleForSkills", () => {
 // one silent makes the other silent. They once had two copies of the rule, and
 // a guard added to one was missing from the other.
 describe("the two ways of offering the skills", () => {
-  it.each([
+  it.for<[string, NodeJS.ProcessEnv, boolean]>([
     ["in CI", { CI: "1" }, true],
     ["when opted out", { NO_SKILLS_PROMPT: "1" }, true],
     ["when nobody is watching", {}, false],
-  ])("agree they have nothing to offer %s", async (_when, extra, interactive) => {
+  ])("agree they have nothing to offer %s", async ([_when, extra, interactive], { said }) => {
     const dir = (await import("node:fs")).mkdtempSync(
       join((await import("node:os")).tmpdir(), "zitadel-skills-agree-"),
     );

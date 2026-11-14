@@ -15,7 +15,7 @@ import (
 // origin.
 var idpEndpointsPartialCode = domain.ErrIDPEndpointsPartial(nil).Code
 
-func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, params api.CreateIdpParams) (api.CreateIdpRes, error) {
+func (h *Handler) PublishIdp(ctx context.Context, req *api.CreateIdpRequest, params api.PublishIdpParams) (api.PublishIdpRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 		// The engine refuses this at sign-in too, where it is the server's
 		// fault. Only here is it the author's, so only here is it a 400.
 		errlog.Log(ctx, de)
-		refused := api.CreateIdpBadRequest(domainErrorDetails(de))
+		refused := api.PublishIdpBadRequest(domainErrorDetails(de))
 		return &refused, nil
 	}
 	if err != nil {
@@ -41,10 +41,10 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 		return nil, err
 	}
 	if result.Created {
-		created := api.CreateIdpCreated(resp)
+		created := api.PublishIdpCreated(resp)
 		return &created, nil
 	}
-	revised := api.CreateIdpOK(resp)
+	revised := api.PublishIdpOK(resp)
 	return &revised, nil
 }
 
@@ -54,12 +54,12 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 // index row of its own: its read resolves the connection it belongs to and
 // checks the grant on that.
 
-func (h *Handler) GetIdpById(ctx context.Context, params api.GetIdpByIdParams) (api.GetIdpByIdRes, error) {
-	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, idpAccess, opRead)
+func (h *Handler) GetIdp(ctx context.Context, params api.GetIdpParams) (api.GetIdpRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.IdpID, idpAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	entity, err := h.idpConnectionService.Get(ctx, projectID, params.ID)
+	entity, err := h.idpConnectionService.Get(ctx, projectID, params.IdpID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (h *Handler) GetIdpById(ctx context.Context, params api.GetIdpByIdParams) (
 	return &resp, nil
 }
 
-func (h *Handler) GetIdpRevisionById(ctx context.Context, params api.GetIdpRevisionByIdParams) (api.GetIdpRevisionByIdRes, error) {
+func (h *Handler) GetIdpRevision(ctx context.Context, params api.GetIdpRevisionParams) (api.GetIdpRevisionRes, error) {
 	projectID := string(params.ProjectID)
 	entity, err := h.idpConnectionService.GetRevision(ctx, projectID, params.RevisionID)
 	if err != nil {
@@ -94,7 +94,7 @@ func (h *Handler) GetIdpRevisionById(ctx context.Context, params api.GetIdpRevis
 }
 
 func (h *Handler) ListIdpRevisions(ctx context.Context, params api.ListIdpRevisionsParams) (api.ListIdpRevisionsRes, error) {
-	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, idpAccess, opRead)
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.IdpID, idpAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (h *Handler) ListIdpRevisions(ctx context.Context, params api.ListIdpRevisi
 	ctx = service.WithAuthzListSkipOnce(ctx)
 	result, err := h.idpConnectionService.ListRevisions(ctx, service.ListIDPConnectionRevisionsInput{
 		ProjectID: projectID,
-		ID:        params.ID,
+		ID:        params.IdpID,
 		Limit:     int(params.Limit.Or(0)),
 		PageToken: string(params.PageToken.Or("")),
 	})

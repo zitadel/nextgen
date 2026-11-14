@@ -11,7 +11,7 @@ post:
 
     The body has the same seven fields for every event type. `type` names
     the event type, and `data` is that type's `payload` as `getEvent`
-    (`GET /events/{id}`) returns it; select a type in the request body below
+    (`GET /events/{event_id}`) returns it; select a type in the request body below
     to see its `data`. The body is not the whole event, and `data` is not
     the resource. Read the resource with `entity.id`, or the whole event
     with `getEvent` and the body's `id`.

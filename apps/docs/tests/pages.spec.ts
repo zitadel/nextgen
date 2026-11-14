@@ -32,7 +32,7 @@ const concurrency = 8;
 const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
 // The CLI reference is /docs/reference/cli, and a command's page has the
-// command's words as the segments after it: /docs/reference/cli/users/list.
+// command's words as the segments after it: /docs/reference/cli/user/list.
 // The reference's own pages beside the commands are no command's.
 const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
 const cliOwnPages = new Set(["telemetry", "release-notes"]);

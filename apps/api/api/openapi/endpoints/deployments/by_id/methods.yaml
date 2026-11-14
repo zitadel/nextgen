@@ -1,5 +1,5 @@
 get:
-  operationId: getDeploymentById
+  operationId: getDeployment
   x-zitadel-cli: deployment get
   summary: Get a deployment by ID
   description: |
@@ -53,4 +53,4 @@ get:
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
     default:
-      $ref: getDeploymentById-error-response.yaml
+      $ref: getDeployment-error-response.yaml
