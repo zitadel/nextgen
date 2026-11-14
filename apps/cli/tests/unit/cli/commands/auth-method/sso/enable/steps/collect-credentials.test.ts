@@ -9,7 +9,7 @@ import { NO_CLAIM_REQUEST } from "@/lib/idp";
 import { asker } from "@/lib/input";
 import type { Questions } from "@/lib/ui";
 import { Connection } from "@/lib/zitadel";
-import { aConfig } from "@tests/helpers/config";
+import { aConfig, aGoogleConnection } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_PROJECT, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import {
   acmeSelection,
@@ -48,7 +48,10 @@ const BARE = aConfig(CUSTOMERS_PROJECT);
 /**
  * The `customers` project with Google enabled.
  */
-const WITH_GOOGLE = BARE.connections.enable(CUSTOMERS_SCHEMA, GOOGLE).after;
+const WITH_GOOGLE = aConfig({
+  ...CUSTOMERS_PROJECT,
+  connections: { "google.json": aGoogleConnection() },
+});
 
 /**
  * How a run asks: nobody to ask, so only a flag or a pipe answers.

@@ -100,7 +100,24 @@ describe("SelectConnection for a custom connection a person finishes", () => {
   });
 
   describe("when the file has no issuer", () => {
-    it("refuses it as no OIDC connection, whatever issuer was given", async () => {
+    it("refuses it as no OIDC connection when no issuer was given", async () => {
+      const error = await rejectionOf(() => {
+        return STEP.run(
+          needsFor(
+            { slug: "acme-sso", protocol: "oidc", display_name: "Acme" },
+            { slug: "acme-sso" },
+          ),
+        );
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({
+        message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
+        hint: "Fix the file, or choose another slug, then run the command again.",
+      });
+    });
+
+    it("refuses it as no OIDC connection to the issuer that was given", async () => {
       const error = await rejectionOf(() => {
         return STEP.run(
           needsFor(
@@ -112,8 +129,7 @@ describe("SelectConnection for a custom connection a person finishes", () => {
 
       expect(error).toBeInstanceOf(ConflictError);
       expect(error).toMatchObject({
-        message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
-        hint: "Fix the file, or choose another slug, then run the command again.",
+        message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection to https://sso.acme.example`,
       });
     });
   });
