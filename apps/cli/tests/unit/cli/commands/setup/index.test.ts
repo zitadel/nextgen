@@ -3964,3 +3964,27 @@ describe("ReadSsoFlags", () => {
     });
   });
 });
+
+describe("the questions setup asks", () => {
+  it("asks them in this order, and asks no login-design question (#1039)", async () => {
+    const source = await readFile(join(cliPackageRoot, "src/cli/commands/setup/index.ts"), "utf8");
+
+    const questions = [...source.matchAll(/\.(?:step|endWhen)\(\s*new (\w+)\(/g)]
+      .map((match) => {
+        return match[1];
+      })
+      .filter((name) => {
+        return /^(Confirm|Choose|SetPassword)/.test(name ?? "");
+      });
+
+    expect(questions).toEqual([
+      "ConfirmFramework",
+      "ChooseServer",
+      "ChooseDevPort",
+      "ChooseUseCase",
+      "ChooseSignIn",
+      "SetPasswordPolicy",
+      "ChooseSocialSignIn",
+    ]);
+  });
+});
