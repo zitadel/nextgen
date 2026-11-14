@@ -593,7 +593,7 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
   withProperties(created: readonly NewProperty[]): Edit<UserSchema> {
     const properties = objectAt(this.body, "properties");
     const added = created.filter((property) => {
-      return properties[property.name] === undefined;
+      return !Object.hasOwn(properties, property.name);
     });
     if (added.length === 0) {
       return { document: this, changed: false, skipped: [] };

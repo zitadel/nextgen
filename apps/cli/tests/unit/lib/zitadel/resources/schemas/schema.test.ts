@@ -565,6 +565,12 @@ describe("UserSchema.withProperties", () => {
     });
   });
 
+  it("adds a property named like one every object has", () => {
+    const edit = schema().withProperties([{ name: "constructor", type: "string" }]);
+
+    expect(Object.hasOwn(objectAt(edit.document.body, "properties"), "constructor")).toBe(true);
+  });
+
   it("changes nothing when there is nothing to add", () => {
     expect(schema().withProperties([]).changed).toBe(false);
   });

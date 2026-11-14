@@ -628,7 +628,8 @@ export function fillable(state: MappingState, claimType: ClaimType): readonly Sc
  * @remarks
  * The schema only forbids a dot, but the name is a JSON key and a field in the
  * login flow, so it is held to a plain identifier. It must not already be a
- * property.
+ * property, nor a name every object has, such as `constructor`, which the
+ * mappings would read as already there.
  *
  * @param value - What was typed.
  * @param taken - The properties the schema already has.
@@ -643,6 +644,9 @@ export function parseNewAttributeName(value: string, taken: readonly string[]): 
     return refuse(
       "Use letters, digits and underscores, starting with a letter, as in employeeNumber.",
     );
+  }
+  if (Object.hasOwn(Object.prototype, name)) {
+    return refuse(`"${name}" is a name every object already has, so it cannot be an attribute.`);
   }
   return taken.includes(name) ? refuse(`"${name}" is already a user attribute.`) : ok(name);
 }

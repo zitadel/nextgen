@@ -559,6 +559,13 @@ describe("parseNewAttributeName", () => {
     },
   );
 
+  it.each(["constructor", "toString", "hasOwnProperty", "__proto__"])(
+    "refuses %s, which every object already has",
+    (name) => {
+      expect(problem(parseNewAttributeName(name, []))).toContain("every object already has");
+    },
+  );
+
   it("refuses a name that is already an attribute", () => {
     expect(problem(parseNewAttributeName("email", ["email"]))).toBe(
       '"email" is already a user attribute.',
