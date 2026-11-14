@@ -17,6 +17,7 @@ import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
   BrokenFilesError,
   ConfigError,
+  ConflictError,
   ConnectionExistsError,
   FileExistsError,
 } from "@/lib/zitadel/errors";
@@ -494,7 +495,8 @@ export class ZitadelConfig {
    * @throws {@link FileExistsError} Without `force`, when the default schema,
    *   flow, password policy or sign-up policy file is already there.
    * @throws {@link ConflictError} When a chosen provider's connection would
-   *   collide with another connection, by file name, slug or variables.
+   *   collide with another connection, by file name, slug or variables, or when
+   *   two providers would create the same property as different types.
    * @throws {@link ConfigError} When `force` keeps a password or sign-up
    *   policy file that is not a sound policy of its operation.
    */
@@ -518,15 +520,39 @@ export class ZitadelConfig {
         notes: claims?.notes ?? [],
       };
     });
+    const proposed = connections.flatMap((scaffolded) => {
+      return scaffolded.created;
+    });
+    const clashing = proposed.find((property) => {
+      return proposed.some((other) => {
+        return other.name === property.name && other.type !== property.type;
+      });
+    });
+    if (clashing !== undefined) {
+      const types = [
+        ...new Set(
+          proposed
+            .filter((property) => {
+              return property.name === clashing.name;
+            })
+            .map((property) => {
+              return property.type;
+            }),
+        ),
+      ];
+      throw new ConflictError(
+        `Two providers would create ${clashing.name} in the user schema as different types: ${types.join(" and ")}`,
+        {
+          hint: "Give the property one type for both providers, or map the claims to different property names.",
+          details: { property: clashing.name, types },
+        },
+      );
+    }
     const created = [
       ...new Map(
-        connections
-          .flatMap((scaffolded) => {
-            return scaffolded.created;
-          })
-          .map((property) => {
-            return [property.name, property] as const;
-          }),
+        proposed.map((property) => {
+          return [property.name, property] as const;
+        }),
       ).values(),
     ];
     for (const scaffolded of connections) {

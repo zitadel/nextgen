@@ -1154,6 +1154,40 @@ describe("ZitadelConfig.scaffold with a claim choice", () => {
     ).toEqual(choice.notes);
   });
 
+  it("adds an attribute two providers create the same way to the schema once", () => {
+    const { schema } = ZitadelConfig.empty().scaffold({
+      ...MINIMAL,
+      sso: [
+        { selection: googleSelection, claims: () => choice },
+        { selection: acmeSelection, claims: () => choice },
+      ],
+    });
+
+    expect(
+      schema.propertyNames.filter((name) => {
+        return name === "employeeNumber";
+      }),
+    ).toEqual(["employeeNumber"]);
+  });
+
+  it("refuses an attribute two providers would create as different types", () => {
+    const error = thrownBy(() => {
+      return ZitadelConfig.empty().scaffold({
+        ...MINIMAL,
+        sso: [
+          { selection: googleSelection, claims: () => choice },
+          {
+            selection: acmeSelection,
+            claims: () => ({ ...choice, created: [{ name: "employeeNumber", type: "integer" }] }),
+          },
+        ],
+      });
+    });
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ details: { property: "employeeNumber" } });
+  });
+
   it("keeps the provider's defaults for a provider with no choice", () => {
     const { connections } = ZitadelConfig.empty().scaffold({
       ...MINIMAL,
