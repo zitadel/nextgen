@@ -270,19 +270,20 @@ export function setupMockHandlers(
   }
 
   /**
-   * The engine's email lookup on a typed submit, when the caller opted in: it
-   * moves the flow to the other purpose only when the email says the visitor
-   * picked the wrong one.
+   * The engine's email lookup on a typed submit or a passkey sign-up, when the
+   * caller opted in: it moves the flow to the other purpose only when the
+   * email says the visitor picked the wrong one.
    */
   function accountOutcome(
     before: FlowStepName | "idle",
     action: string,
     email: string | undefined,
   ): "user_not_found" | "user_already_exists" | undefined {
-    if (!routesByAccount || action !== "submit" || !email) return undefined;
+    if (!routesByAccount || !email) return undefined;
     const known = authn.hasAccount(email);
-    if (before === "identifier" && !known) return "user_not_found";
-    if (before === "register" && known) return "user_already_exists";
+    if (action === "submit" && before === "identifier" && !known) return "user_not_found";
+    const signsUp = action === "submit" || action === "passkey_register";
+    if (signsUp && before === "register" && known) return "user_already_exists";
     return undefined;
   }
 

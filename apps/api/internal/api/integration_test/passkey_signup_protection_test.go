@@ -10,6 +10,7 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	api "go.zitadel.com/zitadel/v5/api"
 )
@@ -114,6 +115,22 @@ func TestPasskeySignupRequiresTheSignupProof(t *testing.T) {
 	user, err := users.GetByID(t.Context(), project.ID, attestOpts.UserID)
 	require.NoError(t, err)
 	require.Equal(t, attestOpts.UserID, user.ID)
+
+	// The email is taken now: a second sign-up is refused before a ceremony
+	// reaches the browser, so no passkey is saved for a user never created.
+	restarted, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeRegister}, api.CreateFlowParams{})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowResponseHeaders{}, restarted, helpers.MustMarshal(t, restarted))
+	restart := restarted.(*api.FlowResponseHeaders)
+	taken, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "passkey_register",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"email": jx.Raw(`"passkey-signup@example.com"`)}),
+	}, api.SubmitFlowStepParams{ID: restart.Response.ID, Zflow: mustExtractZflow(t, restart.SetCookie), Origin: api.NewOptURI(*origin)})
+	require.NoError(t, err)
+	refused := badRequestStep(t, taken).Step
+	require.Equal(t, "register", refused.Name)
+	require.Equal(t, domain.FlowStepErrorUserAlreadyExists, refused.Error.Value)
+	require.False(t, refused.Challenge.Set, "a taken email issues no ceremony")
 }
 
 // A person who asks for the passkey and then cancels the browser's prompt

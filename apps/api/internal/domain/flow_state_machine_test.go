@@ -20,6 +20,12 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
 
+const (
+	passkeyConflictEmail       = "alice@example.com"
+	passkeyConflictChallengeID = "reg-1"
+	passkeyConflictUserID      = "user_existing01"
+)
+
 func containsFieldName(fields []domain.FlowField, name string) bool {
 	for _, f := range fields {
 		if f.Name == name {
@@ -2871,18 +2877,116 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
 }
 
-// TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser covers
-// the uniqueness race on a provisional registration: the verify transaction
-// rolls back, and before routing user_already_exists the engine re-resolves
-// the collected identifier so the existing user is pinned on the attempt —
-// the downstream password step requires a persisted user factor.
-func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *testing.T) {
+// TestFlowStateMachine_Process_PasskeyRegisterConflictBeforeCeremony covers
+// a provisional registration whose unique value is already taken when the
+// challenge is issued. The existing user is pinned and user_already_exists
+// routes before any challenge reaches the browser.
+func TestFlowStateMachine_Process_PasskeyRegisterConflictBeforeCeremony(t *testing.T) {
 	t.Parallel()
-	const email = "alice@example.com"
-	const challengeID = "reg-1"
-	const registrationOpts = `{"rp":{"id":"example.com"}}`
-	const mintedUserID = "user_prov01"
-	const existingUserID = "user_existing01"
+	w, def, state := passkeyRegisterConflictWorld(t)
+	w.expectOwner("email", passkeyConflictEmail, passkeyConflictUserID)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), registeringEmail(passkeyConflictEmail)).
+		Return(passkeyConflictUserID, nil)
+
+	conflicted, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+
+	assertPasskeyConflictPinned(t, conflicted)
+}
+
+// TestFlowStateMachine_Process_PasskeyRegisterConflictDuringCeremony covers a
+// unique value taken while the browser prompt is open. The verify step loses
+// the race, pins the existing user and routes user_already_exists.
+func TestFlowStateMachine_Process_PasskeyRegisterConflictDuringCeremony(t *testing.T) {
+	t.Parallel()
+	w, def, state := passkeyRegisterConflictWorld(t)
+	// The lookup at issue finds no owner a new user would collide with (a
+	// value held only within a team counts as free), the verify step loses
+	// the uniqueness race, and the lookup after it finds the owner.
+	w.expectOwner("email", passkeyConflictEmail, "")
+	w.authAttemptService.EXPECT().
+		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
+		Return(domain.ErrUserAlreadyExists())
+	w.expectOwner("email", passkeyConflictEmail, passkeyConflictUserID)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), registeringEmail(passkeyConflictEmail)).
+		Return(passkeyConflictUserID, nil)
+
+	issued, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+	conflicted, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionPasskeyRegister,
+		ChallengeResponse: &domain.FlowChallengeResponse{
+			ChallengeID: passkeyConflictChallengeID,
+			Method:      domain.FlowChallengeMethodPasskeyRegister,
+			Proof:       []byte(`{"attestation":"conflicting"}`),
+		},
+	})
+	require.NoError(t, err)
+
+	assertPasskeyConflictPinned(t, conflicted)
+}
+
+// TestFlowStateMachine_Process_PasskeyRegisterTakenWithoutOwner covers a value
+// that is taken but whose owner cannot be pinned. The sign-up still routes
+// user_already_exists before any challenge reaches the browser.
+func TestFlowStateMachine_Process_PasskeyRegisterTakenWithoutOwner(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		expect func(w *flowTestWorld)
+	}{
+		{
+			name: "owner of another schema",
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().
+					FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, "email", passkeyConflictEmail).
+					Return("", domain.ErrSSOOwnerOtherSchema)
+			},
+		},
+		{
+			name: "owner the sign-in lookup cannot single out",
+			expect: func(w *flowTestWorld) {
+				w.expectOwner("email", passkeyConflictEmail, passkeyConflictUserID)
+				w.authAttemptService.EXPECT().
+					SubmitIdentifier(gomock.Any(), registeringEmail(passkeyConflictEmail)).
+					Return("", domain.ErrAuthAttemptProofRejected(nil))
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := passkeyRegisterConflictWorld(t)
+			tt.expect(w)
+
+			conflicted, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+				Action:    domain.FlowActionPasskeyRegister,
+				PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, "password", conflicted.State.CurrentStep,
+				"user_already_exists must follow the declared transition")
+			assert.Empty(t, conflicted.State.CollectedData.UserID, "no owner can be pinned")
+			assert.Nil(t, conflicted.State.PendingChallenge)
+			assert.Nil(t, conflicted.Step.Challenge)
+		})
+	}
+}
+
+// passkeyRegisterConflictWorld returns a flow on its register step, with a
+// free email collected and a provisional registration challenge expected.
+func passkeyRegisterConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
 	w := newFlowTestWorld(t)
 	def := passkeyRegisterAfterIdentifierDefinition()
 	def.Steps[1].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "password"}
@@ -2908,23 +3012,11 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *tes
 	w.authAttemptService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Any()).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
-			ChallengeID: challengeID,
-			UserID:      mintedUserID,
-			Options:     []byte(registrationOpts),
+			ChallengeID: passkeyConflictChallengeID,
+			UserID:      "user_prov01",
+			Options:     []byte(`{"rp":{"id":"example.com"}}`),
+			Provisional: true,
 		}, nil)
-	// Verify leg loses the uniqueness race...
-	w.authAttemptService.EXPECT().
-		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
-		Return(domain.ErrUserAlreadyExists())
-	// ...and the engine re-resolves the collected identifier to pin the
-	// conflicting existing user on the attempt.
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value) &&
-				assert.Equal(t, defaultSchemaURL, in.UserSchemaURL)
-		})).
-		Return(existingUserID, nil)
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
@@ -2933,37 +3025,36 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *tes
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-
 	registerStep, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": email},
+		Fields: map[string]any{"email": passkeyConflictEmail},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "register", registerStep.Step.Name)
+	return w, def, registerStep.State
+}
 
-	issued, err := w.sm.Process(t.Context(), def, registerStep.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskeyRegister,
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+// registeringEmail matches a sign-up's lookup of email. Register keeps a free
+// value from being recorded as a failed sign-in.
+func registeringEmail(email string) gomock.Matcher {
+	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+		return in.AttributeName == "email" && in.Value == email &&
+			in.UserSchemaURL == defaultSchemaURL && in.Register
 	})
-	require.NoError(t, err)
-	require.NotNil(t, issued.State.PendingChallenge)
+}
 
-	conflicted, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionPasskeyRegister,
-		ChallengeResponse: &domain.FlowChallengeResponse{
-			ChallengeID: challengeID,
-			Method:      domain.FlowChallengeMethodPasskeyRegister,
-			Proof:       []byte(`{"attestation":"conflicting"}`),
-		},
-	})
-	require.NoError(t, err)
+// assertPasskeyConflictPinned checks the pinned user is set up for the
+// password step: it requires a persisted user factor.
+func assertPasskeyConflictPinned(t *testing.T, conflicted domain.FlowStepResult) {
+	t.Helper()
 	assert.Equal(t, "password", conflicted.State.CurrentStep,
 		"user_already_exists must follow the declared transition")
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, conflicted.State.CurrentPurpose,
 		"the conflict flips back to login for verification")
-	assert.Equal(t, existingUserID, conflicted.State.CollectedData.UserID,
+	assert.Equal(t, passkeyConflictUserID, conflicted.State.CollectedData.UserID,
 		"the conflicting existing user must be pinned for the password step")
 	assert.Nil(t, conflicted.State.PendingChallenge)
+	assert.Nil(t, conflicted.Step.Challenge)
 }
 
 // TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted covers a
@@ -2997,6 +3088,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted(t *testing.T) 
 	w.authAttemptService.EXPECT().
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
 		Return(domain.ErrUserAlreadyExists())
+	w.expectOwner("email", email, "user_existing01")
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("user_existing01", nil)
@@ -3099,13 +3191,10 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField(t *
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
 		Return(domain.ErrUserAlreadyExists())
 	// Re-resolution walks the identifier-class candidates in field order:
-	// the username is fresh (rejected), the email resolves the owner. Both
-	// are a sign-up's lookups, so the fresh one writes no failed check.
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return in.AttributeName == "username" && in.Value == username && in.Register
-		})).
-		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	// the username is fresh, the email has an owner, and only the owner is
+	// pinned, by a sign-up's lookup that writes no failed check.
+	w.expectOwner("username", username, "")
+	w.expectOwner("email", email, existingUserID)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return in.AttributeName == "email" && in.Value == email && in.Register
