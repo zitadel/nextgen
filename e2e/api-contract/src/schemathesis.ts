@@ -46,6 +46,8 @@ export interface SchemathesisInput {
   operationIds: readonly string[];
   /** The checks to apply, by name. */
   checks: readonly string[];
+  /** The phases to run; all of them when absent. */
+  phases?: readonly string[];
   /** The operations that may answer a valid-looking request with a 400. */
   refusals?: readonly string[];
   /** The checks to switch off for an operation. */
@@ -80,6 +82,7 @@ export class Schemathesis {
       schemes: input.schemes,
       operationIds: input.operationIds,
       checks: input.checks,
+      phases: input.phases,
       refusals: input.refusals,
       exemptions: input.exemptions,
     });
