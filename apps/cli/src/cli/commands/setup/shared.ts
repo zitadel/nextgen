@@ -72,6 +72,9 @@ import {
 import type { SetupFlags } from "./index";
 import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
+import { z } from "zod";
+import { type Refused, whole } from "@/lib/oclif/flags";
+import { isDevelopmentBuild } from "@/lib/build-channel";
 
 /**
  * The name of the README setup writes into each configuration directory.
@@ -451,8 +454,14 @@ export type SetupServices = Readonly<{
   meta: GlobalOptions;
 
   /**
-   * Pins the run to the server the preconditions settled, so the steps after
-   * them read it as `source`.
+   * Pins the run to the server the preconditions settled, so the commands the
+   * run suggests next name it.
+   *
+   * @remarks
+   * The command builds every step before the first one runs, so a dependency
+   * the command reads from `this.meta.source` while building holds the server as
+   * it was before the preconditions. Steps after them read the settled server
+   * from `preflight.server.value`, never from a dependency.
    *
    * @param server - The server.
    */
@@ -1423,5 +1432,71 @@ export function ssoRecovery(
         },
       });
     }),
+  };
+}
+
+/**
+ * The lowest TCP port a server can listen on.
+ */
+const MIN_PORT = 1;
+
+/**
+ * The highest TCP port a server can listen on.
+ */
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+export const PORT = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+} as const satisfies Refused<number>;
+
+/**
+ * What a question is given, from what is known and what the command gives its step.
+ *
+ * @param needs - The flags, the app and the framework the run settled on.
+ * @param deps - The questions, the project's directory, the suggestion builder and the screen.
+ * @returns The context the question asks with.
+ */
+export function promptContext(
+  needs: Fact<"flags" | "orca" | "app" | "scaffoldedFramework">,
+  deps: Pick<SetupServices, "ask" | "cwd" | "serverFlag" | "suggest" | "ui">,
+): PromptContext {
+  const { app, flags, orca, scaffoldedFramework } = needs;
+  return {
+    ask: deps.ask,
+    note: (title, lines) => {
+      deps.ui.note(title, lines);
+    },
+    say: (text) => {
+      deps.ui.say(text);
+    },
+    spinner: (label, options) => {
+      return deps.ui.spinner(label, options);
+    },
+    framework: {
+      id: app.framework,
+      displayName: orca.displayName(app.framework),
+    },
+    suggest: deps.suggest,
+    cwd: deps.cwd,
+    frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
+    serverFlag: deps.serverFlag,
+    devPortFromFlag: flags.devPort !== undefined,
+    presetFromFlag: flags.preset !== undefined,
+    useCaseFromFlag: flags.useCase !== undefined,
+    ssoFromFlag: flags.sso !== undefined,
+    passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
+    developmentBuild: isDevelopmentBuild(),
   };
 }

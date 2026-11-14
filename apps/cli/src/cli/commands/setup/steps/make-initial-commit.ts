@@ -133,7 +133,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
    * @returns What was done, never a failure.
    */
   async run(needs: Needs): Promise<Fact<"commit">> {
-    if (!needs.flags.git) {
+    if (needs.flags.git === false) {
       return {
         commit: {
           kind: "skipped",

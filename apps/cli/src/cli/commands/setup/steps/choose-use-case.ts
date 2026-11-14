@@ -1,9 +1,9 @@
 import { SETUP_USE_CASES } from "@zitadel/config/defaults";
 
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
+import { promptContext } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -51,39 +51,13 @@ export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, Needs>
    * @returns The answers, with this question's settled.
    */
   async run(needs: Needs): Promise<Fact<"answers">> {
-    const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
         answers: needs.answers,
       };
     }
     return {
-      answers: await this.ask(needs.answers, {
-        ask: this.deps.ask,
-        note: (title, lines) => {
-          this.deps.ui.note(title, lines);
-        },
-        say: (text) => {
-          this.deps.ui.say(text);
-        },
-        spinner: (label, options) => {
-          return this.deps.ui.spinner(label, options);
-        },
-        framework: {
-          id: app.framework,
-          displayName: orca.displayName(app.framework),
-        },
-        suggest: this.deps.suggest,
-        cwd: this.deps.cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.deps.serverFlag,
-        devPortFromFlag: flags.devPort !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags.useCase !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      }),
+      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
     };
   }
 
