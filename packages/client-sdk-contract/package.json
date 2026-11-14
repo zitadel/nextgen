@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/client-sdk-contract",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "The test cases every client SDK runs through its own glue: the edge-runtime entry and render cases, the server-render table and the standard-attribute cases. Workspace tooling only; nothing is published.",
   "license": "MIT",

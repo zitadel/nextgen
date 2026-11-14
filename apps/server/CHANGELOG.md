@@ -1,5 +1,165 @@
 # @zitadel/server
 
+## 0.7.0
+
+### Minor Changes
+
+- [#3063](https://github.com/zitadel/nextgen/pull/3063) [`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4) - `submitFlowStep` (`POST /flows/{flow_id}/submit`) is now documented to answer `400` with an error (`req.invalid`, `flow.invalid_action`, `flow.unsupported`) when it refuses a request before the step runs, as well as with the step and its `error` field. The generated clients now decode both shapes.
+  
+  **Breaking:** in the Go client, a submit's `200` is now `*api.FlowResponseHeaders` instead of `*api.SubmitFlowStepOK`. Its `400` is `*api.SubmitFlowStepBadRequestHeaders`, whose `Response` holds either the step (`GetFlowResponse`) or the error (`GetErrorDetails`). In `@zitadel/api`, `SubmitFlowStep400` is now a union of the step and the error: check for `step` before reading it.
+
+- [#2901](https://github.com/zitadel/nextgen/pull/2901) [`faac989`](https://github.com/zitadel/nextgen/commit/faac989cf8b4a471d68bb0ee2b60314aa65b578a) - `POST /applications` creates or revises an application and returns each new client's secret once, and `GET /applications/{id}` returns the application at its newest revision. Each write records an `application.created` or `application.updated` event. The `Idempotency-Key` header is accepted but not used yet.
+
+- [#2900](https://github.com/zitadel/nextgen/pull/2900) [`39ebc7f`](https://github.com/zitadel/nextgen/commit/39ebc7f5e38762340a1e28294796026d7f4356bb) - The server stores registered applications, their revisions and the credentials of their OAuth clients.
+
+- [#3094](https://github.com/zitadel/nextgen/pull/3094) [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259) - `GET /branding` now pages like every other list: it takes `limit` and
+  `page_token` and answers `{ branding: […], next_page_token }`, so a project's
+  whole branding history is readable rather than its newest 100 revisions
+  ([API reference](https://preview.zitadel.com/docs/reference/api/branding/listBranding)).
+  `zitadel branding list` takes `--limit`, `--page-token` and `--all` with it.
+  
+  **Breaking:** the response of `GET /branding` is an object, no longer a bare
+  array. Read the revisions from its `branding` field, and follow
+  `next_page_token` for more than one page: a page holds 20 revisions unless
+  `limit` asks for up to 100. In `@zitadel/api`, `listBranding` returns that
+  object; use `listBranding.all(…)` for every revision. In the Go client,
+  `ListBrandingResponse` is a struct with `Branding` and `NextPageToken`.
+  `zitadel branding list` prints one page; pass `--all` for every revision.
+
+- [#3050](https://github.com/zitadel/nextgen/pull/3050) [`c491222`](https://github.com/zitadel/nextgen/commit/c491222d48895057f74c82f365ef1f22492ae57b) - The console's Events screen has a Sign-ins view: one row per sign-in, with how it ended and whose account it was. Opening a sign-in shows its steps in order with the time each took, the rows of one login flow are marked together, and an unfinished sign-in reads Abandoned. Users are shown by name instead of by ID.
+
+- [#3008](https://github.com/zitadel/nextgen/pull/3008) [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb) - The console no longer offers the platform project it signs in to as a project to choose: it is the root, with the projects beneath it. For someone who can act on it, such as a platform operator, the root's sidebar lists its screens beside Projects (Teams, Users, User schemas, Login flows, Branding, Deployments, Authentication and Events), and its Settings pages, General and Admins, head the root's Settings list. Everyone else sees Projects and Settings as before, without a project's screens in that list; choose a project to reach them. Projects, the project switcher and search leave the platform project out. Your own profile moves to the account menu, at `/account`.
+  
+  Writing the platform project's configuration now asks for its admin role, where another project asks for editor: adding an origin, building, creating or revoking a release, creating or rolling back a deployment, ending a preview, registering an application, and writing a variable, a schema, a flow definition, a policy, branding or an identity provider on it answer `403` with the resource's `permission_denied` to anyone granted less. A platform operator holds that role. Every other project is unchanged, including a project a self-hosted server pins with `platform.project_id`. `GET /users/me/projects` takes `exclude_platform` to leave the platform project out ([List my projects](https://preview.zitadel.com/docs/reference/api/projects)).
+
+- [#3005](https://github.com/zitadel/nextgen/pull/3005) [`4b443a1`](https://github.com/zitadel/nextgen/commit/4b443a17c11297dcb17d613ccb70e744ff3d9009) - A project's Settings in the console now opens its own list, as Settings on Projects does: General (the project's name, origins, variables and policies) and Admins, under a heading that leads back to the project. Both Settings rows carry the same arrow. Search lists General and Admins among the project's pages.
+
+- [#2968](https://github.com/zitadel/nextgen/pull/2968) [`e40ac5a`](https://github.com/zitadel/nextgen/commit/e40ac5ac081267db7dacbbd5ed9d27cb7c525212) - The Console's search (⌘K) now shows the best matches of every kind in one list, the selected project's first, each saying beneath its name where it is: the project, a project's site or ID, Settings or Account. It opens on your recent projects, says "Searching…" until the server answers, and names the project it searched when nothing matches.
+
+- [#3096](https://github.com/zitadel/nextgen/pull/3096) [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a) - `GET /events` names its list `events`, as every other list names its
+  resource: the page is `{ events: […], next_page_token }`
+  ([API reference](https://preview.zitadel.com/docs/reference/api/events/listEvents)).
+  
+  **Breaking:** the events of a page were under `data`. Read them from `events`
+  instead. In `@zitadel/api` the item type is `ListEvents200EventsItem`, and in
+  the Go client the field is `ListEventsResponse.Events`. `zitadel event list`
+  and the console read the new field, so use a CLI of this version or later
+  against a server that has it.
+
+- [#3027](https://github.com/zitadel/nextgen/pull/3027) [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7) - Events now carry `user_id`, the user they concern whoever acted, and `GET /events?user_id=…` lists what happened to one account from an index: sign-ins with rejected passwords, sessions, credentials and changes ([Events](https://preview.zitadel.com/docs/reference/api/events)). `zitadel event list --filter user_id=…` and the console's User filter read it. Events recorded before the upgrade have no `user_id`.
+
+- [#2943](https://github.com/zitadel/nextgen/pull/2943) [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd) - Flow definitions no longer take a `status`: every flow a release pins is served, and the release alone decides which flows are live.
+  
+  **Breaking:** a flow definition that still sends `status` is refused. Delete the `"status"` line from each file in `.zitadel/flows/` before the next `zitadel deploy`. A `draft` flow is served as soon as a release pins it, including a release deployed before the upgrade, so move a draft out of `.zitadel/flows/` and deploy before upgrading if it should stay off.
+
+- [#3107](https://github.com/zitadel/nextgen/pull/3107) [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32) - The flow operations now live under `/flows`, plural as every other collection:
+  `POST /flows`, `GET /flows/{flow_id}` and `POST /flows/{flow_id}/submit`
+  ([API reference](https://preview.zitadel.com/docs/reference/api/flows)).
+  `/flow` keeps answering until 1.0.0, with a `Deprecation` header and a `Link`
+  to that page.
+  
+  **Breaking:** `@zitadel/api`, the Go client, `<zitadel-login>`, the SDKs, the
+  CLI and `@zitadel/testing` of this version call `/flows`, which an earlier
+  server answers with `404`: upgrade a self-hosted server before the apps that
+  use them. If you call the HTTP API yourself, change `/flow` to `/flows` in the
+  three paths; nothing else in a request or a response changes. From 1.0.0 the
+  old paths answer `404` with `req.not_found`.
+
+- [#2983](https://github.com/zitadel/nextgen/pull/2983) [`02a415d`](https://github.com/zitadel/nextgen/commit/02a415d6dd4d53d731c6b6775d4f0c72ced7e90c) - `POST /invitations` creates a project invitation and returns its one-time link, or replaces an existing one with `replaces_invitation_id`. `GET /invitations` and `GET /invitations/{id}` read a project's invitations, and `DELETE /invitations/{id}` cancels a pending one. A project holds at most 100 pending invitations. Creating sends `invitation.created`, and cancelling or replacing sends `invitation.cancelled`. Redeeming a link (`/invitations/lookup`, `/accept`, `/reject`) still returns not implemented.
+
+- [#2883](https://github.com/zitadel/nextgen/pull/2883) [`f6eada4`](https://github.com/zitadel/nextgen/commit/f6eada4fb23fafe1d59301afbf76cde631f01c30) - The server gains an `oauth.enabled` setting (`NEXTGEN_OAUTH_ENABLED`, off by default) that serves the OAuth 2.0 authorization server: a project's RFC 8414 metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the project has OAuth enabled, which a later release adds, so every issuer answers 404 for now.
+
+- [#2884](https://github.com/zitadel/nextgen/pull/2884) [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab) - The API contract declares a project's OAuth settings: a release bundle accepts `oauth: { "enabled": true }`, a release pointer can be of `kind: oauth`, and `GET /oauth_settings/{oauth_settings_id}` is declared with the scopes `oauth_settings.read` and `oauth_settings.write` ([docs](https://preview.zitadel.com/docs/reference/api/oauth-settings/getOAuthSettings)). The server does not store the settings yet: it refuses a bundle that carries `oauth` with `rel.invalid`, and the read operation answers `not_implemented`, until it does.
+
+- [#3007](https://github.com/zitadel/nextgen/pull/3007) [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4) - API operation names now follow one scheme: a camelCase verb and the resource
+  they act on, with no `ById` suffix, and every path parameter names its
+  resource (`{schema_id}` instead of `{id}`). No URL or request changes on the
+  wire ([API reference](https://preview.zitadel.com/docs/reference/api)).
+  
+  **Breaking:** 34 operations are renamed, and with them the `@zitadel/api`
+  functions and types, the Go client's methods (`go.zitadel.com/zitadel/v5`),
+  the names `zitadel api` takes and the API reference page URLs (the old pages
+  redirect). `GetUserByID`, `PatchUserByID` and `DeleteUserByID` are `getUser`,
+  `updateUser` and `deleteUser`; the other `…ById` reads drop the suffix;
+  `getVariables` and `updateVariables` are `listVariables` and `setVariables`,
+  `getDeploymentVariables` is `listDeploymentVariables`; `deleteTeam` is
+  `deactivateTeam`; `patchMyUser` and `patchProject` are `updateMyUser` and
+  `updateProject`; passkey registration is `createUserPasskeyRegistration` and
+  `completeUserPasskeyRegistration`; the claim operations are
+  `createProjectClaim`, `getProjectClaimStatus`, `completeProjectClaim` and
+  `getProjectClaimWindow`; `addOrigin`, `removeOrigin`, `listPreviews` and
+  `removePreview` are `addProjectOrigin`, `removeProjectOrigin`,
+  `listProjectPreviews` and `removeProjectPreview`; `issueChallenge`,
+  `verifyChallengeProof` and `createHandoff` are `createAuthAttemptChallenge`,
+  `verifyAuthAttemptChallenge` and `createAuthAttemptHandoff`; and the writes
+  that publish a revision are `publishSchema`, `publishFlowDefinition`,
+  `publishBranding`, `publishIdp` and `publishApplication`. Rename the calls in
+  your code; `zitadel api ls` lists the current names.
+
+- [#2714](https://github.com/zitadel/nextgen/pull/2714) [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e) - Each server process limits concurrent password hashing, so a burst of sign-ins no longer exhausts memory or stalls other requests; by default the budget follows the container's memory limit. Tune it under `password_hasher.concurrency`. A request that finds no room within `max_wait` gets `429 Too Many Requests` with `Retry-After` and code `user.password_hashing_busy`: safe to retry, never a failed sign-in.
+
+- [#2626](https://github.com/zitadel/nextgen/pull/2626) [`d74c989`](https://github.com/zitadel/nextgen/commit/d74c989193ff87eca616365a0d5c66d1f5c3466c) - Protect Flow API password and passkey signup with built-in PBKDF2 proof of
+  work, a browser solver, single-use proofs and per-flow retry limits.
+  `<zitadel-login>` solves it, and `solveSignupPow` from `@zitadel/components`
+  solves it for a signup client of your own.
+  
+  **Breaking:** the server refuses a password signup, or a passkey registration
+  that creates the user, without a proof (`403 flow.proof_invalid`).
+  `<zitadel-login>` 0.5.0 and older sends none, so upgrade `@zitadel/components`,
+  or the SDK that pins it, together with the server. A custom or headless signup
+  client fetches the current step, solves `step.gates.signup_pow` and submits the
+  result as `gate_proofs.signup_pow`, with the password or with the passkey's
+  attestation.
+
+- [#3098](https://github.com/zitadel/nextgen/pull/3098) [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696) - `POST /schemas` answers with the schema it stored, `{ id, schema, metadata }`,
+  as `GET /schemas/{schema_id}` returns it, so a caller no longer needs a second
+  read to see what was published
+  ([API reference](https://preview.zitadel.com/docs/reference/api/schemas/publishSchema)).
+  The answer was `{ id }` alone; `id` is unchanged.
+  
+  **Breaking:** in the Go client, `PublishSchema` returns `*Schema`, and
+  `CreateSchemaResponse` is gone: read `ID` from the `Schema`. In `@zitadel/api`,
+  `PublishSchema201` gains the required `schema` and `metadata`, so code that
+  builds one, such as a test double, must supply them.
+
+- [#2972](https://github.com/zitadel/nextgen/pull/2972) [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469) - `POST /search` on a console session without `project_id` now searches the newest 10 projects the person can act on ([Search](https://preview.zitadel.com/docs/reference/api/search)), and the console's search (⌘K) does so from All projects, Projects and Settings. Teams and configuration now match from the start of a name or of a word in it, no longer inside a word.
+
+- [#3086](https://github.com/zitadel/nextgen/pull/3086) [`a041cf6`](https://github.com/zitadel/nextgen/commit/a041cf6c66518402d43981ee76092e51365e189f) - Every request now has one server span, covering all of its middleware: a `404`, a `405` and the paths outside the API were untraced before. Each PostgreSQL query span names its verb (`SELECT`, `BEGIN`, `COMMIT`) in `db.operation.name`, and a `pgx.acquire` span appears only for a wait of a millisecond or more for a pooled connection. See [Tracing](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/configuration.md#tracing).
+
+- [#2839](https://github.com/zitadel/nextgen/pull/2839) [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce) - `zitadel setup` now writes the sign-up policy, `.zitadel/policies/user.create.json`, beside the password policy. It names the challenge every password or passkey sign-up solves, Zitadel's built-in proof of work, which applies with or without the file. Deploy it like any [policy](https://preview.zitadel.com/docs/guides/deploy#policies); `POST /policies` and `zitadel policy test` take `user.create` too.
+
+### Patch Changes
+
+- [#3049](https://github.com/zitadel/nextgen/pull/3049) [`7d82e59`](https://github.com/zitadel/nextgen/commit/7d82e595668f8b91378959bcd12f54ceb248f0d2) - The console now always names where you are: `Platform` on the platform's screens, Projects and Settings, and `Platform / <project>` inside a project, in the top bar and in search. The project switcher lists Platform apart and checks the current entry. Going up to Projects or Settings no longer keeps the project you came from selected.
+
+- [#2990](https://github.com/zitadel/nextgen/pull/2990) [`dfe9169`](https://github.com/zitadel/nextgen/commit/dfe9169e00c99e916c0cc60bf9cc62c892968bd8) - The console's Branding preview shows the login at a phone's width when switched to phone mode, narrower than on a desktop.
+
+- [#2902](https://github.com/zitadel/nextgen/pull/2902) [`6cb0c1a`](https://github.com/zitadel/nextgen/commit/6cb0c1ab82432a54bf92475472bb839957d420ef) - Console detail screens share one layout: login flow, identity provider and release details now use the same header and cards as users, teams and project settings, and every card lines up its labels and values on the same column.
+
+- [#3108](https://github.com/zitadel/nextgen/pull/3108) [`2e61fba`](https://github.com/zitadel/nextgen/commit/2e61fba8250e1e2600d09b848d7b244b89d40941) - The console's Events view picker describes the All view as "Audit events and API requests". It read "Both, in the order they happened", which no longer said which two once Sign-ins had a view of its own.
+
+- [#3100](https://github.com/zitadel/nextgen/pull/3100) [`456d3d9`](https://github.com/zitadel/nextgen/commit/456d3d946af2083573d290ab9d6121fd504405b5) - The console's Events screen reads more like a log. Its filters are groups that fold away, and the categories, a request's status classes and how a sign-in ended are checkboxes, several at once. Each row leads with its time, as a day and a clock time to the millisecond, and the API requests view shows a request's method and operation, status and duration in columns of their own. An open event no longer covers the list: on a wide window the list ends where the event's drawer starts, so its search, Live, Refresh and Export stay in reach, and the suggestions under the search no longer open over the drawer. The drawer's sections are ruled off like the console's other drawers. A list that a user, operation or status filter leaves empty says that events recorded before the server had that filter are not matched.
+
+- [#3004](https://github.com/zitadel/nextgen/pull/3004) [`5b75eaa`](https://github.com/zitadel/nextgen/commit/5b75eaaed0f6b80514a13113f02a156d72230d54) - The console's Logs screen is now called Events, as `GET /events` and `zitadel event list` are. Its URL, views and filters are unchanged.
+
+- [#2989](https://github.com/zitadel/nextgen/pull/2989) [`4ecf004`](https://github.com/zitadel/nextgen/commit/4ecf00413e988557fce239821e85b2e931a6727b) - The row-menu column on the console's lists has an Actions header for screen readers.
+
+- [#3024](https://github.com/zitadel/nextgen/pull/3024) [`9b92c49`](https://github.com/zitadel/nextgen/commit/9b92c49f2d16ec61a5065230824f3ccb95622562) - Console: in Branding's theme menu, the hint beside a highlighted option is readable against the highlight.
+
+- [#3061](https://github.com/zitadel/nextgen/pull/3061) [`7c6fa14`](https://github.com/zitadel/nextgen/commit/7c6fa14003f4c43dcb6312f662afc3bb21b9a41c) - Events from the API (`GET /api/v1/events`) now carry `occurred_at` and `created_at` to the millisecond instead of whole seconds, so the console's sign-in timeline shows how long each step really took.
+
+- [#3044](https://github.com/zitadel/nextgen/pull/3044) [`c53fade`](https://github.com/zitadel/nextgen/commit/c53fadeb520321da33e3a71bc0415e1f29ee95fe) - Update the server's Go dependencies, among them go-webauthn 0.18. A passkey sign-in still reports whether that sign-in verified the user, and client extension outputs nobody asked for are still accepted.
+
+- [#3031](https://github.com/zitadel/nextgen/pull/3031) [`83b3cfb`](https://github.com/zitadel/nextgen/commit/83b3cfbfe6624a3ae0471b11293267b4388a88a8) - On Spanner, `POST /search` without `project_id` no longer fails with a 500 for a person who can act on more than five projects.
+
+- [#3006](https://github.com/zitadel/nextgen/pull/3006) [`dea482f`](https://github.com/zitadel/nextgen/commit/dea482fe7c6778d312015c264c31068043596f9c) - A sign-in's `session.established` and `auth.token.issued` events, and the `exchangeHandoff` request that wrote them, now carry the `flow_id` of the login flow, so `GET /events?flow_id=…` returns the whole sign-in. In the console, an event of a login flow lists that flow's events in its panel, where it listed only its own request's.
+
+- [#3052](https://github.com/zitadel/nextgen/pull/3052) [`4e5152b`](https://github.com/zitadel/nextgen/commit/4e5152be02f1cd2659aafaf3202770a7a93f5d76) - A sign-up no longer writes an `auth.check.failed` event when it checks that its email is free, so the console's Events stop showing a failed sign-in before every new account. A sign-in with an address that has no account still writes one.
+
+- [#3012](https://github.com/zitadel/nextgen/pull/3012) [`e81ee75`](https://github.com/zitadel/nextgen/commit/e81ee75a40bb9e91f2894266c64a3b8a24d6dc5e) - An SSO sign-in's callback events (`auth.sso.*` and the callback's `request.api`) now carry the login flow's `flow_id`, so `GET /events?flow_id=…` returns the provider's answer with the rest of the sign-in.
+
+- [#3012](https://github.com/zitadel/nextgen/pull/3012) [`e81ee75`](https://github.com/zitadel/nextgen/commit/e81ee75a40bb9e91f2894266c64a3b8a24d6dc5e) - On `auth.token.issued`, `token_id` is now the credential that made the request, as on every other event, and no longer the issued token; read the issued token from `entity_id`.
+
 ## 0.6.0
 
 ### Minor Changes

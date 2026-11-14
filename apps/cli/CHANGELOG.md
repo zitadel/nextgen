@@ -1,5 +1,135 @@
 # @zitadel/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- [#3094](https://github.com/zitadel/nextgen/pull/3094) [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259) - `GET /branding` now pages like every other list: it takes `limit` and
+  `page_token` and answers `{ branding: […], next_page_token }`, so a project's
+  whole branding history is readable rather than its newest 100 revisions
+  ([API reference](https://preview.zitadel.com/docs/reference/api/branding/listBranding)).
+  `zitadel branding list` takes `--limit`, `--page-token` and `--all` with it.
+  
+  **Breaking:** the response of `GET /branding` is an object, no longer a bare
+  array. Read the revisions from its `branding` field, and follow
+  `next_page_token` for more than one page: a page holds 20 revisions unless
+  `limit` asks for up to 100. In `@zitadel/api`, `listBranding` returns that
+  object; use `listBranding.all(…)` for every revision. In the Go client,
+  `ListBrandingResponse` is a struct with `Branding` and `NextPageToken`.
+  `zitadel branding list` prints one page; pass `--all` for every revision.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - Only `zitadel setup` draws a chain and a boxed summary; every other command prints its answer at the left margin with one dim footer line saying where it ran, and asks its questions without the gutter.
+  
+  **Breaking:** what every command prints for a person changed, and so did what a pipe reads from `deploy`, `pull`, `status`, `env` and the lists. `--json` keeps the shape of its envelope, but some `message`, `hint`, `next_actions` and `title` strings were reworded, and a hint that names a command now spells it out as `npx @zitadel/cli@<version> …`.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - Every failure reads `Error: <sentence> (E_CODE)`, with the hint under it and the commands to run next under `Next:`. A refused command line is answered in the CLI's own words, with its help offered under `Next:`, and cancelling says one word, `Cancelled`, everywhere. A failing command also says which project and server it failed against.
+  
+  **Breaking:** the code moved from the front of the failure line to the end, so anything that reads stderr for `Error E_…:` must read `Error: … (E_…)`. `--json` and the exit codes keep their shape.
+
+- [#3037](https://github.com/zitadel/nextgen/pull/3037) [`c21a99e`](https://github.com/zitadel/nextgen/commit/c21a99e07aa58eeb9c14d7cf3ed5b09cdd669f69) - `zitadel release revoke` on a release an origin still serves now names the first three origins that serve it, each with its kind and deployment, and counts the rest. It suggests `deploy` or `deployment rollback` for a primary origin and `preview rm` for the first three previews.
+  
+  **Breaking:** with `--json`, the refusal's `details` is now `{ release_id, origins }`, listing every serving origin as `{ origin, deployment_id, kind }`, instead of the server's `status`, `url` and `body`. Read the origins from `details.origins` instead of `details.body.details.origins`.
+
+- [#3109](https://github.com/zitadel/nextgen/pull/3109) [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79) - Every `zitadel` resource command names its resource in the singular, as
+  `zitadel release`, `zitadel deployment` and `zitadel variable` already did:
+  `zitadel user list`, `zitadel policy test`
+  ([CLI reference](https://preview.zitadel.com/docs/reference/cli)). The plural
+  of every noun still runs the same command, so `zitadel users list` keeps
+  working; help, completion and the reference show only the singular.
+  
+  **Breaking:** nothing you type stops running, but what the CLI prints names
+  the singular whichever spelling you typed. With `--json`, the envelope's
+  `command` is `user:list` where it was `users:list`, and the `topic` that
+  `zitadel resources` and a `--dry-run` report is `user`, for `users`, `teams`,
+  `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `policies` and
+  `flow-definitions` alike. `zitadel commands` lists the singular ids only. A
+  script that compares one of those values needs the new name. A plural typed
+  alone, such as `zitadel users`, no longer prints that topic's help: it fails
+  as an unknown command and names `zitadel user --help` as its next command.
+
+- [#3059](https://github.com/zitadel/nextgen/pull/3059) [`edfbdf6`](https://github.com/zitadel/nextgen/commit/edfbdf67ff1d5ecfb3925bcad4069f755cd6d524) - `zitadel tests add` adds end-to-end tests to a Next.js app that `zitadel setup` wired up: a Playwright config on `@zitadel/testing`, a test of the sign-in, a test that starts signed in, and a `test:e2e` script. Each run boots its own Zitadel server; `setup` still installs no test tooling: https://preview.zitadel.com/docs/guides/test-your-app
+
+- [#3082](https://github.com/zitadel/nextgen/pull/3082) [`a958163`](https://github.com/zitadel/nextgen/commit/a958163f9b7939bed707bc6f211f3a2468ce99ca) - The Vite dev proxy `setup` writes for React, Vue, Solid, Svelte and Qwik reads the server's address from `ZITADEL_URL`, falling back to the server setup ran against, so a test run can point the app at its own server. See [Test your app](https://preview.zitadel.com/docs/guides/test-your-app#other-frameworks).
+  
+  **Upgrading an app set up before:** `doctor --fix` updates its proxy. With the app's env files unchanged it reaches the same server; a `ZITADEL_URL` the shell or CI exports now applies.
+
+- [#3027](https://github.com/zitadel/nextgen/pull/3027) [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7) - Events now carry `user_id`, the user they concern whoever acted, and `GET /events?user_id=…` lists what happened to one account from an index: sign-ins with rejected passwords, sessions, credentials and changes ([Events](https://preview.zitadel.com/docs/reference/api/events)). `zitadel event list --filter user_id=…` and the console's User filter read it. Events recorded before the upgrade have no `user_id`.
+
+- [#2943](https://github.com/zitadel/nextgen/pull/2943) [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd) - Flow definitions no longer take a `status`: every flow a release pins is served, and the release alone decides which flows are live.
+  
+  **Breaking:** a flow definition that still sends `status` is refused. Delete the `"status"` line from each file in `.zitadel/flows/` before the next `zitadel deploy`. A `draft` flow is served as soon as a release pins it, including a release deployed before the upgrade, so move a draft out of `.zitadel/flows/` and deploy before upgrading if it should stay off.
+
+- [#3007](https://github.com/zitadel/nextgen/pull/3007) [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4) - API operation names now follow one scheme: a camelCase verb and the resource
+  they act on, with no `ById` suffix, and every path parameter names its
+  resource (`{schema_id}` instead of `{id}`). No URL or request changes on the
+  wire ([API reference](https://preview.zitadel.com/docs/reference/api)).
+  
+  **Breaking:** 34 operations are renamed, and with them the `@zitadel/api`
+  functions and types, the Go client's methods (`go.zitadel.com/zitadel/v5`),
+  the names `zitadel api` takes and the API reference page URLs (the old pages
+  redirect). `GetUserByID`, `PatchUserByID` and `DeleteUserByID` are `getUser`,
+  `updateUser` and `deleteUser`; the other `…ById` reads drop the suffix;
+  `getVariables` and `updateVariables` are `listVariables` and `setVariables`,
+  `getDeploymentVariables` is `listDeploymentVariables`; `deleteTeam` is
+  `deactivateTeam`; `patchMyUser` and `patchProject` are `updateMyUser` and
+  `updateProject`; passkey registration is `createUserPasskeyRegistration` and
+  `completeUserPasskeyRegistration`; the claim operations are
+  `createProjectClaim`, `getProjectClaimStatus`, `completeProjectClaim` and
+  `getProjectClaimWindow`; `addOrigin`, `removeOrigin`, `listPreviews` and
+  `removePreview` are `addProjectOrigin`, `removeProjectOrigin`,
+  `listProjectPreviews` and `removeProjectPreview`; `issueChallenge`,
+  `verifyChallengeProof` and `createHandoff` are `createAuthAttemptChallenge`,
+  `verifyAuthAttemptChallenge` and `createAuthAttemptHandoff`; and the writes
+  that publish a revision are `publishSchema`, `publishFlowDefinition`,
+  `publishBranding`, `publishIdp` and `publishApplication`. Rename the calls in
+  your code; `zitadel api ls` lists the current names.
+
+- [#3054](https://github.com/zitadel/nextgen/pull/3054) [`95e3594`](https://github.com/zitadel/nextgen/commit/95e359410545820646d25649a79faeaa2ea2f86f) - The SDK READMEs and the `zitadel` CLI's agent skill now point at `@zitadel/testing`, the test kit that runs your app's end-to-end tests against a real local Zitadel server. A new guide shows how to sign seeded users in, start tests signed in and test passkeys: https://preview.zitadel.com/docs/guides/test-your-app
+
+- [#2839](https://github.com/zitadel/nextgen/pull/2839) [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce) - `zitadel setup` now writes the sign-up policy, `.zitadel/policies/user.create.json`, beside the password policy. It names the challenge every password or passkey sign-up solves, Zitadel's built-in proof of work, which applies with or without the file. Deploy it like any [policy](https://preview.zitadel.com/docs/guides/deploy#policies); `POST /policies` and `zitadel policy test` take `user.create` too.
+
+### Patch Changes
+
+- [#3003](https://github.com/zitadel/nextgen/pull/3003) [`4e35e73`](https://github.com/zitadel/nextgen/commit/4e35e73b7de0d186634833ca6b36b32c347db857) - `zitadel api` calls the server your project's environment names (`ZITADEL_URL`, as every other project command reads it) and takes `--env` and `--env-file`. It used to call the cloud unless you passed `--server`, sending a local or self-hosted project's secret there.
+
+- [#3114](https://github.com/zitadel/nextgen/pull/3114) [`bce4a0a`](https://github.com/zitadel/nextgen/commit/bce4a0a90da02219ec834783ab2c1e67f0d1a3fa) - `zitadel setup` no longer writes your project's ID into an Angular app's `src/app/app.ts`. The app imports it from a git-ignored `src/app/zitadel-project.ts`, which `zitadel-ng.cjs` writes from `ZITADEL_PROJECT_ID` (environment or `.env.local`) when your `npm run dev`, `build` and `test` scripts run `ng`, rewriting it only when the ID changes. Build with `npm run build`, not `ng build`.
+
+- [#3062](https://github.com/zitadel/nextgen/pull/3062) [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be) - The `git commit` that `zitadel deploy` suggests now quotes its message and directory the way every other suggested command does, so a message written over several lines stays one word you can paste, and a plain directory is no longer quoted.
+
+- [#3062](https://github.com/zitadel/nextgen/pull/3062) [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be) - `zitadel eject` now suggests removing the SDK with the project's own package manager, such as `pnpm remove @zitadel/sdk-next`, instead of always suggesting `npm uninstall`.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - `zitadel variable list`, `origin list`, `env list` and `resources` answer an empty result with `No <things> found.`, like every other list. A blank display name, client id or client secret is reported as empty rather than as an instruction to type one; it reaches `--json` only as an error `message`.
+
+- [#3071](https://github.com/zitadel/nextgen/pull/3071) [`d5fc33d`](https://github.com/zitadel/nextgen/commit/d5fc33d02ac7123ccdd983f695d877103c543c8d) - The update check that `zitadel doctor` and `zitadel --version` run asks the npm registry again within the hour after a lookup that failed, instead of waiting a day, so one failed request no longer hides a new release. `zitadel upgrade` now also tells you to check that the registry serves the release's dist-tag when the registry answers but does not name the latest release.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - Commands answer in the same words, and every confirmation about a project names the project and the server it acts on, for example `Remove FOO from project proj_1 on api.zitadel.cloud?`. The first release `setup` or `env add` creates is now recorded as "Initial deployment from setup" or "…from env add".
+
+- [#3116](https://github.com/zitadel/nextgen/pull/3116) [`ebf146d`](https://github.com/zitadel/nextgen/commit/ebf146d0459409c837c35cac4d8b702119999e54) - The `@zitadel/cli` README on npm documents the commands the CLI has now. Its command reference had fallen behind, and its guide still told you to run `zitadel plan` and `zitadel apply`, which `zitadel deploy` replaced.
+
+- [#3090](https://github.com/zitadel/nextgen/pull/3090) [`3d773d7`](https://github.com/zitadel/nextgen/commit/3d773d7467bb5c498720a7968216e70752228cca) - `zitadel setup` no longer leaves `.env.example` git-ignored in SvelteKit, Nuxt and SolidStart apps, and `zitadel doctor --fix` un-ignores it in apps an earlier setup left that way.
+
+- [#3103](https://github.com/zitadel/nextgen/pull/3103) [`02c5ece`](https://github.com/zitadel/nextgen/commit/02c5ecec3885e958838b509ad7068a0d1509cea7) - `zitadel setup --framework nuxt`, `angular` and `tanstack-start` now install dependencies once, after adding the SDKs, and not at all with `--skip-install`; the framework's own generator no longer runs an npm install of its own first.
+
+- [#3113](https://github.com/zitadel/nextgen/pull/3113) [`999040c`](https://github.com/zitadel/nextgen/commit/999040c0fbfd5b1998f3d768f22c7f507b86d064) - `zitadel setup --framework tanstack-start` now generates a new app's `src/routeTree.gen.ts` after installing and commits it with the routes it adds, so the app type-checks right away and its first dev run leaves the git working tree clean.
+
+- [#3014](https://github.com/zitadel/nextgen/pull/3014) [`b4250a0`](https://github.com/zitadel/nextgen/commit/b4250a0f3e6df4cdcc00ae28fe40157267c6355d) - Every command the CLI suggests running next (`next_commands`, the `Next:` lines, the retry a refusal names) now carries the `--cwd`, `--env`, `--env-file` and `--server` the run was given, and a retry or a dry run's real command keeps every flag the run was typed with except the ones that only say how it answers (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`, `--no-telemetry`). Suggestions name flags by their long form (`deploy --message '<what changed>'`, not `-m`), and a placeholder value is quoted so a shell does not read it as a redirection (`--client-id '<client-id>'`).
+
+- [#3088](https://github.com/zitadel/nextgen/pull/3088) [`d3f1cc3`](https://github.com/zitadel/nextgen/commit/d3f1cc312f6595875e87f326bf34cb35cce53903) - `zitadel setup --framework sveltekit` now installs dependencies once, after adding the SDKs, and not at all with `--skip-install`; it no longer has `sv create` run an npm install of its own first.
+
+- [#3010](https://github.com/zitadel/nextgen/pull/3010) [`dba0293`](https://github.com/zitadel/nextgen/commit/dba029359521c837befd220ca33b7460399745d4) - A `zitadel` command that does not exist now fails like every other command: under `--json` it prints one `E_VALIDATION` error envelope on stdout, naming the command and suggesting the `--help` of the commands it was close to and of its topic, instead of printing nothing. It still exits 127; an extra word after a command that exists exits 3, as that command's other refusals do. On a terminal it no longer asks "Did you mean …?" and offers to run a different, possibly destructive, command with your flags dropped; it prints the error and names the close matches to type.
+
+- [#3062](https://github.com/zitadel/nextgen/pull/3062) [`8646178`](https://github.com/zitadel/nextgen/commit/86461786e472cfd9de4db5bea9480e1475ebd6be) - The CLI now finds the package manager of an app inside a workspace from the repository's root, where a workspace keeps its lockfile and `packageManager` field, so `setup`, `upgrade`, `doctor` and `eject` use and suggest `pnpm`, `yarn` or `bun` for a member app instead of falling back to npm. It never reads above the repository, or above a project that is in none.
+
+- [#3003](https://github.com/zitadel/nextgen/pull/3003) [`4e35e73`](https://github.com/zitadel/nextgen/commit/4e35e73b7de0d186634833ca6b36b32c347db857) - `zitadel event list --fields` and `event get --fields` accept every event type's payload fields, such as `payload.operation_id` and `payload.status` for an API request. Only the `variable.set` payload's fields were accepted before.
+
+- [#2882](https://github.com/zitadel/nextgen/pull/2882) [`7adc978`](https://github.com/zitadel/nextgen/commit/7adc9786b1361b5dad97c7fea9900dee162761e5) - `zitadel setup` creates Nuxt, Angular, SvelteKit, SolidStart and TanStack Start apps with a tested release of each framework's CLI, and Nuxt apps from a fixed copy of the Nuxt starter, instead of whatever was released last, so a broken upstream release no longer breaks setup on the day it ships.
+
+- [#2881](https://github.com/zitadel/nextgen/pull/2881) [`8ff8273`](https://github.com/zitadel/nextgen/commit/8ff8273110523e15480118027b97b68ae3bbe3f6) - The package READMEs, the test kit's hints for running inside this repository, and the CLI skill's login-UI reference name the repository's Turborepo commands instead of moon's.
+- Updated dependencies [[`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4), [`faac989`](https://github.com/zitadel/nextgen/commit/faac989cf8b4a471d68bb0ee2b60314aa65b578a), [`39ebc7f`](https://github.com/zitadel/nextgen/commit/39ebc7f5e38762340a1e28294796026d7f4356bb), [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259), [`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462), [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd), [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79), [`7d82e59`](https://github.com/zitadel/nextgen/commit/7d82e595668f8b91378959bcd12f54ceb248f0d2), [`dfe9169`](https://github.com/zitadel/nextgen/commit/dfe9169e00c99e916c0cc60bf9cc62c892968bd8), [`6cb0c1a`](https://github.com/zitadel/nextgen/commit/6cb0c1ab82432a54bf92475472bb839957d420ef), [`2e61fba`](https://github.com/zitadel/nextgen/commit/2e61fba8250e1e2600d09b848d7b244b89d40941), [`456d3d9`](https://github.com/zitadel/nextgen/commit/456d3d946af2083573d290ab9d6121fd504405b5), [`5b75eaa`](https://github.com/zitadel/nextgen/commit/5b75eaaed0f6b80514a13113f02a156d72230d54), [`c491222`](https://github.com/zitadel/nextgen/commit/c491222d48895057f74c82f365ef1f22492ae57b), [`4ecf004`](https://github.com/zitadel/nextgen/commit/4ecf00413e988557fce239821e85b2e931a6727b), [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb), [`4b443a1`](https://github.com/zitadel/nextgen/commit/4b443a17c11297dcb17d613ccb70e744ff3d9009), [`e40ac5a`](https://github.com/zitadel/nextgen/commit/e40ac5ac081267db7dacbbd5ed9d27cb7c525212), [`9b92c49`](https://github.com/zitadel/nextgen/commit/9b92c49f2d16ec61a5065230824f3ccb95622562), [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a), [`7c6fa14`](https://github.com/zitadel/nextgen/commit/7c6fa14003f4c43dcb6312f662afc3bb21b9a41c), [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32), [`c53fade`](https://github.com/zitadel/nextgen/commit/c53fadeb520321da33e3a71bc0415e1f29ee95fe), [`02a415d`](https://github.com/zitadel/nextgen/commit/02a415d6dd4d53d731c6b6775d4f0c72ced7e90c), [`f6eada4`](https://github.com/zitadel/nextgen/commit/f6eada4fb23fafe1d59301afbf76cde631f01c30), [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab), [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4), [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e), [`d74c989`](https://github.com/zitadel/nextgen/commit/d74c989193ff87eca616365a0d5c66d1f5c3466c), [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696), [`83b3cfb`](https://github.com/zitadel/nextgen/commit/83b3cfbfe6624a3ae0471b11293267b4388a88a8), [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469), [`a041cf6`](https://github.com/zitadel/nextgen/commit/a041cf6c66518402d43981ee76092e51365e189f), [`dea482f`](https://github.com/zitadel/nextgen/commit/dea482fe7c6778d312015c264c31068043596f9c), [`4e5152b`](https://github.com/zitadel/nextgen/commit/4e5152be02f1cd2659aafaf3202770a7a93f5d76), [`e81ee75`](https://github.com/zitadel/nextgen/commit/e81ee75a40bb9e91f2894266c64a3b8a24d6dc5e), [`e81ee75`](https://github.com/zitadel/nextgen/commit/e81ee75a40bb9e91f2894266c64a3b8a24d6dc5e), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/server@0.7.0
+  - @zitadel/api@0.7.0
+  - @zitadel/config@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
