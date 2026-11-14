@@ -28,7 +28,7 @@ post:
     The `session_token` is superseded when a handoff exchange completes. Clients
     must replace it at that point.
 
-    Anonymous sessions expire after 10 minutes. The lifetime resets to the
+    Anonymous sessions expire after 10 minutes (timing probe). The lifetime resets to the
     configured full session lifetime when a completing authentication attempt
     writes the first authentication factor.
   tags:
