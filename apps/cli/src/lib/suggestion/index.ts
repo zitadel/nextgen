@@ -341,13 +341,13 @@ export type Again = <const Id extends SuggestionId>(
 ) => Promise<SuggestedCommand>;
 
 /**
- * A suggestion of a generated resource command (`users:get`, `release:list`)
+ * A suggestion of a generated resource command (`user:get`, `release:list`)
  * whose id is only known at run time, so the compiler cannot check it against a
  * command. The flags and arguments are checked when the run renders it instead:
  * the renderer throws on one the target does not declare, and on an id that is
  * no command.
  *
- * @param topic - The resource's topic, as oclif names it (`users`).
+ * @param topic - The resource's topic, as oclif names it (`user`).
  * @param verb - The operation on it, under the verb its command is named by.
  * @param input - The target's arguments and flags, by the names code reads them.
  * @returns The suggestion, for the run that reports it to render.
@@ -363,7 +363,7 @@ export function resourceSuggestion(
 /**
  * The help of a command whose id is only known at run time, such as the one a
  * refused command line named or a generated resource command
- * (`users:create`). The renderer checks the id, and throws on one that is no
+ * (`user:create`). The renderer checks the id, and throws on one that is no
  * command, as it does for {@link resourceSuggestion}.
  *
  * @param id - The command's id, as oclif names it (`variable:get`).

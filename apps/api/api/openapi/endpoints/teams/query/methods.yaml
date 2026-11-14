@@ -1,6 +1,6 @@
 post:
   operationId: queryTeams
-  x-zitadel-cli: teams list
+  x-zitadel-cli: team list
   summary: Query teams
   description: |
     Returns a page of a project's teams.

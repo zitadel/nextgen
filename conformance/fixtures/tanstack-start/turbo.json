@@ -1,0 +1,4 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//", "@zitadel/conformance"]
+}

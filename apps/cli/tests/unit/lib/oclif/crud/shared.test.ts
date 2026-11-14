@@ -5,7 +5,7 @@ import { aSuggest } from "@tests/helpers/suggestions";
 import { article, capitalize, dryRunResult, idArg, parseOrThrow } from "@/lib/oclif/crud/shared";
 
 /** A dry run's real command, as a run renders it. */
-const REAL = aSuggest()({ id: "users:delete", args: { id: "user_1" } });
+const REAL = aSuggest()({ id: "user:delete", args: { id: "user_1" } });
 
 describe("parseOrThrow", () => {
   const schema = z.object({ name: z.string() }).strict();
@@ -32,29 +32,29 @@ describe("dryRunResult", () => {
   it("describes a write with its body", () => {
     const result = dryRunResult({
       verb: "create",
-      topic: "users",
+      topic: "user",
       body: { schema: "s" },
       next: REAL,
     });
     expect(result).toMatchObject({
       status: "ok",
-      data: { dry_run: true, verb: "create", topic: "users", body: { schema: "s" } },
+      data: { dry_run: true, verb: "create", topic: "user", body: { schema: "s" } },
     });
-    expect(result.pretty?.text).toBe('Would create users (dry run)\n{\n  "schema": "s"\n}');
+    expect(result.pretty?.text).toBe('Would create user (dry run)\n{\n  "schema": "s"\n}');
   });
 
   it("reports what the server answered when it was asked", () => {
     const result = dryRunResult({
       next: REAL,
       verb: "update",
-      topic: "users",
+      topic: "user",
       id: "user_1",
       body: { schema: "s" },
       checked: { id: "user_1", schema: "s" },
     });
     expect(result.data).toMatchObject({ result: { id: "user_1", schema: "s" } });
     expect(result.pretty?.text).toBe(
-      'Would update users user_1 (dry run)\n{\n  "schema": "s"\n}\nThe server would accept this. Nothing changed.',
+      'Would update user user_1 (dry run)\n{\n  "schema": "s"\n}\nThe server would accept this. Nothing changed.',
     );
   });
 
@@ -62,7 +62,7 @@ describe("dryRunResult", () => {
     const result = dryRunResult({
       next: REAL,
       verb: "update",
-      topic: "users",
+      topic: "user",
       id: "user_1",
       checked: { attributes: { password: "hunter2" } },
     });
@@ -70,22 +70,22 @@ describe("dryRunResult", () => {
   });
 
   it("leaves the answer out when the server was not asked", () => {
-    expect(dryRunResult({ verb: "create", topic: "users", next: REAL }).data).not.toHaveProperty(
+    expect(dryRunResult({ verb: "create", topic: "user", next: REAL }).data).not.toHaveProperty(
       "result",
     );
   });
 
   it("describes a delete by id without a body", () => {
     expect(
-      dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1", next: REAL }).pretty?.text,
-    ).toBe("Would revoke sessions sess_1 (dry run)");
+      dryRunResult({ verb: "revoke", topic: "session", id: "sess_1", next: REAL }).pretty?.text,
+    ).toBe("Would revoke session sess_1 (dry run)");
   });
 
   it("spells the body the way JSON does, so the block a reader copies parses", () => {
     const result = dryRunResult({
       next: REAL,
       verb: "create",
-      topic: "users",
+      topic: "user",
       body: { attributes: { nickname: "a\u009bb" } },
     });
 
@@ -97,7 +97,7 @@ describe("dryRunResult", () => {
 
 describe("dryRunResult next step", () => {
   it("offers the real command as the one next command", () => {
-    const result = dryRunResult({ verb: "delete", topic: "users", id: "user_1", next: REAL });
+    const result = dryRunResult({ verb: "delete", topic: "user", id: "user_1", next: REAL });
 
     expect(result).toMatchObject({ next: { commands: [REAL] } });
   });
@@ -105,28 +105,28 @@ describe("dryRunResult next step", () => {
 
 describe("dryRunResult summary", () => {
   it("titles the summary with what would happen", () => {
-    expect(dryRunResult({ verb: "create", topic: "users", next: REAL }).summary?.title).toBe(
-      "Would create users (dry run)",
+    expect(dryRunResult({ verb: "create", topic: "user", next: REAL }).summary?.title).toBe(
+      "Would create user (dry run)",
     );
   });
 
   it("gives the envelope the title the terminal draws", () => {
-    const result = dryRunResult({ verb: "create", topic: "users", next: REAL });
+    const result = dryRunResult({ verb: "create", topic: "user", next: REAL });
 
-    expect(result).toMatchObject({ data: { title: "Would create users (dry run)" } });
+    expect(result).toMatchObject({ data: { title: "Would create user (dry run)" } });
   });
 
   it("names the resource by its noun in the title and keeps the topic in the data", () => {
     const result = dryRunResult({
       next: REAL,
       verb: "delete",
-      topic: "idps",
+      topic: "idp",
       noun: "identity provider",
       id: "i1",
     });
 
     expect(result).toMatchObject({
-      data: { topic: "idps", title: "Would delete identity provider i1 (dry run)" },
+      data: { topic: "idp", title: "Would delete identity provider i1 (dry run)" },
     });
   });
 
@@ -138,10 +138,10 @@ describe("dryRunResult summary", () => {
   });
 
   it("spells out an escape byte in the title", () => {
-    const title = dryRunResult({ verb: "create", topic: "users\u001b[2J", next: REAL }).summary
+    const title = dryRunResult({ verb: "create", topic: "user\u001b[2J", next: REAL }).summary
       ?.title;
 
-    expect(title).toBe("Would create users\\x1b[2J (dry run)");
+    expect(title).toBe("Would create user\\x1b[2J (dry run)");
     expect(title).not.toContain("\u001b");
   });
 });
@@ -151,7 +151,7 @@ describe("dryRunResult redaction", () => {
     const result = dryRunResult({
       next: REAL,
       verb: "create",
-      topic: "users",
+      topic: "user",
       body: {
         schema: "sch_1",
         attributes: { email: "a@b.c", password: "hunter2", tags: [{ token: "t" }] },
@@ -159,9 +159,9 @@ describe("dryRunResult redaction", () => {
     });
     expect(result.data).toEqual({
       dry_run: true,
-      title: "Would create users (dry run)",
+      title: "Would create user (dry run)",
       verb: "create",
-      topic: "users",
+      topic: "user",
       id: undefined,
       body: {
         schema: "sch_1",

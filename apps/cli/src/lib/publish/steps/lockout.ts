@@ -489,7 +489,7 @@ async function lookupWarnings(
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
       const fix = ctx.suggest({
-        id: "users:update",
+        id: "user:update",
         args: { id: "<user_id>" },
         flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
       });

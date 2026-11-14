@@ -1,6 +1,6 @@
 get:
   operationId: getFlowDefinition
-  x-zitadel-cli: flow-definitions get
+  x-zitadel-cli: flow-definition get
   summary: Get a flow definition by ID
   description: |
     Returns one flow definition revision. Pass the `id` that
