@@ -138,14 +138,14 @@ describe("Lane", () => {
     ]);
   });
 
-  test("gives each family a work folder of its own", async () => {
+  test("gives each operation a work folder of its own", async () => {
     const fake = runner();
 
     await lane(fake).run();
 
     expect(fake.inputs.map((input) => input.workDir)).toEqual([
-      join(directory, "work", "public"),
-      join(directory, "work", "management"),
+      join(directory, "work", "public", "ready"),
+      join(directory, "work", "management", "listProjects"),
     ]);
   });
 
@@ -164,13 +164,15 @@ describe("Lane", () => {
     });
   });
 
-  test("keeps each family's report and output", async () => {
+  test("keeps each container's report and output", async () => {
     await lane(runner()).run();
 
-    expect(await readFile(join(directory, "out", "management", "report.json"), "utf8")).toBe(
-      reportJson,
-    );
-    expect(await readFile(join(directory, "out", "management", "output.log"), "utf8")).toBe("line");
+    expect(
+      await readFile(join(directory, "out", "management", "listProjects", "report.json"), "utf8"),
+    ).toBe(reportJson);
+    expect(
+      await readFile(join(directory, "out", "management", "listProjects", "output.log"), "utf8"),
+    ).toBe("line");
   });
 
   test("keeps only the end of a long output for the failure message", async () => {
@@ -191,20 +193,24 @@ describe("Lane", () => {
     expect(first?.log.split("\n")).toHaveLength(30);
   });
 
-  describe("a family big enough to split", () => {
-    const paths: Record<string, Record<string, unknown>> = {};
-    for (let index = 0; index < 32; index += 1) {
-      paths[`/things/${String(index)}`] = { get: { operationId: `get${String(index)}` } };
+  describe("a family of many operations", () => {
+    function specOf(count: number, prefix = "get"): OpenApiSpec {
+      const paths: Record<string, Record<string, unknown>> = {};
+      for (let index = 0; index < count; index += 1) {
+        paths[`/${prefix}/${String(index)}`] = {
+          get: { operationId: `${prefix}${String(index)}` },
+        };
+      }
+      return new OpenApiSpec({
+        components: { securitySchemes: { oauth2: { type: "oauth2" } } },
+        security: [{ oauth2: [] }],
+        paths,
+      });
     }
-    const big = new OpenApiSpec({
-      components: { securitySchemes: { oauth2: { type: "oauth2" } } },
-      security: [{ oauth2: [] }],
-      paths,
-    });
 
-    function bigLane(runner: Runner): Lane {
+    function laneOf(spec: OpenApiSpec, runner: Runner): Lane {
       return new Lane({
-        spec: big,
+        spec,
         specText: "{}",
         instances: instances(),
         runner,
@@ -219,39 +225,24 @@ describe("Lane", () => {
         operations: { selected: tested, tested, skipped: 0, errored: 0 },
         warnings: { unmatched_filter: [] },
         complete: true,
-        failures: [{ title: "Server error", count: 2, operations: ["GET /things/0"] }],
+        failures: [{ title: "Server error", count: 2, operations: ["GET /get/0"] }],
         errors: [],
       });
     }
 
-    test("deals every operation into exactly one slice", () => {
-      const ids = Array.from({ length: 32 }, (_, index) => `get${String(index)}`);
-
-      const slices = Lane.slices(ids);
-
-      expect(slices.flat().sort()).toEqual([...ids].sort());
-      expect(new Set(slices.flat()).size).toBe(ids.length);
-      expect(Lane.slices(["a", "b"])).toEqual([["a", "b"]]);
-    });
-
-    test("runs the slices without the multi-step phase and the multi-step phase on every operation", async () => {
+    test("runs every operation alone, without the multi-step phase", async () => {
       const fake = runner();
 
-      await bigLane(fake).run();
+      await laneOf(specOf(32), fake).run();
 
-      const stateful = fake.inputs.filter((input) => {
-        return input.phases?.join() === "stateful";
-      });
-      const sliced = fake.inputs.filter((input) => {
+      const alone = fake.inputs.filter((input) => {
         return input.phases?.join() === "examples,coverage,fuzzing";
       });
-      expect(stateful).toHaveLength(1);
-      expect(stateful[0]?.operationIds).toHaveLength(32);
-      expect(sliced.length).toBeGreaterThan(1);
+      expect(alone).toHaveLength(32);
       expect(
-        sliced
-          .flatMap((input) => {
-            return [...input.operationIds];
+        alone
+          .map((input) => {
+            return input.operationIds.join();
           })
           .sort(),
       ).toEqual(
@@ -261,7 +252,35 @@ describe("Lane", () => {
       );
     });
 
-    test("counts only the slices as tested, and adds up the failures", async () => {
+    test("runs the multi-step phase once, on every operation", async () => {
+      const fake = runner();
+
+      await laneOf(specOf(32), fake).run();
+
+      const stateful = fake.inputs.filter((input) => {
+        return input.phases?.join() === "stateful";
+      });
+      expect(stateful).toHaveLength(1);
+      expect(stateful[0]?.operationIds).toHaveLength(32);
+    });
+
+    test("leaves an operation's run the same whatever else is in the family", async () => {
+      const before = runner();
+      const after = runner();
+
+      await laneOf(specOf(5), before).run();
+      await laneOf(specOf(9), after).run();
+
+      const alone = (fake: ReturnType<typeof runner>): unknown => {
+        return fake.inputs.find((input) => {
+          return input.operationIds.join() === "get3" && input.phases?.length === 3;
+        });
+      };
+      expect(alone(after)).toEqual({ ...(alone(before) as object), baseUrl: expect.any(String) });
+      expect(alone(before)).toBeDefined();
+    });
+
+    test("counts every operation once, and adds up the failures of every container", async () => {
       let containers = 0;
       const fake: Runner = {
         run(input) {
@@ -278,12 +297,18 @@ describe("Lane", () => {
         },
       };
 
-      const [run] = await bigLane(fake).run();
+      const [run] = await laneOf(specOf(32), fake).run();
 
       expect(run?.accounting).toMatchObject({ selected: 32, tested: 32 });
       expect(run?.failures).toEqual([
-        { operation: "GET /things/0", check: "Server error", count: 2 * containers },
+        { operation: "GET /get/0", check: "Server error", count: 2 * containers },
       ]);
+      expect(containers).toBe(33);
+    });
+
+    test("names a folder after the operation, with nothing a path could misread", () => {
+      expect(Lane.folderName("listProjects")).toBe("listProjects");
+      expect(Lane.folderName("a/b c:d")).toBe("a_b_c_d");
     });
   });
 
@@ -323,20 +348,12 @@ describe("Lane", () => {
     expect(provider.running.size).toBe(0);
   });
 
-  test("gives every slice and the multi-step run of a big family an instance of their own", async () => {
-    const paths: Record<string, Record<string, unknown>> = {};
-    for (let index = 0; index < 32; index += 1) {
-      paths[`/things/${String(index)}`] = { get: { operationId: `get${String(index)}` } };
-    }
+  test("gives every container an instance of its own, however many there are", async () => {
     const provider = instances();
     const fake = runner();
 
     await new Lane({
-      spec: new OpenApiSpec({
-        components: { securitySchemes: { oauth2: { type: "oauth2" } } },
-        security: [{ oauth2: [] }],
-        paths,
-      }),
+      spec,
       specText: "{}",
       instances: provider,
       runner: fake,
@@ -345,28 +362,7 @@ describe("Lane", () => {
       log: () => undefined,
     }).run();
 
-    expect(fake.inputs.length).toBeGreaterThan(2);
-    expect(new Set(fake.inputs.map((input) => input.baseUrl)).size).toBe(fake.inputs.length);
-    expect(provider.running.size).toBe(0);
-  });
-
-  test("logs how long each container took, so the slowest one can be found", async () => {
-    const messages: string[] = [];
-
-    await new Lane({
-      spec,
-      specText: "{}",
-      instances: instances(),
-      runner: runner(),
-      workDir: join(directory, "work"),
-      artifactsDir: join(directory, "out"),
-      log: (message) => {
-        messages.push(message);
-      },
-    }).run();
-
-    expect(messages).toContain("public/.: 1 operations in 0s");
-    expect(messages).toContain("management/.: 1 operations in 0s");
+    expect(provider.started).toHaveLength(fake.inputs.length);
   });
 
   test("stops an instance whose run failed", async () => {

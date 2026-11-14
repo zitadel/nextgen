@@ -3,6 +3,7 @@ import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { compare } from "./order";
+import { Slots } from "./slots";
 import { CHECKS, exemptionsFor, refusalsFor } from "./checks";
 import type { Credential } from "./credentials";
 import type { Accounting, Failure } from "./report";
@@ -29,23 +30,20 @@ export interface FamilyRun {
   seconds: number;
 }
 
-/** The phases that look at one operation at a time, and so can be split across containers. */
+/** The phases that look at one operation at a time, and so run in a container for each. */
 const PER_OPERATION_PHASES = ["examples", "coverage", "fuzzing"];
 
 /** The phase that chains operations together, and so needs them all in one run. */
 const STATEFUL_PHASES = ["stateful"];
 
-/** A family with this many operations or more is split. */
-const SHARD_FROM = 30;
-
 /**
- * How many slices a big family is split into: `API_CONTRACT_SHARDS`, else 4,
- * never more than the cores there are (each container is about one core) and
- * never less than 1.
+ * How many containers run at once: `API_CONTRACT_SLOTS`, else the number of
+ * cores. Each container and its server keep a core busy, and measured on CI,
+ * two or four times as many finish no sooner: each one just takes longer.
  */
-const SHARDS = Math.max(
+const SLOTS = Math.max(
   1,
-  Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || Math.min(4, availableParallelism()),
+  Math.floor(Number(process.env.API_CONTRACT_SLOTS)) || availableParallelism(),
 );
 
 /**
@@ -117,6 +115,7 @@ export interface LaneInput {
  */
 export class Lane {
   private readonly input: LaneInput;
+  private readonly slots = new Slots(SLOTS);
 
   constructor(input: LaneInput) {
     this.input = input;
@@ -159,48 +158,50 @@ export class Lane {
       exemptions: exemptionsFor(operations),
       refusals: refusalsFor(operations),
     };
-    const slices = Lane.slices(ids);
-    const parts =
-      slices.length === 1
-        ? [{ name: ".", operationIds: ids, phases: undefined }]
-        : [
-            ...slices.map((slice, index) => {
-              return {
-                name: `shard-${String(index + 1)}`,
-                operationIds: slice,
-                phases: PER_OPERATION_PHASES,
-              };
-            }),
-            { name: "stateful", operationIds: ids, phases: STATEFUL_PHASES },
-          ];
+    // Every operation runs alone, on an instance of its own, so what it finds
+    // depends on it and the server alone: adding, removing or reordering other
+    // operations cannot change it. Only the multi-step phase needs them together.
+    const parts = [
+      ...ids.map((id) => {
+        return {
+          name: Lane.folderName(id),
+          operationIds: [id],
+          phases: PER_OPERATION_PHASES,
+        };
+      }),
+      ...(ids.length > 1 ? [{ name: "stateful", operationIds: ids, phases: STATEFUL_PHASES }] : []),
+    ];
     const runs = await allSettled(
-      parts.map(async (part) => {
-        const partStarted = Date.now();
-        const instance = await this.input.instances.start();
-        try {
-          const credential = await instance.credentialFor(family);
-          const run = await this.input.runner.run({
-            ...shared,
-            baseUrl: instance.baseUrl,
-            headers: credential.headers,
-            schemes: credential.schemes,
-            workDir: join(this.input.workDir, family, part.name),
-            operationIds: part.operationIds,
-            phases: part.phases,
-          });
-          await this.keep(join(family, part.name), run);
-          this.input.log(
-            `${family}/${part.name}: ${String(part.operationIds.length)} operations in ${String(Math.round((Date.now() - partStarted) / 1000))}s`,
-          );
-          return { part, run };
-        } finally {
-          await instance.stop();
-        }
+      parts.map((part) => {
+        return this.slots.run(async () => {
+          const partStarted = Date.now();
+          const instance = await this.input.instances.start();
+          const booted = Date.now();
+          try {
+            const credential = await instance.credentialFor(family);
+            const run = await this.input.runner.run({
+              ...shared,
+              baseUrl: instance.baseUrl,
+              headers: credential.headers,
+              schemes: credential.schemes,
+              workDir: join(this.input.workDir, family, part.name),
+              operationIds: part.operationIds,
+              phases: part.phases,
+            });
+            await this.keep(join(family, part.name), run);
+            this.input.log(
+              `${family}/${part.name}: ${String(part.operationIds.length)} operations in ${String(Math.round((Date.now() - partStarted) / 1000))}s (server up in ${String(Math.round((booted - partStarted) / 1000))}s)`,
+            );
+            return { part, run };
+          } finally {
+            await instance.stop();
+          }
+        });
       }),
     );
     this.input.log(`${family}: done in ${String(Math.round((Date.now() - started) / 1000))}s`);
-    // The slices cover every operation once; the stateful run repeats them, so
-    // only the slices say what was tested.
+    // The per-operation runs cover every operation once; the stateful run
+    // repeats them, so only the per-operation runs say what was tested.
     const counted = runs.filter(({ part }) => {
       return part.name !== "stateful";
     });
@@ -257,22 +258,9 @@ export class Lane {
     };
   }
 
-  /**
-   * The operations of a big family dealt out round-robin, so each slice gets a
-   * similar mix. A small family is one slice, because starting a container
-   * costs more than the time a split would save.
-   */
-  static slices(ids: readonly string[]): string[][] {
-    if (ids.length < SHARD_FROM) {
-      return [[...ids]];
-    }
-    const slices: string[][] = Array.from({ length: SHARDS }, () => {
-      return [];
-    });
-    ids.forEach((id, index) => {
-      slices[index % SHARDS]?.push(id);
-    });
-    return slices;
+  /** An operation's id as a folder name. */
+  static folderName(id: string): string {
+    return id.replace(/[^A-Za-z0-9._-]/g, "_");
   }
 
   /** Kept in the ignored test-output folder, so a failing run can be read in full and replayed. */

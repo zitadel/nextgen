@@ -21,7 +21,8 @@ root.
   one per family for the multi-step phase (`Stateful tests (<family>)`). A
   failing test names the check; the raw report and output are in
   `api-contract/test-output/schemathesis/<family>/` (gitignored; the management
-  family keeps each slice in `shard-N/` and its multi-step run in `stateful/`),
+  family keeps each operation in a folder named after its operation id, and its
+  multi-step run in `stateful/`),
   and `st replay <id>` in the image replays a case.
 - The run takes about two minutes. Turbo caches a passing run on the server build and the lane's own files, so a change that touches neither replays it. A failing run is never cached.
 - The verdict is written to `api-contract/test-output/summary.md`, to the job summary on GitHub, and as error annotations on the check.
@@ -48,11 +49,17 @@ Never add a line to hide a failure you introduced. Fix it, or fix the spec.
 
 A baseline is only worth anything if a run repeats.
 
-- Every Schemathesis container runs against a server and database of its own
-  (`src/instances.ts`), so slices never see each other's data and
-  `API_CONTRACT_SHARDS` (default 4, at most the core count) can change without
-  changing which operations fail. Keep it that way: a new run must start its own
-  instance, never share one.
+- Every operation runs alone in a container, against a server and database of
+  its own (`src/instances.ts`), so what it finds depends on that operation and
+  the server only. Adding, removing or reordering other operations cannot change
+  it, and nothing is split by hand: the lane reads the operations from the spec.
+  Schemathesis draws the inputs of one run from a single seeded stream, so
+  grouping operations in a container changes what each of them receives. Keep
+  it that way: never put two operations in a container, and never share an instance.
+  Only the multi-step phase runs on all of a family's operations, because it
+  chains them.
+- `API_CONTRACT_SLOTS` (default the core count) is how many containers run at
+  once. It changes the time a run takes and nothing else.
 - `API_CONTRACT_WORKERS` (default 1) is the requests in flight inside one run, and
   they do share that run's instance, so with more than 1 expect failures the
   baseline does not list.
