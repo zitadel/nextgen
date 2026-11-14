@@ -9,14 +9,16 @@
  * from is the provider classes in `@zitadel/config/idp`. Adding a provider to
  * the configuration, and finding the connection one already has, is
  * `lib/zitadel`'s (`config.connections.enable`). This module owns only what the
- * command line needs around it: choosing the provider from flags, the callback
- * URI, and publishing the credentials to the project through a publisher the
- * caller passes in ({@link CredentialDelivery}).
+ * command line needs around it as plain data and logic: choosing the provider
+ * from flags, the claim mapping, the callback URI, and publishing a credential
+ * through a publisher the caller passes in.
  *
- * **Dependency rule.** No upward imports (`cli/commands/`, `sync/`), none of
- * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
- * depends sideways only on `lib/zitadel` (the configuration a provider is
- * added to) and shared utilities under `apps/cli/src/lib/`.
+ * **Dependency rule.** Generic: it asks, prints, warns and suggests nothing, so
+ * nothing here imports `lib/ui`, `lib/log`, `lib/warnings`, `lib/suggestion`,
+ * `lib/terminal-text` or `lib/oclif`, nor `cli/commands/`, `sync/` or
+ * `lib/backend`: nothing here calls the server. It depends sideways only on
+ * `lib/errors`, `lib/zitadel` (the configuration a provider is added to) and
+ * `@zitadel/config`. The steps that use it draw its results.
  */
 
 export { callbackUriFor } from "./callback";
@@ -54,14 +56,11 @@ export {
 } from "./claims";
 export {
   type CredentialNames,
+  type CredentialVariable,
   type GivenCredentials,
   type PublishedCredentials,
   type PublishState,
   publishClientId,
-  reportClientIdOutcome,
-  reportSecretOutcome,
-  republishCommand,
-  republishCommands,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
@@ -82,6 +81,4 @@ export {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   selectionFromFlags,
-  ssoEnableFlags,
 } from "./custom";
-export { CredentialDelivery, type DeliveryRun } from "./delivery";

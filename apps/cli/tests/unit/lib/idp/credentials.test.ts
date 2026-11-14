@@ -1,89 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { idVariable, secretVariable } from "@tests/helpers/idp-values";
-import { republishCommand, republishCommands, unpublished } from "@/lib/idp";
-import { aSuggest } from "@tests/helpers/suggestions";
-
-/** A run that named no environment. */
-const NO_SELECTOR = aSuggest({}, "1.0.0-alpha.23");
-/** A run with `--env production`. */
-const PRODUCTION = aSuggest({ env: "production" }, "1.0.0-alpha.23");
-
-describe("the recovery command for a credential", () => {
-  it("is runnable rather than a bare subcommand", () => {
-    // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand(idVariable("google"), false, NO_SELECTOR)).toMatch(
-      /^npx .+ variable set /,
-    );
-  });
-
-  it("marks a secret as one, so the value is not stored in the clear", () => {
-    expect(republishCommand(secretVariable("google"), true, NO_SELECTOR)).toContain(
-      "variable set GOOGLE_CLIENT_SECRET --secret",
-    );
-    expect(republishCommand(idVariable("google"), false, NO_SELECTOR)).not.toContain("--secret");
-  });
-
-  it("carries the environment selector so the retry targets the same project", () => {
-    // The selector reproduces the invocation's --env/--env-file/--server; a
-    // retry without it would silently target the default project.
-    expect(republishCommand(idVariable("google"), false, PRODUCTION)).toContain(
-      "variable set GOOGLE_CLIENT_ID --env production",
-    );
-  });
-});
-
-describe("the recovery commands a result carries", () => {
-  it("says nothing when the project received everything", () => {
-    expect(
-      republishCommands(
-        [
-          { name: idVariable("google"), secret: false, published: "stored" },
-          { name: secretVariable("google"), secret: true, published: "stored" },
-        ],
-        NO_SELECTOR,
-      ),
-    ).toEqual([]);
-  });
-
-  it("names every credential that did not land, and only those", () => {
-    const commands = republishCommands(
-      [
-        { name: idVariable("google"), secret: false, published: "stored" },
-        { name: secretVariable("google"), secret: true, published: "failed" },
-      ],
-      NO_SELECTOR,
-    );
-
-    expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
-  });
-
-  it("covers a deferred publish, not just a failed one", () => {
-    // Deferred means the value never reached the project either; the button
-    // fails at token exchange just the same.
-    expect(
-      republishCommands(
-        [{ name: idVariable("google"), secret: false, published: "deferred" }],
-        NO_SELECTOR,
-      ),
-    ).toHaveLength(1);
-  });
-
-  it("skips a credential this run never had", () => {
-    // No provider was enabled, or no secret was supplied: there is nothing to
-    // republish and a command naming an empty variable would be noise.
-    expect(
-      republishCommands([{ name: undefined, secret: false, published: "failed" }], NO_SELECTOR),
-    ).toEqual([]);
-    expect(
-      republishCommands(
-        [{ name: idVariable("google"), secret: false, published: undefined }],
-        NO_SELECTOR,
-      ),
-    ).toEqual([]);
-  });
-});
+import { publishClientId, type SecretPublisher, storeClientSecret, unpublished } from "@/lib/idp";
+import { clientId, clientSecret, idVariable, secretVariable } from "@tests/helpers/idp-values";
 
 describe("the credentials a recovery is for", () => {
   it("lists each credential that did not land, with whether it is a secret", () => {
@@ -99,15 +17,112 @@ describe("the credentials a recovery is for", () => {
     ]);
   });
 
-  it("lists the same credentials as the commands", () => {
-    const credentials = [
-      { name: secretVariable("google"), secret: true, published: "failed" as const },
-    ];
+  it("says nothing when the project received everything", () => {
+    expect(
+      unpublished([
+        { name: idVariable("google"), secret: false, published: "stored" },
+        { name: secretVariable("google"), secret: true, published: "stored" },
+      ]),
+    ).toEqual([]);
+  });
 
-    expect(republishCommands(credentials, NO_SELECTOR)).toEqual(
-      unpublished(credentials).map((missing) => {
-        return republishCommand(missing.name, missing.secret, NO_SELECTOR);
+  it("covers a deferred publish, not just a failed one", () => {
+    expect(
+      unpublished([{ name: idVariable("google"), secret: false, published: "deferred" }]),
+    ).toHaveLength(1);
+  });
+
+  it("skips a credential this run never had", () => {
+    expect(unpublished([{ name: undefined, secret: false, published: "failed" }])).toEqual([]);
+    expect(
+      unpublished([{ name: idVariable("google"), secret: false, published: undefined }]),
+    ).toEqual([]);
+  });
+});
+
+describe("publishing a credential", () => {
+  it("stores the client id as a plain variable and the secret as a secret", async () => {
+    const publisher = vi.fn<SecretPublisher>(async () => {});
+
+    await publishClientId({
+      name: idVariable("acme-sso"),
+      value: clientId("abc"),
+      publish: publisher,
+    });
+    await storeClientSecret({
+      name: secretVariable("acme-sso"),
+      value: clientSecret("shh"),
+      publish: publisher,
+    });
+
+    expect(publisher.mock.calls.map((call) => call[0])).toEqual([
+      idVariable("acme-sso"),
+      secretVariable("acme-sso"),
+    ]);
+    expect(publisher.mock.calls.map((call) => call[2])).toEqual([
+      { secret: false },
+      { secret: true },
+    ]);
+  });
+
+  it("reports both stored", async () => {
+    const stored = async () => {};
+
+    expect(
+      await publishClientId({
+        name: idVariable("acme-sso"),
+        value: clientId("abc"),
+        publish: stored,
       }),
+    ).toBe("stored");
+    expect(
+      await storeClientSecret({
+        name: secretVariable("acme-sso"),
+        value: clientSecret("shh"),
+        publish: stored,
+      }),
+    ).toEqual({ name: secretVariable("acme-sso"), published: "stored" });
+  });
+
+  it("defers both when there is no project to publish to", async () => {
+    expect(await publishClientId({ name: idVariable("acme-sso"), value: clientId("abc") })).toBe(
+      "deferred",
     );
+    expect(
+      await storeClientSecret({
+        name: secretVariable("acme-sso"),
+        value: clientSecret("shh"),
+      }),
+    ).toEqual({ name: secretVariable("acme-sso"), published: "deferred" });
+  });
+
+  it("defers a secret that was not given, without calling the publisher", async () => {
+    const publisher = vi.fn<SecretPublisher>(async () => {});
+
+    expect(
+      await storeClientSecret({ name: secretVariable("acme-sso"), publish: publisher }),
+    ).toEqual({ name: secretVariable("acme-sso"), published: "deferred" });
+    expect(publisher).not.toHaveBeenCalled();
+  });
+
+  it("reports a refused publish as failed instead of raising it", async () => {
+    const refused = async () => {
+      throw new Error("down");
+    };
+
+    expect(
+      await publishClientId({
+        name: idVariable("acme-sso"),
+        value: clientId("abc"),
+        publish: refused,
+      }),
+    ).toBe("failed");
+    expect(
+      await storeClientSecret({
+        name: secretVariable("acme-sso"),
+        value: clientSecret("shh"),
+        publish: refused,
+      }),
+    ).toEqual({ name: secretVariable("acme-sso"), published: "failed" });
   });
 });

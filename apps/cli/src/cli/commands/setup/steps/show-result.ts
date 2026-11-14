@@ -19,7 +19,7 @@ import {
   claimWindowDeadline,
 } from "@/lib/claim-state";
 import { pathExists } from "@/lib/fs";
-import { callbackUriFor, republishCommands } from "@/lib/idp";
+import { callbackUriFor, unpublished } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
 import { readPackageJson } from "@/lib/npm";
 import type { CommandResult } from "@/lib/oclif";
@@ -678,7 +678,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             ...claimNudge.actions,
           ],
           commands: [
-            ...republishCommands(
+            ...unpublished(
               answers.sso.flatMap((answer) => {
                 const slug = providerOf(answer.selection).slug;
                 const outcome = ssoOutcomes.get(slug);
@@ -695,8 +695,17 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   },
                 ];
               }),
-              this.deps.suggest,
-            ),
+            ).map((missing) => {
+              if (missing.secret) {
+                return this.deps.suggest({
+                  id: "variable:set",
+                  args: { name: missing.name },
+                  flags: { secret: true },
+                });
+              }
+
+              return this.deps.suggest({ id: "variable:set", args: { name: missing.name } });
+            }),
             ...deployStep.commands,
             ...installOutcome.nextCommands,
             ...consoleStep.commands,

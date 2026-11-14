@@ -23,7 +23,7 @@ const CLIENT_ID_PLACEHOLDER = "<client-id>";
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"flags" | "selection" | "claimRequest" | "preview" | "delivery">;
+type Needs = Fact<"flags" | "selection" | "claimRequest" | "preview" | "names">;
 
 /**
  * What the step is given by the command.
@@ -125,7 +125,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
       given: needs.flags.clientId,
       retry: this.retryFor(needs, CLIENT_ID_PLACEHOLDER, false),
     });
-    const secretVariable = needs.delivery.names.clientSecret;
+    const secretVariable = needs.names.clientSecret;
     const secret = await this.deps.ask.secret({
       name: `client secret for ${secretVariable}`,
       message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,

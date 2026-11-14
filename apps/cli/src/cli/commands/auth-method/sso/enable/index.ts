@@ -206,11 +206,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           }),
         )
         .step(new ReadClaims())
-        .step(
-          new PlanChange({
-            suggest: this.suggest,
-          }),
-        )
+        .step(new PlanChange())
         .step(new IntroduceProvider())
         .endWhen(
           new PreviewChange({
@@ -245,6 +241,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           new PublishCredentials({
             signal: this.signal,
             source: this.meta.source,
+            suggest: this.suggest,
           }),
         )
         .step(

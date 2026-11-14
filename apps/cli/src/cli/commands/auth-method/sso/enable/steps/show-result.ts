@@ -4,13 +4,14 @@ import {
   type Fact,
   payload,
 } from "@/cli/commands/auth-method/sso/enable/shared";
+import { unpublished as unpublishedCredentials } from "@/lib/idp";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Fact<"summary" | "change" | "written" | "published" | "delivery" | "answered">;
+type Needs = Fact<"summary" | "change" | "written" | "published" | "names" | "answered">;
 
 /**
  * What the step is given by the command.
@@ -56,7 +57,18 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
     const unpublished = !needs.summary.reused || needs.written.length > 0;
     const followUps = this.deps.followUps(
       unpublished,
-      needs.delivery.unpublishedOf(needs.published).map((missing) => {
+      unpublishedCredentials([
+        {
+          name: needs.names.clientId,
+          secret: false,
+          published: needs.published.clientId,
+        },
+        {
+          name: needs.names.clientSecret,
+          secret: true,
+          published: needs.published.secret?.published,
+        },
+      ]).map((missing) => {
         return this.deps.suggest({
           id: "variable:set",
           args: { name: missing.name },
@@ -79,7 +91,7 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
             summary: needs.summary,
             change: needs.change,
             published: needs.published,
-            names: needs.delivery.names,
+            names: needs.names,
             claims: needs.answered,
           }),
           next_args: followUps.args,
@@ -88,7 +100,10 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
           title: escapeControlCharacters(title),
           sections: [],
           lines:
-            unpublished && needs.delivery.areStored(needs.published)
+            unpublished &&
+            needs.published.secret?.published === "stored" &&
+            needs.published.clientId !== "deferred" &&
+            needs.published.clientId !== "failed"
               ? ["Its credentials are stored in your project."]
               : [],
         },

@@ -5,7 +5,6 @@ import type AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import type { Origins } from "@/lib/backend";
 import type {
   ClaimRequest,
-  CredentialDelivery,
   CredentialNames,
   CustomFlagValues,
   GivenCredentials,
@@ -182,9 +181,9 @@ export type EnableFacts = Readonly<{
   preview: DocumentChange<Connection>;
 
   /**
-   * Where the credentials go, and how that is reported.
+   * The project variables the connection reads its credentials from.
    */
-  delivery: CredentialDelivery;
+  names: CredentialNames;
 
   /**
    * What the run says about the connection.

@@ -1,11 +1,11 @@
 import { Readable } from "node:stream";
 
-import { idpProvider, type ProviderSelection } from "@zitadel/config/idp";
+import { credentialVariables, idpProvider, type ProviderSelection } from "@zitadel/config/idp";
 import { describe, expect, it } from "vitest";
 
 import { CollectCredentials } from "@/cli/commands/auth-method/sso/enable/steps/collect-credentials";
 import { ZitadelError } from "@/lib/errors";
-import { CredentialDelivery, NO_CLAIM_REQUEST } from "@/lib/idp";
+import { NO_CLAIM_REQUEST } from "@/lib/idp";
 import { asker } from "@/lib/input";
 import type { Questions } from "@/lib/ui";
 import { Connection } from "@/lib/zitadel";
@@ -108,11 +108,7 @@ function needsFor(
     selection,
     claimRequest: input.claimRequest ?? NO_CLAIM_REQUEST,
     preview,
-    delivery: new CredentialDelivery({
-      connection: preview.document,
-      reused,
-      suggest: aSuggest({}, "1.0.0"),
-    }),
+    names: credentialVariables(preview.document.slug),
   };
 }
 
