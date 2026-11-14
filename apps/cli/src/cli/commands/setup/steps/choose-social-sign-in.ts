@@ -20,7 +20,7 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import { callbackUriFor, loopbackIssuerWarning, ssoEnableFlags } from "@/lib/idp";
+import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
 import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
@@ -34,6 +34,7 @@ import {
   type SetupAnswers,
   type SetupServices,
   type SsoDraft,
+  ssoEnableFlags,
   promptContext,
 } from "@/cli/commands/setup/shared";
 

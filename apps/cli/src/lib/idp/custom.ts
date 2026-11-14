@@ -10,11 +10,9 @@ import {
   parseProviderSelection,
   parseScopes,
   RESERVED_SLUGS,
-  selectionName,
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
-import type { SuggestFlags } from "@/lib/suggestion";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -365,30 +363,5 @@ export function selectionFromFlags(
       issuer: checkedUnder(flag.issuer, parseIssuer(issuer)),
       scopes: checkedUnder(flag.scopes, parseScopes(values.scopes)),
     },
-  };
-}
-
-/**
- * The flags `auth-method sso enable` takes to add `selection` to a project: the
- * provider, and for a custom connection the settings that describe it. None
- * of them is a credential: the client id is asked for, as the secret is.
- *
- * @param selection - The provider.
- * @returns The flags, in the order the command line takes them.
- */
-export function ssoEnableFlags(
-  selection: ProviderSelection,
-): SuggestFlags<"auth-method:sso:enable"> {
-  if (selection.kind !== "custom") {
-    return { provider: selectionName(selection) };
-  }
-  const { slug, displayName, issuer, scopes } = selection.connection;
-
-  return {
-    provider: selectionName(selection),
-    slug,
-    displayName,
-    issuer,
-    scopes: scopes.join(" "),
   };
 }
