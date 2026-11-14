@@ -6,12 +6,6 @@
   "imports": {
     "#/*": "./src/*"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "lightningcss"
-    ]
-  },
   "scripts": {
     "dev": "vite dev --port 3220 --strictPort",
     "generate": "conformance-fixture generate",
@@ -46,7 +40,6 @@
     "framework": "tanstack-start",
     "appPort": 3220,
     "zitadelPort": 8220,
-    "generatePort": 8320,
-    "generatorPinned": false
+    "generatePort": 8320
   }
 }

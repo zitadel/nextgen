@@ -314,6 +314,7 @@
         "!**/playwright-report/**",
         "!**/.vitest/**",
         "!**/next-env.d.ts",
+        "!**/*.gen.ts",
         "!**/*.timestamp*",
         "!apps/docs/.source/**",
         "!apps/docs/.generated/**",
