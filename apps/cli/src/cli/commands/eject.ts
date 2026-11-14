@@ -15,6 +15,7 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { createOrca } from "@/lib/orca";
+import { LAUNCHER_PATH } from "@/lib/orca/patchers/rule/angular/templates";
 import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
@@ -237,10 +238,14 @@ function ejected(
   // outright, while Next and Nuxt keep theirs and only get the dev-server
   // port pinned into it — one line has to cover both, so it names the
   // script and both ways setup touches it rather than claiming the script
-  // itself should go.
+  // itself should go. An Angular app's scripts also run its launcher, which
+  // eject removes, so they need moving back to `ng`.
   const manualSteps = actions.configEdits.map((rel) => {
     if (rel === "package.json" || rel.endsWith("/package.json")) {
-      return `Restore the "dev" script in ${rel} (setup added the script, or pinned its dev-server port)`;
+      const launched = actions.markedFiles.includes(LAUNCHER_PATH)
+        ? `, and run every script that runs "node ${LAUNCHER_PATH}" with "ng" again`
+        : "";
+      return `Restore the "dev" script in ${rel} (setup added the script, or pinned its dev-server port)${launched}`;
     }
     if (rel === "angular.json" || rel.endsWith("/angular.json")) {
       return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;
