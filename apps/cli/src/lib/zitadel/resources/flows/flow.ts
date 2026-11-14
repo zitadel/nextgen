@@ -42,6 +42,7 @@ import type {
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { walk } from "@/lib/zitadel/utils/graph";
+import { isJsonObject } from "@/lib/zitadel/utils/json";
 
 /**
  * A platform schema id, as the server's `isUserSchemaID` tells one apart.
@@ -522,6 +523,53 @@ export class Flow extends ConfigDocument<FlowValue> {
       ),
       changed: true,
       skipped: edit.skipped,
+    };
+  }
+
+  /**
+   * The flow with fields added to the steps that ask a person for their
+   * details.
+   *
+   * @remarks
+   * Those are the `register` and `register-sso` steps that list their fields.
+   * A field a step lists already is not added twice, and every other step is
+   * left as it is.
+   *
+   * @param names - The fields to add.
+   * @returns The edit: the edited flow, or this one when no step takes them.
+   */
+  withFields(names: readonly string[]): Edit<Flow> {
+    const steps = this.body.steps;
+    if (names.length === 0 || !Array.isArray(steps)) {
+      return { document: this, changed: false, skipped: [] };
+    }
+    const edited = steps.map((step) => {
+      if (
+        !isJsonObject(step) ||
+        (step.name !== "register" && step.name !== "register-sso") ||
+        !Array.isArray(step.fields)
+      ) {
+        return step;
+      }
+      const fields = step.fields;
+      const missing = names.filter((name) => {
+        return !fields.includes(name);
+      });
+      return missing.length === 0 ? step : { ...step, fields: [...fields, ...missing] };
+    });
+    const unchanged = edited.every((step, at) => {
+      return step === steps[at];
+    });
+    if (unchanged) {
+      return { document: this, changed: false, skipped: [] };
+    }
+    return {
+      document: Flow.build(
+        { path: this.path, body: { ...this.body, steps: edited } },
+        this.editedStatus,
+      ),
+      changed: true,
+      skipped: [],
     };
   }
 

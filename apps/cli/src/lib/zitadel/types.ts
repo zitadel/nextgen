@@ -20,6 +20,7 @@ import {
   POLICY_TEST_SUFFIX,
 } from "@/lib/zitadel/resources/policies/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { NewProperty } from "@/lib/zitadel/resources/schemas/types";
 import type { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
 
 export type { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
@@ -134,6 +135,49 @@ export type ScaffoldedProvider = {
    * Where the provider answers, when not at its own issuer.
    */
   readonly endpoints?: ConnectionEndpoints;
+
+  /**
+   * What the connection maps, read against the connection the provider's
+   * defaults make and the schema it is scaffolded beside.
+   *
+   * @remarks
+   * Left out, the connection keeps the provider's defaults. It may be called
+   * more than once for the same provider, so it must not report anything
+   * itself: what a caller should hear is in {@link ClaimChoice.notes}.
+   */
+  readonly claims?: (connection: Connection, template: UserSchema) => ClaimChoice;
+};
+
+/**
+ * What a connection maps and requests, as chosen over the provider's defaults.
+ */
+export type ClaimChoice = {
+  /**
+   * The mapping from user-schema property to provider claim.
+   */
+  readonly mapping: Readonly<Record<string, string>>;
+
+  /**
+   * How each mapped property is verified: the boolean claim that says so, or
+   * `true` to trust the provider.
+   */
+  readonly verified: Readonly<Record<string, string | boolean>>;
+
+  /**
+   * The scopes the connection requests.
+   */
+  readonly scopes: readonly string[];
+
+  /**
+   * The user attributes the mapping creates, which join the schema and the
+   * steps of the flow that ask a person for their details.
+   */
+  readonly created: readonly NewProperty[];
+
+  /**
+   * What the choice changed that the developer should hear about.
+   */
+  readonly notes: readonly string[];
 };
 
 /**
@@ -151,6 +195,16 @@ export type ScaffoldedConnection<P extends ScaffoldedProvider = ScaffoldedProvid
    * The connection written for it.
    */
   readonly connection: Connection;
+
+  /**
+   * The user attributes its claim mapping creates.
+   */
+  readonly created: readonly NewProperty[];
+
+  /**
+   * What its claim choice changed that the developer should hear about.
+   */
+  readonly notes: readonly string[];
 };
 
 /**

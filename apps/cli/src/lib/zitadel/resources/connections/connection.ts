@@ -466,6 +466,46 @@ export class Connection extends ConfigDocument<ConnectionValue> {
   }
 
   /**
+   * The connection with a claim mapping, its verification and its scopes
+   * written in.
+   *
+   * @remarks
+   * A block the claims leave empty is removed rather than left as the provider
+   * scaffolded it: what is given is what the connection ends up with.
+   *
+   * @param claims - The mapping from schema property to claim, how each
+   *   property is verified (a claim, or `true` to trust the provider), and the
+   *   scopes to request.
+   * @returns The edit: the connection with the claims written in.
+   * @throws {@link BrokenFilesError} When the connection contract refuses the
+   *   body the edit makes.
+   */
+  withClaims(claims: {
+    readonly mapping: Readonly<Record<string, string>>;
+    readonly verified: Readonly<Record<string, string | boolean>>;
+    readonly scopes: readonly string[];
+  }): Edit<Connection> {
+    const kept = Object.fromEntries(
+      Object.entries(this.body).filter(([block]) => {
+        return block !== "claim_mapping" && block !== "verified_claims";
+      }),
+    );
+    const body = {
+      ...kept,
+      ...(Object.keys(claims.mapping).length > 0 ? { claim_mapping: { ...claims.mapping } } : {}),
+      ...(Object.keys(claims.verified).length > 0
+        ? { verified_claims: { ...claims.verified } }
+        : {}),
+      oidc: { ...objectAt(this.body, "oidc"), scopes: [...claims.scopes] },
+    };
+    return {
+      document: Connection.build({ path: this.path, body }, this.editedStatus),
+      changed: true,
+      skipped: [],
+    };
+  }
+
+  /**
    * List the settings the developer gave that this connection, reused in
    * place of a candidate, does not have, which reusing it does not apply.
    *

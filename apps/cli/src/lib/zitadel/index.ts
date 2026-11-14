@@ -126,6 +126,7 @@ export {
   UserSchema,
   type EnabledMethods,
   type ForceOptions,
+  type NewProperty,
   type SchemaEdit,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas";
@@ -149,6 +150,7 @@ export {
   type ConfigFile,
   type ConfigurationBundle,
   type ConfigFiles,
+  type ClaimChoice,
   type ConfigKind,
   type JsonArray,
   type JsonObject,

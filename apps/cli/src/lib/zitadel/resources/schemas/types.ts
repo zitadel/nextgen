@@ -71,6 +71,21 @@ export type ToggleableMethod = (typeof TOGGLEABLE_METHODS)[number];
 export type EnabledMethods = { readonly [M in ToggleableMethod]: boolean };
 
 /**
+ * A property to add to a user schema, typed to hold what fills it.
+ */
+export type NewProperty = {
+  /**
+   * The property's name.
+   */
+  readonly name: string;
+
+  /**
+   * The JSON Schema type it holds.
+   */
+  readonly type: string;
+};
+
+/**
  * An edit to one user schema, and the configuration before and after it.
  */
 export type SchemaEdit = {

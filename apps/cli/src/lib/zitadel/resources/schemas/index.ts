@@ -7,6 +7,7 @@ export {
   TOGGLEABLE_METHODS,
   type EnabledMethods,
   type ForceOptions,
+  type NewProperty,
   type SchemaEdit,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";

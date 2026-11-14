@@ -513,3 +513,53 @@ describe("UserSchema edits of an external schema", () => {
     expect(error).toBeInstanceOf(RefusedEditError);
   });
 });
+
+describe("UserSchema.withProperties", () => {
+  const schema = () => {
+    return UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, aUserSchema({ properties: { email: { type: "string" } } })),
+    );
+  };
+
+  it("adds a property typed to hold what fills it", () => {
+    const edit = schema().withProperties([{ name: "employeeNumber", type: "integer" }]);
+
+    expect({
+      changed: edit.changed,
+      property: objectAt(edit.document.body, "properties").employeeNumber,
+    }).toEqual({
+      changed: true,
+      property: { type: "integer", description: "Filled from an identity provider claim." },
+    });
+  });
+
+  it("keeps a property the schema defines already as it is", () => {
+    const original = schema();
+
+    const edit = original.withProperties([{ name: "email", type: "integer" }]);
+
+    expect({ changed: edit.changed, same: edit.document === original }).toEqual({
+      changed: false,
+      same: true,
+    });
+  });
+
+  it("changes nothing when there is nothing to add", () => {
+    expect(schema().withProperties([]).changed).toBe(false);
+  });
+
+  it("refuses a schema that points at an external schema", () => {
+    const external = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        kind: "schema-url",
+        url: "https://schemas.test.invalid/remote.json",
+      }),
+    );
+
+    const error = thrownBy(() => {
+      return external.withProperties([{ name: "employeeNumber", type: "string" }]);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+  });
+});

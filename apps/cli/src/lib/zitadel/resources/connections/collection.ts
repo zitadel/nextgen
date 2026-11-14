@@ -187,10 +187,21 @@ export class Connections extends Collection<Connection> {
     const existing = this.resolveExisting(candidate, options);
     const connection = existing ?? candidate;
     const slug = connection.slug;
-    const edited = schema.withProvider(slug).document;
+    const attributes = options.attributes ?? [];
+    const edited = schema.withProvider(slug).document.withProperties(attributes).document;
     const start = existing === undefined ? this.config.with(candidate) : this.config;
     const flowEdits = flows.map((flow) => {
-      return flow.withProvider(slug, schema.enabledMethods);
+      const provided = flow.withProvider(slug, schema.enabledMethods);
+      const fields = provided.document.withFields(
+        attributes.map((property) => {
+          return property.name;
+        }),
+      );
+      return {
+        document: fields.document,
+        changed: provided.changed || fields.changed,
+        skipped: provided.skipped,
+      };
     });
     const after = flowEdits.reduce((current, flowEdit) => {
       return current.with(flowEdit.document);

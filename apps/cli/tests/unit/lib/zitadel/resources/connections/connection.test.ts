@@ -619,3 +619,58 @@ describe("Connection.withEndpoints", () => {
     });
   });
 });
+
+describe("Connection.withClaims", () => {
+  const acme = () => {
+    return Connection.create(
+      aFile(
+        "connections",
+        "acme-sso.json",
+        anOidcConnection({
+          slug: "acme-sso",
+          display_name: "Acme SSO",
+          oidc: { scopes: ["openid", "profile", "email"] },
+          claim_mapping: { email: "email" },
+          verified_claims: { email: "email_verified" },
+        }),
+      ),
+    );
+  };
+
+  it("writes the mapping, the verification and the scopes", () => {
+    const edit = acme().withClaims({
+      mapping: { email: "email", staffNumber: "employee_id" },
+      verified: { email: "email_verified" },
+      scopes: ["openid", "profile", "email", "employee"],
+    });
+
+    expect({
+      mapping: edit.document.body.claim_mapping,
+      verified: edit.document.body.verified_claims,
+      scopes: edit.document.scopes,
+    }).toEqual({
+      mapping: { email: "email", staffNumber: "employee_id" },
+      verified: { email: "email_verified" },
+      scopes: ["openid", "profile", "email", "employee"],
+    });
+  });
+
+  it("removes the verification the provider scaffolded when none is left", () => {
+    const edit = acme().withClaims({
+      mapping: { email: "mail" },
+      verified: {},
+      scopes: ["openid"],
+    });
+
+    expect(edit.document.body).not.toHaveProperty("verified_claims");
+  });
+
+  it("leaves both blocks out when nothing is mapped", () => {
+    const edit = acme().withClaims({ mapping: {}, verified: {}, scopes: ["openid"] });
+
+    expect({
+      mapping: edit.document.body.claim_mapping,
+      verified: edit.document.body.verified_claims,
+    }).toEqual({ mapping: undefined, verified: undefined });
+  });
+});

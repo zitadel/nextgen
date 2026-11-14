@@ -669,3 +669,68 @@ describe("Flow.isPasskeyActionKind", () => {
     expect(Flow.isPasskeyActionKind(kind)).toBe(expected);
   });
 });
+
+describe("Flow.withFields", () => {
+  const registering = (steps: JsonObject[]) => {
+    return aFlow({ ...REGISTER_ONLY, steps });
+  };
+
+  it("adds a field to a register step that lists its fields", () => {
+    const flow = registering([{ name: "register", fields: ["email"] }]);
+
+    const edit = flow.withFields(["employeeNumber"]);
+
+    expect({
+      changed: edit.changed,
+      steps: edit.document.steps.map((step) => {
+        return step.fields;
+      }),
+    }).toEqual({
+      changed: true,
+      steps: [["email", "employeeNumber"]],
+    });
+  });
+
+  it("adds it to a register-sso step too", () => {
+    const flow = registering([
+      { name: "register", fields: ["email"] },
+      { name: "register-sso", fields: ["email"] },
+    ]);
+
+    const edit = flow.withFields(["employeeNumber"]);
+
+    expect(
+      edit.document.steps.map((step) => {
+        return step.fields;
+      }),
+    ).toEqual([
+      ["email", "employeeNumber"],
+      ["email", "employeeNumber"],
+    ]);
+  });
+
+  it("does not add a field a step lists already", () => {
+    const flow = registering([{ name: "register", fields: ["email", "employeeNumber"] }]);
+
+    const edit = flow.withFields(["employeeNumber"]);
+
+    expect({ changed: edit.changed, same: edit.document === flow }).toEqual({
+      changed: false,
+      same: true,
+    });
+  });
+
+  it("leaves a step that does not ask for details alone", () => {
+    const flow = registering([{ name: "other", fields: ["email"] }]);
+
+    const edit = flow.withFields(["employeeNumber"]);
+
+    expect(edit.changed).toBe(false);
+  });
+
+  it("changes nothing when there are no fields to add", () => {
+    const flow = registering([{ name: "register", fields: ["email"] }]);
+
+    expect(flow.withFields([]).changed).toBe(false);
+  });
+});

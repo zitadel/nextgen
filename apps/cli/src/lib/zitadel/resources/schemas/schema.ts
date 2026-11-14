@@ -26,6 +26,7 @@ import {
 import {
   type AuthMethodsValue,
   type EnabledMethods,
+  type NewProperty,
   type PropertiesValue,
   type SchemaValue,
   SIGN_IN_METHODS,
@@ -552,6 +553,57 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
     return {
       document: UserSchema.build(
         { path: this.path, body: this.bodyWithMethod("sso", next) },
+        this.editedStatus,
+      ),
+      changed: true,
+      skipped: [],
+    };
+  }
+
+  /**
+   * The schema with properties added, each optional and typed to hold what
+   * fills it.
+   *
+   * @remarks
+   * A property the schema defines already is left as it is, so the edit is safe
+   * to repeat. Nothing else is written.
+   *
+   * @param created - The properties to add.
+   * @returns The edit: the edited schema, or this one when there is nothing to
+   *   add.
+   * @throws {@link RefusedEditError} When the schema points at an external
+   *   schema, which holds its properties at its url.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   *   schema the edit makes.
+   */
+  withProperties(created: readonly NewProperty[]): Edit<UserSchema> {
+    const properties = objectAt(this.body, "properties");
+    const added = created.filter((property) => {
+      return properties[property.name] === undefined;
+    });
+    if (added.length === 0) {
+      return { document: this, changed: false, skipped: [] };
+    }
+    this.assertMethodsEditable();
+    return {
+      document: UserSchema.build(
+        {
+          path: this.path,
+          body: {
+            ...this.body,
+            properties: {
+              ...properties,
+              ...Object.fromEntries(
+                added.map((property) => {
+                  return [
+                    property.name,
+                    { type: property.type, description: "Filled from an identity provider claim." },
+                  ];
+                }),
+              ),
+            },
+          },
+        },
         this.editedStatus,
       ),
       changed: true,
