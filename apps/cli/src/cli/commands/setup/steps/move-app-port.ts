@@ -1,31 +1,33 @@
-import { access } from "node:fs/promises";
 import { basename, join } from "node:path";
+
+import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
+import {
+  type Fact,
+  relativeDisplayPath as relativeDisplay,
+  type SetupServices,
+} from "@/cli/commands/setup/shared";
+import { createZitadelClient, DeploymentService, OriginService } from "@/lib/backend";
+import { isRefusal } from "@/lib/consent";
+import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
+import type { CommandResult } from "@/lib/oclif";
 import { createOrca, issuerFromPort } from "@/lib/orca";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
+import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
 import {
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
 } from "@/lib/project";
-import { WHAT_CHANGED } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { relativeDisplayPath as relativeDisplay } from "@/cli/commands/setup/shared";
-
-import type { CommandResult } from "@/lib/oclif";
-import { EndStep } from "@/lib/wizard";
-
-import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { createZitadelClient, DeploymentService, OriginService } from "@/lib/backend";
-import { isRefusal } from "@/lib/consent";
-import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { portFromIssuer } from "@/lib/orca/detectors/port";
-import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
 import { readScaffoldManifest } from "@/lib/scaffold-manifest";
+import { WHAT_CHANGED } from "@/lib/suggestion";
 import { updateScaffold } from "@/lib/sync/state";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
+import { EndStep } from "@/lib/wizard";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 
 /**
@@ -65,13 +67,19 @@ type Deps = Pick<
  * is how it moves: there is nothing left to scaffold.
  */
 export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "moveDevPort";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -81,7 +89,6 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
    * Whether the directory is set up and an explicit `--dev-port` came with it.
    *
    * @param needs - The flags and what was settled before the first step.
-   * @param _services - What the command provides.
    * @returns Whether to end here.
    */
   when(needs: Needs): boolean {
@@ -203,7 +210,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         },
       );
       if (!this.deps.dryRun) {
-        const rewrite = (patterns: ReadonlyArray<string>): string[] => {
+        const rewrite = (patterns: readonly string[]): string[] => {
           return replaceOrigin(patterns, previousIssuer, issuer).filter((pattern) => {
             return typeof pattern === "string";
           });
@@ -293,11 +300,10 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
               throw error;
             })
         : undefined;
-      const staleOrigin = !replacing
-        ? undefined
-        : consent === undefined || consent === "refused"
-          ? previousIssuer
-          : await new OriginService(consent.unlock(client), secret.project_id)
+      const granted = consent === undefined || consent === "refused" ? undefined : consent;
+      const removal =
+        replacing && granted !== undefined
+          ? await new OriginService(granted.unlock(client), secret.project_id)
               .remove(previousIssuer)
               .then(
                 () => {
@@ -309,17 +315,10 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
                   }
                   return previousIssuer;
                 },
-              );
-      if (
-        !(await access(join(this.deps.cwd, RECOVERY_ENV_FILE)).then(
-          () => {
-            return true;
-          },
-          () => {
-            return false;
-          },
-        ))
-      ) {
+              )
+          : previousIssuer;
+      const staleOrigin = replacing ? removal : undefined;
+      if (!(await pathExists(join(this.deps.cwd, RECOVERY_ENV_FILE)))) {
         this.deps.recoverAt(source);
       }
       const cleanup =
@@ -352,11 +351,10 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
           `Social sign-in with ${slug} redirects to the old port: add ${callbackUriFor(issuer, slug)} as a redirect URI at the provider.`,
         );
       }
-      const title = `${
-        moved
-          ? `${this.deps.dryRun ? "Would move" : "Moved"} the app to ${issuer}`
-          : `The app is already on ${issuer}`
-      }${this.deps.dryRun ? " (dry run)" : ""}`;
+      const headline = moved
+        ? `${this.deps.dryRun ? "Would move" : "Moved"} the app to ${issuer}`
+        : `The app is already on ${issuer}`;
+      const title = this.deps.dryRun ? `${headline} (dry run)` : headline;
       return {
         status: "ok",
         data: {

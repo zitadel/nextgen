@@ -1,8 +1,7 @@
-import { readPlatformRuntime } from "@/lib/local-server/runtime";
-
+import { isCancellation, toZitadelError } from "@/lib/errors";
 import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
-import { isCancellation, toZitadelError } from "@/lib/errors";
+import { readPlatformRuntime } from "@/lib/local-server/runtime";
 import { serverKind } from "@/lib/oclif/server-kind";
 import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -93,9 +92,9 @@ export class ClaimOwnership extends WizardStep<
     const { answers, project } = needs;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
-      !this.deps.dryRun && isLocal
-        ? Boolean(await readPlatformRuntime(answers.server, PLATFORM_RUNTIME_TIMEOUT_MS))
-        : false;
+      !this.deps.dryRun &&
+      isLocal &&
+      Boolean(await readPlatformRuntime(answers.server, PLATFORM_RUNTIME_TIMEOUT_MS));
     if (!hostsPlatform) {
       return {
         ownedByLocalAdmin: undefined,

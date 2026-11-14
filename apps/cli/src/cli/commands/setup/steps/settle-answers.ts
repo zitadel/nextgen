@@ -1,8 +1,7 @@
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { LocalServer } from "@/lib/local-server/server";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -19,13 +18,19 @@ type Deps = Pick<SetupServices, "dryRun" | "nonInteractive" | "suggest">;
  * script to a port something holds, and records what was settled.
  */
 export class SettleAnswers extends WizardStep<"settle", object, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "settle";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;

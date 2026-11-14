@@ -1,14 +1,15 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import {
-  describeWrittenFile,
-  relativeDisplayPath as relativeDisplay,
-} from "@/cli/commands/setup/shared";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { errorMessage, isErrno } from "@/lib/errors";
-import { reportWarning } from "@/lib/warnings";
 
+import {
+  describeWrittenFile,
+  type Fact,
+  relativeDisplayPath as relativeDisplay,
+  type SetupServices,
+} from "@/cli/commands/setup/shared";
+import { errorMessage, isErrno } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -17,6 +18,12 @@ import { WizardStep } from "@/lib/wizard";
  * with `--env-file` and which therefore decides which project they target.
  */
 const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
+
+/**
+ * The files a setup that got as far as patching leaves behind: `zitadel.json`,
+ * which the already-initialized guard skips on, and the project's secret.
+ */
+const SETUP_MARKERS = ["zitadel.json", ".zitadel/secret"] as const;
 
 /**
  * What the step reads from what is known.
@@ -43,13 +50,19 @@ export class PatchApp extends WizardStep<
   Fact<"patched" | "envFilesBefore" | "patching">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "patch";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -168,7 +181,7 @@ export class PatchApp extends WizardStep<
    */
   private async rollBack(envFilesBefore: ReadonlyMap<string, Buffer | undefined>): Promise<void> {
     if (!this.deps.dryRun) {
-      for (const marker of ["zitadel.json", ".zitadel/secret"]) {
+      for (const marker of SETUP_MARKERS) {
         try {
           await rm(join(this.deps.cwd, marker), { force: true });
         } catch (error) {

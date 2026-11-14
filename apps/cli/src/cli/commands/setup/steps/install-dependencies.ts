@@ -1,5 +1,3 @@
-import { WizardStep } from "@/lib/wizard";
-
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
@@ -15,6 +13,7 @@ import {
 } from "@/lib/package-manager";
 import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
+import { WizardStep } from "@/lib/wizard";
 
 /**
  * How many of a failed after-install script's last output lines its warning quotes.
@@ -58,30 +57,36 @@ export type SetupInstallOutcome = Readonly<{
    * pull each command onto its own styled line; the envelope strings below
    * stay plain prose.
    */
-  boxActions: ReadonlyArray<BoxAction>;
+  boxActions: readonly BoxAction[];
 
   /**
    * Complete journey for the JSON envelope — agents consume all of it.
    */
-  nextActions: ReadonlyArray<string>;
+  nextActions: readonly string[];
 
   /**
    * The commands the reader runs next.
    */
-  nextCommands: ReadonlyArray<SuggestedCommand>;
+  nextCommands: readonly SuggestedCommand[];
 }>;
 
 /**
  * Installs the dependencies the patch added to the app.
  */
 export class InstallDependencies extends WizardStep<"install", Fact<"installOutcome">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "install";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -156,7 +161,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
                   ? {
                       name: error.name,
                       message: error.message,
-                      code: (error as NodeJS.ErrnoException).code,
+                      code: "code" in error ? error.code : undefined,
                     }
                   : {
                       message: String(error),
@@ -187,7 +192,10 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
         if (this.deps.signal.aborted) {
           throw this.deps.signal.reason;
         }
-        const output = (error as { output?: unknown }).output;
+        const output =
+          typeof error === "object" && error !== null && "output" in error
+            ? error.output
+            : undefined;
         reportWarning(
           `${suggestedCommandOf(inDirectory(command, flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
             typeof output === "string" && output.trim() !== ""

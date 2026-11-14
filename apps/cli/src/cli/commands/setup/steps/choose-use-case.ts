@@ -1,13 +1,14 @@
 import { SETUP_USE_CASES } from "@zitadel/config/defaults";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
+
+import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 
 /**
  * What the step is given by the command.
@@ -24,7 +25,7 @@ type Deps = Pick<
  * in. `--use-case` is authoritative; non-interactive runs keep the minimal
  * default seeded by the command.
  */
-export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, QuestionNeeds> {
+export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, Needs> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -49,7 +50,7 @@ export class ChooseUseCase extends WizardStep<"useCase", Fact<"answers">, Questi
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
+  async run(needs: Needs): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {

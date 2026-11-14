@@ -29,13 +29,19 @@ type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive">;
  * `--password-min-length` is authoritative and skips the question.
  */
 export class SetPasswordPolicy extends WizardStep<"passwordPolicy", Fact<"answers">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "passwordPolicy";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;

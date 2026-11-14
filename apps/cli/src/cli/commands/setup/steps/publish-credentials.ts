@@ -1,20 +1,19 @@
+import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
+
+import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 import { createZitadelClient, VariableService, VariableWrite } from "@/lib/backend";
-import type { SecretPublisher } from "@/lib/idp";
 import {
   publishClientId,
   type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
   type SecretOutcome,
+  type SecretPublisher,
   storeClientSecret,
 } from "@/lib/idp";
 import { userAgent } from "@/lib/user-agent";
-
-import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-
-import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -45,13 +44,19 @@ export class PublishCredentials extends WizardStep<
   Fact<"ssoOutcomes">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "publishCredentials";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;

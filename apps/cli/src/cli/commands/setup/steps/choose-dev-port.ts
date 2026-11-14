@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { whole } from "@/lib/oclif/flags";
+
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { LocalServer } from "@/lib/local-server/server";
+import { whole } from "@/lib/oclif/flags";
+import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { isDevelopmentBuild } from "@/lib/build-channel";
-import { WizardStep } from "@/lib/wizard";
 
 /**
  * The lowest TCP port a server can listen on.
@@ -25,7 +26,7 @@ const PORT = whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT));
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 
 /**
  * What the step is given by the command.
@@ -50,7 +51,7 @@ type Deps = Pick<
  * validated answer becomes the issuer URL (`http://localhost:<port>`) via
  * `issuerFromPort`.
  */
-export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, QuestionNeeds> {
+export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -75,7 +76,7 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Questi
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
+  async run(needs: Needs): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
@@ -116,8 +117,8 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Questi
    * Ask which port the app runs on, when the detected one is taken.
    *
    * @remarks
-   * `--dev-port <n>` is authoritative: skip the prompt so an interactive answer can't override the
-   * explicit flag (the base command already folded it into answers.devPort).
+   * `--dev-port <n>` is authoritative: the prompt is skipped so an interactive answer cannot
+   * override the explicit flag, which the command already folded into `answers.devPort`.
    *
    * With the next ones all taken too, the detected port is still the best guess.
    *

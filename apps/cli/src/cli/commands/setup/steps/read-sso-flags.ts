@@ -1,3 +1,6 @@
+import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
+
+import { askCustomSettings, type Fact, type SetupServices } from "@/cli/commands/setup/shared";
 import {
   customExample,
   customFlagValues,
@@ -6,12 +9,8 @@ import {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { askCustomSettings } from "@/cli/commands/setup/shared";
-import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/idp";
 import { andTheRest, pipedFrom } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
-
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -47,13 +46,19 @@ type Deps = Pick<SetupServices, "ask" | "dryRun" | "nonInteractive" | "suggest">
  * answers one of its questions.
  */
 export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLine">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "ssoFlags";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;

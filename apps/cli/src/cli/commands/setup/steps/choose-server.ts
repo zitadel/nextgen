@@ -1,21 +1,24 @@
-import type { Parsed } from "@zitadel/config/idp";
-
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { LocalServer } from "@/lib/local-server/server";
 import { DEFAULT_SERVER } from "@/lib/server";
-
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
 
-/** Sentinel returned by the choice select when the user picks "Custom URL". */
+import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
+
+/**
+ * The value the choice select returns when the person picks "Custom URL".
+ */
 const CUSTOM = "__custom__";
-/** The value of the disabled local option, which can never be picked. */
+
+/**
+ * The value of the disabled local option, which can never be picked.
+ */
 const LOCAL_NOT_RUNNING = "__local_not_running__";
 
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 
 /**
  * What the step is given by the command.
@@ -41,7 +44,7 @@ type Deps = Pick<
  * available. Picking a server writes its URL directly to `answers.server`;
  * picking "Custom URL" still asks for a validated URL.
  */
-export class ChooseServer extends WizardStep<"server", Fact<"answers">, QuestionNeeds> {
+export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -66,7 +69,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Question
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
+  async run(needs: Needs): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
@@ -107,10 +110,9 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Question
    * Ask which server the app uses.
    *
    * @remarks
-   * `--server <url>` overrides the wizard entirely. The base command already validated and resolved
-   * the URL into `answers.server`; asking the user to re-pick from a fixed select list when their
-   * flag isn't in the list (Cloud / detected / Custom) was a bug — clack would silently default
-   * back to Cloud.
+   * `--server <url>` overrides the wizard entirely. The command already validated and resolved the
+   * URL into `answers.server`, and a fixed list of Cloud, the detected server and a custom URL may
+   * not hold the flag's value, so the select would silently fall back to Cloud.
    *
    * The local server is probed in a spinner: the `/readyz` probe of a server that does not answer
    * takes up to 1.5s, long enough that the wizard should say what it is doing. The spinner then
@@ -128,7 +130,6 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Question
     const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
     const detected = await LocalServer.detectUrl(ctx.cwd);
     probing.clear();
-
     const choice = await ctx.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
@@ -164,19 +165,16 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Question
               name: "server URL",
               message: "What is the URL of your Zitadel server?",
               placeholder: "https://zitadel.internal",
-              parse: (value): Parsed<string> => {
-                try {
-                  new URL(value);
-                  return {
-                    ok: true,
-                    value,
-                  };
-                } catch {
-                  return {
-                    ok: false,
-                    problem: "Must be a valid URL",
-                  };
-                }
+              parse: (value) => {
+                return URL.canParse(value)
+                  ? {
+                      ok: true,
+                      value,
+                    }
+                  : {
+                      ok: false,
+                      problem: "Must be a valid URL",
+                    };
               },
             })
           : choice,

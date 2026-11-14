@@ -1,8 +1,13 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { hostUnlessDefault } from "@/lib/server";
-
 import type { CommandResult } from "@/lib/oclif";
+import { hostUnlessDefault } from "@/lib/server";
+import type { Summary } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
+
+/**
+ * The line that says a directory already holds a setup.
+ */
+const ALREADY_SET_UP_TITLE = "Zitadel is already set up in this app";
 
 /**
  * What the step reads from what is known.
@@ -18,13 +23,19 @@ type Deps = Pick<SetupServices, "dryRun">;
  * Ends the run for an app already set up: it has nothing left to scaffold.
  */
 export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "alreadySetUp";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -34,7 +45,6 @@ export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, N
    * Whether the directory is set up.
    *
    * @param needs - What was settled before the first step.
-   * @param _services - What the command provides.
    * @returns Whether to end here.
    */
   when(needs: Needs): boolean {
@@ -52,32 +62,29 @@ export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, N
    */
   async run(needs: Needs): Promise<CommandResult> {
     const skippedHost = hostUnlessDefault(needs.preflight.server.value);
-    const alreadyTitle = this.deps.dryRun
-      ? "Zitadel is already set up in this app (dry run)"
-      : "Zitadel is already set up in this app";
-    const alreadySummary = {
-      title: alreadyTitle,
+    const title = this.deps.dryRun ? `${ALREADY_SET_UP_TITLE} (dry run)` : ALREADY_SET_UP_TITLE;
+    const summary: Summary = {
+      title,
       sections: [],
       lines: ["Nothing was changed."],
       ...(skippedHost === undefined ? {} : { ran: skippedHost }),
-      boxed: true as const,
+      boxed: true,
     };
     if (this.deps.dryRun) {
       return {
         status: "ok",
         data: {
-          title: alreadyTitle,
+          title,
           dry_run: true,
         },
-        summary: alreadySummary,
+        summary,
       };
     }
-
     return {
       status: "skipped",
       reason: "already-initialized",
-      data: { title: alreadyTitle },
-      summary: alreadySummary,
+      data: { title },
+      summary,
     };
   }
 }

@@ -1,10 +1,19 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { retryOptionsFromFlags, setupRetryFlags } from "@/cli/commands/setup/shared";
-
-import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
 import { ZitadelError } from "@/lib/errors";
+import { createOrca, inspectScaffoldTarget } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
+
+import {
+  type Fact,
+  retryOptionsFromFlags,
+  type SetupServices,
+  setupRetryFlags,
+} from "@/cli/commands/setup/shared";
+
+/**
+ * The framework a rerun is told to scaffold when the available ones include it.
+ */
+const PREFERRED_FRAMEWORK = "next";
 
 /**
  * What the step reads from what is known.
@@ -78,7 +87,7 @@ export class DetectFramework extends WizardStep<
    *   cannot be scaffolded into, or no framework was chosen.
    */
   async run(needs: Needs): Promise<Fact<"orca" | "found" | "scaffoldedFramework">> {
-    const flags = needs.flags;
+    const { flags } = needs;
     const orca = createOrca();
     const home = this.deps.env.HOME;
     const detecting = this.deps.ui.begin(
@@ -115,9 +124,7 @@ export class DetectFramework extends WizardStep<
             error.code,
             "Could not detect a supported app framework, and this directory is not empty",
             {
-              hint:
-                `${target.reason ?? "Directory is not empty."} ` +
-                "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
+              hint: `${target.reason ?? "Directory is not empty."} Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.`,
               details: {
                 cwd: this.deps.cwd,
                 entries: target.entries,
@@ -135,12 +142,11 @@ export class DetectFramework extends WizardStep<
           const choices: readonly string[] = orca.availableFrameworks().map((choice) => {
             return choice.id;
           });
-          const suggested = choices.includes("next") ? "next" : choices[0];
+          const suggested = choices.includes(PREFERRED_FRAMEWORK)
+            ? PREFERRED_FRAMEWORK
+            : choices[0];
           throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-            hint: (
-              "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-              `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
-            ).trimEnd(),
+            hint: `Setup asks which framework to scaffold only in a terminal. Without one, or with --json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`,
             nextCommands:
               this.deps.serverFlag === "local" && suggested
                 ? [
@@ -175,11 +181,10 @@ export class DetectFramework extends WizardStep<
           scaffoldedBesideFiles: !target.scaffoldable,
         };
       });
-    const scaffoldedFramework = found.detected === undefined;
     return {
       orca,
       found,
-      scaffoldedFramework,
+      scaffoldedFramework: found.detected === undefined,
     };
   }
 }

@@ -13,6 +13,14 @@ import { WizardStep } from "@/lib/wizard";
 export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with Zitadel setup";
 
 /**
+ * The author the commit carries where git can build no identity of its own.
+ */
+const FALLBACK_AUTHOR = {
+  name: "Zitadel Setup",
+  email: "setup@zitadel.local",
+} as const;
+
+/**
  * What the step reads from what is known.
  */
 type Needs = Fact<"flags">;
@@ -28,29 +36,38 @@ type Deps = Pick<SetupServices, "cwd" | "dryRun" | "ui">;
 export type InitialCommitOutcome = Readonly<
   /** There was no repository, so one was created and the project committed. */
   | {
+      /** What happened. */
       kind: "created";
+      /** The commit's id. */
       sha: string;
+      /** Whether git guessed the author from the machine. */
       guessedIdentity: boolean;
+      /** Whether git could build no author, so the commit carries the fallback one. */
       invented: boolean;
     }
   /** The project was already in a repository, and was committed into it. */
   | {
+      /** What happened. */
       kind: "committed";
+      /** The commit's id. */
       sha: string;
+      /** Whether git guessed the author from the machine. */
       guessedIdentity: boolean;
+      /** Whether git could build no author, so the commit carries the fallback one. */
       invented: boolean;
     }
   /** `--no-git`, or a dry run. */
   | {
+      /** What happened. */
       kind: "skipped";
     }
-  /**
-   * No commit: git is missing, or init/add/commit failed, or a secret would have been committed.
-   * `createdRepository` says whether setup ran `git init` before it failed.
-   */
+  /** No commit: git is missing, or init/add/commit failed, or a secret would have been committed. */
   | {
+      /** What happened. */
       kind: "unavailable";
+      /** Why there is no commit. */
       reason: string;
+      /** Whether setup ran `git init` before it failed. */
       createdRepository: boolean;
     }
 >;
@@ -65,13 +82,19 @@ export type InitialCommitOutcome = Readonly<
  * records no provenance, which is what setup did before.
  */
 export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "commit";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -110,7 +133,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
    * @returns What was done, never a failure.
    */
   async run(needs: Needs): Promise<Fact<"commit">> {
-    if (!needs.flags.git !== false) {
+    if (!needs.flags.git) {
       return {
         commit: {
           kind: "skipped",
@@ -134,10 +157,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
         return repository
           .commitAll(INITIAL_COMMIT_SUBJECT, {
             except: isSecretPath,
-            authorIfGitHasNone: {
-              name: "Zitadel Setup",
-              email: "setup@zitadel.local",
-            },
+            authorIfGitHasNone: FALLBACK_AUTHOR,
           })
           .then(
             (committed): InitialCommitOutcome => {
@@ -180,9 +200,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
       committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       if (outcome.invented) {
         reportWarning(
-          "git could build no author identity on this machine, so the commit was made as " +
-            "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
-            "git commit --amend --reset-author to put your own name on it.",
+          `git could build no author identity on this machine, so the commit was made as ${FALLBACK_AUTHOR.name} <${FALLBACK_AUTHOR.email}>. Set user.name and user.email, then run git commit --amend --reset-author to put your own name on it.`,
         );
       } else if (outcome.guessedIdentity) {
         reportWarning(

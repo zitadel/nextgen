@@ -1,12 +1,14 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { scaffoldOf } from "@/cli/commands/setup/shared";
-
-import type { FrameworkFacts } from "@/lib/orca";
-import { issuerFromPort } from "@/lib/orca";
-import { derivePosture } from "@/lib/orca/patchers/posture";
+import { type Fact, type SetupServices, scaffoldOf } from "@/cli/commands/setup/shared";
 import type { CreatedProject } from "@/lib/backend";
+import { type FrameworkFacts, issuerFromPort } from "@/lib/orca";
+import { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { WizardStep } from "@/lib/wizard";
+
+/**
+ * The renderer the widgets are drawn with when `--renderer` names none.
+ */
+const DEFAULT_RENDERER = "react";
 
 /**
  * What the step reads from what is known.
@@ -33,13 +35,19 @@ export class PlanConfiguration extends WizardStep<
   Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">,
   Needs
 > {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "plan";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -61,7 +69,7 @@ export class PlanConfiguration extends WizardStep<
   ): Promise<Fact<"issuer" | "rendererId" | "posture" | "patcher" | "patchContext" | "planned">> {
     const { answers, app, flags, orca, scaffoldedFramework } = needs;
     const issuer = issuerFromPort(answers.devPort);
-    const rendererId = flags.renderer ?? "react";
+    const rendererId = flags.renderer ?? DEFAULT_RENDERER;
     const posture = derivePosture(app.framework, scaffoldedFramework);
     return {
       issuer,

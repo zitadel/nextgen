@@ -1,11 +1,3 @@
-import type {
-  Fact,
-  PromptContext,
-  SetupAnswers,
-  SetupServices,
-  SsoDraft,
-} from "@/cli/commands/setup/shared";
-import { askCustomSettings } from "@/cli/commands/setup/shared";
 import {
   type ClientId,
   credentialVariables,
@@ -15,18 +7,19 @@ import {
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
-  type Parsed,
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  type Parsed,
   type ProviderName,
-  providerOf,
   type ProviderSelection,
+  providerOf,
   RESERVED_SLUGS,
   selectionName,
   validated,
 } from "@zitadel/config/idp";
 
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import {
   askConnectionEndpoints,
   callbackUriFor,
@@ -36,13 +29,21 @@ import {
 import { issuerFromPort } from "@/lib/orca";
 import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
-import { isDevelopmentBuild } from "@/lib/build-channel";
 import { WizardStep } from "@/lib/wizard";
+
+import {
+  askCustomSettings,
+  type Fact,
+  type PromptContext,
+  type SetupAnswers,
+  type SetupServices,
+  type SsoDraft,
+} from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
  */
-type QuestionNeeds = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
+type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
 
 /**
  * What the step is given by the command.
@@ -74,7 +75,7 @@ type Deps = Pick<
  * — is still asked for it here, the way `--preset` skips its own question and
  * no other. A flagged provider cannot be dropped: the command line asked for it.
  */
-export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers">, QuestionNeeds> {
+export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers">, Needs> {
   /**
    * The step's name, which a wizard refuses to hold twice.
    */
@@ -99,7 +100,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with this question's settled.
    */
-  async run(needs: QuestionNeeds): Promise<Fact<"answers">> {
+  async run(needs: Needs): Promise<Fact<"answers">> {
     const { app, flags, orca, scaffoldedFramework } = needs;
     if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
@@ -160,7 +161,6 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
         sso: [],
       };
     }
-
     return {
       ...answers,
       sso: await this.collect(chosen, answers, ctx),
@@ -256,7 +256,6 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       "Redirect URI:",
       callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
     ]);
-
     const clientId = await ctx.ask.text({
       name: "client id",
       message:
@@ -325,7 +324,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    * @returns The providers chosen.
    */
   private async chooseProviders(ask: Questions): Promise<readonly ProviderName[]> {
-    const chosen: readonly ProviderName[] = await ask.multiselect({
+    const chosen = await ask.multiselect<ProviderName>({
       name: "external sign-in providers",
       message:
         "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
@@ -333,12 +332,12 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       options: [
         ...IDP_PROVIDERS.map((provider) => {
           return {
-            value: provider as ProviderName,
+            value: provider,
             label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
           };
         }),
         {
-          value: CUSTOM_PROVIDER as ProviderName,
+          value: CUSTOM_PROVIDER,
           label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
         },
       ],

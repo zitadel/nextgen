@@ -1,10 +1,16 @@
-import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import {
-  pickWrittenFile,
-  relativeDisplayPath as relativeDisplay,
-} from "@/cli/commands/setup/shared";
+import { basename, join } from "node:path";
+
+import semver from "semver";
+
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { credentialVariables, providerOf, selectionName } from "@zitadel/config/idp";
+
+import {
+  type Fact,
+  pickWrittenFile,
+  relativeDisplayPath as relativeDisplay,
+  type SetupServices,
+} from "@/cli/commands/setup/shared";
 import {
   claimAction,
   claimBoxAction,
@@ -12,26 +18,21 @@ import {
   claimState,
   claimWindowDeadline,
 } from "@/lib/claim-state";
+import { pathExists } from "@/lib/fs";
 import { callbackUriFor, republishCommands } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
+import { readPackageJson } from "@/lib/npm";
+import type { CommandResult } from "@/lib/oclif";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { painted } from "@/lib/oclif/rendering";
+import { detectors } from "@/lib/orca/detectors";
+import { detectPackageManager } from "@/lib/package-manager";
 import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import type { Summary } from "@/lib/ui";
-import { type Fact as SummaryFact, section } from "@/lib/ui";
-import { CONFIG_DIRECTORIES, PasswordPolicy } from "@/lib/zitadel";
-
-import type { CommandResult } from "@/lib/oclif";
+import { type Fact as SummaryFact, section, type Summary } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
-import { basename, join } from "node:path";
-import semver from "semver";
-
-import { pathExists } from "@/lib/fs";
-import { readPackageJson } from "@/lib/npm";
-import { detectors } from "@/lib/orca/detectors";
-import { detectPackageManager } from "@/lib/package-manager";
+import { CONFIG_DIRECTORIES, PasswordPolicy } from "@/lib/zitadel";
 
 /**
  * The line a finished setup closes on.
@@ -126,13 +127,19 @@ type Deps = Pick<
  * and the envelope.
  */
 export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandResult }>, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "result";
+
+  /**
+   * What the command gives the step.
+   */
+  private readonly deps: Deps;
 
   /**
    * @param deps - What the command gives the step.
    */
-  private readonly deps: Deps;
-
   constructor(deps: Deps) {
     super();
     this.deps = deps;
@@ -274,7 +281,6 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             boxActions: [],
             commands: [],
           };
-
     const deadline = this.deps.dryRun ? undefined : claimWindowDeadline(project.created_at);
     const claimNudge =
       !ownedByLocalAdmin &&
@@ -579,7 +585,6 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   ]),
             ],
           })}`;
-
     return {
       answer: {
         status: "ok",
