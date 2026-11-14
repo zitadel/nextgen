@@ -1,8 +1,7 @@
 import { ZitadelError } from "@/lib/errors";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { promptContext } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -51,49 +50,43 @@ export class ConfirmFramework extends WizardStep<"frameworkConfirm", Fact<"answe
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
+   * Ask whether to set up Zitadel in the detected app, or leave the answers as they are when
+   * nothing can be asked.
    *
    * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * Ask whether to set up Zitadel in the detected app.
-   *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
    * @returns The answers, unchanged.
    * @throws {@link ZitadelError} When the developer declines.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.frameworkChosen) {
-      return answers;
-    }
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers, app, flags, orca, scaffoldedFramework } = needs;
     if (
-      (await ctx.ask.yesNo({
+      this.deps.nonInteractive ||
+      this.deps.dryRun ||
+      scaffoldedFramework ||
+      flags.framework !== undefined
+    ) {
+      return {
+        answers,
+      };
+    }
+    const displayName = orca.displayName(app.framework);
+    if (
+      (await this.deps.ask.yesNo({
         name: "confirm the framework",
-        message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
+        message: `Would you like to set up Zitadel in this ${displayName} app?`,
         initialValue: true,
       })) === false
     ) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Setup stopped before changing this ${ctx.framework.displayName} app`,
+        `Setup stopped before changing this ${displayName} app`,
         {
           hint: "To set up another app, run setup in its directory, or pass --cwd with that directory.",
         },
       );
     }
-    return answers;
+    return {
+      answers,
+    };
   }
 }

@@ -50,7 +50,7 @@ import {
   selectionFromFlags,
 } from "@/lib/idp";
 import type { GlobalOptions } from "@/lib/oclif/types";
-import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
+import type { FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { isLocalRuntimePath } from "@/lib/secret-paths";
@@ -59,7 +59,7 @@ import { path as stylePath } from "@/lib/style";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { tryCatch } from "@/lib/try-catch";
-import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
+import type { Questions, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
   Connection,
@@ -82,7 +82,6 @@ import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
 import { z } from "zod";
 import { type Refused, whole } from "@/lib/oclif/flags";
-import { isDevelopmentBuild } from "@/lib/build-channel";
 
 /**
  * The name of the README setup writes into each configuration directory.
@@ -584,128 +583,6 @@ export type SetupServices = Readonly<{
    * @param server - The server to pin them to.
    */
   recoverAt: (server: string) => void;
-}>;
-
-/**
- * Read-only facts a question may need.
- */
-export type PromptContext = Readonly<{
-  /**
-   * How a prompt asks its question: the typed questions every other command
-   * asks through, so every question the wizard asks behaves like every other
-   * question the CLI asks. It cannot ask a destructive `confirm`, so
-   * setup's `--force`, which means "overwrite files", never answers one of its
-   * questions.
-   */
-  ask: Questions;
-
-  /**
-   * Something the person must read or go and do outside the terminal, such as
-   * registering an OAuth application, as the one boxed thing a prompt draws.
-   * It goes through the UI package for the same reason `ask` does: a prompt
-   * that drew its own box would draw one that matches nothing else.
-   */
-  note: (title: string, lines: readonly string[]) => void;
-
-  /**
-   * One line in the chain that is not a question, such as what happens now
-   * that a provider was skipped.
-   */
-  say: (text: string) => void;
-
-  /**
-   * A spinner for a probe that takes long enough to need saying so, stopped or
-   * cleared by the prompt that started it. It draws nothing when nobody is
-   * watching, so a prompt never tests for a terminal.
-   */
-  spinner: (label: string, options?: Readonly<{ guide?: boolean }>) => Spinner;
-
-  /**
-   * The framework of the app setup integrates: its id and the name a question
-   * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
-   * asks, because setup creates it once it has every answer.
-   */
-  framework: FrameworkChoice;
-
-  /**
-   * A command for this app's project, for a question that names what to run
-   * once setup is done, such as adding a skipped provider. It carries the
-   * selector setup's own recovery commands carry, so it reaches the project
-   * setup creates and not one the shell's environment names.
-   */
-  suggest: Suggest;
-
-  /**
-   * The app directory setup runs in. `ChooseServer` reads the local runtime
-   * metadata (`.zitadel/local/runtime.json`) under it to detect a managed local
-   * server started here.
-   */
-  cwd: string;
-
-  /**
-   * Whether the developer already named the framework: picked it to scaffold
-   * an empty directory, or passed `--framework`. Then `ConfirmFramework` has
-   * nothing left to confirm and skips itself.
-   */
-  frameworkChosen?: boolean;
-
-  /**
-   * The raw `--server` flag value as the user passed it, or `undefined` when
-   * not provided.
-   *
-   * @remarks
-   * Prompts use this to skip themselves when the flag already pinned the answer
-   * (a step returns unchanged answers in that case). It is distinct from
-   * `answers.server`, which the base command's server resolution always
-   * populates, so that alone cannot tell "user passed a flag" from "we fell
-   * back to the cloud default".
-   */
-  serverFlag?: string;
-
-  /**
-   * Whether `--dev-port` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseDevPort` skips itself so an interactive answer
-   * cannot override a scripted or flagged port.
-   */
-  devPortFromFlag?: boolean;
-
-  /**
-   * Whether `--preset` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseSignIn` skips itself.
-   */
-  presetFromFlag?: boolean;
-
-  /**
-   * Whether `--use-case` was passed explicitly. When set, the flag is
-   * authoritative and `ChooseUseCase` skips itself.
-   */
-  useCaseFromFlag?: boolean;
-
-  /**
-   * Whether `--sso` was passed explicitly. When set, the flag answers the
-   * provider question and `ChooseSocialSignIn` does not ask it.
-   *
-   * @remarks
-   * The credential questions are a separate matter: the prompt still asks for
-   * a client id or secret the invocation did not supply, because a connection
-   * missing either is one that cannot work. Only a `--non-interactive` run has
-   * nobody to ask, and that one is refused rather than left incomplete.
-   */
-  ssoFromFlag?: boolean;
-
-  /**
-   * Whether `--password-min-length` was passed explicitly. When set, the flag
-   * is authoritative and `SetPasswordPolicy` skips itself.
-   */
-  passwordMinLengthFromFlag?: boolean;
-
-  /**
-   * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
-   * development run asks where a provider's endpoints are; see
-   * `ChooseSocialSignIn`. Passed in rather than read from the bundle so a test
-   * can drive both answers.
-   */
-  developmentBuild?: boolean;
 }>;
 
 /**
@@ -1606,43 +1483,3 @@ export const PORT = {
     max: MAX_PORT,
   },
 } as const satisfies Refused<number>;
-
-/**
- * What a question is given, from what is known and what the command gives its step.
- *
- * @param needs - The flags, the app and the framework the run settled on.
- * @param deps - The questions, the project's directory, the suggestion builder and the screen.
- * @returns The context the question asks with.
- */
-export function promptContext(
-  needs: Fact<"flags" | "orca" | "app" | "scaffoldedFramework">,
-  deps: Pick<SetupServices, "ask" | "cwd" | "serverFlag" | "suggest" | "ui">,
-): PromptContext {
-  const { app, flags, orca, scaffoldedFramework } = needs;
-  return {
-    ask: deps.ask,
-    note: (title, lines) => {
-      deps.ui.note(title, lines);
-    },
-    say: (text) => {
-      deps.ui.say(text);
-    },
-    spinner: (label, options) => {
-      return deps.ui.spinner(label, options);
-    },
-    framework: {
-      id: app.framework,
-      displayName: orca.displayName(app.framework),
-    },
-    suggest: deps.suggest,
-    cwd: deps.cwd,
-    frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-    serverFlag: deps.serverFlag,
-    devPortFromFlag: flags.devPort !== undefined,
-    presetFromFlag: flags.preset !== undefined,
-    useCaseFromFlag: flags.useCase !== undefined,
-    ssoFromFlag: flags.sso !== undefined,
-    passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-    developmentBuild: isDevelopmentBuild(),
-  };
-}

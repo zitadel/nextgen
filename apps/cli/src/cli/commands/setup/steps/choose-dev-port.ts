@@ -1,8 +1,8 @@
 import { LocalServer } from "@/lib/local-server/server";
 import { WizardStep } from "@/lib/wizard";
 
-import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { PORT, promptContext } from "@/cli/commands/setup/shared";
+import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import { PORT } from "@/cli/commands/setup/shared";
 
 /**
  * What the step reads from what is known.
@@ -52,60 +52,53 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * Ask which port the app runs on, when the detected one is taken.
+   * Ask which port the app runs on, when the detected one is taken, or leave the answers as they
+   * are when nothing can be asked.
    *
    * @remarks
-   * `--dev-port <n>` is authoritative: the prompt is skipped so an interactive answer cannot
+   * `--dev-port <n>` is authoritative: the question is skipped so an interactive answer cannot
    * override the explicit flag, which the command already folded into `answers.devPort`.
    *
    * With the next ones all taken too, the detected port is still the best guess.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the question needs to ask.
+   * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the port settled.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.devPortFromFlag || (await LocalServer.isPortFree(answers.devPort))) {
-      return answers;
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers, flags } = needs;
+    if (
+      this.deps.nonInteractive ||
+      this.deps.dryRun ||
+      flags.devPort !== undefined ||
+      (await LocalServer.isPortFree(answers.devPort))
+    ) {
+      return {
+        answers,
+      };
     }
     const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
     return {
-      ...answers,
-      devPort: await ctx.ask.text({
-        name: "dev server port",
-        message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
-        placeholder: suggested,
-        initialValue: suggested,
-        parse: (value) => {
-          const parsed = PORT.schema.safeParse(value);
-          return parsed.success
-            ? {
-                ok: true,
-                value: parsed.data,
-              }
-            : {
-                ok: false,
-                problem: "Must be a port number",
-              };
-        },
-      }),
+      answers: {
+        ...answers,
+        devPort: await this.deps.ask.text({
+          name: "dev server port",
+          message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
+          placeholder: suggested,
+          initialValue: suggested,
+          parse: (value) => {
+            const parsed = PORT.schema.safeParse(value);
+            return parsed.success
+              ? {
+                  ok: true,
+                  value: parsed.data,
+                }
+              : {
+                  ok: false,
+                  problem: "Must be a port number",
+                };
+          },
+        }),
+      },
     };
   }
 }

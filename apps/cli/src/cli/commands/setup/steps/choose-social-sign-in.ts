@@ -20,22 +20,20 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
+import { isDevelopmentBuild } from "@/lib/build-channel";
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
-import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 
 import {
   askCustomSettings,
   type Fact,
-  type PromptContext,
   refuseUnmappableClaims,
   type SetupAnswers,
   type SetupServices,
   type SsoDraft,
   ssoEnableFlags,
-  promptContext,
 } from "@/cli/commands/setup/shared";
 
 /**
@@ -96,49 +94,35 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
   }
 
   /**
-   * Ask the question, or leave the answers as they are when nothing can be asked.
-   *
-   * @param needs - The flags, the app and the answers so far.
-   * @returns The answers, with this question's settled.
-   */
-  async run(needs: Needs): Promise<Fact<"answers">> {
-    if (this.deps.nonInteractive || this.deps.dryRun) {
-      return {
-        answers: needs.answers,
-      };
-    }
-    return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
-    };
-  }
-
-  /**
-   * `--sso` names the set; the wizard asks for it only when no flag did.
+   * Ask which providers to add and for their credentials, or leave the answers as they are when
+   * nothing can be asked. `--sso` names the set; the wizard asks for it only when no flag did.
    *
    * @remarks
    * Asked per provider rather than once: each registers its own OAuth application, so each has its
    * own console, its own client id and its own secret. A flagged run still gets asked for whatever
    * the flags left out.
    *
-   * @param answers - The answers so far.
-   * @param ctx - What the questions may need to know.
+   * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the chosen providers and their credentials.
    */
-  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    const chosen = ctx.ssoFromFlag
-      ? answers.sso.map((draft) => {
-          return selectionName(draft.selection);
-        })
-      : await this.chooseProviders(ctx.ask);
-    if (chosen.length === 0) {
+  async run(needs: Needs): Promise<Fact<"answers">> {
+    const { answers, flags } = needs;
+    if (this.deps.nonInteractive || this.deps.dryRun) {
       return {
-        ...answers,
-        sso: [],
+        answers,
       };
     }
+    const chosen =
+      flags.sso === undefined
+        ? await this.chooseProviders()
+        : answers.sso.map((draft) => {
+            return selectionName(draft.selection);
+          });
     return {
-      ...answers,
-      sso: await this.collect(chosen, answers, ctx),
+      answers: {
+        ...answers,
+        sso: chosen.length === 0 ? [] : await this.collect(chosen, answers),
+      },
     };
   }
 
@@ -175,13 +159,11 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    *
    * @param names - The providers still to ask about.
    * @param answers - The answers so far.
-   * @param ctx - What the questions may need to know.
    * @returns The providers with their credentials, skipped ones left out.
    */
   private async collect(
     names: readonly ProviderName[],
     answers: SetupAnswers,
-    ctx: PromptContext,
   ): Promise<readonly SsoDraft[]> {
     const [name, ...rest] = names;
     if (name === undefined) {
@@ -195,7 +177,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       (name === CUSTOM_PROVIDER
         ? {
             kind: "custom",
-            connection: await askCustomSettings({}, ctx.ask).then((values) => {
+            connection: await askCustomSettings({}, this.deps.ask).then((values) => {
               return {
                 slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
                 displayName: validated(parseDisplayName(values.displayName)),
@@ -220,9 +202,9 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       selection.kind === "custom"
         ? undefined
         : (flagged?.endpoints ??
-          (ctx.developmentBuild === true
+          (isDevelopmentBuild()
             ? {
-                issuer: await ctx.ask.text({
+                issuer: await this.deps.ask.text({
                   name: "issuer",
                   message: "What is the issuer URL of the provider?",
                   parse: parseIssuer,
@@ -230,7 +212,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
                 }),
               }
             : undefined));
-    ctx.note(`${entry.displayName} sign-in`, [
+    this.deps.ui.note(`${entry.displayName} sign-in`, [
       ...(endpoints?.issuer === undefined
         ? [
             entry.consoleUrl === undefined
@@ -243,7 +225,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       "Redirect URI:",
       callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
     ]);
-    const clientId = await ctx.ask.text({
+    const clientId = await this.deps.ask.text({
       name: "client id",
       message:
         flagged === undefined
@@ -263,20 +245,20 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       given: flagged?.credentials.clientId,
     });
     if (clientId === undefined) {
-      ctx.say(
+      this.deps.ui.say(
         [
           `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-          ctx.suggest({
+          this.deps.suggest({
             id: "auth-method:sso:enable",
             flags: ssoEnableFlags(selection),
           }),
         ].join("\n"),
       );
-      return this.collect(rest, answers, ctx);
+      return this.collect(rest, answers);
     }
     const secret =
       flagged?.credentials.secret ??
-      (await ctx.ask.secret({
+      (await this.deps.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(entry.slug).clientSecret}.`,
         parse: parseClientSecret,
@@ -291,7 +273,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
         endpoints,
         claimRequest: flagged?.claimRequest,
       },
-      ...(await this.collect(rest, answers, ctx)),
+      ...(await this.collect(rest, answers)),
     ];
   }
 
@@ -308,11 +290,10 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
    * Nothing is preselected, and declining costs nothing: `auth-method sso enable`
    * performs this journey on an existing Project later.
    *
-   * @param ask - The questions.
    * @returns The providers chosen.
    */
-  private async chooseProviders(ask: Questions): Promise<readonly ProviderName[]> {
-    const chosen = await ask.multiselect<ProviderName>({
+  private async chooseProviders(): Promise<readonly ProviderName[]> {
+    const chosen = await this.deps.ask.multiselect<ProviderName>({
       name: "external sign-in providers",
       message:
         "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
@@ -333,11 +314,11 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
     if (chosen.length > 0) {
       return chosen;
     }
-    const continueWithout = await ask.yesNo({
+    const continueWithout = await this.deps.ask.yesNo({
       name: "continue without SSO",
       message: "Would you like to continue without setting up SSO?",
       initialValue: false,
     });
-    return continueWithout ? [] : this.chooseProviders(ask);
+    return continueWithout ? [] : this.chooseProviders();
   }
 }
