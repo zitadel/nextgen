@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
@@ -18,11 +17,12 @@ import { Members, fetchMembers } from "@/features/teams/components/team-members"
  * as on user detail. A team becomes a sidebar scope once it owns configuration
  * (Console ADR 0005).
  *
- * The header card carries `TEAM ID` and `CREATED`. The design draws a third cell,
- * `PRIMARY DOMAIN`, which is deliberately not built: a domain that discovers and
- * claims a team is security-relevant, so it needs its own model — verification,
- * and more than one domain per team — rather than a string on `team-response`.
- * That model is not defined yet, so the cell is left out rather than shown empty.
+ * The header's identity line carries `Team ID` and `Created`. The design draws
+ * a third value, `Primary Domain`, which is deliberately not built: a domain
+ * that discovers and claims a team is security-relevant, so it needs its own model (verification,
+ * and more than one domain per team) rather than a string on `team-response`.
+ * That model is not defined yet, so the value is left out rather than shown
+ * empty.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project", resource: "team" },
@@ -51,13 +51,10 @@ function TeamDetail() {
         icon={Box}
         title={team.name}
         status={<StatusBadge status={team.status} />}
-        meta={
-          <>
-            <MetaValue label="Team ID" value={team.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(team.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Team ID", value: team.id, copyable: true },
+          { label: "Created", value: formatDate(team.created_at) },
+        ]}
       />
 
       <Tabs defaultValue="overview" className={`${DETAIL_BODY} ${DETAIL_STACK}`}>

@@ -1,7 +1,10 @@
 /** A screen's title: the 24/24 display face. */
 export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
 
-/** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
+/**
+ * The row a list, settings or System screen's title sits in (`docs/styling.md`,
+ * "Page wrapper"). A detail screen's `DetailHeader` has its own 24px title row.
+ */
 export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
 
 /**

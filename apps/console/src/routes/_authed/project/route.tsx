@@ -2,7 +2,6 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Boxes } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { formatDate } from "@/lib/date";
@@ -24,12 +23,13 @@ import { projectScopeDeps, requireProjectScope } from "@/features/projects/proje
  * that project selected, so a link to one project's page still lands on it,
  * and the projects list's row menu opens it as `View project`.
  *
- * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
- * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
+ * The header's identity line carries `Project ID` and `Created`. The design
+ * draws a third value, `Issuer` (the project's issuer origin), but nothing
+ * carries it:
  * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
- * domain layer. The cell is left out rather than shown empty, and returns as one
- * more `MetaValue` when the field lands.
+ * domain layer. The value is left out rather than shown empty, and returns as one
+ * more `meta` item when the field lands.
  */
 export const Route = createFileRoute("/_authed/project")({
   loaderDeps: projectScopeDeps,
@@ -47,13 +47,10 @@ function ProjectSettingsLayout() {
       <DetailHeader
         icon={Boxes}
         title={project.name}
-        meta={
-          <>
-            <MetaValue label="Project ID" value={project.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(project.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Project ID", value: project.id, copyable: true },
+          { label: "Created", value: formatDate(project.created_at) },
+        ]}
       />
       <div className={DETAIL_BODY}>
         <Outlet />

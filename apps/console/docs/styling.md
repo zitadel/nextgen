@@ -171,7 +171,7 @@ own. Do not add a per-screen wrapper with its own padding.
 | Page top | 20px at `lg`, 16px below |
 | Page gutter | 16px |
 | Page bottom | 32px |
-| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
+| Title row | 36px, title centred: `PAGE_TITLE_ROW` in `typography.ts`, used by lists, settings and System; a detail screen's `DetailHeader` has its own 24px title row |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
 | Beside a sheet | `besideSheet`: while a sheet that is not modal stands open (Events' event drawer), the page ends a gutter before it from `xl`; narrower, the sheet covers the page's right. Never let page content sit under an open non-modal sheet at `xl` |
 
@@ -198,7 +198,7 @@ its card below 576px rather than squeezing the cells.
 | --- | --- |
 | Page | `Page` — 16px gutter, the same inset as the table; 20px top at `lg` |
 | Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
-| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`) — every screen's title sits on this line |
+| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`), as settings and System; detail screens use `DetailHeader` |
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
@@ -276,40 +276,43 @@ row and cards 16px apart (`DETAIL_STACK`).
   card puts its values on the same 218px rail, and a label beside a form
   control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
   responsive `FieldGroup`) so the control starts there too.
-- User schemas head the same body with `DetailTitle` instead of
-  `DetailHeader`: the title over one 12/16 line with the id, its copy button
-  and the created date, no icon tile and no header card. The line stacks under
-  `sm`.
 
 Settings (Profile) is a different composition: a bare title over one card of
 labelled rows, in a centred column `--zl-container-settings` wide. Compose
 `Page` + `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE`
 heading with no header gutter, then `SettingsCard`
 (`src/components/settings-card.tsx`) holding `Field` rows: 24px inset, 20px
-block, 16px between rows. No icon tile and no header card: a settings screen is
-not a resource with an id.
+block, 16px between rows. No icon tile and no identity line: a settings screen
+is not a resource with an id.
 
-`DetailHeader` carries the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date, and an optional `action` (a release's menu)
-after the card. The identity-line header carries the same two values in one
-line instead.
+`DetailHeader` is the title row (a resource's icon tile, carrying the glyph of
+its sidebar entry, the title, a status beside it) over one identity line: the `meta`
+items, each value after its muted label, the id `copyable` and cut in the
+middle, a rule between items. A `labelHidden` item (a user's email) stands
+alone in the foreground. A screen whose list is not a sidebar entry (an
+identity provider, listed in a tab of Authentication) takes a `parent` link to
+that list, 8px over the title. The line stacks under `sm`. An `action` (a
+release's menu) sits at the right, beside the title and the line together.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
 | Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
-| Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
-| Header card   | 20px inset, 14px block, values centred on the rule     |
-| Body          | 24px under the header row; 16px between its parts      |
+| Parent link   | 14/20 muted, 8px over the title row; only where the list is not in the sidebar |
+| Title row     | 24px icon tile (`ICON_PLATE`) on a resource, 8px to a 24/24 display-face title, status 8px after |
+| Identity line | 16px under the title row; 12/16, value 4px after its label, a 1px by 16px rule with 8px either side |
+| Body          | 36px under the identity line; 16px between its parts   |
 | Body card     | 24px inset, 20px block, 16px from title to rule to content; the 1px stroke is drawn inside the edge (`Card`'s inset outline), as the design draws it |
 | Labelled row  | 218px label rail from `sm`, stacked below; 20px line, 4px block; 16px either side of a zero-height rule between rows |
 
-The title's icon is the glyph the resource's sidebar entry carries, at stroke
-1.5. Tabs are the body's first element when a resource has more than one
-section (Users: Overview / Authentication); a single-section resource renders
-its cards directly. A new resource's detail screen composes this shell rather
-than measuring its own frame.
+Only resources (projects, teams, users, releases) carry the icon tile, the
+glyph their sidebar entry carries at stroke 1.5; configuration (user schemas,
+login flows, identity providers) has none. A value with no data behind it is
+left out of the identity line rather than shown empty. Tabs are the body's
+first element when a resource has more than one section (Users: Overview /
+Authentication); a single-section resource renders its cards directly. A new
+resource's detail screen composes this shell rather than measuring its own
+frame.
 
 ## Traps that have already cost time
 
