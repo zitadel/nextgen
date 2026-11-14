@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { compare } from "./order";
 import { CHECKS, exemptionsFor, refusalsFor } from "./checks";
-import type { Credentials } from "./credentials";
+import type { Credential, Credentials } from "./credentials";
 import type { Accounting, Failure } from "./report";
 import type { SchemathesisInput, SchemathesisRun } from "./schemathesis";
 import { FAMILIES, type Family, type OpenApiSpec } from "./spec";
@@ -37,8 +38,33 @@ const STATEFUL_PHASES = ["stateful"];
 /** A family with this many operations or more is split. */
 const SHARD_FROM = 30;
 
-/** How many slices a big family is split into. */
-const SHARDS = Number(process.env.API_CONTRACT_SHARDS ?? 4);
+/**
+ * How many slices a big family is split into: `API_CONTRACT_SHARDS`, else 4,
+ * never more than the cores there are (each container is about one core) and
+ * never less than 1.
+ */
+const SHARDS = Math.max(
+  1,
+  Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || Math.min(4, availableParallelism()),
+);
+
+/**
+ * Waits for every promise, then throws the first failure. `Promise.all` would
+ * throw at once and let the caller tear the instance down under runs that are
+ * still going.
+ */
+async function allSettled<T>(promises: readonly Promise<T>[]): Promise<T[]> {
+  const settled = await Promise.allSettled(promises);
+  const failed = settled.find((result): result is PromiseRejectedResult => {
+    return result.status === "rejected";
+  });
+  if (failed) {
+    throw failed.reason;
+  }
+  return settled.map((result) => {
+    return (result as PromiseFulfilledResult<T>).value;
+  });
+}
 
 function sum(
   parts: readonly { run: SchemathesisRun }[],
@@ -94,9 +120,17 @@ export class Lane {
    * family are the ones no other family calls.
    */
   async run(): Promise<FamilyRun[]> {
-    const runs = await Promise.all(
+    // Credentials are minted one at a time: two sessions seeded at once would
+    // share the instance's seeding helper.
+    const credentials = new Map<Family, Credential>();
+    for (const family of FAMILIES) {
+      if (this.input.spec.operationsOf(family).length > 0) {
+        credentials.set(family, await this.input.credentials.forFamily(family));
+      }
+    }
+    const runs = await allSettled(
       FAMILIES.map((family) => {
-        return this.runFamily(family);
+        return this.runFamily(family, credentials.get(family));
       }),
     );
     return runs.filter((run): run is FamilyRun => {
@@ -104,14 +138,16 @@ export class Lane {
     });
   }
 
-  private async runFamily(family: Family): Promise<FamilyRun | undefined> {
+  private async runFamily(
+    family: Family,
+    credential: Credential | undefined,
+  ): Promise<FamilyRun | undefined> {
     const operations = this.input.spec.operationsOf(family);
-    if (operations.length === 0) {
+    if (operations.length === 0 || credential === undefined) {
       return undefined;
     }
     this.input.log(`${family}: ${String(operations.length)} operations`);
     const started = Date.now();
-    const credential = await this.input.credentials.forFamily(family);
     const ids = operations.map((operation) => {
       return operation.id;
     });
@@ -138,7 +174,7 @@ export class Lane {
             }),
             { name: "stateful", operationIds: ids, phases: STATEFUL_PHASES },
           ];
-    const runs = await Promise.all(
+    const runs = await allSettled(
       parts.map(async (part) => {
         const run = await this.input.runner.run({
           ...shared,
