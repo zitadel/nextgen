@@ -200,6 +200,11 @@ export type EnableServices = Readonly<{
   source: string;
 
   /**
+   * Stops the run when the person interrupts it.
+   */
+  signal: AbortSignal;
+
+  /**
    * The project's directory.
    */
   cwd: string;

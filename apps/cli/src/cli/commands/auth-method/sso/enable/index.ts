@@ -204,6 +204,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(new BuildChange())
         .step(
           new PublishCredentials({
+            signal: this.signal,
             source: this.meta.source,
           }),
         )
