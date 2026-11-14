@@ -28,7 +28,7 @@ env:
   # re-test every entry ahead of it, which its own group tests. A dispatch
   # and the nightly run compare with the repository's first commit, so they
   # run every task.
-  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || '4f5f35d2ed692a2de6966727d831a57757f7757d' }}
+  TURBO_SCM_BASE: 4f5f35d2ed692a2de6966727d831a57757f7757d
   # Suppress CLI telemetry for every step (https://consoledonottrack.com).
   DO_NOT_TRACK: "1"
   TURBO_TELEMETRY_DISABLED: "1"
@@ -48,10 +48,9 @@ env:
   # the ranges the pinned framework CLIs write as they stood that day, so a
   # release within them that breaks setup shows here first, not in a pull
   # request that happens to rerun the journey.
-  TURBO_FORCE: ${{ github.event_name == 'schedule' }}
+  TURBO_FORCE: "true"
   # The same run checks the conformance fixtures whose framework generator
   # its pin does not fix (`generatorPinned: false`, conformance/README.md).
-  API_CONTRACT_SHARDS: "8"
   CONFORMANCE_UNPINNED: ${{ github.event_name == 'schedule' }}
 
 jobs:
