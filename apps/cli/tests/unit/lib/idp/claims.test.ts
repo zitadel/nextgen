@@ -279,6 +279,21 @@ describe("parseScopeList", () => {
   it("reads nothing as no scopes", () => {
     expect(value(parseScopeList(""))).toEqual([]);
   });
+
+  it.each([
+    ['bad"scope', "a quote"],
+    ["back\\slash", "a backslash"],
+    ["café", "a character outside ASCII"],
+  ])("refuses %s, which has %s", (scope, _what) => {
+    expect(problem(parseScopeList(`phone ${scope}`))).toContain(`${scope} is not a valid scope`);
+  });
+
+  it("accepts the characters the grammar allows", () => {
+    expect(value(parseScopeList("urn:acme/read.all https://api.acme.example/auth"))).toEqual([
+      "urn:acme/read.all",
+      "https://api.acme.example/auth",
+    ]);
+  });
 });
 
 describe("standard claims", () => {
