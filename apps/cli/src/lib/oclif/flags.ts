@@ -32,7 +32,9 @@ export type Refused<T> = Readonly<{
   values?: Placeholders;
 }>;
 
-/** The names {@link read} fills in every flag's and argument's refusal. */
+/**
+ * The names {@link read} fills in every flag's and argument's refusal.
+ */
 type Parsed = "value" | "input" | "problem";
 
 /**
@@ -300,39 +302,12 @@ export type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = 
 }>;
 
 /**
- * The schema of a trimmed, non-blank value a parser accepts.
+ * The `parse` of a flag that refuses a blank value, then whatever its parser
+ * refuses, and yields what `pick` makes of the rest.
  *
  * @remarks
  * The parser's `problem` becomes the schema's message, so a flag and the prompt
  * that asks the same thing cannot word a refusal differently.
- *
- * @typeParam T - What the parser makes of the text.
- * @typeParam V - What the schema yields.
- * @param parse - The parser.
- * @param pick - What the schema yields, given the trimmed text and what the
- *   parser made of it.
- * @returns The schema.
- */
-function acceptedBy<T, V>(
-  parse: (value: string) => Outcome<T>,
-  pick: (text: string, made: T) => V,
-) {
-  return filled.transform((text, ctx) => {
-    const outcome = parse(text);
-    if (!outcome.ok) {
-      ctx.addIssue({
-        code: "custom",
-        message: outcome.problem,
-      });
-      return z.NEVER;
-    }
-    return pick(text, outcome.value);
-  });
-}
-
-/**
- * The `parse` of a flag that refuses a blank value, then whatever its parser
- * refuses, and yields what `pick` makes of the rest.
  *
  * @typeParam T - What the parser makes of the text.
  * @typeParam V - What the flag yields.
@@ -350,7 +325,19 @@ function parsing<T, V>(
 ): Parse<V> {
   const refusing: ParseRefusal = refusal ?? REFUSED_SETTING;
   const declared: Refused<V> = {
-    schema: acceptedBy(parse, pick),
+    schema: filled.transform((text, ctx) => {
+      const outcome = parse(text);
+      if (!outcome.ok) {
+        ctx.addIssue({
+          code: "custom",
+          message: outcome.problem,
+        });
+
+        return z.NEVER;
+      }
+
+      return pick(text, outcome.value);
+    }),
     refusal: refusing,
   };
   const value = reads(declared);
@@ -427,7 +414,9 @@ export function accepts<
   );
 }
 
-/** A string flag whose value must not be blank. See {@link filled}. */
+/**
+ * A string flag whose value must not be blank. See {@link filled}.
+ */
 export const nonBlankString = Flags.custom<string>({
   parse: reads({
     schema: filled,
@@ -441,7 +430,9 @@ export const nonBlankString = Flags.custom<string>({
   }),
 });
 
-/** A positional argument whose value must not be blank. See {@link filled}. */
+/**
+ * A positional argument whose value must not be blank. See {@link filled}.
+ */
 export const nonBlankArg = Args.custom<string>({
   parse: taken({
     schema: filled,
@@ -455,7 +446,9 @@ export const nonBlankArg = Args.custom<string>({
   }),
 });
 
-/** The server a command is about: `local`, or an http(s) URL, as it was typed. */
+/**
+ * The server a command is about: `local`, or an http(s) URL, as it was typed.
+ */
 export const serverFlag = Flags.custom<string>({
   parse: reads({
     schema: z

@@ -78,44 +78,6 @@ function nothingToUndo(): Promise<void> {
 }
 
 /**
- * Undoes one step, reporting a failure to undo rather than throwing it, so the
- * steps before it are still undone.
- *
- * @param key - The step.
- * @param work - Its undo.
- * @param options - Where to report.
- * @returns Once it is undone, or its failure reported.
- */
-async function undoQuietly(key: string, work: Undo, options: RunOptions): Promise<void> {
-  try {
-    await work();
-  } catch (error) {
-    options.onUndoError?.(key, error);
-  }
-}
-
-/**
- * What is known, with a loop's results under the loop's name.
- *
- * @remarks
- * The one assertion in the wizard: the compiler types a computed key of a
- * generic name as a string index, but the value is exactly the state with that
- * one key added, which is the type it returns.
- *
- * @param state - What is known before the loop.
- * @param key - The loop's name.
- * @param results - What each pass ended with, in order.
- * @returns The state with the results added.
- */
-function withLoopResults<State extends object, Key extends string, Inner extends object>(
-  state: State,
-  key: Key,
-  results: readonly Inner[],
-): State & { readonly [K in Key]: readonly Inner[] } {
-  return { ...state, [key]: results } as State & { readonly [K in Key]: readonly Inner[] };
-}
-
-/**
  * A wizard being put together: an ordered list of steps, each reading what the
  * steps before it settled, checked by the compiler.
  *
@@ -144,8 +106,14 @@ export class Wizard<Initial extends object, State extends object, Result> {
    */
   readonly name: string;
 
+  /**
+   * The step names taken so far.
+   */
   private readonly keys: ReadonlySet<string>;
 
+  /**
+   * Runs the steps added so far.
+   */
   private readonly runner: Runner<Initial, State, Result>;
 
   /**
@@ -177,7 +145,11 @@ export class Wizard<Initial extends object, State extends object, Result> {
     name: string,
   ): Wizard<Initial, Initial, Result> {
     return new Wizard<Initial, Initial, Result>(name, new Set<string>(), (initial) => {
-      return Promise.resolve({ kind: "continue", state: initial, undo: nothingToUndo });
+      return Promise.resolve({
+        kind: "continue",
+        state: initial,
+        undo: nothingToUndo,
+      });
     });
   }
 
@@ -207,11 +179,10 @@ export class Wizard<Initial extends object, State extends object, Result> {
     argument?: Observer<State & Out> | Unmet<Needs, State>,
   ): Wizard<Initial, State & Out, Result> {
     const keys = this.claim(step.key);
-    const previous = this.runner;
     const reader: WizardStep<string, Out, object> = step;
     const observe = typeof argument === "function" ? argument : undefined;
     const runner: Runner<Initial, State & Out, Result> = async (initial, options) => {
-      const before = await previous(initial, options);
+      const before = await this.runner(initial, options);
       if (before.kind === "end") {
         return before;
       }
@@ -219,16 +190,22 @@ export class Wizard<Initial extends object, State extends object, Result> {
         options.signal?.throwIfAborted();
         const out = await reader.run(before.state);
         const undo = async (): Promise<void> => {
-          await undoQuietly(
-            step.key,
-            () => {
-              return reader.undo(out);
-            },
-            options,
-          );
+          try {
+            await reader.undo(out);
+          } catch (error) {
+            options.onUndoError?.(step.key, error);
+          }
           await before.undo();
         };
-        return { kind: "continue", state: { ...before.state, ...out }, undo };
+
+        return {
+          kind: "continue",
+          state: {
+            ...before.state,
+            ...out,
+          },
+          undo,
+        };
       };
       const finished = await attempt().catch(async (error: unknown) => {
         await before.undo();
@@ -260,10 +237,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
     ..._unmet: State extends Needs ? [] : [Unmet<Needs, State>]
   ): Wizard<Initial, State, Result> {
     const keys = this.claim(step.key);
-    const previous = this.runner;
     const reader: EndStep<string, Result, object> = step;
     const runner: Runner<Initial, State, Result> = async (initial, options) => {
-      const before = await previous(initial, options);
+      const before = await this.runner(initial, options);
       if (before.kind === "end") {
         return before;
       }
@@ -274,7 +250,12 @@ export class Wizard<Initial extends object, State extends object, Result> {
           return before;
         }
         const result = await reader.run(before.state);
-        return { kind: "end", result, undo: before.undo };
+
+        return {
+          kind: "end",
+          result,
+          undo: before.undo,
+        };
       };
       return attempt().catch(async (error: unknown) => {
         await before.undo();
@@ -308,7 +289,6 @@ export class Wizard<Initial extends object, State extends object, Result> {
     ) => Wizard<State & { readonly item: Item }, Inner, never>,
   ): Wizard<Initial, State & { readonly [K in Key]: readonly Inner[] }, Result> {
     const keys = this.claim(key);
-    const previous = this.runner;
     const pass = build(
       Wizard.named<State & { readonly item: Item }, never>(`${this.name}.${key}`),
     ).runner;
@@ -317,7 +297,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
       State & { readonly [K in Key]: readonly Inner[] },
       Result
     > = async (initial, options) => {
-      const before = await previous(initial, options);
+      const before = await this.runner(initial, options);
       if (before.kind === "end") {
         return before;
       }
@@ -326,12 +306,16 @@ export class Wizard<Initial extends object, State extends object, Result> {
       >(
         async (accumulated, item) => {
           const soFar = await accumulated;
-          const progress = await pass({ ...before.state, item }, options).catch(
-            async (error: unknown) => {
-              await soFar.undo();
-              throw error;
+          const progress = await pass(
+            {
+              ...before.state,
+              item,
             },
-          );
+            options,
+          ).catch(async (error: unknown) => {
+            await soFar.undo();
+            throw error;
+          });
           if (progress.kind === "end") {
             throw new WizardDefinitionError(
               `The loop "${key}" in "${this.name}" cannot end the wizard`,
@@ -345,13 +329,19 @@ export class Wizard<Initial extends object, State extends object, Result> {
             },
           };
         },
-        Promise.resolve({ results: [], undo: nothingToUndo }),
+        Promise.resolve({
+          results: [],
+          undo: nothingToUndo,
+        }),
       );
       return passes.then(
         (done) => {
           const progress: Progress<State & { readonly [K in Key]: readonly Inner[] }, Result> = {
             kind: "continue",
-            state: withLoopResults(before.state, key, done.results),
+            state: {
+              ...before.state,
+              [key]: done.results,
+            } as State & { readonly [K in Key]: readonly Inner[] },
             undo: async (): Promise<void> => {
               await done.undo();
               await before.undo();
@@ -379,13 +369,17 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @returns The wizard with the mark added.
    */
   commit(): Wizard<Initial, State, Result> {
-    const previous = this.runner;
     return new Wizard(this.name, this.keys, async (initial, options) => {
-      const before = await previous(initial, options);
+      const before = await this.runner(initial, options);
       if (before.kind === "end") {
         return before;
       }
-      return { kind: "continue", state: before.state, undo: nothingToUndo };
+
+      return {
+        kind: "continue",
+        state: before.state,
+        undo: nothingToUndo,
+      };
     });
   }
 
@@ -397,9 +391,8 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * @returns The wizard, ready to run.
    */
   finish(answer: (state: State) => Result): ReadyWizard<Initial, Result> {
-    const runner = this.runner;
     return new ReadyWizard(this.name, async (initial, options) => {
-      const progress = await runner(initial, options);
+      const progress = await this.runner(initial, options);
       if (progress.kind === "end") {
         return progress.result;
       }
@@ -439,6 +432,9 @@ export class ReadyWizard<Initial extends object, Result> {
    */
   readonly name: string;
 
+  /**
+   * Runs the steps and answers.
+   */
   private readonly execute: (initial: Initial, options: RunOptions) => Promise<Result>;
 
   /**
