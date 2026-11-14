@@ -26,7 +26,7 @@ zitadel <resource> delete  <id> [--force]
 ```
 
 The verbs are generated from one registry
-(`apps/cli/src/commands/resources.ts`)
+(`apps/cli/src/cli/commands/resources.ts`)
 by a platform-agnostic factory
 (`apps/cli/src/lib/oclif/crud/`).
 The registry names the client call per verb, the id field, the table columns,
@@ -35,35 +35,34 @@ Adding a backend resource is adding a registry entry.
 
 Runtime resources:
 
-| Resource   | Verbs                             | Backing endpoints                                   |
-| ---------- | --------------------------------- | --------------------------------------------------- |
-| `users`    | list, get, create, update, delete | `POST /users/query`, `/users/{id}`                  |
-| `teams`    | list, get, create, update, deactivate | `POST /teams/query`, `/teams/{id}`              |
-| `sessions` | list, get, revoke                 | `POST /sessions/query`, `DELETE /sessions/{id}`     |
-| `events`   | list, get                         | `GET /events`, `GET /events/{id}`                   |
-| `grants`   | list, get, create, delete         | `POST /grants/query`, `/grants/{id}`                |
-| `projects` | list, get, update                 | `POST /projects/query`, `/projects/{id}`            |
+| Resource  | Verbs                                 | Backing endpoints                               |
+| --------- | ------------------------------------- | ----------------------------------------------- |
+| `user`    | list, get, create, update, delete     | `POST /users/query`, `/users/{id}`              |
+| `team`    | list, get, create, update, deactivate | `POST /teams/query`, `/teams/{id}`              |
+| `session` | list, get, revoke                     | `POST /sessions/query`, `DELETE /sessions/{id}` |
+| `event`   | list, get                             | `GET /events`, `GET /events/{event_id}`         |
+| `grant`   | list, get, create, delete             | `POST /grants/query`, `/grants/{grant_id}`      |
+| `project` | list, get, update                     | `POST /projects/query`, `/projects/{id}`        |
 
 Configuration resources, read-only — they are authored as files and shipped
 through a release, so the CLI reads them to show what the server currently
 holds and never writes them here:
 
-| Resource            | Verbs     | Backing endpoints                                    |
-| ------------------- | --------- | ---------------------------------------------------- |
-| `schemas`           | list, get | `GET /schemas`, `GET /schemas/{id}`                  |
-| `releases`          | list, get | `GET /releases`, `GET /releases/{id}`                |
-| `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
-| `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
+| Resource          | Verbs     | Backing endpoints                                                     |
+| ----------------- | --------- | --------------------------------------------------------------------- |
+| `schema`          | list, get | `GET /schemas`, `GET /schemas/{schema_id}`                            |
+| `release`         | list, get | `GET /releases`, `GET /releases/{id}`                                 |
+| `flow-definition` | list, get | `GET /flow_definitions`, `GET /flow_definitions/{flow_definition_id}` |
+| `branding`        | list, get | `GET /branding`, `GET /branding/{branding_id}`                        |
 
 Two of these behave differently underneath, and the registry says so rather
-than the caller having to learn it. `schemas list` and `flow-definitions list` send
+than the caller having to learn it. `schema list` and `flow-definition list` send
 `revisions=latest`, so they show the current schemas and flows rather than
-every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
-flags at all, because its endpoint has no cursor and answers with a bare array.
+every revision ever written; `--filter revisions=all` gives the history.
 
-`schemas` and `flow-definitions` are also addressable by the value that groups
-their revisions, so `schemas get human-user` returns the current revision of
-that object type and `flow-definitions get default-login` the newest revision
+`schema` and `flow-definition` are also addressable by the value that groups
+their revisions, so `schema get human-user` returns the current revision of
+that object type and `flow-definition get default-login` the newest revision
 of that flow. A prefixed id or a URI is still fetched directly. There is no
 endpoint for either lookup yet, so each entry resolves the reference with one
 filtered list of its own; see ADR 064 §12.
@@ -81,7 +80,7 @@ Every verb is a class with the same two members, so the operations read alike:
 | `crud/types.ts`                           | The registry contract, generic over the platform connection `Ctx`  |
 
 `buildResourceCommands` binds each registry entry to its operation classes and
-returns oclif command classes keyed by id (`users:list`).
+returns oclif command classes keyed by id (`user:list`).
 
 ## Discovery
 
@@ -93,11 +92,11 @@ writes. It is a projection of the registry, talks to no server, and is the role
 
 ```console
 $ zitadel resources
-resource  verbs                              filter on
---------  ---------------------------------  ---------------------------------------------
-users     list, get, create, update, delete  created_at, id, schema, status, team_id, …
-teams     list, get, create, update, deactivate  created_at, name, status
-sessions  list, get, revoke                  created_at, user_id, state, …
+topic    verbs                                  filters
+-------  -------------------------------------  ------------------------------------------
+user     list, get, create, update, delete      created_at, id, schema, status, team_id, …
+team     list, get, create, update, deactivate  created_at, name, status
+session  list, get, revoke                      created_at, user_id, state, …
 ```
 
 `--json` also carries `delete_outcome`, the property a delete's envelope puts
@@ -123,10 +122,11 @@ environment, the `.env` files, then `.zitadel/secret`. Endpoints that take
 ## Listing and pagination
 
 - `list` returns **one page**. The server's default page size applies unless
-  `--limit N` (1–100) is given. `branding` declares otherwise: it has no paging
-  flags at all, because its endpoint has no cursor.
+  `--limit N` (1–100) is given. A list whose endpoint has no cursor declares
+  itself unpaged and has no paging flags at all; every list pages today,
+  `branding` included.
 - A filter field may declare the value sent when the caller does not name it.
-  `schemas` uses this for `revisions`, defaulting to `latest`; naming the field
+  `schema` uses this for `revisions`, defaulting to `latest`; naming the field
   always wins, so `--filter revisions=all` still returns the history.
 - `--page-token T` continues from a previous response; the token is opaque and
   is passed back verbatim.
@@ -139,7 +139,7 @@ environment, the `.env` files, then `.zitadel/secret`. Endpoints that take
 - The envelope is identical for every resource:
 
   ```json
-  { "cli_version": "…", "command": "users:list", "source": "…",
+  { "cli_version": "…", "command": "user:list", "source": "…",
     "status": "ok", "data": { "items": [ … ], "count": 42, "next_page_token": "…" } }
   ```
 
@@ -179,7 +179,7 @@ since a script wants the record, not a view of it. `--fields` overrides the
 list on either path.
 
 ```console
-$ zitadel users get user_01J…
+$ zitadel user get user_01J…
 ada@example.com
 
 id                   user_01J…
@@ -256,9 +256,9 @@ than by declaration. A field required only once its optional object is given
 says so: `(required with oidc.*)`.
 
 ```sh
-zitadel users create --schema human-user --attributes email=ada@example.com
-zitadel grants create --relation viewer --user-identifier alice@acme.com
-zitadel projects update prj_01J… --password-hash-algorithm bcrypt --password-hash-params-cost 12
+zitadel user create --schema human-user --attributes email=ada@example.com
+zitadel grant create --relation viewer --user-identifier alice@acme.com
+zitadel project update prj_01J… --password-hash-algorithm bcrypt --password-hash-params-cost 12
 ```
 
 A field whose flag would collide with another field's, or with a flag the
@@ -274,10 +274,10 @@ provider connection travels as `{"idp": {…}}`, so its flags, `--set` paths,
 wraps it on the way out. A document still wrapped in `idp` is accepted too.
 
 ```sh
-zitadel idps create --slug acme-sso --protocol oidc --display-name 'Acme SSO' \
+zitadel idp create --slug acme-sso --protocol oidc --display-name 'Acme SSO' \
   --oidc-issuer https://sso.acme.example --oidc-client-id abc123 \
   --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid
-zitadel idps create --file .zitadel/idps/acme-sso.json
+zitadel idp create --file .zitadel/idps/acme-sso.json
 ```
 
 An **open record** — a user's `attributes`, whose keys come from the project's
@@ -291,7 +291,7 @@ is HTTPie's, and keeping the two explicit means the CLI never guesses which was
 meant:
 
 ```sh
-zitadel users create --schema sch_01J… \
+zitadel user create --schema sch_01J… \
   --attributes email=ada@example.com \
   --attributes age:=42 \
   --attributes optIn:=true \
@@ -317,8 +317,8 @@ only, so `0x10` is refused rather than read as 16. A list or an object takes
 `--set 'claim_mapping:={"a.b":"c"}'`.
 
 ```sh
-zitadel idps create --file acme-sso.json --set oidc.pkce_enabled=false
-zitadel users update user_01J… --set attributes.address.city=Zurich --set attributes.phone:=null
+zitadel idp create --file acme-sso.json --set oidc.pkce_enabled=false
+zitadel user update user_01J… --set attributes.address.city=Zurich --set attributes.phone:=null
 ```
 
 **The whole body at once.** `--data '<json>'` or `--file <path>`, where
@@ -356,9 +356,9 @@ the caller is missing rather than as schema issues. A nested field counts once
 its optional object is given:
 
 ```console
-$ zitadel grants create --expires-at 2030-01-01T00:00:00Z --json | jq -r '.message, .hint'
-grants create is missing required field: --relation
-Pass --relation, or include it in --data / --file. See `grants create --help`.
+$ zitadel grant create --expires-at 2030-01-01T00:00:00Z --json | jq -r '.message, .hint'
+grant create is missing required field: --relation
+Pass --relation, or include it in --data / --file. See `grant create --help`.
 ```
 
 The assembled body is then validated against the generated request schema
@@ -372,8 +372,8 @@ saved as a document to send later with `--file`.
 ## Deleting
 
 - `delete` means the resource is gone. An endpoint that changes state and
-  leaves the resource readable is named after what it does: `sessions revoke`,
-  `teams deactivate`. This is `gh`'s rule — secrets are deleted, pull requests
+  leaves the resource readable is named after what it does: `session revoke`,
+  `team deactivate`. This is `gh`'s rule — secrets are deleted, pull requests
   are closed — and it keeps the verb from lying about the outcome.
 - Interactive runs confirm first. Non-interactive runs require `--force`, the
   same guard as `reset`; without it the command fails with `E_VALIDATION` and a

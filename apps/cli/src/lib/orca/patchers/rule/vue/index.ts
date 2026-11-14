@@ -1,6 +1,6 @@
 import { sdkVersionForCli } from "@/lib/public-cli";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
-import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import type { DevelopmentServerUrl, PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import {
@@ -12,6 +12,7 @@ import {
   type ViteSupport,
   buildViteApiPrefixOp,
   buildViteProxyOp,
+  buildViteServerAddressOp,
   buildViteSessionCookieOp,
 } from "@/lib/orca/patchers/rule/vite-support";
 import { appTemplate } from "./templates";
@@ -52,6 +53,10 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteApiPrefixOp();
   }
 
+  viteServerAddressOp(override?: DevelopmentServerUrl): FileOp {
+    return buildViteServerAddressOp(override);
+  }
+
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
   }
@@ -66,6 +71,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       this.viteSessionCookieOp(),
       this.viteApiPrefixOp(),
+      this.viteServerAddressOp(this.developmentServerUrl(ctx)),
       {
         kind: "merge-env",
         path: ".env.example",

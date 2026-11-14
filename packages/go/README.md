@@ -52,8 +52,8 @@ example asserts the type. The same code runs as `api/example_test.go` against a
 test server.
 
 The client is generated from the OpenAPI source in
-[`apps/api/api/openapi`](../../apps/api/api/openapi) by `moon run
-server:generate`, with ogen. Do not edit the `*_gen.go` files: change the
+[`apps/api/api/openapi`](../../apps/api/api/openapi) by `turbo run generate
+--filter=@zitadel/server`, with ogen. Do not edit the `*_gen.go` files: change the
 spec and regenerate.
 
 Versions are tagged `packages/go/v5.x.y`. The module path resolves through the

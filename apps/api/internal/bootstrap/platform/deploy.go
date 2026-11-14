@@ -25,8 +25,8 @@ const maxBuildAttempts = 3
 
 // EnsureDeployed deploys the platform project the way the CLI deploys any
 // project: the configuration this server ships (the platform user schema, the
-// default login flows and the recommended password policy) is built into one
-// release and deployed to consoleOrigin, the project's one primary origin. It
+// default login flows, the recommended password policy and the default sign-up
+// policy) is built into one release and deployed to consoleOrigin, the project's one primary origin. It
 // runs on every start, so an upgrade's defaults go live. A start that changes
 // nothing deploys nothing, and a server built before the one that made the live
 // deployment leaves it alone.
@@ -158,17 +158,14 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 	if err != nil {
 		return service.BuildReleaseInput{}, fmt.Errorf("platform login flows: %w", err)
 	}
-	var policy struct {
-		Operation string         `json:"operation"`
-		Config    map[string]any `json:"config"`
-	}
-	if err := json.Unmarshal(configdefaults.DefaultPasswordPolicy(), &policy); err != nil {
-		return service.BuildReleaseInput{}, fmt.Errorf("platform password policy: %w", err)
+	policies, err := platformPolicies()
+	if err != nil {
+		return service.BuildReleaseInput{}, err
 	}
 	bundle := service.BuildReleaseInput{
 		ProjectID: domain.PlatformProjectID,
 		Schemas:   []service.BuildSchema{{Document: schema}},
-		Policies:  []service.BuildPolicy{{Operation: policy.Operation, Config: policy.Config}},
+		Policies:  policies,
 	}
 	for i, flow := range flows {
 		purposes := make(map[string]string, len(flow.Purposes))
@@ -179,7 +176,6 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 			Index: i,
 			Request: service.FlowDefinitionRequest{
 				Name:          flow.Name,
-				Status:        flow.Status.String(),
 				SchemaVersion: "1.0.0",
 				UserSchema:    flow.UserSchema,
 				Purposes:      purposes,
@@ -189,4 +185,28 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 		})
 	}
 	return bundle, nil
+}
+
+// platformPolicies are the policies `zitadel setup` writes for a new project:
+// the recommended password policy, and the free sign-up protection, which
+// restates the guard (ADR 088 §5).
+func platformPolicies() ([]service.BuildPolicy, error) {
+	var out []service.BuildPolicy
+	for _, def := range []struct {
+		name string
+		doc  []byte
+	}{
+		{"password policy", configdefaults.DefaultPasswordPolicy()},
+		{"sign-up policy", configdefaults.DefaultUserCreatePolicy()},
+	} {
+		var policy struct {
+			Operation string         `json:"operation"`
+			Config    map[string]any `json:"config"`
+		}
+		if err := json.Unmarshal(def.doc, &policy); err != nil {
+			return nil, fmt.Errorf("platform %s: %w", def.name, err)
+		}
+		out = append(out, service.BuildPolicy{Operation: policy.Operation, Config: policy.Config})
+	}
+	return out, nil
 }

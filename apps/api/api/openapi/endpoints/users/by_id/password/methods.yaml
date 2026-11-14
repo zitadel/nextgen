@@ -63,7 +63,7 @@ put:
     policy.
 
     The password policy is the one in the release that serves the caller's
-    `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+    `Origin`, chosen as `createFlow` (`POST /flows`) chooses it. A frontend on a
     preview URL gets that preview's policy, and one on a primary origin the
     newest primary deployment's. A request with no `Origin`, or from the
     console when the project does not list the console's origin, gets the
@@ -118,6 +118,18 @@ put:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+    '429':
+      description: |
+        The server is hashing or checking as many passwords as it allows right
+        now and could not take on another within its wait. Nothing was changed;
+        retry after the number of seconds in the `Retry-After` header.
+      headers:
+        Retry-After:
+          $ref: ../../../../components/headers/retry-after.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/too-many-requests.yaml
     '500':
       description: Something went wrong on the server. This was not your fault.
       content:

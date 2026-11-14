@@ -29,7 +29,7 @@ Each origin is served the release of the newest deployment to it. A sign-in stay
 
 `zitadel release revoke <id>` stops a release from being served or deployed again (`409 rel.revoked`), for example one with a broken flow that a rollback could bring back.
 
-- A live release cannot be revoked (`409 rel.in_use`). Deploy another release to its origins first.
+- A release an origin still serves cannot be revoked (`409 rel.in_use`). The command names the first three origins that serve it and counts the rest; `--json` lists them all. Deploying another release frees a primary origin; `zitadel preview rm` frees a preview, which also frees itself when it expires.
 - Revoking rarely affects users, because a sign-in keeps the release it started on. It fails at its next step only if it started before the newer deployment and is still running when you revoke.
 
 Every origin of a project shares the same users and sessions; only configuration differs. Users that must stay apart, such as staging's, belong in a second project: a separate [environment](/docs/concepts/repo-config#environments).

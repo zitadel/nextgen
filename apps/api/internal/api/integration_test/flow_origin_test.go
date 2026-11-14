@@ -212,7 +212,9 @@ func TestOriginlessFlowContinues(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	internalapi.MountAPI(mux, internalapi.WithRequestHostMiddleware, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
+	internalapi.MountAPI(mux, func(next http.Handler) http.Handler {
+		return harness.SpecChecked(t, internalapi.WithRequestHostMiddleware(next))
+	}, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	base := server.URL + client.PathPrefix
@@ -222,7 +224,7 @@ func TestOriginlessFlowContinues(t *testing.T) {
 
 	body, err := json.Marshal(map[string]string{"project_id": fixture.project, "purpose": "login"})
 	require.NoError(t, err)
-	resp, body := postFlowAtHost(t, base+"/flow", body, host, nil)
+	resp, body := postFlowAtHost(t, base+"/flows", body, host, nil)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 	var opened api.FlowResponse
 	require.NoError(t, opened.UnmarshalJSON(body), string(body))
@@ -232,7 +234,7 @@ func TestOriginlessFlowContinues(t *testing.T) {
 		"fields": map[string]string{"email": "nobody@example.test"},
 	})
 	require.NoError(t, err)
-	resp, body = postFlowAtHost(t, base+"/flow/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
+	resp, body = postFlowAtHost(t, base+"/flows/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
 	assert.Less(t, resp.StatusCode, http.StatusBadRequest, string(body))
 }
 
@@ -260,7 +262,7 @@ func openFlow(t *testing.T, projectID, origin string) (*http.Response, []byte) {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"project_id": projectID, "purpose": "login"})
 	require.NoError(t, err)
-	return postFlow(t, "/flow", body, origin, nil)
+	return postFlow(t, "/flows", body, origin, nil)
 }
 
 // submitFlow submits an email to the flow's first step from origin.
@@ -271,7 +273,7 @@ func submitFlow(t *testing.T, flowID, zflow, origin string) (*http.Response, []b
 		"fields": map[string]string{"email": "nobody@example.test"},
 	})
 	require.NoError(t, err)
-	return postFlow(t, "/flow/"+flowID+"/submit", body, origin, &http.Cookie{Name: "_zflow", Value: zflow})
+	return postFlow(t, "/flows/"+flowID+"/submit", body, origin, &http.Cookie{Name: "_zflow", Value: zflow})
 }
 
 func postFlow(t *testing.T, path string, body []byte, origin string, cookie *http.Cookie) (*http.Response, []byte) {

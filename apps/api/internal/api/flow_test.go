@@ -167,11 +167,11 @@ func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(
 	// The project service is read only when a submit carries an Origin, so
 	// a test that sends one sets its expectation.
 	projects := mocks.NewMockProjectService(mock)
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, projects, nil, nil, nil, nil, nil, releaseService, nil, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, projects, nil, nil, nil, nil, nil, releaseService, nil, nil, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
-		gen.WithErrorHandler(api.OgenErrorHandler),
+		gen.WithErrorHandler(api.OgenErrorHandler(0)),
 	)
 	require.NoError(t, err)
 	var h http.Handler = oas
@@ -232,7 +232,7 @@ func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 		Step:  &domain.FlowStep{Name: "identify"},
 	}
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows", map[string]any{
 		"project_id": "proj_1",
 		"purpose":    "login",
 	}, "")
@@ -259,7 +259,7 @@ func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
 	state := &domain.FlowState{ID: "flow_real", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_wrong/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_wrong/submit", map[string]any{
 		"action": "submit",
 	}, cookieVal)
 	if resp.StatusCode != http.StatusNotFound {
@@ -269,7 +269,7 @@ func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
 
 func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
 	ts := newTestServer(t)
-	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 	}, "garbage")
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -290,7 +290,7 @@ func TestSubmitFlowStep_MalformedCookieHeaderReturns401(t *testing.T) {
 		`{"alg":"dir","enc":"A256GCM","kid":"` + fixedKeyID + `"}`,
 	} {
 		cookie := base64.RawURLEncoding.EncodeToString([]byte(header)) + ".key.iv.ciphertext.tag"
-		resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 			"action": "submit",
 		}, cookie)
 		if resp.StatusCode != http.StatusUnauthorized {
@@ -312,8 +312,8 @@ func TestFlowStep_KeyStoreUnavailableKeepsItsStatus(t *testing.T) {
 		path   string
 		body   any
 	}{
-		{http.MethodGet, "/flow/flow_1", nil},
-		{http.MethodPost, "/flow/flow_1/submit", map[string]any{"action": "submit"}},
+		{http.MethodGet, "/flows/flow_1", nil},
+		{http.MethodPost, "/flows/flow_1/submit", map[string]any{"action": "submit"}},
 	} {
 		resp, body := doRequest(t, tc.method, ts.srv.URL+tc.path, tc.body, cookieVal)
 		if resp.StatusCode != http.StatusServiceUnavailable {
@@ -332,7 +332,7 @@ func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
 	state := &domain.FlowState{ID: "flow_1", IssuedAt: stale}
 	cookieVal := ts.sealCookie(t, state)
 
-	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 	}, cookieVal)
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -348,7 +348,7 @@ func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
 	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitResult = domain.FlowStepResult{State: advanced, Step: &domain.FlowStep{Name: "password"}}
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 		"fields": map[string]any{"identifier": "alice@example.com"},
 	}, cookieVal)
@@ -372,7 +372,7 @@ func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	ts.fake.submitResult = domain.FlowStepResult{State: terminal, Step: &domain.FlowStep{Name: "done", Complete: &complete}}
 
-	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 	}, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -398,7 +398,7 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 		HandoffTokenExpiresAt: expiresAt,
 	}
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 	}, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -485,7 +485,7 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			if storedTarget == "" {
 				storedTarget = returnTarget
 			}
-			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 				"action":          "sso",
 				"sso_provider_id": "google",
 				"return_target":   returnTarget,
@@ -528,7 +528,7 @@ func TestSubmitFlowStep_SSO_ProviderIDAloneDoesNotSelectTheBranch(t *testing.T) 
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitErr = domain.ErrFlowInvalidAction()
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action":          "submit",
 		"sso_provider_id": "google",
 	}, ts.sealCookie(t, state))
@@ -549,7 +549,7 @@ func TestSubmitFlowStep_SSO_HandedOffAttemptIsAConflict(t *testing.T) {
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
 
-	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action":          "sso",
 		"sso_provider_id": "google",
 		"return_target":   origin + "/login",
@@ -565,7 +565,7 @@ func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 
-	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action":          "sso",
 		"sso_provider_id": "google",
 		"return_target":   origin + "/login?pad=" + strings.Repeat("x", 2048),
@@ -626,7 +626,7 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 				requestOrigin = ""
 			}
 
-			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)
+			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)
 			require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 			require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
 		})
@@ -643,7 +643,7 @@ func TestSubmitFlowStep_UnknownPropertiesReturnError(t *testing.T) {
 	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 		"data":   map[string]any{"identifier": "alice@example.com"},
 	}, cookieVal)
@@ -664,7 +664,7 @@ func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
 	}
@@ -688,7 +688,7 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 		Step:  &domain.FlowStep{Name: "done", Complete: &complete},
 	}
 
-	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusGone {
 		t.Fatalf("status = %d, want 410", resp.StatusCode)
 	}
@@ -702,7 +702,7 @@ func TestGetFlowStep_PlainRenderLeavesCookie(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
 	}
@@ -717,7 +717,7 @@ func TestGetFlowStep_SSOResolvedRenderResealsCookie(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, Reseal: true}
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
 	}
@@ -743,7 +743,7 @@ func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
 		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
 	}
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
 	}
@@ -778,7 +778,7 @@ func TestGetFlowStep_ResolvedHandoffSurvivesSealFailure(t *testing.T) {
 		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
 	}
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
 	}
@@ -800,7 +800,7 @@ func TestGetFlowStep_RestartRequiredReturns409(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.getErr = domain.ErrFlowRestartRequired()
 
-	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flows/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 (body = %s)", resp.StatusCode, body)
 	}
@@ -817,7 +817,7 @@ func TestSubmitFlowStep_HandedOffAttemptReturns409(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
 
-	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 		"fields": map[string]any{"identifier": "alice@example.com"},
 	}, cookieVal)
@@ -844,7 +844,7 @@ func TestSubmitFlowStep_StepErrorLogsOnce(t *testing.T) {
 	failure := domain.FlowStepFailed(domain.FlowStepErrorInvalidCredentials, domain.ErrAuthAttemptProofRejected(nil))
 	ts.fake.submitResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "password", Error: &failure.Key, Failure: failure}}
 
-	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flows/flow_1/submit", map[string]any{
 		"action": "submit",
 		"fields": map[string]any{"x-auth-methods#password": "wrong"},
 	}, cookieVal)

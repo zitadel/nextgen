@@ -9,7 +9,8 @@ import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/term
  * a person reads an escape, {@link json} the way JSON spells one, and
  * {@link rows} and {@link painted} not at all, because their fragments were
  * spelled out where each was read. So nothing downstream has to work out which
- * treatment a string wanted, and no command escapes anything of its own.
+ * treatment a string wanted. A summary is drawn as it is written, so a command
+ * that puts text from a server in one spells it out itself.
  *
  * `kind` says only who the output is for: `piped` output is what a script
  * reads, so it keeps stdout to itself and the next steps go beside it on

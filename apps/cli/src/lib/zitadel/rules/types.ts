@@ -62,7 +62,6 @@ export const RULE_IDS = [
   "sso/outcome-routing",
   "sso/collection-conflict-routing",
   "sso/empty-claim-mapping",
-  "sso/collection-misses-required",
   "sso/unknown-connection-field",
   "sso/unmapped-verification-key",
   "sso/claim-needs-scope",

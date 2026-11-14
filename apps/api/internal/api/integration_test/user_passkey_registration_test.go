@@ -74,11 +74,11 @@ func attestMgmtRegistration(t *testing.T, options api.BeginUserPasskeyRegistrati
 func beginMgmtRegistration(t *testing.T, client *helpers.ApiClient, userID string) *api.BeginUserPasskeyRegistrationResponse {
 	t.Helper()
 	rp := helpers.PasskeyRelyingParty
-	resp, err := client.BeginUserPasskeyRegistration(t.Context(), &api.BeginUserPasskeyRegistrationRequest{
+	resp, err := client.CreateUserPasskeyRegistration(t.Context(), &api.BeginUserPasskeyRegistrationRequest{
 		RpID:      rp.ID,
 		RpOrigins: []url.URL{*mustParseURL(t, rp.Origin)},
 		Username:  api.NewOptString("mgmt-enroll@example.com"),
-	}, api.BeginUserPasskeyRegistrationParams{UserID: api.UserID(userID)})
+	}, api.CreateUserPasskeyRegistrationParams{UserID: api.UserID(userID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.BeginUserPasskeyRegistrationResponse{}, resp, helpers.MustMarshal(t, resp))
 	return resp.(*api.BeginUserPasskeyRegistrationResponse)
@@ -105,10 +105,10 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		require.NotEmpty(t, begun.RegistrationID)
 		require.NotEmpty(t, begun.Options)
 
-		finishResp, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		finishResp, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: attestMgmtRegistration(t, begun.Options),
 			Name:        api.NewOptString("Work laptop"),
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(userID),
 			RegistrationID: begun.RegistrationID,
 		})
@@ -132,12 +132,12 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		_, _, client := seedMgmtPasskeyUser(t)
 
 		rp := helpers.PasskeyRelyingParty
-		resp, err := client.BeginUserPasskeyRegistration(t.Context(), &api.BeginUserPasskeyRegistrationRequest{
+		resp, err := client.CreateUserPasskeyRegistration(t.Context(), &api.BeginUserPasskeyRegistrationRequest{
 			RpID:      rp.ID,
 			RpOrigins: []url.URL{*mustParseURL(t, rp.Origin)},
-		}, api.BeginUserPasskeyRegistrationParams{UserID: api.UserID("user_does_not_exist")})
+		}, api.CreateUserPasskeyRegistrationParams{UserID: api.UserID("user_does_not_exist")})
 		require.NoError(t, err)
-		require.IsType(t, &api.BeginUserPasskeyRegistrationNotFound{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.CreateUserPasskeyRegistrationNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("bad_attestation_leaves_the_ceremony_open_for_retry", func(t *testing.T) {
@@ -148,9 +148,9 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		var garbage api.FinishUserPasskeyRegistrationRequestAttestation
 		require.NoError(t, json.Unmarshal([]byte(`{"not":"valid-webauthn"}`), &garbage))
 
-		rejectedResp, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		rejectedResp, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: garbage,
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(userID),
 			RegistrationID: begun.RegistrationID,
 		})
@@ -159,9 +159,9 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		assert.NotContains(t, helpers.MustMarshal(t, rejectedResp), `"id"`,
 			"a rejected attestation must not register a credential")
 
-		retryResp, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		retryResp, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: attestMgmtRegistration(t, begun.Options),
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(userID),
 			RegistrationID: begun.RegistrationID,
 		})
@@ -186,9 +186,9 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		}))
 
 		begun := beginMgmtRegistration(t, client, userID)
-		resp, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		resp, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: attestMgmtRegistration(t, begun.Options),
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(otherID),
 			RegistrationID: begun.RegistrationID,
 		})
@@ -211,7 +211,7 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 			"an internal ceremony attempt must read as not found")
 
 		// ...nor be handed off toward a session.
-		handedOff, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{
+		handedOff, err := client.CreateAuthAttemptHandoff(t.Context(), api.CreateAuthAttemptHandoffParams{
 			AttemptID: api.AttemptID(begun.RegistrationID),
 		})
 		require.NoError(t, err)
@@ -224,18 +224,18 @@ func TestUserPasskeyRegistrationManagement(t *testing.T) {
 		_, userID, client := seedMgmtPasskeyUser(t)
 
 		begun := beginMgmtRegistration(t, client, userID)
-		first, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		first, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: attestMgmtRegistration(t, begun.Options),
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(userID),
 			RegistrationID: begun.RegistrationID,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.FinishUserPasskeyRegistrationResponse{}, first, helpers.MustMarshal(t, first))
 
-		second, err := client.FinishUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
+		second, err := client.CompleteUserPasskeyRegistration(t.Context(), &api.FinishUserPasskeyRegistrationRequest{
 			Attestation: attestMgmtRegistration(t, begun.Options),
-		}, api.FinishUserPasskeyRegistrationParams{
+		}, api.CompleteUserPasskeyRegistrationParams{
 			UserID:         api.UserID(userID),
 			RegistrationID: begun.RegistrationID,
 		})

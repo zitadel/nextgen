@@ -44,7 +44,7 @@ under `fixtures/` and name it in `start`.
 
 A stage passes on its **outcome**:
 
-- reads against the live instance (`projects list`, `schemas get …`), and
+- reads against the live instance (`project list`, `schema get …`), and
 - for stages that name one, the app driven in a real browser: register, reach a
   protected page, sign out, sign back in, a field on the form, a passkey offered
   at sign-in, a signed-out visitor stopped at a protected page.
@@ -78,24 +78,24 @@ non-deterministic. It is kept out of CI and run on demand.
 
 ## Run it
 
-With Moon, from anywhere in the repository:
+With turbo, from anywhere in the repository:
 
 ```sh
-moon run cli-skill-e2e:eval          # every enabled scenario × journey
-moon run cli-skill-e2e:report        # rebuild the report pages from out/
-moon run cli-skill-e2e:typecheck
+turbo run eval --filter=@zitadel/cli-skill-e2e        # every enabled scenario × journey
+turbo run report --filter=@zitadel/cli-skill-e2e      # rebuild the report pages from out/
+turbo run typecheck --filter=@zitadel/cli-skill-e2e
 ```
 
 Pick what runs with environment variables in front of the same command:
 
 ```sh
-EVAL_SCENARIOS=sonnet EVAL_JOURNEYS=existing-nextjs moon run cli-skill-e2e:eval
-EVAL_SCENARIOS=haiku,sonnet-baseline moon run cli-skill-e2e:eval
-EVAL_REPEATS=3 moon run cli-skill-e2e:eval     # each run three times, side by side
-LOCAL_SKILL=1 moon run cli-skill-e2e:eval      # try a skill edit before pushing it
+EVAL_SCENARIOS=sonnet EVAL_JOURNEYS=existing-nextjs turbo run eval --filter=@zitadel/cli-skill-e2e
+EVAL_SCENARIOS=haiku,sonnet-baseline turbo run eval --filter=@zitadel/cli-skill-e2e
+EVAL_REPEATS=3 turbo run eval --filter=@zitadel/cli-skill-e2e     # each run three times, side by side
+LOCAL_SKILL=1 turbo run eval --filter=@zitadel/cli-skill-e2e      # try a skill edit before pushing it
 ```
 
-Without Moon, `corepack pnpm --filter @zitadel/cli-skill-e2e eval` does the same.
+Without turbo, `corepack pnpm --filter @zitadel/cli-skill-e2e eval` does the same.
 
 A full run of one scenario takes 8 to 10 minutes and spends Claude tokens. The
 first run also pulls the `node:24` image.

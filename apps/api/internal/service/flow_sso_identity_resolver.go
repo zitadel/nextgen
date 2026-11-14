@@ -358,6 +358,7 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 		ProjectID:  link.ProjectID,
 		EntityType: "idp_identity_link",
 		EntityID:   link.ID,
+		UserID:     link.UserID,
 		Payload:    domain.IDPIdentityLinkCreatedPayload{ConnectionID: link.ConnectionID, UserID: link.UserID},
 	}); err != nil {
 		return fmt.Errorf("create sso user: emit identity link created: %w", err)
@@ -369,8 +370,8 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 
 var _ UserAction = (*ssoLinkAction)(nil)
 
-// FindUniqueOwner looks the value up in the rows of the unique-attributes
-// registry with team scope "", without recording anything on the attempt.
+// FindUniqueOwner looks the value up in the unique claims with team
+// scope "", without recording anything on the attempt.
 // Those are the rows a new user with no team collides with: project-unique
 // values, and team-unique values of users with no team. A row of a team does
 // not collide, so it does not count.
@@ -389,7 +390,7 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 	if err != nil {
 		return "", fmt.Errorf("find unique owner: %w", err)
 	}
-	// The registry key has no schema, so the owner can be a user of another
+	// The unique index has no schema column, so the owner can be a user of another
 	// schema that also marks the property project-unique. The flow cannot
 	// continue with that user, and creation would collide on the value.
 	sameSchema, err := r.storedUserSchemaMatches(ctx, projectID, user.SchemaURL, userSchemaURL)

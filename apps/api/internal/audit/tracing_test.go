@@ -127,12 +127,12 @@ type tracedExportSource struct {
 	listErr, cursorErr, afterErr, upsertErr error
 }
 
-func (s *tracedExportSource) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
+func (s *tracedExportSource) ListProjectIDs(ctx context.Context) ([]string, error) {
 	s.list = trace.SpanContextFromContext(ctx)
 	if s.listErr != nil {
 		return nil, s.listErr
 	}
-	return s.fakeExportSource.ListClaimedProjectIDs(ctx)
+	return s.fakeExportSource.ListProjectIDs(ctx)
 }
 
 func (s *tracedExportSource) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
@@ -166,7 +166,7 @@ func TestShipper_failedStepFailsItsSpan(t *testing.T) {
 		src      tracedExportSource
 		wantSpan string
 	}{
-		{name: "project list", src: tracedExportSource{listErr: failed}, wantSpan: "audit.ListClaimedProjects"},
+		{name: "project list", src: tracedExportSource{listErr: failed}, wantSpan: "audit.ListProjects"},
 		{name: "cursor read", src: tracedExportSource{cursorErr: failed}, wantSpan: "audit.ShipEvents"},
 		{name: "event list", src: tracedExportSource{afterErr: failed}, wantSpan: "audit.ShipEvents"},
 		{name: "cursor write", src: tracedExportSource{upsertErr: failed}, wantSpan: "audit.ShipEvents"},
@@ -208,7 +208,7 @@ func TestShipper_runIsTraced(t *testing.T) {
 
 	s.shipOnce()
 
-	list := jobSpan(t, "audit.ListClaimedProjects")
+	list := jobSpan(t, "audit.ListProjects")
 	assert.Equal(t, list.SpanContext, src.list, "the project list runs under the list span")
 
 	ships := rootSpans("audit.ShipEvents")
@@ -244,34 +244,31 @@ func TestShipper_StartWithoutSinksRunsNoLoop(t *testing.T) {
 }
 
 // serveTracedRequest sends one request through the audit middleware the way
-// the server does: the logging middleware plants the operation ID holder
-// outside it, and the ogen tracer stores the server span context in it when it
-// starts that span. A sampled request gets a real server span; an unsampled
-// one carries a span context that is valid but not sampled. The whole chain of
-// the server is covered in cmd/server.
+// the server does: inside the request's server span, which opens in front of
+// the middleware and is still open when it enqueues the event. A sampled
+// request gets a real server span; an unsampled one carries a span context
+// that is valid but not sampled. The whole chain of the server is covered in
+// cmd/server.
 func serveTracedRequest(t *testing.T, buf *RequestBuffer, sampled bool) trace.SpanContext {
 	t.Helper()
-	var server trace.SpanContext
 	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := trace.ContextWithSpanContext(r.Context(), trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID: trace.TraceID{1},
-			SpanID:  trace.SpanID{1},
-		}))
-		if sampled {
-			var span trace.Span
-			ctx, span = otel.Tracer("test").Start(r.Context(), "server", trace.WithSpanKind(trace.SpanKindServer))
-			defer span.End()
-		}
-		server = trace.SpanContextFromContext(ctx)
-		middleware.SetServerSpanContext(ctx, server)
-		ac, ok := ActorSlotFromContext(ctx)
+		ac, ok := ActorSlotFromContext(r.Context())
 		require.True(t, ok)
 		ac.ProjectID = "proj_1"
 		w.WriteHeader(http.StatusOK)
 	}))
 	r := httptest.NewRequest(http.MethodPatch, "/users/u1", nil)
-	h.ServeHTTP(httptest.NewRecorder(), r.WithContext(middleware.WithOperationIDContext(r.Context(), "")))
-	return server
+	ctx := trace.ContextWithSpanContext(r.Context(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1},
+		SpanID:  trace.SpanID{1},
+	}))
+	if sampled {
+		var span trace.Span
+		ctx, span = otel.Tracer("test").Start(r.Context(), "server", trace.WithSpanKind(trace.SpanKindServer))
+		defer span.End()
+	}
+	h.ServeHTTP(httptest.NewRecorder(), r.WithContext(middleware.WithOperationIDContext(ctx, "")))
+	return trace.SpanContextFromContext(ctx)
 }
 
 func newTracedBuffer(t *testing.T) (*channelInserter, *RequestBuffer) {

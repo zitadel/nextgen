@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { sourceFiles } from "@tests/helpers/source-files";
 import {
   maskPublicCliVersion,
   normalizePublicCliCommand,
@@ -8,9 +12,9 @@ import {
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   optionArgs,
-  portableCommands,
   publicCliCommand,
   sdkVersionForCli,
+  spellOutCommands,
 } from "@/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -51,6 +55,37 @@ describe("public CLI command formatting", () => {
     );
     expect(normalizePublicCliCommand("npm install", "0.1.0-alpha.1")).toBe("npm install");
     expect(normalizePublicCliCommand("docker version", "0.1.0-alpha.1")).toBe("docker version");
+  });
+});
+
+describe("spellOutCommands", () => {
+  it("spells a quoted zitadel command out as the one that runs, without backticks", () => {
+    expect(spellOutCommands("Run `zitadel setup` first.", "0.1.0-alpha.1")).toBe(
+      "Run npx @zitadel/cli@0.1.0-alpha.1 setup first.",
+    );
+  });
+
+  it("spells out each command in a hint, and the one after a pipe", () => {
+    expect(
+      spellOutCommands(
+        "Run `zitadel reset --force`, then `zitadel start`; or `cat body.json | zitadel api x`.",
+        "0.1.0",
+      ),
+    ).toBe(
+      "Run npx @zitadel/cli@0.1.0 reset --force, then npx @zitadel/cli@0.1.0 start; or cat body.json | npx @zitadel/cli@0.1.0 api x.",
+    );
+  });
+
+  it("takes the backticks off anything else that was quoted, and leaves the words", () => {
+    expect(spellOutCommands("Set one with `variable set`, or pass `--preview`.", "0.1.0")).toBe(
+      "Set one with variable set, or pass --preview.",
+    );
+  });
+
+  it("leaves a file name that merely starts with the word alone", () => {
+    expect(spellOutCommands("Edit `zitadel.json` and `.zitadel/secret`.", "0.1.0")).toBe(
+      "Edit zitadel.json and .zitadel/secret.",
+    );
   });
 });
 
@@ -144,46 +179,6 @@ describe("maskPublicCliVersion", () => {
   });
 });
 
-describe("portableCommands", () => {
-  it("prefixes every command when every argument is portable", () => {
-    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
-      expect.stringMatching(/ plan$/),
-      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
-    ]);
-  });
-
-  it("accepts a plain value and a POSIX-style path", () => {
-    expect(
-      portableCommands(
-        [["plan", "--schema", "default-human-user", "--cwd", "/home/dev/my-app"]],
-        "1.0.0",
-      ),
-    ).toHaveLength(1);
-  });
-
-  it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
-    for (const value of [
-      "my users",
-      "x;y",
-      "$(id)",
-      "a&b",
-      "%PATH%",
-      "it's",
-      "a|b",
-      "a`b",
-      "C:\\dev",
-    ]) {
-      expect(portableCommands([["plan", "--cwd", value]], "1.0.0"), value).toEqual([]);
-    }
-  });
-
-  it("returns none when any argument in any command needs quoting", () => {
-    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
-      [],
-    );
-  });
-});
-
 describe("optionArgs", () => {
   it("passes the option and its value as two arguments", () => {
     expect(optionArgs("--schema", "customers")).toEqual(["--schema", "customers"]);
@@ -191,5 +186,89 @@ describe("optionArgs", () => {
 
   it("joins a value that starts with a dash to its option", () => {
     expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
+  });
+});
+
+/**
+ * The one name, enforced over the source rather than per call site.
+ *
+ * A reader of a terminal sees one command spelling or three. The public
+ * `npx @zitadel/cli@<version> …` form is the one that runs on their machine —
+ * the CLI is not a dependency of the app it scaffolds — so it is the only
+ * spelling human output uses, and {@link publicCliCommand}, through a
+ * `lib/suggestion/` builder, is the only thing that writes it. Two spellings
+ * reach the terminal by hand, and this scan refuses both: a command written
+ * out as bare `zitadel …`, which does not exist on the reader's PATH, and a
+ * backtick, which a terminal prints as a backtick rather than as code.
+ *
+ * Comments are exempt — the bare spelling is the readable one to write about a
+ * command in prose about the code — so they are blanked before a rule reads a
+ * line, which is also why a failure's line number is the one in the file.
+ */
+describe("the CLI names itself once in human output", () => {
+  const COMMANDS = join(import.meta.dirname, "../../../src/cli/commands");
+
+  /**
+   * The source with every comment blanked, keeping each line where it was.
+   *
+   * String literals are matched first and kept. A slash-star inside a string
+   * such as `@zitadel/*` would otherwise open a comment that runs to the next
+   * real comment close and blanks every line a person reads in between. That
+   * hid twenty lines of `doctor/index.ts` from this scan, one an offender.
+   */
+  const blankComments = (source: string): string =>
+    source.replaceAll(
+      /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+      (match) => (match.startsWith("/") ? match.replaceAll(/[^\n]/g, " ") : match),
+    );
+
+  /** The double-quoted string literals on a line, quotes included. */
+  const quoted = (line: string): string[] => line.match(/"(?:[^"\\\n]|\\.)*"/g) ?? [];
+
+  /** The string literals on a line a person could end up reading: both kinds. */
+  const literals = (line: string): string[] => [
+    ...quoted(line),
+    ...(line.match(/`(?:[^`\\\n]|\\.)*`/g) ?? []),
+  ];
+
+  /**
+   * A failure's `hint:`. It may quote a command in backticks: the base command
+   * spells every hint out on its way to the terminal (`spellOutCommands`), so
+   * the backticks never reach a person.
+   */
+  const HINT = /\bhint:/;
+
+  /** A path as a failure names it, with forward slashes on every platform. */
+  const asWritten = (file: string): string =>
+    relative(join(COMMANDS, ".."), file).split(sep).join("/");
+
+  async function offenders(offends: (line: string) => boolean): Promise<string[]> {
+    const files = await sourceFiles(COMMANDS);
+    const found = await Promise.all(
+      files.map(async (file) => {
+        const name = asWritten(file);
+        const lines = blankComments(await readFile(file, "utf8")).split("\n");
+        return lines.flatMap((line, index) => {
+          return !HINT.test(line) && offends(line) ? [`${name}:${index + 1}`] : [];
+        });
+      }),
+    );
+    return found.flat().sort();
+  }
+
+  it("quotes no command in backticks, which a terminal does not render", async () => {
+    // An escaped backtick is one inside a template literal; a plain one inside
+    // a double-quoted string is the other way a backtick reaches the terminal.
+    const offends = (line: string): boolean =>
+      line.includes("\\`") || quoted(line).some((literal) => literal.includes("`"));
+
+    expect(await offenders(offends)).toEqual([]);
+  });
+
+  it("writes out no bare zitadel command for a person to copy", async () => {
+    const offends = (line: string): boolean =>
+      literals(line).some((literal) => /\bzitadel [a-z]/.test(literal));
+
+    expect(await offenders(offends)).toEqual([]);
   });
 });

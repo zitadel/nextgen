@@ -1,6 +1,6 @@
 x-meta-schema: true
 type: object
-required: [ name, status, user_schema, purposes, steps ]
+required: [ name, user_schema, purposes, steps ]
 description: |
   A flow definition is the configuration of one flow: the sequence of screens
   the login component (`<zitadel-login>`) walks a user through to sign in,
@@ -19,7 +19,7 @@ description: |
   that `zitadel deploy` publishes or through the API, and they are stored in
   the project/team configuration hierarchy. The server selects the matching
   definition from the purpose and audience when a flow starts with
-  `createFlow` (`POST /flow`).
+  `createFlow` (`POST /flows`).
 additionalProperties: false
 properties:
   "$schema":
@@ -42,16 +42,13 @@ properties:
       definition may reference. It acts as the human display label as well;
       there is no separate slug.
 
-  status:
-    $ref: flow-definition-status.yaml
-
   user_schema:
     type: string
     description: |
       The user schema this flow operates on, named by its `objectType`. The
       flow runs against the revision of that schema its release pins, so
       publishing a schema revision needs no change to the flow. A schema ID
-      as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
+      as `publishSchema` (`POST /schemas`) returns it is also accepted and is stored as that
       schema's `objectType`; reading the definition back returns the
       `objectType`. A value naming no schema of the project is refused with
       `flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)

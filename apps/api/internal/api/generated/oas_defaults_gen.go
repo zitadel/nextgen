@@ -55,6 +55,38 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *FlowDefinitionStep) setDefaults() {
+	{
+		var defaultVal0 []string
+		s.Fields = defaultVal0
+	}
+	{
+		var defaultVal0 []StepAction
+		s.Actions = defaultVal0
+	}
+	{
+		var defaultVal0 []string
+		s.SSOProviders = defaultVal0
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowStep) setDefaults() {
+	{
+		var defaultVal0 []Field
+		s.Fields = defaultVal0
+	}
+	{
+		var defaultVal0 []FlowStepAction
+		s.Actions = defaultVal0
+	}
+	{
+		var defaultVal0 []SSOProvider
+		s.SSOProviders = defaultVal0
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *FlowStepAction) setDefaults() {
 	{
 		val := bool(false)
@@ -71,6 +103,31 @@ func (s *IdpConnectionOidc) setDefaults() {
 	{
 		val := IdpConnectionOidcTokenEndpointAuthMethod("client_secret_basic")
 		s.TokenEndpointAuthMethod.SetTo(val)
+	}
+	{
+		var defaultVal0 []string
+		{
+			var defaultVal0Elem string
+
+			val := string("openid")
+			defaultVal0Elem = val
+			defaultVal0 = append(defaultVal0, defaultVal0Elem)
+		}
+		{
+			var defaultVal0Elem string
+
+			val := string("profile")
+			defaultVal0Elem = val
+			defaultVal0 = append(defaultVal0, defaultVal0Elem)
+		}
+		{
+			var defaultVal0Elem string
+
+			val := string("email")
+			defaultVal0Elem = val
+			defaultVal0 = append(defaultVal0, defaultVal0Elem)
+		}
+		s.Scopes = defaultVal0
 	}
 	{
 		val := bool(true)
@@ -91,6 +148,10 @@ func (s *PasswordSetEvaluateFacts) setDefaults() {
 	{
 		val := bool(true)
 		s.SelfService.SetTo(val)
+	}
+	{
+		var defaultVal0 []bool
+		s.HistoryMatches = defaultVal0
 	}
 }
 
@@ -147,6 +208,14 @@ func (s *ReleaseMetadata) setDefaults() {
 	{
 		val := bool(false)
 		s.GitDirty = val
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *SearchRequest) setDefaults() {
+	{
+		val := int(5)
+		s.LimitPerType.SetTo(val)
 	}
 }
 

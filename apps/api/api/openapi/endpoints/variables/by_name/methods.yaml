@@ -7,9 +7,9 @@ get:
     holds a value per kind: `primary` for primary origins and `preview` for
     preview URLs.
 
-    Pass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists
+    Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists
     it. A name with no value for the requested kind answers `var.not_found`;
-    set it with `updateVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
+    set it with `setVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
   tags:
     - Variables
   parameters:
@@ -40,9 +40,9 @@ delete:
     records a `variable.removed` event.
 
     A name with no value for that kind answers `var.not_found`: there is
-    nothing to delete. `getVariables` (`GET /variables`) lists the names the project holds. To
+    nothing to delete. `listVariables` (`GET /variables`) lists the names the project holds. To
     remove several names in one request, or to remove a name that may already
-    be absent, send `null` for each name to `updateVariables` (`PATCH /variables`).
+    be absent, send `null` for each name to `setVariables` (`PATCH /variables`).
   tags:
     - Variables
   parameters:

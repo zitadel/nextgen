@@ -53,7 +53,7 @@ let objectType: string;
 let revision1: string;
 let revision2: string;
 let revision3: string;
-type UserRecord = Awaited<ReturnType<ZitadelClient["getUserByID"]>>;
+type UserRecord = Awaited<ReturnType<ZitadelClient["getUser"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
 let recordC: UserRecord;
@@ -229,7 +229,7 @@ async function expectProviderSignIns(page: Page, users: { username: string }[]):
 /** Each user still has the revision, attributes and update time it was recorded with. */
 async function expectRecordsUnchanged(expected: (readonly [UserRecord, string])[]): Promise<void> {
   for (const [record, revision] of expected) {
-    const now = await client.getUserByID(record.id);
+    const now = await client.getUser(record.id);
     expect(now.schema).toBe(revision);
     expect(now.attributes).toEqual(record.attributes);
     expect(now.metadata.updated_at).toBe(record.metadata.updated_at);
@@ -293,5 +293,5 @@ async function registerThroughProvider(
   await client.setUserPassword(created.id, { password });
 
   await logout(page);
-  return client.getUserByID(created.id);
+  return client.getUser(created.id);
 }

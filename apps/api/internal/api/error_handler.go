@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
@@ -131,6 +133,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return releaseErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixIDPConnection.ErrorCodePrefix("")):
 		return idpErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixApplication.ErrorCodePrefix("")):
+		return applicationErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):
@@ -145,6 +149,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return teamErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixGrant.ErrorCodePrefix("")):
 		return grantErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixInvitation.ErrorCodePrefix("")):
+		return invitationErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
 		return projectErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
@@ -207,30 +213,48 @@ func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 	return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 }
 
-// OgenErrorHandler is a custom ogen ErrorHandler that maps ogen's structural
-// errors (decode, validate, security) into the ErrorDetails wire format so all
-// error responses are consistent regardless of where the error originates.
-func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
-	status, logged, details := apiError(err)
+// minRetryAfter is the least a 429 tells the client to wait: Retry-After
+// counts whole seconds, and a wait of nothing would invite the retry that
+// was just refused.
+const minRetryAfter = time.Second
 
-	// Decode and security fail before ogen's middleware names the operation.
-	// Their errors carry it, and filling the holder lets the access line and
-	// the audit middleware see it too.
-	if operationID, _ := middleware.GetOperationIDContext(ctx); operationID == "" {
-		var oc interface{ OperationID() string }
-		if errors.As(err, &oc) {
-			ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
+// OgenErrorHandler returns the ogen ErrorHandler that maps ogen's structural
+// errors (decode, validate, security) and the handlers' domain errors into
+// the ErrorDetails wire format, so all error responses are consistent
+// regardless of where the error originates.
+//
+// retryAfter is what a user.password_hashing_busy 429 tells the client in
+// Retry-After: what the handler waited before refusing, since the hashing
+// limiter's queue drains within it and the next request stands a fair chance
+// after as long again. It is rounded to whole seconds and floored at
+// [minRetryAfter]. No other response gets the header.
+func OgenErrorHandler(retryAfter time.Duration) ogenerrors.ErrorHandler {
+	seconds := strconv.Itoa(int(max(retryAfter.Round(time.Second), minRetryAfter) / time.Second))
+	return func(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
+		status, logged, details := apiError(err)
+
+		// Decode and security fail before ogen's middleware names the operation.
+		// Their errors carry it, and filling the holder lets the access line and
+		// the audit middleware see it too.
+		if operationID, _ := middleware.GetOperationIDContext(ctx); operationID == "" {
+			var oc interface{ OperationID() string }
+			if errors.As(err, &oc) {
+				ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
+			}
 		}
+		switch {
+		case status >= http.StatusInternalServerError:
+			errlog.LogFault(ctx, logged)
+		case ssoMisconfigured(logged):
+			errlog.LogLevel(ctx, slog.LevelWarn, logged)
+		default:
+			errlog.Log(ctx, logged)
+		}
+		if logged.Code == passwordHashingBusyCode {
+			w.Header().Set("Retry-After", seconds)
+		}
+		writeErrorResponse(ctx, w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
 	}
-	switch {
-	case status >= http.StatusInternalServerError:
-		errlog.LogFault(ctx, logged)
-	case ssoMisconfigured(logged):
-		errlog.LogLevel(ctx, slog.LevelWarn, logged)
-	default:
-		errlog.Log(ctx, logged)
-	}
-	writeErrorResponse(ctx, w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
 }
 
 // apiError maps an error to the status it answers, the error the log line carries
@@ -352,6 +376,9 @@ func writeErrorResponse(ctx context.Context, w http.ResponseWriter, resp *api.Er
 // csrfInvalidCode is compared on every error response, so it is read once:
 // building a domain.Error captures its origin.
 var csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
+
+// passwordHashingBusyCode is the one 429 that carries Retry-After.
+var passwordHashingBusyCode = domain.ErrUserPasswordHashingBusy().Code
 
 func isSecurityError(err error) bool {
 	var target *ogenerrors.SecurityError

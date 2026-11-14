@@ -30,9 +30,11 @@ the repo root.
 - Passkey coverage is required in CI and rides the `passkey-first` preset
   lane, because the shipped `password-first` flow offers no passkey.
   `JOURNEY_ENABLE_PASSKEY=0` is a local debugging escape hatch only.
-- The testkit suite (`moon run e2e:journey -- --suite testkit`) installs
-  `@zitadel/testing` from the journey registry into one Next app and runs the
-  consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
+- The testkit suite (`turbo run journey --filter=@zitadel/e2e -- --suite testkit`) runs
+  `zitadel tests add` in one fresh Next app, which installs `@zitadel/testing`
+  from the journey registry, and runs the suite it wrote with `npm run test:e2e`.
+  The starter suite lives only in the CLI (`apps/cli/src/lib/test-kit.ts`);
+  a framework joins `tests add` once this lane runs it. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.
 - Skip a spec that needs the mock OIDC provider when `JOURNEY_OIDC_MOCK_URL`
@@ -42,35 +44,40 @@ the repo root.
 
 - Install `@zitadel/*` from the workflow's tarballs through the temporary
   Verdaccio registry, never from public npm.
-- Produce tarballs with `moon run release:pack`, which stages the server
-  binaries, packs every public package and verifies their metadata.
-  `--tarballs-dir` hands prebuilt ones to the runner, which skips building but
-  still verifies and publishes them.
-- `e2e:journey-local` never packs its own: `release:pack` rewrites the dist
-  folders the lanes beside it read. It sets `JOURNEY_TARBALLS_REQUIRED=1`; by
-  hand, `moon run e2e:journey -- --ci` packs its own.
+- Produce tarballs with `turbo run pack --filter=@zitadel/release`, which
+  packs every public package with the server binaries the graph built.
+  `--tarballs-dir` hands prebuilt ones to the runner, which skips building
+  but still verifies and publishes them.
+- The CI journeys (`journey:<id>`, `--packed`) install only what they need
+  (`journeyPackageDirs`, `e2e/journey/scripts/journey-packages.mjs`) from the
+  builds their task depends on: the `journey-packages` task packs what every
+  CI journey installs once per run, and a `journey:<id>` task copies those
+  and packs the rest (run any other way, `--packed` packs it all); by hand,
+  `turbo run journey --filter=@zitadel/e2e -- --ci` packs the release set.
+- Publish to the journey registry with `publish-tarballs.mjs`'s own request,
+  not `npm publish`: an npm process per package costs seconds each.
+- Give a journey task an edge to the build of every package it installs, in
+  `e2e/turbo.json`; `frameworks.test.mjs` checks them against the manifests.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
-  enforces that set.
-- `RELEASE_HOST_ONLY=1` (ci-turbo's journey) drops the other platforms'
-  server packages from that set, in the snapshot and in the check.
-- Keep Verdaccio's npmjs metadata cache (`maxage` in
-  `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
-  can ask for a nuxt released two hours earlier.
+  enforces the set: the full one for `@zitadel/release#pack`, the journey's
+  own with `--packages`.
+- The `journey:<id>` tasks are cached, so run nothing whose version the repo
+  does not fix: the CLI runs each framework CLI at its pin
+  ([cli](../../apps/cli/AGENTS.md)); only the npm ranges those write resolve
+  at run time.
 
 ## The runner
 
-- CI runs every variant (fresh-app matrix, passkey preset, pre-existing app,
-  testkit, remote https) in one `--ci` invocation, the `e2e:journey-local`
-  lane, so one process shares one port allocator. A new variant joins the
-  runner's `--ci` set, never a new workflow step. How the lane reaches CI:
-  [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- `scripts/ci-mode.mjs` (in ci-turbo.yml, `turbo query affected`) gates the
-  tarball snapshot and collapses the fresh-app matrix to one framework
-  (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
+- Add a CI journey to `ciJourneyVariants` (`frameworks.mjs`) and give it a
+  `journey:<id>` task under `journey-local` and in the root `ci` script
+  (so `--affected` can skip it); `frameworks.test.mjs` fails
+  until it has one. Never a workflow step.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.
+- `JOURNEY_*` is in the cached journeys' key; exclude a variable that only
+  moves where a run writes, as `!JOURNEY_WORK_DIR` (`e2e/turbo.json`).
 - Keep each framework suite Playwright-serial with one worker. Suites run in
   parallel only with their own app directory, npm cache and tmp directories,
   app port, Zitadel port and runtime state.

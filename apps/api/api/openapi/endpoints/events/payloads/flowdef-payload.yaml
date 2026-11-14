@@ -7,8 +7,6 @@ description: |
 properties:
   name:
     type: string
-  status:
-    type: string
   user_schema:
     type: string
   purposes:

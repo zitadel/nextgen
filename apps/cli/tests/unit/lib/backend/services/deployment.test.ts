@@ -9,6 +9,7 @@ import { Deployment, DeploymentService } from "@/lib/backend/services/deployment
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";
@@ -34,7 +35,7 @@ function record(
 }
 
 /** A deployment on a primary origin, whose target never expires. */
-function primary(id: string, origin = "https://app.acme.com"): ListDeployments200DeploymentsItem {
+function primary(id: string, origin = PRIMARY_ORIGIN): ListDeployments200DeploymentsItem {
   return record(id, [{ origin }]);
 }
 
@@ -172,7 +173,7 @@ describe("DeploymentService.get", () => {
   it("answers the deployment the project holds", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentById: async () => primary("dep_1"),
+        getDeployment: async () => primary("dep_1"),
       }),
       "proj_1",
     );
@@ -181,27 +182,27 @@ describe("DeploymentService.get", () => {
   });
 
   it("reads it for the project it is bound to", async () => {
-    const getDeploymentById = vi.fn(async () => primary("dep_1"));
-    const deploymentService = new DeploymentService(fakeClient({ getDeploymentById }), "proj_1");
+    const getDeployment = vi.fn(async () => primary("dep_1"));
+    const deploymentService = new DeploymentService(fakeClient({ getDeployment }), "proj_1");
 
     await deploymentService.get("dep_1");
 
-    expect(getDeploymentById).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
+    expect(getDeployment).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
   });
 
   it("reads no variables, so it takes no permission to read them", async () => {
-    const getDeploymentVariables = vi.fn(async () => ({}));
+    const listDeploymentVariables = vi.fn(async () => ({}));
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentById: async () => primary("dep_1"),
-        getDeploymentVariables,
+        getDeployment: async () => primary("dep_1"),
+        listDeploymentVariables,
       }),
       "proj_1",
     );
 
     await deploymentService.get("dep_1");
 
-    expect(getDeploymentVariables).not.toHaveBeenCalled();
+    expect(listDeploymentVariables).not.toHaveBeenCalled();
   });
 });
 
@@ -209,7 +210,7 @@ describe("DeploymentService.variables", () => {
   it("answers a secret as held, without its value", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
-        getDeploymentVariables: async () => ({ TOKEN: { secret: true } }),
+        listDeploymentVariables: async () => ({ TOKEN: { secret: true } }),
       }),
       "proj_1",
     );
@@ -278,7 +279,7 @@ describe("DeploymentService.liveOn", () => {
   it("answers the deployment live on the origin it was given", async () => {
     const deploymentService = serviceListing([primary("dep_1")]);
 
-    await expect(deploymentService.liveOn("https://app.acme.com")).resolves.toMatchObject({
+    await expect(deploymentService.liveOn(PRIMARY_ORIGIN)).resolves.toMatchObject({
       outcome: "live",
       deployment: { id: "dep_1" },
     });
@@ -317,11 +318,11 @@ describe("DeploymentService.liveOn", () => {
   it("blames the deploy when the named origin is a primary origin with nothing on it", async () => {
     const deploymentService = serviceListing([], {
       getProject: async () => ({
-        origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+        origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
       }),
     });
 
-    await expect(deploymentService.liveOn("https://app.acme.com")).resolves.toEqual({
+    await expect(deploymentService.liveOn(PRIMARY_ORIGIN)).resolves.toEqual({
       outcome: "nothing-deployed",
       reason: "primary",
     });
@@ -343,7 +344,7 @@ describe("DeploymentService.liveOn", () => {
   it("says the origin is not the project's when no pattern covers it", async () => {
     const deploymentService = serviceListing([], {
       getProject: async () => ({
-        origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+        origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
       }),
     });
 

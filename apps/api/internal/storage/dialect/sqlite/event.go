@@ -25,17 +25,19 @@ INSERT INTO events (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    operation_status, status_class,
     payload, metadata
 ) VALUES (
     ?, ?, ?, ?,
     ?, max(?, coalesce((SELECT max(created_at) FROM events WHERE project_id = ?), 0) + 1),
     ?, ?, ?,
-    ?, ?,
+    ?, ?, ?,
     ?, ?, ?, ?, ?, ?,
     ?, ?, ?,
+    ?, ?,
     ?, ?
 ) RETURNING occurred_at, created_at`
 
@@ -43,10 +45,17 @@ INSERT INTO events (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    operation_status, status_class,
     payload, metadata
+FROM events`
+
+	// eventScanSelect and eventScanFrom are ScanEvents' statement, around the
+	// expression that says whether a row matched.
+	eventScanSelect = `SELECT id, created_at, `
+	eventScanFrom   = `
 FROM events`
 
 	deleteEventsOlderThanStmt = `
@@ -109,9 +118,10 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
 		occurredNano, createdNano, event.ProjectID,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
-		nullString(event.EntityType), nullString(event.EntityID),
+		nullString(event.EntityType), nullString(event.EntityID), nullString(event.UserID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
 		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
+		nullString(events.OperationStatusOf(event)), nullStatusClass(event.StatusClass),
 		string(payload), string(metadata),
 	).Scan(&occurredOut, &createdOut)
 	if err != nil {
@@ -173,6 +183,48 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 		Items:      items,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// ScanEvents implements [service.EventStatements]. It reads the rows of one
+// index range, within, in its order and no further than its limit, and says
+// of each whether it satisfies match. match is not part of the WHERE: the
+// database then has nothing to choose another index by, so the read is the
+// range and stops at the limit, whatever the data. A nil match matches every
+// row.
+func (e eventStatements) ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error) {
+	var compiler statementCompiler
+	compiler.WriteString(eventScanSelect)
+	if match == nil {
+		compiler.WriteString("1")
+	} else {
+		compiler.WriteString("CASE WHEN ")
+		compileFilter(&compiler, match, events.Schema)
+		compiler.WriteString(" THEN 1 ELSE 0 END")
+	}
+	if err := compileRead(&compiler, eventScanFrom, within, events.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	scanned, err := collectRows(rows, func(row *sql.Rows) (events.Scanned, error) {
+		var (
+			s           events.Scanned
+			createdNano int64
+			matched     int64
+		)
+		if err := row.Scan(&s.ID, &createdNano, &matched); err != nil {
+			return s, err
+		}
+		s.CreatedAt = timeFromUnixNano(createdNano)
+		s.Matched = matched != 0
+		return s, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return scanned, nil
 }
 
 // DeleteEventsOlderThan implements [service.EventStatements].
@@ -286,7 +338,9 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		ev                                               domain.Event
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID sql.NullString
+		userID                                           sql.NullString
 		requestID, sessionID, flowID                     sql.NullString
+		operationStatus, statusClass                     sql.NullString
 		occurredNano, createdNano                        int64
 		payload, metadata                                string
 	)
@@ -294,9 +348,10 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		&ev.ProjectID, &ev.ID, &eventType, &category,
 		&occurredNano, &createdNano,
 		&teamID, &actorID, &actorType,
-		&entityType, &entityID,
+		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
+		&operationStatus, &statusClass,
 		&payload, &metadata,
 	); err != nil {
 		return nil, err
@@ -313,9 +368,18 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 	}
 	ev.EntityType = nullStringPtr(entityType)
 	ev.EntityID = nullStringPtr(entityID)
+	ev.UserID = nullStringPtr(userID)
 	ev.RequestID = nullStringPtr(requestID)
 	ev.SessionID = nullStringPtr(sessionID)
 	ev.FlowID = nullStringPtr(flowID)
+	if statusClass.Valid {
+		c := domain.HTTPStatusClass(statusClass.String)
+		ev.StatusClass = &c
+	}
+	if operationStatus.Valid {
+		operation := events.OperationOf(operationStatus.String)
+		ev.OperationID = &operation
+	}
 	ev.Payload = events.NormalizeJSON([]byte(payload))
 	ev.Metadata = events.NormalizeJSON([]byte(metadata))
 	return &ev, nil
@@ -329,6 +393,13 @@ func nullString(p *string) any {
 }
 
 func nullActorType(p *domain.EventActorType) any {
+	if p == nil {
+		return nil
+	}
+	return string(*p)
+}
+
+func nullStatusClass(p *domain.HTTPStatusClass) any {
 	if p == nil {
 		return nil
 	}

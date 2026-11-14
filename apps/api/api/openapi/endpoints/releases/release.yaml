@@ -5,8 +5,8 @@ description: |
 
   A release owns pointers and metadata, not content: it records *which*
   revisions belong together. To get the resource bytes, resolve each
-  `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
-  `GET /flow_definitions/{id}`, …).
+  `revision_id` through the per-kind read endpoints (`GET /schemas/{schema_id}`,
+  `GET /flow_definitions/{flow_definition_id}`, …).
 
   A release exists on its own and is not tied to an origin. Deploying it is a
   separate call (`createDeployment` (`POST /deployments`)).

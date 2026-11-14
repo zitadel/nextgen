@@ -44,7 +44,7 @@ func TestAuthAttemptPasswordLogin(t *testing.T) {
 		})
 	require.Contains(t, completedMethods(passworded), api.FactorMethodPassword)
 
-	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
+	handoffResp, err := client.CreateAuthAttemptHandoff(t.Context(), api.CreateAuthAttemptHandoffParams{AttemptID: attemptID})
 	require.NoError(t, err)
 	require.IsType(t, &api.HandoffResponse{}, handoffResp, helpers.MustMarshal(t, handoffResp))
 	require.NotEmpty(t, handoffResp.(*api.HandoffResponse).HandoffToken)
@@ -78,9 +78,9 @@ func TestAuthAttemptIdentifierOnly_CannotHandoff(t *testing.T) {
 	// created with no explicit required checks.
 	require.Equal(t, api.AuthAttemptResponseStateInProgress, identified.State, helpers.MustMarshal(t, identified))
 
-	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
+	handoffResp, err := client.CreateAuthAttemptHandoff(t.Context(), api.CreateAuthAttemptHandoffParams{AttemptID: attemptID})
 	require.NoError(t, err)
-	// createHandoff declares 409 explicitly (att.not_completed), so ogen decodes
+	// createAuthAttemptHandoff declares 409 explicitly (att.not_completed), so ogen decodes
 	// that conflict as ErrorDetails rather than the default
 	// CreateHandoffErrorResponseStatusCode wrapper.
 	rejected, ok := handoffResp.(*api.ErrorDetails)
@@ -173,7 +173,7 @@ func createAttemptUser(t *testing.T, project *domain.Project, team *domain.Team,
 
 func setAttemptPassword(t *testing.T, project *domain.Project, userID, password string) {
 	t.Helper()
-	encodedHash, err := harness.EnsureHasher(t).Hash(password)
+	encodedHash, err := harness.EnsureHasher(t).Hash(t.Context(), password)
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureUserFixture(t).SetPassword(t.Context(), &domain.SetUserPassword{
 		ProjectID:   project.ID,
@@ -208,7 +208,7 @@ func verifyAttemptProof(
 ) *api.AuthAttemptResponse {
 	t.Helper()
 	challengeID := issueAttemptChallenge(t, client, attemptID, method)
-	verifyResp, err := client.VerifyChallengeProof(t.Context(), proof, api.VerifyChallengeProofParams{
+	verifyResp, err := client.VerifyAuthAttemptChallenge(t.Context(), proof, api.VerifyAuthAttemptChallengeParams{
 		AttemptID:   attemptID,
 		ChallengeID: challengeID,
 	})
@@ -222,7 +222,7 @@ func verifyAttemptProof(
 func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, proof *api.VerifyChallengeRequest) {
 	t.Helper()
 	challengeID := issueAttemptChallenge(t, client, attemptID, api.ChallengeMethodIdentifier)
-	verifyResp, err := client.VerifyChallengeProof(t.Context(), proof, api.VerifyChallengeProofParams{
+	verifyResp, err := client.VerifyAuthAttemptChallenge(t.Context(), proof, api.VerifyAuthAttemptChallengeParams{
 		AttemptID:   attemptID,
 		ChallengeID: challengeID,
 	})
@@ -236,7 +236,7 @@ func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api
 
 func issueAttemptChallenge(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, method api.ChallengeMethod) api.ChallengeID {
 	t.Helper()
-	resp, err := client.IssueChallenge(t.Context(), &api.IssueChallengeRequest{Method: method}, api.IssueChallengeParams{AttemptID: attemptID})
+	resp, err := client.CreateAuthAttemptChallenge(t.Context(), &api.IssueChallengeRequest{Method: method}, api.CreateAuthAttemptChallengeParams{AttemptID: attemptID})
 	require.NoError(t, err)
 	require.IsType(t, &api.ChallengeResponse{}, resp, helpers.MustMarshal(t, resp))
 	return resp.(*api.ChallengeResponse).ChallengeID

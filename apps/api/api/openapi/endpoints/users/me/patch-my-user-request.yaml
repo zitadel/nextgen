@@ -5,7 +5,7 @@ description: |
   `null` deletes the attribute, and any other value replaces the stored one.
   The merged result is validated as a whole against the user's schema.
 
-  Unlike `PatchUserByID` (`PATCH /users/{user_id}`), this request cannot move
+  Unlike `updateUser` (`PATCH /users/{user_id}`), this request cannot move
   the user to another schema: schema upgrades are a management operation.
 type: object
 additionalProperties: false

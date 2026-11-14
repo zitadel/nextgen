@@ -1,0 +1,20 @@
+type: object
+description: |
+  A stored OAuth settings revision. `oauth` echoes the canonical stored
+  settings, so a client such as the CLI can reconcile local files with the
+  server's stored state.
+required:
+  - id
+  - created_at
+  - oauth
+properties:
+  id:
+    type: string
+    description: The unique identifier of this OAuth settings revision.
+    example: oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM
+  created_at:
+    type: string
+    format: date-time
+    description: When this revision was published.
+  oauth:
+    $ref: ../../components/oauth/oauth-settings.yaml

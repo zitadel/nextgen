@@ -11,23 +11,20 @@
     "sync:export": {
       "outputs": ["src/generated/figma.tokens.json"]
     },
-    // The Figma export is the input; the rest is generated (and committed).
+    // The Figma export is the input; the rest is generated and committed, so
+    // every task reads it as source and none depends on `generate`, the tool
+    // a person runs after a sync. Not cached: it writes committed files.
+    // check-generate, in the lint group, fails when they forgot.
     "generate": {
-      "outputs": [
-        "src/generated/tokens.css",
-        "src/generated/tokens.ts",
-        "src/generated/tailwind.css",
-        "src/generated/shadcn.css"
-      ]
+      "cache": false
     },
-    "typecheck": {
-      "dependsOn": ["generate"]
-    },
-    "build": {
-      "dependsOn": ["generate"]
-    },
-    "test": {
-      "dependsOn": ["generate"]
+    // Both packages' lint group: each runs the one of these its package has
+    // (this one's check-generate, the Go module's format, which the root
+    // turbo.json gives its command).
+    "check-generate": {},
+    "format": {},
+    "lint": {
+      "dependsOn": ["check-generate", "format"]
     },
     // This directory is also the Go module the server and bench embed the
     // tokens through (tokens.go), which turbo finds through go.work as the

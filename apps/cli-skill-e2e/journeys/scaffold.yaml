@@ -32,25 +32,25 @@ stages:
     app: register-signin
     assert:
       - name: a project exists on the instance
-        get: projects list
+        get: project list
         path: items
         op: count-gte
         value: 1
       - name: deployed schema collects a first name
-        get: schemas get human-user
+        get: schema get human-user
         path: [schema.properties.givenName, schema.properties.firstName]
         op: exists
       - name: deployed schema collects a last name
-        get: schemas get human-user
+        get: schema get human-user
         path: [schema.properties.familyName, schema.properties.lastName]
         op: exists
       - name: password sign-in is enabled
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.x-auth-methods.password.enabled
         op: eq
         value: true
       - name: passkeys are NOT enabled (the developer said no)
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.x-auth-methods.passkey.enabled
         op: neq
         value: true
@@ -63,7 +63,7 @@ stages:
       what you find. Drive the CLI non-interactively.
     assert:
       - name: exactly one project exists
-        get: projects list
+        get: project list
         path: items
         op: count-eq
         value: 1
@@ -85,7 +85,7 @@ stages:
     app: register-has-phone
     assert:
       - name: a phone field is live on the deployed schema
-        get: schemas get human-user
+        get: schema get human-user
         path:
           - schema.properties.phoneNumber
           - schema.properties.telephoneNumber
@@ -102,7 +102,7 @@ stages:
     app: signin-offers-passkey
     assert:
       - name: passkeys are enabled on the deployed schema
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.x-auth-methods.passkey.enabled
         op: eq
         value: true
@@ -116,12 +116,12 @@ stages:
     app: register-has-phone
     assert:
       - name: still exactly one project
-        get: projects list
+        get: project list
         path: items
         op: count-eq
         value: 1
       - name: the phone field is live on the deployed schema
-        get: schemas get human-user
+        get: schema get human-user
         path:
           - schema.properties.phoneNumber
           - schema.properties.telephoneNumber
@@ -141,12 +141,12 @@ stages:
       deployed. Drive the CLI non-interactively.
     assert:
       - name: the nickname field is live on the deployed schema
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.properties.nickname.type
         op: eq
         value: string
       - name: the phone field is still live
-        get: schemas get human-user
+        get: schema get human-user
         path:
           - schema.properties.phoneNumber
           - schema.properties.telephoneNumber

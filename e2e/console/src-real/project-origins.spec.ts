@@ -69,7 +69,9 @@ test("refuses a wildcard as primary, then adds, edits and removes an origin", as
     // Whatever the test left behind: a lone origin closes the project's gate
     // to every other spec. Removing an absent pattern is idempotent.
     for (const origin of [pattern, edited]) {
-      await withErrorBody(zitadel.api.removeOrigin(zitadel.handle.projectId, { pattern: origin }));
+      await withErrorBody(
+        zitadel.api.removeProjectOrigin(zitadel.handle.projectId, { pattern: origin }),
+      );
     }
   }
 });
@@ -85,7 +87,7 @@ test("lists variables set through the API, with a secret held rather than shown"
   const params = { project_id: zitadel.handle.projectId };
 
   await withErrorBody(
-    zitadel.api.updateVariables(
+    zitadel.api.setVariables(
       { [name]: "plain-value", [secret]: { value: "never-shown", secret: true } },
       params,
     ),

@@ -1,0 +1,15 @@
+description: |
+  An application as `publishApplication` (`POST /applications`) wrote it, with
+  its document as `definition` and the secrets of the clients it created.
+allOf:
+  - $ref: application-response.yaml
+  - type: object
+    properties:
+      client_secrets:
+        type: array
+        items:
+          $ref: application-client-secret.yaml
+        description: |
+          The secrets this write generated, one for each client it created,
+          each with the client's `client_id`. Absent when the write created
+          no client. Each secret is shown only once.

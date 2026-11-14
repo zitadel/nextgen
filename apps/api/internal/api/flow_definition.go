@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strings"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+func (h Handler) PublishFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.PublishFlowDefinitionRes, error) {
 	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -31,11 +30,11 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opRead)
+	projectID, err := h.requireResourceAccess(ctx, params.FlowDefinitionID, flowDefinitionAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.ID)
+	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.FlowDefinitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +138,6 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 		ProjectID:     string(req.GetProjectID()),
 		Name:          definition.GetName(),
 		UserSchema:    definition.GetUserSchema(),
-		Status:        strings.ToLower(string(definition.GetStatus())),
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -303,7 +301,6 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefi
 		ProjectID: flowDefinition.ProjectID,
 		FlowDefinition: api.FlowDefinition{
 			Name:       flowDefinition.Name,
-			Status:     api.FlowDefinitionStatus(flowDefinition.Status.String()),
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,

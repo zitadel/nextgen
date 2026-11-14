@@ -1,0 +1,18 @@
+title: TeamMemberInvitation
+description: |
+  An invitation that adds the accepter to a team. Declared now so the contract
+  does not change when team invitations ship; creating one answers `501`
+  `not_implemented` until then.
+allOf:
+  - $ref: invitation-common.yaml
+  - type: object
+    required:
+      - type
+      - team_member
+    properties:
+      type:
+        type: string
+        enum:
+          - team_member
+      team_member:
+        $ref: invitation-team-member-payload.yaml

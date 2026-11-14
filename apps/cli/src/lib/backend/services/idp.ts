@@ -1,7 +1,7 @@
 import type { QueryIdps200IdpsItem } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
+import type { ZitadelClient } from "@/lib/backend/client";
 import { BackendError } from "@/lib/backend/errors";
 
 /** An identity-provider connection, at its newest revision, as the list of them returns it. */

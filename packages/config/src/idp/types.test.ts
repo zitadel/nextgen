@@ -14,7 +14,9 @@ import {
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  RESERVED_SLUGS,
   type Scopes,
+  slugFromDisplayName,
   variableReference,
 } from "./index.js";
 import { slug } from "./test-support.js";
@@ -48,12 +50,60 @@ describe("parseConnectionSlug", () => {
   });
 });
 
+describe("slugFromDisplayName", () => {
+  it("lowercases the name and turns each run of other characters into one dash", () => {
+    expect(slugFromDisplayName("Zitadel Cloud")).toBe("zitadel-cloud");
+    expect(slugFromDisplayName("Acme  -  SSO!")).toBe("acme-sso");
+  });
+
+  it("drops the dashes at either end", () => {
+    expect(slugFromDisplayName("  (Acme) ")).toBe("acme");
+  });
+
+  it("suggests only a slug the parser accepts", () => {
+    for (const name of ["Zitadel Cloud", "Acme SSO", "1Password", "a".repeat(200)]) {
+      expect(
+        parseConnectionSlug(slugFromDisplayName(name, RESERVED_SLUGS), RESERVED_SLUGS).ok,
+        name,
+      ).toBe(true);
+    }
+  });
+
+  it("does not end on a dash when the length cut lands just after one", () => {
+    expect(slugFromDisplayName(`${"a".repeat(63)} b`)).toBe("a".repeat(63));
+  });
+
+  it.each(["Google", "Custom"])("suggests nothing for the reserved name %j", (name) => {
+    expect(slugFromDisplayName(name, RESERVED_SLUGS)).toBe("");
+  });
+
+  it("transliterates accented and non-Latin letters rather than dropping them", () => {
+    expect(slugFromDisplayName("Ünïcode Login")).toBe("uenicode-login");
+    expect(slugFromDisplayName("Вход Acme")).toBe("vkhod-acme");
+  });
+
+  it("keeps a camel-case name as one word", () => {
+    expect(slugFromDisplayName("GitHub Enterprise")).toBe("github-enterprise");
+  });
+
+  it("suggests nothing when the name has no letter or digit", () => {
+    expect(slugFromDisplayName("!!!")).toBe("");
+  });
+});
+
 describe("parseDisplayName", () => {
   it("wants something to show, and trims it", () => {
     expect(parseDisplayName("")).toMatchObject({ ok: false });
     expect(parseDisplayName("   ")).toMatchObject({ ok: false });
     expect(parseDisplayName("x".repeat(257))).toMatchObject({ ok: false });
     expect(parseDisplayName("  Acme SSO ")).toEqual({ ok: true, value: "Acme SSO" });
+  });
+
+  it("states what is wrong rather than ordering the reader to type something", () => {
+    expect(parseDisplayName("   ")).toEqual({
+      ok: false,
+      problem: "The name shown on the sign-in button is empty.",
+    });
   });
 });
 
@@ -102,6 +152,11 @@ describe("parseClientId and parseClientSecret", () => {
     expect(parseClientId(" id ")).toEqual({ ok: true, value: "id" });
     expect(parseClientSecret("")).toMatchObject({ ok: false });
     expect(parseClientSecret(" s3cret ")).toEqual({ ok: true, value: "s3cret" });
+  });
+
+  it("state what is wrong rather than ordering the reader to type something", () => {
+    expect(parseClientId("  ")).toEqual({ ok: false, problem: "The client id is empty." });
+    expect(parseClientSecret("")).toEqual({ ok: false, problem: "The client secret is empty." });
   });
 });
 

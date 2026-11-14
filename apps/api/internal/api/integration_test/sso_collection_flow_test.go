@@ -15,7 +15,7 @@ import (
 )
 
 // These tests resolve an unlinked identity into the register-sso step through
-// GET /flow/{id}, then submit that step. Like the resolution tests they run
+// GET /flows/{flow_id}, then submit that step. Like the resolution tests they run
 // sequentially.
 
 // ssoCollectionFixture is an sso resolution fixture whose flows start on a
@@ -55,11 +55,10 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"dependentRequired": {"country": ["zip"]}
 	}`)
 	submit := api.StepAction{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)}
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: f.projectID(),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "sso-collection",
-			Status:     "active",
 			UserSchema: schemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
 			Steps: []api.FlowDefinitionStep{
@@ -134,8 +133,8 @@ func (f *ssoCollectionFixture) submit(t *testing.T, flow ssoFlow, fields map[str
 // stepError, and created, bound and linked nothing.
 func (f *ssoCollectionFixture) requireStepError(t *testing.T, flow ssoFlow, resp api.SubmitFlowStepRes, subject, stepError string) {
 	t.Helper()
-	require.IsType(t, &api.SubmitFlowStepBadRequest{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepBadRequest).Response
+	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := badRequestStep(t, resp)
 	assert.Equal(t, "register-sso", got.Step.Name)
 	assert.Equal(t, stepError, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
@@ -164,8 +163,8 @@ func TestSSOCollectionSubmitCreatesUserAndLinkAtomically(t *testing.T) {
 
 	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice"})
 
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepOK).Response
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "done", got.Step.Name)
 	assert.True(t, got.HandoffToken.Set, "the created user signs in")
 	user, err := f.userByEmail(t, "alice@example.com")
@@ -259,8 +258,8 @@ func TestSSOCollectionSubmitTypedCollisionBindsOwner(t *testing.T) {
 
 			resp := f.submit(t, flow, tc.fields)
 
-			require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-			got := resp.(*api.SubmitFlowStepOK).Response
+			require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+			got := resp.(*api.FlowResponseHeaders).Response
 			assert.Equal(t, "identifier", got.Step.Name)
 			assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
 			attempt := f.attempt(t, flow)
@@ -291,8 +290,8 @@ func TestSSOCollectionSubmitInvalidUserShowsStepError(t *testing.T) {
 
 	// The rotated cookie still holds the row, so the corrected submit creates
 	// the user.
-	flow.zflow = mustExtractZflow(t, resp.(*api.SubmitFlowStepBadRequest).SetCookie)
+	flow.zflow = mustExtractZflow(t, resp.(*api.SubmitFlowStepBadRequestHeaders).SetCookie)
 	fixed := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice", "country": "DE", "zip": "10115"})
-	require.IsType(t, &api.SubmitFlowStepOK{}, fixed, helpers.MustMarshal(t, fixed))
-	assert.Equal(t, "done", fixed.(*api.SubmitFlowStepOK).Response.Step.Name)
+	require.IsType(t, &api.FlowResponseHeaders{}, fixed, helpers.MustMarshal(t, fixed))
+	assert.Equal(t, "done", fixed.(*api.FlowResponseHeaders).Response.Step.Name)
 }

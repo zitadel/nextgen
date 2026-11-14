@@ -48,7 +48,7 @@ Every envelope includes:
 - `source`
 - `status`: `ok`, `skipped`, or `error`
 
-`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
+`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a no-op, not a failure: nothing was done because a person declined or there was nothing to do, with a stable `reason` such as `already-claimed`. A dry run answers `ok` with `data.dry_run: true` and a headline ending in "(dry run)". `error` responses include `code`, `message`, and usually a `hint`. Prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
 
 ## Read the results
 
@@ -80,6 +80,8 @@ Summarize commands run, JSON statuses, files changed, browser steps completed, a
 ```
 
 The run worked when `setup` returned `status: ok` and the browser loop ends on the signed-in page, with the profile showing the user you registered.
+
+To keep that proof as a test in the app, write it with `@zitadel/testing`, which boots its own Zitadel server and seeds the users ([Test your app's sign-in](/docs/guides/test-your-app)).
 
 ## Stable UI proof
 

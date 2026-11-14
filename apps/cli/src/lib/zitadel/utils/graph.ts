@@ -3,10 +3,9 @@
  * in the order it was first reached.
  *
  * @remarks
- * A node is told apart from another by its key, so a walk that carries
- * something along, such as the provider chosen on the way, visits a step once
- * for each thing it can carry there. A node is queued only when its key has not
- * been seen, so each node is judged once and the order is the order reached.
+ * A node is told apart from another by its key. A node is queued only when its
+ * key has not been seen, so each node is judged once and the order is the order
+ * reached.
  *
  * @typeParam Node - What the walk visits.
  * @param start - Where the walk starts.
@@ -32,11 +31,8 @@ export function walk<Node>(
   };
   enqueue(start);
   // The list grows as nodes are found, and the loop follows it to the end.
-  for (let index = 0; index < reached.length; index += 1) {
-    const node = reached[index];
-    if (node !== undefined) {
-      enqueue(next(node));
-    }
+  for (const node of reached) {
+    enqueue(next(node));
   }
   return reached;
 }

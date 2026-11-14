@@ -1,7 +1,7 @@
 # Release Runbook
 
-This repo uses Moon for CI/build orchestration, server artifacts, containers,
-and the draft GitHub Release shell for `v<version>`. Changesets owns package
+This repo uses Turborepo for CI/build orchestration, server artifacts,
+containers, and the draft GitHub Release shell for `v<version>`. Changesets owns package
 versioning, changelogs, npm publishing, and public package tags. Notable
 changes get entries on the website's changelog, which an agent drafts in a
 pull request ([Product notes](#product-notes)).
@@ -146,10 +146,10 @@ shorten the notes and rerun.
 ## Local checks
 
 ```sh
-moon ci
-moon run release:snapshot
-moon run release:publish -- --dry-run  # from a generated version commit
-moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
+pnpm run ci
+pnpm run release:snapshot
+RELEASE_DRY_RUN=1 pnpm run release:publish   # from a generated version commit
+RELEASE_DRY_RUN=1 RECOVER_VERSION=0.1.0-alpha.8 pnpm run release:publish
 ```
 
 ## Renumbering the 1.0.0-alpha releases

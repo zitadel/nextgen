@@ -1,9 +1,19 @@
 name: ci
 
+# The required check, `ci / full-pr`: the root `ci` script (package.json)
+# through turbo, on the tasks the change reaches (`--affected` from the base
+# below), with turbo's remote cache (docs/design/build/turborepo.md). The
+# release checks are tasks of the graph too, so a Changesets version PR runs
+# like any other.
+
 on:
   pull_request:
   merge_group:
   workflow_dispatch:
+  # Every task, nightly on main; it also saves main's Go cache, the one entry
+  # pull requests and merge groups can restore.
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -12,75 +22,74 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # What `--affected` compares with: the commit a merge group is built on, or
+  # a pull request's base. Against main, an entry queued behind others would
+  # re-test every entry ahead of it, which its own group tests. A dispatch
+  # and the nightly run compare with the repository's first commit, so they
+  # run every task.
+  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || '4f5f35d2ed692a2de6966727d831a57757f7757d' }}
+  # Suppress CLI telemetry for every step (https://consoledonottrack.com).
+  DO_NOT_TRACK: "1"
+  TURBO_TELEMETRY_DISABLED: "1"
+  # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+  # warns on every process that also sees NO_COLOR. Blank it so only the test
+  # output is left in the log.
+  NO_COLOR: ""
+  # No Ryuk reaper: it is the postgres lane's only image from Docker Hub,
+  # whose pull rate limit then fails the lane. Every test package stops its
+  # own container, and the runner goes away after the job.
+  TESTCONTAINERS_RYUK_DISABLED: "true"
+  # Every run reads and writes Vercel's remote cache: a pull request's later
+  # pushes restore what its earlier ones built, and the merge queue writes
+  # the results of the commit that lands on main.
+  TURBO_CACHE: "local:rw,remote:rw"
+  # The nightly run reads no cache. A cached journey's npm installs resolved
+  # the ranges the pinned framework CLIs write as they stood that day, so a
+  # release within them that breaks setup shows here first, not in a pull
+  # request that happens to rerun the journey.
+  TURBO_FORCE: ${{ github.event_name == 'schedule' }}
+  # The same run checks the conformance fixtures whose framework generator
+  # its pin does not fix (`generatorPinned: false`, conformance/README.md).
+  CONFORMANCE_UNPINNED: ${{ github.event_name == 'schedule' }}
+
 jobs:
   full-pr:
-    # Fork PRs execute untrusted repository code. Keep them off Depot runners,
-    # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
-    timeout-minutes: 120
+    # GitHub's 32-core arm64 runner (the 32-arm-linux runner group), for
+    # every run: the graph is CPU-bound. Its JavaScript results share the
+    # remote cache with x64 runs; a Go task's key holds the toolchain and
+    # target, so its entries stay apart (docs/design/build/turborepo.md).
+    runs-on:
+      group: 32-arm-linux
+    # A run of every task, with no cache at all, takes about 7.5 minutes, so
+    # 15 stops a runaway task without cutting a slow run short.
+    timeout-minutes: 15
     permissions:
       contents: read
-    env:
-      # What the change is measured against: a pull request's base, or the
-      # commit a merge group is built on. Against origin/main, an entry queued
-      # behind others re-tested every entry ahead of it, which its own group
-      # tests (docs/design/build/turborepo-graph.md).
-      CI_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
-      # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
-      # "Tasks: 1 failed" with no named target. The summary names them in plain
-      # text and replays each failed task's own output. Green runs pay only a
-      # pass/fail list; the replay section is empty when nothing failed.
-      MOON_SUMMARY: detailed
-      # Suppress CLI telemetry for every step in CI. DO_NOT_TRACK is the
-      # cross-tool standard (https://consoledonottrack.com) the CLI honors, so
-      # no build runs here ever ship events to the telemetry backend.
-      DO_NOT_TRACK: "1"
-      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
-      # warns on every process that also sees NO_COLOR. Blank it so only the
-      # test output is left in the log.
-      NO_COLOR: ""
-      # Keep testcontainers from starting its Ryuk reaper. Ryuk is the postgres
-      # lane's only image from Docker Hub (testcontainers/ryuk), whose pull rate
-      # limit then fails the lane. Nothing here needs reaping: every test
-      # package stops its own container, and the runner goes away after the
-      # job with whatever a crashed test binary left running.
-      TESTCONTAINERS_RYUK_DISABLED: "true"
+      # The remote-cache step trades this for a Turborepo token.
+      id-token: write
     steps:
-      # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
-      # volume that writes about 250 MB/s. Linux writes dirty pages back only
-      # once they are 30 s old or 10 % of the memory (6-12 GB there), so that
-      # disk idles while the job unpacks its caches, and the backlog grows to
-      # several GB. A sync waits for all of it, and Docker syncs the root
-      # filesystem on every container create (it unmounts the container's
-      # init layer, an overlay): the postgres lane's first testcontainer
-      # waited 22-29 s there, 2-4 s on Depot's microVMs. With writeback from
-      # 64 MB on, it waited 8-22 s. The cost: writers get throttled from
-      # about 10 % of the memory dirty instead of 15 %.
-      - name: Write dirty pages back early
-        run: sudo sysctl -w vm.dirty_background_bytes=67108864
-
       - uses: actions/checkout@v6
         with:
+          # The base `--affected` compares with.
           fetch-depth: 0
 
       # A version PR has to land on its own: release-publish finds the version
       # commit from the diff of the push, which would also hold every PR the
-      # queue squashed it onto, and then refuses to publish. Running that
-      # detection here drops such a version PR from the queue instead; queue it
-      # again once the PRs ahead of it land. Any other merge group skips.
+      # queue squashed it onto, and then refuses to publish. This drops such a
+      # version PR from the queue instead; queue it again once the PRs ahead
+      # of it land. Any other merge group skips.
       - name: Check a queued version PR lands alone
         if: ${{ github.event_name == 'merge_group' }}
         env:
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: node scripts/release-automation.mjs publish --base "$BASE_SHA"
 
-      # The postgres lane (server:test-postgres) starts its databases through
-      # testcontainers, and every package of the lane waits while the first
-      # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
-      # runners. Pull it now, in the background while the job installs, so
-      # the lane finds it there. The image name comes from the testdb package,
-      # so the two cannot drift; the output goes to a file, so the step
-      # returns at once.
+      # The postgres lane starts its databases through testcontainers, and
+      # every package of the lane waits while the first one pulls the image.
+      # Pull it in the background while the job installs; the name comes from
+      # the testdb package, so the two cannot drift. Both registries serve the
+      # same official image.
       - name: Pull the postgres lane's image
         run: |
           image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
@@ -88,7 +97,6 @@ jobs:
             echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
-          # Both registries serve the same official image and version.
           nohup bash -c '
             if ! docker pull --quiet "$1"; then
               fallback="docker.io/${1#public.ecr.aws/docker/}"
@@ -97,24 +105,23 @@ jobs:
             fi
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Keyed on every module's go.sum and go.work.sum (tools/bench and tools/oidc-mock are
-      # modules of their own) instead of setup-go's default, go.mod.
-      # ci-turbo.yml shared the go.mod key until it got a cache of its own,
-      # and its entry there for Go 1.26.8 holds Go's own cache files. On Depot
-      # this job builds through GOCACHEPROG (`depot gocache`, which keeps
-      # depot-* files in GOCACHE), so it cannot use them.
+      # Keyed on go.work and every module's go.sum, so the entry holds what
+      # this job compiles; a key keeps its first save. A pull request or a
+      # merge group restores its own entry or main's, which the nightly run
+      # saves.
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
+            go.work
             apps/api/go.sum
             packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
             go.work.sum
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
 
@@ -126,265 +133,84 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
-      # runs the exact version the lockfile resolves — same as local dev.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
-      # Each package imports only its own files and the packages its
-      # package.json declares; an import that cannot carries
-      # `// @boundaries-ignore <reason>` (docs/design/build/turborepo.md).
-      - name: Check package boundaries
-        run: turbo boundaries
-
-      # Below 1.0.0 a `major` changeset would release every public package as
-      # 1.0.0 (docs/adrs/074-preview-releases-on-0x.md), so the pending ones are
-      # checked before they reach the version PR. `changeset status` compares
-      # HEAD with the base branch by its local name, which a pull request's
-      # checkout does not have.
-      - name: Check pending changesets
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          git branch --force main origin/main
-          node scripts/check-changesets-status.mjs --pending --summary
-
-      # Emits `mode`, per-lane affected gates (go_tests, e2e, snapshot,
-      # journey_fresh_app, journey_passkey, journey_preexisting,
-      # journey_testkit, suites_*, browsers), and the journey_matrix scope,
-      # computed from moon's affected task selection. This workflow reads
-      # go_tests, e2e, snapshot and journey_matrix. Gates fail open — unclaimed
-      # files, empty diffs, and query failures all force a full run. Logic +
-      # tests: scripts/ci-mode.mjs.
-      - name: Detect CI mode
-        id: ci-mode
-        run: node scripts/ci-mode.mjs "$CI_BASE"
-
-      # Pruning variant: deletes every generated file before regenerating, so
-      # output that no directive produces any more fails here instead of
-      # living on in the tree. Subsumes plain `check-generate`, and keeps the
-      # generators honest about bootstrapping from an empty tree.
-      - name: Check Go generated files
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:check-generate-pruned
-
-      # Chromium for the e2e lanes (`e2e:all`, in the e2e step below). moon's
-      # component/storybook browser lanes install their own through an
-      # `install-browsers` dep; this covers the Playwright e2e specs.
-      - name: Cache Playwright browsers
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        uses: actions/cache@v5
+      # Vercel's remote cache over OIDC: the TURBO_TEAM repository variable
+      # and the team's Turborepo CLI policy for this repository. Forks get no
+      # token and run with the local cache only, as does any run whose
+      # exchange fails (the step prints Vercel's answer).
+      - name: Set up Turborepo remote cache
+        id: remote-cache
+        if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+        continue-on-error: true
+        uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          team: ${{ vars.TURBO_TEAM }}
 
-      - name: Install Playwright Chromium
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+      - name: Use the local cache only without a token
+        if: ${{ steps.remote-cache.outcome != 'success' }}
+        run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
+      # `changeset status` (`@zitadel/release#check-changesets`) compares HEAD
+      # with the base branch by its local name, which only a checkout of main
+      # has.
+      - name: Give the checkout a local main
+        run: git rev-parse --verify --quiet refs/heads/main >/dev/null || git branch main origin/main
+
+      # Chromium aborts every in-flight request when the host gains or loses
+      # an IP address (ERR_NETWORK_CHANGED), and each container the postgres
+      # lane starts beside the browser lanes adds a link-local IPv6 address.
+      # Off on interfaces created from here on and on docker0. (#1490)
       - name: Keep Docker's interface churn away from Chromium
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # Chromium aborts every in-flight request when the host gains or loses
-        # an IP address (ERR_NETWORK_CHANGED), failing whichever browser-mode
-        # suite is loading a module at that moment. The containers the Go
-        # integration suites start add addresses in two ways: with IPv6 on, the
-        # kernel gives each container's host veth interface a link-local
-        # address, and the job's first container brings up the docker0 bridge,
-        # which then gets one too. Disable IPv6 on interfaces created from here
-        # on and on docker0, which already exists; loopback and the runner's
-        # NIC keep it. (#1490)
         run: |
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
           if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
             sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
           fi
 
-      # Builds, lint, typecheck and unit tests. `:test` is unit tests here as in
-      # a local `pnpm run check`; the e2e suite runs in its own step below.
-      - name: Run Moon build and test graph
-        id: moon-ci
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # moon ci only selects tasks whose own inputs changed. --downstream deep
-        # with --include-relations also runs the tasks of every project that
-        # depends on a changed one, so an api change re-tests its consumers.
-        # It compares with the same base as ci-mode; without one, a merge
-        # group fell back to origin/main.
+      # In GitHub Actions turbo groups each task's log and annotates every
+      # failed task itself (`::error::`). A task per core: the graph is
+      # CPU-bound, and turbo's default of 10 leaves this runner's cores idle.
+      # The script itself keeps the default, since a task per core overloads
+      # a laptop and its tests time out; pnpm appends the flag to its
+      # `turbo run`. `--summarize` writes the run's per-task timings and
+      # cache results to .turbo/runs for the two steps after this one.
+      - name: Run the ci script
+        run: corepack pnpm run ci --concurrency=100% --summarize
         env:
-          MOON_BASE: ${{ env.CI_BASE }}
-        run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph :check-go-work --downstream deep --include-relations
-
-      - name: Upload component test diagnostics
-        if: ${{ failure() && steps.moon-ci.outcome == 'failure' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: component-test-diagnostics
-          path: |
-            packages/components/test-output/vitest/junit.xml
-            packages/components/src/**/__screenshots__/**
-            packages/api-mock/test-output/vitest/junit.xml
-          if-no-files-found: ignore
-          retention-days: 7
-
-      # The graph step above runs the Go database lanes whenever moon finds
-      # them affected, as dependents of the console and login UI builds their
-      # binary embeds. When ci-mode forces a full run for files neither lane
-      # lists as input (a workflow-only edit, say), go_tests is on but moon
-      # finds the lanes unaffected, so the two steps below are their only run.
-      # This step reads the graph's report, so those steps run only the lanes
-      # it did not.
-      - name: Find the Go database lanes the graph ran
-        id: graph-lanes
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: node scripts/ci-mode.mjs --ran-in-graph postgres=server:test-postgres sqlite=server:test-sqlite
-
-      - name: Run Go integration tests (postgres)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.postgres != 'true' }}
-        run: moon run server:test-postgres
-
-      # The Spanner lane is not part of this job: it runs in spanner.yml
-      # (weekly on Spanner Omni, and on demand) and is not a required check.
-
-      - name: Run Go integration tests (sqlite)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.sqlite != 'true' }}
-        run: moon run server:test-sqlite
-
-      # Build the journey's release tarballs outside any moon graph, then hand
-      # them to the journey via JOURNEY_TARBALLS_DIR. The journey must not pack
-      # inside the e2e step below: that would spawn a second, concurrent moon
-      # graph (forbidden — see packages/testing/AGENTS.md) and race the
-      # dist-rewriting build tasks. `release:*` are runInCI:false, so unset CI
-      # to run them.
-      - name: Build release snapshot for the journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: |
-          env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
-          version="$(node -p "require('./apps/server/package.json').version")"
-          echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
-
-      # Verdaccio proxies every public framework package the journey scaffolds
-      # pull from npmjs; persisting its storage turns a dozen cold npm installs
-      # into warm ones. restore-keys pulls the newest saved store (on Depot
-      # runners from any branch: Depot's cache has no branch scopes); the key is
-      # per attempt, so a re-run starts from the newest store too, not from its
-      # first attempt's. The journey always republishes the @zitadel packages
-      # fresh (local-registry.mjs), so a stale store is still valid. The steps
-      # after the e2e suites save it again only when the journey fetched new
-      # tarballs into it.
-      - name: Restore journey registry packages
-        id: journey-registry
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache/restore@v5
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            journey-verdaccio-${{ runner.os }}-
-
-      - name: List restored journey registry packages
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs list
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-
-      # The e2e suite, after the graph rather than inside it: run alongside the
-      # unit suites, its browsers and dev servers slowed both sides into
-      # timeouts (run 38496066612). `e2e:all` depends on every lane (console
-      # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix,
-      # the kit's real-instance suite), and moon runs them side by side: only
-      # the two demo-next lanes share a mutex (e2e/moon.yml).
-      # The lanes are `runInCI: "skip"`, which keeps them out of the graph step
-      # above; `--ignore-ci-checks` runs them here. ci-mode's `e2e` gate says
-      # when: moon finds e2e:all affected, or the run is forced full (a
-      # workflow, root-script or moon.yml edit, which no lane lists as input).
-      # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the snapshot
-      # step.
-      - name: Run e2e suites
-        id: moon-e2e
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
-        # Streamed rather than buffered: buffered, a task's output reached the
-        # log only when the task ended, every line under one timestamp (run
-        # 38585094551). Each line still names its task, and MOON_SUMMARY still
-        # replays the failed tasks' output after the run.
-        run: moon exec e2e:all --ignore-ci-checks --on-failure continue --output-style stream
-        env:
-          # The journey's options, as ci-turbo.yml passes them: the work dir the
-          # diagnostics upload below reads, ci-mode's framework scope (`single`
-          # unless an SDK, the CLI, the test kit or the journey's own files
-          # moved), and the Verdaccio storage the restore step above fills.
+          # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
-          JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
-          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
 
-      # Saves the store only when the journey changed what a later run gets from
-      # it: new npmjs tarballs, or packuments it refreshed when local-registry.mjs
-      # keeps them for longer than Verdaccio's 2-minute default
-      # (registry-cache.mjs says why). An unchanged store would upload the same
-      # ~700 MB again, about 8 s of every run. Only after green e2e suites, as
-      # the cache action's post step did.
-      - name: Look for journey registry changes
-        id: journey-registry-changes
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs compare
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+      # The run's totals, critical path and slowest tasks on the run's
+      # summary page. A run that stops before turbo starts has no file.
+      - name: Summarize the turbo run
+        if: ${{ !cancelled() && hashFiles('.turbo/runs/*.json') != '' }}
+        run: node scripts/turbo-run-summary.mjs >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Save journey registry packages
-        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
-        uses: actions/cache/save@v5
+      # The raw summary, for comparing runs over time.
+      - name: Upload the turbo run summary
+        if: ${{ !cancelled() && hashFiles('.turbo/runs/*.json') != '' }}
+        uses: actions/upload-artifact@v7
         with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
+          name: turbo-run-summary
+          path: .turbo/runs/*.json
+          retention-days: 30
 
-      # Reads moon's newest run report, so it names the failures of whichever
-      # moon step failed.
-      - name: Report Moon CI failures
-        if: ${{ failure() && (steps.moon-ci.conclusion == 'failure' || steps.moon-e2e.conclusion == 'failure') }}
-        run: node scripts/report-moon-failures.mjs
-
-      - name: Validate version PR
-        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:version
-
-      # npm trusted publishing cannot create a package, so release publish
-      # stops a version that includes a public package npm has never seen
-      # (scripts/release-npm-preflight.mjs).
-      # It used to find out only after the version commit was on main (run
-      # 39324183811). Asking npm here fails the version PR and its merge group
-      # instead, with the one-time commands that fix it.
-      - name: Check npm can publish the version PR's packages
-        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: node scripts/release.mjs check-npm
-
-      - name: Pack version PR artifacts
-        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
-
-      - name: Verify version PR tarballs
-        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
-
-      - name: Upload journey diagnostics
+      # Every lane's results and the journeys' diagnostics. The handshake is
+      # left out: it carries the project secret and sits beside them in
+      # .zitadel-testing/.
+      - name: Upload diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: journey-diagnostics
-          path: ${{ runner.temp }}/ci-journey/diagnostics
-          if-no-files-found: ignore
-          retention-days: 7
-
-      # Every lane's results, each in its config folder's test-results/ and
-      # playwright-report/, and the API contract lane's Schemathesis reports
-      # (credentials filtered) in its test-output/. The handshake is deliberately excluded: it carries
-      # the project secret and sits beside them in .zitadel-testing/.
-      - name: Upload e2e diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-diagnostics
+          name: diagnostics
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
             e2e/api-contract/test-output
+            conformance/fixtures/*/test-results
+            conformance/fixtures/*/playwright-report
+            ${{ runner.temp }}/ci-journey/*/diagnostics
+            packages/components/test-output/vitest/junit.xml
+            packages/components/src/**/__screenshots__/**
+            packages/api-mock/test-output/vitest/junit.xml
           if-no-files-found: ignore
           retention-days: 7

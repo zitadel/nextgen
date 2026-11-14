@@ -149,7 +149,7 @@ much, so the pair is not read as exhaustive.
 
 ## Grant expansion
 
-`POST /grants/query` and `GET /grants/{id}` accept `expand: ["principal"]`.
+`POST /grants/query` and `GET /grants/{grant_id}` accept `expand: ["principal"]`.
 That flag does **not** add a sibling `principal` property. Extra fields are
 copied onto the existing `user` or `team` ref so the discriminator stays which
 of those keys is present (`user_id` / `team_id`, never `id`). Create does

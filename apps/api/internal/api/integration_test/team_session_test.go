@@ -91,7 +91,7 @@ func TestQueryTeamsSessionAuthorization(t *testing.T) {
 // TestTeamReadsAcceptSession pins #1227: after a claim the Console lands on
 // /teams holding only its session cookie, so queryTeams and getTeam must accept
 // that cookie as a user principal. createTeam and updateTeam joined them with
-// #1300 (TestConsoleManagementAcceptsSession); deleteTeam stays secret-only --
+// #1300 (TestConsoleManagementAcceptsSession); deactivateTeam stays secret-only --
 // this is not a blanket "sessions may call everything".
 //
 // The caller is seeded in the post-claim shape (personal team owning the
@@ -103,7 +103,12 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	console := harness.EnsurePlatformProject(t)
 	claimerID, claimerTeamID := harness.CreateUserOwnedByTeam(t, console.ID)
-	harness.SeedOwningTeam(t, console.ID, claimerTeamID)
+	// The platform project outlives the test and holds one active owning
+	// team, so a rerun (-count) could not seed its own without this revoke.
+	owning := harness.SeedOwningTeam(t, console.ID, claimerTeamID)
+	t.Cleanup(func() {
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), owning.ProjectID, owning.ID))
+	})
 
 	session := sessionClientForUser(t, claimerID)
 
@@ -157,13 +162,13 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.IsType(t, &api.TeamResponse{}, getResp, helpers.MustMarshal(t, getResp))
 	})
 
-	// The allowlist is per-operation: deleteTeam declares oauth2 only, so the
+	// The allowlist is per-operation: deactivateTeam declares oauth2 only, so the
 	// generated client cannot even offer the cookie and fails before sending.
 	// That pins the spec half -- adding sessionCookie to its security block
 	// breaks it.
 	t.Run("team delete does not offer the session scheme", func(t *testing.T) {
-		_, err := session.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(claimerTeamID)})
-		require.Error(t, err, "deleteTeam must not accept the session cookie")
+		_, err := session.DeactivateTeam(t.Context(), api.DeactivateTeamParams{TeamID: api.TeamID(claimerTeamID)})
+		require.Error(t, err, "deactivateTeam must not accept the session cookie")
 	})
 
 	// ...and the server half, which the generated client cannot reach: a raw

@@ -417,6 +417,7 @@ func TestRevokeRelease(t *testing.T) {
 		var served []string
 		for _, origin := range conflict.Details.Origins {
 			assert.Equal(t, live.ID, origin.DeploymentID)
+			assert.Equal(t, api.DeploymentKindPrimary, origin.Kind)
 			served = append(served, string(origin.Origin))
 		}
 		assert.Equal(t, origins(live.Targets), served)
@@ -434,6 +435,7 @@ func TestRevokeRelease(t *testing.T) {
 		require.Len(t, conflict.Details.Origins, 1)
 		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
 		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
+		assert.Equal(t, api.DeploymentKindPreview, conflict.Details.Origins[0].Kind)
 
 		// The preview moves on to the other release, so nothing serves it.
 		fixture.deployPreview(t, other)
@@ -449,7 +451,7 @@ func TestRevokeRelease(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), got.RevokedAt.Value, time.Minute)
 		revokedAt = got.RevokedAt.Value
 
-		read, err := fixture.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: project, ReleaseID: fixture.release.ID})
+		read, err := fixture.client.GetRelease(t.Context(), api.GetReleaseParams{ProjectID: project, ReleaseID: fixture.release.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, read, helpers.MustMarshal(t, read))
 		assert.Equal(t, revokedAt, read.(*api.Release).RevokedAt.Value)
@@ -468,7 +470,7 @@ func TestRevokeRelease(t *testing.T) {
 	})
 
 	t.Run("the history keeps its deployments", func(t *testing.T) {
-		read, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: live.ID})
+		read, err := fixture.client.GetDeployment(t.Context(), api.GetDeploymentParams{ProjectID: project, DeploymentID: live.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Deployment{}, read, helpers.MustMarshal(t, read))
 		assert.Equal(t, api.DeploymentStatusInactive, read.(*api.Deployment).Status)
@@ -511,7 +513,7 @@ func TestDeploymentReads(t *testing.T) {
 
 	get := func(t *testing.T, id api.DeploymentID) *api.Deployment {
 		t.Helper()
-		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: id})
+		resp, err := fixture.client.GetDeployment(t.Context(), api.GetDeploymentParams{ProjectID: project, DeploymentID: id})
 		require.NoError(t, err)
 		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.Deployment)
@@ -545,7 +547,7 @@ func TestDeploymentReads(t *testing.T) {
 	})
 
 	t.Run("get an unknown id", func(t *testing.T) {
-		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
+		resp, err := fixture.client.GetDeployment(t.Context(), api.GetDeploymentParams{
 			ProjectID: project, DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
 		require.NoError(t, err)
@@ -626,7 +628,7 @@ func TestPreviews(t *testing.T) {
 
 	list := func(t *testing.T) []string {
 		t.Helper()
-		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		resp, err := fixture.client.ListProjectPreviews(t.Context(), api.ListProjectPreviewsParams{ProjectID: project})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListPreviewsResponse{}, resp, helpers.MustMarshal(t, resp))
 		var listed []string
@@ -638,11 +640,11 @@ func TestPreviews(t *testing.T) {
 	}
 	remove := func(t *testing.T, origin string) {
 		t.Helper()
-		resp, err := fixture.client.RemovePreview(t.Context(),
+		resp, err := fixture.client.RemoveProjectPreview(t.Context(),
 			&api.RemovePreviewRequest{Origin: api.Origin(origin)},
-			api.RemovePreviewParams{ProjectID: project})
+			api.RemoveProjectPreviewParams{ProjectID: project})
 		require.NoError(t, err)
-		require.IsType(t, &api.RemovePreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.RemoveProjectPreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
 	}
 
 	assert.ElementsMatch(t, origins, list(t))
@@ -718,7 +720,7 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 	})
 
 	t.Run("get in another project", func(t *testing.T) {
-		resp, err := theirs.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
+		resp, err := theirs.client.GetDeployment(t.Context(), api.GetDeploymentParams{
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
@@ -769,7 +771,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	}
 	get := func(t *testing.T, id api.DeploymentID) *api.Deployment {
 		t.Helper()
-		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: id})
+		resp, err := fixture.client.GetDeployment(t.Context(), api.GetDeploymentParams{ProjectID: project, DeploymentID: id})
 		require.NoError(t, err)
 		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.Deployment)
@@ -868,7 +870,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 
 func (f deploymentFixture) frozenVariables(t *testing.T, id api.DeploymentID) api.Variables {
 	t.Helper()
-	resp, err := f.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+	resp, err := f.client.ListDeploymentVariables(t.Context(), api.ListDeploymentVariablesParams{
 		ProjectID: api.ProjectID(f.project), DeploymentID: id,
 	})
 	require.NoError(t, err)
@@ -878,7 +880,7 @@ func (f deploymentFixture) frozenVariables(t *testing.T, id api.DeploymentID) ap
 
 func (f deploymentFixture) setPrimaryVariables(t *testing.T, body api.UpdateVariablesRequest) {
 	t.Helper()
-	res, err := f.client.UpdateVariables(t.Context(), body, api.UpdateVariablesParams{
+	res, err := f.client.SetVariables(t.Context(), body, api.SetVariablesParams{
 		ProjectID: api.ProjectID(f.project),
 		Kind:      api.NewOptVariableKind(api.VariableKindPrimary),
 	})
@@ -903,7 +905,7 @@ func TestDeploymentFreezesItsKind(t *testing.T) {
 	fixture := newDeploymentFixture(t)
 	releaseID := fixture.release.ID
 
-	unknown, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+	unknown, err := fixture.client.ListDeploymentVariables(t.Context(), api.ListDeploymentVariablesParams{
 		ProjectID:    api.ProjectID(fixture.project),
 		DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 	})
@@ -979,12 +981,12 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 	oidc.ClientID = "${{ ZEBRA }}"
 	oidc.ClientSecret = "${{ GONE }}"
 	connection.Oidc = api.NewOptIdpConnectionOidc(oidc)
-	created, err := fixture.client.CreateIdp(t.Context(), &api.CreateIdpRequest{Idp: connection}, api.CreateIdpParams{
+	created, err := fixture.client.PublishIdp(t.Context(), &api.CreateIdpRequest{Idp: connection}, api.PublishIdpParams{
 		ProjectID: api.ProjectID(fixture.project),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateIdpCreated{}, created, helpers.MustMarshal(t, created))
-	idp := api.IdpResponse(*created.(*api.CreateIdpCreated))
+	require.IsType(t, &api.PublishIdpCreated{}, created, helpers.MustMarshal(t, created))
+	idp := api.IdpResponse(*created.(*api.PublishIdpCreated))
 
 	release := fixture.create(t, &api.CreateReleaseRequest{Pointers: append(fixture.pointers(), api.CreateReleasePointer{
 		Kind: api.ReleasePointerKindIdp, RevisionID: idp.RevisionID,
