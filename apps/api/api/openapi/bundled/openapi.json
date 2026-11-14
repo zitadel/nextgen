@@ -14383,7 +14383,8 @@
           "properties": {
             "pattern": {
               "not": {
-                "pattern": "\\*"
+                "pattern": "\\*",
+                "x-zitadel-pattern-message": "must not contain *: only a preview origin may have a wildcard"
               }
             }
           }
@@ -14392,6 +14393,7 @@
           "pattern": {
             "type": "string",
             "pattern": "^https?://(\\*[a-z0-9._-]*|[a-z0-9._-]+\\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
+            "x-zitadel-pattern-message": "must be an origin with at most one *: http or https, a lowercase host and an optional port, with no path",
             "description": "The origin pattern: an exact origin for `primary`, or an origin with at\nmost one `*` for `preview`.\n"
           },
           "kind": {
@@ -22286,6 +22288,7 @@
           "team_id": {
             "type": "string",
             "pattern": "^team_[a-zA-Z0-9_-]+$",
+            "x-zitadel-pattern-message": "must start with team_ and then hold letters, digits, _ or -",
             "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1",
             "description": "Platform-homed team id (`team_<opaque>`). The team must be active.\n"
           },
@@ -37886,7 +37889,8 @@
         "description": "Encrypted flow state cookie set by `POST /flows` or the previous\n`POST /flows/{flow_id}/submit`. The cookie holds the sealed state of one\nflow; the `{flow_id}` path parameter must name that flow, any other id is\nrefused.\n\nBrowsers send this automatically; non-browser clients must capture the\n`Set-Cookie` header and resend it.\n",
         "schema": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9._-]+$"
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "x-zitadel-pattern-message": "must be the cookie value the server issued: letters, digits, ., _ or -"
         }
       },
       "attempt-id": {
