@@ -1,39 +1,20 @@
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { isCancelled, Origins, OriginService } from "@/lib/backend";
-import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import { WizardStep } from "@/lib/wizard";
-
-/**
- * What the run learned about the project it addresses.
- */
-type Remote = Readonly<{
-  /**
-   * The connection to the project and server.
-   */
-  remote: RemoteConnection;
-
-  /**
-   * The origins the project serves, which name more callback URIs.
-   */
-  origins: Origins;
-}>;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Readonly<{
-  /**
-   * Resolves the project and server the run addresses.
-   *
-   * @returns The connection to them.
-   */
-  connect(): Promise<RemoteConnection>;
-}>;
+type Deps = Pick<EnableServices, "connect">;
 
 /**
  * Resolves the project and server before anything else is asked for: being
  * turned away after typing a secret would mean typing it again.
  */
-export class ReadOrigins extends WizardStep<"remote", Remote, object> {
+export class ReadOrigins extends WizardStep<"remote", Fact<"remote" | "origins">, object> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "remote";
 
   /**
@@ -60,7 +41,7 @@ export class ReadOrigins extends WizardStep<"remote", Remote, object> {
    * @param _needs - Nothing from earlier steps.
    * @returns The connection and the origins.
    */
-  async run(_needs: object): Promise<Remote> {
+  async run(_needs: object): Promise<Fact<"remote" | "origins">> {
     const remote = await this.deps.connect();
     return {
       remote,

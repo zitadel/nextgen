@@ -1,3 +1,4 @@
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { resolveEnvironment } from "@/lib/environment";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { WizardStep } from "@/lib/wizard";
@@ -12,36 +13,25 @@ const NO_ISSUER_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * What the step reads from what the run starts from: the flags that pick the
- * environment a run reads its issuer from.
+ * What the step reads from what is known: the flags that pick the environment a
+ * run reads its issuer from.
  */
 type Needs = Readonly<{
-  flags: Readonly<{
-    server?: string | undefined;
-    env?: string | undefined;
-    envFile?: string | undefined;
-  }>;
+  flags: Partial<Pick<Fact<"flags">["flags"], "server" | "env" | "envFile">>;
 }>;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Readonly<{
-  /**
-   * The project's directory.
-   */
-  cwd: string;
-
-  /**
-   * The run's environment variables.
-   */
-  env: Readonly<NodeJS.ProcessEnv>;
-}>;
+type Deps = Pick<EnableServices, "cwd" | "env">;
 
 /**
  * Reads the origin the app serves from, which every callback URI is built on.
  */
-export class ReadIssuer extends WizardStep<"issuer", Readonly<{ issuer: string }>, Needs> {
+export class ReadIssuer extends WizardStep<"issuer", Fact<"issuer">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "issuer";
 
   /**
@@ -64,7 +54,7 @@ export class ReadIssuer extends WizardStep<"issuer", Readonly<{ issuer: string }
    * @returns The issuer.
    * @throws {@link ZitadelError} When the Project has none, so it has not been set up.
    */
-  async run(needs: Needs): Promise<Readonly<{ issuer: string }>> {
+  async run(needs: Needs): Promise<Fact<"issuer">> {
     const environment = await resolveEnvironment({
       cwd: this.deps.cwd,
       env: this.deps.env,

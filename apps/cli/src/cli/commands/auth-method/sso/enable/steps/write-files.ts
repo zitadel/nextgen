@@ -1,53 +1,26 @@
-import type { IdpProvider } from "@zitadel/config/idp";
-
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { GivenCredentials } from "@/lib/idp";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-import type { Change, Connection, DocumentChange } from "@/lib/zitadel";
 
 /**
  * What the step reads from the steps before it.
  */
-type Needs = Readonly<{
-  target: SchemaTarget;
-  provider: IdpProvider;
-  given: GivenCredentials;
-  change: DocumentChange<Connection>;
-}>;
+type Needs = Fact<"target" | "provider" | "given" | "change">;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Readonly<{
-  /**
-   * Says what a configuration change did, and what else the developer would not
-   * otherwise see.
-   *
-   * @param change - The change.
-   */
-  report(change: Change): void;
-
-  /**
-   * Writes the change to the project's files.
-   *
-   * @param target - What the run read.
-   * @param change - The change.
-   * @returns The files written.
-   */
-  write(target: SchemaTarget, change: Change): Promise<readonly string[]>;
-}>;
+type Deps = Pick<EnableServices, "report" | "write">;
 
 /**
  * Writes the configuration, and says what it said about the change.
  */
-export class WriteFiles extends WizardStep<
-  "write",
-  Readonly<{ written: readonly string[] }>,
-  Needs
-> {
+export class WriteFiles extends WizardStep<"write", Fact<"written">, Needs> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "write";
 
   /**
@@ -74,7 +47,7 @@ export class WriteFiles extends WizardStep<
    * @param needs - What was read and decided.
    * @returns The files written.
    */
-  async run(needs: Needs): Promise<Readonly<{ written: readonly string[] }>> {
+  async run(needs: Needs): Promise<Fact<"written">> {
     const written = await this.deps.write(needs.target, needs.change);
     this.deps.report(needs.change);
     const endpointIssuer = needs.given.endpoints?.issuer;

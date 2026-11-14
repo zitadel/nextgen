@@ -1,9 +1,6 @@
-import type { IdpProvider, ProviderSelection } from "@zitadel/config/idp";
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
-import type { SchemaTarget } from "@/cli/commands/auth-method/command";
-import type { Summary } from "@/cli/commands/auth-method/sso/enable/shared";
-import type { Origins } from "@/lib/backend";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   callbackUriFor,
   CredentialDelivery,
@@ -11,82 +8,35 @@ import {
   loopbackIssuerWarning,
 } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
-import type { Connection as RemoteConnection } from "@/lib/oclif/types";
-import type { Suggest } from "@/lib/suggestion";
-import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
-import { Connection, type DocumentChange, type SsoOptions } from "@/lib/zitadel";
+import { Connection } from "@/lib/zitadel";
 
 /**
- * What the step reads from the steps before it.
+ * What the step reads from what is known.
  */
-type Needs = Readonly<{
-  target: SchemaTarget;
-  remote: RemoteConnection;
-  origins: Origins;
-  issuer: string;
-  selection: ProviderSelection;
-  provider: IdpProvider;
-  options: SsoOptions;
-}>;
-
-/**
- * What the plan settles.
- */
-type Planned = Readonly<{
-  /**
-   * The connection the provider's defaults make.
-   */
-  candidate: Connection;
-
-  /**
-   * The change worked out before anything was asked.
-   */
-  preview: DocumentChange<Connection>;
-
-  /**
-   * Where the credentials go, and how that is reported.
-   */
-  delivery: CredentialDelivery;
-
-  /**
-   * The questions that ask for the credentials.
-   */
-  prompt: CredentialPrompt;
-
-  /**
-   * What the run says about the connection.
-   */
-  summary: Summary;
-}>;
+type Needs = Fact<
+  "target" | "remote" | "origins" | "issuer" | "selection" | "provider" | "options"
+>;
 
 /**
  * What the step is given by the command.
  */
-type Deps = Readonly<{
-  /**
-   * The questions the run may ask a person.
-   */
-  ask: Questions;
-
-  /**
-   * Whether this is a development build that may ask where a provider answers.
-   */
-  developmentBuild: boolean;
-
-  /**
-   * Builds the commands the run suggests.
-   */
-  suggest: Suggest;
-}>;
+type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
  * refusal comes first: a connection that would step on another, a region the
  * edits cannot write, or a flow `deploy` would then reject (ADR 070 section 3).
  */
-export class PlanChange extends WizardStep<"plan", Planned, Needs> {
+export class PlanChange extends WizardStep<
+  "plan",
+  Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">,
+  Needs
+> {
+  /**
+   * The step's name, which a wizard refuses to hold twice.
+   */
   readonly key = "plan";
 
   /**
@@ -118,7 +68,9 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
    * @returns The plan.
    * @throws {@link ZitadelError} When the change would be refused.
    */
-  async run(needs: Needs): Promise<Planned> {
+  async run(
+    needs: Needs,
+  ): Promise<Fact<"candidate" | "preview" | "delivery" | "prompt" | "summary">> {
     const candidate = Connection.forProvider(needs.provider, needs.target.schema);
     const preview = needs.target.config.connections.enable(
       needs.target.schema,
@@ -133,9 +85,10 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
       reportWarning(loopback);
     }
     const connection = preview.document;
+    const reused = !preview.created;
     const delivery = new CredentialDelivery({
       connection,
-      reused: !preview.created,
+      reused,
       suggest: this.deps.suggest,
     });
     const callbackUri = callbackUriFor(needs.issuer, connection.slug);
@@ -154,7 +107,7 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
       delivery,
       prompt: new CredentialPrompt({
         selection: needs.selection,
-        reused: !preview.created,
+        reused,
         secretVariable: delivery.names.clientSecret,
         ask: this.deps.ask,
         developmentBuild: this.deps.developmentBuild,
@@ -166,7 +119,7 @@ export class PlanChange extends WizardStep<"plan", Planned, Needs> {
         displayName: providerOf(needs.selection).displayName,
         schema: needs.target.schema.name,
         connection,
-        reused: !preview.created,
+        reused,
         callbackUri,
         deployedCallbackUris,
         previewCallbackUris: [

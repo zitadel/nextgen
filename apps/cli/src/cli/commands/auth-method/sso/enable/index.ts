@@ -12,7 +12,7 @@ import {
 } from "@zitadel/config/idp";
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import type { EnableInput } from "@/cli/commands/auth-method/sso/enable/shared";
+import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
@@ -144,7 +144,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
 
     return this.emit(
-      await Wizard.named<EnableInput, CommandResult>("auth-method sso enable")
+      await Wizard.named<Fact<"flags">, CommandResult>("auth-method sso enable")
         .step(
           new ChooseProvider({
             dryRun: this.dryRun,
