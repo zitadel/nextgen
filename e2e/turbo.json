@@ -243,7 +243,7 @@
       ],
       "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "outputs": ["api-contract/test-output/**"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "API_CONTRACT_*", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "demo-nuxt-mock": {
       "inputs": [

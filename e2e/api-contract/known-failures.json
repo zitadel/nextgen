@@ -1,34 +1,18 @@
 [
   {
-    "operation": "PATCH /teams/{team_id}",
+    "operation": "Stateful tests (public)",
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "PATCH /users/me",
+    "operation": "GET /oauth_settings/{oauth_settings_id}",
     "check": "Server error"
   },
   {
-    "operation": "POST /auth_attempts",
+    "operation": "POST /applications",
     "check": "API rejected schema-compliant request"
   },
   {
     "operation": "POST /auth_attempts/{attempt_id}/challenges",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /branding",
-    "check": "API accepted schema-violating request"
-  },
-  {
-    "operation": "POST /branding",
-    "check": "Response violates schema"
-  },
-  {
-    "operation": "POST /deployments",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /grants/query",
     "check": "API rejected schema-compliant request"
   },
   {
@@ -40,19 +24,7 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /projects/{project_id}/origins/remove",
-    "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "POST /releases/build",
-    "check": "Server error"
-  },
-  {
     "operation": "POST /schemas",
-    "check": "Server error"
-  },
-  {
-    "operation": "POST /sessions",
     "check": "Server error"
   },
   {
@@ -65,6 +37,26 @@
   },
   {
     "operation": "POST /users/query",
+    "check": "Server error"
+  },
+  {
+    "operation": "Stateful tests (management)",
     "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "PATCH /users/me",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /invitations/accept",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /invitations/lookup",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /invitations/reject",
+    "check": "Server error"
   }
 ]
