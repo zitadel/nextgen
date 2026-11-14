@@ -41,7 +41,7 @@ import { listProjectEvents } from "@/features/events/api";
 import { EventSheet, EventRowsContext } from "@/features/events/components/event-panel";
 import { EventSearchField } from "@/features/events/components/event-search-field";
 import { ActorName, OutcomeBadge, UserName } from "@/features/events/components/event-people";
-import { EventSubject } from "@/features/events/components/event-subject";
+import { EventSubject, RequestStatus } from "@/features/events/components/event-subject";
 import {
   ExportMenu,
   LiveDot,
@@ -53,6 +53,8 @@ import {
   around,
   belongingWith,
   eventFilterValues,
+  eventSubject,
+  formatSpan,
   isFailure,
   isNarrowed,
   isNarrowedTo,
@@ -61,6 +63,7 @@ import {
   type EventView,
   NO_AUDIT_EVENTS,
   narrowedBy,
+  olderUnmatched,
   parseEventsSearch,
   rangeStart,
   signinOf,
@@ -70,7 +73,7 @@ import { useUserNames } from "@/features/events/use-user-names";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import { formatEventTime } from "@/lib/date";
+import { formatClockTime, formatEventDay, formatEventTime } from "@/lib/date";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 
@@ -80,12 +83,17 @@ import { cn } from "@/lib/utils";
  * a change to a record or an API request (`GET /events`), and the screen, the
  * route, the API and the CLI all call it that.
  *
- * A row names the event's type, what it was about, who caused it and when it
- * happened, to the millisecond, which tells the events of one request apart.
+ * A row leads with when the event happened, as a row of Vercel's Logs does:
+ * the day, then the clock time to the millisecond, which tells the events of
+ * one request apart. Then its type, what it was about and who caused it. In
+ * the API requests view every row is a request, so the row is the request, as
+ * in Vercel's Request Logs: its method and operation, its status and how long
+ * it took.
  * A failure (a failure type, a request answered with 5xx) is tinted. A row
- * opens the event in a drawer over the list (`$eventId`, this route's child),
- * as Vercel's Logs opens a request: the list keeps its rows, its scroll and
- * its pages, and the drawer steps through them.
+ * opens the event in a drawer at the list's right (`$eventId`, this route's
+ * child), as Vercel's Logs opens a request: the list keeps its rows, its
+ * scroll and its pages, and the drawer steps through them. Where the two fit
+ * side by side the list ends where the drawer starts (D46).
  *
  * Which events are listed is chosen in the sidebar, whose list Events replaces
  * with its own (`EventViewPicker`, `EventFilters`): the view (audit events, the
@@ -200,6 +208,7 @@ function EventsScreen() {
     [events, loaded.search, asOf],
   );
   const signins = loaded.search.view === "signins";
+  const requests = loaded.search.view === "requests";
   // A page short of its size that still has a token: the server stopped at
   // its bound, not at the end of the events (root ADR 048).
   const newestRows = newest.of === loaded ? newest.rows : loaded.items.length;
@@ -216,15 +225,23 @@ function EventsScreen() {
     }
   }
 
+  const eventOpen = eventId !== undefined;
+  const unmatched = olderUnmatched(loaded.search);
+
   return (
     <EventRowsContext.Provider value={{ rows: events, search }}>
-      <Page>
+      {/* Beside the drawer where both fit, not under it. */}
+      <Page besideSheet={eventOpen}>
         <ResourceTitle
           filterBelow
           filter={
             <>
               <SidebarFilters search={search} />
-              <EventSearchField current={search} me={session.user_id || undefined} />
+              <EventSearchField
+                current={search}
+                me={session.user_id || undefined}
+                besideEvent={eventOpen}
+              />
             </>
           }
           action={
@@ -270,26 +287,36 @@ function EventsScreen() {
           {/* An event type runs to thirty characters, and the time must show
               its milliseconds, which tell the events of one request apart.
               The table keeps the width both need and scrolls in its card
-              below it; a quarter of that width is a timestamp with its
-              inset. */}
+              below it. */}
           <Table className={cn(RESOURCE_TABLE_FIXED, "min-w-[60rem]")}>
             <TableHeader>
               <ResourceHeaderRow>
+                {/* First, as a log leads with its time (Vercel's Logs): the
+                    column that stays in view beside an open event, and when
+                    the card scrolls. */}
+                <ResourceHeadCell className={TIME_COLUMN}>Time</ResourceHeadCell>
+                {/* In each view one column has no width: it takes what the
+                    others and the menu column leave. */}
                 {signins ? (
                   <>
                     <ResourceHeadCell className="w-[17%]">Outcome</ResourceHeadCell>
-                    <ResourceHeadCell className="w-[33%]">User</ResourceHeadCell>
-                    <ResourceHeadCell className="w-[18%]">Session</ResourceHeadCell>
+                    <ResourceHeadCell>User</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[22%]">Session</ResourceHeadCell>
+                  </>
+                ) : requests ? (
+                  <>
+                    <ResourceHeadCell>Request</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[11%]">Status</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[13%]">Duration</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[20%]">Actor</ResourceHeadCell>
                   </>
                 ) : (
                   <>
-                    <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
-                    <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
-                    <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[28%]">Event</ResourceHeadCell>
+                    <ResourceHeadCell>Details</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[17%]">Actor</ResourceHeadCell>
                   </>
                 )}
-                {/* No width: Time takes what the others and the menu column leave. */}
-                <ResourceHeadCell>Time</ResourceHeadCell>
                 {/* Pinned, as on Users: the table scrolls in its card, and the menu
                     stays in reach. */}
                 <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
@@ -297,13 +324,15 @@ function EventsScreen() {
             </TableHeader>
             <TableBody>
               {events.length === 0 ? (
-                <ResourceEmptyRow colSpan={5}>
+                <ResourceEmptyRow colSpan={requests ? 6 : 5}>
                   {/* Nothing yet is not nothing: more events are still unread. */}
                   {stoppedShort
                     ? "No events have matched so far."
                     : isNarrowed(loaded.search)
                       ? "No events match these filters."
                       : NOTHING[loaded.search.view]}
+                  {/* An event that offered the filter may be one it cannot match. */}
+                  {unmatched && <span className="mt-1 block text-xs">{unmatched}</span>}
                 </ResourceEmptyRow>
               ) : (
                 events.map((event) => (
@@ -315,6 +344,7 @@ function EventsScreen() {
                     added={added.has(event.id)}
                     names={names}
                     signins={signins}
+                    requests={requests}
                     together={together.ids.has(event.id) ? together.by : undefined}
                     grouped={event.id === eventId && together.ids.size > 0}
                     abandoned={abandoned.has(event.id)}
@@ -332,13 +362,38 @@ function EventsScreen() {
         />
       </Page>
 
-      <EventSheet
-        open={eventId !== undefined}
-        onClose={() => void navigate({ to: "/events", search })}
-      >
+      <EventSheet open={eventOpen} onClose={() => void navigate({ to: "/events", search })}>
         <Outlet />
       </EventSheet>
     </EventRowsContext.Provider>
+  );
+}
+
+/**
+ * The Time column: a day, a clock time to the millisecond in a twelve-hour
+ * locale, and the cell's inset. A day older than eleven months carries its
+ * year and fits too.
+ */
+const TIME_COLUMN = "w-62";
+
+/**
+ * A row's time, which leads it as in Vercel's Logs: the day, stepped back,
+ * then the clock time to the millisecond, which is what tells the rows of one
+ * screen apart. The whole moment, year included, is the cell's title and the
+ * drawer's.
+ */
+function RowTime({ at }: { at: string }) {
+  // What arrived, once, when it is no moment.
+  if (Number.isNaN(Date.parse(at))) return <span className="truncate text-sm">{at}</span>;
+  return (
+    <time
+      dateTime={at}
+      title={formatEventTime(at)}
+      className="flex min-w-0 items-baseline gap-1.5 text-sm whitespace-nowrap tabular-nums"
+    >
+      <span className="text-muted-foreground shrink-0">{formatEventDay(at)}</span>
+      <span className="text-foreground truncate">{formatClockTime(at)}</span>
+    </time>
   );
 }
 
@@ -357,6 +412,7 @@ function EventRow({
   added,
   names,
   signins,
+  requests,
   together,
   grouped,
   abandoned,
@@ -371,6 +427,8 @@ function EventRow({
   names: ReadonlyMap<string, string>;
   /** Drawn as a sign-in: how it ended, whose account, which session. */
   signins: boolean;
+  /** Drawn as an API request: its method and operation, its status and how long it took. */
+  requests: boolean;
   /** Of the open event's login flow or request: marked, and named for a screen reader. */
   together?: "login flow" | "request";
   /** Open, with other rows of its flow or request loaded: it heads their rail. */
@@ -381,6 +439,8 @@ function EventRow({
   const navigate = useNavigate();
   const params = { eventId: event.id };
   const signin = signins ? signinOf(event) : undefined;
+  const subject = eventSubject(event);
+  const request = requests && subject?.kind === "request" ? subject : undefined;
   // A value the list is narrowed to already would narrow it no further.
   const narrowings = eventFilterValues(event).filter(
     ({ filter, value }) => !isNarrowedTo(search, filter.key, value),
@@ -408,6 +468,9 @@ function EventRow({
           (together || grouped) && "shadow-[inset_3px_0_0_var(--color-primary)]",
         )}
       >
+        <RowTime at={event.occurred_at} />
+      </TableCell>
+      <TableCell className={RESOURCE_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Link
             to="/events/$eventId"
@@ -417,6 +480,16 @@ function EventRow({
           >
             {signin ? (
               <OutcomeBadge outcome={signin.outcome} />
+            ) : request ? (
+              // The method steps back, as in Vercel's request rows: the
+              // operation is what tells the rows apart.
+              <span
+                className={cn("truncate", failure && "text-destructive")}
+                title={`${request.method} ${request.route}`}
+              >
+                <span className="text-muted-foreground font-normal">{request.method}</span>{" "}
+                {request.route}
+              </span>
             ) : (
               <span
                 className={cn("truncate", failure && "text-destructive")}
@@ -459,6 +532,18 @@ function EventRow({
             )}
           </TableCell>
         </>
+      ) : request ? (
+        <>
+          <TableCell className={cn(RESOURCE_CELL, "text-sm tabular-nums")}>
+            <RequestStatus status={request.status} />
+          </TableCell>
+          <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
+            {event.event_type === "request.api" ? formatSpan(event.payload.duration_ms) : "—"}
+          </TableCell>
+          <TableCell className={RESOURCE_CELL}>
+            <ActorName actorId={event.actor_id} actorType={event.actor_type} names={names} />
+          </TableCell>
+        </>
       ) : (
         <>
           <TableCell className={RESOURCE_CELL}>
@@ -467,11 +552,10 @@ function EventRow({
           <TableCell className={RESOURCE_CELL}>
             <ActorName actorId={event.actor_id} actorType={event.actor_type} names={names} />
           </TableCell>
+          {/* Only in the requests' own columns, should another event reach them. */}
+          {requests && <TableCell className={RESOURCE_CELL} />}
         </>
       )}
-      <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
-        <time dateTime={event.occurred_at}>{formatEventTime(event.occurred_at)}</time>
-      </TableCell>
       <TableCell
         className={cn(
           RESOURCE_MENU_CELL_NARROW,

@@ -1004,7 +1004,7 @@ var operationExcludedErrors = map[string][]string{
 	// Self-access operations answer any refused session as auth.unauthorized
 	// (requireSelf, #553).
 	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
-	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"updateMyUser":        {"domain.ErrSessionTokenInvalid"},
 	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
 	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
 	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
@@ -1031,15 +1031,15 @@ var operationExcludedErrors = map[string][]string{
 	// The identifier lookup of the flow path turns a bound user schema the
 	// project does not hold into domain.ErrInternal (resolveIdentifier), so
 	// sch.not_found never reaches the response.
-	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
-	// sch.not_found is remapped as for verifyChallengeProof.
-	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
+	"verifyAuthAttemptChallenge": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyAuthAttemptChallenge.
+	"completeUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
 	// Create and revise run the engine's connection parse after the schema
 	// check. The schema already refuses a missing protocol block, scopes
 	// without openid, and a cleartext endpoint as req.invalid, so only the
 	// parse's own rule, the partial endpoint block, reaches the caller; any
 	// other parse refusal is reported as req.invalid.
-	"createIdp": {
+	"publishIdp": {
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",

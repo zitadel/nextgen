@@ -189,7 +189,7 @@ export class ZitadelConfig {
    * @remarks
    * Refuses every broken file, and every finding a document makes about
    * itself, so a configuration that loads is one whose files validate on
-   * their own. A broken policy test file is left to `zitadel policies test`,
+   * their own. A broken policy test file is left to `zitadel policy test`,
    * as no release carries one.
    *
    * @param store - Where the configuration is kept.
@@ -610,7 +610,7 @@ export class ZitadelConfig {
    * @remarks
    * Refuses every broken file, and every finding a document makes about
    * itself, so a configuration that passes is one whose files validate on
-   * their own. A broken policy test file is left to `zitadel policies test`,
+   * their own. A broken policy test file is left to `zitadel policy test`,
    * as no release carries one.
    *
    * @param store - Where the configuration is kept, for the rules that read

@@ -1,0 +1,40 @@
+{
+  "name": "@zitadel/conformance-angular",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node zitadel-ng.cjs serve",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/core": "catalog:",
+    "@angular/forms": "catalog:",
+    "@angular/platform-browser": "catalog:",
+    "@angular/router": "catalog:",
+    "@zitadel/sdk-angular": "workspace:*",
+    "rxjs": "~7.8.0",
+    "tslib": "catalog:"
+  },
+  "devDependencies": {
+    "@angular/build": "catalog:",
+    "@angular/cli": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@playwright/test": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "conformance": {
+    "framework": "angular",
+    "appPort": 3218,
+    "zitadelPort": 8218,
+    "generatePort": 8318
+  }
+}

@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("TanStackStartScaffolder", () => {
-  it("runs @tanstack/cli create (full Start mode) then removes the starter routes/index.tsx", async () => {
+  it("runs @tanstack/cli create (full Start mode) without an install, then removes the starter routes/index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new TanStackStartScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "tanstack-start");
@@ -45,6 +45,7 @@ describe("TanStackStartScaffolder", () => {
       "--no-intent",
       "--no-git",
       "-y",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/index.tsx"), {
@@ -62,6 +63,10 @@ describe("TanStackStartScaffolder", () => {
     supported: ["24.15.0", "20.19.0", "22.12.0"],
     warned: ["21.0.0", "20.18.0"],
     refused: [],
+  });
+
+  it("names the template's generate-routes script as its after-install script", () => {
+    expect(new TanStackStartScaffolder().afterInstallScript).toBe("generate-routes");
   });
 
   it("only supports tanstack-start", () => {

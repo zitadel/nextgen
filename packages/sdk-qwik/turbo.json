@@ -3,8 +3,10 @@
   "extends": ["//"],
   "tasks": {
     // The edge spec imports this package's built dist.
+    // The specs run the cases of @zitadel/client-sdk-contract; its typecheck edge
+    // puts their source in the typecheck and test hashes.
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "build"]
+      "dependsOn": ["@zitadel/api-mock#build", "build", "@zitadel/client-sdk-contract#typecheck"]
     },
     // src/browser-commands.d.ts declares the Vitest browser commands, which
     // the library build never reads.
@@ -16,7 +18,12 @@
     // Lit components need a real DOM); api-mock serves the Flow API to the
     // specs. The script retries a failed suite (#1490).
     "test": {
-      "dependsOn": ["@zitadel/api-mock#build", "install-browsers", "build"],
+      "dependsOn": [
+        "@zitadel/api-mock#build",
+        "install-browsers",
+        "build",
+        "@zitadel/client-sdk-contract#typecheck"
+      ],
       "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/task-guard.mjs"]
     }
   }

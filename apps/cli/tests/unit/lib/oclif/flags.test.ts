@@ -2,7 +2,16 @@ import { Args, Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { filled, type ReadAlone, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import {
+  accepts,
+  filled,
+  parses,
+  type ReadAlone,
+  reads,
+  serverFlag,
+  taken,
+  whole,
+} from "@/lib/oclif/flags";
 import type { Placeholders } from "@/lib/oclif/refusal";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
@@ -327,6 +336,72 @@ describe("the server flag", () => {
     await expect(parseFlag(serverFlag({}), value, "server")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: `Invalid server "${value}"`,
+    });
+  });
+});
+
+/**
+ * A parser that accepts digits and answers with their number.
+ *
+ * @param value - The text.
+ * @returns The number, or what is wrong with the text.
+ */
+function digits(value: string): { ok: true; value: number } | { ok: false; problem: string } {
+  return /^\d+$/.test(value)
+    ? { ok: true, value: Number(value) }
+    : { ok: false, problem: "Use digits only." };
+}
+
+describe("a flag that is its parser", () => {
+  const count = Flags.custom<number>({ parse: parses(digits) });
+  const text = Flags.custom<string>({ parse: accepts(digits) });
+
+  it("yields what the parser made of the trimmed text", async () => {
+    await expect(parseFlag(count({}), " 42 ", "count")).resolves.toBe(42);
+  });
+
+  it("keeps the trimmed text when the parser only checks it", async () => {
+    await expect(parseFlag(text({}), " 42 ", "count")).resolves.toBe("42");
+  });
+
+  it("refuses what the parser refuses, with its reason, naming the flag", async () => {
+    await expect(parseFlag(count({}), "x", "count")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "--count: Use digits only.",
+      hint: "Fix --count and run the command again.",
+      details: { flag: "--count" },
+    });
+  });
+
+  it("refuses a blank value apart, saying to pass one", async () => {
+    await expect(parseFlag(count({}), "  ", "count")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "the value is empty",
+      hint: "Pass a value for --count, or omit it entirely.",
+    });
+  });
+
+  it("words a blank value as the flag's own refusal when told to", async () => {
+    const asked = Flags.custom<number>({ parse: parses(digits, { blankAsValue: true }) });
+
+    await expect(parseFlag(asked({}), "  ", "count")).rejects.toMatchObject({
+      message: "--count: it was given an empty value",
+    });
+  });
+
+  it("uses the wording it is given", async () => {
+    const worded = Flags.custom<number>({
+      parse: parses(digits, {
+        refusal: { message: "{input} is {problem}", hint: "Try again." },
+        empty: { message: "{input} is blank", hint: "Pass one." },
+      }),
+    });
+
+    await expect(parseFlag(worded({}), "x", "count")).rejects.toMatchObject({
+      message: "--count is Use digits only.",
+    });
+    await expect(parseFlag(worded({}), "", "count")).rejects.toMatchObject({
+      message: "--count is blank",
     });
   });
 });

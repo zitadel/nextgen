@@ -228,7 +228,7 @@ func (s *Server) handleAcceptInvitationRequest(args [0]string, argsEscaped bool,
 	}
 }
 
-// handleAddOriginRequest handles addOrigin operation.
+// handleAddProjectOriginRequest handles addProjectOrigin operation.
 //
 // Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
 //
@@ -242,15 +242,15 @@ func (s *Server) handleAcceptInvitationRequest(args [0]string, argsEscaped bool,
 //
 // Adding a pattern that already exists with the same kind is idempotent and answers `201` with the
 // stored origin. If the pattern exists with the other kind, the request is refused with
-// `origin.kind_conflict`: remove it with `removeOrigin`
+// `origin.kind_conflict`: remove it with `removeProjectOrigin`
 // (`POST /projects/{project_id}/origins/remove`), then add it again.
 //
 // POST /projects/{project_id}/origins
-func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAddProjectOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("addOrigin"),
+		otelogen.OperationID("addProjectOrigin"),
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/projects/{project_id}/origins"),
 	}
@@ -258,7 +258,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), AddOriginOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), AddProjectOriginOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -313,15 +313,15 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: AddOriginOperation,
-			ID:   "addOrigin",
+			Name: AddProjectOriginOperation,
+			ID:   "addProjectOrigin",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, AddOriginOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, AddProjectOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -338,7 +338,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, AddOriginOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, AddProjectOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -379,7 +379,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 			return
 		}
 	}
-	params, err := decodeAddOriginParams(args, argsEscaped, r)
+	params, err := decodeAddProjectOriginParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -391,7 +391,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeAddOriginRequest(r)
+	request, rawBody, close, err := s.decodeAddProjectOriginRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -407,13 +407,13 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 		}
 	}()
 
-	var response AddOriginRes
+	var response AddProjectOriginRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    AddOriginOperation,
+			OperationName:    AddProjectOriginOperation,
 			OperationSummary: "Add an origin pattern",
-			OperationID:      "addOrigin",
+			OperationID:      "addProjectOrigin",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -427,8 +427,8 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 
 		type (
 			Request  = *ProjectOrigin
-			Params   = AddOriginParams
-			Response = AddOriginRes
+			Params   = AddProjectOriginParams
+			Response = AddProjectOriginRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -437,14 +437,14 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 		](
 			m,
 			mreq,
-			unpackAddOriginParams,
+			unpackAddProjectOriginParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.AddOrigin(ctx, request, params)
+				response, err = s.h.AddProjectOrigin(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.AddOrigin(ctx, request, params)
+		response, err = s.h.AddProjectOrigin(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -452,216 +452,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 		return
 	}
 
-	if err := encodeAddOriginResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleBeginUserPasskeyRegistrationRequest handles beginUserPasskeyRegistration operation.
-//
-// Starts a WebAuthn registration ceremony for the user and returns the creation options for
-// `navigator.credentials.create()`. A passkey is registered in two steps: this one returns options for
-// the browser, and `finishUserPasskeyRegistration`
-// (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
-//
-// Complete the ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
-// five minutes, using the `registration_id` this response returns. Credentials already registered for
-// the user are excluded automatically.
-//
-// POST /users/{user_id}/passkeys/registrations
-func (s *Server) handleBeginUserPasskeyRegistrationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("beginUserPasskeyRegistration"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), BeginUserPasskeyRegistrationOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: BeginUserPasskeyRegistrationOperation,
-			ID:   "beginUserPasskeyRegistration",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, BeginUserPasskeyRegistrationOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeBeginUserPasskeyRegistrationParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeBeginUserPasskeyRegistrationRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response BeginUserPasskeyRegistrationRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    BeginUserPasskeyRegistrationOperation,
-			OperationSummary: "Begin a passkey registration",
-			OperationID:      "beginUserPasskeyRegistration",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *BeginUserPasskeyRegistrationRequest
-			Params   = BeginUserPasskeyRegistrationParams
-			Response = BeginUserPasskeyRegistrationRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackBeginUserPasskeyRegistrationParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.BeginUserPasskeyRegistration(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.BeginUserPasskeyRegistration(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeBeginUserPasskeyRegistrationResponse(response, w, span); err != nil {
+	if err := encodeAddProjectOriginResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -913,14 +704,14 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 // Cancelling needs the same project `admin` check as `createGrant` (`POST /grants`). Cookie requests
 // follow that scheme's CSRF rules.
 //
-// DELETE /invitations/{id}
+// DELETE /invitations/{invitation_id}
 func (s *Server) handleCancelInvitationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("cancelInvitation"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
-		semconv.HTTPRouteKey.String("/invitations/{id}"),
+		semconv.HTTPRouteKey.String("/invitations/{invitation_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -1071,9 +862,9 @@ func (s *Server) handleCancelInvitationRequest(args [1]string, argsEscaped bool,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "invitation_id",
 					In:   "path",
-				}: params.ID,
+				}: params.InvitationID,
 				{
 					Name: "project_id",
 					In:   "query",
@@ -1118,27 +909,28 @@ func (s *Server) handleCancelInvitationRequest(args [1]string, argsEscaped bool,
 	}
 }
 
-// handleCompleteClaimRequest handles completeClaim operation.
+// handleCompleteProjectClaimRequest handles completeProjectClaim operation.
 //
 // Completes a claim by attaching the project to the signed-in developer's personal team.
 //
 // A [claim attaches a project to a team], so that the team's members administer it. The claim page in
 // the browser calls this operation after the developer signs in, with the session cookie. The
-// `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`)
-// returns is the request's single-use, browser-safe authorization.
+// `challenge_id` from the claim URL that `createProjectClaim`
+// (`POST /projects/{project_id}/claim/init`) returns is the request's single-use, browser-safe
+// authorization.
 //
 // Claims are first-claim-wins and spend the challenge. If a team already claimed the project, the
-// request answers `409`. If the challenge lapsed (`410` with `proj.claim_expired`), call `initClaim`
-// again for a fresh one.
+// request answers `409`. If the challenge lapsed (`410` with `proj.claim_expired`), call
+// `createProjectClaim` again for a fresh one.
 //
 // [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
 //
 // POST /projects/{project_id}/claim/complete
-func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCompleteProjectClaimRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("completeClaim"),
+		otelogen.OperationID("completeProjectClaim"),
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/complete"),
 	}
@@ -1146,7 +938,7 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CompleteClaimOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CompleteProjectClaimOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -1201,15 +993,15 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: CompleteClaimOperation,
-			ID:   "completeClaim",
+			Name: CompleteProjectClaimOperation,
+			ID:   "completeProjectClaim",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, CompleteClaimOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CompleteProjectClaimOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -1249,7 +1041,7 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 			return
 		}
 	}
-	params, err := decodeCompleteClaimParams(args, argsEscaped, r)
+	params, err := decodeCompleteProjectClaimParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -1261,7 +1053,7 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeCompleteClaimRequest(r)
+	request, rawBody, close, err := s.decodeCompleteProjectClaimRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -1277,13 +1069,13 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 		}
 	}()
 
-	var response CompleteClaimRes
+	var response CompleteProjectClaimRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    CompleteClaimOperation,
+			OperationName:    CompleteProjectClaimOperation,
 			OperationSummary: "Complete a project claim",
-			OperationID:      "completeClaim",
+			OperationID:      "completeProjectClaim",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -1297,8 +1089,8 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 
 		type (
 			Request  = *CompleteClaimRequest
-			Params   = CompleteClaimParams
-			Response = CompleteClaimRes
+			Params   = CompleteProjectClaimParams
+			Response = CompleteProjectClaimRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -1307,14 +1099,14 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 		](
 			m,
 			mreq,
-			unpackCompleteClaimParams,
+			unpackCompleteProjectClaimParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CompleteClaim(ctx, request, params)
+				response, err = s.h.CompleteProjectClaim(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CompleteClaim(ctx, request, params)
+		response, err = s.h.CompleteProjectClaim(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -1322,7 +1114,7 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 		return
 	}
 
-	if err := encodeCompleteClaimResponse(response, w, span); err != nil {
+	if err := encodeCompleteProjectClaimResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -1331,47 +1123,31 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 	}
 }
 
-// handleCreateApplicationRequest handles createApplication operation.
+// handleCompleteUserPasskeyRegistrationRequest handles completeUserPasskeyRegistration operation.
 //
-// Creates or revises a registered application that authenticates its users via Zitadel. If the slug
-// does not already exist in the project, a new application is created. If one with that slug already
-// exists, a revision is created.
+// Verifies the attestation against the registration ceremony and stores the new passkey for the user.
+// `registration_id` is the one that `createUserPasskeyRegistration`
+// (`POST /users/{user_id}/passkeys/registrations`) returned when it started the ceremony. The
+// attestation is the browser's answer from `navigator.credentials.create()`.
 //
-// A revision gets a new `revision_id` and does not modify the application's `id`. Sending an unchanged
-// document also creates a revision. Each client is matched to the stored one by its slug and keeps its
-// `client_id`: a revision that changes a client's `client_id` is rejected with `app.field_immutable`.
-// A revision keeps every client of the stored document: one that omits a client is also rejected with
-// `app.field_immutable`, since removing a client is not available yet. A client with a new slug is a
-// new client. It takes the `client_id` the document supplies, or the server generates one, and every
-// response carries it in `definition`. A `client_id` another client of the project holds, or ever
-// held, is rejected with `app.client_id_taken`.
+// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
+// `att.stale_challenge`: begin a new registration. An unknown or already-consumed registration ID
+// answers `att.not_found`.
 //
-// Every new client gets a secret, generated by the server and returned once in `client_secrets`. The
-// server stores only its hash, so no later read returns it.
-//
-// The document is validated against the `application.json` schema before anything is stored, and then
-// against the rules the authorization server applies: `refresh_token` comes with `authorization_code`,
-// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
-// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
-// details identify the setting.
-//
-// If the document is refused, no change is stored and an existing application keeps its current
-// revision.
-//
-// POST /applications
-func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /users/{user_id}/passkeys/registrations/{registration_id}
+func (s *Server) handleCompleteUserPasskeyRegistrationRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createApplication"),
+		otelogen.OperationID("completeUserPasskeyRegistration"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/applications"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations/{registration_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateApplicationOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CompleteUserPasskeyRegistrationOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -1426,15 +1202,15 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: CreateApplicationOperation,
-			ID:   "createApplication",
+			Name: CompleteUserPasskeyRegistrationOperation,
+			ID:   "completeUserPasskeyRegistration",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateApplicationOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, CompleteUserPasskeyRegistrationOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -1474,7 +1250,7 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 			return
 		}
 	}
-	params, err := decodeCreateApplicationParams(args, argsEscaped, r)
+	params, err := decodeCompleteUserPasskeyRegistrationParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -1486,7 +1262,7 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateApplicationRequest(r)
+	request, rawBody, close, err := s.decodeCompleteUserPasskeyRegistrationRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -1502,32 +1278,32 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 		}
 	}()
 
-	var response CreateApplicationRes
+	var response CompleteUserPasskeyRegistrationRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    CreateApplicationOperation,
-			OperationSummary: "Create or revise a registered application",
-			OperationID:      "createApplication",
+			OperationName:    CompleteUserPasskeyRegistrationOperation,
+			OperationSummary: "Finish a passkey registration",
+			OperationID:      "completeUserPasskeyRegistration",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
 				{
-					Name: "Idempotency-Key",
-					In:   "header",
-				}: params.IdempotencyKey,
+					Name: "registration_id",
+					In:   "path",
+				}: params.RegistrationID,
 			},
 			Raw: r,
 		}
 
 		type (
-			Request  = *CreateApplicationRequest
-			Params   = CreateApplicationParams
-			Response = CreateApplicationRes
+			Request  = *FinishUserPasskeyRegistrationRequest
+			Params   = CompleteUserPasskeyRegistrationParams
+			Response = CompleteUserPasskeyRegistrationRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -1536,14 +1312,14 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 		](
 			m,
 			mreq,
-			unpackCreateApplicationParams,
+			unpackCompleteUserPasskeyRegistrationParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateApplication(ctx, request, params)
+				response, err = s.h.CompleteUserPasskeyRegistration(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CreateApplication(ctx, request, params)
+		response, err = s.h.CompleteUserPasskeyRegistration(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -1551,7 +1327,7 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 		return
 	}
 
-	if err := encodeCreateApplicationResponse(response, w, span); err != nil {
+	if err := encodeCompleteUserPasskeyRegistrationResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -1569,14 +1345,15 @@ func (s *Server) handleCreateApplicationRequest(args [0]string, argsEscaped bool
 // exchange. A client makes these calls in order:
 //
 //  1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
-//  2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to
-//     prove one factor such as `identifier`, `password` or `passkey`.
-//  3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
-//     submits the proof for that challenge: the credential, code or assertion. Repeat steps 2 and 3
-//     until `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means
-//     every factor in `required_factors` is verified.
-//  4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns
-//     the `handoff_token`.
+//  2. `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge,
+//     a request to prove one factor such as `identifier`, `password` or `passkey`.
+//  3. `verifyAuthAttemptChallenge`
+//     (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that
+//     challenge: the credential, code or assertion. Repeat steps 2 and 3 until `getAuthAttempt`
+//     (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
+//     `required_factors` is verified.
+//  4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and
+//     returns the `handoff_token`.
 //  5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token for the session and its
 //     `session_token`.
 //
@@ -1773,32 +1550,29 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 	}
 }
 
-// handleCreateBrandingRequest handles createBranding operation.
+// handleCreateAuthAttemptChallengeRequest handles createAuthAttemptChallenge operation.
 //
-// Publishes a new immutable branding revision for the project, and records a `branding.created` event.
-// Branding revisions cannot be updated or deleted. Every edit publishes a new revision. Flow responses
-// carry the branding revision the request's release pins.
+// Issues a challenge, a request to prove one factor, within an authentication attempt.
 //
-// The `id` of the new revision is the revision ID a release pins for `kind: branding`.
+// A challenge names one factor method, such as password, passkey, TOTP or OTP via SMS. The response
+// carries the challenge's `challenge_id`, method, metadata and any UI hints. The client then submits
+// the proof with `verifyAuthAttemptChallenge`
+// (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
 //
-// The `liquid_template` is validated lexically on save (size, encoding, banned patterns such as
-// `<script>` tags, inline event handlers, and the `| raw` filter). Authoritative LiquidJS validation
-// runs at authoring time, in `zitadel deploy` and `zitadel deploy --dry-run`.
-//
-// POST /branding
-func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /auth_attempts/{attempt_id}/challenges
+func (s *Server) handleCreateAuthAttemptChallengeRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createBranding"),
+		otelogen.OperationID("createAuthAttemptChallenge"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/branding"),
+		semconv.HTTPRouteKey.String("/auth_attempts/{attempt_id}/challenges"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateBrandingOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateAuthAttemptChallengeOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -1853,15 +1627,15 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: CreateBrandingOperation,
-			ID:   "createBranding",
+			Name: CreateAuthAttemptChallengeOperation,
+			ID:   "createAuthAttemptChallenge",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateBrandingOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, CreateAuthAttemptChallengeOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -1901,7 +1675,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 			return
 		}
 	}
-	params, err := decodeCreateBrandingParams(args, argsEscaped, r)
+	params, err := decodeCreateAuthAttemptChallengeParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -1913,7 +1687,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateBrandingRequest(r)
+	request, rawBody, close, err := s.decodeCreateAuthAttemptChallengeRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -1929,28 +1703,28 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		}
 	}()
 
-	var response CreateBrandingRes
+	var response CreateAuthAttemptChallengeRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    CreateBrandingOperation,
-			OperationSummary: "Publish a branding revision",
-			OperationID:      "createBranding",
+			OperationName:    CreateAuthAttemptChallengeOperation,
+			OperationSummary: "Issue a factor challenge",
+			OperationID:      "createAuthAttemptChallenge",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
+					Name: "attempt_id",
+					In:   "path",
+				}: params.AttemptID,
 			},
 			Raw: r,
 		}
 
 		type (
-			Request  = *Branding
-			Params   = CreateBrandingParams
-			Response = CreateBrandingRes
+			Request  = *IssueChallengeRequest
+			Params   = CreateAuthAttemptChallengeParams
+			Response = CreateAuthAttemptChallengeRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -1959,14 +1733,14 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		](
 			m,
 			mreq,
-			unpackCreateBrandingParams,
+			unpackCreateAuthAttemptChallengeParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateBranding(ctx, request, params)
+				response, err = s.h.CreateAuthAttemptChallenge(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CreateBranding(ctx, request, params)
+		response, err = s.h.CreateAuthAttemptChallenge(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -1974,7 +1748,213 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		return
 	}
 
-	if err := encodeCreateBrandingResponse(response, w, span); err != nil {
+	if err := encodeCreateAuthAttemptChallengeResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleCreateAuthAttemptHandoffRequest handles createAuthAttemptHandoff operation.
+//
+// Completes an authentication attempt and mints a `handoff_token`.
+//
+// A handoff token is the short-lived credential that a completed attempt hands to the session
+// exchange. Call this after every required factor is verified and the attempt is in `completed` state.
+// Otherwise it answers `409` with `att.not_completed`: verify the remaining factors, then call again.
+//
+// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
+// within 60 seconds to receive the session and its `session_token`. The handoff token is:
+//
+//   - Single-use: exchange it once, with no retry.
+//   - Bound to the project: the exchange needs the same project's credential.
+//   - Created once: a second call answers `409 att.already_handed_off`, even with the same idempotency
+//     key.
+//
+// A revoked release is refused when the handoff is exchanged, not here. A release is the configuration
+// that `zitadel deploy` publishes.
+//
+// POST /auth_attempts/{attempt_id}/handoff
+func (s *Server) handleCreateAuthAttemptHandoffRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createAuthAttemptHandoff"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/auth_attempts/{attempt_id}/handoff"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateAuthAttemptHandoffOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: CreateAuthAttemptHandoffOperation,
+			ID:   "createAuthAttemptHandoff",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, CreateAuthAttemptHandoffOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeCreateAuthAttemptHandoffParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response CreateAuthAttemptHandoffRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    CreateAuthAttemptHandoffOperation,
+			OperationSummary: "Complete an authentication attempt and create a handoff token",
+			OperationID:      "createAuthAttemptHandoff",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "attempt_id",
+					In:   "path",
+				}: params.AttemptID,
+				{
+					Name: "Idempotency-Key",
+					In:   "header",
+				}: params.IdempotencyKey,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = CreateAuthAttemptHandoffParams
+			Response = CreateAuthAttemptHandoffRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackCreateAuthAttemptHandoffParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.CreateAuthAttemptHandoff(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.CreateAuthAttemptHandoff(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeCreateAuthAttemptHandoffResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -2019,7 +1999,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 //     sends `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct the request.
 //   - `400 dep.variables_missing`: a variable the release references has no value for the kind.
 //     `details` names the kind and every missing variable. Set each one for that kind with
-//     `updateVariables` (`PATCH /variables`), then deploy again.
+//     `setVariables` (`PATCH /variables`), then deploy again.
 //   - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern of the project, or is a
 //     loopback URL. Use a URL that matches a pattern.
 //   - `404 rel.not_found`: the release ID or digest names no release in this project. List the
@@ -2254,9 +2234,9 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 //
 // The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
 // step. It starts a flow here, renders the step it gets back, and submits the user's input with
-// `submitFlowStep` (`POST /flow/{id}/submit`) to get the next step. This call creates a new session
-// implicitly, unless `session_id` is provided together with that session's `session_token` (for
-// step-up or reauthentication on an existing session).
+// `submitFlowStep` (`POST /flows/{flow_id}/submit`) to get the next step. This call creates a new
+// session implicitly, unless `session_id` is provided together with that session's `session_token`
+// (for step-up or reauthentication on an existing session).
 //
 // The browser `Origin` header selects which deployment serves this attempt. The server checks the
 // origin against the project's origin patterns and live previews, and the deployment that origin
@@ -2284,20 +2264,20 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // origin is still refused unless the project lists it.
 //
 // The response contains an `id` field, the flow handle. Use it as the path parameter for all
-// subsequent `/flow/{id}/submit` calls.
+// subsequent `/flows/{flow_id}/submit` calls.
 //
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
 // state (current step, collected data, history). The server is stateless between requests: all flow
 // state lives in this cookie. The browser sends it automatically on subsequent requests.
 //
-// POST /flow
+// POST /flows
 func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createFlow"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/flow"),
+		semconv.HTTPRouteKey.String("/flows"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -2444,206 +2424,6 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 	}
 }
 
-// handleCreateFlowDefinitionRequest handles createFlowDefinition operation.
-//
-// Creates a flow definition by publishing a new revision of it. It records a `flowdef.created` event.
-//
-// A [flow definition] is a template that defines the sequence of steps (capabilities) for one user
-// journey, such as registration, login or password reset. The body follows the flow definition schema,
-// which includes the flow's purpose, audience and steps.
-//
-// Every call allocates a new opaque ID. That `id` is the `revision_id` a release pins for
-// `kind: flow_definition`.
-//
-// Revisions of one flow share its `name`. Posting a definition under an existing `name` publishes a
-// new revision of that flow, which is not a conflict. List with `name` to see a flow's revisions,
-// newest by creation time first.
-//
-// [flow definition]: /docs/concepts/flows-and-schemas
-//
-// POST /flow_definitions
-func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createFlowDefinition"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/flow_definitions"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateFlowDefinitionOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: CreateFlowDefinitionOperation,
-			ID:   "createFlowDefinition",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateFlowDefinitionOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateFlowDefinitionRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response CreateFlowDefinitionRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    CreateFlowDefinitionOperation,
-			OperationSummary: "Create a flow definition",
-			OperationID:      "createFlowDefinition",
-			Body:             request,
-			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
-		}
-
-		type (
-			Request  = *CreateFlowDefinitionRequest
-			Params   = struct{}
-			Response = CreateFlowDefinitionRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			nil,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateFlowDefinition(ctx, request)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.CreateFlowDefinition(ctx, request)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeCreateFlowDefinitionResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleCreateGrantRequest handles createGrant operation.
 //
 // Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or
@@ -2651,9 +2431,9 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 //
 // The project is the one named by the `project_id` query parameter. Name the principal with `user`
 // (`user_id` or `identifier`) or `team` (`team_id` or `name`). The `id` in the response
-// (`asgn_<opaque>`) is the grant ID that `getGrant` (`GET /grants/{id}`) and `deleteGrant`
-// (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not created here: a claim,
-// which attaches a project to a team, creates them.
+// (`asgn_<opaque>`) is the grant ID that `getGrant` (`GET /grants/{grant_id}`) and `deleteGrant`
+// (`DELETE /grants/{grant_id}`) take. Owning-team (`project.team`) grants are not created here: a
+// claim, which attaches a project to a team, creates them.
 //
 // An unrevoked grant with the same principal and relation holds that binding even after `expires_at`.
 // Revoke it with `deleteGrant` before you create it again.
@@ -2878,440 +2658,6 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 	}
 
 	if err := encodeCreateGrantResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleCreateHandoffRequest handles createHandoff operation.
-//
-// Completes an authentication attempt and mints a `handoff_token`.
-//
-// A handoff token is the short-lived credential that a completed attempt hands to the session
-// exchange. Call this after every required factor is verified and the attempt is in `completed` state.
-// Otherwise it answers `409` with `att.not_completed`: verify the remaining factors, then call again.
-//
-// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
-// within 60 seconds to receive the session and its `session_token`. The handoff token is:
-//
-//   - Single-use: exchange it once, with no retry.
-//   - Bound to the project: the exchange needs the same project's credential.
-//   - Created once: a second call answers `409 att.already_handed_off`, even with the same idempotency
-//     key.
-//
-// A revoked release is refused when the handoff is exchanged, not here. A release is the configuration
-// that `zitadel deploy` publishes.
-//
-// POST /auth_attempts/{attempt_id}/handoff
-func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createHandoff"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/auth_attempts/{attempt_id}/handoff"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateHandoffOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: CreateHandoffOperation,
-			ID:   "createHandoff",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateHandoffOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeCreateHandoffParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response CreateHandoffRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    CreateHandoffOperation,
-			OperationSummary: "Complete an authentication attempt and create a handoff token",
-			OperationID:      "createHandoff",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "attempt_id",
-					In:   "path",
-				}: params.AttemptID,
-				{
-					Name: "Idempotency-Key",
-					In:   "header",
-				}: params.IdempotencyKey,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = CreateHandoffParams
-			Response = CreateHandoffRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackCreateHandoffParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateHandoff(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.CreateHandoff(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeCreateHandoffResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleCreateIdpRequest handles createIdp operation.
-//
-// Creates or revises an identity provider, an external sign-in such as Google, from its connection
-// document. If the slug does not already exist, a new identity provider is created. If one with that
-// slug already exists, a revision is created.
-//
-// A revision gets a new `revision_id` and does not modify the identity provider's `id`. Identity
-// links, which tie a user to an account at the provider, keep resolving. Releases and authentication
-// attempts stay pinned to the revision they captured.
-//
-// Identity fields are fixed for the life of the identity provider and a revision that changes one is
-// rejected: `protocol`, `subject_claim`, and `issuer`, the field that names the authority. Their
-// values decide which provider account a stored subject belongs to, so changing one would silently
-// repoint existing identities at a different provider.
-//
-// `subject_claim` is optional, and `sub` is used as the default value. If a revision updates
-// `subject_claim` to a different value than the one set during creation, the request is rejected.
-//
-// OIDC is the only protocol.
-//
-// The document is validated against the `idp-connection.json` schema before anything is stored. The
-// rules the server applies when it starts a sign-in then run on the document, so a document that could
-// never start one is refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
-// without the others. Set no endpoint, and discovery fills them, or set `authorization_endpoint`,
-// `token_endpoint`, `jwks_uri`, and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
-// `id_token_mapping` is on, but setting it alone still counts as setting an endpoint. The details list
-// the missing endpoints.
-//
-// A refused document stores nothing, and on a revise the current revision stays unchanged.
-//
-// POST /idps
-func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createIdp"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/idps"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateIdpOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: CreateIdpOperation,
-			ID:   "createIdp",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateIdpOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeCreateIdpParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateIdpRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response CreateIdpRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    CreateIdpOperation,
-			OperationSummary: "Create or revise an identity provider",
-			OperationID:      "createIdp",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *CreateIdpRequest
-			Params   = CreateIdpParams
-			Response = CreateIdpRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackCreateIdpParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateIdp(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.CreateIdp(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeCreateIdpResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -3561,7 +2907,7 @@ func (s *Server) handleCreateInvitationRequest(args [0]string, argsEscaped bool,
 // returns.
 //
 // A project is the top-level boundary that holds users, sessions and configuration. It has no owning
-// team until someone claims it; see `initClaim` (`POST /projects/{project_id}/claim/init`).
+// team until someone claims it; see `createProjectClaim` (`POST /projects/{project_id}/claim/init`).
 //
 // The request needs no credential and is rate-limited. On `429`, wait and retry. Unless
 // `seed_defaults` is `false`, the project starts with a default user schema and flow. The CLI sets it
@@ -3706,6 +3052,209 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 	}
 }
 
+// handleCreateProjectClaimRequest handles createProjectClaim operation.
+//
+// Starts a claim, which attaches a project created before sign-in to a team, and returns the
+// `claim_url` to open in a browser.
+//
+// A claim [attaches a project to a team] so that the team's members administer it. This operation
+// mints a single-use, short-lived challenge for an unclaimed project. The developer opens `claim_url`,
+// signs in and completes the claim in the browser; see `completeProjectClaim`
+// (`POST /projects/{project_id}/claim/complete`). Poll `getProjectClaimStatus`
+// (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`, as `zitadel claim`
+// does. The response's `expires_at` carries the exact expiry.
+//
+// Authenticate with the project secret that `createProject` (`POST /projects`) returns as
+// `project_secret`.
+//
+// A `409` means a team already claimed the project, and its details name that team. A `410` means the
+// project's 14-day claim window has closed, which is final.
+//
+// [attaches a project to a team]: /docs/concepts/project-team-user#claim
+//
+// POST /projects/{project_id}/claim/init
+func (s *Server) handleCreateProjectClaimRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createProjectClaim"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/init"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateProjectClaimOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: CreateProjectClaimOperation,
+			ID:   "createProjectClaim",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, CreateProjectClaimOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeCreateProjectClaimParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response CreateProjectClaimRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    CreateProjectClaimOperation,
+			OperationSummary: "Initialize a project claim",
+			OperationID:      "createProjectClaim",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = CreateProjectClaimParams
+			Response = CreateProjectClaimRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackCreateProjectClaimParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.CreateProjectClaim(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.CreateProjectClaim(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeCreateProjectClaimResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleCreateReleaseRequest handles createRelease operation.
 //
 // Creates a release from existing revisions, given as `(kind, revision_id)` pairs. To build one from
@@ -3713,8 +3262,8 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 //
 // A release is a snapshot of the project's configuration: it pins one revision of each resource it
 // includes, and it is not tied to an origin. Take each `revision_id` from the operation that created
-// the revision, for example the `id` that `createBranding` (`POST /branding`) or
-// `createFlowDefinition` (`POST /flow_definitions`) returns.
+// the revision, for example the `id` that `publishBranding` (`POST /branding`) or
+// `publishFlowDefinition` (`POST /flow_definitions`) returns.
 //
 // Each revision must exist in the project and is recorded under the handle it declares. The release
 // must be complete and consistent:
@@ -3924,222 +3473,6 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 	}
 
 	if err := encodeCreateReleaseResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleCreateSchemaRequest handles createSchema operation.
-//
-// Creates a user schema, the JSON Schema that says which attributes a user has and which attribute
-// identifies the user.
-//
-// The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
-// the server resolves. The response's `id` is what `createUser` (`POST /users`) takes as `schema`.
-//
-// The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
-// is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server
-// generates a `sch_*` URL. When provided, `$id` must be unique within the project and should ideally
-// be a valid URI pointing at where the schema can be accessed. A `$id` that already exists in the
-// project is refused; pick another or omit it.
-//
-// POST /schemas
-func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createSchema"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/schemas"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateSchemaOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: CreateSchemaOperation,
-			ID:   "createSchema",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateSchemaOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeCreateSchemaParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateSchemaRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response CreateSchemaRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    CreateSchemaOperation,
-			OperationSummary: "Create a schema",
-			OperationID:      "createSchema",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "team_id",
-					In:   "query",
-				}: params.TeamID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = CreateSchemaReq
-			Params   = CreateSchemaParams
-			Response = CreateSchemaRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackCreateSchemaParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateSchema(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.CreateSchema(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeCreateSchemaResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -4585,10 +3918,10 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 //
 // Creates a user whose attributes satisfy the user schema named in the request.
 //
-// The server assigns the user's ID and returns it. `schema` is the `id` of a schema, as `createSchema`
-// (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With `team_id`, the user
-// also becomes an active member of that team. A value the schema marks unique that another user
-// already holds is refused with `409`; send a different value.
+// The server assigns the user's ID and returns it. `schema` is the `id` of a schema, as
+// `publishSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With
+// `team_id`, the user also becomes an active member of that team. A value the schema marks unique that
+// another user already holds is refused with `409`; send a different value.
 //
 // POST /users
 func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4810,6 +4143,412 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 	}
 }
 
+// handleCreateUserPasskeyRegistrationRequest handles createUserPasskeyRegistration operation.
+//
+// Starts a WebAuthn registration ceremony for the user and returns the creation options for
+// `navigator.credentials.create()`. A passkey is registered in two steps: this one returns options for
+// the browser, and `completeUserPasskeyRegistration`
+// (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
+//
+// Complete the ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+// five minutes, using the `registration_id` this response returns. Credentials already registered for
+// the user are excluded automatically.
+//
+// POST /users/{user_id}/passkeys/registrations
+func (s *Server) handleCreateUserPasskeyRegistrationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createUserPasskeyRegistration"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateUserPasskeyRegistrationOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: CreateUserPasskeyRegistrationOperation,
+			ID:   "createUserPasskeyRegistration",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, CreateUserPasskeyRegistrationOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeCreateUserPasskeyRegistrationParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeCreateUserPasskeyRegistrationRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response CreateUserPasskeyRegistrationRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    CreateUserPasskeyRegistrationOperation,
+			OperationSummary: "Begin a passkey registration",
+			OperationID:      "createUserPasskeyRegistration",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *BeginUserPasskeyRegistrationRequest
+			Params   = CreateUserPasskeyRegistrationParams
+			Response = CreateUserPasskeyRegistrationRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackCreateUserPasskeyRegistrationParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.CreateUserPasskeyRegistration(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.CreateUserPasskeyRegistration(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeCreateUserPasskeyRegistrationResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleDeactivateTeamRequest handles deactivateTeam operation.
+//
+// Deactivates a team and removes its memberships.
+//
+// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with status
+// `deactivated`. The users whose lifecycle the team owns are deactivated with it.
+//
+// The request is idempotent. Deleting a team that is already deactivated or does not exist succeeds
+// without changing anything.
+//
+// A team that still owns a project is refused with `409 team.owns_project`. Deactivating it would
+// leave the project owned by a deactivated team and so unmanageable. No endpoint ends a team's
+// ownership of a project yet, so for now such a team cannot be deactivated through the API.
+//
+// DELETE /teams/{team_id}
+func (s *Server) handleDeactivateTeamRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deactivateTeam"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.HTTPRouteKey.String("/teams/{team_id}"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), DeactivateTeamOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: DeactivateTeamOperation,
+			ID:   "deactivateTeam",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, DeactivateTeamOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeDeactivateTeamParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response DeactivateTeamRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    DeactivateTeamOperation,
+			OperationSummary: "Deactivate a team",
+			OperationID:      "deactivateTeam",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "team_id",
+					In:   "path",
+				}: params.TeamID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = DeactivateTeamParams
+			Response = DeactivateTeamRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackDeactivateTeamParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.DeactivateTeam(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.DeactivateTeam(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeDeactivateTeamResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleDeleteGrantRequest handles deleteGrant operation.
 //
 // Revokes a grant this API manages and emits `authz.revoked`.
@@ -4821,14 +4560,14 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
 //
-// DELETE /grants/{id}
+// DELETE /grants/{grant_id}
 func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("deleteGrant"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
-		semconv.HTTPRouteKey.String("/grants/{id}"),
+		semconv.HTTPRouteKey.String("/grants/{grant_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -4979,9 +4718,9 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "grant_id",
 					In:   "path",
-				}: params.ID,
+				}: params.GrantID,
 				{
 					Name: "project_id",
 					In:   "query",
@@ -5026,204 +4765,7 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 	}
 }
 
-// handleDeleteTeamRequest handles deleteTeam operation.
-//
-// Deactivates a team and removes its memberships.
-//
-// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with status
-// `deactivated`. The users whose lifecycle the team owns are deactivated with it.
-//
-// The request is idempotent. Deleting a team that is already deactivated or does not exist succeeds
-// without changing anything.
-//
-// A team that still owns a project is refused with `409 team.owns_project`. Deactivating it would
-// leave the project owned by a deactivated team and so unmanageable. No endpoint ends a team's
-// ownership of a project yet, so for now such a team cannot be deactivated through the API.
-//
-// DELETE /teams/{team_id}
-func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("deleteTeam"),
-		semconv.HTTPRequestMethodKey.String("DELETE"),
-		semconv.HTTPRouteKey.String("/teams/{team_id}"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), DeleteTeamOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: DeleteTeamOperation,
-			ID:   "deleteTeam",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, DeleteTeamOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeDeleteTeamParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response DeleteTeamRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    DeleteTeamOperation,
-			OperationSummary: "Deactivate a team",
-			OperationID:      "deleteTeam",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "team_id",
-					In:   "path",
-				}: params.TeamID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = DeleteTeamParams
-			Response = DeleteTeamRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackDeleteTeamParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.DeleteTeam(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.DeleteTeam(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeDeleteTeamResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleDeleteUserByIDRequest handles DeleteUserByID operation.
+// handleDeleteUserRequest handles deleteUser operation.
 //
 // Deletes a user, removes them from every team they belong to, and revokes every grant they hold, on
 // any project.
@@ -5234,11 +4776,11 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 // of a project's owning team returns 409 `proj.last_owner` and changes nothing.
 //
 // DELETE /users/{user_id}
-func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteUserRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("DeleteUserByID"),
+		otelogen.OperationID("deleteUser"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
 		semconv.HTTPRouteKey.String("/users/{user_id}"),
 	}
@@ -5246,7 +4788,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), DeleteUserByIDOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), DeleteUserOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -5301,15 +4843,15 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: DeleteUserByIDOperation,
-			ID:   "DeleteUserByID",
+			Name: DeleteUserOperation,
+			ID:   "deleteUser",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, DeleteUserByIDOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, DeleteUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -5326,7 +4868,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, DeleteUserByIDOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, DeleteUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -5367,7 +4909,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 			return
 		}
 	}
-	params, err := decodeDeleteUserByIDParams(args, argsEscaped, r)
+	params, err := decodeDeleteUserParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -5380,13 +4922,13 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 
 	var rawBody []byte
 
-	var response DeleteUserByIDRes
+	var response DeleteUserRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    DeleteUserByIDOperation,
+			OperationName:    DeleteUserOperation,
 			OperationSummary: "Delete a user by ID",
-			OperationID:      "DeleteUserByID",
+			OperationID:      "deleteUser",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -5400,8 +4942,8 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 
 		type (
 			Request  = struct{}
-			Params   = DeleteUserByIDParams
-			Response = DeleteUserByIDRes
+			Params   = DeleteUserParams
+			Response = DeleteUserRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -5410,14 +4952,14 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 		](
 			m,
 			mreq,
-			unpackDeleteUserByIDParams,
+			unpackDeleteUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.DeleteUserByID(ctx, params)
+				response, err = s.h.DeleteUser(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.DeleteUserByID(ctx, params)
+		response, err = s.h.DeleteUser(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -5425,7 +4967,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 		return
 	}
 
-	if err := encodeDeleteUserByIDResponse(response, w, span); err != nil {
+	if err := encodeDeleteUserResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -5440,9 +4982,9 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 // keep the values they froze. Each kind removed records a `variable.removed` event.
 //
 // A name with no value for that kind answers `var.not_found`: there is nothing to delete.
-// `getVariables` (`GET /variables`) lists the names the project holds. To remove several names in one
-// request, or to remove a name that may already be absent, send `null` for each name to
-// `updateVariables` (`PATCH /variables`).
+// `listVariables` (`GET /variables`) lists the names the project holds. To remove several names in one
+// request, or to remove a name that may already be absent, send `null` for each name to `setVariables`
+// (`PATCH /variables`).
 //
 // DELETE /variables/{variable_name}
 func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5879,7 +5421,7 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 //
 // Exchanges a handoff token for a session and a `session_token`.
 //
-// A handoff token is the short-lived, single-use credential that `createHandoff`
+// A handoff token is the short-lived, single-use credential that `createAuthAttemptHandoff`
 // (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication
 // attempt is complete. This call consumes it. It is the last step of the sign-in sequence: create the
 // attempt, issue a challenge, verify the proof, create the handoff, exchange it.
@@ -6107,241 +5649,28 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 	}
 }
 
-// handleFinishUserPasskeyRegistrationRequest handles finishUserPasskeyRegistration operation.
-//
-// Verifies the attestation against the registration ceremony and stores the new passkey for the user.
-// `registration_id` is the one that `beginUserPasskeyRegistration`
-// (`POST /users/{user_id}/passkeys/registrations`) returned when it started the ceremony. The
-// attestation is the browser's answer from `navigator.credentials.create()`.
-//
-// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
-// `att.stale_challenge`: begin a new registration. An unknown or already-consumed registration ID
-// answers `att.not_found`.
-//
-// POST /users/{user_id}/passkeys/registrations/{registration_id}
-func (s *Server) handleFinishUserPasskeyRegistrationRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("finishUserPasskeyRegistration"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys/registrations/{registration_id}"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), FinishUserPasskeyRegistrationOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: FinishUserPasskeyRegistrationOperation,
-			ID:   "finishUserPasskeyRegistration",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, FinishUserPasskeyRegistrationOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeFinishUserPasskeyRegistrationParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeFinishUserPasskeyRegistrationRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response FinishUserPasskeyRegistrationRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    FinishUserPasskeyRegistrationOperation,
-			OperationSummary: "Finish a passkey registration",
-			OperationID:      "finishUserPasskeyRegistration",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
-				{
-					Name: "registration_id",
-					In:   "path",
-				}: params.RegistrationID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *FinishUserPasskeyRegistrationRequest
-			Params   = FinishUserPasskeyRegistrationParams
-			Response = FinishUserPasskeyRegistrationRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackFinishUserPasskeyRegistrationParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.FinishUserPasskeyRegistration(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.FinishUserPasskeyRegistration(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeFinishUserPasskeyRegistrationResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleGetApplicationByIdRequest handles getApplicationById operation.
+// handleGetApplicationRequest handles getApplication operation.
 //
 // Returns an application that authenticates its users via Zitadel, by ID at its newest revision, with
-// each client's `client_id` in `definition`. It never returns a client secret: `createApplication`
+// each client's `client_id` in `definition`. It never returns a client secret: `publishApplication`
 // (`POST /applications`) shows one once, when it creates the client.
 //
 // The lookup is scoped to the project in `project_id`.
 //
-// GET /applications/{id}
-func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /applications/{application_id}
+func (s *Server) handleGetApplicationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getApplicationById"),
+		otelogen.OperationID("getApplication"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/applications/{id}"),
+		semconv.HTTPRouteKey.String("/applications/{application_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetApplicationOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -6396,15 +5725,15 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetApplicationByIdOperation,
-			ID:   "getApplicationById",
+			Name: GetApplicationOperation,
+			ID:   "getApplication",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetApplicationOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -6444,7 +5773,7 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 			return
 		}
 	}
-	params, err := decodeGetApplicationByIdParams(args, argsEscaped, r)
+	params, err := decodeGetApplicationParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -6457,13 +5786,13 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 
 	var rawBody []byte
 
-	var response GetApplicationByIdRes
+	var response GetApplicationRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetApplicationByIdOperation,
+			OperationName:    GetApplicationOperation,
 			OperationSummary: "Get an application by ID",
-			OperationID:      "getApplicationById",
+			OperationID:      "getApplication",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -6472,17 +5801,17 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "id",
+					Name: "application_id",
 					In:   "path",
-				}: params.ID,
+				}: params.ApplicationID,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = GetApplicationByIdParams
-			Response = GetApplicationByIdRes
+			Params   = GetApplicationParams
+			Response = GetApplicationRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -6491,14 +5820,14 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 		](
 			m,
 			mreq,
-			unpackGetApplicationByIdParams,
+			unpackGetApplicationParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetApplicationById(ctx, params)
+				response, err = s.h.GetApplication(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetApplicationById(ctx, params)
+		response, err = s.h.GetApplication(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -6506,7 +5835,7 @@ func (s *Server) handleGetApplicationByIdRequest(args [1]string, argsEscaped boo
 		return
 	}
 
-	if err := encodeGetApplicationByIdResponse(response, w, span); err != nil {
+	if err := encodeGetApplicationResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -6708,25 +6037,25 @@ func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w
 	}
 }
 
-// handleGetBrandingByIdRequest handles getBrandingById operation.
+// handleGetBrandingRequest handles getBranding operation.
 //
 // Returns one branding revision, including its stored configuration. Pass the `id` that
-// `createBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
+// `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
 //
-// GET /branding/{id}
-func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /branding/{branding_id}
+func (s *Server) handleGetBrandingRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getBrandingById"),
+		otelogen.OperationID("getBranding"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/branding/{id}"),
+		semconv.HTTPRouteKey.String("/branding/{branding_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetBrandingByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetBrandingOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -6781,15 +6110,15 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetBrandingByIdOperation,
-			ID:   "getBrandingById",
+			Name: GetBrandingOperation,
+			ID:   "getBranding",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetBrandingByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetBrandingOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -6806,7 +6135,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetBrandingByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetBrandingOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -6847,7 +6176,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 			return
 		}
 	}
-	params, err := decodeGetBrandingByIdParams(args, argsEscaped, r)
+	params, err := decodeGetBrandingParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -6860,28 +6189,28 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 
 	var rawBody []byte
 
-	var response GetBrandingByIdRes
+	var response GetBrandingRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetBrandingByIdOperation,
+			OperationName:    GetBrandingOperation,
 			OperationSummary: "Get a branding revision by ID",
-			OperationID:      "getBrandingById",
+			OperationID:      "getBranding",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "branding_id",
 					In:   "path",
-				}: params.ID,
+				}: params.BrandingID,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = GetBrandingByIdParams
-			Response = GetBrandingByIdRes
+			Params   = GetBrandingParams
+			Response = GetBrandingRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -6890,14 +6219,14 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			unpackGetBrandingByIdParams,
+			unpackGetBrandingParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetBrandingById(ctx, params)
+				response, err = s.h.GetBranding(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetBrandingById(ctx, params)
+		response, err = s.h.GetBranding(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -6905,7 +6234,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 		return
 	}
 
-	if err := encodeGetBrandingByIdResponse(response, w, span); err != nil {
+	if err := encodeGetBrandingResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -6914,371 +6243,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 	}
 }
 
-// handleGetClaimStatusRequest handles getClaimStatus operation.
-//
-// Returns the status of a claim challenge, `pending` or `completed`, while a browser completes the
-// claim.
-//
-// A [claim attaches a project to a team]. `zitadel claim` polls this operation after `initClaim`
-// (`POST /projects/{project_id}/claim/init`) starts the claim. Once the project is claimed, the
-// response is `completed` with the owning team, the claim timestamp and the dashboard URL.
-//
-// The claim itself, not the polled challenge, decides the status. A project claimed through another
-// concurrent challenge also reports `completed`. A completed claim keeps reporting `completed` past
-// this challenge's expiry and past the project's claim window.
-//
-// Pass the `challenge_id` that `initClaim` returns. Authenticate with the project secret that started
-// the challenge. On `410` with `proj.claim_expired`, call `initClaim` again for a fresh challenge.
-//
-// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
-//
-// GET /projects/{project_id}/claim/status
-func (s *Server) handleGetClaimStatusRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getClaimStatus"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/status"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetClaimStatusOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: GetClaimStatusOperation,
-			ID:   "getClaimStatus",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetClaimStatusOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeGetClaimStatusParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response GetClaimStatusRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetClaimStatusOperation,
-			OperationSummary: "Get the status of a project claim",
-			OperationID:      "getClaimStatus",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
-				{
-					Name: "challenge_id",
-					In:   "query",
-				}: params.ChallengeID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = GetClaimStatusParams
-			Response = GetClaimStatusRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackGetClaimStatusParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetClaimStatus(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetClaimStatus(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetClaimStatusResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleGetClaimWindowRequest handles getClaimWindow operation.
-//
-// Returns when a project's claim window closes and whether it has already closed.
-//
-// The claim window is the 14 days after a project is created during which a team can [claim it]. The
-// claim page in the browser calls this operation to show how long is left.
-//
-// The request needs no credential, because the claim page calls it before the developer has signed in.
-// Holding the `challenge_id` from the claim URL that `initClaim`
-// (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
-// `completeClaim` (`POST /projects/{project_id}/claim/complete`) accepts. The response reveals only
-// the window, never the project itself. Unlike `completeClaim` it spends nothing, so reloading the
-// page is safe.
-//
-// [claim it]: /docs/concepts/project-team-user#claim
-//
-// GET /projects/{project_id}/claim/window
-func (s *Server) handleGetClaimWindowRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getClaimWindow"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/window"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetClaimWindowOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: GetClaimWindowOperation,
-			ID:   "getClaimWindow",
-		}
-	)
-	params, err := decodeGetClaimWindowParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response GetClaimWindowRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetClaimWindowOperation,
-			OperationSummary: "Get the claim window for a project",
-			OperationID:      "getClaimWindow",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
-				{
-					Name: "challenge_id",
-					In:   "query",
-				}: params.ChallengeID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = GetClaimWindowParams
-			Response = GetClaimWindowRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackGetClaimWindowParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetClaimWindow(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetClaimWindow(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetClaimWindowResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleGetDeploymentByIdRequest handles getDeploymentById operation.
+// handleGetDeploymentRequest handles getDeployment operation.
 //
 // Returns one deployment: the release it made live, the origins it made it live on, and whether they
 // still serve it.
@@ -7291,11 +6256,11 @@ func (s *Server) handleGetClaimWindowRequest(args [1]string, argsEscaped bool, w
 // deployments in projects the caller cannot read.
 //
 // GET /deployments/{deployment_id}
-func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDeploymentRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getDeploymentById"),
+		otelogen.OperationID("getDeployment"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/deployments/{deployment_id}"),
 	}
@@ -7303,7 +6268,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetDeploymentByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetDeploymentOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -7358,15 +6323,15 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetDeploymentByIdOperation,
-			ID:   "getDeploymentById",
+			Name: GetDeploymentOperation,
+			ID:   "getDeployment",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -7383,7 +6348,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetDeploymentByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -7424,7 +6389,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 			return
 		}
 	}
-	params, err := decodeGetDeploymentByIdParams(args, argsEscaped, r)
+	params, err := decodeGetDeploymentParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -7437,13 +6402,13 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 
 	var rawBody []byte
 
-	var response GetDeploymentByIdRes
+	var response GetDeploymentRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetDeploymentByIdOperation,
+			OperationName:    GetDeploymentOperation,
 			OperationSummary: "Get a deployment by ID",
-			OperationID:      "getDeploymentById",
+			OperationID:      "getDeployment",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -7461,8 +6426,8 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 
 		type (
 			Request  = struct{}
-			Params   = GetDeploymentByIdParams
-			Response = GetDeploymentByIdRes
+			Params   = GetDeploymentParams
+			Response = GetDeploymentRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -7471,14 +6436,14 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 		](
 			m,
 			mreq,
-			unpackGetDeploymentByIdParams,
+			unpackGetDeploymentParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetDeploymentById(ctx, params)
+				response, err = s.h.GetDeployment(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetDeploymentById(ctx, params)
+		response, err = s.h.GetDeployment(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -7486,202 +6451,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 		return
 	}
 
-	if err := encodeGetDeploymentByIdResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleGetDeploymentVariablesRequest handles getDeploymentVariables operation.
-//
-// Returns the variable values the deployment froze when it was made. Later changes to the project's
-// variables do not affect them. A secret reads back as `{"secret": true}`.
-//
-// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments`
-// (`GET /deployments`) returns.
-//
-// GET /deployments/{deployment_id}/variables
-func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getDeploymentVariables"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/deployments/{deployment_id}/variables"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetDeploymentVariablesOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: GetDeploymentVariablesOperation,
-			ID:   "getDeploymentVariables",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentVariablesOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeGetDeploymentVariablesParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response GetDeploymentVariablesRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetDeploymentVariablesOperation,
-			OperationSummary: "Get a deployment's variables",
-			OperationID:      "getDeploymentVariables",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "deployment_id",
-					In:   "path",
-				}: params.DeploymentID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = GetDeploymentVariablesParams
-			Response = GetDeploymentVariablesRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackGetDeploymentVariablesParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetDeploymentVariables(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetDeploymentVariables(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetDeploymentVariablesResponse(response, w, span); err != nil {
+	if err := encodeGetDeploymentResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -7702,14 +6472,14 @@ func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped
 //
 // [claim]: /docs/concepts/project-team-user#claim
 //
-// GET /events/{id}
+// GET /events/{event_id}
 func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getEvent"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/events/{id}"),
+		semconv.HTTPRouteKey.String("/events/{event_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -7860,9 +6630,9 @@ func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "event_id",
 					In:   "path",
-				}: params.ID,
+				}: params.EventID,
 				{
 					Name: "project_id",
 					In:   "query",
@@ -7909,17 +6679,17 @@ func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.
 
 // handleGetFlowDefinitionRequest handles getFlowDefinition operation.
 //
-// Returns one flow definition revision. Pass the `id` that `createFlowDefinition`
+// Returns one flow definition revision. Pass the `id` that `publishFlowDefinition`
 // (`POST /flow_definitions`) or `listFlowDefinitions` (`GET /flow_definitions`) returns.
 //
-// GET /flow_definitions/{id}
+// GET /flow_definitions/{flow_definition_id}
 func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getFlowDefinition"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/flow_definitions/{id}"),
+		semconv.HTTPRouteKey.String("/flow_definitions/{flow_definition_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -8070,9 +6840,9 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "flow_definition_id",
 					In:   "path",
-				}: params.ID,
+				}: params.FlowDefinitionID,
 			},
 			Raw: r,
 		}
@@ -8119,8 +6889,8 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 // page reload or a network error.
 //
 // The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
-// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep` (`POST /flow/{id}/submit`)
-// advances it.
+// step. `createFlow` (`POST /flows`) starts a flow, and `submitFlowStep`
+// (`POST /flows/{flow_id}/submit`) advances it.
 //
 // For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
 // or one carrying a passkey registration that creates its user. Reuses challenges with more than a
@@ -8130,14 +6900,14 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 // that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
-// GET /flow/{id}
+// GET /flows/{flow_id}
 func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getFlowStep"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/flow/{id}"),
+		semconv.HTTPRouteKey.String("/flows/{flow_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -8226,9 +6996,9 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "flow_id",
 					In:   "path",
-				}: params.ID,
+				}: params.FlowID,
 				{
 					Name: "_zflow",
 					In:   "cookie",
@@ -8278,10 +7048,10 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // Returns a grant by ID, when this API manages it and it has not been revoked.
 //
 // This API manages grants that bind a user or team to the viewer, editor or admin role. An expired
-// grant is still returned, so you can revoke it with `deleteGrant` (`DELETE /grants/{id}`) before you
-// grant the same binding again. Authorization still ignores expired grants. Send `project_id` as well
-// as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
-// (`relation=team`) rows and grants of another project all return `404`.
+// grant is still returned, so you can revoke it with `deleteGrant` (`DELETE /grants/{grant_id}`)
+// before you grant the same binding again. Authorization still ignores expired grants. Send
+// `project_id` as well as the grant ID. Misses, revoked grants, project-secret setup rows (`sk_proj`),
+// owning-team (`relation=team`) rows and grants of another project all return `404`.
 //
 // `expand=principal` adds envelope fields on `user` or `team`. For project secrets it requires
 // `user.read` and `team.read` in addition to `project.read`. A user-bound console session that already
@@ -8290,14 +7060,14 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // Authenticate with a project secret (`oauth2`) or a console session cookie (`sessionCookie`). Cookie
 // requests follow that scheme's CSRF rules.
 //
-// GET /grants/{id}
+// GET /grants/{grant_id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getGrant"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/grants/{id}"),
+		semconv.HTTPRouteKey.String("/grants/{grant_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -8448,9 +7218,9 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "grant_id",
 					In:   "path",
-				}: params.ID,
+				}: params.GrantID,
 				{
 					Name: "project_id",
 					In:   "query",
@@ -8499,27 +7269,27 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 	}
 }
 
-// handleGetIdpByIdRequest handles getIdpById operation.
+// handleGetIdpRequest handles getIdp operation.
 //
 // Returns an identity provider, an external sign-in such as Google, by ID at its newest revision.
-// `listIdpRevisions` (`GET /idps/{id}/revisions`) lists every revision of it.
+// `listIdpRevisions` (`GET /idps/{idp_id}/revisions`) lists every revision of it.
 //
 // The lookup is scoped to the project in `project_id`.
 //
-// GET /idps/{id}
-func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /idps/{idp_id}
+func (s *Server) handleGetIdpRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getIdpById"),
+		otelogen.OperationID("getIdp"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/idps/{id}"),
+		semconv.HTTPRouteKey.String("/idps/{idp_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetIdpByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetIdpOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -8574,15 +7344,15 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetIdpByIdOperation,
-			ID:   "getIdpById",
+			Name: GetIdpOperation,
+			ID:   "getIdp",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetIdpByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetIdpOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -8599,7 +7369,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -8640,7 +7410,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 			return
 		}
 	}
-	params, err := decodeGetIdpByIdParams(args, argsEscaped, r)
+	params, err := decodeGetIdpParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -8653,13 +7423,13 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 
 	var rawBody []byte
 
-	var response GetIdpByIdRes
+	var response GetIdpRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetIdpByIdOperation,
+			OperationName:    GetIdpOperation,
 			OperationSummary: "Get an identity provider by ID",
-			OperationID:      "getIdpById",
+			OperationID:      "getIdp",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -8668,17 +7438,17 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "id",
+					Name: "idp_id",
 					In:   "path",
-				}: params.ID,
+				}: params.IdpID,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = GetIdpByIdParams
-			Response = GetIdpByIdRes
+			Params   = GetIdpParams
+			Response = GetIdpRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -8687,14 +7457,14 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 		](
 			m,
 			mreq,
-			unpackGetIdpByIdParams,
+			unpackGetIdpParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetIdpById(ctx, params)
+				response, err = s.h.GetIdp(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetIdpById(ctx, params)
+		response, err = s.h.GetIdp(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -8702,7 +7472,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 		return
 	}
 
-	if err := encodeGetIdpByIdResponse(response, w, span); err != nil {
+	if err := encodeGetIdpResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -8711,7 +7481,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 	}
 }
 
-// handleGetIdpRevisionByIdRequest handles getIdpRevisionById operation.
+// handleGetIdpRevisionRequest handles getIdpRevision operation.
 //
 // Returns one revision of an identity provider, an external sign-in such as Google, by its
 // `revision_id`, the value an authentication attempt or a release pins.
@@ -8719,11 +7489,11 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 // The lookup is scoped to the project in `project_id`.
 //
 // GET /idps/revisions/{revision_id}
-func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetIdpRevisionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getIdpRevisionById"),
+		otelogen.OperationID("getIdpRevision"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/idps/revisions/{revision_id}"),
 	}
@@ -8731,7 +7501,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetIdpRevisionByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetIdpRevisionOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -8786,15 +7556,15 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetIdpRevisionByIdOperation,
-			ID:   "getIdpRevisionById",
+			Name: GetIdpRevisionOperation,
+			ID:   "getIdpRevision",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetIdpRevisionByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetIdpRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -8811,7 +7581,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpRevisionByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -8852,7 +7622,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 			return
 		}
 	}
-	params, err := decodeGetIdpRevisionByIdParams(args, argsEscaped, r)
+	params, err := decodeGetIdpRevisionParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -8865,13 +7635,13 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 
 	var rawBody []byte
 
-	var response GetIdpRevisionByIdRes
+	var response GetIdpRevisionRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetIdpRevisionByIdOperation,
+			OperationName:    GetIdpRevisionOperation,
 			OperationSummary: "Get a revision of an identity provider",
-			OperationID:      "getIdpRevisionById",
+			OperationID:      "getIdpRevision",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -8889,8 +7659,8 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 
 		type (
 			Request  = struct{}
-			Params   = GetIdpRevisionByIdParams
-			Response = GetIdpRevisionByIdRes
+			Params   = GetIdpRevisionParams
+			Response = GetIdpRevisionRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -8899,14 +7669,14 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 		](
 			m,
 			mreq,
-			unpackGetIdpRevisionByIdParams,
+			unpackGetIdpRevisionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetIdpRevisionById(ctx, params)
+				response, err = s.h.GetIdpRevision(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetIdpRevisionById(ctx, params)
+		response, err = s.h.GetIdpRevision(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -8914,7 +7684,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 		return
 	}
 
-	if err := encodeGetIdpRevisionByIdResponse(response, w, span); err != nil {
+	if err := encodeGetIdpRevisionResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -8931,14 +7701,14 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 // secret (`oauth2`) or a console session cookie (`sessionCookie`). Reading needs the same project
 // `admin` check as `createGrant` (`POST /grants`).
 //
-// GET /invitations/{id}
+// GET /invitations/{invitation_id}
 func (s *Server) handleGetInvitationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getInvitation"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/invitations/{id}"),
+		semconv.HTTPRouteKey.String("/invitations/{invitation_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -9089,9 +7859,9 @@ func (s *Server) handleGetInvitationRequest(args [1]string, argsEscaped bool, w 
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "invitation_id",
 					In:   "path",
-				}: params.ID,
+				}: params.InvitationID,
 				{
 					Name: "project_id",
 					In:   "query",
@@ -10224,21 +8994,21 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 	}
 }
 
-// handleGetOAuthSettingsByIdRequest handles getOAuthSettingsById operation.
+// handleGetOAuthSettingsRequest handles getOAuthSettings operation.
 //
 // Returns one OAuth settings revision, including its stored settings. Pass the `revision_id` of the
-// `kind: oauth` pointer on a release, which `buildRelease` (`POST /releases/build`) and
-// `getReleaseById` (`GET /releases/{release_id}`) return.
+// `kind: oauth` pointer on a release, which `buildRelease` (`POST /releases/build`) and `getRelease`
+// (`GET /releases/{release_id}`) return.
 //
 // A release is the only writer of OAuth settings, so there is no operation that publishes a revision
 // on its own: put `oauth` in the bundle that `buildRelease` takes.
 //
 // GET /oauth_settings/{oauth_settings_id}
-func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetOAuthSettingsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getOAuthSettingsById"),
+		otelogen.OperationID("getOAuthSettings"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/oauth_settings/{oauth_settings_id}"),
 	}
@@ -10246,7 +9016,7 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetOAuthSettingsByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetOAuthSettingsOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -10301,15 +9071,15 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetOAuthSettingsByIdOperation,
-			ID:   "getOAuthSettingsById",
+			Name: GetOAuthSettingsOperation,
+			ID:   "getOAuthSettings",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetOAuthSettingsByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetOAuthSettingsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -10326,7 +9096,7 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetOAuthSettingsByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetOAuthSettingsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -10367,7 +9137,7 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 			return
 		}
 	}
-	params, err := decodeGetOAuthSettingsByIdParams(args, argsEscaped, r)
+	params, err := decodeGetOAuthSettingsParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -10380,13 +9150,13 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 
 	var rawBody []byte
 
-	var response GetOAuthSettingsByIdRes
+	var response GetOAuthSettingsRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetOAuthSettingsByIdOperation,
+			OperationName:    GetOAuthSettingsOperation,
 			OperationSummary: "Get an OAuth settings revision by ID",
-			OperationID:      "getOAuthSettingsById",
+			OperationID:      "getOAuthSettings",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -10400,8 +9170,8 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 
 		type (
 			Request  = struct{}
-			Params   = GetOAuthSettingsByIdParams
-			Response = GetOAuthSettingsByIdRes
+			Params   = GetOAuthSettingsParams
+			Response = GetOAuthSettingsRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -10410,14 +9180,14 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 		](
 			m,
 			mreq,
-			unpackGetOAuthSettingsByIdParams,
+			unpackGetOAuthSettingsParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetOAuthSettingsById(ctx, params)
+				response, err = s.h.GetOAuthSettings(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetOAuthSettingsById(ctx, params)
+		response, err = s.h.GetOAuthSettings(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -10425,7 +9195,7 @@ func (s *Server) handleGetOAuthSettingsByIdRequest(args [1]string, argsEscaped b
 		return
 	}
 
-	if err := encodeGetOAuthSettingsByIdResponse(response, w, span); err != nil {
+	if err := encodeGetOAuthSettingsResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -11072,6 +9842,372 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 	}
 }
 
+// handleGetProjectClaimStatusRequest handles getProjectClaimStatus operation.
+//
+// Returns the status of a claim challenge, `pending` or `completed`, while a browser completes the
+// claim.
+//
+// A [claim attaches a project to a team]. `zitadel claim` polls this operation after
+// `createProjectClaim` (`POST /projects/{project_id}/claim/init`) starts the claim. Once the project
+// is claimed, the response is `completed` with the owning team, the claim timestamp and the dashboard
+// URL.
+//
+// The claim itself, not the polled challenge, decides the status. A project claimed through another
+// concurrent challenge also reports `completed`. A completed claim keeps reporting `completed` past
+// this challenge's expiry and past the project's claim window.
+//
+// Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the project secret that
+// started the challenge. On `410` with `proj.claim_expired`, call `createProjectClaim` again for a
+// fresh challenge.
+//
+// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
+//
+// GET /projects/{project_id}/claim/status
+func (s *Server) handleGetProjectClaimStatusRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getProjectClaimStatus"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/status"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetProjectClaimStatusOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetProjectClaimStatusOperation,
+			ID:   "getProjectClaimStatus",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetProjectClaimStatusOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetProjectClaimStatusParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetProjectClaimStatusRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetProjectClaimStatusOperation,
+			OperationSummary: "Get the status of a project claim",
+			OperationID:      "getProjectClaimStatus",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+				{
+					Name: "challenge_id",
+					In:   "query",
+				}: params.ChallengeID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetProjectClaimStatusParams
+			Response = GetProjectClaimStatusRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetProjectClaimStatusParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetProjectClaimStatus(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetProjectClaimStatus(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetProjectClaimStatusResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleGetProjectClaimWindowRequest handles getProjectClaimWindow operation.
+//
+// Returns when a project's claim window closes and whether it has already closed.
+//
+// The claim window is the 14 days after a project is created during which a team can [claim it]. The
+// claim page in the browser calls this operation to show how long is left.
+//
+// The request needs no credential, because the claim page calls it before the developer has signed in.
+// Holding the `challenge_id` from the claim URL that `createProjectClaim`
+// (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
+// `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`) accepts. The response reveals
+// only the window, never the project itself. Unlike `completeProjectClaim` it spends nothing, so
+// reloading the page is safe.
+//
+// [claim it]: /docs/concepts/project-team-user#claim
+//
+// GET /projects/{project_id}/claim/window
+func (s *Server) handleGetProjectClaimWindowRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getProjectClaimWindow"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/window"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetProjectClaimWindowOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetProjectClaimWindowOperation,
+			ID:   "getProjectClaimWindow",
+		}
+	)
+	params, err := decodeGetProjectClaimWindowParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetProjectClaimWindowRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetProjectClaimWindowOperation,
+			OperationSummary: "Get the claim window for a project",
+			OperationID:      "getProjectClaimWindow",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+				{
+					Name: "challenge_id",
+					In:   "query",
+				}: params.ChallengeID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetProjectClaimWindowParams
+			Response = GetProjectClaimWindowRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetProjectClaimWindowParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetProjectClaimWindow(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetProjectClaimWindow(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetProjectClaimWindowResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleGetReadyRequest handles getReady operation.
 //
 // Answers `ok` when the server can serve requests, which takes its database answering within a second,
@@ -11202,7 +10338,7 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 	}
 }
 
-// handleGetReleaseByIdRequest handles getReleaseById operation.
+// handleGetReleaseRequest handles getRelease operation.
 //
 // Returns one release: its digest, its metadata, whether it was revoked, and the
 // `(kind, handle, revision_id)` tuples it pins. A release is a snapshot of the project's
@@ -11220,11 +10356,11 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 // releases in projects the caller cannot read.
 //
 // GET /releases/{release_id}
-func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetReleaseRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getReleaseById"),
+		otelogen.OperationID("getRelease"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/releases/{release_id}"),
 	}
@@ -11232,7 +10368,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetReleaseByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetReleaseOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -11287,15 +10423,15 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetReleaseByIdOperation,
-			ID:   "getReleaseById",
+			Name: GetReleaseOperation,
+			ID:   "getRelease",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetReleaseByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -11312,7 +10448,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetReleaseByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -11353,7 +10489,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 			return
 		}
 	}
-	params, err := decodeGetReleaseByIdParams(args, argsEscaped, r)
+	params, err := decodeGetReleaseParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -11366,13 +10502,13 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 
 	var rawBody []byte
 
-	var response GetReleaseByIdRes
+	var response GetReleaseRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetReleaseByIdOperation,
+			OperationName:    GetReleaseOperation,
 			OperationSummary: "Get a release by ID",
-			OperationID:      "getReleaseById",
+			OperationID:      "getRelease",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -11390,8 +10526,8 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 
 		type (
 			Request  = struct{}
-			Params   = GetReleaseByIdParams
-			Response = GetReleaseByIdRes
+			Params   = GetReleaseParams
+			Response = GetReleaseRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -11400,14 +10536,14 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 		](
 			m,
 			mreq,
-			unpackGetReleaseByIdParams,
+			unpackGetReleaseParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetReleaseById(ctx, params)
+				response, err = s.h.GetRelease(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetReleaseById(ctx, params)
+		response, err = s.h.GetRelease(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -11415,7 +10551,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 		return
 	}
 
-	if err := encodeGetReleaseByIdResponse(response, w, span); err != nil {
+	if err := encodeGetReleaseResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -11424,7 +10560,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 	}
 }
 
-// handleGetSchemaByIdRequest handles getSchemaById operation.
+// handleGetSchemaRequest handles getSchema operation.
 //
 // Returns a schema by ID. A schema ID identifies one immutable revision, so this returns exactly that
 // revision. To find the current revision of an object type, call `listSchemas` (`GET /schemas`) with
@@ -11435,20 +10571,20 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 // with `project_id`; without it, the ID is resolved in the credential's own project when it is
 // ambiguous. A project secret always resolves in its own project and ignores `project_id`.
 //
-// GET /schemas/{id}
-func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /schemas/{schema_id}
+func (s *Server) handleGetSchemaRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getSchemaById"),
+		otelogen.OperationID("getSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/schemas/{id}"),
+		semconv.HTTPRouteKey.String("/schemas/{schema_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetSchemaByIdOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetSchemaOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -11503,15 +10639,15 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetSchemaByIdOperation,
-			ID:   "getSchemaById",
+			Name: GetSchemaOperation,
+			ID:   "getSchema",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetSchemaByIdOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetSchemaOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -11528,7 +10664,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetSchemaByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetSchemaOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -11569,7 +10705,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 			return
 		}
 	}
-	params, err := decodeGetSchemaByIdParams(args, argsEscaped, r)
+	params, err := decodeGetSchemaParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -11582,20 +10718,20 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 
 	var rawBody []byte
 
-	var response GetSchemaByIdRes
+	var response GetSchemaRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetSchemaByIdOperation,
+			OperationName:    GetSchemaOperation,
 			OperationSummary: "Get a schema by ID",
-			OperationID:      "getSchemaById",
+			OperationID:      "getSchema",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "schema_id",
 					In:   "path",
-				}: params.ID,
+				}: params.SchemaID,
 				{
 					Name: "team_id",
 					In:   "query",
@@ -11610,8 +10746,8 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 
 		type (
 			Request  = struct{}
-			Params   = GetSchemaByIdParams
-			Response = GetSchemaByIdRes
+			Params   = GetSchemaParams
+			Response = GetSchemaRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -11620,14 +10756,14 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 		](
 			m,
 			mreq,
-			unpackGetSchemaByIdParams,
+			unpackGetSchemaParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetSchemaById(ctx, params)
+				response, err = s.h.GetSchema(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetSchemaById(ctx, params)
+		response, err = s.h.GetSchema(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -11635,7 +10771,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 		return
 	}
 
-	if err := encodeGetSchemaByIdResponse(response, w, span); err != nil {
+	if err := encodeGetSchemaResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -12044,18 +11180,18 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 	}
 }
 
-// handleGetUserByIDRequest handles GetUserByID operation.
+// handleGetUserRequest handles getUser operation.
 //
 // Returns a user by ID, with the attributes its schema defines.
 //
 // With `team_id`, the user is returned only while they are an active member of that team.
 //
 // GET /users/{user_id}
-func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetUserRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("GetUserByID"),
+		otelogen.OperationID("getUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/users/{user_id}"),
 	}
@@ -12063,7 +11199,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetUserByIDOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetUserOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -12118,15 +11254,15 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetUserByIDOperation,
-			ID:   "GetUserByID",
+			Name: GetUserOperation,
+			ID:   "getUser",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetUserByIDOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -12143,7 +11279,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetUserByIDOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -12184,7 +11320,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 			return
 		}
 	}
-	params, err := decodeGetUserByIDParams(args, argsEscaped, r)
+	params, err := decodeGetUserParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -12197,13 +11333,13 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 
 	var rawBody []byte
 
-	var response GetUserByIDRes
+	var response GetUserRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetUserByIDOperation,
+			OperationName:    GetUserOperation,
 			OperationSummary: "Get a user by ID",
-			OperationID:      "GetUserByID",
+			OperationID:      "getUser",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -12221,8 +11357,8 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 
 		type (
 			Request  = struct{}
-			Params   = GetUserByIDParams
-			Response = GetUserByIDRes
+			Params   = GetUserParams
+			Response = GetUserRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -12231,14 +11367,14 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 		](
 			m,
 			mreq,
-			unpackGetUserByIDParams,
+			unpackGetUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetUserByID(ctx, params)
+				response, err = s.h.GetUser(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetUserByID(ctx, params)
+		response, err = s.h.GetUser(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -12246,7 +11382,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 		return
 	}
 
-	if err := encodeGetUserByIDResponse(response, w, span); err != nil {
+	if err := encodeGetUserResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -12466,8 +11602,8 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 // Returns one variable by name, with its value for each kind. A variable holds a value per kind:
 // `primary` for primary origins and `preview` for preview URLs.
 //
-// Pass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists it. A name
-// with no value for the requested kind answers `var.not_found`; set it with `updateVariables`
+// Pass the name of a variable the project holds, as `listVariables` (`GET /variables`) lists it. A
+// name with no value for the requested kind answers `var.not_found`; set it with `setVariables`
 // (`PATCH /variables`). A secret reads back as `{"secret": true}`.
 //
 // GET /variables/{variable_name}
@@ -12679,636 +11815,16 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 	}
 }
 
-// handleGetVariablesRequest handles getVariables operation.
-//
-// Returns the project's variables, keyed by name, each with its value for each kind: `primary` for
-// primary origins and `preview` for preview URLs. With `kind`, only that kind's values are returned.
-//
-// Secret values are not returned. A secret appears as `{"secret": true}`, which says a value is held
-// without disclosing it.
-//
-// GET /variables
-func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getVariables"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/variables"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetVariablesOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: GetVariablesOperation,
-			ID:   "getVariables",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetVariablesOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-		{
-			sctx, ok, err := s.securitySessionCookie(ctx, GetVariablesOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "SessionCookie",
-					Err:              err,
-				}
-				defer recordError("Security:SessionCookie", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 1
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-				{0b00000010},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeGetVariablesParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response GetVariablesRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetVariablesOperation,
-			OperationSummary: "Get a project's variables",
-			OperationID:      "getVariables",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "kind",
-					In:   "query",
-				}: params.Kind,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = GetVariablesParams
-			Response = GetVariablesRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackGetVariablesParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetVariables(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetVariables(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetVariablesResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleInitClaimRequest handles initClaim operation.
-//
-// Starts a claim, which attaches a project created before sign-in to a team, and returns the
-// `claim_url` to open in a browser.
-//
-// A claim [attaches a project to a team] so that the team's members administer it. This operation
-// mints a single-use, short-lived challenge for an unclaimed project. The developer opens `claim_url`,
-// signs in and completes the claim in the browser; see `completeClaim`
-// (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus`
-// (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`, as `zitadel claim`
-// does. The response's `expires_at` carries the exact expiry.
-//
-// Authenticate with the project secret that `createProject` (`POST /projects`) returns as
-// `project_secret`.
-//
-// A `409` means a team already claimed the project, and its details name that team. A `410` means the
-// project's 14-day claim window has closed, which is final.
-//
-// [attaches a project to a team]: /docs/concepts/project-team-user#claim
-//
-// POST /projects/{project_id}/claim/init
-func (s *Server) handleInitClaimRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("initClaim"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/claim/init"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), InitClaimOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: InitClaimOperation,
-			ID:   "initClaim",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, InitClaimOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeInitClaimParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response InitClaimRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    InitClaimOperation,
-			OperationSummary: "Initialize a project claim",
-			OperationID:      "initClaim",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = InitClaimParams
-			Response = InitClaimRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackInitClaimParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.InitClaim(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.InitClaim(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeInitClaimResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleIssueChallengeRequest handles issueChallenge operation.
-//
-// Issues a challenge, a request to prove one factor, within an authentication attempt.
-//
-// A challenge names one factor method, such as password, passkey, TOTP or OTP via SMS. The response
-// carries the challenge's `challenge_id`, method, metadata and any UI hints. The client then submits
-// the proof with `verifyChallengeProof`
-// (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
-//
-// POST /auth_attempts/{attempt_id}/challenges
-func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("issueChallenge"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/auth_attempts/{attempt_id}/challenges"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), IssueChallengeOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: IssueChallengeOperation,
-			ID:   "issueChallenge",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, IssueChallengeOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeIssueChallengeParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeIssueChallengeRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response IssueChallengeRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    IssueChallengeOperation,
-			OperationSummary: "Issue a factor challenge",
-			OperationID:      "issueChallenge",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "attempt_id",
-					In:   "path",
-				}: params.AttemptID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *IssueChallengeRequest
-			Params   = IssueChallengeParams
-			Response = IssueChallengeRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackIssueChallengeParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.IssueChallenge(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.IssueChallenge(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeIssueChallengeResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleListBrandingRequest handles listBranding operation.
 //
-// Lists a project's branding revisions, newest first, capped at the 100 most recent and not paginated.
-// The first entry is the newest revision.
+// Lists a project's branding revisions, newest first, paginated with a cursor. The first entry of the
+// first page is the newest revision.
 //
-// The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and that
-// a release pins for `kind: branding`.
+// Every publish adds a revision, so the list grows without bound. Pass `next_page_token` back as
+// `page_token` to read the next page.
+//
+// The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
+// that a release pins for `kind: branding`.
 //
 // GET /branding
 func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -13471,6 +11987,14 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "limit",
+					In:   "query",
+				}: params.Limit,
+				{
+					Name: "page_token",
+					In:   "query",
+				}: params.PageToken,
 			},
 			Raw: r,
 		}
@@ -13511,6 +12035,201 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 	}
 }
 
+// handleListDeploymentVariablesRequest handles listDeploymentVariables operation.
+//
+// Returns the variable values the deployment froze when it was made. Later changes to the project's
+// variables do not affect them. A secret reads back as `{"secret": true}`.
+//
+// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments`
+// (`GET /deployments`) returns.
+//
+// GET /deployments/{deployment_id}/variables
+func (s *Server) handleListDeploymentVariablesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listDeploymentVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/deployments/{deployment_id}/variables"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListDeploymentVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ListDeploymentVariablesOperation,
+			ID:   "listDeploymentVariables",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ListDeploymentVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeListDeploymentVariablesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ListDeploymentVariablesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ListDeploymentVariablesOperation,
+			OperationSummary: "Get a deployment's variables",
+			OperationID:      "listDeploymentVariables",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "deployment_id",
+					In:   "path",
+				}: params.DeploymentID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ListDeploymentVariablesParams
+			Response = ListDeploymentVariablesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackListDeploymentVariablesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ListDeploymentVariables(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ListDeploymentVariables(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeListDeploymentVariablesResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleListDeploymentsRequest handles listDeployments operation.
 //
 // Lists the project's deployments: the history of what ran where and when, or with `live=true` what is
@@ -13527,9 +12246,8 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 // it is the one deployment that origin serves, or empty, as it is for an origin the project no longer
 // lists.
 //
-// The `id` of an entry is the deployment ID that `getDeploymentById`
-// (`GET /deployments/{deployment_id}`), `getDeploymentVariables`
-// (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
+// The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
+// `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
 // (`POST /deployments/{deployment_id}/rollback`) take.
 //
 // `expand: ["release"]` embeds the release each deployment made live. It requires `release.read` and
@@ -13768,7 +12486,7 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 // Team-scoped credentials are not issued today.
 //
 // Each item carries an `event_type` that says which type of event it is, and the matching `payload`.
-// To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+// To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).
 //
 // Filters combine. These are answered from an index and fill their pages: no filter, `category`,
 // `event_type`, `status_class`, `operation_id` with or without `status_class`, `request_id`,
@@ -14063,7 +12781,8 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 // flow definition sets which step of a sign-in renders when, and which fields each step collects.
 //
 // The `id` of an entry is the flow definition ID that `getFlowDefinition`
-// (`GET /flow_definitions/{id}`) takes. Filter by `name` to list the revisions of one flow.
+// (`GET /flow_definitions/{flow_definition_id}`) takes. Filter by `name` to list the revisions of one
+// flow.
 //
 // GET /flow_definitions
 func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -14297,14 +13016,14 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 //
 // The lookup is scoped to the project in `project_id`.
 //
-// GET /idps/{id}/revisions
+// GET /idps/{idp_id}/revisions
 func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("listIdpRevisions"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/idps/{id}/revisions"),
+		semconv.HTTPRouteKey.String("/idps/{idp_id}/revisions"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -14441,9 +13160,9 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "id",
+					Name: "idp_id",
 					In:   "path",
-				}: params.ID,
+				}: params.IdpID,
 				{
 					Name: "limit",
 					In:   "query",
@@ -15983,204 +14702,6 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 	}
 }
 
-// handleListPreviewsRequest handles listPreviews operation.
-//
-// Lists the project's live previews, newest first by `created_at`.
-//
-// A preview is a URL with a deployment on it, served until it expires. An expired or removed preview
-// is not listed. What was deployed to it stays in `GET /deployments`.
-//
-// GET /projects/{project_id}/previews
-func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listPreviews"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/previews"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), ListPreviewsOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: ListPreviewsOperation,
-			ID:   "listPreviews",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, ListPreviewsOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeListPreviewsParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response ListPreviewsRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    ListPreviewsOperation,
-			OperationSummary: "List a project's previews",
-			OperationID:      "listPreviews",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
-				{
-					Name: "limit",
-					In:   "query",
-				}: params.Limit,
-				{
-					Name: "page_token",
-					In:   "query",
-				}: params.PageToken,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = ListPreviewsParams
-			Response = ListPreviewsRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackListPreviewsParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListPreviews(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.ListPreviews(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeListPreviewsResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleListProjectAdminsRequest handles listProjectAdmins operation.
 //
 // Lists the people who can administer a project, and how each of them holds that access.
@@ -16417,14 +14938,212 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 	}
 }
 
+// handleListProjectPreviewsRequest handles listProjectPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`.
+//
+// A preview is a URL with a deployment on it, served until it expires. An expired or removed preview
+// is not listed. What was deployed to it stays in `GET /deployments`.
+//
+// GET /projects/{project_id}/previews
+func (s *Server) handleListProjectPreviewsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listProjectPreviews"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/previews"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListProjectPreviewsOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ListProjectPreviewsOperation,
+			ID:   "listProjectPreviews",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ListProjectPreviewsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeListProjectPreviewsParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ListProjectPreviewsRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ListProjectPreviewsOperation,
+			OperationSummary: "List a project's previews",
+			OperationID:      "listProjectPreviews",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+				{
+					Name: "limit",
+					In:   "query",
+				}: params.Limit,
+				{
+					Name: "page_token",
+					In:   "query",
+				}: params.PageToken,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ListProjectPreviewsParams
+			Response = ListProjectPreviewsRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackListProjectPreviewsParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ListProjectPreviews(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ListProjectPreviews(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeListProjectPreviewsResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleListReleasesRequest handles listReleases operation.
 //
 // Lists the project's releases, newest first. A release is a snapshot of the project's configuration.
 //
 // Entries carry the digest, the metadata and `revoked_at`. The pinned set is omitted: read one release
-// with `getReleaseById` (`GET /releases/{release_id}`) to get its pointers.
+// with `getRelease` (`GET /releases/{release_id}`) to get its pointers.
 //
-// The `id` of an entry is the release ID that `getReleaseById`, `revokeRelease`
+// The `id` of an entry is the release ID that `getRelease`, `revokeRelease`
 // (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST /deployments`) take.
 //
 // `content_hash` looks a release up by its content, as the CLI does when a person types the digest a
@@ -17525,6 +16244,219 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 	}
 }
 
+// handleListVariablesRequest handles listVariables operation.
+//
+// Returns the project's variables, keyed by name, each with its value for each kind: `primary` for
+// primary origins and `preview` for preview URLs. With `kind`, only that kind's values are returned.
+//
+// Secret values are not returned. A secret appears as `{"secret": true}`, which says a value is held
+// without disclosing it.
+//
+// GET /variables
+func (s *Server) handleListVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/variables"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ListVariablesOperation,
+			ID:   "listVariables",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ListVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, ListVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeListVariablesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ListVariablesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ListVariablesOperation,
+			OperationSummary: "Get a project's variables",
+			OperationID:      "listVariables",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "kind",
+					In:   "query",
+				}: params.Kind,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ListVariablesParams
+			Response = ListVariablesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackListVariablesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ListVariables(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ListVariables(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeListVariablesResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleLookupInvitationRequest handles lookupInvitation operation.
 //
 // Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
@@ -17718,27 +16650,47 @@ func (s *Server) handleLookupInvitationRequest(args [0]string, argsEscaped bool,
 	}
 }
 
-// handlePatchMyUserRequest handles patchMyUser operation.
+// handlePublishApplicationRequest handles publishApplication operation.
 //
-// Partially updates the caller's own schema-defined attributes. The merged result is validated against
-// the user's schema before commit. Concurrent writes are last-write-wins.
+// Creates or revises a registered application that authenticates its users via Zitadel. If the slug
+// does not already exist in the project, a new application is created. If one with that slug already
+// exists, a revision is created.
 //
-// With `project_id`, the user is updated only when the session belongs to that project.
+// A revision gets a new `revision_id` and does not modify the application's `id`. Sending an unchanged
+// document also creates a revision. Each client is matched to the stored one by its slug and keeps its
+// `client_id`: a revision that changes a client's `client_id` is rejected with `app.field_immutable`.
+// A revision keeps every client of the stored document: one that omits a client is also rejected with
+// `app.field_immutable`, since removing a client is not available yet. A client with a new slug is a
+// new client. It takes the `client_id` the document supplies, or the server generates one, and every
+// response carries it in `definition`. A `client_id` another client of the project holds, or ever
+// held, is rejected with `app.client_id_taken`.
 //
-// PATCH /users/me
-func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// Every new client gets a secret, generated by the server and returned once in `client_secrets`. The
+// server stores only its hash, so no later read returns it.
+//
+// The document is validated against the `application.json` schema before anything is stored, and then
+// against the rules the authorization server applies: `refresh_token` comes with `authorization_code`,
+// a client with `authorization_code` has at least one redirect URI, and each redirect URI meets the
+// rules `redirect_uris` states. A document that breaks one is refused with `app.invalid`, whose
+// details identify the setting.
+//
+// If the document is refused, no change is stored and an existing application keeps its current
+// revision.
+//
+// POST /applications
+func (s *Server) handlePublishApplicationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("patchMyUser"),
-		semconv.HTTPRequestMethodKey.String("PATCH"),
-		semconv.HTTPRouteKey.String("/users/me"),
+		otelogen.OperationID("publishApplication"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/applications"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), PatchMyUserOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), PublishApplicationOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -17793,22 +16745,22 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: PatchMyUserOperation,
-			ID:   "patchMyUser",
+			Name: PublishApplicationOperation,
+			ID:   "publishApplication",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, PatchMyUserOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, PublishApplicationOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "SessionCookie",
+					Security:         "OAuth2",
 					Err:              err,
 				}
-				defer recordError("Security:SessionCookie", err)
+				defer recordError("Security:OAuth2", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -17841,7 +16793,7 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 			return
 		}
 	}
-	params, err := decodePatchMyUserParams(args, argsEscaped, r)
+	params, err := decodePublishApplicationParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -17853,7 +16805,7 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodePatchMyUserRequest(r)
+	request, rawBody, close, err := s.decodePublishApplicationRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -17869,13 +16821,227 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		}
 	}()
 
-	var response PatchMyUserRes
+	var response PublishApplicationRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    PatchMyUserOperation,
-			OperationSummary: "Update my user information",
-			OperationID:      "patchMyUser",
+			OperationName:    PublishApplicationOperation,
+			OperationSummary: "Create or revise a registered application",
+			OperationID:      "publishApplication",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "Idempotency-Key",
+					In:   "header",
+				}: params.IdempotencyKey,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *CreateApplicationRequest
+			Params   = PublishApplicationParams
+			Response = PublishApplicationRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackPublishApplicationParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.PublishApplication(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.PublishApplication(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodePublishApplicationResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handlePublishBrandingRequest handles publishBranding operation.
+//
+// Publishes a new immutable branding revision for the project, and records a `branding.created` event.
+// Branding revisions cannot be updated or deleted. Every edit publishes a new revision. Flow responses
+// carry the branding revision the request's release pins.
+//
+// The `id` of the new revision is the revision ID a release pins for `kind: branding`.
+//
+// The `liquid_template` is validated lexically on save (size, encoding, banned patterns such as
+// `<script>` tags, inline event handlers, and the `| raw` filter). Authoritative LiquidJS validation
+// runs at authoring time, in `zitadel deploy` and `zitadel deploy --dry-run`.
+//
+// POST /branding
+func (s *Server) handlePublishBrandingRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("publishBranding"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/branding"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), PublishBrandingOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: PublishBrandingOperation,
+			ID:   "publishBranding",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, PublishBrandingOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodePublishBrandingParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodePublishBrandingRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response PublishBrandingRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    PublishBrandingOperation,
+			OperationSummary: "Publish a branding revision",
+			OperationID:      "publishBranding",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -17888,9 +17054,9 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		}
 
 		type (
-			Request  = *PatchMyUserRequest
-			Params   = PatchMyUserParams
-			Response = PatchMyUserRes
+			Request  = *Branding
+			Params   = PublishBrandingParams
+			Response = PublishBrandingRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -17899,14 +17065,14 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		](
 			m,
 			mreq,
-			unpackPatchMyUserParams,
+			unpackPublishBrandingParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.PatchMyUser(ctx, request, params)
+				response, err = s.h.PublishBranding(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.PatchMyUser(ctx, request, params)
+		response, err = s.h.PublishBranding(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -17914,7 +17080,7 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		return
 	}
 
-	if err := encodePatchMyUserResponse(response, w, span); err != nil {
+	if err := encodePublishBrandingResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -17923,31 +17089,38 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 	}
 }
 
-// handlePatchProjectRequest handles patchProject operation.
+// handlePublishFlowDefinitionRequest handles publishFlowDefinition operation.
 //
-// Updates a project's name or password hashing method.
+// Publishes a new revision of a flow definition, creating the flow definition on its first publish. It
+// records a `flowdef.created` event.
 //
-// Fields you leave out keep their value. Sending `password_hash: null` drops the project's own method
-// and returns to the server default. A change of method rewrites no stored password: each moves to the
-// new method when its owner next signs in or sets a new password.
+// A [flow definition] is a template that defines the sequence of steps (capabilities) for one user
+// journey, such as registration, login or password reset. The body follows the flow definition schema,
+// which includes the flow's purpose, audience and steps.
 //
-// Authenticate with the project secret, or with the session of a signed-in person who can act on the
-// project.
+// Every call allocates a new opaque ID. That `id` is the `revision_id` a release pins for
+// `kind: flow_definition`.
 //
-// PATCH /projects/{project_id}
-func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// Revisions of one flow share its `name`. Posting a definition under an existing `name` publishes a
+// new revision of that flow, which is not a conflict. List with `name` to see a flow's revisions,
+// newest by creation time first.
+//
+// [flow definition]: /docs/concepts/flows-and-schemas
+//
+// POST /flow_definitions
+func (s *Server) handlePublishFlowDefinitionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("patchProject"),
-		semconv.HTTPRequestMethodKey.String("PATCH"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}"),
+		otelogen.OperationID("publishFlowDefinition"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/flow_definitions"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), PatchProjectOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), PublishFlowDefinitionOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -18002,15 +17175,15 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: PatchProjectOperation,
-			ID:   "patchProject",
+			Name: PublishFlowDefinitionOperation,
+			ID:   "publishFlowDefinition",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, PatchProjectOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, PublishFlowDefinitionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -18026,29 +17199,11 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 				ctx = sctx
 			}
 		}
-		{
-			sctx, ok, err := s.securitySessionCookie(ctx, PatchProjectOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "SessionCookie",
-					Err:              err,
-				}
-				defer recordError("Security:SessionCookie", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 1
-				ctx = sctx
-			}
-		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
-				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -18068,19 +17223,9 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 			return
 		}
 	}
-	params, err := decodePatchProjectParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodePatchProjectRequest(r)
+	request, rawBody, close, err := s.decodePublishFlowDefinitionRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -18096,28 +17241,251 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 		}
 	}()
 
-	var response PatchProjectRes
+	var response PublishFlowDefinitionRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    PatchProjectOperation,
-			OperationSummary: "Update a project",
-			OperationID:      "patchProject",
+			OperationName:    PublishFlowDefinitionOperation,
+			OperationSummary: "Publish a flow definition",
+			OperationID:      "publishFlowDefinition",
+			Body:             request,
+			RawBody:          rawBody,
+			Params:           middleware.Parameters{},
+			Raw:              r,
+		}
+
+		type (
+			Request  = *CreateFlowDefinitionRequest
+			Params   = struct{}
+			Response = PublishFlowDefinitionRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			nil,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.PublishFlowDefinition(ctx, request)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.PublishFlowDefinition(ctx, request)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodePublishFlowDefinitionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handlePublishIdpRequest handles publishIdp operation.
+//
+// Creates or revises an identity provider, an external sign-in such as Google, from its connection
+// document. If the slug does not already exist, a new identity provider is created. If one with that
+// slug already exists, a revision is created.
+//
+// A revision gets a new `revision_id` and does not modify the identity provider's `id`. Identity
+// links, which tie a user to an account at the provider, keep resolving. Releases and authentication
+// attempts stay pinned to the revision they captured.
+//
+// Identity fields are fixed for the life of the identity provider and a revision that changes one is
+// rejected: `protocol`, `subject_claim`, and `issuer`, the field that names the authority. Their
+// values decide which provider account a stored subject belongs to, so changing one would silently
+// repoint existing identities at a different provider.
+//
+// `subject_claim` is optional, and `sub` is used as the default value. If a revision updates
+// `subject_claim` to a different value than the one set during creation, the request is rejected.
+//
+// OIDC is the only protocol.
+//
+// The document is validated against the `idp-connection.json` schema before anything is stored. The
+// rules the server applies when it starts a sign-in then run on the document, so a document that could
+// never start one is refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
+// without the others. Set no endpoint, and discovery fills them, or set `authorization_endpoint`,
+// `token_endpoint`, `jwks_uri`, and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+// `id_token_mapping` is on, but setting it alone still counts as setting an endpoint. The details list
+// the missing endpoints.
+//
+// A refused document stores nothing, and on a revise the current revision stays unchanged.
+//
+// POST /idps
+func (s *Server) handlePublishIdpRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("publishIdp"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/idps"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), PublishIdpOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: PublishIdpOperation,
+			ID:   "publishIdp",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, PublishIdpOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodePublishIdpParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodePublishIdpRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response PublishIdpRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    PublishIdpOperation,
+			OperationSummary: "Create or revise an identity provider",
+			OperationID:      "publishIdp",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
 					Name: "project_id",
-					In:   "path",
+					In:   "query",
 				}: params.ProjectID,
 			},
 			Raw: r,
 		}
 
 		type (
-			Request  = *PatchProjectRequest
-			Params   = PatchProjectParams
-			Response = PatchProjectRes
+			Request  = *CreateIdpRequest
+			Params   = PublishIdpParams
+			Response = PublishIdpRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -18126,14 +17494,14 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 		](
 			m,
 			mreq,
-			unpackPatchProjectParams,
+			unpackPublishIdpParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.PatchProject(ctx, request, params)
+				response, err = s.h.PublishIdp(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.PatchProject(ctx, request, params)
+		response, err = s.h.PublishIdp(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -18141,241 +17509,7 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 		return
 	}
 
-	if err := encodePatchProjectResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handlePatchUserByIDRequest handles PatchUserByID operation.
-//
-// Partially updates a user's schema-defined attributes, and optionally moves the user to another
-// registered schema. The merged result is validated against the schema before commit. Concurrent
-// writes are last-write-wins.
-//
-// To move the user, send `schema` with the `id` of a registered schema, as `createSchema`
-// (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
-//
-// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes the same permission
-// and answers the same status and `details` as the real request, and it changes nothing and emits no
-// `user.updated`. The request itself is still recorded as `request.api`, like any other API call. A
-// `200` holds for the moment of the check: a unique value that is free then can be taken before the
-// real request, which then answers `409`.
-//
-// `dry_run` is a body field so that a server from before it refuses the request as malformed
-// (`400 req.invalid`) instead of applying the patch.
-//
-// PATCH /users/{user_id}
-func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("PatchUserByID"),
-		semconv.HTTPRequestMethodKey.String("PATCH"),
-		semconv.HTTPRouteKey.String("/users/{user_id}"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), PatchUserByIDOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: PatchUserByIDOperation,
-			ID:   "PatchUserByID",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, PatchUserByIDOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-		{
-			sctx, ok, err := s.securitySessionCookie(ctx, PatchUserByIDOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "SessionCookie",
-					Err:              err,
-				}
-				defer recordError("Security:SessionCookie", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 1
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-				{0b00000010},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodePatchUserByIDParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodePatchUserByIDRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response PatchUserByIDRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    PatchUserByIDOperation,
-			OperationSummary: "Update a user by ID",
-			OperationID:      "PatchUserByID",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "user_id",
-					In:   "path",
-				}: params.UserID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *PatchUserRequest
-			Params   = PatchUserByIDParams
-			Response = PatchUserByIDRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackPatchUserByIDParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.PatchUserByID(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.PatchUserByID(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodePatchUserByIDResponse(response, w, span); err != nil {
+	if err := encodePublishIdpResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -18604,14 +17738,231 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 	}
 }
 
+// handlePublishSchemaRequest handles publishSchema operation.
+//
+// Publishes a user schema, the JSON Schema that says which attributes a user has and which attribute
+// identifies the user.
+//
+// The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
+// the server resolves. The response is the stored schema, as `getSchema` (`GET /schemas/{schema_id}`)
+// returns it; its `id` is what `createUser` (`POST /users`) takes as `schema`.
+//
+// The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
+// is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the project and should ideally
+// be a valid URI pointing at where the schema can be accessed. A `$id` that already exists in the
+// project is refused; pick another or omit it.
+//
+// POST /schemas
+func (s *Server) handlePublishSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("publishSchema"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/schemas"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), PublishSchemaOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: PublishSchemaOperation,
+			ID:   "publishSchema",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, PublishSchemaOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodePublishSchemaParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodePublishSchemaRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response PublishSchemaRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    PublishSchemaOperation,
+			OperationSummary: "Publish a schema",
+			OperationID:      "publishSchema",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "team_id",
+					In:   "query",
+				}: params.TeamID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = PublishSchemaReq
+			Params   = PublishSchemaParams
+			Response = PublishSchemaRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackPublishSchemaParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.PublishSchema(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.PublishSchema(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodePublishSchemaResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleQueryGrantsRequest handles queryGrants operation.
 //
 // Returns a page of a project's grants.
 //
 // Only unrevoked grants this API manages are listed, which bind a user or team to the viewer, editor
 // or admin role. Expired grants are included, so a client can revoke them with `deleteGrant`
-// (`DELETE /grants/{id}`) before it grants the same binding again. Project-secret setup (`sk_proj`)
-// and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
+// (`DELETE /grants/{grant_id}`) before it grants the same binding again. Project-secret setup
+// (`sk_proj`) and owning-team (`relation=team`) rows are not returned. Requires `project.read`.
 //
 // `expand: ["principal"]` adds envelope fields on `user` and `team`. For project secrets it
 // additionally requires `user.read` and `team.read`. A user-bound console session that already passed
@@ -20097,7 +19448,7 @@ func (s *Server) handleRejectInvitationRequest(args [0]string, argsEscaped bool,
 	}
 }
 
-// handleRemoveOriginRequest handles removeOrigin operation.
+// handleRemoveProjectOriginRequest handles removeProjectOrigin operation.
 //
 // Removes one origin pattern from the project's origins.
 //
@@ -20105,14 +19456,14 @@ func (s *Server) handleRejectInvitationRequest(args [0]string, argsEscaped bool,
 // history are untouched. Removing the last pattern leaves an empty list, which admits no origin except
 // a loopback origin. Removing a pattern that is already absent is idempotent and answers `204`.
 //
-// The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
+// The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`) stored.
 //
 // POST /projects/{project_id}/origins/remove
-func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRemoveProjectOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("removeOrigin"),
+		otelogen.OperationID("removeProjectOrigin"),
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/projects/{project_id}/origins/remove"),
 	}
@@ -20120,7 +19471,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), RemoveOriginOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RemoveProjectOriginOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -20175,15 +19526,15 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: RemoveOriginOperation,
-			ID:   "removeOrigin",
+			Name: RemoveProjectOriginOperation,
+			ID:   "removeProjectOrigin",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, RemoveOriginOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, RemoveProjectOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -20200,7 +19551,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securitySessionCookie(ctx, RemoveOriginOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, RemoveProjectOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -20241,7 +19592,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 			return
 		}
 	}
-	params, err := decodeRemoveOriginParams(args, argsEscaped, r)
+	params, err := decodeRemoveProjectOriginParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -20253,7 +19604,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeRemoveOriginRequest(r)
+	request, rawBody, close, err := s.decodeRemoveProjectOriginRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -20269,13 +19620,13 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		}
 	}()
 
-	var response RemoveOriginRes
+	var response RemoveProjectOriginRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    RemoveOriginOperation,
+			OperationName:    RemoveProjectOriginOperation,
 			OperationSummary: "Remove an origin pattern",
-			OperationID:      "removeOrigin",
+			OperationID:      "removeProjectOrigin",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -20288,9 +19639,9 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		}
 
 		type (
-			Request  = *RemoveOriginReq
-			Params   = RemoveOriginParams
-			Response = RemoveOriginRes
+			Request  = *RemoveProjectOriginReq
+			Params   = RemoveProjectOriginParams
+			Response = RemoveProjectOriginRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -20299,14 +19650,14 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		](
 			m,
 			mreq,
-			unpackRemoveOriginParams,
+			unpackRemoveProjectOriginParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RemoveOrigin(ctx, request, params)
+				response, err = s.h.RemoveProjectOrigin(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.RemoveOrigin(ctx, request, params)
+		response, err = s.h.RemoveProjectOrigin(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -20314,7 +19665,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		return
 	}
 
-	if err := encodeRemoveOriginResponse(response, w, span); err != nil {
+	if err := encodeRemoveProjectOriginResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -20323,7 +19674,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 	}
 }
 
-// handleRemovePreviewRequest handles removePreview operation.
+// handleRemoveProjectPreviewRequest handles removeProjectPreview operation.
 //
 // Ends a preview before it expires: the URL stops being served at once.
 //
@@ -20332,14 +19683,14 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 // expiry still succeeds.
 //
 // The URL travels in the body rather than the path because an origin contains `/`. Take it from
-// `listPreviews` (`GET /projects/{project_id}/previews`).
+// `listProjectPreviews` (`GET /projects/{project_id}/previews`).
 //
 // POST /projects/{project_id}/previews/remove
-func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRemoveProjectPreviewRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("removePreview"),
+		otelogen.OperationID("removeProjectPreview"),
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/projects/{project_id}/previews/remove"),
 	}
@@ -20347,7 +19698,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), RemovePreviewOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RemoveProjectPreviewOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -20402,15 +19753,15 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: RemovePreviewOperation,
-			ID:   "removePreview",
+			Name: RemoveProjectPreviewOperation,
+			ID:   "removeProjectPreview",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, RemovePreviewOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, RemoveProjectPreviewOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -20450,7 +19801,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 			return
 		}
 	}
-	params, err := decodeRemovePreviewParams(args, argsEscaped, r)
+	params, err := decodeRemoveProjectPreviewParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -20462,7 +19813,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeRemovePreviewRequest(r)
+	request, rawBody, close, err := s.decodeRemoveProjectPreviewRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -20478,13 +19829,13 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		}
 	}()
 
-	var response RemovePreviewRes
+	var response RemoveProjectPreviewRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    RemovePreviewOperation,
+			OperationName:    RemoveProjectPreviewOperation,
 			OperationSummary: "Remove a preview",
-			OperationID:      "removePreview",
+			OperationID:      "removeProjectPreview",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -20498,8 +19849,8 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 
 		type (
 			Request  = *RemovePreviewRequest
-			Params   = RemovePreviewParams
-			Response = RemovePreviewRes
+			Params   = RemoveProjectPreviewParams
+			Response = RemoveProjectPreviewRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -20508,14 +19859,14 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		](
 			m,
 			mreq,
-			unpackRemovePreviewParams,
+			unpackRemoveProjectPreviewParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RemovePreview(ctx, request, params)
+				response, err = s.h.RemoveProjectPreview(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.RemovePreview(ctx, request, params)
+		response, err = s.h.RemoveProjectPreview(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -20523,7 +19874,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		return
 	}
 
-	if err := encodeRemovePreviewResponse(response, w, span); err != nil {
+	if err := encodeRemoveProjectPreviewResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -21414,8 +20765,7 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 // `query` is what the person typed and `types` names the kinds of result to look for; only those are
 // searched. Each result is a reference: its `type`, its `id`, its `project_id`, a `title` and
 // sometimes a `subtitle`. Read the resource itself with the type's own operation, for example
-// `GetUserByID` (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the result's
-// project.
+// `getUser` (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the result's project.
 //
 // What a type matches on:
 //
@@ -21673,7 +21023,7 @@ func (s *Server) handleSearchRequest(args [0]string, argsEscaped bool, w http.Re
 // that meets the policy.
 //
 // The password policy is the one in the release that serves the caller's `Origin`, chosen as
-// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+// `createFlow` (`POST /flows`) chooses it. A frontend on a preview URL gets that preview's policy, and
 // one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
 // console when the project does not list the console's origin, gets the project's newest primary
 // deployment.
@@ -21891,12 +21241,235 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 	}
 }
 
+// handleSetVariablesRequest handles setVariables operation.
+//
+// Sets, replaces and removes the project's variables for the requested kind, in one request. Names not
+// in the body are untouched. Existing deployments keep the values they froze.
+//
+// A bare scalar enters a non-secret value. `{"value": …, "secret": true}` stores the value encrypted
+// under the project's active `secret` key, after which it can be referenced but not read back. `null`
+// removes the name (RFC 7386), which is how several variables are removed in one request. Removing a
+// name the project does not hold is a no-op rather than an error.
+//
+// Without `kind`, a plain value is written for both kinds. A secret is written for `primary` only and
+// removes the name's `preview` value, so a preview never keeps a plaintext copy. Set a preview secret
+// with `kind=preview`. `null` removes the name from both kinds.
+//
+// The body is applied whole or not at all, so a rejected request leaves the project's variables
+// exactly as they were. Fix what the error reports and send the request again. Writing the same name
+// twice replaces the value rather than duplicating it, which makes a retry safe.
+//
+// Each kind written records a `variable.set` event, and each kind removed a `variable.removed` event.
+// The value never appears in either.
+//
+// PATCH /variables
+func (s *Server) handleSetVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("setVariables"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.HTTPRouteKey.String("/variables"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), SetVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: SetVariablesOperation,
+			ID:   "setVariables",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, SetVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeSetVariablesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeSetVariablesRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response SetVariablesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    SetVariablesOperation,
+			OperationSummary: "Update a project's variables",
+			OperationID:      "setVariables",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "kind",
+					In:   "query",
+				}: params.Kind,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = UpdateVariablesRequest
+			Params   = SetVariablesParams
+			Response = SetVariablesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackSetVariablesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.SetVariables(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.SetVariables(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeSetVariablesResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleSubmitFlowStepRequest handles submitFlowStep operation.
 //
 // Submits the user's input for the current step of a flow. The server validates it, processes it (for
 // example, verifies a credential), advances the flow through any invisible steps, and returns the next
 // visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
-// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+// makes, step by step; `createFlow` (`POST /flows`) starts a flow.
 //
 // The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
 // server is stateless: all orchestration state is carried in this cookie between requests.
@@ -21949,14 +21522,14 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 // that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
-// POST /flow/{id}/submit
+// POST /flows/{flow_id}/submit
 func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("submitFlowStep"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/flow/{id}/submit"),
+		semconv.HTTPRouteKey.String("/flows/{flow_id}/submit"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -22060,9 +21633,9 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "id",
+					Name: "flow_id",
 					In:   "path",
-				}: params.ID,
+				}: params.FlowID,
 				{
 					Name: "_zflow",
 					In:   "cookie",
@@ -22103,6 +21676,438 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 	}
 
 	if err := encodeSubmitFlowStepResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleUpdateMyUserRequest handles updateMyUser operation.
+//
+// Partially updates the caller's own schema-defined attributes. The merged result is validated against
+// the user's schema before commit. Concurrent writes are last-write-wins.
+//
+// With `project_id`, the user is updated only when the session belongs to that project.
+//
+// PATCH /users/me
+func (s *Server) handleUpdateMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("updateMyUser"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.HTTPRouteKey.String("/users/me"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), UpdateMyUserOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: UpdateMyUserOperation,
+			ID:   "updateMyUser",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, UpdateMyUserOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeUpdateMyUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeUpdateMyUserRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response UpdateMyUserRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    UpdateMyUserOperation,
+			OperationSummary: "Update my user information",
+			OperationID:      "updateMyUser",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *PatchMyUserRequest
+			Params   = UpdateMyUserParams
+			Response = UpdateMyUserRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackUpdateMyUserParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.UpdateMyUser(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.UpdateMyUser(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeUpdateMyUserResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleUpdateProjectRequest handles updateProject operation.
+//
+// Updates a project's name or password hashing method.
+//
+// Fields you leave out keep their value. Sending `password_hash: null` drops the project's own method
+// and returns to the server default. A change of method rewrites no stored password: each moves to the
+// new method when its owner next signs in or sets a new password.
+//
+// Authenticate with the project secret, or with the session of a signed-in person who can act on the
+// project.
+//
+// PATCH /projects/{project_id}
+func (s *Server) handleUpdateProjectRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("updateProject"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), UpdateProjectOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: UpdateProjectOperation,
+			ID:   "updateProject",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, UpdateProjectOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, UpdateProjectOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeUpdateProjectParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeUpdateProjectRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response UpdateProjectRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    UpdateProjectOperation,
+			OperationSummary: "Update a project",
+			OperationID:      "updateProject",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *PatchProjectRequest
+			Params   = UpdateProjectParams
+			Response = UpdateProjectRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackUpdateProjectParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.UpdateProject(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.UpdateProject(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeUpdateProjectResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -22334,41 +22339,38 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 	}
 }
 
-// handleUpdateVariablesRequest handles updateVariables operation.
+// handleUpdateUserRequest handles updateUser operation.
 //
-// Sets, replaces and removes the project's variables for the requested kind, in one request. Names not
-// in the body are untouched. Existing deployments keep the values they froze.
+// Partially updates a user's schema-defined attributes, and optionally moves the user to another
+// registered schema. The merged result is validated against the schema before commit. Concurrent
+// writes are last-write-wins.
 //
-// A bare scalar enters a non-secret value. `{"value": …, "secret": true}` stores the value encrypted
-// under the project's active `secret` key, after which it can be referenced but not read back. `null`
-// removes the name (RFC 7386), which is how several variables are removed in one request. Removing a
-// name the project does not hold is a no-op rather than an error.
+// To move the user, send `schema` with the `id` of a registered schema, as `publishSchema`
+// (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
 //
-// Without `kind`, a plain value is written for both kinds. A secret is written for `primary` only and
-// removes the name's `preview` value, so a preview never keeps a plaintext copy. Set a preview secret
-// with `kind=preview`. `null` removes the name from both kinds.
+// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes the same permission
+// and answers the same status and `details` as the real request, and it changes nothing and emits no
+// `user.updated`. The request itself is still recorded as `request.api`, like any other API call. A
+// `200` holds for the moment of the check: a unique value that is free then can be taken before the
+// real request, which then answers `409`.
 //
-// The body is applied whole or not at all, so a rejected request leaves the project's variables
-// exactly as they were. Fix what the error reports and send the request again. Writing the same name
-// twice replaces the value rather than duplicating it, which makes a retry safe.
+// `dry_run` is a body field so that a server from before it refuses the request as malformed
+// (`400 req.invalid`) instead of applying the patch.
 //
-// Each kind written records a `variable.set` event, and each kind removed a `variable.removed` event.
-// The value never appears in either.
-//
-// PATCH /variables
-func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// PATCH /users/{user_id}
+func (s *Server) handleUpdateUserRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("updateVariables"),
+		otelogen.OperationID("updateUser"),
 		semconv.HTTPRequestMethodKey.String("PATCH"),
-		semconv.HTTPRouteKey.String("/variables"),
+		semconv.HTTPRouteKey.String("/users/{user_id}"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), UpdateVariablesOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), UpdateUserOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -22423,15 +22425,15 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: UpdateVariablesOperation,
-			ID:   "updateVariables",
+			Name: UpdateUserOperation,
+			ID:   "updateUser",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, UpdateVariablesOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, UpdateUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -22447,11 +22449,29 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, UpdateUserOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -22471,7 +22491,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
-	params, err := decodeUpdateVariablesParams(args, argsEscaped, r)
+	params, err := decodeUpdateUserParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -22483,7 +22503,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeUpdateVariablesRequest(r)
+	request, rawBody, close, err := s.decodeUpdateUserRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -22499,32 +22519,28 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		}
 	}()
 
-	var response UpdateVariablesRes
+	var response UpdateUserRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    UpdateVariablesOperation,
-			OperationSummary: "Update a project's variables",
-			OperationID:      "updateVariables",
+			OperationName:    UpdateUserOperation,
+			OperationSummary: "Update a user by ID",
+			OperationID:      "updateUser",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "kind",
-					In:   "query",
-				}: params.Kind,
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
 			},
 			Raw: r,
 		}
 
 		type (
-			Request  = UpdateVariablesRequest
-			Params   = UpdateVariablesParams
-			Response = UpdateVariablesRes
+			Request  = *PatchUserRequest
+			Params   = UpdateUserParams
+			Response = UpdateUserRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -22533,14 +22549,14 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			unpackUpdateVariablesParams,
+			unpackUpdateUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.UpdateVariables(ctx, request, params)
+				response, err = s.h.UpdateUser(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.UpdateVariables(ctx, request, params)
+		response, err = s.h.UpdateUser(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -22548,7 +22564,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		return
 	}
 
-	if err := encodeUpdateVariablesResponse(response, w, span); err != nil {
+	if err := encodeUpdateUserResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -22557,7 +22573,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 	}
 }
 
-// handleVerifyChallengeProofRequest handles verifyChallengeProof operation.
+// handleVerifyAuthAttemptChallengeRequest handles verifyAuthAttemptChallenge operation.
 //
 // Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
 //
@@ -22569,18 +22585,18 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 //   - `recovery_code` method: { recovery_code: "…" }
 //
 // On success, the factor is recorded on the authentication attempt. The attempt moves to the next
-// pending challenge, or completes when every required factor is verified. Then call `createHandoff`
-// (`POST /auth_attempts/{attempt_id}/handoff`).
+// pending challenge, or completes when every required factor is verified. Then call
+// `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
 //
 // A `409` with `att.proof_rejected` means the proof was wrong. Check it and try again. There is no
 // retry limit: you can retry until the attempt expires.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
-func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleVerifyAuthAttemptChallengeRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("verifyChallengeProof"),
+		otelogen.OperationID("verifyAuthAttemptChallenge"),
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/auth_attempts/{attempt_id}/challenges/{challenge_id}/verify"),
 	}
@@ -22588,7 +22604,7 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), VerifyChallengeProofOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), VerifyAuthAttemptChallengeOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -22643,15 +22659,15 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: VerifyChallengeProofOperation,
-			ID:   "verifyChallengeProof",
+			Name: VerifyAuthAttemptChallengeOperation,
+			ID:   "verifyAuthAttemptChallenge",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, VerifyChallengeProofOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, VerifyAuthAttemptChallengeOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -22691,7 +22707,7 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 			return
 		}
 	}
-	params, err := decodeVerifyChallengeProofParams(args, argsEscaped, r)
+	params, err := decodeVerifyAuthAttemptChallengeParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -22703,7 +22719,7 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeVerifyChallengeProofRequest(r)
+	request, rawBody, close, err := s.decodeVerifyAuthAttemptChallengeRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -22719,13 +22735,13 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		}
 	}()
 
-	var response VerifyChallengeProofRes
+	var response VerifyAuthAttemptChallengeRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    VerifyChallengeProofOperation,
+			OperationName:    VerifyAuthAttemptChallengeOperation,
 			OperationSummary: "Verify a challenge proof",
-			OperationID:      "verifyChallengeProof",
+			OperationID:      "verifyAuthAttemptChallenge",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -22747,8 +22763,8 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 
 		type (
 			Request  = *VerifyChallengeRequest
-			Params   = VerifyChallengeProofParams
-			Response = VerifyChallengeProofRes
+			Params   = VerifyAuthAttemptChallengeParams
+			Response = VerifyAuthAttemptChallengeRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -22757,14 +22773,14 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		](
 			m,
 			mreq,
-			unpackVerifyChallengeProofParams,
+			unpackVerifyAuthAttemptChallengeParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.VerifyChallengeProof(ctx, request, params)
+				response, err = s.h.VerifyAuthAttemptChallenge(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.VerifyChallengeProof(ctx, request, params)
+		response, err = s.h.VerifyAuthAttemptChallenge(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -22772,7 +22788,7 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		return
 	}
 
-	if err := encodeVerifyChallengeProofResponse(response, w, span); err != nil {
+	if err := encodeVerifyAuthAttemptChallengeResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

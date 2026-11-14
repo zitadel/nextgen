@@ -22,7 +22,8 @@
       "!**/generated",
       "!**/dist",
       "!**/out-tsc",
-      "!**/.nuxt-typecheck"
+      "!**/.nuxt-typecheck",
+      "!**/conformance/fixtures"
     ]
   },
   "formatter": {
@@ -101,6 +102,14 @@
         "./biome-plugins/no-cli-spelling-read.grit",
         "./biome-plugins/no-own-colour.grit"
       ]
+    },
+    {
+      "includes": [
+        "**/apps/cli/src/**",
+        "**/apps/cli/tests/**",
+        "!**/apps/cli/src/lib/orca/patchers/**"
+      ],
+      "plugins": ["./biome-plugins/no-let.grit"]
     },
     {
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],

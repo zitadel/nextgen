@@ -25,15 +25,25 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import ts from "typescript";
+
 /** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
 const KNOWN_VACUOUS = new Set([]);
 
-function stripJsonComments(text) {
-  return text.replace(/^\s*\/\/.*$/gm, "");
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function readJson(path) {
-  return JSON.parse(stripJsonComments(readFileSync(path, "utf8")));
+/**
+ * A tsconfig as TypeScript reads it: line and block comments and trailing
+ * commas allowed, which generators write (create-qwik's has a block comment).
+ */
+export function parseTsconfig(text, path = "tsconfig.json") {
+  const { config, error } = ts.parseConfigFileTextToJson(path, text);
+  if (error) {
+    throw new Error(`${path}: ${ts.flattenDiagnosticMessageText(error.messageText, "\n")}`);
+  }
+  return config;
 }
 
 function projectDirs() {
@@ -47,6 +57,17 @@ function projectDirs() {
   }
   // The root-level e2e package is a package itself, not a folder of them.
   if (existsSync(join("e2e", "package.json"))) dirs.push("e2e");
+  // The conformance lane's suite and its fixtures (conformance/README.md).
+  if (existsSync(join("conformance", "suite", "package.json")))
+    dirs.push(join("conformance", "suite"));
+  const fixtures = join("conformance", "fixtures");
+  if (existsSync(fixtures)) {
+    for (const entry of readdirSync(fixtures, { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(fixtures, entry.name, "package.json"))) {
+        dirs.push(join(fixtures, entry.name));
+      }
+    }
+  }
   return dirs;
 }
 
@@ -57,7 +78,7 @@ function typecheckCommand(dir) {
 
 function isSolutionStyle(configPath) {
   if (!existsSync(configPath)) return false;
-  const config = readJson(configPath);
+  const config = parseTsconfig(readFileSync(configPath, "utf8"), configPath);
   const noInputs =
     Array.isArray(config.files) &&
     config.files.length === 0 &&

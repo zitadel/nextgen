@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
     // "Used by" has no API: it is every schema and flow whose latest revision
     // names the slug, read from the full lists.
     const [idp, schemas, flows] = await Promise.all([
-      api.getIdpById(params.idpId, { project_id: projectId }),
+      api.getIdp(params.idpId, { project_id: projectId }),
       fetchAllSchemas(projectId),
       fetchAllFlows(projectId),
     ]);

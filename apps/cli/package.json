@@ -54,25 +54,25 @@
       "@oclif/plugin-version"
     ],
     "topics": {
-      "users": {
+      "user": {
         "description": "Create and manage users."
       },
-      "teams": {
+      "team": {
         "description": "Create and manage teams."
       },
-      "sessions": {
+      "session": {
         "description": "View and revoke sessions."
       },
-      "events": {
+      "event": {
         "description": "View events."
       },
-      "grants": {
+      "grant": {
         "description": "Manage access grants."
       },
-      "projects": {
+      "project": {
         "description": "View and update projects."
       },
-      "schemas": {
+      "schema": {
         "description": "View user schemas."
       },
       "branding": {
@@ -105,13 +105,13 @@
       "variable": {
         "description": "Manage project variables."
       },
-      "idps": {
+      "idp": {
         "description": "Manage identity provider connections."
       },
-      "flow-definitions": {
+      "flow-definition": {
         "description": "View login flows."
       },
-      "policies": {
+      "policy": {
         "description": "View and test policies."
       },
       "env": {
@@ -155,6 +155,7 @@
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
     "fastest-levenshtein": "catalog:",
+    "ignore": "^7.0.14",
     "is-wsl": "catalog:",
     "jsonc-parser": "catalog:",
     "magicast": "^0.5.3",

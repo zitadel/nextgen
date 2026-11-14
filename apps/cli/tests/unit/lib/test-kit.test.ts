@@ -11,6 +11,7 @@ import {
   PLAYWRIGHT_RANGE,
   supportsTestSuite,
   TEST_KIT_PACKAGE,
+  TEST_RUN_OUTPUTS,
   testSuitePlan,
 } from "@/lib/test-kit";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -80,7 +81,7 @@ describe("testSuitePlan", () => {
   it("ignores the test run's outputs, the handshake file with the project secret among them", () => {
     expect(NEXT_PLAN.ops).toContainEqual({
       kind: "append-gitignore",
-      entries: [".zitadel-testing/", "test-results/", "playwright-report/"],
+      rules: TEST_RUN_OUTPUTS,
     });
   });
 

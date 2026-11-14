@@ -1,0 +1,365 @@
+### Fixture for scripts/openapi-list-conventions.test.mjs, shaped like the
+### bundled spec (every $ref local). Each operation or collection breaks one
+### list convention, once; everything else about it is compliant.
+openapi: 3.1.0
+info:
+  title: list violations
+  version: 1.0.0
+paths:
+  # list-response-shape
+  /bare_arrays:
+    get:
+      operationId: listBareArrays
+      parameters: &paged
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/page-token"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: array, items: { type: object } }
+  /widgets:
+    get:
+      # The array is named `data`, not after the resource.
+      operationId: listWidgets
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /gadgets:
+    get:
+      operationId: listGadgets
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gadgets: { type: array, items: { type: object } }
+  /gizmos:
+    get:
+      operationId: listGizmos
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gizmos: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /tools:
+    get:
+      operationId: listTools
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools: { type: object }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /pins:
+    get:
+      # Not named list…: `/pins/{pin_id}` makes `/pins` a collection.
+      operationId: getPins
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pins: { type: array, items: { type: object } }
+  /pins/{pin_id}:
+    get:
+      operationId: getPin
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /bolts/{bolt_id}/threads:
+    get:
+      # A nested collection is named after its own segment, not its parent's.
+      operationId: listBoltThreads
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bolt_threads: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /parts/query:
+    post:
+      operationId: queryParts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/part-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  # list-pagination
+  /nuts:
+    get:
+      operationId: listNuts
+      parameters:
+        - $ref: "#/components/parameters/page-token"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nuts: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /screws:
+    get:
+      operationId: listScrews
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 20 }
+        - $ref: "#/components/parameters/page-token"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  screws: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /washers:
+    get:
+      operationId: listWashers
+      parameters:
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  washers: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /rivets/query:
+    post:
+      # No page_token in the body, and a limit default of 50.
+      operationId: queryRivets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, maximum: 100, default: 50 }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/rivet-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rivets: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  # query-sort-field
+  /springs/query:
+    post:
+      # Sorts by its filter's enum.
+      operationId: querySprings
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/query-springs-request" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  springs: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /gears/query:
+    post:
+      # Sorts by an inline enum, which names no schema at all.
+      operationId: queryGears
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { type: string, enum: [created_at] }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gears: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /gear_wheels/query:
+    post:
+      # Keeps the path's underscore: the component is `gear-wheel-sort-field`.
+      operationId: queryGearWheels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/gear_wheel-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gear_wheels: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  # collection-plural
+  /flow/{flow_id}:
+    get:
+      operationId: getFlow
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /thingGroups/{thing_group_id}:
+    get:
+      operationId: getThingGroup
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /bolts/{bolt_id}/child/{child_id}:
+    get:
+      operationId: getBoltChild
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { type: object }
+  /inventory:
+    get:
+      # A collection by its list operation alone: no ID follows it.
+      operationId: listInventory
+      parameters: *paged
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inventory: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+  /stock/query:
+    post:
+      # A collection by its query alone.
+      operationId: queryStock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { $ref: "#/components/schemas/limit" }
+                page_token: { $ref: "#/components/schemas/page-token" }
+                sorting:
+                  type: object
+                  properties:
+                    field: { $ref: "#/components/schemas/stock-sort-field" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stock: { type: array, items: { type: object } }
+                  next_page_token: { $ref: "#/components/schemas/next-page-token" }
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema: { $ref: "#/components/schemas/limit" }
+    page-token:
+      name: page_token
+      in: query
+      schema: { $ref: "#/components/schemas/page-token" }
+  schemas:
+    limit: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    page-token: { type: string }
+    next-page-token:
+      oneOf:
+        - $ref: "#/components/schemas/page-token"
+        - type: "null"
+    part-sort-field: { type: string, enum: [created_at] }
+    rivet-sort-field: { type: string, enum: [created_at] }
+    spring-filter-field: { type: string, enum: [created_at] }
+    gear_wheel-sort-field: { type: string, enum: [created_at] }
+    stock-sort-field: { type: string, enum: [created_at] }
+    query-springs-request:
+      type: object
+      properties:
+        limit: { $ref: "#/components/schemas/limit" }
+        page_token: { $ref: "#/components/schemas/page-token" }
+        sorting:
+          type: object
+          properties:
+            field: { $ref: "#/components/schemas/spring-filter-field" }

@@ -9,6 +9,8 @@
 export class SpanRouter {
   #open = new Map();
   unmatched = 0;
+  /** How many exports arrived: 0 means the server has not exported yet. */
+  exports = 0;
 
   /**
    * Opens an entry for a request. Returns null when a request with the same
@@ -26,6 +28,7 @@ export class SpanRouter {
 
   /** Files the spans of one export (OTLP JSON) under their requests. */
   ingest(request) {
+    this.exports++;
     for (const rs of request.resourceSpans ?? []) {
       for (const ss of rs.scopeSpans ?? []) {
         const byTrace = new Map();

@@ -60,10 +60,10 @@ func newReleaseFixture(t *testing.T) releaseFixture {
 
 func publishBranding(t *testing.T, client *helpers.ApiClient, projectID, template string) string {
 	t.Helper()
-	resp, err := client.CreateBranding(t.Context(), &api.Branding{
+	resp, err := client.PublishBranding(t.Context(), &api.Branding{
 		Layout:         api.NewOptBrandingLayout(api.BrandingLayoutSplit),
 		LiquidTemplate: api.NewOptString(template),
-	}, api.CreateBrandingParams{ProjectID: api.ProjectID(projectID)})
+	}, api.PublishBrandingParams{ProjectID: api.ProjectID(projectID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
 	return resp.(*api.BrandingRevisionResponse).ID
@@ -316,7 +316,7 @@ func TestCreateReleaseChecksFlowAgainstItsSchemaRevision(t *testing.T) {
 
 	definition := newFlowDefinitionFixture("release-fit-flow", "example-user")
 	definition.Steps[0].Fields = []string{"email", "firstName"}
-	created, err := client.CreateFlowDefinition(t.Context(),
+	created, err := client.PublishFlowDefinition(t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), definition))
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))

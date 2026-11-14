@@ -65,23 +65,24 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
  * project, such as a home directory's stray lockfile, can choose for it.
  *
  * @param cwd - The project's directory.
+ * @param below - The directories already walked, nearest first.
  * @returns The directories, nearest first.
  */
-async function projectDirectories(cwd: string): Promise<string[]> {
-  const start = resolve(cwd);
-  const dirs: string[] = [];
-  let dir = start;
-  for (;;) {
-    dirs.push(dir);
-    if (await pathExists(join(dir, ".git"))) {
-      return dirs;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return [start];
-    }
-    dir = parent;
+async function projectDirectories(
+  cwd: string,
+  below: readonly string[] = [],
+): Promise<readonly string[]> {
+  const dir = resolve(cwd);
+  const dirs = [...below, dir];
+  if (await pathExists(join(dir, ".git"))) {
+    return dirs;
   }
+  const parent = dirname(dir);
+  if (parent === dir) {
+    // No project root above: only the directory the walk began in counts.
+    return [below[0] ?? dir];
+  }
+  return projectDirectories(parent, dirs);
 }
 
 /**
@@ -224,25 +225,39 @@ export function inDirectory(
   };
 }
 
+/**
+ * Runs a package manager's command in `cwd`, its output on the terminal unless
+ * `redirectStdoutToStderr` keeps it off stdout or `captureOutput` keeps it
+ * off the terminal altogether.
+ *
+ * @param options.captureOutput - Prints nothing; the error a failure throws
+ *   carries the command's output, stdout and stderr interleaved, as `output`.
+ * @throws When the command cannot start or exits non-zero.
+ */
 export async function runPackageCommand(
   packageCommand: PackageCommand,
   options: {
     cwd: string;
     env?: NodeJS.ProcessEnv;
     redirectStdoutToStderr?: boolean;
+    captureOutput?: boolean;
   },
 ): Promise<void> {
+  const capture = options.captureOutput === true;
   const subprocess = execa(packageCommand.command, packageCommand.args, {
     cwd: options.cwd,
     env: options.env ?? process.env,
     extendEnv: false,
-    stdio: options.redirectStdoutToStderr ? ["ignore", "pipe", "pipe"] : "inherit",
+    stdio: capture || options.redirectStdoutToStderr ? ["ignore", "pipe", "pipe"] : "inherit",
+    all: capture,
     reject: false,
   });
-  // Piped through `process.stderr.write` rather than handed the descriptor, so
-  // anything that wraps that stream (the test harness, a progress UI) sees it.
-  subprocess.stdout?.pipe(process.stderr, { end: false });
-  subprocess.stderr?.pipe(process.stderr, { end: false });
+  if (!capture) {
+    // Piped through `process.stderr.write` rather than handed the descriptor, so
+    // anything that wraps that stream (the test harness, a progress UI) sees it.
+    subprocess.stdout?.pipe(process.stderr, { end: false });
+    subprocess.stderr?.pipe(process.stderr, { end: false });
+  }
   const result = await subprocess;
   if (result.code !== undefined && result.exitCode === undefined) {
     throw Object.assign(new Error(result.originalMessage ?? result.message), {
@@ -254,7 +269,11 @@ export async function runPackageCommand(
       ? `signal ${result.signal}`
       : `exit ${String(result.exitCode ?? 1)}`;
     const error = new Error(`${packageCommand.display} failed with ${detail}`);
-    Object.assign(error, { code: result.exitCode ?? 1, signal: result.signal ?? null });
+    Object.assign(error, {
+      code: result.exitCode ?? 1,
+      signal: result.signal ?? null,
+      ...(capture ? { output: String(result.all ?? "") } : {}),
+    });
     throw error;
   }
 }

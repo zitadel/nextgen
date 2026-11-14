@@ -13,13 +13,13 @@ post:
     in order:
 
     1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
-    2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as
+    2. `createAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as
        `identifier`, `password` or `passkey`.
-    3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the
+    3. `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the
        credential, code or assertion. Repeat steps 2 and 3 until
        `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
        `required_factors` is verified.
-    4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.
+    4. `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.
     5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
        for the session and its `session_token`.
 

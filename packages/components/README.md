@@ -67,7 +67,7 @@ language. `<zitadel-login>` reads the global project handle from
 
 What `<zitadel-login>` handles for you:
 
-- `POST /flow` on mount, `POST /flow/{id}/submit` for every step, terminal
+- `POST /flows` on mount, `POST /flows/{flow_id}/submit` for every step, terminal
   `redirect` / `show` honoured automatically.
 - Native `<form>` semantics: Enter submits, password managers see the inputs,
   `<button type="submit">` works, browser autofill works.

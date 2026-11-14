@@ -166,7 +166,7 @@ sequenceDiagram
     E->>B: step.gates[bot_check] = { kind, provider, config }
     Note over E,A: Altcha challenge minted server-side at render
     B->>B: solve PoW (Altcha) OR vendor widget token
-    B->>E: POST /flow/{id}/submit { gate_proofs: { bot_check: "<proof>" } }
+    B->>E: POST /flows/{flow_id}/submit { gate_proofs: { bot_check: "<proof>" } }
     E->>A: issue+verify challenge (method: captcha)
     A->>P: verify (Altcha recompute / vendor siteverify + secret)
     P-->>A: ok / fail
@@ -292,7 +292,7 @@ This list doubles as the implementation checklist for the follow-up PRs.
 
 - **Risk-based difficulty and dynamic injection** depend on the policy engine; this ADR
   fixes the contract so they can land without a contract change.
-- **Fingerprint / behavioral telemetry** continue to flow through `/flow/{id}/event`
+- **Fingerprint / behavioral telemetry** continue to flow through `/flows/{flow_id}/event`
   (observation-only); only the synchronous edge verdict uses the inline header.
 
 [adr005]: 005-public-runtime-private-credentials.md

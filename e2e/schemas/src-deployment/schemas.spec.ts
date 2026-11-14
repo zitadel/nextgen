@@ -47,7 +47,7 @@ test("a name that is no built-in schema is a 404 of the schemas service", async 
   expect(response.status()).toBe(404);
 });
 
-test("the API answers /schemas and /schemas/{id} under /api/v1, and at the root until 1.0.0", async ({
+test("the API answers /schemas and /schemas/{schema_id} under /api/v1, and at the root until 1.0.0", async ({
   request,
 }) => {
   // The API lives under /api/v1 (ADR 077), and until 1.0.0 also answers its

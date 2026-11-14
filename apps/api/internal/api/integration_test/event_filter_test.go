@@ -84,8 +84,8 @@ func TestListEventsByRequestAndResourceType(t *testing.T) {
 			require.NoError(t, err)
 			page, ok := resp.(*api.ListEventsResponse)
 			require.True(t, ok, helpers.MustMarshal(t, resp))
-			require.LessOrEqual(t, len(page.Data), 2)
-			for _, event := range page.Data {
+			require.LessOrEqual(t, len(page.Events), 2)
+			for _, event := range page.Events {
 				raw, err := event.MarshalJSON()
 				require.NoError(t, err)
 				var envelope struct {

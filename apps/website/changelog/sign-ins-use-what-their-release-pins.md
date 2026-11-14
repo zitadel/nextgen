@@ -11,4 +11,4 @@ A sign-in that resolves to a release now uses the user schema, branding and iden
 - A deploy during a sign-in does not change that sign-in's steps. Once the release it started on is revoked, `GET /flow/{id}` and `POST /flow/{id}/submit` answer `409` `rel.revoked`.
 - A deployment freezes its kind's variables when it is created, and `GET /deployments/{deployment_id}/variables` returns that set, a secret as `{"secret": true}`. A release that references a name without a value for that kind is refused with `400` `dep.variables_missing`, and a rollback keeps the restored deployment's set.
 
-[Deployment variables in the API reference](https://preview.zitadel.com/docs/reference/api/deployments/getDeploymentVariables)
+[Deployment variables in the API reference](https://preview.zitadel.com/docs/reference/api/deployments/listDeploymentVariables)

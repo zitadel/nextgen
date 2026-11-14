@@ -306,16 +306,16 @@ describe("validateStep", () => {
     });
 
     it("refuses a literal client_secret before the project's variables are read", async () => {
-      const getVariables = vi.fn(async () => {
+      const listVariables = vi.fn(async () => {
         return {};
       });
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
 
       await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config, client: { getVariables } }));
+        return validateStep.run(aStepContext({ config, client: { listVariables } }));
       });
 
-      expect(getVariables).not.toHaveBeenCalled();
+      expect(listVariables).not.toHaveBeenCalled();
     });
 
     it("never echoes a literal client_secret in the refusal", async () => {

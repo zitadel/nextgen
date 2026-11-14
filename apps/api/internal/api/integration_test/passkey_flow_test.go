@@ -134,7 +134,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-login",
@@ -178,7 +178,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	issueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "passkey",
 	}, api.SubmitFlowStepParams{
-		ID:     flowID,
+		FlowID: flowID,
 		Zflow:  zflow,
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
@@ -214,8 +214,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 			},
 		),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, verifyResp, helpers.MustMarshal(t, verifyResp))

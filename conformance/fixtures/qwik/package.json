@@ -1,0 +1,32 @@
+{
+  "name": "@zitadel/conformance-qwik",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -b",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@qwik.dev/core": "catalog:",
+    "@zitadel/sdk-qwik": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "conformance": {
+    "framework": "qwik",
+    "appPort": 3215,
+    "zitadelPort": 8215,
+    "generatePort": 8315
+  }
+}

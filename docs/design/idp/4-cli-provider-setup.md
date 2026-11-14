@@ -537,7 +537,7 @@ never presented as proof that sign-in works.
 * **Secret-free previews:** previews display only the reference
   (`${{ GOOGLE_CLIENT_SECRET }}`), never a value.
   Update previews show a field diff: the syncer reads the stored connection
-  through `GET /idps/{id}`, and refuses a body whose `client_secret` comes
+  through `GET /idps/{idp_id}`, and refuses a body whose `client_secret` comes
   back as a value rather than a reference, so a resolved secret stops the
   plan instead of being printed into it.
 * **Delete:** a local file delete schedules a platform delete; what the server

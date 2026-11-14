@@ -228,20 +228,20 @@ abstract class WriteOperation<
       });
     }
 
-    // Some writes answer without a body (`grants create` by identifier answers
+    // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
-    let summary: Summary = {
-      title: "Command completed",
-      sections: [],
-    };
-    if (result !== undefined) {
-      summary = {
-        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
-        sections: [],
-        lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-      };
-    }
+    const summary: Summary =
+      result === undefined
+        ? {
+            title: "Command completed",
+            sections: [],
+          }
+        : {
+            title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
+            sections: [],
+            lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+          };
 
     return {
       status: "ok",

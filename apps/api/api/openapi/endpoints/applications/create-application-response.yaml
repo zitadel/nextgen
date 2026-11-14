@@ -1,5 +1,5 @@
 description: |
-  An application as `createApplication` (`POST /applications`) wrote it, with
+  An application as `publishApplication` (`POST /applications`) wrote it, with
   its document as `definition` and the secrets of the clients it created.
 allOf:
   - $ref: application-response.yaml

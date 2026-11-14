@@ -1,7 +1,7 @@
 /**
  * Standalone HTTP server for the api-mock.
  *
- * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
+ * Flow routes (POST /flows, GET /flows/:flow_id, POST /flows/:flow_id/submit) and the
  * platform CRUD routes (projects, schemas, flow_definitions) are served by
  * reusing the existing MSW handlers via @mswjs/http-middleware — zero
  * duplication of routing logic.
@@ -29,16 +29,16 @@
  *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
  *   GET    /schemas                   — list user schemas
- *   GET    /schemas/:id               — fetch user schema
+ *   GET    /schemas/:schema_id               — fetch user schema
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
- *   GET    /flow_definitions/:id      — get flow definition
+ *   GET    /flow_definitions/:flow_definition_id      — get flow definition
  */
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 
 import { createMiddleware } from "@mswjs/http-middleware";
-import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { CompleteProjectClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
@@ -521,7 +521,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           .json(errorBody("auth.unauthorized", "session is not eligible to claim a project"));
         return;
       }
-      const parsed = CompleteClaimBody.safeParse(req.body);
+      const parsed = CompleteProjectClaimBody.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json(
           errorBody("req.invalid", "request does not conform to spec", {

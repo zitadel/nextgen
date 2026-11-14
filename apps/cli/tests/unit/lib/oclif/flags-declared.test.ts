@@ -17,7 +17,7 @@ import {
 import { WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
 
-const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+const commands = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
 
 /**
  * The ways a flag's refusal is raised by the flag itself: the `parse` it gives
@@ -34,7 +34,7 @@ const RAISED_BY_THE_FLAG = ["reads", "taken", "readsFilled"];
 type Command = Readonly<{ file: string; refused: string[]; run: ts.ClassDeclaration }>;
 
 /**
- * Every command under `src/commands` that declares a `Refused`, with its class.
+ * Every command under `src/cli/commands` that declares a `Refused`, with its class.
  *
  * @returns The commands.
  */

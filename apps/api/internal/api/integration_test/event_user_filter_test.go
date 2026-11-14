@@ -56,7 +56,7 @@ func TestListEventsByUser(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 	})
@@ -86,7 +86,7 @@ func TestListEventsByUser(t *testing.T) {
 			resp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 				Action: "submit",
 				Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{field: jx.Raw(`"` + value + `"`)}),
-			}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+			}, api.SubmitFlowStepParams{FlowID: flowID, Zflow: zflow})
 			require.NoError(t, err)
 			var answer api.FlowResponseHeaders
 			switch r := resp.(type) {
@@ -142,7 +142,7 @@ func TestListEventsByUser(t *testing.T) {
 			require.NoError(t, err)
 			page, ok := resp.(*api.ListEventsResponse)
 			require.True(t, ok, helpers.MustMarshal(t, resp))
-			for _, event := range page.Data {
+			for _, event := range page.Events {
 				raw, err := event.MarshalJSON()
 				require.NoError(t, err)
 				var item listed

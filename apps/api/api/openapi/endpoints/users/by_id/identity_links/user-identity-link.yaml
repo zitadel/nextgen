@@ -14,7 +14,7 @@ properties:
     type: string
     description: |
       The ID of the identity provider connection the account signs in through,
-      not a revision ID. `getIdpById` (`GET /idps/{id}`) resolves it.
+      not a revision ID. `getIdp` (`GET /idps/{idp_id}`) resolves it.
     example: idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB
   created_at:
     type: string

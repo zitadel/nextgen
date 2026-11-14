@@ -8,6 +8,8 @@
 - `command-reference.json` is the docs site's CLI reference, generated from
   `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
   rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+- `README.md`'s command reference is `oclif readme` output: after adding, renaming or removing a
+  command, run `turbo run readme --filter=@zitadel/cli`; `tests/unit/docs/readme.test.ts` gates it.
 - Running git, and why every call goes through one module:
   [`src/lib/git/AGENTS.md`](src/lib/git/AGENTS.md).
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
@@ -15,6 +17,10 @@
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
   [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+- No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
+  `// biome-ignore lint/plugin: <reason>` stating the mechanism.
+- `src/lib/orca/patchers` edits and drops code into the customer's project, so no
+  style or lint sweep may touch it: [`src/lib/orca/AGENTS.md`](src/lib/orca/AGENTS.md).
 - Imports: reach `src/` with `@/` (`@/lib/errors`), never `../`; `./` stays for siblings.
 - Scaffold posture: [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)
   (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:
@@ -67,7 +73,7 @@
 - Name the CLI one way in anything a person reads — a hint, a warning, a box
   line, a description: the public `npx @zitadel/cli@<version> …` form, from
   `this.suggest`, never bare `zitadel …` and never in
-  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/cli/commands` for both,
   and exempts only a `hint:` line (see the rule on quoting a command below).
   - Say it once: when the run's own step already prints the command, the
     prose says what to do and leaves the spelling to the step.
@@ -116,7 +122,18 @@
   - Annotate one only where its `next` would make the type circular;
     `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
-  command.
+  command, with one exception: a command that runs as a wizard.
+  - A wizard command (`setup`, `auth-method sso enable`) keeps one class per step under its own
+    `steps/`, built on `WizardStep` (`src/lib/wizard`), named for what it does
+    (`publish-credentials`, `make-initial-commit`). Beside `index.ts` it may have one `shared.ts`,
+    for the types the steps are wired with and for what two or more steps use; whatever one step
+    uses lives in that step's file.
+  - A step never imports another step or a value from the command's `index.ts`. It takes what it
+    needs through its constructor, which the command's `execute` fills when it builds the wizard,
+    and the command keeps its flags, refusals and telemetry (recorded through the observer given
+    to `.step(...)`) and emits the one result the wizard returns.
+- Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
+  `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
@@ -136,7 +153,13 @@
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never
-  imports `lib/oclif`.
+  imports `lib/oclif`. The exception is `src/lib/upgrade` (classes, one word per
+  file): it carries Zitadel's defaults in `defaults.ts` and `config.ts`, takes
+  every one of them as an option so a test or another product can swap it, and
+  builds only on small utilities (`lib/ci`, `fs`, `json`, `npm`,
+  `package-manager`, `public-cli`, `telemetry/identity`). It never imports
+  commands or `lib/oclif`; the `upgrade` command does the CLI's part,
+  `doctor --fix` included.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
   sink decides the look, and `--json` installs one that draws nothing; with no
@@ -150,7 +173,7 @@
   off (`spellOutCommands`). Only a `hint:` line may do this: a message, a
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
-  `src/commands`.
+  `src/cli/commands`.
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per

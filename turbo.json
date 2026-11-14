@@ -44,7 +44,17 @@
   // the same packages got other keys there than in the console's build and
   // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
-  "globalEnv": ["!VITE_VERCEL_*"],
+  //
+  // On Vercel, turbo's default hashes VERCEL_TARGET_ENV (production or
+  // preview) into every task, so a preview never restored what main's
+  // production build had stored and each branch's first preview built every
+  // shared package again. It is dropped: Vercel's cache policies, not the
+  // key, keep a branch's artifacts away from production
+  // (docs/design/build/turborepo.md, "Commands"). A build whose output depends
+  // on the environment lists it itself (the console's VERCEL_ENV). VERCEL is
+  // hashed in its place, so the keys of Vercel's builds stay apart from
+  // CI's and a checkout's, as that default kept them.
+  "globalEnv": ["!VITE_VERCEL_*", "!VERCEL_TARGET_ENV", "VERCEL"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
@@ -304,7 +314,9 @@
         "!**/playwright-report/**",
         "!**/.vitest/**",
         "!**/next-env.d.ts",
+        "!**/*.gen.ts",
         "!**/*.timestamp*",
+        "!conformance/fixtures/**",
         "!apps/docs/.source/**",
         "!apps/docs/.generated/**",
         "!apps/cloud-functions/app/.well-known/workflow/**",
@@ -353,6 +365,10 @@
         "tools/*/package.json",
         "e2e/turbo.json",
         "e2e/package.json",
+        "conformance/*/turbo.json",
+        "conformance/*/package.json",
+        "conformance/fixtures/*/turbo.json",
+        "conformance/fixtures/*/package.json",
         ".gitignore",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
@@ -368,6 +384,8 @@
         "scripts/render-builtin-schemas.test.mjs",
         "scripts/turbo-run-summary.mjs",
         "scripts/turbo-run-summary.test.mjs",
+        "scripts/artifacts-failure-issue.mjs",
+        "scripts/artifacts-failure-issue.test.mjs",
         "apps/api/api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
         // namespace.
@@ -389,6 +407,10 @@
         "packages/*/tsconfig*.json",
         "e2e/package.json",
         "e2e/tsconfig*.json",
+        "conformance/suite/package.json",
+        "conformance/suite/tsconfig*.json",
+        "conformance/fixtures/*/package.json",
+        "conformance/fixtures/*/tsconfig*.json",
         "vitest.config.ts"
       ]
     },
@@ -397,8 +419,15 @@
         "packages/vitest-config/vitest.shared.mjs",
         "packages/vitest-config/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
+        "scripts/openapi-list-conventions.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",
+        "scripts/testdata/openapi-lists/**",
+        // The verb allow-list test reads the spec's operationIds.
+        "apps/api/api/openapi/endpoints/**/methods.yaml",
+        // The list conventions are checked on the committed bundle;
+        // @zitadel/server#check-generate keeps it in step with the YAML.
+        "apps/api/api/openapi/bundled/openapi.json",
         "redocly.yaml",
         ".redocly.lint-ignore.yaml",
         "vitest.config.ts"
@@ -501,8 +530,8 @@
     },
     // The latest published @zitadel/server writes a data dir (a project and
     // a user); the current build migrates it and reads the user back. It
-    // installs that release from npm, so it is never cached. The nightly
-    // artifacts workflow runs it.
+    // installs that release from npm, so it is never cached. The root `ci`
+    // script and the nightly artifacts workflow run it.
     "//#smoke-upgrade": {
       "cache": false,
       "dependsOn": ["@zitadel/server#build"],

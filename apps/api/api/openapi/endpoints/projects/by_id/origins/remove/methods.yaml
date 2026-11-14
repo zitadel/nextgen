@@ -1,5 +1,5 @@
 post:
-  operationId: removeOrigin
+  operationId: removeProjectOrigin
   x-zitadel-cli: origin rm
   x-zitadel-destructive: true
   summary: Remove an origin pattern
@@ -12,7 +12,7 @@ post:
     origin.
     Removing a pattern that is already absent is idempotent and answers `204`.
 
-    The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
+    The body's `pattern` is a pattern `addProjectOrigin` (`POST /projects/{project_id}/origins`) stored.
   tags:
     - Projects
   parameters:
@@ -34,10 +34,10 @@ post:
               type: string
               description: |
                 The origin pattern exactly as stored on the project: the string
-                that `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addOrigin` (`POST /projects/{project_id}/origins`) returns.
+                that `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addProjectOrigin` (`POST /projects/{project_id}/origins`) returns.
               example: https://app.example.com
   responses:
     '204':
       description: The pattern was removed.
     default:
-      $ref: removeOrigin-error-response.yaml
+      $ref: removeProjectOrigin-error-response.yaml

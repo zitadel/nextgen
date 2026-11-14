@@ -115,7 +115,7 @@ const fullClients = new WeakMap<object, ZitadelClient>();
  * an `any`). Only {@link allowDestructive} hands back the full client.
  * `createZitadelClient` narrows every client it makes.
  *
- * Updates are not withheld: a merge-patch `null` (`updateVariables`, the user and
+ * Updates are not withheld: a merge-patch `null` (`setVariables`, the user and
  * project patches) still removes what it names.
  */
 function withholdDestructive(client: ZitadelClient): ZitadelClient {

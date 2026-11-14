@@ -27,6 +27,7 @@ import {
   isFailure,
   isNarrowed,
   isNarrowedTo,
+  olderUnmatched,
   EVENT_VIEWS,
   type ProjectEvent,
   type EventsSearch,
@@ -67,10 +68,10 @@ describe("eventSubject", () => {
       event_type: "request.api",
       category: "request",
       payload: {
-        operation_id: "getUserByID",
+        operation_id: "getUser",
         method: "GET",
         // The server records the operation as the route, never the raw path.
-        route_template: "getUserByID",
+        route_template: "getUser",
         status: 404,
         duration_ms: 3,
       },
@@ -78,7 +79,7 @@ describe("eventSubject", () => {
     expect(eventSubject(request)).toEqual({
       kind: "request",
       method: "GET",
-      route: "getUserByID",
+      route: "getUser",
       status: 404,
     });
   });
@@ -177,7 +178,7 @@ describe("parseEventsSearch", () => {
     });
     expect(parsed).toMatchObject({
       view: "all",
-      category: "admin",
+      category: ["admin"],
       since: "7d",
       actor: "user_1",
       resource: "user_2",
@@ -234,7 +235,7 @@ describe("parseEventsSearch", () => {
       }),
     ).toEqual({
       view: "audit",
-      category: "auth",
+      category: ["auth"],
       since: "7d",
       from: undefined,
       to: undefined,
@@ -288,7 +289,7 @@ describe("servedSearch", () => {
     expect(
       servedSearch({
         view: "requests",
-        category: "auth",
+        category: ["auth"],
         type: ["user.created", "user.deleted"],
         actor: "user_1",
       }),
@@ -315,13 +316,13 @@ describe("servedSearch", () => {
   });
 
   it("gives the requests no category", () => {
-    expect(servedSearch({ view: "requests", category: "auth" }).category).toBeUndefined();
+    expect(servedSearch({ view: "requests", category: ["auth"] }).category).toBeUndefined();
   });
 
   it("leaves every other combination as it is", () => {
     const search: EventsSearch = {
       view: "audit",
-      category: "entity",
+      category: ["entity"],
       actor: "user_1",
       resource: "user_2",
       request: "req_1",
@@ -343,11 +344,16 @@ describe("eventsQuery", () => {
     expect(eventsQuery(parseEventsSearch({ view: "all" })).category).toBeUndefined();
   });
 
-  it("narrows either view to the one category chosen", () => {
+  it("narrows either view to the categories chosen, one or several", () => {
     expect(eventsQuery(parseEventsSearch({ category: "auth" })).category).toEqual(["auth"]);
     expect(eventsQuery(parseEventsSearch({ view: "all", category: "auth" })).category).toEqual([
       "auth",
     ]);
+    // Several, once each, in the API's order; what it does not narrow by is dropped.
+    expect(
+      eventsQuery(parseEventsSearch({ category: ["session", "auth", "session", "request"] }))
+        .category,
+    ).toEqual(["auth", "session"]);
   });
 
   it("names each value filter as the API's parameter, and no other", () => {
@@ -399,7 +405,7 @@ describe("eventsQuery", () => {
     // Not through the URL's parser: a type still takes no category.
     const query = eventsQuery({
       view: "audit",
-      category: "auth",
+      category: ["auth"],
       type: ["user.created"],
       actor: "user_1",
     });
@@ -435,26 +441,29 @@ describe("the list in another view, category or range", () => {
   it("drops the category on the way into the requests", () => {
     const current = parseEventsSearch({ category: "auth" });
     expect(withView(current, "requests")).toMatchObject({ view: "requests", category: undefined });
-    expect(withView(current, "all")).toMatchObject({ view: "all", category: "auth" });
+    expect(withView(current, "all")).toMatchObject({ view: "all", category: ["auth"] });
   });
 
   it("gives up the type for a category, and keeps it when the category is cleared", () => {
     const typed = parseEventsSearch({ type: "user.created" });
-    expect(withCategory(typed, "entity")).toMatchObject({
+    expect(withCategory(typed, ["entity"])).toMatchObject({
       view: "all",
-      category: "entity",
+      category: ["entity"],
       type: undefined,
     });
-    expect(withCategory(typed, undefined).type).toEqual(["user.created"]);
+    expect(withCategory(typed, []).type).toEqual(["user.created"]);
   });
 
   it("keeps an actor beside a category", () => {
     const current = parseEventsSearch({ actor: "user_1" });
-    expect(withCategory(current, "admin")).toMatchObject({
+    expect(withCategory(current, ["admin"])).toMatchObject({
       view: "audit",
-      category: "admin",
+      category: ["admin"],
       actor: "user_1",
     });
+    // Several at once, in the API's order whatever order they were ticked in.
+    expect(withCategory(current, ["entity", "auth"]).category).toEqual(["auth", "entity"]);
+    expect(withCategory(current, []).category).toBeUndefined();
   });
 
   it("changes the time range and nothing else", () => {
@@ -531,7 +540,7 @@ describe("narrowing by one value", () => {
     for (const key of ["request", "session", "flow"] as const) {
       expect(narrowedBy(current, key, "id_1")).toMatchObject({
         view: "all",
-        category: "entity",
+        category: ["entity"],
         [key]: "id_1",
       });
     }
@@ -542,7 +551,7 @@ describe("narrowing by one value", () => {
     for (const key of ["actor", "resource", "resource_type", "client", "device"] as const) {
       expect(narrowedBy(current, key, "user_1")).toMatchObject({
         view: "audit",
-        category: "entity",
+        category: ["entity"],
         since: "24h",
         [key]: "user_1",
       });
@@ -720,8 +729,9 @@ describe("what gives way, on every way into a list", () => {
       const current = parseEventsSearch(url);
       for (const view of EVENT_VIEWS) expectServedOnce(withView(current, view));
       for (const category of [...AUDIT_CATEGORIES, undefined]) {
-        expectServedOnce(withCategory(current, category));
+        expectServedOnce(withCategory(current, category ? [category] : []));
       }
+      expectServedOnce(withCategory(current, ["auth", "session"]));
       for (const since of [...TIME_RANGES, undefined]) {
         expectServedOnce(withTimeRange(current, since));
       }
@@ -754,6 +764,26 @@ describe("rangeStart", () => {
   });
 });
 
+describe("olderUnmatched", () => {
+  it("says which filters miss the events recorded before the server had them", () => {
+    expect(olderUnmatched(parseEventsSearch({ operation: "createUser" }))).toBe(
+      "Events recorded before the server had the operation filter are not matched.",
+    );
+    expect(
+      olderUnmatched(parseEventsSearch({ user: "user_1", operation: "createUser", status: "5xx" })),
+    ).toBe(
+      "Events recorded before the server had the user, operation and status filters are not matched.",
+    );
+  });
+
+  it("says nothing under the filters every event is matched by", () => {
+    expect(olderUnmatched(parseEventsSearch({}))).toBeUndefined();
+    expect(
+      olderUnmatched(parseEventsSearch({ actor: "user_1", type: "user.created", since: "1h" })),
+    ).toBeUndefined();
+  });
+});
+
 describe("searchMeanings", () => {
   /** A term's meanings, as `event` or the filters' keys. */
   const meanings = (term: string) =>
@@ -774,7 +804,7 @@ describe("searchMeanings", () => {
 
   it("reads one camel-cased word as an API operation", () => {
     expect(meanings("createUser")).toEqual(["operation createUser"]);
-    expect(meanings("deleteUserByID")).toEqual(["operation deleteUserByID"]);
+    expect(meanings("deleteUser")).toEqual(["operation deleteUser"]);
     // A lowercase word or an ID is not one.
     expect(meanings("admin")).toEqual(["actor admin", "resource admin"]);
   });
@@ -826,6 +856,14 @@ describe("searchMeanings", () => {
     expect(meanings("")).toEqual([]);
     expect(meanings("   ")).toEqual([]);
     expect(meanings("failed sign in")).toEqual([]);
+  });
+
+  it("means nothing by a filter's prefix until its value follows", () => {
+    expect(meanings("actor:")).toEqual([]);
+    expect(meanings("resource_type:")).toEqual([]);
+    expect(meanings("application:")).toEqual([]);
+    // No filter's prefix: an id like any other.
+    expect(meanings("urn:")).toEqual(["actor urn:", "resource urn:"]);
   });
 });
 
@@ -1016,15 +1054,20 @@ describe("the sign-ins", () => {
       category: undefined,
       event_type: SIGNIN_OUTCOME_TYPES,
     });
-    expect(eventsQuery(withOutcome(signins, "signed_in")).event_type).toEqual([
+    expect(eventsQuery(withOutcome(signins, ["signed_in"])).event_type).toEqual([
       "session.established",
     ]);
-    expect(eventsQuery(withOutcome(signins, "failed")).event_type).toEqual([
+    expect(eventsQuery(withOutcome(signins, ["failed"])).event_type).toEqual([
       "auth.check.failed",
       "auth.sso.authorization.failed",
       "auth.sso.exchange.failed",
     ]);
-    expect(filterCount(withOutcome(signins, "failed"))).toBe(1);
+    expect(filterCount(withOutcome(signins, ["failed"]))).toBe(1);
+    // Both ticked read what none does, and still count as a filter that is set.
+    const both = withOutcome(signins, ["failed", "signed_in"]);
+    expect(both.outcome).toEqual(["signed_in", "failed"]);
+    expect(eventsQuery(both).event_type).toEqual(SIGNIN_OUTCOME_TYPES);
+    expect(withOutcome(both, []).outcome).toBeUndefined();
   });
 
   it("keeps an outcome only in the sign-ins, and takes no category or type there", () => {
@@ -1043,7 +1086,7 @@ describe("the sign-ins", () => {
     });
     const failed = parseEventsSearch({ view: "signins", outcome: "failed" });
     expect(withView(failed, "audit").outcome).toBeUndefined();
-    expect(withView(failed, "signins").outcome).toBe("failed");
+    expect(withView(failed, "signins").outcome).toEqual(["failed"]);
     // A session's events are in every view.
     expect(narrowedBy(failed, "session", "sess_1")).toMatchObject({
       view: "all",
@@ -1152,7 +1195,7 @@ describe("the sign-ins", () => {
       new Set(["evt_left"]),
     );
     // A filter beyond the view and the time could hide what finished it.
-    expect(abandonedAttempts(rows, { view: "audit", category: "auth" }, loadedAt).size).toBe(0);
+    expect(abandonedAttempts(rows, { view: "audit", category: ["auth"] }, loadedAt).size).toBe(0);
     // A range that ends before now may stop short of what ended a flow.
     expect(abandonedAttempts(rows, { view: "all", to: at(600) }, loadedAt).size).toBe(0);
     expect(

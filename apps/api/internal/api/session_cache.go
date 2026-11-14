@@ -15,8 +15,10 @@ const sessionStateCacheControl = "private, no-store"
 // return the single-use handoff token. It wraps the generated server so the
 // header is also present on security and decoding errors emitted before the
 // operation handler runs. It runs ahead of the generated server, so it reads
-// the path before the server cuts client.PathPrefix: the API answers under it
-// and, until 1.0.0, at the root (ADR 077), and both spellings match.
+// the path before the server cuts client.PathPrefix and before
+// withLegacyFlowPath maps it: the API answers under the prefix and, until
+// 1.0.0, at the root (ADR 077), and the flow operations at `/flows` and,
+// until 1.0.0, at `/flow`, and every spelling matches.
 // TestWithSessionStateNoStoreCoversTheSpec keeps the GET paths in step with
 // the OpenAPI source.
 func WithSessionStateNoStore(next http.Handler) http.Handler {
@@ -35,11 +37,15 @@ func isNoStoreOperation(method, path string) bool {
 	if method == http.MethodGet && (path == "/sessions/me" || path == "/sessions/me/csrf") {
 		return true
 	}
+	// The flow operations answer at their old `/flow` paths too, until 1.0.0.
+	if current, ok := flowsPath(path); ok {
+		path = current
+	}
 	// Flow start shares the step response, and with it the documented header.
-	if method == http.MethodPost && path == "/flow" {
+	if method == http.MethodPost && path == flowCollection {
 		return true
 	}
-	rest, ok := strings.CutPrefix(path, "/flow/")
+	rest, ok := strings.CutPrefix(path, flowCollection+"/")
 	if !ok || rest == "" {
 		return false
 	}

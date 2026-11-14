@@ -15,7 +15,7 @@ import (
 )
 
 // These tests resolve an unlinked identity into the register-sso step through
-// GET /flow/{id}, then submit that step. Like the resolution tests they run
+// GET /flows/{flow_id}, then submit that step. Like the resolution tests they run
 // sequentially.
 
 // ssoCollectionFixture is an sso resolution fixture whose flows start on a
@@ -55,7 +55,7 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"dependentRequired": {"country": ["zip"]}
 	}`)
 	submit := api.StepAction{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)}
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: f.projectID(),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "sso-collection",

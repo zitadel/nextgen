@@ -541,396 +541,6 @@ func (s *AcceptInvitationUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AddOriginErrorResponse as json.
-func (s AddOriginErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginInvalidAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.invalid")
-		{
-			s := s.OriginInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginKindConflictAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.kind_conflict")
-		{
-			s := s.OriginKindConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginNotFoundAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.not_found")
-		{
-			s := s.OriginNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginPermissionDeniedAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.permission_denied")
-		{
-			s := s.OriginPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginPrimaryNotExactAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.primary_not_exact")
-		{
-			s := s.OriginPrimaryNotExact
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjMissingIDAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.missing_id")
-		{
-			s := s.ProjMissingID
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNotFoundAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes AddOriginErrorResponse from json.
-func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AddOriginErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidAddOriginErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedAddOriginErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidAddOriginErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalAddOriginErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedAddOriginErrorResponse
-					found = true
-				case "origin.invalid":
-					s.Type = OriginInvalidAddOriginErrorResponse
-					found = true
-				case "origin.kind_conflict":
-					s.Type = OriginKindConflictAddOriginErrorResponse
-					found = true
-				case "origin.not_found":
-					s.Type = OriginNotFoundAddOriginErrorResponse
-					found = true
-				case "origin.permission_denied":
-					s.Type = OriginPermissionDeniedAddOriginErrorResponse
-					found = true
-				case "origin.primary_not_exact":
-					s.Type = OriginPrimaryNotExactAddOriginErrorResponse
-					found = true
-				case "proj.missing_id":
-					s.Type = ProjMissingIDAddOriginErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundAddOriginErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidAddOriginErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableAddOriginErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidAddOriginErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedAddOriginErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidAddOriginErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalAddOriginErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedAddOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case OriginInvalidAddOriginErrorResponse:
-		if err := s.OriginInvalid.Decode(d); err != nil {
-			return err
-		}
-	case OriginKindConflictAddOriginErrorResponse:
-		if err := s.OriginKindConflict.Decode(d); err != nil {
-			return err
-		}
-	case OriginNotFoundAddOriginErrorResponse:
-		if err := s.OriginNotFound.Decode(d); err != nil {
-			return err
-		}
-	case OriginPermissionDeniedAddOriginErrorResponse:
-		if err := s.OriginPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case OriginPrimaryNotExactAddOriginErrorResponse:
-		if err := s.OriginPrimaryNotExact.Decode(d); err != nil {
-			return err
-		}
-	case ProjMissingIDAddOriginErrorResponse:
-		if err := s.ProjMissingID.Decode(d); err != nil {
-			return err
-		}
-	case ProjNotFoundAddOriginErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidAddOriginErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableAddOriginErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AddOriginErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddOriginErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *AddOriginResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1078,6 +688,396 @@ func (s AddOriginResponseKind) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AddOriginResponseKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AddProjectOriginErrorResponse as json.
+func (s AddProjectOriginErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s AddProjectOriginErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthCsrfInvalidAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginInvalidAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.invalid")
+		{
+			s := s.OriginInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginKindConflictAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.kind_conflict")
+		{
+			s := s.OriginKindConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginNotFoundAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.not_found")
+		{
+			s := s.OriginNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginPermissionDeniedAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.permission_denied")
+		{
+			s := s.OriginPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginPrimaryNotExactAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.primary_not_exact")
+		{
+			s := s.OriginPrimaryNotExact
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjMissingIDAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableAddProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes AddProjectOriginErrorResponse from json.
+func (s *AddProjectOriginErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AddProjectOriginErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidAddProjectOriginErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedAddProjectOriginErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidAddProjectOriginErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalAddProjectOriginErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedAddProjectOriginErrorResponse
+					found = true
+				case "origin.invalid":
+					s.Type = OriginInvalidAddProjectOriginErrorResponse
+					found = true
+				case "origin.kind_conflict":
+					s.Type = OriginKindConflictAddProjectOriginErrorResponse
+					found = true
+				case "origin.not_found":
+					s.Type = OriginNotFoundAddProjectOriginErrorResponse
+					found = true
+				case "origin.permission_denied":
+					s.Type = OriginPermissionDeniedAddProjectOriginErrorResponse
+					found = true
+				case "origin.primary_not_exact":
+					s.Type = OriginPrimaryNotExactAddProjectOriginErrorResponse
+					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDAddProjectOriginErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundAddProjectOriginErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidAddProjectOriginErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableAddProjectOriginErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthCsrfInvalidAddProjectOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedAddProjectOriginErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidAddProjectOriginErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalAddProjectOriginErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedAddProjectOriginErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case OriginInvalidAddProjectOriginErrorResponse:
+		if err := s.OriginInvalid.Decode(d); err != nil {
+			return err
+		}
+	case OriginKindConflictAddProjectOriginErrorResponse:
+		if err := s.OriginKindConflict.Decode(d); err != nil {
+			return err
+		}
+	case OriginNotFoundAddProjectOriginErrorResponse:
+		if err := s.OriginNotFound.Decode(d); err != nil {
+			return err
+		}
+	case OriginPermissionDeniedAddProjectOriginErrorResponse:
+		if err := s.OriginPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case OriginPrimaryNotExactAddProjectOriginErrorResponse:
+		if err := s.OriginPrimaryNotExact.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDAddProjectOriginErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundAddProjectOriginErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidAddProjectOriginErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableAddProjectOriginErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AddProjectOriginErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AddProjectOriginErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -15374,525 +15374,6 @@ func (s *AuthzRevokedEventDelegationType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes BeginUserPasskeyRegistrationBadRequest as json.
-func (s *BeginUserPasskeyRegistrationBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes BeginUserPasskeyRegistrationBadRequest from json.
-func (s *BeginUserPasskeyRegistrationBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = BeginUserPasskeyRegistrationBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *BeginUserPasskeyRegistrationBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes BeginUserPasskeyRegistrationErrorResponse as json.
-func (s BeginUserPasskeyRegistrationErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s BeginUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.already_handed_off")
-		{
-			s := s.AttAlreadyHandedOff
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_request")
-		{
-			s := s.AttInvalidRequest
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidStateBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_state")
-		{
-			s := s.AttInvalidState
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttNotFoundBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.not_found")
-		{
-			s := s.AttNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserInvalidBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.invalid")
-		{
-			s := s.UserInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserNotFoundBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.not_found")
-		{
-			s := s.UserNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.permission_denied")
-		{
-			s := s.UserPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes BeginUserPasskeyRegistrationErrorResponse from json.
-func (s *BeginUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "att.already_handed_off":
-					s.Type = AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.invalid_request":
-					s.Type = AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.invalid_state":
-					s.Type = AttInvalidStateBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.not_found":
-					s.Type = AttNotFoundBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.invalid":
-					s.Type = UserInvalidBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.not_found":
-					s.Type = UserNotFoundBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.permission_denied":
-					s.Type = UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AttAlreadyHandedOffBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidRequestBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.AttInvalidRequest.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidStateBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.AttInvalidState.Decode(d); err != nil {
-			return err
-		}
-	case AttNotFoundBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.AttNotFound.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case UserInvalidBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.UserInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UserNotFoundBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.UserNotFound.Decode(d); err != nil {
-			return err
-		}
-	case UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s BeginUserPasskeyRegistrationErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes BeginUserPasskeyRegistrationForbidden as json.
-func (s *BeginUserPasskeyRegistrationForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes BeginUserPasskeyRegistrationForbidden from json.
-func (s *BeginUserPasskeyRegistrationForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = BeginUserPasskeyRegistrationForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *BeginUserPasskeyRegistrationForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes BeginUserPasskeyRegistrationInternalServerError as json.
-func (s *BeginUserPasskeyRegistrationInternalServerError) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes BeginUserPasskeyRegistrationInternalServerError from json.
-func (s *BeginUserPasskeyRegistrationInternalServerError) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationInternalServerError to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = BeginUserPasskeyRegistrationInternalServerError(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *BeginUserPasskeyRegistrationInternalServerError) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationInternalServerError) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes BeginUserPasskeyRegistrationNotFound as json.
-func (s *BeginUserPasskeyRegistrationNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes BeginUserPasskeyRegistrationNotFound from json.
-func (s *BeginUserPasskeyRegistrationNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = BeginUserPasskeyRegistrationNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *BeginUserPasskeyRegistrationNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *BeginUserPasskeyRegistrationRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -16217,44 +15698,6 @@ func (s BeginUserPasskeyRegistrationResponseOptions) MarshalJSON() ([]byte, erro
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *BeginUserPasskeyRegistrationResponseOptions) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes BeginUserPasskeyRegistrationUnauthorized as json.
-func (s *BeginUserPasskeyRegistrationUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes BeginUserPasskeyRegistrationUnauthorized from json.
-func (s *BeginUserPasskeyRegistrationUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode BeginUserPasskeyRegistrationUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = BeginUserPasskeyRegistrationUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *BeginUserPasskeyRegistrationUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *BeginUserPasskeyRegistrationUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -17658,6 +17101,119 @@ func (s *BrandingRevisionResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *BrandingRevisionResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *BrandingRevisionSummary) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *BrandingRevisionSummary) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+}
+
+var jsonFieldsNameOfBrandingRevisionSummary = [2]string{
+	0: "id",
+	1: "created_at",
+}
+
+// Decode decodes BrandingRevisionSummary from json.
+func (s *BrandingRevisionSummary) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode BrandingRevisionSummary to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode BrandingRevisionSummary")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfBrandingRevisionSummary) {
+					name = jsonFieldsNameOfBrandingRevisionSummary[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *BrandingRevisionSummary) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *BrandingRevisionSummary) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -22387,746 +21943,6 @@ func (s *ClaimWindowResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CompleteClaimBadRequest as json.
-func (s *CompleteClaimBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CompleteClaimBadRequest from json.
-func (s *CompleteClaimBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CompleteClaimBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CompleteClaimBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CompleteClaimErrorResponse as json.
-func (s CompleteClaimErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CompleteClaimErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ClaimChallengeNotFoundCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim_challenge.not_found")
-		{
-			s := s.ClaimChallengeNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ClaimNoPersonalTeamCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim.no_personal_team")
-		{
-			s := s.ClaimNoPersonalTeam
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ClaimPersonalTeamNotActiveCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim.personal_team_not_active")
-		{
-			s := s.ClaimPersonalTeamNotActive
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjAlreadyClaimedCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.already_claimed")
-		{
-			s := s.ProjAlreadyClaimed
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimExpiredCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.claim_expired")
-		{
-			s := s.ProjClaimExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimWindowExpiredCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.claim_window_expired")
-		{
-			s := s.ProjClaimWindowExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNotFoundCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SessNotFoundCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("sess.not_found")
-		{
-			s := s.SessNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCompleteClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CompleteClaimErrorResponse from json.
-func (s *CompleteClaimErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidCompleteClaimErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCompleteClaimErrorResponse
-					found = true
-				case "claim_challenge.not_found":
-					s.Type = ClaimChallengeNotFoundCompleteClaimErrorResponse
-					found = true
-				case "claim.no_personal_team":
-					s.Type = ClaimNoPersonalTeamCompleteClaimErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCompleteClaimErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCompleteClaimErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCompleteClaimErrorResponse
-					found = true
-				case "claim.personal_team_not_active":
-					s.Type = ClaimPersonalTeamNotActiveCompleteClaimErrorResponse
-					found = true
-				case "proj.already_claimed":
-					s.Type = ProjAlreadyClaimedCompleteClaimErrorResponse
-					found = true
-				case "proj.claim_expired":
-					s.Type = ProjClaimExpiredCompleteClaimErrorResponse
-					found = true
-				case "proj.claim_window_expired":
-					s.Type = ProjClaimWindowExpiredCompleteClaimErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundCompleteClaimErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCompleteClaimErrorResponse
-					found = true
-				case "sess.not_found":
-					s.Type = SessNotFoundCompleteClaimErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCompleteClaimErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidCompleteClaimErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedCompleteClaimErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case ClaimChallengeNotFoundCompleteClaimErrorResponse:
-		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ClaimNoPersonalTeamCompleteClaimErrorResponse:
-		if err := s.ClaimNoPersonalTeam.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCompleteClaimErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalCompleteClaimErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCompleteClaimErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ClaimPersonalTeamNotActiveCompleteClaimErrorResponse:
-		if err := s.ClaimPersonalTeamNotActive.Decode(d); err != nil {
-			return err
-		}
-	case ProjAlreadyClaimedCompleteClaimErrorResponse:
-		if err := s.ProjAlreadyClaimed.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimExpiredCompleteClaimErrorResponse:
-		if err := s.ProjClaimExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimWindowExpiredCompleteClaimErrorResponse:
-		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjNotFoundCompleteClaimErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCompleteClaimErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case SessNotFoundCompleteClaimErrorResponse:
-		if err := s.SessNotFound.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCompleteClaimErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CompleteClaimErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CompleteClaimForbidden as json.
-func (s CompleteClaimForbidden) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CompleteClaimForbidden) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case ClaimNoPersonalTeamCompleteClaimForbidden:
-		e.FieldStart("code")
-		e.Str("claim.no_personal_team")
-		{
-			s := s.ClaimNoPersonalTeam
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ClaimPersonalTeamNotActiveCompleteClaimForbidden:
-		e.FieldStart("code")
-		e.Str("claim.personal_team_not_active")
-		{
-			s := s.ClaimPersonalTeamNotActive
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthCsrfInvalidCompleteClaimForbidden:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CompleteClaimForbidden from json.
-func (s *CompleteClaimForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimForbidden to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "claim.no_personal_team":
-					s.Type = ClaimNoPersonalTeamCompleteClaimForbidden
-					found = true
-				case "claim.personal_team_not_active":
-					s.Type = ClaimPersonalTeamNotActiveCompleteClaimForbidden
-					found = true
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidCompleteClaimForbidden
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case ClaimNoPersonalTeamCompleteClaimForbidden:
-		if err := s.ClaimNoPersonalTeam.Decode(d); err != nil {
-			return err
-		}
-	case ClaimPersonalTeamNotActiveCompleteClaimForbidden:
-		if err := s.ClaimPersonalTeamNotActive.Decode(d); err != nil {
-			return err
-		}
-	case AuthCsrfInvalidCompleteClaimForbidden:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CompleteClaimForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CompleteClaimGone as json.
-func (s CompleteClaimGone) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CompleteClaimGone) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case ProjClaimExpiredCompleteClaimGone:
-		e.FieldStart("code")
-		e.Str("proj.claim_expired")
-		{
-			s := s.ProjClaimExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimWindowExpiredCompleteClaimGone:
-		e.FieldStart("code")
-		e.Str("proj.claim_window_expired")
-		{
-			s := s.ProjClaimWindowExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CompleteClaimGone from json.
-func (s *CompleteClaimGone) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimGone to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "proj.claim_expired":
-					s.Type = ProjClaimExpiredCompleteClaimGone
-					found = true
-				case "proj.claim_window_expired":
-					s.Type = ProjClaimWindowExpiredCompleteClaimGone
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case ProjClaimExpiredCompleteClaimGone:
-		if err := s.ProjClaimExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimWindowExpiredCompleteClaimGone:
-		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CompleteClaimGone) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimGone) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CompleteClaimNotFound as json.
-func (s *CompleteClaimNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CompleteClaimNotFound from json.
-func (s *CompleteClaimNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CompleteClaimNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CompleteClaimNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *CompleteClaimRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -23347,17 +22163,17 @@ func (s *CompleteClaimResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CompleteClaimTooManyRequests as json.
-func (s *CompleteClaimTooManyRequests) Encode(e *jx.Encoder) {
+// Encode encodes CompleteProjectClaimBadRequest as json.
+func (s *CompleteProjectClaimBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes CompleteClaimTooManyRequests from json.
-func (s *CompleteClaimTooManyRequests) Decode(d *jx.Decoder) error {
+// Decode decodes CompleteProjectClaimBadRequest from json.
+func (s *CompleteProjectClaimBadRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode CompleteClaimTooManyRequests to nil")
+		return errors.New("invalid: unable to decode CompleteProjectClaimBadRequest to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -23368,19 +22184,1477 @@ func (s *CompleteClaimTooManyRequests) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = CompleteClaimTooManyRequests(unwrapped)
+	*s = CompleteProjectClaimBadRequest(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *CompleteClaimTooManyRequests) MarshalJSON() ([]byte, error) {
+func (s *CompleteProjectClaimBadRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CompleteClaimTooManyRequests) UnmarshalJSON(data []byte) error {
+func (s *CompleteProjectClaimBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteProjectClaimErrorResponse as json.
+func (s CompleteProjectClaimErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CompleteProjectClaimErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthCsrfInvalidCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimChallengeNotFoundCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim_challenge.not_found")
+		{
+			s := s.ClaimChallengeNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimNoPersonalTeamCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim.no_personal_team")
+		{
+			s := s.ClaimNoPersonalTeam
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim.personal_team_not_active")
+		{
+			s := s.ClaimPersonalTeamNotActive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjAlreadyClaimedCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.already_claimed")
+		{
+			s := s.ProjAlreadyClaimed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimExpiredCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.claim_expired")
+		{
+			s := s.ProjClaimExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimWindowExpiredCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.claim_window_expired")
+		{
+			s := s.ProjClaimWindowExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SessNotFoundCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.not_found")
+		{
+			s := s.SessNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCompleteProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CompleteProjectClaimErrorResponse from json.
+func (s *CompleteProjectClaimErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteProjectClaimErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCompleteProjectClaimErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCompleteProjectClaimErrorResponse
+					found = true
+				case "claim_challenge.not_found":
+					s.Type = ClaimChallengeNotFoundCompleteProjectClaimErrorResponse
+					found = true
+				case "claim.no_personal_team":
+					s.Type = ClaimNoPersonalTeamCompleteProjectClaimErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCompleteProjectClaimErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCompleteProjectClaimErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCompleteProjectClaimErrorResponse
+					found = true
+				case "claim.personal_team_not_active":
+					s.Type = ClaimPersonalTeamNotActiveCompleteProjectClaimErrorResponse
+					found = true
+				case "proj.already_claimed":
+					s.Type = ProjAlreadyClaimedCompleteProjectClaimErrorResponse
+					found = true
+				case "proj.claim_expired":
+					s.Type = ProjClaimExpiredCompleteProjectClaimErrorResponse
+					found = true
+				case "proj.claim_window_expired":
+					s.Type = ProjClaimWindowExpiredCompleteProjectClaimErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundCompleteProjectClaimErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCompleteProjectClaimErrorResponse
+					found = true
+				case "sess.not_found":
+					s.Type = SessNotFoundCompleteProjectClaimErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCompleteProjectClaimErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthCsrfInvalidCompleteProjectClaimErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedCompleteProjectClaimErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case ClaimChallengeNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ClaimNoPersonalTeamCompleteProjectClaimErrorResponse:
+		if err := s.ClaimNoPersonalTeam.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCompleteProjectClaimErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalCompleteProjectClaimErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCompleteProjectClaimErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimErrorResponse:
+		if err := s.ClaimPersonalTeamNotActive.Decode(d); err != nil {
+			return err
+		}
+	case ProjAlreadyClaimedCompleteProjectClaimErrorResponse:
+		if err := s.ProjAlreadyClaimed.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimExpiredCompleteProjectClaimErrorResponse:
+		if err := s.ProjClaimExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimWindowExpiredCompleteProjectClaimErrorResponse:
+		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCompleteProjectClaimErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessNotFoundCompleteProjectClaimErrorResponse:
+		if err := s.SessNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCompleteProjectClaimErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CompleteProjectClaimErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteProjectClaimErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteProjectClaimForbidden as json.
+func (s CompleteProjectClaimForbidden) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CompleteProjectClaimForbidden) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ClaimNoPersonalTeamCompleteProjectClaimForbidden:
+		e.FieldStart("code")
+		e.Str("claim.no_personal_team")
+		{
+			s := s.ClaimNoPersonalTeam
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimForbidden:
+		e.FieldStart("code")
+		e.Str("claim.personal_team_not_active")
+		{
+			s := s.ClaimPersonalTeamNotActive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthCsrfInvalidCompleteProjectClaimForbidden:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CompleteProjectClaimForbidden from json.
+func (s *CompleteProjectClaimForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteProjectClaimForbidden to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "claim.no_personal_team":
+					s.Type = ClaimNoPersonalTeamCompleteProjectClaimForbidden
+					found = true
+				case "claim.personal_team_not_active":
+					s.Type = ClaimPersonalTeamNotActiveCompleteProjectClaimForbidden
+					found = true
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCompleteProjectClaimForbidden
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ClaimNoPersonalTeamCompleteProjectClaimForbidden:
+		if err := s.ClaimNoPersonalTeam.Decode(d); err != nil {
+			return err
+		}
+	case ClaimPersonalTeamNotActiveCompleteProjectClaimForbidden:
+		if err := s.ClaimPersonalTeamNotActive.Decode(d); err != nil {
+			return err
+		}
+	case AuthCsrfInvalidCompleteProjectClaimForbidden:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CompleteProjectClaimForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteProjectClaimForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteProjectClaimGone as json.
+func (s CompleteProjectClaimGone) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CompleteProjectClaimGone) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ProjClaimExpiredCompleteProjectClaimGone:
+		e.FieldStart("code")
+		e.Str("proj.claim_expired")
+		{
+			s := s.ProjClaimExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimWindowExpiredCompleteProjectClaimGone:
+		e.FieldStart("code")
+		e.Str("proj.claim_window_expired")
+		{
+			s := s.ProjClaimWindowExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CompleteProjectClaimGone from json.
+func (s *CompleteProjectClaimGone) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteProjectClaimGone to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "proj.claim_expired":
+					s.Type = ProjClaimExpiredCompleteProjectClaimGone
+					found = true
+				case "proj.claim_window_expired":
+					s.Type = ProjClaimWindowExpiredCompleteProjectClaimGone
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ProjClaimExpiredCompleteProjectClaimGone:
+		if err := s.ProjClaimExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimWindowExpiredCompleteProjectClaimGone:
+		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CompleteProjectClaimGone) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteProjectClaimGone) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteProjectClaimNotFound as json.
+func (s *CompleteProjectClaimNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteProjectClaimNotFound from json.
+func (s *CompleteProjectClaimNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteProjectClaimNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteProjectClaimNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteProjectClaimNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteProjectClaimNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteProjectClaimTooManyRequests as json.
+func (s *CompleteProjectClaimTooManyRequests) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteProjectClaimTooManyRequests from json.
+func (s *CompleteProjectClaimTooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteProjectClaimTooManyRequests to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteProjectClaimTooManyRequests(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteProjectClaimTooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteProjectClaimTooManyRequests) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationBadRequest as json.
+func (s *CompleteUserPasskeyRegistrationBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationBadRequest from json.
+func (s *CompleteUserPasskeyRegistrationBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteUserPasskeyRegistrationBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteUserPasskeyRegistrationBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationErrorResponse as json.
+func (s CompleteUserPasskeyRegistrationErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CompleteUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AttAlreadyHandedOffCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.already_handed_off")
+		{
+			s := s.AttAlreadyHandedOff
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidProofCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_proof")
+		{
+			s := s.AttInvalidProof
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidRequestCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_request")
+		{
+			s := s.AttInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidStateCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_state")
+		{
+			s := s.AttInvalidState
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_found")
+		{
+			s := s.AttNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttProofRejectedCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.proof_rejected")
+		{
+			s := s.AttProofRejected
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttStaleChallengeCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.stale_challenge")
+		{
+			s := s.AttStaleChallenge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.invalid")
+		{
+			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordEmptyCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_empty")
+		{
+			s := s.UserPasswordEmpty
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordHashingBusyCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordPolicyViolationCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_policy_violation")
+		{
+			s := s.UserPasswordPolicyViolation
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordTooLongCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_too_long")
+		{
+			s := s.UserPasswordTooLong
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPermissionDeniedCompleteUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.permission_denied")
+		{
+			s := s.UserPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationErrorResponse from json.
+func (s *CompleteUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "att.already_handed_off":
+					s.Type = AttAlreadyHandedOffCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.invalid_proof":
+					s.Type = AttInvalidProofCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.invalid_request":
+					s.Type = AttInvalidRequestCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.invalid_state":
+					s.Type = AttInvalidStateCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.not_found":
+					s.Type = AttNotFoundCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.proof_rejected":
+					s.Type = AttProofRejectedCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.stale_challenge":
+					s.Type = AttStaleChallengeCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.invalid":
+					s.Type = UserInvalidCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.password_empty":
+					s.Type = UserPasswordEmptyCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.password_policy_violation":
+					s.Type = UserPasswordPolicyViolationCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.password_too_long":
+					s.Type = UserPasswordTooLongCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.permission_denied":
+					s.Type = UserPermissionDeniedCompleteUserPasskeyRegistrationErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AttAlreadyHandedOffCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidProofCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidProof.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidRequestCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidRequest.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidStateCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidState.Decode(d); err != nil {
+			return err
+		}
+	case AttNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AttProofRejectedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttProofRejected.Decode(d); err != nil {
+			return err
+		}
+	case AttStaleChallengeCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AttStaleChallenge.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case UserInvalidCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordEmptyCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordPolicyViolationCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordPolicyViolation.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordTooLongCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordTooLong.Decode(d); err != nil {
+			return err
+		}
+	case UserPermissionDeniedCompleteUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CompleteUserPasskeyRegistrationErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationForbidden as json.
+func (s *CompleteUserPasskeyRegistrationForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationForbidden from json.
+func (s *CompleteUserPasskeyRegistrationForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteUserPasskeyRegistrationForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteUserPasskeyRegistrationForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationInternalServerError as json.
+func (s *CompleteUserPasskeyRegistrationInternalServerError) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationInternalServerError from json.
+func (s *CompleteUserPasskeyRegistrationInternalServerError) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationInternalServerError to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteUserPasskeyRegistrationInternalServerError(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteUserPasskeyRegistrationInternalServerError) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationInternalServerError) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationNotFound as json.
+func (s *CompleteUserPasskeyRegistrationNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationNotFound from json.
+func (s *CompleteUserPasskeyRegistrationNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteUserPasskeyRegistrationNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteUserPasskeyRegistrationNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteUserPasskeyRegistrationUnauthorized as json.
+func (s *CompleteUserPasskeyRegistrationUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteUserPasskeyRegistrationUnauthorized from json.
+func (s *CompleteUserPasskeyRegistrationUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteUserPasskeyRegistrationUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteUserPasskeyRegistrationUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteUserPasskeyRegistrationUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteUserPasskeyRegistrationUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -23982,578 +24256,6 @@ func (s *ConfigurationBundleSchemasItem) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CreateApplicationBadRequest as json.
-func (s *CreateApplicationBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationBadRequest from json.
-func (s *CreateApplicationBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationConflict as json.
-func (s *CreateApplicationConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationConflict from json.
-func (s *CreateApplicationConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationCreated as json.
-func (s *CreateApplicationCreated) Encode(e *jx.Encoder) {
-	unwrapped := (*CreateApplicationResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationCreated from json.
-func (s *CreateApplicationCreated) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationCreated to nil")
-	}
-	var unwrapped CreateApplicationResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationCreated(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationCreated) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationCreated) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationErrorResponse as json.
-func (s CreateApplicationErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateApplicationErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AppClientIDTakenCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.client_id_taken")
-		{
-			s := s.AppClientIDTaken
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AppFieldImmutableCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.field_immutable")
-		{
-			s := s.AppFieldImmutable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AppInvalidCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.invalid")
-		{
-			s := s.AppInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AppNotFoundCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.not_found")
-		{
-			s := s.AppNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AppPermissionDeniedCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.permission_denied")
-		{
-			s := s.AppPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AppRevisionConflictCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("app.revision_conflict")
-		{
-			s := s.AppRevisionConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateApplicationErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateApplicationErrorResponse from json.
-func (s *CreateApplicationErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "app.client_id_taken":
-					s.Type = AppClientIDTakenCreateApplicationErrorResponse
-					found = true
-				case "app.field_immutable":
-					s.Type = AppFieldImmutableCreateApplicationErrorResponse
-					found = true
-				case "app.invalid":
-					s.Type = AppInvalidCreateApplicationErrorResponse
-					found = true
-				case "app.not_found":
-					s.Type = AppNotFoundCreateApplicationErrorResponse
-					found = true
-				case "app.permission_denied":
-					s.Type = AppPermissionDeniedCreateApplicationErrorResponse
-					found = true
-				case "app.revision_conflict":
-					s.Type = AppRevisionConflictCreateApplicationErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateApplicationErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateApplicationErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateApplicationErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateApplicationErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateApplicationErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateApplicationErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AppClientIDTakenCreateApplicationErrorResponse:
-		if err := s.AppClientIDTaken.Decode(d); err != nil {
-			return err
-		}
-	case AppFieldImmutableCreateApplicationErrorResponse:
-		if err := s.AppFieldImmutable.Decode(d); err != nil {
-			return err
-		}
-	case AppInvalidCreateApplicationErrorResponse:
-		if err := s.AppInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AppNotFoundCreateApplicationErrorResponse:
-		if err := s.AppNotFound.Decode(d); err != nil {
-			return err
-		}
-	case AppPermissionDeniedCreateApplicationErrorResponse:
-		if err := s.AppPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case AppRevisionConflictCreateApplicationErrorResponse:
-		if err := s.AppRevisionConflict.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedCreateApplicationErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateApplicationErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateApplicationErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateApplicationErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateApplicationErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateApplicationErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateApplicationErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationForbidden as json.
-func (s *CreateApplicationForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationForbidden from json.
-func (s *CreateApplicationForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationNotFound as json.
-func (s *CreateApplicationNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationNotFound from json.
-func (s *CreateApplicationNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateApplicationOK as json.
-func (s *CreateApplicationOK) Encode(e *jx.Encoder) {
-	unwrapped := (*CreateApplicationResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateApplicationOK from json.
-func (s *CreateApplicationOK) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationOK to nil")
-	}
-	var unwrapped CreateApplicationResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateApplicationOK(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationOK) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationOK) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *CreateApplicationRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -24855,40 +24557,277 @@ func (s *CreateApplicationResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CreateApplicationUnauthorized as json.
-func (s *CreateApplicationUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
+// Encode encodes CreateAuthAttemptChallengeErrorResponse as json.
+func (s CreateAuthAttemptChallengeErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
 }
 
-// Decode decodes CreateApplicationUnauthorized from json.
-func (s *CreateApplicationUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateApplicationUnauthorized to nil")
+func (s CreateAuthAttemptChallengeErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.already_handed_off")
+		{
+			s := s.AttAlreadyHandedOff
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidRequestCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_request")
+		{
+			s := s.AttInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidStateCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_state")
+		{
+			s := s.AttInvalidState
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttNotFoundCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_found")
+		{
+			s := s.AttNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateAuthAttemptChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
+}
+
+// Decode decodes CreateAuthAttemptChallengeErrorResponse from json.
+func (s *CreateAuthAttemptChallengeErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateAuthAttemptChallengeErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "att.already_handed_off":
+					s.Type = AttAlreadyHandedOffCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "att.invalid_request":
+					s.Type = AttInvalidRequestCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "att.invalid_state":
+					s.Type = AttInvalidStateCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "att.not_found":
+					s.Type = AttNotFoundCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCreateAuthAttemptChallengeErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateAuthAttemptChallengeErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
 			return err
 		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
+	case AttInvalidRequestCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidRequest.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidStateCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttInvalidState.Decode(d); err != nil {
+			return err
+		}
+	case AttNotFoundCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedCreateAuthAttemptChallengeErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalCreateAuthAttemptChallengeErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCreateAuthAttemptChallengeErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCreateAuthAttemptChallengeErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateAuthAttemptChallengeErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	*s = CreateApplicationUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *CreateApplicationUnauthorized) MarshalJSON() ([]byte, error) {
+func (s CreateAuthAttemptChallengeErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateApplicationUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *CreateAuthAttemptChallengeErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -25352,6 +25291,304 @@ func (s *CreateAuthAttemptErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes CreateAuthAttemptHandoffErrorResponse as json.
+func (s CreateAuthAttemptHandoffErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CreateAuthAttemptHandoffErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.already_handed_off")
+		{
+			s := s.AttAlreadyHandedOff
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidStateCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_state")
+		{
+			s := s.AttInvalidState
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttNotCompletedCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_completed")
+		{
+			s := s.AttNotCompleted
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttNotFoundCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_found")
+		{
+			s := s.AttNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateAuthAttemptHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CreateAuthAttemptHandoffErrorResponse from json.
+func (s *CreateAuthAttemptHandoffErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateAuthAttemptHandoffErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "att.already_handed_off":
+					s.Type = AttAlreadyHandedOffCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "att.invalid_state":
+					s.Type = AttInvalidStateCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "att.not_completed":
+					s.Type = AttNotCompletedCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "att.not_found":
+					s.Type = AttNotFoundCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCreateAuthAttemptHandoffErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateAuthAttemptHandoffErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AttAlreadyHandedOffCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidStateCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttInvalidState.Decode(d); err != nil {
+			return err
+		}
+	case AttNotCompletedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttNotCompleted.Decode(d); err != nil {
+			return err
+		}
+	case AttNotFoundCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateAuthAttemptHandoffErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalCreateAuthAttemptHandoffErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCreateAuthAttemptHandoffErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCreateAuthAttemptHandoffErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateAuthAttemptHandoffErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CreateAuthAttemptHandoffErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateAuthAttemptHandoffErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *CreateAuthAttemptRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -25493,304 +25730,6 @@ func (s *CreateAuthAttemptRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateAuthAttemptRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateBrandingErrorResponse as json.
-func (s CreateBrandingErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateBrandingErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case BrndInvalidCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("brnd.invalid")
-		{
-			s := s.BrndInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case BrndMissingProjectIDCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("brnd.missing_project_id")
-		{
-			s := s.BrndMissingProjectID
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case BrndNotFoundCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("brnd.not_found")
-		{
-			s := s.BrndNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case BrndPermissionDeniedCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("brnd.permission_denied")
-		{
-			s := s.BrndPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateBrandingErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateBrandingErrorResponse from json.
-func (s *CreateBrandingErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateBrandingErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateBrandingErrorResponse
-					found = true
-				case "brnd.invalid":
-					s.Type = BrndInvalidCreateBrandingErrorResponse
-					found = true
-				case "brnd.missing_project_id":
-					s.Type = BrndMissingProjectIDCreateBrandingErrorResponse
-					found = true
-				case "brnd.not_found":
-					s.Type = BrndNotFoundCreateBrandingErrorResponse
-					found = true
-				case "brnd.permission_denied":
-					s.Type = BrndPermissionDeniedCreateBrandingErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateBrandingErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateBrandingErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateBrandingErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateBrandingErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateBrandingErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedCreateBrandingErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case BrndInvalidCreateBrandingErrorResponse:
-		if err := s.BrndInvalid.Decode(d); err != nil {
-			return err
-		}
-	case BrndMissingProjectIDCreateBrandingErrorResponse:
-		if err := s.BrndMissingProjectID.Decode(d); err != nil {
-			return err
-		}
-	case BrndNotFoundCreateBrandingErrorResponse:
-		if err := s.BrndNotFound.Decode(d); err != nil {
-			return err
-		}
-	case BrndPermissionDeniedCreateBrandingErrorResponse:
-		if err := s.BrndPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateBrandingErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateBrandingErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateBrandingErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateBrandingErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateBrandingErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateBrandingErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateBrandingErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -26832,350 +26771,6 @@ func (s *CreateFlowConflict) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateFlowConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateFlowDefinitionErrorResponse as json.
-func (s CreateFlowDefinitionErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefInvalidCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.invalid")
-		{
-			s := s.FlowdefInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefNotFoundCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.not_found")
-		{
-			s := s.FlowdefNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.permission_denied")
-		{
-			s := s.FlowdefPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefRevisionConflictCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.revision_conflict")
-		{
-			s := s.FlowdefRevisionConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchNotFoundCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.not_found")
-		{
-			s := s.SchNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.schema_fetch_failed")
-		{
-			s := s.FlowdefSchemaFetchFailed
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateFlowDefinitionErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateFlowDefinitionErrorResponse from json.
-func (s *CreateFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateFlowDefinitionErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateFlowDefinitionErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateFlowDefinitionErrorResponse
-					found = true
-				case "flowdef.invalid":
-					s.Type = FlowdefInvalidCreateFlowDefinitionErrorResponse
-					found = true
-				case "flowdef.not_found":
-					s.Type = FlowdefNotFoundCreateFlowDefinitionErrorResponse
-					found = true
-				case "flowdef.permission_denied":
-					s.Type = FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse
-					found = true
-				case "flowdef.revision_conflict":
-					s.Type = FlowdefRevisionConflictCreateFlowDefinitionErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateFlowDefinitionErrorResponse
-					found = true
-				case "sch.not_found":
-					s.Type = SchNotFoundCreateFlowDefinitionErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateFlowDefinitionErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateFlowDefinitionErrorResponse
-					found = true
-				case "flowdef.schema_fetch_failed":
-					s.Type = FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateFlowDefinitionErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedCreateFlowDefinitionErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateFlowDefinitionErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefInvalidCreateFlowDefinitionErrorResponse:
-		if err := s.FlowdefInvalid.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefNotFoundCreateFlowDefinitionErrorResponse:
-		if err := s.FlowdefNotFound.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefPermissionDeniedCreateFlowDefinitionErrorResponse:
-		if err := s.FlowdefPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefRevisionConflictCreateFlowDefinitionErrorResponse:
-		if err := s.FlowdefRevisionConflict.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateFlowDefinitionErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case SchNotFoundCreateFlowDefinitionErrorResponse:
-		if err := s.SchNotFound.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateFlowDefinitionErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateFlowDefinitionErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse:
-		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateFlowDefinitionErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateFlowDefinitionErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateFlowDefinitionErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -29035,815 +28630,6 @@ func (s *CreateGrantUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CreateHandoffErrorResponse as json.
-func (s CreateHandoffErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateHandoffErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AttAlreadyHandedOffCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.already_handed_off")
-		{
-			s := s.AttAlreadyHandedOff
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidStateCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_state")
-		{
-			s := s.AttInvalidState
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttNotCompletedCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.not_completed")
-		{
-			s := s.AttNotCompleted
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttNotFoundCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.not_found")
-		{
-			s := s.AttNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateHandoffErrorResponse from json.
-func (s *CreateHandoffErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateHandoffErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "att.already_handed_off":
-					s.Type = AttAlreadyHandedOffCreateHandoffErrorResponse
-					found = true
-				case "att.invalid_state":
-					s.Type = AttInvalidStateCreateHandoffErrorResponse
-					found = true
-				case "att.not_completed":
-					s.Type = AttNotCompletedCreateHandoffErrorResponse
-					found = true
-				case "att.not_found":
-					s.Type = AttNotFoundCreateHandoffErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateHandoffErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateHandoffErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateHandoffErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateHandoffErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateHandoffErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateHandoffErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AttAlreadyHandedOffCreateHandoffErrorResponse:
-		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidStateCreateHandoffErrorResponse:
-		if err := s.AttInvalidState.Decode(d); err != nil {
-			return err
-		}
-	case AttNotCompletedCreateHandoffErrorResponse:
-		if err := s.AttNotCompleted.Decode(d); err != nil {
-			return err
-		}
-	case AttNotFoundCreateHandoffErrorResponse:
-		if err := s.AttNotFound.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedCreateHandoffErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateHandoffErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateHandoffErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateHandoffErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateHandoffErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateHandoffErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateHandoffErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateHandoffErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpBadRequest as json.
-func (s *CreateIdpBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpBadRequest from json.
-func (s *CreateIdpBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpCreated as json.
-func (s *CreateIdpCreated) Encode(e *jx.Encoder) {
-	unwrapped := (*IdpResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpCreated from json.
-func (s *CreateIdpCreated) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpCreated to nil")
-	}
-	var unwrapped IdpResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpCreated(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpCreated) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpCreated) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpErrorResponse as json.
-func (s CreateIdpErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateIdpErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpFieldImmutableCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.field_immutable")
-		{
-			s := s.IdpFieldImmutable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpNotFoundCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.not_found")
-		{
-			s := s.IdpNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpPermissionDeniedCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.permission_denied")
-		{
-			s := s.IdpPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpRevisionConflictCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.revision_conflict")
-		{
-			s := s.IdpRevisionConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpEndpointsPartialCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.endpoints_partial")
-		{
-			s := s.IdpEndpointsPartial
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateIdpErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateIdpErrorResponse from json.
-func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateIdpErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateIdpErrorResponse
-					found = true
-				case "idp.field_immutable":
-					s.Type = IdpFieldImmutableCreateIdpErrorResponse
-					found = true
-				case "idp.not_found":
-					s.Type = IdpNotFoundCreateIdpErrorResponse
-					found = true
-				case "idp.permission_denied":
-					s.Type = IdpPermissionDeniedCreateIdpErrorResponse
-					found = true
-				case "idp.revision_conflict":
-					s.Type = IdpRevisionConflictCreateIdpErrorResponse
-					found = true
-				case "idp.endpoints_partial":
-					s.Type = IdpEndpointsPartialCreateIdpErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateIdpErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateIdpErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateIdpErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateIdpErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedCreateIdpErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateIdpErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case IdpFieldImmutableCreateIdpErrorResponse:
-		if err := s.IdpFieldImmutable.Decode(d); err != nil {
-			return err
-		}
-	case IdpNotFoundCreateIdpErrorResponse:
-		if err := s.IdpNotFound.Decode(d); err != nil {
-			return err
-		}
-	case IdpPermissionDeniedCreateIdpErrorResponse:
-		if err := s.IdpPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case IdpRevisionConflictCreateIdpErrorResponse:
-		if err := s.IdpRevisionConflict.Decode(d); err != nil {
-			return err
-		}
-	case IdpEndpointsPartialCreateIdpErrorResponse:
-		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateIdpErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateIdpErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateIdpErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateIdpErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateIdpErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpForbidden as json.
-func (s *CreateIdpForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpForbidden from json.
-func (s *CreateIdpForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpNotFound as json.
-func (s *CreateIdpNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpNotFound from json.
-func (s *CreateIdpNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpOK as json.
-func (s *CreateIdpOK) Encode(e *jx.Encoder) {
-	unwrapped := (*IdpResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpOK from json.
-func (s *CreateIdpOK) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpOK to nil")
-	}
-	var unwrapped IdpResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpOK(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpOK) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpOK) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *CreateIdpRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -29934,44 +28720,6 @@ func (s *CreateIdpRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateIdpRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateIdpUnauthorized as json.
-func (s *CreateIdpUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateIdpUnauthorized from json.
-func (s *CreateIdpUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateIdpUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateIdpUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateIdpUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateIdpUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -32134,6 +30882,304 @@ func (s *CreateInvitationUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes CreateProjectClaimErrorResponse as json.
+func (s CreateProjectClaimErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CreateProjectClaimErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimChallengeInvalidCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim_challenge.invalid")
+		{
+			s := s.ClaimChallengeInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjAlreadyClaimedCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.already_claimed")
+		{
+			s := s.ProjAlreadyClaimed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimWindowExpiredCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.claim_window_expired")
+		{
+			s := s.ProjClaimWindowExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPermissionDeniedCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.permission_denied")
+		{
+			s := s.ProjPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateProjectClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CreateProjectClaimErrorResponse from json.
+func (s *CreateProjectClaimErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateProjectClaimErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCreateProjectClaimErrorResponse
+					found = true
+				case "claim_challenge.invalid":
+					s.Type = ClaimChallengeInvalidCreateProjectClaimErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCreateProjectClaimErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateProjectClaimErrorResponse
+					found = true
+				case "proj.already_claimed":
+					s.Type = ProjAlreadyClaimedCreateProjectClaimErrorResponse
+					found = true
+				case "proj.claim_window_expired":
+					s.Type = ProjClaimWindowExpiredCreateProjectClaimErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundCreateProjectClaimErrorResponse
+					found = true
+				case "proj.permission_denied":
+					s.Type = ProjPermissionDeniedCreateProjectClaimErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCreateProjectClaimErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateProjectClaimErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedCreateProjectClaimErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case ClaimChallengeInvalidCreateProjectClaimErrorResponse:
+		if err := s.ClaimChallengeInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalCreateProjectClaimErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCreateProjectClaimErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjAlreadyClaimedCreateProjectClaimErrorResponse:
+		if err := s.ProjAlreadyClaimed.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimWindowExpiredCreateProjectClaimErrorResponse:
+		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundCreateProjectClaimErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjPermissionDeniedCreateProjectClaimErrorResponse:
+		if err := s.ProjPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCreateProjectClaimErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateProjectClaimErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CreateProjectClaimErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateProjectClaimErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes CreateProjectErrorResponse as json.
 func (s CreateProjectErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -33588,681 +32634,6 @@ func (s *CreateReleaseRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateReleaseRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateSchemaErrorResponse as json.
-func (s CreateSchemaErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateSchemaErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchAlreadyExistsCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.already_exists")
-		{
-			s := s.SchAlreadyExists
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchFetchDeniedCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.fetch_denied")
-		{
-			s := s.SchFetchDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchFetchDowngradeCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.fetch_downgrade")
-		{
-			s := s.SchFetchDowngrade
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchFetchTimeoutCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.fetch_timeout")
-		{
-			s := s.SchFetchTimeout
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchFetchTooLargeCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.fetch_too_large")
-		{
-			s := s.SchFetchTooLarge
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchFetchTooManyRedirectsCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.fetch_too_many_redirects")
-		{
-			s := s.SchFetchTooManyRedirects
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchInvalidRequestCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.invalid_request")
-		{
-			s := s.SchInvalidRequest
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchNotFoundCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.not_found")
-		{
-			s := s.SchNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchPermissionDeniedCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.permission_denied")
-		{
-			s := s.SchPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchRevisionConflictCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.revision_conflict")
-		{
-			s := s.SchRevisionConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableCreateSchemaErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes CreateSchemaErrorResponse from json.
-func (s *CreateSchemaErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateSchemaErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidCreateSchemaErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalCreateSchemaErrorResponse
-					found = true
-				case "sch.already_exists":
-					s.Type = SchAlreadyExistsCreateSchemaErrorResponse
-					found = true
-				case "sch.fetch_denied":
-					s.Type = SchFetchDeniedCreateSchemaErrorResponse
-					found = true
-				case "sch.fetch_downgrade":
-					s.Type = SchFetchDowngradeCreateSchemaErrorResponse
-					found = true
-				case "sch.fetch_timeout":
-					s.Type = SchFetchTimeoutCreateSchemaErrorResponse
-					found = true
-				case "sch.fetch_too_large":
-					s.Type = SchFetchTooLargeCreateSchemaErrorResponse
-					found = true
-				case "sch.fetch_too_many_redirects":
-					s.Type = SchFetchTooManyRedirectsCreateSchemaErrorResponse
-					found = true
-				case "sch.invalid_request":
-					s.Type = SchInvalidRequestCreateSchemaErrorResponse
-					found = true
-				case "sch.not_found":
-					s.Type = SchNotFoundCreateSchemaErrorResponse
-					found = true
-				case "sch.permission_denied":
-					s.Type = SchPermissionDeniedCreateSchemaErrorResponse
-					found = true
-				case "sch.revision_conflict":
-					s.Type = SchRevisionConflictCreateSchemaErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedCreateSchemaErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidCreateSchemaErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableCreateSchemaErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedCreateSchemaErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidCreateSchemaErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalCreateSchemaErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case SchAlreadyExistsCreateSchemaErrorResponse:
-		if err := s.SchAlreadyExists.Decode(d); err != nil {
-			return err
-		}
-	case SchFetchDeniedCreateSchemaErrorResponse:
-		if err := s.SchFetchDenied.Decode(d); err != nil {
-			return err
-		}
-	case SchFetchDowngradeCreateSchemaErrorResponse:
-		if err := s.SchFetchDowngrade.Decode(d); err != nil {
-			return err
-		}
-	case SchFetchTimeoutCreateSchemaErrorResponse:
-		if err := s.SchFetchTimeout.Decode(d); err != nil {
-			return err
-		}
-	case SchFetchTooLargeCreateSchemaErrorResponse:
-		if err := s.SchFetchTooLarge.Decode(d); err != nil {
-			return err
-		}
-	case SchFetchTooManyRedirectsCreateSchemaErrorResponse:
-		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
-			return err
-		}
-	case SchInvalidRequestCreateSchemaErrorResponse:
-		if err := s.SchInvalidRequest.Decode(d); err != nil {
-			return err
-		}
-	case SchNotFoundCreateSchemaErrorResponse:
-		if err := s.SchNotFound.Decode(d); err != nil {
-			return err
-		}
-	case SchPermissionDeniedCreateSchemaErrorResponse:
-		if err := s.SchPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case SchRevisionConflictCreateSchemaErrorResponse:
-		if err := s.SchRevisionConflict.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedCreateSchemaErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidCreateSchemaErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableCreateSchemaErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateSchemaErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateSchemaReq as json.
-func (s CreateSchemaReq) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case UserSchemaCreateSchemaReq:
-		e.FieldStart("kind")
-		e.Str("user-schema")
-		{
-			s := s.UserSchema
-			{
-				e.FieldStart("$schema")
-				e.Str("https://json-schema.org/draft/2020-12/schema")
-			}
-			{
-				e.FieldStart("objectType")
-				e.Str(s.ObjectType)
-			}
-			{
-				e.FieldStart("metaSchema")
-				json.EncodeURI(e, s.MetaSchema)
-			}
-			{
-				e.FieldStart("x-auth-methods")
-				s.XMinusAuthMinusMethods.Encode(e)
-			}
-			{
-				if s.XMinusIdentifier.Set {
-					e.FieldStart("x-identifier")
-					s.XMinusIdentifier.Encode(e)
-				}
-			}
-			{
-				if s.XMinusDisplay != nil {
-					e.FieldStart("x-display")
-					e.ArrStart()
-					for _, elem := range s.XMinusDisplay {
-						e.Str(elem)
-					}
-					e.ArrEnd()
-				}
-			}
-			{
-				if s.Properties.Set {
-					e.FieldStart("properties")
-					s.Properties.Encode(e)
-				}
-			}
-			for k, elem := range s.AdditionalProps {
-				e.FieldStart(k)
-
-				if len(elem) != 0 {
-					e.Raw(elem)
-				}
-			}
-		}
-	case SchemaURLCreateSchemaReq:
-		e.FieldStart("kind")
-		e.Str("schema-url")
-		{
-			s := s.SchemaURL
-			{
-				e.FieldStart("url")
-				json.EncodeURI(e, s.URL)
-			}
-		}
-	}
-}
-
-// Decode decodes CreateSchemaReq from json.
-func (s *CreateSchemaReq) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaReq to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "kind":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "user-schema":
-					s.Type = UserSchemaCreateSchemaReq
-					found = true
-				case "schema-url":
-					s.Type = SchemaURLCreateSchemaReq
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case UserSchemaCreateSchemaReq:
-		if err := s.UserSchema.Decode(d); err != nil {
-			return err
-		}
-	case SchemaURLCreateSchemaReq:
-		if err := s.SchemaURL.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s CreateSchemaReq) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaReq) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *CreateSchemaResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *CreateSchemaResponse) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("id")
-		e.Str(s.ID)
-	}
-}
-
-var jsonFieldsNameOfCreateSchemaResponse = [1]string{
-	0: "id",
-}
-
-// Decode decodes CreateSchemaResponse from json.
-func (s *CreateSchemaResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateSchemaResponse to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.ID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode CreateSchemaResponse")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfCreateSchemaResponse) {
-					name = jsonFieldsNameOfCreateSchemaResponse[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateSchemaResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateSchemaResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -36043,6 +34414,563 @@ func (s *CreateUserInternalServerError) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes CreateUserPasskeyRegistrationBadRequest as json.
+func (s *CreateUserPasskeyRegistrationBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateUserPasskeyRegistrationBadRequest from json.
+func (s *CreateUserPasskeyRegistrationBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateUserPasskeyRegistrationBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateUserPasskeyRegistrationBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateUserPasskeyRegistrationErrorResponse as json.
+func (s CreateUserPasskeyRegistrationErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s CreateUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AttAlreadyHandedOffCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.already_handed_off")
+		{
+			s := s.AttAlreadyHandedOff
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidRequestCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_request")
+		{
+			s := s.AttInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttInvalidStateCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.invalid_state")
+		{
+			s := s.AttInvalidState
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_found")
+		{
+			s := s.AttNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserInvalidCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.invalid")
+		{
+			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPermissionDeniedCreateUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.permission_denied")
+		{
+			s := s.UserPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes CreateUserPasskeyRegistrationErrorResponse from json.
+func (s *CreateUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "att.already_handed_off":
+					s.Type = AttAlreadyHandedOffCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.invalid_request":
+					s.Type = AttInvalidRequestCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.invalid_state":
+					s.Type = AttInvalidStateCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "att.not_found":
+					s.Type = AttNotFoundCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.invalid":
+					s.Type = UserInvalidCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.permission_denied":
+					s.Type = UserPermissionDeniedCreateUserPasskeyRegistrationErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AttAlreadyHandedOffCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidRequestCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidRequest.Decode(d); err != nil {
+			return err
+		}
+	case AttInvalidStateCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttInvalidState.Decode(d); err != nil {
+			return err
+		}
+	case AttNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case UserInvalidCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPermissionDeniedCreateUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s CreateUserPasskeyRegistrationErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateUserPasskeyRegistrationForbidden as json.
+func (s *CreateUserPasskeyRegistrationForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateUserPasskeyRegistrationForbidden from json.
+func (s *CreateUserPasskeyRegistrationForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateUserPasskeyRegistrationForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateUserPasskeyRegistrationForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateUserPasskeyRegistrationInternalServerError as json.
+func (s *CreateUserPasskeyRegistrationInternalServerError) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateUserPasskeyRegistrationInternalServerError from json.
+func (s *CreateUserPasskeyRegistrationInternalServerError) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationInternalServerError to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateUserPasskeyRegistrationInternalServerError(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateUserPasskeyRegistrationInternalServerError) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationInternalServerError) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateUserPasskeyRegistrationNotFound as json.
+func (s *CreateUserPasskeyRegistrationNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateUserPasskeyRegistrationNotFound from json.
+func (s *CreateUserPasskeyRegistrationNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateUserPasskeyRegistrationNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateUserPasskeyRegistrationNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CreateUserPasskeyRegistrationUnauthorized as json.
+func (s *CreateUserPasskeyRegistrationUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CreateUserPasskeyRegistrationUnauthorized from json.
+func (s *CreateUserPasskeyRegistrationUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CreateUserPasskeyRegistrationUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CreateUserPasskeyRegistrationUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CreateUserPasskeyRegistrationUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CreateUserPasskeyRegistrationUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *CreateUserRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -36342,6 +35270,433 @@ func (s *CsrfTokenResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CsrfTokenResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateTeamBadRequest as json.
+func (s *DeactivateTeamBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateTeamBadRequest from json.
+func (s *DeactivateTeamBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateTeamBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateTeamBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateTeamBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateTeamBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateTeamConflict as json.
+func (s *DeactivateTeamConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateTeamConflict from json.
+func (s *DeactivateTeamConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateTeamConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateTeamConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateTeamConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateTeamConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateTeamErrorResponse as json.
+func (s DeactivateTeamErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s DeactivateTeamErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TeamTeamNotFoundDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("team.team_not_found")
+		{
+			s := s.TeamTeamNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TeamOwnsProjectDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("team.owns_project")
+		{
+			s := s.TeamOwnsProject
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TeamPermissionDeniedDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("team.permission_denied")
+		{
+			s := s.TeamPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableDeactivateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes DeactivateTeamErrorResponse from json.
+func (s *DeactivateTeamErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateTeamErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedDeactivateTeamErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidDeactivateTeamErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalDeactivateTeamErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeactivateTeamErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidDeactivateTeamErrorResponse
+					found = true
+				case "team.team_not_found":
+					s.Type = TeamTeamNotFoundDeactivateTeamErrorResponse
+					found = true
+				case "team.owns_project":
+					s.Type = TeamOwnsProjectDeactivateTeamErrorResponse
+					found = true
+				case "team.permission_denied":
+					s.Type = TeamPermissionDeniedDeactivateTeamErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableDeactivateTeamErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedDeactivateTeamErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidDeactivateTeamErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalDeactivateTeamErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedDeactivateTeamErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidDeactivateTeamErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case TeamTeamNotFoundDeactivateTeamErrorResponse:
+		if err := s.TeamTeamNotFound.Decode(d); err != nil {
+			return err
+		}
+	case TeamOwnsProjectDeactivateTeamErrorResponse:
+		if err := s.TeamOwnsProject.Decode(d); err != nil {
+			return err
+		}
+	case TeamPermissionDeniedDeactivateTeamErrorResponse:
+		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableDeactivateTeamErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DeactivateTeamErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateTeamErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateTeamForbidden as json.
+func (s *DeactivateTeamForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateTeamForbidden from json.
+func (s *DeactivateTeamForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateTeamForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateTeamForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateTeamForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateTeamForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateTeamUnauthorized as json.
+func (s *DeactivateTeamUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateTeamUnauthorized from json.
+func (s *DeactivateTeamUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateTeamUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateTeamUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateTeamUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateTeamUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -36735,17 +36090,17 @@ func (s *DeleteGrantUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes DeleteTeamBadRequest as json.
-func (s *DeleteTeamBadRequest) Encode(e *jx.Encoder) {
+// Encode encodes DeleteUserConflict as json.
+func (s *DeleteUserConflict) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes DeleteTeamBadRequest from json.
-func (s *DeleteTeamBadRequest) Decode(d *jx.Decoder) error {
+// Decode decodes DeleteUserConflict from json.
+func (s *DeleteUserConflict) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeleteTeamBadRequest to nil")
+		return errors.New("invalid: unable to decode DeleteUserConflict to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -36756,460 +36111,33 @@ func (s *DeleteTeamBadRequest) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = DeleteTeamBadRequest(unwrapped)
+	*s = DeleteUserConflict(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteTeamBadRequest) MarshalJSON() ([]byte, error) {
+func (s *DeleteUserConflict) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteTeamBadRequest) UnmarshalJSON(data []byte) error {
+func (s *DeleteUserConflict) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes DeleteTeamConflict as json.
-func (s *DeleteTeamConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes DeleteTeamConflict from json.
-func (s *DeleteTeamConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteTeamConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeleteTeamConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteTeamConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteTeamConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeleteTeamErrorResponse as json.
-func (s DeleteTeamErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes DeleteUserErrorResponse as json.
+func (s DeleteUserErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s DeleteTeamErrorResponse) encodeFields(e *jx.Encoder) {
+func (s DeleteUserErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case TeamTeamNotFoundDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.team_not_found")
-		{
-			s := s.TeamTeamNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case TeamOwnsProjectDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.owns_project")
-		{
-			s := s.TeamOwnsProject
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case TeamPermissionDeniedDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes DeleteTeamErrorResponse from json.
-func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteTeamErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedDeleteTeamErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidDeleteTeamErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalDeleteTeamErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedDeleteTeamErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidDeleteTeamErrorResponse
-					found = true
-				case "team.team_not_found":
-					s.Type = TeamTeamNotFoundDeleteTeamErrorResponse
-					found = true
-				case "team.owns_project":
-					s.Type = TeamOwnsProjectDeleteTeamErrorResponse
-					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedDeleteTeamErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableDeleteTeamErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedDeleteTeamErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidDeleteTeamErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalDeleteTeamErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedDeleteTeamErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidDeleteTeamErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamTeamNotFoundDeleteTeamErrorResponse:
-		if err := s.TeamTeamNotFound.Decode(d); err != nil {
-			return err
-		}
-	case TeamOwnsProjectDeleteTeamErrorResponse:
-		if err := s.TeamOwnsProject.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedDeleteTeamErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableDeleteTeamErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s DeleteTeamErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteTeamErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeleteTeamForbidden as json.
-func (s *DeleteTeamForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes DeleteTeamForbidden from json.
-func (s *DeleteTeamForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteTeamForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeleteTeamForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteTeamForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteTeamForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeleteTeamUnauthorized as json.
-func (s *DeleteTeamUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes DeleteTeamUnauthorized from json.
-func (s *DeleteTeamUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteTeamUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeleteTeamUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteTeamUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteTeamUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeleteUserByIDConflict as json.
-func (s *DeleteUserByIDConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes DeleteUserByIDConflict from json.
-func (s *DeleteUserByIDConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteUserByIDConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeleteUserByIDConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteUserByIDConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteUserByIDConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeleteUserByIDErrorResponse as json.
-func (s DeleteUserByIDErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidDeleteUserByIDErrorResponse:
+	case AuthCsrfInvalidDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.csrf_invalid")
 		{
@@ -37225,7 +36153,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedDeleteUserByIDErrorResponse:
+	case AuthUnauthorizedDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -37241,7 +36169,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EvtInvalidDeleteUserByIDErrorResponse:
+	case EvtInvalidDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("evt.invalid")
 		{
@@ -37257,7 +36185,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalDeleteUserByIDErrorResponse:
+	case InternalDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -37273,7 +36201,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedDeleteUserByIDErrorResponse:
+	case NotImplementedDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -37289,7 +36217,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastOwnerDeleteUserByIDErrorResponse:
+	case ProjLastOwnerDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.last_owner")
 		{
@@ -37305,7 +36233,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidDeleteUserByIDErrorResponse:
+	case ReqInvalidDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -37321,7 +36249,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableDeleteUserByIDErrorResponse:
+	case UnavailableDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -37337,7 +36265,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserNotFoundDeleteUserByIDErrorResponse:
+	case UserNotFoundDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
 		{
@@ -37353,7 +36281,7 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPermissionDeniedDeleteUserByIDErrorResponse:
+	case UserPermissionDeniedDeleteUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
 		{
@@ -37372,10 +36300,10 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes DeleteUserByIDErrorResponse from json.
-func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes DeleteUserErrorResponse from json.
+func (s *DeleteUserErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeleteUserByIDErrorResponse to nil")
+		return errors.New("invalid: unable to decode DeleteUserErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -37396,34 +36324,34 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidDeleteUserByIDErrorResponse
+					s.Type = AuthCsrfInvalidDeleteUserErrorResponse
 					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedDeleteUserByIDErrorResponse
+					s.Type = AuthUnauthorizedDeleteUserErrorResponse
 					found = true
 				case "evt.invalid":
-					s.Type = EvtInvalidDeleteUserByIDErrorResponse
+					s.Type = EvtInvalidDeleteUserErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalDeleteUserByIDErrorResponse
+					s.Type = InternalDeleteUserErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedDeleteUserByIDErrorResponse
+					s.Type = NotImplementedDeleteUserErrorResponse
 					found = true
 				case "proj.last_owner":
-					s.Type = ProjLastOwnerDeleteUserByIDErrorResponse
+					s.Type = ProjLastOwnerDeleteUserErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidDeleteUserByIDErrorResponse
+					s.Type = ReqInvalidDeleteUserErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableDeleteUserByIDErrorResponse
+					s.Type = UnavailableDeleteUserErrorResponse
 					found = true
 				case "user.not_found":
-					s.Type = UserNotFoundDeleteUserByIDErrorResponse
+					s.Type = UserNotFoundDeleteUserErrorResponse
 					found = true
 				case "user.permission_denied":
-					s.Type = UserPermissionDeniedDeleteUserByIDErrorResponse
+					s.Type = UserPermissionDeniedDeleteUserErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -37439,43 +36367,43 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthCsrfInvalidDeleteUserByIDErrorResponse:
+	case AuthCsrfInvalidDeleteUserErrorResponse:
 		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
 			return err
 		}
-	case AuthUnauthorizedDeleteUserByIDErrorResponse:
+	case AuthUnauthorizedDeleteUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EvtInvalidDeleteUserByIDErrorResponse:
+	case EvtInvalidDeleteUserErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
-	case InternalDeleteUserByIDErrorResponse:
+	case InternalDeleteUserErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedDeleteUserByIDErrorResponse:
+	case NotImplementedDeleteUserErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ProjLastOwnerDeleteUserByIDErrorResponse:
+	case ProjLastOwnerDeleteUserErrorResponse:
 		if err := s.ProjLastOwner.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidDeleteUserByIDErrorResponse:
+	case ReqInvalidDeleteUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableDeleteUserByIDErrorResponse:
+	case UnavailableDeleteUserErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
-	case UserNotFoundDeleteUserByIDErrorResponse:
+	case UserNotFoundDeleteUserErrorResponse:
 		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
-	case UserPermissionDeniedDeleteUserByIDErrorResponse:
+	case UserPermissionDeniedDeleteUserErrorResponse:
 		if err := s.UserPermissionDenied.Decode(d); err != nil {
 			return err
 		}
@@ -37486,29 +36414,29 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s DeleteUserByIDErrorResponse) MarshalJSON() ([]byte, error) {
+func (s DeleteUserErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteUserByIDErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *DeleteUserErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes DeleteUserByIDNotFound as json.
-func (s *DeleteUserByIDNotFound) Encode(e *jx.Encoder) {
+// Encode encodes DeleteUserNotFound as json.
+func (s *DeleteUserNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes DeleteUserByIDNotFound from json.
-func (s *DeleteUserByIDNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes DeleteUserNotFound from json.
+func (s *DeleteUserNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeleteUserByIDNotFound to nil")
+		return errors.New("invalid: unable to decode DeleteUserNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -37519,34 +36447,34 @@ func (s *DeleteUserByIDNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = DeleteUserByIDNotFound(unwrapped)
+	*s = DeleteUserNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteUserByIDNotFound) MarshalJSON() ([]byte, error) {
+func (s *DeleteUserNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteUserByIDNotFound) UnmarshalJSON(data []byte) error {
+func (s *DeleteUserNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes DeleteUserByIDUnauthorized as json.
-func (s *DeleteUserByIDUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes DeleteUserUnauthorized as json.
+func (s *DeleteUserUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes DeleteUserByIDUnauthorized from json.
-func (s *DeleteUserByIDUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes DeleteUserUnauthorized from json.
+func (s *DeleteUserUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeleteUserByIDUnauthorized to nil")
+		return errors.New("invalid: unable to decode DeleteUserUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -37557,19 +36485,19 @@ func (s *DeleteUserByIDUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = DeleteUserByIDUnauthorized(unwrapped)
+	*s = DeleteUserUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteUserByIDUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *DeleteUserUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteUserByIDUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *DeleteUserUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -51988,686 +50916,6 @@ func (s *FilterValue) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FinishUserPasskeyRegistrationBadRequest as json.
-func (s *FinishUserPasskeyRegistrationBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes FinishUserPasskeyRegistrationBadRequest from json.
-func (s *FinishUserPasskeyRegistrationBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = FinishUserPasskeyRegistrationBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FinishUserPasskeyRegistrationBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FinishUserPasskeyRegistrationErrorResponse as json.
-func (s FinishUserPasskeyRegistrationErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.already_handed_off")
-		{
-			s := s.AttAlreadyHandedOff
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidProofFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_proof")
-		{
-			s := s.AttInvalidProof
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_request")
-		{
-			s := s.AttInvalidRequest
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidStateFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_state")
-		{
-			s := s.AttInvalidState
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttNotFoundFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.not_found")
-		{
-			s := s.AttNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttProofRejectedFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.proof_rejected")
-		{
-			s := s.AttProofRejected
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.stale_challenge")
-		{
-			s := s.AttStaleChallenge
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserInvalidFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.invalid")
-		{
-			s := s.UserInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserNotFoundFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.not_found")
-		{
-			s := s.UserNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.password_empty")
-		{
-			s := s.UserPasswordEmpty
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.password_hashing_busy")
-		{
-			s := s.UserPasswordHashingBusy
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.password_policy_violation")
-		{
-			s := s.UserPasswordPolicyViolation
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.password_too_long")
-		{
-			s := s.UserPasswordTooLong
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.permission_denied")
-		{
-			s := s.UserPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes FinishUserPasskeyRegistrationErrorResponse from json.
-func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "att.already_handed_off":
-					s.Type = AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.invalid_proof":
-					s.Type = AttInvalidProofFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.invalid_request":
-					s.Type = AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.invalid_state":
-					s.Type = AttInvalidStateFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.not_found":
-					s.Type = AttNotFoundFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.proof_rejected":
-					s.Type = AttProofRejectedFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "att.stale_challenge":
-					s.Type = AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.invalid":
-					s.Type = UserInvalidFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.not_found":
-					s.Type = UserNotFoundFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.password_empty":
-					s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.password_hashing_busy":
-					s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.password_policy_violation":
-					s.Type = UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.password_too_long":
-					s.Type = UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				case "user.permission_denied":
-					s.Type = UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidProofFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttInvalidProof.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttInvalidRequest.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidStateFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttInvalidState.Decode(d); err != nil {
-			return err
-		}
-	case AttNotFoundFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttNotFound.Decode(d); err != nil {
-			return err
-		}
-	case AttProofRejectedFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttProofRejected.Decode(d); err != nil {
-			return err
-		}
-	case AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AttStaleChallenge.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case UserInvalidFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UserNotFoundFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserNotFound.Decode(d); err != nil {
-			return err
-		}
-	case UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPasswordEmpty.Decode(d); err != nil {
-			return err
-		}
-	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
-			return err
-		}
-	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPasswordPolicyViolation.Decode(d); err != nil {
-			return err
-		}
-	case UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPasswordTooLong.Decode(d); err != nil {
-			return err
-		}
-	case UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse:
-		if err := s.UserPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FinishUserPasskeyRegistrationErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FinishUserPasskeyRegistrationForbidden as json.
-func (s *FinishUserPasskeyRegistrationForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes FinishUserPasskeyRegistrationForbidden from json.
-func (s *FinishUserPasskeyRegistrationForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = FinishUserPasskeyRegistrationForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FinishUserPasskeyRegistrationForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FinishUserPasskeyRegistrationInternalServerError as json.
-func (s *FinishUserPasskeyRegistrationInternalServerError) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes FinishUserPasskeyRegistrationInternalServerError from json.
-func (s *FinishUserPasskeyRegistrationInternalServerError) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationInternalServerError to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = FinishUserPasskeyRegistrationInternalServerError(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FinishUserPasskeyRegistrationInternalServerError) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationInternalServerError) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FinishUserPasskeyRegistrationNotFound as json.
-func (s *FinishUserPasskeyRegistrationNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes FinishUserPasskeyRegistrationNotFound from json.
-func (s *FinishUserPasskeyRegistrationNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = FinishUserPasskeyRegistrationNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FinishUserPasskeyRegistrationNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *FinishUserPasskeyRegistrationRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -52963,44 +51211,6 @@ func (s *FinishUserPasskeyRegistrationResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FinishUserPasskeyRegistrationResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FinishUserPasskeyRegistrationUnauthorized as json.
-func (s *FinishUserPasskeyRegistrationUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes FinishUserPasskeyRegistrationUnauthorized from json.
-func (s *FinishUserPasskeyRegistrationUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FinishUserPasskeyRegistrationUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = FinishUserPasskeyRegistrationUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *FinishUserPasskeyRegistrationUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FinishUserPasskeyRegistrationUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -63332,16 +61542,16 @@ func (s *GateKind) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationByIdErrorResponse as json.
-func (s GetApplicationByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationErrorResponse as json.
+func (s GetApplicationErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetApplicationErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AppNotFoundGetApplicationByIdErrorResponse:
+	case AppNotFoundGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.not_found")
 		{
@@ -63357,7 +61567,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppPermissionDeniedGetApplicationByIdErrorResponse:
+	case AppPermissionDeniedGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.permission_denied")
 		{
@@ -63373,7 +61583,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedGetApplicationByIdErrorResponse:
+	case AuthUnauthorizedGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -63389,7 +61599,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetApplicationByIdErrorResponse:
+	case InternalGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -63405,7 +61615,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetApplicationByIdErrorResponse:
+	case NotImplementedGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -63421,7 +61631,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetApplicationByIdErrorResponse:
+	case ReqInvalidGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -63437,7 +61647,7 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetApplicationByIdErrorResponse:
+	case UnavailableGetApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -63456,10 +61666,10 @@ func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetApplicationByIdErrorResponse from json.
-func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationErrorResponse from json.
+func (s *GetApplicationErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetApplicationErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -63480,25 +61690,25 @@ func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "app.not_found":
-					s.Type = AppNotFoundGetApplicationByIdErrorResponse
+					s.Type = AppNotFoundGetApplicationErrorResponse
 					found = true
 				case "app.permission_denied":
-					s.Type = AppPermissionDeniedGetApplicationByIdErrorResponse
+					s.Type = AppPermissionDeniedGetApplicationErrorResponse
 					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetApplicationByIdErrorResponse
+					s.Type = AuthUnauthorizedGetApplicationErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetApplicationByIdErrorResponse
+					s.Type = InternalGetApplicationErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetApplicationByIdErrorResponse
+					s.Type = NotImplementedGetApplicationErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetApplicationByIdErrorResponse
+					s.Type = ReqInvalidGetApplicationErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetApplicationByIdErrorResponse
+					s.Type = UnavailableGetApplicationErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -63514,31 +61724,31 @@ func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AppNotFoundGetApplicationByIdErrorResponse:
+	case AppNotFoundGetApplicationErrorResponse:
 		if err := s.AppNotFound.Decode(d); err != nil {
 			return err
 		}
-	case AppPermissionDeniedGetApplicationByIdErrorResponse:
+	case AppPermissionDeniedGetApplicationErrorResponse:
 		if err := s.AppPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case AuthUnauthorizedGetApplicationByIdErrorResponse:
+	case AuthUnauthorizedGetApplicationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetApplicationByIdErrorResponse:
+	case InternalGetApplicationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetApplicationByIdErrorResponse:
+	case NotImplementedGetApplicationErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetApplicationByIdErrorResponse:
+	case ReqInvalidGetApplicationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetApplicationByIdErrorResponse:
+	case UnavailableGetApplicationErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -63549,29 +61759,29 @@ func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetApplicationByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetApplicationErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationByIdForbidden as json.
-func (s *GetApplicationByIdForbidden) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationForbidden as json.
+func (s *GetApplicationForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationByIdForbidden from json.
-func (s *GetApplicationByIdForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationForbidden from json.
+func (s *GetApplicationForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationByIdForbidden to nil")
+		return errors.New("invalid: unable to decode GetApplicationForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63582,34 +61792,34 @@ func (s *GetApplicationByIdForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationByIdForbidden(unwrapped)
+	*s = GetApplicationForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationByIdForbidden) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationByIdForbidden) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationByIdNotFound as json.
-func (s *GetApplicationByIdNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationNotFound as json.
+func (s *GetApplicationNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationByIdNotFound from json.
-func (s *GetApplicationByIdNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationNotFound from json.
+func (s *GetApplicationNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationByIdNotFound to nil")
+		return errors.New("invalid: unable to decode GetApplicationNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63620,34 +61830,34 @@ func (s *GetApplicationByIdNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationByIdNotFound(unwrapped)
+	*s = GetApplicationNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationByIdNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationByIdNotFound) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetApplicationByIdUnauthorized as json.
-func (s *GetApplicationByIdUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes GetApplicationUnauthorized as json.
+func (s *GetApplicationUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetApplicationByIdUnauthorized from json.
-func (s *GetApplicationByIdUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes GetApplicationUnauthorized from json.
+func (s *GetApplicationUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetApplicationByIdUnauthorized to nil")
+		return errors.New("invalid: unable to decode GetApplicationUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -63658,19 +61868,19 @@ func (s *GetApplicationByIdUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetApplicationByIdUnauthorized(unwrapped)
+	*s = GetApplicationUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetApplicationByIdUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *GetApplicationUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetApplicationByIdUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *GetApplicationUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -63881,16 +62091,16 @@ func (s *GetAuthAttemptErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetBrandingByIdErrorResponse as json.
-func (s GetBrandingByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetBrandingErrorResponse as json.
+func (s GetBrandingErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetBrandingErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetBrandingByIdErrorResponse:
+	case AuthUnauthorizedGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -63906,7 +62116,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case BrndNotFoundGetBrandingByIdErrorResponse:
+	case BrndNotFoundGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("brnd.not_found")
 		{
@@ -63922,7 +62132,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case BrndPermissionDeniedGetBrandingByIdErrorResponse:
+	case BrndPermissionDeniedGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("brnd.permission_denied")
 		{
@@ -63938,7 +62148,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetBrandingByIdErrorResponse:
+	case InternalGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -63954,7 +62164,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetBrandingByIdErrorResponse:
+	case NotImplementedGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -63970,7 +62180,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetBrandingByIdErrorResponse:
+	case ReqInvalidGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -63986,7 +62196,7 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetBrandingByIdErrorResponse:
+	case UnavailableGetBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -64005,10 +62215,10 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetBrandingByIdErrorResponse from json.
-func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetBrandingErrorResponse from json.
+func (s *GetBrandingErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetBrandingByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetBrandingErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -64029,25 +62239,25 @@ func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetBrandingByIdErrorResponse
+					s.Type = AuthUnauthorizedGetBrandingErrorResponse
 					found = true
 				case "brnd.not_found":
-					s.Type = BrndNotFoundGetBrandingByIdErrorResponse
+					s.Type = BrndNotFoundGetBrandingErrorResponse
 					found = true
 				case "brnd.permission_denied":
-					s.Type = BrndPermissionDeniedGetBrandingByIdErrorResponse
+					s.Type = BrndPermissionDeniedGetBrandingErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetBrandingByIdErrorResponse
+					s.Type = InternalGetBrandingErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetBrandingByIdErrorResponse
+					s.Type = NotImplementedGetBrandingErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetBrandingByIdErrorResponse
+					s.Type = ReqInvalidGetBrandingErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetBrandingByIdErrorResponse
+					s.Type = UnavailableGetBrandingErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -64063,31 +62273,31 @@ func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetBrandingByIdErrorResponse:
+	case AuthUnauthorizedGetBrandingErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case BrndNotFoundGetBrandingByIdErrorResponse:
+	case BrndNotFoundGetBrandingErrorResponse:
 		if err := s.BrndNotFound.Decode(d); err != nil {
 			return err
 		}
-	case BrndPermissionDeniedGetBrandingByIdErrorResponse:
+	case BrndPermissionDeniedGetBrandingErrorResponse:
 		if err := s.BrndPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetBrandingByIdErrorResponse:
+	case InternalGetBrandingErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetBrandingByIdErrorResponse:
+	case NotImplementedGetBrandingErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetBrandingByIdErrorResponse:
+	case ReqInvalidGetBrandingErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetBrandingByIdErrorResponse:
+	case UnavailableGetBrandingErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -64098,28 +62308,28 @@ func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetBrandingByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetBrandingErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetBrandingByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetBrandingErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetClaimStatusErrorResponse as json.
-func (s GetClaimStatusErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetDeploymentErrorResponse as json.
+func (s GetDeploymentErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetClaimStatusErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetClaimStatusErrorResponse:
+	case AuthUnauthorizedGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -64135,746 +62345,7 @@ func (s GetClaimStatusErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ClaimChallengeNotFoundGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim_challenge.not_found")
-		{
-			s := s.ClaimChallengeNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimExpiredGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.claim_expired")
-		{
-			s := s.ProjClaimExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimWindowExpiredGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.claim_window_expired")
-		{
-			s := s.ProjClaimWindowExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNotFoundGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjPermissionDeniedGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.permission_denied")
-		{
-			s := s.ProjPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableGetClaimStatusErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetClaimStatusErrorResponse from json.
-func (s *GetClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimStatusErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetClaimStatusErrorResponse
-					found = true
-				case "claim_challenge.not_found":
-					s.Type = ClaimChallengeNotFoundGetClaimStatusErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalGetClaimStatusErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedGetClaimStatusErrorResponse
-					found = true
-				case "proj.claim_expired":
-					s.Type = ProjClaimExpiredGetClaimStatusErrorResponse
-					found = true
-				case "proj.claim_window_expired":
-					s.Type = ProjClaimWindowExpiredGetClaimStatusErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundGetClaimStatusErrorResponse
-					found = true
-				case "proj.permission_denied":
-					s.Type = ProjPermissionDeniedGetClaimStatusErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidGetClaimStatusErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableGetClaimStatusErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedGetClaimStatusErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case ClaimChallengeNotFoundGetClaimStatusErrorResponse:
-		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
-			return err
-		}
-	case InternalGetClaimStatusErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedGetClaimStatusErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimExpiredGetClaimStatusErrorResponse:
-		if err := s.ProjClaimExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimWindowExpiredGetClaimStatusErrorResponse:
-		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjNotFoundGetClaimStatusErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ProjPermissionDeniedGetClaimStatusErrorResponse:
-		if err := s.ProjPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidGetClaimStatusErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableGetClaimStatusErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetClaimStatusErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimStatusErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimStatusGone as json.
-func (s GetClaimStatusGone) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetClaimStatusGone) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case ProjClaimExpiredGetClaimStatusGone:
-		e.FieldStart("code")
-		e.Str("proj.claim_expired")
-		{
-			s := s.ProjClaimExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimWindowExpiredGetClaimStatusGone:
-		e.FieldStart("code")
-		e.Str("proj.claim_window_expired")
-		{
-			s := s.ProjClaimWindowExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetClaimStatusGone from json.
-func (s *GetClaimStatusGone) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimStatusGone to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "proj.claim_expired":
-					s.Type = ProjClaimExpiredGetClaimStatusGone
-					found = true
-				case "proj.claim_window_expired":
-					s.Type = ProjClaimWindowExpiredGetClaimStatusGone
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case ProjClaimExpiredGetClaimStatusGone:
-		if err := s.ProjClaimExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimWindowExpiredGetClaimStatusGone:
-		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetClaimStatusGone) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimStatusGone) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimStatusNotFound as json.
-func (s *GetClaimStatusNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetClaimStatusNotFound from json.
-func (s *GetClaimStatusNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimStatusNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetClaimStatusNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetClaimStatusNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimStatusNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimStatusTooManyRequests as json.
-func (s *GetClaimStatusTooManyRequests) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetClaimStatusTooManyRequests from json.
-func (s *GetClaimStatusTooManyRequests) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimStatusTooManyRequests to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetClaimStatusTooManyRequests(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetClaimStatusTooManyRequests) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimStatusTooManyRequests) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimStatusUnauthorized as json.
-func (s *GetClaimStatusUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetClaimStatusUnauthorized from json.
-func (s *GetClaimStatusUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimStatusUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetClaimStatusUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetClaimStatusUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimStatusUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimWindowErrorResponse as json.
-func (s GetClaimWindowErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetClaimWindowErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case ClaimChallengeNotFoundGetClaimWindowErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim_challenge.not_found")
-		{
-			s := s.ClaimChallengeNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalGetClaimWindowErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidGetClaimWindowErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetClaimWindowErrorResponse from json.
-func (s *GetClaimWindowErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimWindowErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "claim_challenge.not_found":
-					s.Type = ClaimChallengeNotFoundGetClaimWindowErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalGetClaimWindowErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidGetClaimWindowErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case ClaimChallengeNotFoundGetClaimWindowErrorResponse:
-		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
-			return err
-		}
-	case InternalGetClaimWindowErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidGetClaimWindowErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetClaimWindowErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimWindowErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimWindowNotFound as json.
-func (s *GetClaimWindowNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetClaimWindowNotFound from json.
-func (s *GetClaimWindowNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimWindowNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetClaimWindowNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetClaimWindowNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimWindowNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetClaimWindowTooManyRequests as json.
-func (s *GetClaimWindowTooManyRequests) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetClaimWindowTooManyRequests from json.
-func (s *GetClaimWindowTooManyRequests) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetClaimWindowTooManyRequests to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetClaimWindowTooManyRequests(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetClaimWindowTooManyRequests) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetClaimWindowTooManyRequests) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetDeploymentByIdErrorResponse as json.
-func (s GetDeploymentByIdErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedGetDeploymentByIdErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepNotFoundGetDeploymentByIdErrorResponse:
+	case DepNotFoundGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("dep.not_found")
 		{
@@ -64890,7 +62361,7 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case DepPermissionDeniedGetDeploymentByIdErrorResponse:
+	case DepPermissionDeniedGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("dep.permission_denied")
 		{
@@ -64906,7 +62377,7 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetDeploymentByIdErrorResponse:
+	case InternalGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -64922,7 +62393,7 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetDeploymentByIdErrorResponse:
+	case NotImplementedGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -64938,7 +62409,7 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetDeploymentByIdErrorResponse:
+	case ReqInvalidGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -64954,7 +62425,7 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetDeploymentByIdErrorResponse:
+	case UnavailableGetDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -64973,10 +62444,10 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetDeploymentByIdErrorResponse from json.
-func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetDeploymentErrorResponse from json.
+func (s *GetDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetDeploymentByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetDeploymentErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -64997,25 +62468,25 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetDeploymentByIdErrorResponse
+					s.Type = AuthUnauthorizedGetDeploymentErrorResponse
 					found = true
 				case "dep.not_found":
-					s.Type = DepNotFoundGetDeploymentByIdErrorResponse
+					s.Type = DepNotFoundGetDeploymentErrorResponse
 					found = true
 				case "dep.permission_denied":
-					s.Type = DepPermissionDeniedGetDeploymentByIdErrorResponse
+					s.Type = DepPermissionDeniedGetDeploymentErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetDeploymentByIdErrorResponse
+					s.Type = InternalGetDeploymentErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetDeploymentByIdErrorResponse
+					s.Type = NotImplementedGetDeploymentErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetDeploymentByIdErrorResponse
+					s.Type = ReqInvalidGetDeploymentErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetDeploymentByIdErrorResponse
+					s.Type = UnavailableGetDeploymentErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -65031,31 +62502,31 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetDeploymentByIdErrorResponse:
+	case AuthUnauthorizedGetDeploymentErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case DepNotFoundGetDeploymentByIdErrorResponse:
+	case DepNotFoundGetDeploymentErrorResponse:
 		if err := s.DepNotFound.Decode(d); err != nil {
 			return err
 		}
-	case DepPermissionDeniedGetDeploymentByIdErrorResponse:
+	case DepPermissionDeniedGetDeploymentErrorResponse:
 		if err := s.DepPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetDeploymentByIdErrorResponse:
+	case InternalGetDeploymentErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetDeploymentByIdErrorResponse:
+	case NotImplementedGetDeploymentErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetDeploymentByIdErrorResponse:
+	case ReqInvalidGetDeploymentErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetDeploymentByIdErrorResponse:
+	case UnavailableGetDeploymentErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -65066,289 +62537,14 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetDeploymentByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetDeploymentErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetDeploymentByIdErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetDeploymentVariablesErrorResponse as json.
-func (s GetDeploymentVariablesErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetDeploymentVariablesErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepNotFoundGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.not_found")
-		{
-			s := s.DepNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepPermissionDeniedGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.permission_denied")
-		{
-			s := s.DepPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarNotFoundGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.not_found")
-		{
-			s := s.VarNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarPermissionDeniedGetDeploymentVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.permission_denied")
-		{
-			s := s.VarPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetDeploymentVariablesErrorResponse from json.
-func (s *GetDeploymentVariablesErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetDeploymentVariablesErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetDeploymentVariablesErrorResponse
-					found = true
-				case "dep.not_found":
-					s.Type = DepNotFoundGetDeploymentVariablesErrorResponse
-					found = true
-				case "dep.permission_denied":
-					s.Type = DepPermissionDeniedGetDeploymentVariablesErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalGetDeploymentVariablesErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedGetDeploymentVariablesErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidGetDeploymentVariablesErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableGetDeploymentVariablesErrorResponse
-					found = true
-				case "var.not_found":
-					s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
-					found = true
-				case "var.permission_denied":
-					s.Type = VarPermissionDeniedGetDeploymentVariablesErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedGetDeploymentVariablesErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case DepNotFoundGetDeploymentVariablesErrorResponse:
-		if err := s.DepNotFound.Decode(d); err != nil {
-			return err
-		}
-	case DepPermissionDeniedGetDeploymentVariablesErrorResponse:
-		if err := s.DepPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case InternalGetDeploymentVariablesErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedGetDeploymentVariablesErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidGetDeploymentVariablesErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableGetDeploymentVariablesErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case VarNotFoundGetDeploymentVariablesErrorResponse:
-		if err := s.VarNotFound.Decode(d); err != nil {
-			return err
-		}
-	case VarPermissionDeniedGetDeploymentVariablesErrorResponse:
-		if err := s.VarPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetDeploymentVariablesErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetDeploymentVariablesErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetDeploymentErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -67508,16 +64704,16 @@ func (s *GetGrantUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpByIdErrorResponse as json.
-func (s GetIdpByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpErrorResponse as json.
+func (s GetIdpErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetIdpErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetIdpByIdErrorResponse:
+	case AuthUnauthorizedGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -67533,7 +64729,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpNotFoundGetIdpByIdErrorResponse:
+	case IdpNotFoundGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.not_found")
 		{
@@ -67549,7 +64745,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpPermissionDeniedGetIdpByIdErrorResponse:
+	case IdpPermissionDeniedGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.permission_denied")
 		{
@@ -67565,7 +64761,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetIdpByIdErrorResponse:
+	case InternalGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -67581,7 +64777,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetIdpByIdErrorResponse:
+	case NotImplementedGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -67597,7 +64793,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetIdpByIdErrorResponse:
+	case ReqInvalidGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -67613,7 +64809,7 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetIdpByIdErrorResponse:
+	case UnavailableGetIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -67632,10 +64828,10 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetIdpByIdErrorResponse from json.
-func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpErrorResponse from json.
+func (s *GetIdpErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetIdpErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -67656,25 +64852,25 @@ func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetIdpByIdErrorResponse
+					s.Type = AuthUnauthorizedGetIdpErrorResponse
 					found = true
 				case "idp.not_found":
-					s.Type = IdpNotFoundGetIdpByIdErrorResponse
+					s.Type = IdpNotFoundGetIdpErrorResponse
 					found = true
 				case "idp.permission_denied":
-					s.Type = IdpPermissionDeniedGetIdpByIdErrorResponse
+					s.Type = IdpPermissionDeniedGetIdpErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetIdpByIdErrorResponse
+					s.Type = InternalGetIdpErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetIdpByIdErrorResponse
+					s.Type = NotImplementedGetIdpErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetIdpByIdErrorResponse
+					s.Type = ReqInvalidGetIdpErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetIdpByIdErrorResponse
+					s.Type = UnavailableGetIdpErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -67690,31 +64886,31 @@ func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetIdpByIdErrorResponse:
+	case AuthUnauthorizedGetIdpErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case IdpNotFoundGetIdpByIdErrorResponse:
+	case IdpNotFoundGetIdpErrorResponse:
 		if err := s.IdpNotFound.Decode(d); err != nil {
 			return err
 		}
-	case IdpPermissionDeniedGetIdpByIdErrorResponse:
+	case IdpPermissionDeniedGetIdpErrorResponse:
 		if err := s.IdpPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetIdpByIdErrorResponse:
+	case InternalGetIdpErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetIdpByIdErrorResponse:
+	case NotImplementedGetIdpErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetIdpByIdErrorResponse:
+	case ReqInvalidGetIdpErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetIdpByIdErrorResponse:
+	case UnavailableGetIdpErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -67725,29 +64921,29 @@ func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetIdpByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetIdpErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetIdpErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpByIdForbidden as json.
-func (s *GetIdpByIdForbidden) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpForbidden as json.
+func (s *GetIdpForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetIdpByIdForbidden from json.
-func (s *GetIdpByIdForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpForbidden from json.
+func (s *GetIdpForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpByIdForbidden to nil")
+		return errors.New("invalid: unable to decode GetIdpForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -67758,34 +64954,34 @@ func (s *GetIdpByIdForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetIdpByIdForbidden(unwrapped)
+	*s = GetIdpForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpByIdForbidden) MarshalJSON() ([]byte, error) {
+func (s *GetIdpForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpByIdForbidden) UnmarshalJSON(data []byte) error {
+func (s *GetIdpForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpByIdNotFound as json.
-func (s *GetIdpByIdNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpNotFound as json.
+func (s *GetIdpNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetIdpByIdNotFound from json.
-func (s *GetIdpByIdNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpNotFound from json.
+func (s *GetIdpNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpByIdNotFound to nil")
+		return errors.New("invalid: unable to decode GetIdpNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -67796,71 +64992,33 @@ func (s *GetIdpByIdNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetIdpByIdNotFound(unwrapped)
+	*s = GetIdpNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpByIdNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetIdpNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpByIdNotFound) UnmarshalJSON(data []byte) error {
+func (s *GetIdpNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpByIdUnauthorized as json.
-func (s *GetIdpByIdUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetIdpByIdUnauthorized from json.
-func (s *GetIdpByIdUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpByIdUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetIdpByIdUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpByIdUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpByIdUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetIdpRevisionByIdErrorResponse as json.
-func (s GetIdpRevisionByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpRevisionErrorResponse as json.
+func (s GetIdpRevisionErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetIdpRevisionErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetIdpRevisionByIdErrorResponse:
+	case AuthUnauthorizedGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -67876,7 +65034,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpNotFoundGetIdpRevisionByIdErrorResponse:
+	case IdpNotFoundGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.not_found")
 		{
@@ -67892,7 +65050,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpPermissionDeniedGetIdpRevisionByIdErrorResponse:
+	case IdpPermissionDeniedGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.permission_denied")
 		{
@@ -67908,7 +65066,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetIdpRevisionByIdErrorResponse:
+	case InternalGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -67924,7 +65082,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetIdpRevisionByIdErrorResponse:
+	case NotImplementedGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -67940,7 +65098,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetIdpRevisionByIdErrorResponse:
+	case ReqInvalidGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -67956,7 +65114,7 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetIdpRevisionByIdErrorResponse:
+	case UnavailableGetIdpRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -67975,10 +65133,10 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetIdpRevisionByIdErrorResponse from json.
-func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpRevisionErrorResponse from json.
+func (s *GetIdpRevisionErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpRevisionByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetIdpRevisionErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -67999,25 +65157,25 @@ func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetIdpRevisionByIdErrorResponse
+					s.Type = AuthUnauthorizedGetIdpRevisionErrorResponse
 					found = true
 				case "idp.not_found":
-					s.Type = IdpNotFoundGetIdpRevisionByIdErrorResponse
+					s.Type = IdpNotFoundGetIdpRevisionErrorResponse
 					found = true
 				case "idp.permission_denied":
-					s.Type = IdpPermissionDeniedGetIdpRevisionByIdErrorResponse
+					s.Type = IdpPermissionDeniedGetIdpRevisionErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetIdpRevisionByIdErrorResponse
+					s.Type = InternalGetIdpRevisionErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetIdpRevisionByIdErrorResponse
+					s.Type = NotImplementedGetIdpRevisionErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetIdpRevisionByIdErrorResponse
+					s.Type = ReqInvalidGetIdpRevisionErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetIdpRevisionByIdErrorResponse
+					s.Type = UnavailableGetIdpRevisionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -68033,31 +65191,31 @@ func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetIdpRevisionByIdErrorResponse:
+	case AuthUnauthorizedGetIdpRevisionErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case IdpNotFoundGetIdpRevisionByIdErrorResponse:
+	case IdpNotFoundGetIdpRevisionErrorResponse:
 		if err := s.IdpNotFound.Decode(d); err != nil {
 			return err
 		}
-	case IdpPermissionDeniedGetIdpRevisionByIdErrorResponse:
+	case IdpPermissionDeniedGetIdpRevisionErrorResponse:
 		if err := s.IdpPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetIdpRevisionByIdErrorResponse:
+	case InternalGetIdpRevisionErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetIdpRevisionByIdErrorResponse:
+	case NotImplementedGetIdpRevisionErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetIdpRevisionByIdErrorResponse:
+	case ReqInvalidGetIdpRevisionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetIdpRevisionByIdErrorResponse:
+	case UnavailableGetIdpRevisionErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -68068,29 +65226,29 @@ func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetIdpRevisionByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetIdpRevisionErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpRevisionByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetIdpRevisionErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpRevisionByIdForbidden as json.
-func (s *GetIdpRevisionByIdForbidden) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpRevisionForbidden as json.
+func (s *GetIdpRevisionForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetIdpRevisionByIdForbidden from json.
-func (s *GetIdpRevisionByIdForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpRevisionForbidden from json.
+func (s *GetIdpRevisionForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpRevisionByIdForbidden to nil")
+		return errors.New("invalid: unable to decode GetIdpRevisionForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -68101,34 +65259,34 @@ func (s *GetIdpRevisionByIdForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetIdpRevisionByIdForbidden(unwrapped)
+	*s = GetIdpRevisionForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpRevisionByIdForbidden) MarshalJSON() ([]byte, error) {
+func (s *GetIdpRevisionForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpRevisionByIdForbidden) UnmarshalJSON(data []byte) error {
+func (s *GetIdpRevisionForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpRevisionByIdNotFound as json.
-func (s *GetIdpRevisionByIdNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpRevisionNotFound as json.
+func (s *GetIdpRevisionNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetIdpRevisionByIdNotFound from json.
-func (s *GetIdpRevisionByIdNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpRevisionNotFound from json.
+func (s *GetIdpRevisionNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpRevisionByIdNotFound to nil")
+		return errors.New("invalid: unable to decode GetIdpRevisionNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -68139,34 +65297,34 @@ func (s *GetIdpRevisionByIdNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetIdpRevisionByIdNotFound(unwrapped)
+	*s = GetIdpRevisionNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpRevisionByIdNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetIdpRevisionNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpRevisionByIdNotFound) UnmarshalJSON(data []byte) error {
+func (s *GetIdpRevisionNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetIdpRevisionByIdUnauthorized as json.
-func (s *GetIdpRevisionByIdUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes GetIdpRevisionUnauthorized as json.
+func (s *GetIdpRevisionUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetIdpRevisionByIdUnauthorized from json.
-func (s *GetIdpRevisionByIdUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes GetIdpRevisionUnauthorized from json.
+func (s *GetIdpRevisionUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetIdpRevisionByIdUnauthorized to nil")
+		return errors.New("invalid: unable to decode GetIdpRevisionUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -68177,19 +65335,57 @@ func (s *GetIdpRevisionByIdUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetIdpRevisionByIdUnauthorized(unwrapped)
+	*s = GetIdpRevisionUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetIdpRevisionByIdUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *GetIdpRevisionUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetIdpRevisionByIdUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *GetIdpRevisionUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetIdpUnauthorized as json.
+func (s *GetIdpUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetIdpUnauthorized from json.
+func (s *GetIdpUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetIdpUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetIdpUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetIdpUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetIdpUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -69796,16 +66992,16 @@ func (s *GetMyUserSchemaErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetOAuthSettingsByIdErrorResponse as json.
-func (s GetOAuthSettingsByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetOAuthSettingsErrorResponse as json.
+func (s GetOAuthSettingsErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetOAuthSettingsErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetOAuthSettingsByIdErrorResponse:
+	case AuthUnauthorizedGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -69821,7 +67017,7 @@ func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetOAuthSettingsByIdErrorResponse:
+	case InternalGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -69837,7 +67033,7 @@ func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetOAuthSettingsByIdErrorResponse:
+	case NotImplementedGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -69853,7 +67049,7 @@ func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetOAuthSettingsByIdErrorResponse:
+	case ReqInvalidGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -69869,7 +67065,7 @@ func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetOAuthSettingsByIdErrorResponse:
+	case UnavailableGetOAuthSettingsErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -69888,10 +67084,10 @@ func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetOAuthSettingsByIdErrorResponse from json.
-func (s *GetOAuthSettingsByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetOAuthSettingsErrorResponse from json.
+func (s *GetOAuthSettingsErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetOAuthSettingsByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetOAuthSettingsErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -69912,19 +67108,19 @@ func (s *GetOAuthSettingsByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+					s.Type = AuthUnauthorizedGetOAuthSettingsErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetOAuthSettingsByIdErrorResponse
+					s.Type = InternalGetOAuthSettingsErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetOAuthSettingsByIdErrorResponse
+					s.Type = NotImplementedGetOAuthSettingsErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetOAuthSettingsByIdErrorResponse
+					s.Type = ReqInvalidGetOAuthSettingsErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetOAuthSettingsByIdErrorResponse
+					s.Type = UnavailableGetOAuthSettingsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -69940,23 +67136,23 @@ func (s *GetOAuthSettingsByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetOAuthSettingsByIdErrorResponse:
+	case AuthUnauthorizedGetOAuthSettingsErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetOAuthSettingsByIdErrorResponse:
+	case InternalGetOAuthSettingsErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetOAuthSettingsByIdErrorResponse:
+	case NotImplementedGetOAuthSettingsErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetOAuthSettingsByIdErrorResponse:
+	case ReqInvalidGetOAuthSettingsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetOAuthSettingsByIdErrorResponse:
+	case UnavailableGetOAuthSettingsErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -69967,14 +67163,14 @@ func (s *GetOAuthSettingsByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetOAuthSettingsByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetOAuthSettingsErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetOAuthSettingsByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetOAuthSettingsErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -70437,6 +67633,745 @@ func (s *GetPolicyRevisionErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes GetProjectClaimStatusErrorResponse as json.
+func (s GetProjectClaimStatusErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetProjectClaimStatusErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ClaimChallengeNotFoundGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim_challenge.not_found")
+		{
+			s := s.ClaimChallengeNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimExpiredGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.claim_expired")
+		{
+			s := s.ProjClaimExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimWindowExpiredGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.claim_window_expired")
+		{
+			s := s.ProjClaimWindowExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPermissionDeniedGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.permission_denied")
+		{
+			s := s.ProjPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetProjectClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetProjectClaimStatusErrorResponse from json.
+func (s *GetProjectClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimStatusErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetProjectClaimStatusErrorResponse
+					found = true
+				case "claim_challenge.not_found":
+					s.Type = ClaimChallengeNotFoundGetProjectClaimStatusErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetProjectClaimStatusErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetProjectClaimStatusErrorResponse
+					found = true
+				case "proj.claim_expired":
+					s.Type = ProjClaimExpiredGetProjectClaimStatusErrorResponse
+					found = true
+				case "proj.claim_window_expired":
+					s.Type = ProjClaimWindowExpiredGetProjectClaimStatusErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundGetProjectClaimStatusErrorResponse
+					found = true
+				case "proj.permission_denied":
+					s.Type = ProjPermissionDeniedGetProjectClaimStatusErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetProjectClaimStatusErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetProjectClaimStatusErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetProjectClaimStatusErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case ClaimChallengeNotFoundGetProjectClaimStatusErrorResponse:
+		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetProjectClaimStatusErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetProjectClaimStatusErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimExpiredGetProjectClaimStatusErrorResponse:
+		if err := s.ProjClaimExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimWindowExpiredGetProjectClaimStatusErrorResponse:
+		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundGetProjectClaimStatusErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjPermissionDeniedGetProjectClaimStatusErrorResponse:
+		if err := s.ProjPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetProjectClaimStatusErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetProjectClaimStatusErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetProjectClaimStatusErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimStatusErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimStatusGone as json.
+func (s GetProjectClaimStatusGone) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetProjectClaimStatusGone) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ProjClaimExpiredGetProjectClaimStatusGone:
+		e.FieldStart("code")
+		e.Str("proj.claim_expired")
+		{
+			s := s.ProjClaimExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjClaimWindowExpiredGetProjectClaimStatusGone:
+		e.FieldStart("code")
+		e.Str("proj.claim_window_expired")
+		{
+			s := s.ProjClaimWindowExpired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetProjectClaimStatusGone from json.
+func (s *GetProjectClaimStatusGone) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimStatusGone to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "proj.claim_expired":
+					s.Type = ProjClaimExpiredGetProjectClaimStatusGone
+					found = true
+				case "proj.claim_window_expired":
+					s.Type = ProjClaimWindowExpiredGetProjectClaimStatusGone
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ProjClaimExpiredGetProjectClaimStatusGone:
+		if err := s.ProjClaimExpired.Decode(d); err != nil {
+			return err
+		}
+	case ProjClaimWindowExpiredGetProjectClaimStatusGone:
+		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetProjectClaimStatusGone) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimStatusGone) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimStatusNotFound as json.
+func (s *GetProjectClaimStatusNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetProjectClaimStatusNotFound from json.
+func (s *GetProjectClaimStatusNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimStatusNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetProjectClaimStatusNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetProjectClaimStatusNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimStatusNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimStatusTooManyRequests as json.
+func (s *GetProjectClaimStatusTooManyRequests) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetProjectClaimStatusTooManyRequests from json.
+func (s *GetProjectClaimStatusTooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimStatusTooManyRequests to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetProjectClaimStatusTooManyRequests(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetProjectClaimStatusTooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimStatusTooManyRequests) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimStatusUnauthorized as json.
+func (s *GetProjectClaimStatusUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetProjectClaimStatusUnauthorized from json.
+func (s *GetProjectClaimStatusUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimStatusUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetProjectClaimStatusUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetProjectClaimStatusUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimStatusUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimWindowErrorResponse as json.
+func (s GetProjectClaimWindowErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetProjectClaimWindowErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ClaimChallengeNotFoundGetProjectClaimWindowErrorResponse:
+		e.FieldStart("code")
+		e.Str("claim_challenge.not_found")
+		{
+			s := s.ClaimChallengeNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetProjectClaimWindowErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetProjectClaimWindowErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetProjectClaimWindowErrorResponse from json.
+func (s *GetProjectClaimWindowErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimWindowErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "claim_challenge.not_found":
+					s.Type = ClaimChallengeNotFoundGetProjectClaimWindowErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetProjectClaimWindowErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetProjectClaimWindowErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ClaimChallengeNotFoundGetProjectClaimWindowErrorResponse:
+		if err := s.ClaimChallengeNotFound.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetProjectClaimWindowErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetProjectClaimWindowErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetProjectClaimWindowErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimWindowErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimWindowNotFound as json.
+func (s *GetProjectClaimWindowNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetProjectClaimWindowNotFound from json.
+func (s *GetProjectClaimWindowNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimWindowNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetProjectClaimWindowNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetProjectClaimWindowNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimWindowNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetProjectClaimWindowTooManyRequests as json.
+func (s *GetProjectClaimWindowTooManyRequests) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetProjectClaimWindowTooManyRequests from json.
+func (s *GetProjectClaimWindowTooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetProjectClaimWindowTooManyRequests to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetProjectClaimWindowTooManyRequests(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetProjectClaimWindowTooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetProjectClaimWindowTooManyRequests) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes GetProjectErrorResponse as json.
 func (s GetProjectErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -70856,16 +68791,16 @@ func (s *GetReadyErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetReleaseByIdErrorResponse as json.
-func (s GetReleaseByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetReleaseErrorResponse as json.
+func (s GetReleaseErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetReleaseByIdErrorResponse:
+	case AuthUnauthorizedGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -70881,7 +68816,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetReleaseByIdErrorResponse:
+	case InternalGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -70897,7 +68832,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetReleaseByIdErrorResponse:
+	case NotImplementedGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -70913,7 +68848,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case RelNotFoundGetReleaseByIdErrorResponse:
+	case RelNotFoundGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
 		{
@@ -70929,7 +68864,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case RelPermissionDeniedGetReleaseByIdErrorResponse:
+	case RelPermissionDeniedGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.permission_denied")
 		{
@@ -70945,7 +68880,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetReleaseByIdErrorResponse:
+	case ReqInvalidGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -70961,7 +68896,7 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetReleaseByIdErrorResponse:
+	case UnavailableGetReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -70980,10 +68915,10 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetReleaseByIdErrorResponse from json.
-func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetReleaseErrorResponse from json.
+func (s *GetReleaseErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetReleaseByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetReleaseErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -71004,25 +68939,25 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetReleaseByIdErrorResponse
+					s.Type = AuthUnauthorizedGetReleaseErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetReleaseByIdErrorResponse
+					s.Type = InternalGetReleaseErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetReleaseByIdErrorResponse
+					s.Type = NotImplementedGetReleaseErrorResponse
 					found = true
 				case "rel.not_found":
-					s.Type = RelNotFoundGetReleaseByIdErrorResponse
+					s.Type = RelNotFoundGetReleaseErrorResponse
 					found = true
 				case "rel.permission_denied":
-					s.Type = RelPermissionDeniedGetReleaseByIdErrorResponse
+					s.Type = RelPermissionDeniedGetReleaseErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetReleaseByIdErrorResponse
+					s.Type = ReqInvalidGetReleaseErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetReleaseByIdErrorResponse
+					s.Type = UnavailableGetReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -71038,31 +68973,31 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetReleaseByIdErrorResponse:
+	case AuthUnauthorizedGetReleaseErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetReleaseByIdErrorResponse:
+	case InternalGetReleaseErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetReleaseByIdErrorResponse:
+	case NotImplementedGetReleaseErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case RelNotFoundGetReleaseByIdErrorResponse:
+	case RelNotFoundGetReleaseErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
 			return err
 		}
-	case RelPermissionDeniedGetReleaseByIdErrorResponse:
+	case RelPermissionDeniedGetReleaseErrorResponse:
 		if err := s.RelPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetReleaseByIdErrorResponse:
+	case ReqInvalidGetReleaseErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetReleaseByIdErrorResponse:
+	case UnavailableGetReleaseErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -71073,28 +69008,28 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetReleaseByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetReleaseErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetReleaseByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetReleaseErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetSchemaByIdErrorResponse as json.
-func (s GetSchemaByIdErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetSchemaErrorResponse as json.
+func (s GetSchemaErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetSchemaByIdErrorResponse:
+	case AuthUnauthorizedGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -71110,7 +69045,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetSchemaByIdErrorResponse:
+	case InternalGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -71126,7 +69061,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case SchNotFoundGetSchemaByIdErrorResponse:
+	case SchNotFoundGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.not_found")
 		{
@@ -71142,7 +69077,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case SchPermissionDeniedGetSchemaByIdErrorResponse:
+	case SchPermissionDeniedGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("sch.permission_denied")
 		{
@@ -71158,7 +69093,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetSchemaByIdErrorResponse:
+	case NotImplementedGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -71174,7 +69109,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetSchemaByIdErrorResponse:
+	case ReqInvalidGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -71190,7 +69125,7 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetSchemaByIdErrorResponse:
+	case UnavailableGetSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -71209,10 +69144,10 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetSchemaByIdErrorResponse from json.
-func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetSchemaErrorResponse from json.
+func (s *GetSchemaErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetSchemaByIdErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetSchemaErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -71233,25 +69168,25 @@ func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetSchemaByIdErrorResponse
+					s.Type = AuthUnauthorizedGetSchemaErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetSchemaByIdErrorResponse
+					s.Type = InternalGetSchemaErrorResponse
 					found = true
 				case "sch.not_found":
-					s.Type = SchNotFoundGetSchemaByIdErrorResponse
+					s.Type = SchNotFoundGetSchemaErrorResponse
 					found = true
 				case "sch.permission_denied":
-					s.Type = SchPermissionDeniedGetSchemaByIdErrorResponse
+					s.Type = SchPermissionDeniedGetSchemaErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetSchemaByIdErrorResponse
+					s.Type = NotImplementedGetSchemaErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetSchemaByIdErrorResponse
+					s.Type = ReqInvalidGetSchemaErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetSchemaByIdErrorResponse
+					s.Type = UnavailableGetSchemaErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -71267,31 +69202,31 @@ func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetSchemaByIdErrorResponse:
+	case AuthUnauthorizedGetSchemaErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetSchemaByIdErrorResponse:
+	case InternalGetSchemaErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case SchNotFoundGetSchemaByIdErrorResponse:
+	case SchNotFoundGetSchemaErrorResponse:
 		if err := s.SchNotFound.Decode(d); err != nil {
 			return err
 		}
-	case SchPermissionDeniedGetSchemaByIdErrorResponse:
+	case SchPermissionDeniedGetSchemaErrorResponse:
 		if err := s.SchPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetSchemaByIdErrorResponse:
+	case NotImplementedGetSchemaErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetSchemaByIdErrorResponse:
+	case ReqInvalidGetSchemaErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetSchemaByIdErrorResponse:
+	case UnavailableGetSchemaErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -71302,14 +69237,14 @@ func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetSchemaByIdErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetSchemaErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetSchemaByIdErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetSchemaErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -71962,16 +69897,16 @@ func (s *GetTeamUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserByIDErrorResponse as json.
-func (s GetUserByIDErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetUserErrorResponse as json.
+func (s GetUserErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetUserErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetUserByIDErrorResponse:
+	case AuthUnauthorizedGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -71987,7 +69922,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetUserByIDErrorResponse:
+	case InternalGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -72003,7 +69938,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetUserByIDErrorResponse:
+	case NotImplementedGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -72019,7 +69954,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetUserByIDErrorResponse:
+	case ReqInvalidGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -72035,7 +69970,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableGetUserByIDErrorResponse:
+	case UnavailableGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -72051,7 +69986,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserNotFoundGetUserByIDErrorResponse:
+	case UserNotFoundGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
 		{
@@ -72067,7 +70002,7 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPermissionDeniedGetUserByIDErrorResponse:
+	case UserPermissionDeniedGetUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
 		{
@@ -72086,10 +70021,10 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetUserByIDErrorResponse from json.
-func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserErrorResponse from json.
+func (s *GetUserErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserByIDErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetUserErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -72110,25 +70045,25 @@ func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetUserByIDErrorResponse
+					s.Type = AuthUnauthorizedGetUserErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetUserByIDErrorResponse
+					s.Type = InternalGetUserErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedGetUserByIDErrorResponse
+					s.Type = NotImplementedGetUserErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetUserByIDErrorResponse
+					s.Type = ReqInvalidGetUserErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableGetUserByIDErrorResponse
+					s.Type = UnavailableGetUserErrorResponse
 					found = true
 				case "user.not_found":
-					s.Type = UserNotFoundGetUserByIDErrorResponse
+					s.Type = UserNotFoundGetUserErrorResponse
 					found = true
 				case "user.permission_denied":
-					s.Type = UserPermissionDeniedGetUserByIDErrorResponse
+					s.Type = UserPermissionDeniedGetUserErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -72144,31 +70079,31 @@ func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetUserByIDErrorResponse:
+	case AuthUnauthorizedGetUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetUserByIDErrorResponse:
+	case InternalGetUserErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedGetUserByIDErrorResponse:
+	case NotImplementedGetUserErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetUserByIDErrorResponse:
+	case ReqInvalidGetUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableGetUserByIDErrorResponse:
+	case UnavailableGetUserErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
-	case UserNotFoundGetUserByIDErrorResponse:
+	case UserNotFoundGetUserErrorResponse:
 		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
-	case UserPermissionDeniedGetUserByIDErrorResponse:
+	case UserPermissionDeniedGetUserErrorResponse:
 		if err := s.UserPermissionDenied.Decode(d); err != nil {
 			return err
 		}
@@ -72179,29 +70114,29 @@ func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetUserByIDErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetUserErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserByIDErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetUserErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserByIDNotFound as json.
-func (s *GetUserByIDNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetUserNotFound as json.
+func (s *GetUserNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetUserByIDNotFound from json.
-func (s *GetUserByIDNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserNotFound from json.
+func (s *GetUserNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserByIDNotFound to nil")
+		return errors.New("invalid: unable to decode GetUserNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -72212,57 +70147,19 @@ func (s *GetUserByIDNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetUserByIDNotFound(unwrapped)
+	*s = GetUserNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserByIDNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetUserNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserByIDNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetUserByIDUnauthorized as json.
-func (s *GetUserByIDUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes GetUserByIDUnauthorized from json.
-func (s *GetUserByIDUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetUserByIDUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = GetUserByIDUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserByIDUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserByIDUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *GetUserNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -72648,6 +70545,44 @@ func (s *GetUserPasswordStateUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes GetUserUnauthorized as json.
+func (s *GetUserUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetUserUnauthorized from json.
+func (s *GetUserUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetUserUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetUserUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetUserUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetUserUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes GetVariableErrorResponse as json.
 func (s GetVariableErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -72873,235 +70808,6 @@ func (s GetVariableErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetVariableErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetVariablesErrorResponse as json.
-func (s GetVariablesErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarNotFoundGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.not_found")
-		{
-			s := s.VarNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarPermissionDeniedGetVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.permission_denied")
-		{
-			s := s.VarPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetVariablesErrorResponse from json.
-func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetVariablesErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetVariablesErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalGetVariablesErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedGetVariablesErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidGetVariablesErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableGetVariablesErrorResponse
-					found = true
-				case "var.not_found":
-					s.Type = VarNotFoundGetVariablesErrorResponse
-					found = true
-				case "var.permission_denied":
-					s.Type = VarPermissionDeniedGetVariablesErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedGetVariablesErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case InternalGetVariablesErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedGetVariablesErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidGetVariablesErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableGetVariablesErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case VarNotFoundGetVariablesErrorResponse:
-		if err := s.VarNotFound.Decode(d); err != nil {
-			return err
-		}
-	case VarPermissionDeniedGetVariablesErrorResponse:
-		if err := s.VarPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetVariablesErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetVariablesErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -80156,304 +77862,6 @@ func (s IdpUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *IdpUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes InitClaimErrorResponse as json.
-func (s InitClaimErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s InitClaimErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ClaimChallengeInvalidInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("claim_challenge.invalid")
-		{
-			s := s.ClaimChallengeInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjAlreadyClaimedInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.already_claimed")
-		{
-			s := s.ProjAlreadyClaimed
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjClaimWindowExpiredInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.claim_window_expired")
-		{
-			s := s.ProjClaimWindowExpired
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNotFoundInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjPermissionDeniedInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.permission_denied")
-		{
-			s := s.ProjPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableInitClaimErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes InitClaimErrorResponse from json.
-func (s *InitClaimErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode InitClaimErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedInitClaimErrorResponse
-					found = true
-				case "claim_challenge.invalid":
-					s.Type = ClaimChallengeInvalidInitClaimErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalInitClaimErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedInitClaimErrorResponse
-					found = true
-				case "proj.already_claimed":
-					s.Type = ProjAlreadyClaimedInitClaimErrorResponse
-					found = true
-				case "proj.claim_window_expired":
-					s.Type = ProjClaimWindowExpiredInitClaimErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundInitClaimErrorResponse
-					found = true
-				case "proj.permission_denied":
-					s.Type = ProjPermissionDeniedInitClaimErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidInitClaimErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableInitClaimErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedInitClaimErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case ClaimChallengeInvalidInitClaimErrorResponse:
-		if err := s.ClaimChallengeInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalInitClaimErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedInitClaimErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ProjAlreadyClaimedInitClaimErrorResponse:
-		if err := s.ProjAlreadyClaimed.Decode(d); err != nil {
-			return err
-		}
-	case ProjClaimWindowExpiredInitClaimErrorResponse:
-		if err := s.ProjClaimWindowExpired.Decode(d); err != nil {
-			return err
-		}
-	case ProjNotFoundInitClaimErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ProjPermissionDeniedInitClaimErrorResponse:
-		if err := s.ProjPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidInitClaimErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableInitClaimErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s InitClaimErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InitClaimErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -88289,281 +85697,6 @@ func (s *InvitationTokenRequest) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes IssueChallengeErrorResponse as json.
-func (s IssueChallengeErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s IssueChallengeErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AttAlreadyHandedOffIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.already_handed_off")
-		{
-			s := s.AttAlreadyHandedOff
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidRequestIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_request")
-		{
-			s := s.AttInvalidRequest
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttInvalidStateIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.invalid_state")
-		{
-			s := s.AttInvalidState
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AttNotFoundIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("att.not_found")
-		{
-			s := s.AttNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableIssueChallengeErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes IssueChallengeErrorResponse from json.
-func (s *IssueChallengeErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IssueChallengeErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "att.already_handed_off":
-					s.Type = AttAlreadyHandedOffIssueChallengeErrorResponse
-					found = true
-				case "att.invalid_request":
-					s.Type = AttInvalidRequestIssueChallengeErrorResponse
-					found = true
-				case "att.invalid_state":
-					s.Type = AttInvalidStateIssueChallengeErrorResponse
-					found = true
-				case "att.not_found":
-					s.Type = AttNotFoundIssueChallengeErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedIssueChallengeErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalIssueChallengeErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedIssueChallengeErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidIssueChallengeErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableIssueChallengeErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AttAlreadyHandedOffIssueChallengeErrorResponse:
-		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidRequestIssueChallengeErrorResponse:
-		if err := s.AttInvalidRequest.Decode(d); err != nil {
-			return err
-		}
-	case AttInvalidStateIssueChallengeErrorResponse:
-		if err := s.AttInvalidState.Decode(d); err != nil {
-			return err
-		}
-	case AttNotFoundIssueChallengeErrorResponse:
-		if err := s.AttNotFound.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedIssueChallengeErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case InternalIssueChallengeErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedIssueChallengeErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidIssueChallengeErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableIssueChallengeErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IssueChallengeErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IssueChallengeErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *IssueChallengeRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -89096,15 +86229,34 @@ func (s *ListBrandingErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ListBrandingResponse as json.
-func (s ListBrandingResponse) Encode(e *jx.Encoder) {
-	unwrapped := []ListBrandingResponseItem(s)
+// Encode implements json.Marshaler.
+func (s *ListBrandingResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
 
-	e.ArrStart()
-	for _, elem := range unwrapped {
-		elem.Encode(e)
+// encodeFields encodes fields.
+func (s *ListBrandingResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("branding")
+		e.ArrStart()
+		for _, elem := range s.Branding {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
 	}
-	e.ArrEnd()
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfListBrandingResponse = [2]string{
+	0: "branding",
+	1: "next_page_token",
 }
 
 // Decode decodes ListBrandingResponse from json.
@@ -89112,108 +86264,49 @@ func (s *ListBrandingResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode ListBrandingResponse to nil")
 	}
-	var unwrapped []ListBrandingResponseItem
-	if err := func() error {
-		unwrapped = make([]ListBrandingResponseItem, 0)
-		if err := d.Arr(func(d *jx.Decoder) error {
-			var elem ListBrandingResponseItem
-			if err := elem.Decode(d); err != nil {
-				return err
-			}
-			unwrapped = append(unwrapped, elem)
-			return nil
-		}); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = ListBrandingResponse(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ListBrandingResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListBrandingResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *ListBrandingResponseItem) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *ListBrandingResponseItem) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("id")
-		e.Str(s.ID)
-	}
-	{
-		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
-	}
-}
-
-var jsonFieldsNameOfListBrandingResponseItem = [2]string{
-	0: "id",
-	1: "created_at",
-}
-
-// Decode decodes ListBrandingResponseItem from json.
-func (s *ListBrandingResponseItem) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ListBrandingResponseItem to nil")
-	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "id":
+		case "branding":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := d.Str()
-				s.ID = string(v)
-				if err != nil {
+				s.Branding = make([]BrandingRevisionSummary, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem BrandingRevisionSummary
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Branding = append(s.Branding, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
+				return errors.Wrap(err, "decode field \"branding\"")
 			}
-		case "created_at":
-			requiredBitSet[0] |= 1 << 1
+		case "next_page_token":
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.CreatedAt = v
-				if err != nil {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"created_at\"")
+				return errors.Wrap(err, "decode field \"next_page_token\"")
 			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ListBrandingResponseItem")
+		return errors.Wrap(err, "decode ListBrandingResponse")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -89225,8 +86318,8 @@ func (s *ListBrandingResponseItem) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfListBrandingResponseItem) {
-					name = jsonFieldsNameOfListBrandingResponseItem[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfListBrandingResponse) {
+					name = jsonFieldsNameOfListBrandingResponse[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -89247,14 +86340,289 @@ func (s *ListBrandingResponseItem) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListBrandingResponseItem) MarshalJSON() ([]byte, error) {
+func (s *ListBrandingResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListBrandingResponseItem) UnmarshalJSON(data []byte) error {
+func (s *ListBrandingResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListDeploymentVariablesErrorResponse as json.
+func (s ListDeploymentVariablesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListDeploymentVariablesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepNotFoundListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.not_found")
+		{
+			s := s.DepNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepPermissionDeniedListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.permission_denied")
+		{
+			s := s.DepPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarNotFoundListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.not_found")
+		{
+			s := s.VarNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarPermissionDeniedListDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.permission_denied")
+		{
+			s := s.VarPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListDeploymentVariablesErrorResponse from json.
+func (s *ListDeploymentVariablesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListDeploymentVariablesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListDeploymentVariablesErrorResponse
+					found = true
+				case "dep.not_found":
+					s.Type = DepNotFoundListDeploymentVariablesErrorResponse
+					found = true
+				case "dep.permission_denied":
+					s.Type = DepPermissionDeniedListDeploymentVariablesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListDeploymentVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListDeploymentVariablesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListDeploymentVariablesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListDeploymentVariablesErrorResponse
+					found = true
+				case "var.not_found":
+					s.Type = VarNotFoundListDeploymentVariablesErrorResponse
+					found = true
+				case "var.permission_denied":
+					s.Type = VarPermissionDeniedListDeploymentVariablesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListDeploymentVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case DepNotFoundListDeploymentVariablesErrorResponse:
+		if err := s.DepNotFound.Decode(d); err != nil {
+			return err
+		}
+	case DepPermissionDeniedListDeploymentVariablesErrorResponse:
+		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case InternalListDeploymentVariablesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListDeploymentVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListDeploymentVariablesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListDeploymentVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case VarNotFoundListDeploymentVariablesErrorResponse:
+		if err := s.VarNotFound.Decode(d); err != nil {
+			return err
+		}
+	case VarPermissionDeniedListDeploymentVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListDeploymentVariablesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListDeploymentVariablesErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -89949,9 +87317,9 @@ func (s *ListEventsResponse) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *ListEventsResponse) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("data")
+		e.FieldStart("events")
 		e.ArrStart()
-		for _, elem := range s.Data {
+		for _, elem := range s.Events {
 			elem.Encode(e)
 		}
 		e.ArrEnd()
@@ -89965,7 +87333,7 @@ func (s *ListEventsResponse) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfListEventsResponse = [2]string{
-	0: "data",
+	0: "events",
 	1: "next_page_token",
 }
 
@@ -89978,23 +87346,23 @@ func (s *ListEventsResponse) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "data":
+		case "events":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Data = make([]Event, 0)
+				s.Events = make([]Event, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
 					var elem Event
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
-					s.Data = append(s.Data, elem)
+					s.Events = append(s.Events, elem)
 					return nil
 				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"data\"")
+				return errors.Wrap(err, "decode field \"events\"")
 			}
 		case "next_page_token":
 			if err := func() error {
@@ -93187,235 +90555,6 @@ func (s *ListPolicyRevisionsResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ListPreviewsErrorResponse as json.
-func (s ListPreviewsErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s ListPreviewsErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepNotFoundListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.not_found")
-		{
-			s := s.DepNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepPermissionDeniedListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.permission_denied")
-		{
-			s := s.DepPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableListPreviewsErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes ListPreviewsErrorResponse from json.
-func (s *ListPreviewsErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ListPreviewsErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedListPreviewsErrorResponse
-					found = true
-				case "dep.not_found":
-					s.Type = DepNotFoundListPreviewsErrorResponse
-					found = true
-				case "dep.permission_denied":
-					s.Type = DepPermissionDeniedListPreviewsErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalListPreviewsErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedListPreviewsErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidListPreviewsErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableListPreviewsErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedListPreviewsErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case DepNotFoundListPreviewsErrorResponse:
-		if err := s.DepNotFound.Decode(d); err != nil {
-			return err
-		}
-	case DepPermissionDeniedListPreviewsErrorResponse:
-		if err := s.DepPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case InternalListPreviewsErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedListPreviewsErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidListPreviewsErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableListPreviewsErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ListPreviewsErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListPreviewsErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *ListPreviewsResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -94062,6 +91201,235 @@ func (s *ListProjectAdminsUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ListProjectAdminsUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListProjectPreviewsErrorResponse as json.
+func (s ListProjectPreviewsErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListProjectPreviewsErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepNotFoundListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.not_found")
+		{
+			s := s.DepNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepPermissionDeniedListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.permission_denied")
+		{
+			s := s.DepPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListProjectPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListProjectPreviewsErrorResponse from json.
+func (s *ListProjectPreviewsErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListProjectPreviewsErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListProjectPreviewsErrorResponse
+					found = true
+				case "dep.not_found":
+					s.Type = DepNotFoundListProjectPreviewsErrorResponse
+					found = true
+				case "dep.permission_denied":
+					s.Type = DepPermissionDeniedListProjectPreviewsErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListProjectPreviewsErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListProjectPreviewsErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListProjectPreviewsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListProjectPreviewsErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListProjectPreviewsErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case DepNotFoundListProjectPreviewsErrorResponse:
+		if err := s.DepNotFound.Decode(d); err != nil {
+			return err
+		}
+	case DepPermissionDeniedListProjectPreviewsErrorResponse:
+		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case InternalListProjectPreviewsErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListProjectPreviewsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListProjectPreviewsErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListProjectPreviewsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListProjectPreviewsErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListProjectPreviewsErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -96522,6 +93890,235 @@ func (s *ListUserTeamsUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ListUserTeamsUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListVariablesErrorResponse as json.
+func (s ListVariablesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListVariablesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarNotFoundListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.not_found")
+		{
+			s := s.VarNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarPermissionDeniedListVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.permission_denied")
+		{
+			s := s.VarPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListVariablesErrorResponse from json.
+func (s *ListVariablesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListVariablesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListVariablesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListVariablesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListVariablesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListVariablesErrorResponse
+					found = true
+				case "var.not_found":
+					s.Type = VarNotFoundListVariablesErrorResponse
+					found = true
+				case "var.permission_denied":
+					s.Type = VarPermissionDeniedListVariablesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListVariablesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListVariablesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case VarNotFoundListVariablesErrorResponse:
+		if err := s.VarNotFound.Decode(d); err != nil {
+			return err
+		}
+	case VarPermissionDeniedListVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListVariablesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListVariablesErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -116618,464 +114215,6 @@ func (s *PasswordSetPolicyOperation) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes PatchMyUserBadRequest as json.
-func (s *PatchMyUserBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchMyUserBadRequest from json.
-func (s *PatchMyUserBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchMyUserBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchMyUserBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchMyUserBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchMyUserBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchMyUserConflict as json.
-func (s *PatchMyUserConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchMyUserConflict from json.
-func (s *PatchMyUserConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchMyUserConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchMyUserConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchMyUserConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchMyUserConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchMyUserErrorResponse as json.
-func (s PatchMyUserErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SessProjectMismatchPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("sess.project_mismatch")
-		{
-			s := s.SessProjectMismatch
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailablePatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserAlreadyExistsPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.already_exists")
-		{
-			s := s.UserAlreadyExists
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserConflictPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.conflict")
-		{
-			s := s.UserConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserInvalidPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.invalid")
-		{
-			s := s.UserInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserNotFoundPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.not_found")
-		{
-			s := s.UserNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes PatchMyUserErrorResponse from json.
-func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchMyUserErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidPatchMyUserErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedPatchMyUserErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidPatchMyUserErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalPatchMyUserErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedPatchMyUserErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidPatchMyUserErrorResponse
-					found = true
-				case "sess.project_mismatch":
-					s.Type = SessProjectMismatchPatchMyUserErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailablePatchMyUserErrorResponse
-					found = true
-				case "user.already_exists":
-					s.Type = UserAlreadyExistsPatchMyUserErrorResponse
-					found = true
-				case "user.conflict":
-					s.Type = UserConflictPatchMyUserErrorResponse
-					found = true
-				case "user.invalid":
-					s.Type = UserInvalidPatchMyUserErrorResponse
-					found = true
-				case "user.not_found":
-					s.Type = UserNotFoundPatchMyUserErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidPatchMyUserErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedPatchMyUserErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidPatchMyUserErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalPatchMyUserErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedPatchMyUserErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidPatchMyUserErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case SessProjectMismatchPatchMyUserErrorResponse:
-		if err := s.SessProjectMismatch.Decode(d); err != nil {
-			return err
-		}
-	case UnavailablePatchMyUserErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case UserAlreadyExistsPatchMyUserErrorResponse:
-		if err := s.UserAlreadyExists.Decode(d); err != nil {
-			return err
-		}
-	case UserConflictPatchMyUserErrorResponse:
-		if err := s.UserConflict.Decode(d); err != nil {
-			return err
-		}
-	case UserInvalidPatchMyUserErrorResponse:
-		if err := s.UserInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UserNotFoundPatchMyUserErrorResponse:
-		if err := s.UserNotFound.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PatchMyUserErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchMyUserErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchMyUserForbidden as json.
-func (s *PatchMyUserForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchMyUserForbidden from json.
-func (s *PatchMyUserForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchMyUserForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchMyUserForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchMyUserForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchMyUserForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *PatchMyUserRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -117239,464 +114378,6 @@ func (s *PatchMyUserRequestAttributes) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes PatchMyUserUnauthorized as json.
-func (s *PatchMyUserUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchMyUserUnauthorized from json.
-func (s *PatchMyUserUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchMyUserUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchMyUserUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchMyUserUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchMyUserUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchProjectBadRequest as json.
-func (s *PatchProjectBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchProjectBadRequest from json.
-func (s *PatchProjectBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchProjectBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchProjectBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchProjectBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchProjectBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchProjectErrorResponse as json.
-func (s PatchProjectErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s PatchProjectErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjMissingIDPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.missing_id")
-		{
-			s := s.ProjMissingID
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNameInvalidPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.name_invalid")
-		{
-			s := s.ProjNameInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjNotFoundPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjPasswordHashInvalidPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.password_hash_invalid")
-		{
-			s := s.ProjPasswordHashInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjPermissionDeniedPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.permission_denied")
-		{
-			s := s.ProjPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidPatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailablePatchProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes PatchProjectErrorResponse from json.
-func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchProjectErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidPatchProjectErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedPatchProjectErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidPatchProjectErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalPatchProjectErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedPatchProjectErrorResponse
-					found = true
-				case "proj.missing_id":
-					s.Type = ProjMissingIDPatchProjectErrorResponse
-					found = true
-				case "proj.name_invalid":
-					s.Type = ProjNameInvalidPatchProjectErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundPatchProjectErrorResponse
-					found = true
-				case "proj.password_hash_invalid":
-					s.Type = ProjPasswordHashInvalidPatchProjectErrorResponse
-					found = true
-				case "proj.permission_denied":
-					s.Type = ProjPermissionDeniedPatchProjectErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidPatchProjectErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailablePatchProjectErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidPatchProjectErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedPatchProjectErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidPatchProjectErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalPatchProjectErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedPatchProjectErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ProjMissingIDPatchProjectErrorResponse:
-		if err := s.ProjMissingID.Decode(d); err != nil {
-			return err
-		}
-	case ProjNameInvalidPatchProjectErrorResponse:
-		if err := s.ProjNameInvalid.Decode(d); err != nil {
-			return err
-		}
-	case ProjNotFoundPatchProjectErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ProjPasswordHashInvalidPatchProjectErrorResponse:
-		if err := s.ProjPasswordHashInvalid.Decode(d); err != nil {
-			return err
-		}
-	case ProjPermissionDeniedPatchProjectErrorResponse:
-		if err := s.ProjPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidPatchProjectErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailablePatchProjectErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PatchProjectErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchProjectErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchProjectNotFound as json.
-func (s *PatchProjectNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchProjectNotFound from json.
-func (s *PatchProjectNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchProjectNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchProjectNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchProjectNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchProjectNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *PatchProjectRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -117773,578 +114454,6 @@ func (s *PatchProjectRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PatchProjectRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchProjectUnauthorized as json.
-func (s *PatchProjectUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchProjectUnauthorized from json.
-func (s *PatchProjectUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchProjectUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchProjectUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchProjectUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchProjectUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDBadRequest as json.
-func (s *PatchUserByIDBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchUserByIDBadRequest from json.
-func (s *PatchUserByIDBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchUserByIDBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchUserByIDBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDConflict as json.
-func (s *PatchUserByIDConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchUserByIDConflict from json.
-func (s *PatchUserByIDConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchUserByIDConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchUserByIDConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDErrorResponse as json.
-func (s PatchUserByIDErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailablePatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserAlreadyExistsPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.already_exists")
-		{
-			s := s.UserAlreadyExists
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserConflictPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.conflict")
-		{
-			s := s.UserConflict
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserInvalidPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.invalid")
-		{
-			s := s.UserInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserNotFoundPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.not_found")
-		{
-			s := s.UserNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPermissionDeniedPatchUserByIDErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.permission_denied")
-		{
-			s := s.UserPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes PatchUserByIDErrorResponse from json.
-func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidPatchUserByIDErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedPatchUserByIDErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidPatchUserByIDErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalPatchUserByIDErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedPatchUserByIDErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidPatchUserByIDErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailablePatchUserByIDErrorResponse
-					found = true
-				case "user.already_exists":
-					s.Type = UserAlreadyExistsPatchUserByIDErrorResponse
-					found = true
-				case "user.conflict":
-					s.Type = UserConflictPatchUserByIDErrorResponse
-					found = true
-				case "user.invalid":
-					s.Type = UserInvalidPatchUserByIDErrorResponse
-					found = true
-				case "user.not_found":
-					s.Type = UserNotFoundPatchUserByIDErrorResponse
-					found = true
-				case "user.permission_denied":
-					s.Type = UserPermissionDeniedPatchUserByIDErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidPatchUserByIDErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedPatchUserByIDErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidPatchUserByIDErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalPatchUserByIDErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedPatchUserByIDErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidPatchUserByIDErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailablePatchUserByIDErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case UserAlreadyExistsPatchUserByIDErrorResponse:
-		if err := s.UserAlreadyExists.Decode(d); err != nil {
-			return err
-		}
-	case UserConflictPatchUserByIDErrorResponse:
-		if err := s.UserConflict.Decode(d); err != nil {
-			return err
-		}
-	case UserInvalidPatchUserByIDErrorResponse:
-		if err := s.UserInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UserNotFoundPatchUserByIDErrorResponse:
-		if err := s.UserNotFound.Decode(d); err != nil {
-			return err
-		}
-	case UserPermissionDeniedPatchUserByIDErrorResponse:
-		if err := s.UserPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PatchUserByIDErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDForbidden as json.
-func (s *PatchUserByIDForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchUserByIDForbidden from json.
-func (s *PatchUserByIDForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchUserByIDForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchUserByIDForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDForbidden) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDNotFound as json.
-func (s *PatchUserByIDNotFound) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchUserByIDNotFound from json.
-func (s *PatchUserByIDNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDNotFound to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchUserByIDNotFound(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchUserByIDNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes PatchUserByIDUnauthorized as json.
-func (s *PatchUserByIDUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes PatchUserByIDUnauthorized from json.
-func (s *PatchUserByIDUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PatchUserByIDUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = PatchUserByIDUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PatchUserByIDUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PatchUserByIDUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -127158,6 +123267,1807 @@ func (s *ProjectUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes PublishApplicationBadRequest as json.
+func (s *PublishApplicationBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationBadRequest from json.
+func (s *PublishApplicationBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationConflict as json.
+func (s *PublishApplicationConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationConflict from json.
+func (s *PublishApplicationConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationCreated as json.
+func (s *PublishApplicationCreated) Encode(e *jx.Encoder) {
+	unwrapped := (*CreateApplicationResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationCreated from json.
+func (s *PublishApplicationCreated) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationCreated to nil")
+	}
+	var unwrapped CreateApplicationResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationCreated(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationCreated) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationCreated) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationErrorResponse as json.
+func (s PublishApplicationErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishApplicationErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AppClientIDTakenPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.client_id_taken")
+		{
+			s := s.AppClientIDTaken
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppFieldImmutablePublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.field_immutable")
+		{
+			s := s.AppFieldImmutable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppInvalidPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.invalid")
+		{
+			s := s.AppInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppNotFoundPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppRevisionConflictPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.revision_conflict")
+		{
+			s := s.AppRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidPublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePublishApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes PublishApplicationErrorResponse from json.
+func (s *PublishApplicationErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "app.client_id_taken":
+					s.Type = AppClientIDTakenPublishApplicationErrorResponse
+					found = true
+				case "app.field_immutable":
+					s.Type = AppFieldImmutablePublishApplicationErrorResponse
+					found = true
+				case "app.invalid":
+					s.Type = AppInvalidPublishApplicationErrorResponse
+					found = true
+				case "app.not_found":
+					s.Type = AppNotFoundPublishApplicationErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedPublishApplicationErrorResponse
+					found = true
+				case "app.revision_conflict":
+					s.Type = AppRevisionConflictPublishApplicationErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedPublishApplicationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPublishApplicationErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalPublishApplicationErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishApplicationErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidPublishApplicationErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishApplicationErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AppClientIDTakenPublishApplicationErrorResponse:
+		if err := s.AppClientIDTaken.Decode(d); err != nil {
+			return err
+		}
+	case AppFieldImmutablePublishApplicationErrorResponse:
+		if err := s.AppFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case AppInvalidPublishApplicationErrorResponse:
+		if err := s.AppInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AppNotFoundPublishApplicationErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedPublishApplicationErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case AppRevisionConflictPublishApplicationErrorResponse:
+		if err := s.AppRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedPublishApplicationErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPublishApplicationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalPublishApplicationErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedPublishApplicationErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidPublishApplicationErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishApplicationErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishApplicationErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationForbidden as json.
+func (s *PublishApplicationForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationForbidden from json.
+func (s *PublishApplicationForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationNotFound as json.
+func (s *PublishApplicationNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationNotFound from json.
+func (s *PublishApplicationNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationOK as json.
+func (s *PublishApplicationOK) Encode(e *jx.Encoder) {
+	unwrapped := (*CreateApplicationResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationOK from json.
+func (s *PublishApplicationOK) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationOK to nil")
+	}
+	var unwrapped CreateApplicationResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationOK(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationOK) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationOK) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishApplicationUnauthorized as json.
+func (s *PublishApplicationUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishApplicationUnauthorized from json.
+func (s *PublishApplicationUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishApplicationUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishApplicationUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishApplicationUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishApplicationUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishBrandingErrorResponse as json.
+func (s PublishBrandingErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishBrandingErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case BrndInvalidPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("brnd.invalid")
+		{
+			s := s.BrndInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case BrndMissingProjectIDPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("brnd.missing_project_id")
+		{
+			s := s.BrndMissingProjectID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case BrndNotFoundPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("brnd.not_found")
+		{
+			s := s.BrndNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case BrndPermissionDeniedPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("brnd.permission_denied")
+		{
+			s := s.BrndPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidPublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePublishBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes PublishBrandingErrorResponse from json.
+func (s *PublishBrandingErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishBrandingErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedPublishBrandingErrorResponse
+					found = true
+				case "brnd.invalid":
+					s.Type = BrndInvalidPublishBrandingErrorResponse
+					found = true
+				case "brnd.missing_project_id":
+					s.Type = BrndMissingProjectIDPublishBrandingErrorResponse
+					found = true
+				case "brnd.not_found":
+					s.Type = BrndNotFoundPublishBrandingErrorResponse
+					found = true
+				case "brnd.permission_denied":
+					s.Type = BrndPermissionDeniedPublishBrandingErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPublishBrandingErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalPublishBrandingErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishBrandingErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidPublishBrandingErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishBrandingErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedPublishBrandingErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case BrndInvalidPublishBrandingErrorResponse:
+		if err := s.BrndInvalid.Decode(d); err != nil {
+			return err
+		}
+	case BrndMissingProjectIDPublishBrandingErrorResponse:
+		if err := s.BrndMissingProjectID.Decode(d); err != nil {
+			return err
+		}
+	case BrndNotFoundPublishBrandingErrorResponse:
+		if err := s.BrndNotFound.Decode(d); err != nil {
+			return err
+		}
+	case BrndPermissionDeniedPublishBrandingErrorResponse:
+		if err := s.BrndPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPublishBrandingErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalPublishBrandingErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedPublishBrandingErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidPublishBrandingErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishBrandingErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishBrandingErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishBrandingErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishFlowDefinitionErrorResponse as json.
+func (s PublishFlowDefinitionErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefInvalidPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefNotFoundPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.not_found")
+		{
+			s := s.FlowdefNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefPermissionDeniedPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.permission_denied")
+		{
+			s := s.FlowdefPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefRevisionConflictPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.revision_conflict")
+		{
+			s := s.FlowdefRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchNotFoundPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.not_found")
+		{
+			s := s.SchNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefSchemaFetchFailedPublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.schema_fetch_failed")
+		{
+			s := s.FlowdefSchemaFetchFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePublishFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes PublishFlowDefinitionErrorResponse from json.
+func (s *PublishFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishFlowDefinitionErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedPublishFlowDefinitionErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPublishFlowDefinitionErrorResponse
+					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidPublishFlowDefinitionErrorResponse
+					found = true
+				case "flowdef.not_found":
+					s.Type = FlowdefNotFoundPublishFlowDefinitionErrorResponse
+					found = true
+				case "flowdef.permission_denied":
+					s.Type = FlowdefPermissionDeniedPublishFlowDefinitionErrorResponse
+					found = true
+				case "flowdef.revision_conflict":
+					s.Type = FlowdefRevisionConflictPublishFlowDefinitionErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalPublishFlowDefinitionErrorResponse
+					found = true
+				case "sch.not_found":
+					s.Type = SchNotFoundPublishFlowDefinitionErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishFlowDefinitionErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidPublishFlowDefinitionErrorResponse
+					found = true
+				case "flowdef.schema_fetch_failed":
+					s.Type = FlowdefSchemaFetchFailedPublishFlowDefinitionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishFlowDefinitionErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedPublishFlowDefinitionErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefNotFoundPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefNotFound.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefPermissionDeniedPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefRevisionConflictPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case InternalPublishFlowDefinitionErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchNotFoundPublishFlowDefinitionErrorResponse:
+		if err := s.SchNotFound.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedPublishFlowDefinitionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidPublishFlowDefinitionErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefSchemaFetchFailedPublishFlowDefinitionErrorResponse:
+		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishFlowDefinitionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishFlowDefinitionErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishFlowDefinitionErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpBadRequest as json.
+func (s *PublishIdpBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpBadRequest from json.
+func (s *PublishIdpBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpCreated as json.
+func (s *PublishIdpCreated) Encode(e *jx.Encoder) {
+	unwrapped := (*IdpResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpCreated from json.
+func (s *PublishIdpCreated) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpCreated to nil")
+	}
+	var unwrapped IdpResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpCreated(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpCreated) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpCreated) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpErrorResponse as json.
+func (s PublishIdpErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishIdpErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpFieldImmutablePublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.field_immutable")
+		{
+			s := s.IdpFieldImmutable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpNotFoundPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpPermissionDeniedPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.permission_denied")
+		{
+			s := s.IdpPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpRevisionConflictPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.revision_conflict")
+		{
+			s := s.IdpRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpEndpointsPartialPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoints_partial")
+		{
+			s := s.IdpEndpointsPartial
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidPublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePublishIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes PublishIdpErrorResponse from json.
+func (s *PublishIdpErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedPublishIdpErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPublishIdpErrorResponse
+					found = true
+				case "idp.field_immutable":
+					s.Type = IdpFieldImmutablePublishIdpErrorResponse
+					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundPublishIdpErrorResponse
+					found = true
+				case "idp.permission_denied":
+					s.Type = IdpPermissionDeniedPublishIdpErrorResponse
+					found = true
+				case "idp.revision_conflict":
+					s.Type = IdpRevisionConflictPublishIdpErrorResponse
+					found = true
+				case "idp.endpoints_partial":
+					s.Type = IdpEndpointsPartialPublishIdpErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalPublishIdpErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishIdpErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidPublishIdpErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishIdpErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedPublishIdpErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPublishIdpErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case IdpFieldImmutablePublishIdpErrorResponse:
+		if err := s.IdpFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundPublishIdpErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
+			return err
+		}
+	case IdpPermissionDeniedPublishIdpErrorResponse:
+		if err := s.IdpPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case IdpRevisionConflictPublishIdpErrorResponse:
+		if err := s.IdpRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointsPartialPublishIdpErrorResponse:
+		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
+			return err
+		}
+	case InternalPublishIdpErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedPublishIdpErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidPublishIdpErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishIdpErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishIdpErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpForbidden as json.
+func (s *PublishIdpForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpForbidden from json.
+func (s *PublishIdpForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpNotFound as json.
+func (s *PublishIdpNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpNotFound from json.
+func (s *PublishIdpNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpOK as json.
+func (s *PublishIdpOK) Encode(e *jx.Encoder) {
+	unwrapped := (*IdpResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpOK from json.
+func (s *PublishIdpOK) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpOK to nil")
+	}
+	var unwrapped IdpResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpOK(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpOK) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpOK) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishIdpUnauthorized as json.
+func (s *PublishIdpUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PublishIdpUnauthorized from json.
+func (s *PublishIdpUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishIdpUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PublishIdpUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PublishIdpUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishIdpUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes PublishPolicyErrorResponse as json.
 func (s PublishPolicyErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -127554,6 +125464,585 @@ func (s PublishPolicyRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PublishPolicyRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishSchemaErrorResponse as json.
+func (s PublishSchemaErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishSchemaErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchAlreadyExistsPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.already_exists")
+		{
+			s := s.SchAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDeniedPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_denied")
+		{
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradePublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargePublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchInvalidRequestPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.invalid_request")
+		{
+			s := s.SchInvalidRequest
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchNotFoundPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.not_found")
+		{
+			s := s.SchNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchPermissionDeniedPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.permission_denied")
+		{
+			s := s.SchPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchRevisionConflictPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.revision_conflict")
+		{
+			s := s.SchRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidPublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePublishSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes PublishSchemaErrorResponse from json.
+func (s *PublishSchemaErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishSchemaErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedPublishSchemaErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPublishSchemaErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalPublishSchemaErrorResponse
+					found = true
+				case "sch.already_exists":
+					s.Type = SchAlreadyExistsPublishSchemaErrorResponse
+					found = true
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedPublishSchemaErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradePublishSchemaErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutPublishSchemaErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargePublishSchemaErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsPublishSchemaErrorResponse
+					found = true
+				case "sch.invalid_request":
+					s.Type = SchInvalidRequestPublishSchemaErrorResponse
+					found = true
+				case "sch.not_found":
+					s.Type = SchNotFoundPublishSchemaErrorResponse
+					found = true
+				case "sch.permission_denied":
+					s.Type = SchPermissionDeniedPublishSchemaErrorResponse
+					found = true
+				case "sch.revision_conflict":
+					s.Type = SchRevisionConflictPublishSchemaErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishSchemaErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidPublishSchemaErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishSchemaErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedPublishSchemaErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPublishSchemaErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalPublishSchemaErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case SchAlreadyExistsPublishSchemaErrorResponse:
+		if err := s.SchAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDeniedPublishSchemaErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradePublishSchemaErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutPublishSchemaErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargePublishSchemaErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsPublishSchemaErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
+			return err
+		}
+	case SchInvalidRequestPublishSchemaErrorResponse:
+		if err := s.SchInvalidRequest.Decode(d); err != nil {
+			return err
+		}
+	case SchNotFoundPublishSchemaErrorResponse:
+		if err := s.SchNotFound.Decode(d); err != nil {
+			return err
+		}
+	case SchPermissionDeniedPublishSchemaErrorResponse:
+		if err := s.SchPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchRevisionConflictPublishSchemaErrorResponse:
+		if err := s.SchRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedPublishSchemaErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidPublishSchemaErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishSchemaErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishSchemaErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishSchemaErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PublishSchemaReq as json.
+func (s PublishSchemaReq) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s PublishSchemaReq) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case UserSchemaPublishSchemaReq:
+		e.FieldStart("kind")
+		e.Str("user-schema")
+		{
+			s := s.UserSchema
+			{
+				e.FieldStart("$schema")
+				e.Str("https://json-schema.org/draft/2020-12/schema")
+			}
+			{
+				e.FieldStart("objectType")
+				e.Str(s.ObjectType)
+			}
+			{
+				e.FieldStart("metaSchema")
+				json.EncodeURI(e, s.MetaSchema)
+			}
+			{
+				e.FieldStart("x-auth-methods")
+				s.XMinusAuthMinusMethods.Encode(e)
+			}
+			{
+				if s.XMinusIdentifier.Set {
+					e.FieldStart("x-identifier")
+					s.XMinusIdentifier.Encode(e)
+				}
+			}
+			{
+				if s.XMinusDisplay != nil {
+					e.FieldStart("x-display")
+					e.ArrStart()
+					for _, elem := range s.XMinusDisplay {
+						e.Str(elem)
+					}
+					e.ArrEnd()
+				}
+			}
+			{
+				if s.Properties.Set {
+					e.FieldStart("properties")
+					s.Properties.Encode(e)
+				}
+			}
+			for k, elem := range s.AdditionalProps {
+				e.FieldStart(k)
+
+				if len(elem) != 0 {
+					e.Raw(elem)
+				}
+			}
+		}
+	case SchemaURLPublishSchemaReq:
+		e.FieldStart("kind")
+		e.Str("schema-url")
+		{
+			s := s.SchemaURL
+			{
+				e.FieldStart("url")
+				json.EncodeURI(e, s.URL)
+			}
+		}
+	}
+}
+
+// Decode decodes PublishSchemaReq from json.
+func (s *PublishSchemaReq) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PublishSchemaReq to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "kind":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "user-schema":
+					s.Type = UserSchemaPublishSchemaReq
+					found = true
+				case "schema-url":
+					s.Type = SchemaURLPublishSchemaReq
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case UserSchemaPublishSchemaReq:
+		if err := s.UserSchema.Decode(d); err != nil {
+			return err
+		}
+	case SchemaURLPublishSchemaReq:
+		if err := s.SchemaURL.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PublishSchemaReq) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PublishSchemaReq) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -137889,698 +136378,6 @@ func (s *ReleaseSummary) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes RemoveOriginErrorResponse as json.
-func (s RemoveOriginErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthCsrfInvalidRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.csrf_invalid")
-		{
-			s := s.AuthCsrfInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case AuthUnauthorizedRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginInvalidRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.invalid")
-		{
-			s := s.OriginInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginNotFoundRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.not_found")
-		{
-			s := s.OriginNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case OriginPermissionDeniedRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.permission_denied")
-		{
-			s := s.OriginPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ProjMissingIDRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.missing_id")
-		{
-			s := s.ProjMissingID
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes RemoveOriginErrorResponse from json.
-func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode RemoveOriginErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.csrf_invalid":
-					s.Type = AuthCsrfInvalidRemoveOriginErrorResponse
-					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedRemoveOriginErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidRemoveOriginErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalRemoveOriginErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRemoveOriginErrorResponse
-					found = true
-				case "origin.invalid":
-					s.Type = OriginInvalidRemoveOriginErrorResponse
-					found = true
-				case "origin.not_found":
-					s.Type = OriginNotFoundRemoveOriginErrorResponse
-					found = true
-				case "origin.permission_denied":
-					s.Type = OriginPermissionDeniedRemoveOriginErrorResponse
-					found = true
-				case "proj.missing_id":
-					s.Type = ProjMissingIDRemoveOriginErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidRemoveOriginErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableRemoveOriginErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthCsrfInvalidRemoveOriginErrorResponse:
-		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedRemoveOriginErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidRemoveOriginErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalRemoveOriginErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedRemoveOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case OriginInvalidRemoveOriginErrorResponse:
-		if err := s.OriginInvalid.Decode(d); err != nil {
-			return err
-		}
-	case OriginNotFoundRemoveOriginErrorResponse:
-		if err := s.OriginNotFound.Decode(d); err != nil {
-			return err
-		}
-	case OriginPermissionDeniedRemoveOriginErrorResponse:
-		if err := s.OriginPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case ProjMissingIDRemoveOriginErrorResponse:
-		if err := s.ProjMissingID.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidRemoveOriginErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableRemoveOriginErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s RemoveOriginErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *RemoveOriginErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *RemoveOriginReq) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *RemoveOriginReq) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("pattern")
-		e.Str(s.Pattern)
-	}
-}
-
-var jsonFieldsNameOfRemoveOriginReq = [1]string{
-	0: "pattern",
-}
-
-// Decode decodes RemoveOriginReq from json.
-func (s *RemoveOriginReq) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode RemoveOriginReq to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "pattern":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Pattern = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"pattern\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode RemoveOriginReq")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfRemoveOriginReq) {
-					name = jsonFieldsNameOfRemoveOriginReq[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *RemoveOriginReq) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *RemoveOriginReq) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes RemovePreviewErrorResponse as json.
-func (s RemovePreviewErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s RemovePreviewErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case AuthUnauthorizedRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepNotFoundRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.not_found")
-		{
-			s := s.DepNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case DepPermissionDeniedRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("dep.permission_denied")
-		{
-			s := s.DepPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EnvProjectNotFoundRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("env.project_not_found")
-		{
-			s := s.EnvProjectNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("evt.invalid")
-		{
-			s := s.EvtInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case InternalRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableRemovePreviewErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes RemovePreviewErrorResponse from json.
-func (s *RemovePreviewErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode RemovePreviewErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedRemovePreviewErrorResponse
-					found = true
-				case "dep.not_found":
-					s.Type = DepNotFoundRemovePreviewErrorResponse
-					found = true
-				case "dep.permission_denied":
-					s.Type = DepPermissionDeniedRemovePreviewErrorResponse
-					found = true
-				case "env.project_not_found":
-					s.Type = EnvProjectNotFoundRemovePreviewErrorResponse
-					found = true
-				case "evt.invalid":
-					s.Type = EvtInvalidRemovePreviewErrorResponse
-					found = true
-				case "internal":
-					s.Type = InternalRemovePreviewErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRemovePreviewErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidRemovePreviewErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableRemovePreviewErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case AuthUnauthorizedRemovePreviewErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
-	case DepNotFoundRemovePreviewErrorResponse:
-		if err := s.DepNotFound.Decode(d); err != nil {
-			return err
-		}
-	case DepPermissionDeniedRemovePreviewErrorResponse:
-		if err := s.DepPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case EnvProjectNotFoundRemovePreviewErrorResponse:
-		if err := s.EnvProjectNotFound.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidRemovePreviewErrorResponse:
-		if err := s.EvtInvalid.Decode(d); err != nil {
-			return err
-		}
-	case InternalRemovePreviewErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedRemovePreviewErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidRemovePreviewErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableRemovePreviewErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s RemovePreviewErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *RemovePreviewErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *RemovePreviewRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -138671,6 +136468,698 @@ func (s *RemovePreviewRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RemovePreviewRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RemoveProjectOriginErrorResponse as json.
+func (s RemoveProjectOriginErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s RemoveProjectOriginErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthCsrfInvalidRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginInvalidRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.invalid")
+		{
+			s := s.OriginInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginNotFoundRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.not_found")
+		{
+			s := s.OriginNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case OriginPermissionDeniedRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.permission_denied")
+		{
+			s := s.OriginPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjMissingIDRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableRemoveProjectOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes RemoveProjectOriginErrorResponse from json.
+func (s *RemoveProjectOriginErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RemoveProjectOriginErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidRemoveProjectOriginErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedRemoveProjectOriginErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRemoveProjectOriginErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalRemoveProjectOriginErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRemoveProjectOriginErrorResponse
+					found = true
+				case "origin.invalid":
+					s.Type = OriginInvalidRemoveProjectOriginErrorResponse
+					found = true
+				case "origin.not_found":
+					s.Type = OriginNotFoundRemoveProjectOriginErrorResponse
+					found = true
+				case "origin.permission_denied":
+					s.Type = OriginPermissionDeniedRemoveProjectOriginErrorResponse
+					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDRemoveProjectOriginErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidRemoveProjectOriginErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRemoveProjectOriginErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthCsrfInvalidRemoveProjectOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedRemoveProjectOriginErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidRemoveProjectOriginErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalRemoveProjectOriginErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedRemoveProjectOriginErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case OriginInvalidRemoveProjectOriginErrorResponse:
+		if err := s.OriginInvalid.Decode(d); err != nil {
+			return err
+		}
+	case OriginNotFoundRemoveProjectOriginErrorResponse:
+		if err := s.OriginNotFound.Decode(d); err != nil {
+			return err
+		}
+	case OriginPermissionDeniedRemoveProjectOriginErrorResponse:
+		if err := s.OriginPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDRemoveProjectOriginErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidRemoveProjectOriginErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRemoveProjectOriginErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RemoveProjectOriginErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RemoveProjectOriginErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *RemoveProjectOriginReq) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RemoveProjectOriginReq) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("pattern")
+		e.Str(s.Pattern)
+	}
+}
+
+var jsonFieldsNameOfRemoveProjectOriginReq = [1]string{
+	0: "pattern",
+}
+
+// Decode decodes RemoveProjectOriginReq from json.
+func (s *RemoveProjectOriginReq) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RemoveProjectOriginReq to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "pattern":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Pattern = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"pattern\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RemoveProjectOriginReq")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRemoveProjectOriginReq) {
+					name = jsonFieldsNameOfRemoveProjectOriginReq[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RemoveProjectOriginReq) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RemoveProjectOriginReq) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RemoveProjectPreviewErrorResponse as json.
+func (s RemoveProjectPreviewErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s RemoveProjectPreviewErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepNotFoundRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.not_found")
+		{
+			s := s.DepNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepPermissionDeniedRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.permission_denied")
+		{
+			s := s.DepPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EnvProjectNotFoundRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("env.project_not_found")
+		{
+			s := s.EnvProjectNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableRemoveProjectPreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes RemoveProjectPreviewErrorResponse from json.
+func (s *RemoveProjectPreviewErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RemoveProjectPreviewErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedRemoveProjectPreviewErrorResponse
+					found = true
+				case "dep.not_found":
+					s.Type = DepNotFoundRemoveProjectPreviewErrorResponse
+					found = true
+				case "dep.permission_denied":
+					s.Type = DepPermissionDeniedRemoveProjectPreviewErrorResponse
+					found = true
+				case "env.project_not_found":
+					s.Type = EnvProjectNotFoundRemoveProjectPreviewErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRemoveProjectPreviewErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalRemoveProjectPreviewErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRemoveProjectPreviewErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidRemoveProjectPreviewErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRemoveProjectPreviewErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedRemoveProjectPreviewErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case DepNotFoundRemoveProjectPreviewErrorResponse:
+		if err := s.DepNotFound.Decode(d); err != nil {
+			return err
+		}
+	case DepPermissionDeniedRemoveProjectPreviewErrorResponse:
+		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case EnvProjectNotFoundRemoveProjectPreviewErrorResponse:
+		if err := s.EnvProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidRemoveProjectPreviewErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalRemoveProjectPreviewErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedRemoveProjectPreviewErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidRemoveProjectPreviewErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRemoveProjectPreviewErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RemoveProjectPreviewErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RemoveProjectPreviewErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -150783,6 +149272,465 @@ func (s *SetUserPasswordRequest) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SetVariablesErrorResponse as json.
+func (s SetVariablesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s SetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyDecryptFailedSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknInvalidSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarInvalidNameSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.invalid_name")
+		{
+			s := s.VarInvalidName
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarInvalidValueSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.invalid_value")
+		{
+			s := s.VarInvalidValue
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarNoProjectIDSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.no_project_id")
+		{
+			s := s.VarNoProjectID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyUnknownAlgSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarLimitExceededSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.limit_exceeded")
+		{
+			s := s.VarLimitExceeded
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarNotFoundSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.not_found")
+		{
+			s := s.VarNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarPermissionDeniedSetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.permission_denied")
+		{
+			s := s.VarPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes SetVariablesErrorResponse from json.
+func (s *SetVariablesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SetVariablesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedSetVariablesErrorResponse
+					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedSetVariablesErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundSetVariablesErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidSetVariablesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalSetVariablesErrorResponse
+					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidSetVariablesErrorResponse
+					found = true
+				case "var.invalid_name":
+					s.Type = VarInvalidNameSetVariablesErrorResponse
+					found = true
+				case "var.invalid_value":
+					s.Type = VarInvalidValueSetVariablesErrorResponse
+					found = true
+				case "var.no_project_id":
+					s.Type = VarNoProjectIDSetVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedSetVariablesErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundSetVariablesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidSetVariablesErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgSetVariablesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableSetVariablesErrorResponse
+					found = true
+				case "var.limit_exceeded":
+					s.Type = VarLimitExceededSetVariablesErrorResponse
+					found = true
+				case "var.not_found":
+					s.Type = VarNotFoundSetVariablesErrorResponse
+					found = true
+				case "var.permission_denied":
+					s.Type = VarPermissionDeniedSetVariablesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedSetVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyDecryptFailedSetVariablesErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundSetVariablesErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidSetVariablesErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalSetVariablesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case TknInvalidSetVariablesErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
+	case VarInvalidNameSetVariablesErrorResponse:
+		if err := s.VarInvalidName.Decode(d); err != nil {
+			return err
+		}
+	case VarInvalidValueSetVariablesErrorResponse:
+		if err := s.VarInvalidValue.Decode(d); err != nil {
+			return err
+		}
+	case VarNoProjectIDSetVariablesErrorResponse:
+		if err := s.VarNoProjectID.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedSetVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundSetVariablesErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidSetVariablesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgSetVariablesErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableSetVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case VarLimitExceededSetVariablesErrorResponse:
+		if err := s.VarLimitExceeded.Decode(d); err != nil {
+			return err
+		}
+	case VarNotFoundSetVariablesErrorResponse:
+		if err := s.VarNotFound.Decode(d); err != nil {
+			return err
+		}
+	case VarPermissionDeniedSetVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SetVariablesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SetVariablesErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SortDirection as json.
 func (s SortDirection) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -156528,6 +155476,960 @@ func (s *UnavailableDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UpdateMyUserBadRequest as json.
+func (s *UpdateMyUserBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateMyUserBadRequest from json.
+func (s *UpdateMyUserBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateMyUserBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateMyUserBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateMyUserBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateMyUserBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateMyUserConflict as json.
+func (s *UpdateMyUserConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateMyUserConflict from json.
+func (s *UpdateMyUserConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateMyUserConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateMyUserConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateMyUserConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateMyUserConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateMyUserErrorResponse as json.
+func (s UpdateMyUserErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s UpdateMyUserErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SessProjectMismatchUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserAlreadyExistsUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.already_exists")
+		{
+			s := s.UserAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserConflictUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.conflict")
+		{
+			s := s.UserConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserInvalidUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.invalid")
+		{
+			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundUpdateMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes UpdateMyUserErrorResponse from json.
+func (s *UpdateMyUserErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateMyUserErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidUpdateMyUserErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedUpdateMyUserErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidUpdateMyUserErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalUpdateMyUserErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedUpdateMyUserErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidUpdateMyUserErrorResponse
+					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchUpdateMyUserErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableUpdateMyUserErrorResponse
+					found = true
+				case "user.already_exists":
+					s.Type = UserAlreadyExistsUpdateMyUserErrorResponse
+					found = true
+				case "user.conflict":
+					s.Type = UserConflictUpdateMyUserErrorResponse
+					found = true
+				case "user.invalid":
+					s.Type = UserInvalidUpdateMyUserErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundUpdateMyUserErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthCsrfInvalidUpdateMyUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedUpdateMyUserErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidUpdateMyUserErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalUpdateMyUserErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedUpdateMyUserErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidUpdateMyUserErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessProjectMismatchUpdateMyUserErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableUpdateMyUserErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case UserAlreadyExistsUpdateMyUserErrorResponse:
+		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserConflictUpdateMyUserErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
+			return err
+		}
+	case UserInvalidUpdateMyUserErrorResponse:
+		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundUpdateMyUserErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UpdateMyUserErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateMyUserErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateMyUserForbidden as json.
+func (s *UpdateMyUserForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateMyUserForbidden from json.
+func (s *UpdateMyUserForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateMyUserForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateMyUserForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateMyUserForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateMyUserForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateMyUserUnauthorized as json.
+func (s *UpdateMyUserUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateMyUserUnauthorized from json.
+func (s *UpdateMyUserUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateMyUserUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateMyUserUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateMyUserUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateMyUserUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateProjectBadRequest as json.
+func (s *UpdateProjectBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateProjectBadRequest from json.
+func (s *UpdateProjectBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateProjectBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateProjectBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateProjectBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateProjectBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateProjectErrorResponse as json.
+func (s UpdateProjectErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s UpdateProjectErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthCsrfInvalidUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjMissingIDUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNameInvalidUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.name_invalid")
+		{
+			s := s.ProjNameInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPasswordHashInvalidUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.password_hash_invalid")
+		{
+			s := s.ProjPasswordHashInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPermissionDeniedUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.permission_denied")
+		{
+			s := s.ProjPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableUpdateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes UpdateProjectErrorResponse from json.
+func (s *UpdateProjectErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateProjectErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidUpdateProjectErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedUpdateProjectErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidUpdateProjectErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalUpdateProjectErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedUpdateProjectErrorResponse
+					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDUpdateProjectErrorResponse
+					found = true
+				case "proj.name_invalid":
+					s.Type = ProjNameInvalidUpdateProjectErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundUpdateProjectErrorResponse
+					found = true
+				case "proj.password_hash_invalid":
+					s.Type = ProjPasswordHashInvalidUpdateProjectErrorResponse
+					found = true
+				case "proj.permission_denied":
+					s.Type = ProjPermissionDeniedUpdateProjectErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidUpdateProjectErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableUpdateProjectErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthCsrfInvalidUpdateProjectErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedUpdateProjectErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidUpdateProjectErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalUpdateProjectErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedUpdateProjectErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDUpdateProjectErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
+			return err
+		}
+	case ProjNameInvalidUpdateProjectErrorResponse:
+		if err := s.ProjNameInvalid.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundUpdateProjectErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjPasswordHashInvalidUpdateProjectErrorResponse:
+		if err := s.ProjPasswordHashInvalid.Decode(d); err != nil {
+			return err
+		}
+	case ProjPermissionDeniedUpdateProjectErrorResponse:
+		if err := s.ProjPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidUpdateProjectErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableUpdateProjectErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UpdateProjectErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateProjectErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateProjectNotFound as json.
+func (s *UpdateProjectNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateProjectNotFound from json.
+func (s *UpdateProjectNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateProjectNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateProjectNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateProjectNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateProjectNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateProjectUnauthorized as json.
+func (s *UpdateProjectUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateProjectUnauthorized from json.
+func (s *UpdateProjectUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateProjectUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateProjectUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateProjectUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateProjectUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UpdateTeamBadRequest as json.
 func (s *UpdateTeamBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -157125,16 +157027,108 @@ func (s *UpdateTeamUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes UpdateVariablesErrorResponse as json.
-func (s UpdateVariablesErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes UpdateUserBadRequest as json.
+func (s *UpdateUserBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateUserBadRequest from json.
+func (s *UpdateUserBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateUserBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateUserBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateUserBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateUserBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateUserConflict as json.
+func (s *UpdateUserConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateUserConflict from json.
+func (s *UpdateUserConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateUserConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateUserConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateUserConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateUserConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateUserErrorResponse as json.
+func (s UpdateUserErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
+func (s UpdateUserErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedUpdateVariablesErrorResponse:
+	case AuthCsrfInvalidUpdateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -157150,39 +157144,7 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EncKeyDecryptFailedUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("enc_key.decrypt_failed")
-		{
-			s := s.EncKeyDecryptFailed
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EncKeyNotFoundUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("enc_key.not_found")
-		{
-			s := s.EncKeyNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case EvtInvalidUpdateVariablesErrorResponse:
+	case EvtInvalidUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("evt.invalid")
 		{
@@ -157198,7 +157160,7 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalUpdateVariablesErrorResponse:
+	case InternalUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -157214,71 +157176,7 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TknInvalidUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("tkn.invalid")
-		{
-			s := s.TknInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarInvalidNameUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.invalid_name")
-		{
-			s := s.VarInvalidName
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarInvalidValueUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.invalid_value")
-		{
-			s := s.VarInvalidValue
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case VarNoProjectIDUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("var.no_project_id")
-		{
-			s := s.VarNoProjectID
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case NotImplementedUpdateVariablesErrorResponse:
+	case NotImplementedUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -157294,23 +157192,7 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjNotFoundUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidUpdateVariablesErrorResponse:
+	case ReqInvalidUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -157326,23 +157208,7 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EncKeyUnknownAlgUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("enc_key.unknown_alg")
-		{
-			s := s.EncKeyUnknownAlg
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableUpdateVariablesErrorResponse:
+	case UnavailableUpdateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -157358,11 +157224,11 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case VarLimitExceededUpdateVariablesErrorResponse:
+	case UserAlreadyExistsUpdateUserErrorResponse:
 		e.FieldStart("code")
-		e.Str("var.limit_exceeded")
+		e.Str("user.already_exists")
 		{
-			s := s.VarLimitExceeded
+			s := s.UserAlreadyExists
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -157374,11 +157240,11 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case VarNotFoundUpdateVariablesErrorResponse:
+	case UserConflictUpdateUserErrorResponse:
 		e.FieldStart("code")
-		e.Str("var.not_found")
+		e.Str("user.conflict")
 		{
-			s := s.VarNotFound
+			s := s.UserConflict
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -157390,11 +157256,43 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case VarPermissionDeniedUpdateVariablesErrorResponse:
+	case UserInvalidUpdateUserErrorResponse:
 		e.FieldStart("code")
-		e.Str("var.permission_denied")
+		e.Str("user.invalid")
 		{
-			s := s.VarPermissionDenied
+			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundUpdateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPermissionDeniedUpdateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.permission_denied")
+		{
+			s := s.UserPermissionDenied
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -157409,10 +157307,10 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes UpdateVariablesErrorResponse from json.
-func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes UpdateUserErrorResponse from json.
+func (s *UpdateUserErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode UpdateVariablesErrorResponse to nil")
+		return errors.New("invalid: unable to decode UpdateUserErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -157432,56 +157330,41 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidUpdateUserErrorResponse
+					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedUpdateVariablesErrorResponse
-					found = true
-				case "enc_key.decrypt_failed":
-					s.Type = EncKeyDecryptFailedUpdateVariablesErrorResponse
-					found = true
-				case "enc_key.not_found":
-					s.Type = EncKeyNotFoundUpdateVariablesErrorResponse
+					s.Type = AuthUnauthorizedUpdateUserErrorResponse
 					found = true
 				case "evt.invalid":
-					s.Type = EvtInvalidUpdateVariablesErrorResponse
+					s.Type = EvtInvalidUpdateUserErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalUpdateVariablesErrorResponse
-					found = true
-				case "tkn.invalid":
-					s.Type = TknInvalidUpdateVariablesErrorResponse
-					found = true
-				case "var.invalid_name":
-					s.Type = VarInvalidNameUpdateVariablesErrorResponse
-					found = true
-				case "var.invalid_value":
-					s.Type = VarInvalidValueUpdateVariablesErrorResponse
-					found = true
-				case "var.no_project_id":
-					s.Type = VarNoProjectIDUpdateVariablesErrorResponse
+					s.Type = InternalUpdateUserErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedUpdateVariablesErrorResponse
-					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundUpdateVariablesErrorResponse
+					s.Type = NotImplementedUpdateUserErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidUpdateVariablesErrorResponse
-					found = true
-				case "enc_key.unknown_alg":
-					s.Type = EncKeyUnknownAlgUpdateVariablesErrorResponse
+					s.Type = ReqInvalidUpdateUserErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableUpdateVariablesErrorResponse
+					s.Type = UnavailableUpdateUserErrorResponse
 					found = true
-				case "var.limit_exceeded":
-					s.Type = VarLimitExceededUpdateVariablesErrorResponse
+				case "user.already_exists":
+					s.Type = UserAlreadyExistsUpdateUserErrorResponse
 					found = true
-				case "var.not_found":
-					s.Type = VarNotFoundUpdateVariablesErrorResponse
+				case "user.conflict":
+					s.Type = UserConflictUpdateUserErrorResponse
 					found = true
-				case "var.permission_denied":
-					s.Type = VarPermissionDeniedUpdateVariablesErrorResponse
+				case "user.invalid":
+					s.Type = UserInvalidUpdateUserErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundUpdateUserErrorResponse
+					found = true
+				case "user.permission_denied":
+					s.Type = UserPermissionDeniedUpdateUserErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -157497,72 +157380,52 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedUpdateVariablesErrorResponse:
+	case AuthCsrfInvalidUpdateUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedUpdateUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EncKeyDecryptFailedUpdateVariablesErrorResponse:
-		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
-			return err
-		}
-	case EncKeyNotFoundUpdateVariablesErrorResponse:
-		if err := s.EncKeyNotFound.Decode(d); err != nil {
-			return err
-		}
-	case EvtInvalidUpdateVariablesErrorResponse:
+	case EvtInvalidUpdateUserErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
-	case InternalUpdateVariablesErrorResponse:
+	case InternalUpdateUserErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case TknInvalidUpdateVariablesErrorResponse:
-		if err := s.TknInvalid.Decode(d); err != nil {
-			return err
-		}
-	case VarInvalidNameUpdateVariablesErrorResponse:
-		if err := s.VarInvalidName.Decode(d); err != nil {
-			return err
-		}
-	case VarInvalidValueUpdateVariablesErrorResponse:
-		if err := s.VarInvalidValue.Decode(d); err != nil {
-			return err
-		}
-	case VarNoProjectIDUpdateVariablesErrorResponse:
-		if err := s.VarNoProjectID.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedUpdateVariablesErrorResponse:
+	case NotImplementedUpdateUserErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ProjNotFoundUpdateVariablesErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidUpdateVariablesErrorResponse:
+	case ReqInvalidUpdateUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case EncKeyUnknownAlgUpdateVariablesErrorResponse:
-		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableUpdateVariablesErrorResponse:
+	case UnavailableUpdateUserErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
-	case VarLimitExceededUpdateVariablesErrorResponse:
-		if err := s.VarLimitExceeded.Decode(d); err != nil {
+	case UserAlreadyExistsUpdateUserErrorResponse:
+		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
-	case VarNotFoundUpdateVariablesErrorResponse:
-		if err := s.VarNotFound.Decode(d); err != nil {
+	case UserConflictUpdateUserErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
 			return err
 		}
-	case VarPermissionDeniedUpdateVariablesErrorResponse:
-		if err := s.VarPermissionDenied.Decode(d); err != nil {
+	case UserInvalidUpdateUserErrorResponse:
+		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundUpdateUserErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPermissionDeniedUpdateUserErrorResponse:
+		if err := s.UserPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -157572,14 +157435,128 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s UpdateVariablesErrorResponse) MarshalJSON() ([]byte, error) {
+func (s UpdateUserErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *UpdateVariablesErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *UpdateUserErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateUserForbidden as json.
+func (s *UpdateUserForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateUserForbidden from json.
+func (s *UpdateUserForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateUserForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateUserForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateUserForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateUserForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateUserNotFound as json.
+func (s *UpdateUserNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateUserNotFound from json.
+func (s *UpdateUserNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateUserNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateUserNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateUserNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateUserNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UpdateUserUnauthorized as json.
+func (s *UpdateUserUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes UpdateUserUnauthorized from json.
+func (s *UpdateUserUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UpdateUserUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UpdateUserUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UpdateUserUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UpdateUserUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -167945,16 +167922,16 @@ func (s *VariablesByKind) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes VerifyChallengeProofErrorResponse as json.
-func (s VerifyChallengeProofErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes VerifyAuthAttemptChallengeErrorResponse as json.
+func (s VerifyAuthAttemptChallengeErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
+func (s VerifyAuthAttemptChallengeErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AttAlreadyHandedOffVerifyChallengeProofErrorResponse:
+	case AttAlreadyHandedOffVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.already_handed_off")
 		{
@@ -167970,7 +167947,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttInvalidProofVerifyChallengeProofErrorResponse:
+	case AttInvalidProofVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.invalid_proof")
 		{
@@ -167986,7 +167963,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttInvalidRequestVerifyChallengeProofErrorResponse:
+	case AttInvalidRequestVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.invalid_request")
 		{
@@ -168002,7 +167979,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttInvalidStateVerifyChallengeProofErrorResponse:
+	case AttInvalidStateVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.invalid_state")
 		{
@@ -168018,7 +167995,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttNotFoundVerifyChallengeProofErrorResponse:
+	case AttNotFoundVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.not_found")
 		{
@@ -168034,7 +168011,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttProofRejectedVerifyChallengeProofErrorResponse:
+	case AttProofRejectedVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.proof_rejected")
 		{
@@ -168050,7 +168027,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AttStaleChallengeVerifyChallengeProofErrorResponse:
+	case AttStaleChallengeVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("att.stale_challenge")
 		{
@@ -168066,7 +168043,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedVerifyChallengeProofErrorResponse:
+	case AuthUnauthorizedVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -168082,7 +168059,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EvtInvalidVerifyChallengeProofErrorResponse:
+	case EvtInvalidVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("evt.invalid")
 		{
@@ -168098,7 +168075,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalVerifyChallengeProofErrorResponse:
+	case InternalVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -168114,7 +168091,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedVerifyChallengeProofErrorResponse:
+	case NotImplementedVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -168130,7 +168107,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidVerifyChallengeProofErrorResponse:
+	case ReqInvalidVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -168146,7 +168123,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableVerifyChallengeProofErrorResponse:
+	case UnavailableVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -168162,7 +168139,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserAlreadyExistsVerifyChallengeProofErrorResponse:
+	case UserAlreadyExistsVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.already_exists")
 		{
@@ -168178,7 +168155,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserInvalidVerifyChallengeProofErrorResponse:
+	case UserInvalidVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
 		{
@@ -168194,7 +168171,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserNotFoundVerifyChallengeProofErrorResponse:
+	case UserNotFoundVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
 		{
@@ -168210,7 +168187,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPasswordEmptyVerifyChallengeProofErrorResponse:
+	case UserPasswordEmptyVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_empty")
 		{
@@ -168226,7 +168203,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+	case UserPasswordHashingBusyVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_hashing_busy")
 		{
@@ -168242,7 +168219,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:
+	case UserPasswordPolicyViolationVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
 		{
@@ -168258,7 +168235,7 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPasswordTooLongVerifyChallengeProofErrorResponse:
+	case UserPasswordTooLongVerifyAuthAttemptChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_too_long")
 		{
@@ -168277,10 +168254,10 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes VerifyChallengeProofErrorResponse from json.
-func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes VerifyAuthAttemptChallengeErrorResponse from json.
+func (s *VerifyAuthAttemptChallengeErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VerifyChallengeProofErrorResponse to nil")
+		return errors.New("invalid: unable to decode VerifyAuthAttemptChallengeErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -168301,64 +168278,64 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "att.already_handed_off":
-					s.Type = AttAlreadyHandedOffVerifyChallengeProofErrorResponse
+					s.Type = AttAlreadyHandedOffVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.invalid_proof":
-					s.Type = AttInvalidProofVerifyChallengeProofErrorResponse
+					s.Type = AttInvalidProofVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.invalid_request":
-					s.Type = AttInvalidRequestVerifyChallengeProofErrorResponse
+					s.Type = AttInvalidRequestVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.invalid_state":
-					s.Type = AttInvalidStateVerifyChallengeProofErrorResponse
+					s.Type = AttInvalidStateVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.not_found":
-					s.Type = AttNotFoundVerifyChallengeProofErrorResponse
+					s.Type = AttNotFoundVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.proof_rejected":
-					s.Type = AttProofRejectedVerifyChallengeProofErrorResponse
+					s.Type = AttProofRejectedVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "att.stale_challenge":
-					s.Type = AttStaleChallengeVerifyChallengeProofErrorResponse
+					s.Type = AttStaleChallengeVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedVerifyChallengeProofErrorResponse
+					s.Type = AuthUnauthorizedVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "evt.invalid":
-					s.Type = EvtInvalidVerifyChallengeProofErrorResponse
+					s.Type = EvtInvalidVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalVerifyChallengeProofErrorResponse
+					s.Type = InternalVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedVerifyChallengeProofErrorResponse
+					s.Type = NotImplementedVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidVerifyChallengeProofErrorResponse
+					s.Type = ReqInvalidVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableVerifyChallengeProofErrorResponse
+					s.Type = UnavailableVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.already_exists":
-					s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
+					s.Type = UserAlreadyExistsVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.invalid":
-					s.Type = UserInvalidVerifyChallengeProofErrorResponse
+					s.Type = UserInvalidVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.not_found":
-					s.Type = UserNotFoundVerifyChallengeProofErrorResponse
+					s.Type = UserNotFoundVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.password_empty":
-					s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
+					s.Type = UserPasswordEmptyVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.password_hashing_busy":
-					s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+					s.Type = UserPasswordHashingBusyVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.password_policy_violation":
-					s.Type = UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
+					s.Type = UserPasswordPolicyViolationVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				case "user.password_too_long":
-					s.Type = UserPasswordTooLongVerifyChallengeProofErrorResponse
+					s.Type = UserPasswordTooLongVerifyAuthAttemptChallengeErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -168374,83 +168351,83 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AttAlreadyHandedOffVerifyChallengeProofErrorResponse:
+	case AttAlreadyHandedOffVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttAlreadyHandedOff.Decode(d); err != nil {
 			return err
 		}
-	case AttInvalidProofVerifyChallengeProofErrorResponse:
+	case AttInvalidProofVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttInvalidProof.Decode(d); err != nil {
 			return err
 		}
-	case AttInvalidRequestVerifyChallengeProofErrorResponse:
+	case AttInvalidRequestVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttInvalidRequest.Decode(d); err != nil {
 			return err
 		}
-	case AttInvalidStateVerifyChallengeProofErrorResponse:
+	case AttInvalidStateVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttInvalidState.Decode(d); err != nil {
 			return err
 		}
-	case AttNotFoundVerifyChallengeProofErrorResponse:
+	case AttNotFoundVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttNotFound.Decode(d); err != nil {
 			return err
 		}
-	case AttProofRejectedVerifyChallengeProofErrorResponse:
+	case AttProofRejectedVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttProofRejected.Decode(d); err != nil {
 			return err
 		}
-	case AttStaleChallengeVerifyChallengeProofErrorResponse:
+	case AttStaleChallengeVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AttStaleChallenge.Decode(d); err != nil {
 			return err
 		}
-	case AuthUnauthorizedVerifyChallengeProofErrorResponse:
+	case AuthUnauthorizedVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EvtInvalidVerifyChallengeProofErrorResponse:
+	case EvtInvalidVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
-	case InternalVerifyChallengeProofErrorResponse:
+	case InternalVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedVerifyChallengeProofErrorResponse:
+	case NotImplementedVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidVerifyChallengeProofErrorResponse:
+	case ReqInvalidVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableVerifyChallengeProofErrorResponse:
+	case UnavailableVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
-	case UserAlreadyExistsVerifyChallengeProofErrorResponse:
+	case UserAlreadyExistsVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
-	case UserInvalidVerifyChallengeProofErrorResponse:
+	case UserInvalidVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UserNotFoundVerifyChallengeProofErrorResponse:
+	case UserNotFoundVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
-	case UserPasswordEmptyVerifyChallengeProofErrorResponse:
+	case UserPasswordEmptyVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
 			return err
 		}
-	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+	case UserPasswordHashingBusyVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
-	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:
+	case UserPasswordPolicyViolationVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserPasswordPolicyViolation.Decode(d); err != nil {
 			return err
 		}
-	case UserPasswordTooLongVerifyChallengeProofErrorResponse:
+	case UserPasswordTooLongVerifyAuthAttemptChallengeErrorResponse:
 		if err := s.UserPasswordTooLong.Decode(d); err != nil {
 			return err
 		}
@@ -168461,14 +168438,14 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s VerifyChallengeProofErrorResponse) MarshalJSON() ([]byte, error) {
+func (s VerifyAuthAttemptChallengeErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VerifyChallengeProofErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *VerifyAuthAttemptChallengeErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

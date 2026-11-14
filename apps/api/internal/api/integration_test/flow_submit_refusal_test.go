@@ -58,7 +58,7 @@ func TestFlowSubmitRefusesAMalformedSubmission(t *testing.T) {
 
 			submission, err := json.Marshal(tc.submission)
 			require.NoError(t, err)
-			resp, body = postFlow(t, "/flow/"+opened.ID+"/submit", submission, appOrigin, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
+			resp, body = postFlow(t, "/flows/"+opened.ID+"/submit", submission, appOrigin, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 			assert.Equal(t, tc.code, errorCode(body), string(body))
 			assert.Empty(t, resp.Header.Values("Set-Cookie"), "a refusal leaves the flow cookie as it was")

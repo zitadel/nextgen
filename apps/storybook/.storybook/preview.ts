@@ -27,14 +27,14 @@ import "../src/preview.css";
 
 // Point the typed Flow API client at the story origin so the orchestrator's
 // MSW mock (wired per-story in orchestrator.stories.ts) has an absolute URL to
-// intercept. The host need not resolve — the api-mock handlers match `*/flow*`
+// intercept. The host need not resolve — the api-mock handlers match `*/flows*`
 // regardless. Harmless for atom stories, which make no requests.
 configureZitadel({ proxyPath: window.location.origin, projectId: "storybook" });
 
 // The MSW worker unregisters itself when its last client closes. A page opened
 // while that is settling re-registers the same, already active worker: no
 // `activate` fires, so nothing claims the page, and its requests reach the dev
-// server (`POST /flow` answers 404). MSW reloads an uncontrolled page only when
+// server (`POST /flows` answers 404). MSW reloads an uncontrolled page only when
 // it can already see the registration, which it cannot at that moment. Apply
 // the same remedy once the worker has started; the flag stops a reload loop if
 // the page stays uncontrolled.

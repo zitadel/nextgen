@@ -70,8 +70,8 @@ function isFieldAtom(el: Element): el is FieldAtom {
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
  *
- * Drives the typed `@zitadel/api` Flow API directly: `POST /flow`
- * starts a flow, `POST /flow/{id}/submit` advances it. Renders each step
+ * Drives the typed `@zitadel/api` Flow API directly: `POST /flows`
+ * starts a flow, `POST /flows/{flow_id}/submit` advances it. Renders each step
  * through LiquidJS, sanitises the output via DOMPurify, and mounts the
  * result inside a real `<form>` element in its Shadow DOM via Lit's
  * `unsafeHTML` directive. Atom CustomEvents (`zl-input` / `zl-submit`)
@@ -112,7 +112,7 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * each of the scaffolded templates, and a page that forgot them would silently
  * restart the flow instead of completing the sign-in.
  *
- * A handle from the URL is not a capability: `GET /flow/{id}` only answers
+ * A handle from the URL is not a capability: `GET /flows/{flow_id}` only answers
  * when the sealed flow cookie names that same id, so an id someone else put
  * there resolves to nothing.
  */
@@ -327,7 +327,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Existing flow handle to resume rather than start a new flow. When set,
-   * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
+   * the orchestrator hits `GET /flows/{flow_id}` instead of `POST /flows` on
    * mount, so a page reload after a network blip can re-render the same
    * step without losing collected state. A handle that no longer resolves
    * starts a new flow instead, with a console warning.

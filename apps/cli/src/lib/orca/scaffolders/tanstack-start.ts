@@ -24,7 +24,9 @@ const TANSTACK_CLI = frameworkCli("@tanstack/cli");
  * Nitro target, and `--no-examples`/`--no-toolchain`/`--no-intent` keep the
  * output minimal. `vite.config.*` is left in place — auth is wired through
  * `src/start.ts` (the framework's server entry, which the patcher writes), so
- * no config edit is needed.
+ * no config edit is needed. It installs nothing: setup's own install step
+ * does, once, and not under `--skip-install`, then runs
+ * {@link afterInstallScript}.
  */
 export class TanStackStartScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "TanStack Start";
@@ -37,6 +39,13 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
     enforcement: "warn",
   };
   override readonly pinnedPackages: ReadonlyArray<string> = [TANSTACK_CLI];
+  /**
+   * The template's own script for `src/routeTree.gen.ts` (a `vite build`, whose
+   * router plugin writes the file as `vite dev` does). TanStack Router says to
+   * commit that file, and the template does not ignore it; it needs the
+   * installed plugin, so it can only run after setup's install.
+   */
+  readonly afterInstallScript = "generate-routes";
 
   protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
@@ -55,6 +64,9 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
         "--no-intent",
         "--no-git",
         "-y",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--no-install",
       ],
       cwd,
     );

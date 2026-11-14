@@ -44,7 +44,7 @@ under `fixtures/` and name it in `start`.
 
 A stage passes on its **outcome**:
 
-- reads against the live instance (`projects list`, `schemas get …`), and
+- reads against the live instance (`project list`, `schema get …`), and
 - for stages that name one, the app driven in a real browser: register, reach a
   protected page, sign out, sign back in, a field on the form, a passkey offered
   at sign-in, a signed-out visitor stopped at a protected page.

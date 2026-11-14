@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "OauthSettings",
   "type": "object",
-  "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+  "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
   "additionalProperties": false,
   "required": [
     "enabled"

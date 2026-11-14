@@ -33,7 +33,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
@@ -64,8 +64,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, flipResp, helpers.MustMarshal(t, flipResp))
@@ -84,8 +84,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, idResp, helpers.MustMarshal(t, idResp))
@@ -101,8 +101,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
@@ -207,7 +207,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -331,7 +331,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -417,8 +417,8 @@ func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action
 		req.Fields = api.NewOptFlowSubmitRequestFields(fields)
 	}
 	resp, err := client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))

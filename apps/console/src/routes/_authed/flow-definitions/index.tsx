@@ -67,7 +67,7 @@ export interface FlowRow {
 // Mapped rather than spread so the wire's snake_case stops at the loader.
 function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
   const definition = entry.flow_definition;
-  // The embed is the `GET /schemas/{id}` envelope, so the document is one level in.
+  // The embed is the `GET /schemas/{schema_id}` envelope, so the document is one level in.
   const embed = entry.user_schema;
   return {
     id: entry.id,

@@ -1,5 +1,5 @@
 post:
-  operationId: initClaim
+  operationId: createProjectClaim
   summary: Initialize a project claim
   description: |
     Starts a claim, which attaches a project created before sign-in to a
@@ -9,7 +9,7 @@ post:
     so that the team's members administer it. This operation mints a
     single-use, short-lived challenge for an unclaimed project. The developer
     opens `claim_url`, signs in and completes the claim in the browser; see
-    `completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,
+    `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,
     as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
 
     Authenticate with the project secret that `createProject` (`POST /projects`) returns as
@@ -63,4 +63,4 @@ post:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     default:
-      $ref: initClaim-error-response.yaml
+      $ref: createProjectClaim-error-response.yaml

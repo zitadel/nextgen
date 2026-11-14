@@ -1,12 +1,12 @@
 get:
-  operationId: getClaimStatus
+  operationId: getProjectClaimStatus
   summary: Get the status of a project claim
   description: |
     Returns the status of a claim challenge, `pending` or `completed`, while a
     browser completes the claim.
 
     A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
-    `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.
+    `zitadel claim` polls this operation after `createProjectClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.
     Once the project is claimed, the response is `completed` with the owning
     team, the claim timestamp and the dashboard URL.
 
@@ -15,9 +15,9 @@ get:
     completed claim keeps reporting `completed` past this challenge's expiry
     and past the project's claim window.
 
-    Pass the `challenge_id` that `initClaim` returns. Authenticate with the
+    Pass the `challenge_id` that `createProjectClaim` returns. Authenticate with the
     project secret that started the challenge. On `410` with `proj.claim_expired`, call
-    `initClaim` again for a fresh challenge.
+    `createProjectClaim` again for a fresh challenge.
   tags:
     - Projects
   parameters:
@@ -49,7 +49,7 @@ get:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
     '404':
-      description: Challenge not found. Use the `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returned.
+      description: Challenge not found. Use the `challenge_id` that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returned.
       content:
         application/json:
           schema:
@@ -84,4 +84,4 @@ get:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      $ref: getClaimStatus-error-response.yaml
+      $ref: getProjectClaimStatus-error-response.yaml

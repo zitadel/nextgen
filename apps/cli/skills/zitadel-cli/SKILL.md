@@ -49,7 +49,7 @@ runs the new release's `doctor --fix`. It reports `data.packages`,
 `data.refresh` (`done`, `issues`, `failed`, `planned` on a dry run, or `skipped`). A range or dist-tag is
 listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
 did not say what the latest release is. `doctor` warns (`cli-version`) when a
-newer CLI exists, asking the npm registry at most once a day and never on CI;
+newer CLI exists, asking the npm registry at most once a day (once an hour after a lookup that failed) and never on CI;
 `ZITADEL_UPDATE_CHECK=0` turns that off, and a registry that does not answer
 passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
 `local_server`, `project`, `credentials`, `app_integration` or `environment`.
@@ -82,7 +82,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   destructive change is the exception: it fails with `E_CONFIRMATION_REQUIRED`,
   whose flag only the user may agree to (next rule).
 - **Ask the user before `--force` on anything destructive.** A command that
-  deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
+  deletes, revokes or rolls back (`user delete`, `variable rm`, `origin rm`,
   `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
   person first. Non-interactive and without `--force`, it fails with
   `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
@@ -151,7 +151,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   project has a client id or secret, answer **no**, say it has a project id and
   project secret instead, and name where they live. The only `client_id` and
   `client_secret` fields the CLI knows belong to an external sign-in provider's
-  connection (`idps`, `auth-method sso`), which exists only once someone adds
+  connection (`idp`, `auth-method sso`), which exists only once someone adds
   one.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
@@ -205,7 +205,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   deeply nested body, writing the document and passing it with `--file -` is
   often simplest. An `update` body holding a `null` removes what it names
   (a user attribute, a project's own password hash) without asking first.
-  `users create` and `users update` refuse an attribute that fails its schema's `format` (`email`, `uri`, `uuid`, `date`, `date-time` and the other standard names). `users update` validates the whole merged user, so a stored value that fails must be corrected in the same request.
+  `user create` and `user update` refuse an attribute that fails its schema's `format` (`email`, `uri`, `uuid`, `date`, `date-time` and the other standard names). `user update` validates the whole merged user, so a stored value that fails must be corrected in the same request.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the server, project and project secret every
   project command resolves (`--server`, `--env`, `--env-file`, the `.env`
@@ -248,13 +248,15 @@ nothing; `data.skills` and `data.directories` say what it added where.
 The CLI ships its own command list and per-command flags, always correct for the
 installed version. **Do not guess a command name.** Before running any command you
 are not certain of, look it up first and use the exact name the CLI prints:
-command and resource names — including whether a resource is singular or plural
-and the exact verb — are whatever the CLI shows, never what you would assume. A
-wrong guess costs a failed call and a round of recovery; one cheap lookup up
-front avoids it. `zitadel --help` lists each family of commands (`users`,
-`release`) as one row, so it stays short; `zitadel commands` is the flat list of
-every command, verbs included, and `zitadel <family> --help` lists one family's
-verbs. Treat the CLI's own output as authoritative over anything you remember:
+command and resource names and the exact verb are whatever the CLI shows, never
+what you would assume. A resource's noun is singular (`user list`,
+`policy get`, `flow-definition list`); `branding` has no other form. The
+plural runs the same command (`users list`), but nothing lists it, and every
+output names the singular. A wrong guess costs a failed call and a round of
+recovery; one cheap lookup up front avoids it. `zitadel --help` lists each
+family of commands (`user`, `release`) as one row, so it stays short;
+`zitadel commands` is the flat list of every command, verbs included, and
+`zitadel <family> --help` lists one family's verbs. Treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
 npx @zitadel/cli@latest --help               # every command family, grouped by purpose
@@ -266,8 +268,8 @@ npx @zitadel/cli@latest api ls --json        # every API operation, its paramete
 
 `--help` groups the commands by what you are doing: getting started, local
 development, users and teams, authentication, configuration and releases, and
-diagnostics and utilities. A family such as `users` is one row, and
-`zitadel users --help` lists its verbs. Read the groups from `--help` rather than
+diagnostics and utilities. A family such as `user` is one row, and
+`zitadel user --help` lists its verbs. Read the groups from `--help` rather than
 from memory, since they change as the CLI gains commands.
 
 Use `zitadel --help` to find *which* family or command to run, and
@@ -282,7 +284,7 @@ you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
 To find a user by their identifier, the value a user carries as `identifier`:
-`users list --filter identifier=starts_with:<start> --json` matches its start,
+`user list --filter identifier=starts_with:<start> --json` matches its start,
 ignoring case. Name the operation: `starts_with` is the only one, so a part from
 the middle of an identifier (the domain of an email) finds nothing. The users
 come back ordered by identifier, and `--sort` cannot be combined with the
@@ -293,17 +295,17 @@ boolean. Other attributes are not filterable.
 
 To find the users still on an older revision of a schema, filter on the
 schema's object type and exclude the newest revision's URL:
-`users list --filter schema_object_type=equals:<type> --filter
+`user list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
 
-To find what happened to one user's account, whoever did it: `events list
+To find what happened to one user's account, whoever did it: `event list
 --filter user_id=<user-id> --json` returns the user's sign-ins with the
 passwords that were rejected, their sessions and credentials, and the changes
 made to the user. Add `--filter category=auth` for the sign-ins alone.
 `--filter actor_id=<user-id>` is the other question, what that user did. Only
 events recorded by a server that has this filter carry `user_id`.
 
-To find the API requests that failed: `events list --filter status_class=4xx
+To find the API requests that failed: `event list --filter status_class=4xx
 --filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
 (such as `createUser`) for one operation. Only requests recorded by a server
 that has these filters match, so an older request is found by its
@@ -345,7 +347,7 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
-- A filtered `events list` page can hold fewer items than `--limit`, or none,
+- A filtered `event list` page can hold fewer items than `--limit`, or none,
   and still carry `next_page_token`: the server matches some filters over a
   bounded number of events per request. Follow the token, or pass `--all`,
   before you report that nothing matched.
@@ -404,20 +406,23 @@ Each invocation prints one JSON object:
   the run that first built its content, usually the pull request's `preview`.
   `deployment rollback -m` records why on the rollback.
 - `deployment get`, `deployment rollback`, `deployment create --release`,
-  `release revoke` and the `users`, `sessions` and `release` commands that take
+  `release revoke` and the `user`, `session` and `release` commands that take
   an id refuse a value that is not that kind of id (surrounding whitespace is
   trimmed) before they ask or call the server, saying what one looks like and
   suggesting the list command. `claim --challenge-id` refuses a malformed
   challenge id the same way.
 - `release revoke` on a release an origin still serves fails with `E_CONFLICT`.
-  When the server names the origins that serve it, the `hint` names each with
-  its kind (`primary` or `preview`) and the deployment that pins the release
-  there, and `next_commands` lists what frees them: `deploy` and
-  `deployment rollback` for primary origins (each only helps if the release it
-  puts live is a different one), `preview rm <url>` for each preview, which
-  cannot be rolled back and also stops serving when it expires. Without them
-  the conflict has no `hint` and no `next_commands`. Revoke again once none
-  serves it.
+  When the server names the origins that serve it, the `hint` names the first
+  three with their kind (`primary` or `preview`) and the deployment that pins
+  the release there, and counts the rest. `details` is `{ release_id, origins }`
+  and `origins` lists every one as `{ origin, deployment_id, kind }`; the
+  server's own `status`, `url` and `body` are not in it. `next_commands` lists
+  what frees them: `deploy` and `deployment rollback` for primary origins (each
+  only helps if the release it puts live is a different one), and
+  `preview rm <url>` for the first three previews, which cannot be rolled back
+  and also stop serving when they expire. Revoke again once none serves it.
+  Without origins the CLI can read, the conflict is the plain one: no `hint`, no
+  `next_commands`, and `details` holds the server's `status`, `url` and `body`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
@@ -466,7 +471,7 @@ Each invocation prints one JSON object:
   with a note); it still publishes the files as they are now, so a revert is
   published too. Commit your `.zitadel/` changes before every `deploy` so the
   next diff is exact, and read the change back from the server afterwards.
-  `schemas get <objectType> --json` shows the newest uploaded revision, which
+  `schema get <objectType> --json` shows the newest uploaded revision, which
   is not necessarily the one the live deployment serves, so also check that
   the deployment went through (`deployment list --live`). Never treat `ok` as
   proof that the change is what you meant to publish.
@@ -488,7 +493,7 @@ Each invocation prints one JSON object:
   an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
-- `users update --dry-run` is the exception: it also asks the server (the
+- `user update --dry-run` is the exception: it also asks the server (the
   `dry_run` body field of `PATCH /users/{user_id}`), so it needs the credential
   the real update needs, and changes nothing. `data.result` is the user as the
   update would leave them. A refusal is the real update's error envelope: a
@@ -565,9 +570,10 @@ without an envelope. In human mode a cancel prints no error block. A name the
 CLI cannot resolve to a command, an unknown command or an unknown subcommand,
 is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
 does for a command it cannot find. Its `next_commands` are the `--help` of the
-command it was one edit from and of the topic. It is never run as a different
-command. Its message names the first word that is no command where it was
-typed, as typed, and never a word after that one. A stray extra word after a
+command it was the plural of (`policies` alone names `policy --help`) or one
+edit from, and of the topic. It is never run as a different command. Its message
+names the first word that is no command where it was typed, as typed, and
+never a word after that one. A stray extra word after a
 real command is that command refusing an argument it does not take: an
 `E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help
 on such a name is the one exception: the help layer answers, with nothing on stdout. With `--help`
@@ -638,7 +644,7 @@ shows the same under *Sign-in*. Report it to the developer in their words.
 
 Translate the developer's answers into the right axis values, then **verify
 against what actually deployed**: read the live schema back
-(`schemas get <objectType> --json`) and confirm the fields and auth methods
+(`schema get <objectType> --json`) and confirm the fields and auth methods
 match what they asked for — don't assume a preset name did it.
 
 Skip the questions and proceed with the defaults above — stating the assumptions
@@ -679,6 +685,14 @@ is not yet a repository, then one commit, `chore: scaffold the project with
 Zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
+
+For a new TanStack Start app, the commit includes `src/routeTree.gen.ts`,
+which setup generates after installing (the app's `generate-routes` script),
+so the first dev run changes nothing. With `--skip-install` it is missing
+until your install and first dev run write it: commit it then, with the
+lockfile. In a TanStack Start app that already existed, setup adds routes but
+does not regenerate the tree: run the dev server (or the app's
+`generate-routes` script, where it has one), then commit `src/routeTree.gen.ts`.
 
 Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
 to verify is served the release it built. `data.deployment` carries the
@@ -725,6 +739,14 @@ anything, naming what stops the commit.
 `commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
+
+`setup` appends to `.gitignore` only what it needs, judged by what the lines
+already there do, so every file that holds a secret is ignored and
+`.env.example` stays committable after a generator's own `.env.*` and
+`!.env.example`. `doctor` fails (`gitignore`) when a file that holds a secret
+is not ignored, and warns when `.env.example` is, as an older setup left
+SvelteKit, Nuxt and SolidStart apps; `doctor --fix` appends `!.env.example`
+while the file names variables without values.
 
 In an app that already exists, `setup` adds the sign-in, sign-up and profile
 pages and the protection for the pages it guards, and leaves the app's own
@@ -1024,7 +1046,7 @@ fetches every revision before it writes a file, and refuses, writing nothing,
 when a pinned handle cannot be a file name (`E_VALIDATION`), when two broken
 files in `.zitadel/` hold the same handle (`E_CONFLICT`), or when two pinned
 handles would be written to one file (`E_CONFLICT`).
-`policies test` reads every file under `.zitadel/policies/`; a file that is not
+`policy test` reads every file under `.zitadel/policies/`; a file that is not
 valid JSON is listed, as text, in `details.issues` of its `E_VALIDATION`
 (naming one operation limits that to its own files).
 
@@ -1036,6 +1058,48 @@ session-cookie hooks a CLI wrote before these names: the server no longer
 reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
 wrote them; ones changed by hand must be updated by hand, which the failure
 says. Browsers signed in before the change sign in again.
+
+A Vite app's dev proxy (React, Vue, Solid, Svelte, Qwik) reaches the server
+at `ZITADEL_URL`, read with Vite's `loadEnv`: the process environment first,
+then `.env.development.local` (which `setup` writes it to, beside
+`.env.local`), `.env.development`, `.env.local` and `.env`, then the address
+`setup` ran against, which `vite.config.*` carries as the fallback. So a test
+run points the app at its own server through the environment, and an app
+without the variable keeps working. An empty value counts as unset and hides
+the sources below it: an empty `ZITADEL_URL` in the process environment skips
+the env files and lands on the fallback. A value that is no http(s) URL stops
+the config from loading, `vite build` included, naming the variable; one with a
+path is reduced to its origin. A proxy an older CLI wrote fixes the address in
+`vite.config.*`: it still works, and `doctor` warns (`managed-files`,
+`unapplied managed config edit(s)`). `doctor --fix`, which `upgrade` runs,
+turns it into the current target with that address as the fallback, moving
+nothing between files, so with the env files as they are the app reaches the
+same server; a `ZITADEL_URL` the shell or CI exports now takes effect. It leaves the proxy alone, with a warning naming both
+addresses and the file, while the env files set `ZITADEL_URL` to another
+server, and it warns about a proxy changed by hand or a target set on purpose
+without touching either. Angular's `proxy.conf.cjs` reads the process
+environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
+
+The `src/app/app.ts` `setup` writes into an Angular app imports its project id
+from `src/app/zitadel-project.ts`, a git-ignored module setup writes once and
+`zitadel-ng.cjs` keeps current: the launcher takes `ZITADEL_PROJECT_ID` from the
+process environment, then `.env.local`, writes the module, and runs `ng` with
+its arguments unchanged. `setup` runs each plain `ng serve …`, `ng build …` or
+`ng test …` script through it (`dev` is `node zitadel-ng.cjs serve`, `build` is
+`node zitadel-ng.cjs build`); a script in another form stays on `ng`. Run the
+app through its npm scripts: a CI job or hosting preset that runs `ng build`
+must run `npm run build`, with `ZITADEL_PROJECT_ID` exported where there is no
+`.env.local`, and the launcher stops when neither sets it. A plain `ng` command
+fails to compile on a clean checkout, the module missing, and after an
+`npm run` reuses the id that run wrote; every run writes the same module, so a
+build for another project reloads a running dev server with it, and a local
+`npm run build` puts `.env.local`'s id into the bundle. An app an earlier CLI
+set up keeps the project id its `app.ts` names and its `ng` scripts: `doctor`
+passes it, and `doctor --fix` writes none of these files into it. If its
+`app.ts` is missing, `doctor` warns (`managed-files`, unverifiable wiring
+`src/app/app.ts`) that `doctor --fix` writes it only into an app whose scripts
+run `zitadel-ng.cjs`: restore it from version control, or run those scripts as
+`node zitadel-ng.cjs …` and run `doctor --fix` again.
 
 ## Testing the app
 
@@ -1052,7 +1116,8 @@ created or the runtime `start` runs.
   then its `next_actions` (Chromium, once) and `next_commands`: it writes a
   sign-in test and a signed-in test, adds the dev dependencies and a
   `test:e2e` script. `tests add --help` lists what it writes and refuses.
-  Another framework: wire the kit by hand.
+  Another framework: wire the kit by hand. A React, Vue, Solid, Svelte or
+  Qwik app `setup` wired takes the kit's `viteAppEnv` as `app.env`.
 - Seed a user per test (`seed.user()`) and drive the real login
   (`loginWithPassword`) to test the sign-in itself.
 - Start other tests signed in (`authenticatedPage`, or `seed.session()` for

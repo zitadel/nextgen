@@ -204,12 +204,12 @@ paths:
     $ref: endpoints/users/me/schema/methods.yaml
   /users/me/teams:
     $ref: endpoints/users/me/teams/methods.yaml
-  /flow:
-    $ref: endpoints/flow/methods.yaml
-  /flow/{id}:
-    $ref: endpoints/flow/session/methods.yaml
-  /flow/{id}/submit:
-    $ref: endpoints/flow/submit/methods.yaml
+  /flows:
+    $ref: endpoints/flows/methods.yaml
+  /flows/{flow_id}:
+    $ref: endpoints/flows/session/methods.yaml
+  /flows/{flow_id}/submit:
+    $ref: endpoints/flows/submit/methods.yaml
   /auth_attempts:
     $ref: endpoints/auth_attempts/methods.yaml
   /auth_attempts/{attempt_id}:
@@ -258,11 +258,11 @@ paths:
     $ref: endpoints/sessions/me/csrf/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
-  /schemas/{id}:
+  /schemas/{schema_id}:
     $ref: endpoints/schemas/by_id/methods.yaml
   /flow_definitions:
     $ref: endpoints/flow_definitions/methods.yaml
-  /flow_definitions/{id}:
+  /flow_definitions/{flow_definition_id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
@@ -274,7 +274,7 @@ paths:
     $ref: endpoints/search/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
-  /branding/{id}:
+  /branding/{branding_id}:
     $ref: endpoints/branding/by_id/methods.yaml
   /oauth_settings/{oauth_settings_id}:
     $ref: endpoints/oauth_settings/by_id/methods.yaml
@@ -282,15 +282,15 @@ paths:
     $ref: endpoints/idps/methods.yaml
   /idps/query:
     $ref: endpoints/idps/query/methods.yaml
-  /idps/{id}:
+  /idps/{idp_id}:
     $ref: endpoints/idps/by_id/methods.yaml
-  /idps/{id}/revisions:
+  /idps/{idp_id}/revisions:
     $ref: endpoints/idps/by_id/revisions/methods.yaml
   /idps/revisions/{revision_id}:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /applications:
     $ref: endpoints/applications/methods.yaml
-  /applications/{id}:
+  /applications/{application_id}:
     $ref: endpoints/applications/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
@@ -314,7 +314,7 @@ paths:
     $ref: endpoints/grants/methods.yaml
   /grants/query:
     $ref: endpoints/grants/query/methods.yaml
-  /grants/{id}:
+  /grants/{grant_id}:
     $ref: endpoints/grants/by_id/methods.yaml
   /invitations:
     $ref: endpoints/invitations/methods.yaml
@@ -324,11 +324,11 @@ paths:
     $ref: endpoints/invitations/accept/methods.yaml
   /invitations/reject:
     $ref: endpoints/invitations/reject/methods.yaml
-  /invitations/{id}:
+  /invitations/{invitation_id}:
     $ref: endpoints/invitations/by_id/methods.yaml
   /events:
     $ref: endpoints/events/methods.yaml
-  /events/{id}:
+  /events/{event_id}:
     $ref: endpoints/events/by_id/methods.yaml
   /variables:
     $ref: endpoints/variables/methods.yaml
