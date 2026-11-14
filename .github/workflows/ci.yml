@@ -51,6 +51,7 @@ env:
   TURBO_FORCE: ${{ github.event_name == 'schedule' }}
   # The same run checks the conformance fixtures whose framework generator
   # its pin does not fix (`generatorPinned: false`, conformance/README.md).
+  API_CONTRACT_SHARDS: "8"
   CONFORMANCE_UNPINNED: ${{ github.event_name == 'schedule' }}
 
 jobs:

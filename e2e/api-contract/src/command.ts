@@ -175,6 +175,7 @@ export class SchemathesisCommand {
       `--seed ${String(SEED)}`,
       `--max-examples ${String(MAX_EXAMPLES)}`,
       `--workers ${String(WORKERS)}`,
+      "--no-shrink",
       ...(this.input.phases ? [`--phases ${this.input.phases.join(",")}`] : []),
       "--report json --report-json-path /work/report.json",
       "--no-color",
