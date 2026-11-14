@@ -2,6 +2,7 @@ import { startLocalZitadel } from "@zitadel/testing";
 
 import { Credentials } from "./credentials";
 import type { Instance, Instances } from "./lane";
+import { untilPortFree } from "./port-retry";
 import type { OpenApiSpec } from "./spec";
 
 /**
@@ -29,7 +30,9 @@ export class LocalInstances implements Instances {
   }
 
   async start(): Promise<Instance> {
-    const zitadel = await startLocalZitadel({ serverBinary: this.serverBinary });
+    const zitadel = await untilPortFree(() => {
+      return startLocalZitadel({ serverBinary: this.serverBinary });
+    });
     const baseUrl = `${zitadel.handle.baseUrl.replace(/\/$/, "")}${API_PREFIX}`;
     const spec = this.spec;
     return {
