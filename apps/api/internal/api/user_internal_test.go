@@ -241,6 +241,14 @@ func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUser
 	return nil, errors.New("unexpected PatchMyUser")
 }
 
+func (s *stubQueryUsersService) SearchUsers(context.Context, service.SearchUsersInput) (*service.SearchUsersOutput, error) {
+	return nil, errors.New("unexpected SearchUsers")
+}
+
+func (s *stubQueryUsersService) SearchUsersInProjects(context.Context, service.SearchUsersInProjectsInput) (*service.SearchUsersOutput, error) {
+	return nil, errors.New("unexpected SearchUsersInProjects")
+}
+
 var _ service.UserService = (*stubQueryUsersService)(nil)
 
 func TestAttributeNamesInvalid(t *testing.T) {

@@ -1,6 +1,6 @@
 get:
   operationId: getProject
-  x-zitadel-cli: projects get
+  x-zitadel-cli: project get
   summary: Get a project by ID
   description: |
     Returns a project's current state: its name, origins, password hashing
@@ -46,8 +46,8 @@ get:
       $ref: getProject-error-response.yaml
 
 patch:
-  operationId: patchProject
-  x-zitadel-cli: projects update
+  operationId: updateProject
+  x-zitadel-cli: project update
   summary: Update a project
   description: |
     Updates a project's name or password hashing method.
@@ -102,4 +102,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: patchProject-error-response.yaml
+      $ref: updateProject-error-response.yaml

@@ -1,4 +1,4 @@
-name: id
+name: event_id
 in: path
 required: true
 description: |

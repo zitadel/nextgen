@@ -65,28 +65,28 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("add is idempotent and rejects kind conflict", func(t *testing.T) {
-		first, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		first, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
 			Kind:    api.ProjectOriginKindPreview,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		origin, ok := first.(*api.AddOriginResponse)
 		require.True(t, ok, helpers.MustMarshal(t, first))
 		assert.Equal(t, "https://preview.example.com", origin.Pattern)
 		assert.Equal(t, api.AddOriginResponseKindPreview, origin.Kind)
 
-		again, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		again, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
 			Kind:    api.ProjectOriginKindPreview,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		_, ok = again.(*api.AddOriginResponse)
 		require.True(t, ok, helpers.MustMarshal(t, again))
 
-		conflict, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		conflict, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
 			Kind:    api.ProjectOriginKindPrimary,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, conflict)
 		require.True(t, ok, helpers.MustMarshal(t, conflict))
@@ -95,32 +95,32 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("remove is idempotent", func(t *testing.T) {
-		_, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		_, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://tmp.example.com",
 			Kind:    api.ProjectOriginKindPrimary,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 
-		removed, err := client.RemoveOrigin(t.Context(), &api.RemoveOriginReq{
+		removed, err := client.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{
 			Pattern: "https://tmp.example.com",
-		}, api.RemoveOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.RemoveProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		_, ok := removed.(*api.RemoveOriginNoContent)
+		_, ok := removed.(*api.RemoveProjectOriginNoContent)
 		require.True(t, ok, helpers.MustMarshal(t, removed))
 
-		again, err := client.RemoveOrigin(t.Context(), &api.RemoveOriginReq{
+		again, err := client.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{
 			Pattern: "https://tmp.example.com",
-		}, api.RemoveOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.RemoveProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		_, ok = again.(*api.RemoveOriginNoContent)
+		_, ok = again.(*api.RemoveProjectOriginNoContent)
 		require.True(t, ok, helpers.MustMarshal(t, again))
 	})
 
 	t.Run("accepts shared-host preview wildcard as written", func(t *testing.T) {
-		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		resp, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://*.vercel.app",
 			Kind:    api.ProjectOriginKindPreview,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		added, ok := resp.(*api.AddOriginResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -129,10 +129,10 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("rejects primary wildcard", func(t *testing.T) {
-		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
+		resp, err := client.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://*.example.com",
 			Kind:    api.ProjectOriginKindPrimary,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
+		}, api.AddProjectOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, resp)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -140,7 +140,7 @@ func TestOriginsAddRemove(t *testing.T) {
 		assert.Equal(t, domain.ErrOriginPrimaryNotExact().Code, code)
 	})
 
-	// addOrigin accepts the session cookie (#2320), so like every other
+	// addProjectOrigin accepts the session cookie (#2320), so like every other
 	// session write it needs the CSRF token (ADR 053 §5). The generated client
 	// sends the token; a raw request carrying only the cookie must be refused
 	// at the security layer, before any handler runs.

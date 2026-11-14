@@ -12,24 +12,30 @@ const LAYER = posix.join("lib", "oclif");
 /**
  * The modules outside the layer that the glue may reach for, each standing for
  * itself and everything under it: the envelope and its errors, the command
- * line, the palette, the spelling it is printed in, the suggestion builders,
+ * line, the palette, the spelling it is printed in, the plural a noun takes,
+ * the suggestion builders,
  * the telemetry and process plumbing every command pays for, and the backend
  * the generated resource commands speak through.
  */
 const GENERIC = [
   "lib/backend",
+  "lib/box",
   "lib/cmd",
   "lib/consent",
   "lib/errors",
   "lib/host",
   "lib/input",
   "lib/json",
+  "lib/log",
+  "lib/names",
   "lib/paths",
+  "lib/plural",
   "lib/public-cli",
   "lib/server",
   "lib/style",
   "lib/suggestion",
   "lib/telemetry",
+  "lib/ui",
   "lib/terminal-text",
   "lib/user-agent",
   "lib/warnings",
@@ -132,7 +138,7 @@ describe("the oclif layer", () => {
 
     for (const file of await layerFiles()) {
       for (const target of await reachesOutside(file)) {
-        if (target.startsWith("commands/")) {
+        if (target.startsWith("cli/commands/")) {
           importing.push(`${file} -> ${target}`);
         }
       }

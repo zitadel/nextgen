@@ -1,5 +1,5 @@
 post:
-  operationId: addOrigin
+  operationId: addProjectOrigin
   x-zitadel-cli: origin add
   summary: Add an origin pattern
   description: |
@@ -18,7 +18,7 @@ post:
     Adding a pattern that already exists with the same kind is idempotent and
     answers `201` with the stored origin. If the pattern exists with the other
     kind, the request is refused with `origin.kind_conflict`: remove it with
-    `removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
+    `removeProjectOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
   tags:
     - Projects
   parameters:
@@ -51,4 +51,4 @@ post:
           schema:
             $ref: add-origin-response.yaml
     default:
-      $ref: addOrigin-error-response.yaml
+      $ref: addProjectOrigin-error-response.yaml

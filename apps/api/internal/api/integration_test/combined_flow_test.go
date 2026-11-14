@@ -33,7 +33,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
@@ -64,12 +64,12 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
-	flipOK := flipResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, flipResp, helpers.MustMarshal(t, flipResp))
+	flipOK := flipResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
 	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
@@ -84,28 +84,29 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
-	idOK := idResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "register-password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie)
 
 	// Submit the password → create_user fires → done + handoff token.
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, idOK.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -125,7 +126,6 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "combined-password",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",
@@ -207,7 +207,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -331,7 +331,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: purposeNavFlowDefinition(schemaURL),
 	})
@@ -407,19 +407,22 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 }
 
 // mustSubmitOK submits a flow action and requires a non-error step response.
-func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action string, fields api.FlowSubmitRequestFields) *api.SubmitFlowStepOK {
+func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action string, fields api.FlowSubmitRequestFields) *api.FlowResponseHeaders {
 	t.Helper()
 	req := &api.FlowSubmitRequest{Action: action}
+	if action == "submit" && fields["x-auth-methods#password"] != nil {
+		req.GateProofs = currentSignupProofs(t, client, flowID, zflow)
+	}
 	if fields != nil {
 		req.Fields = api.NewOptFlowSubmitRequestFields(fields)
 	}
 	resp, err := client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{
-		ID:    flowID,
-		Zflow: zflow,
+		FlowID: flowID,
+		Zflow:  zflow,
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	ok := resp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	ok := resp.(*api.FlowResponseHeaders)
 	require.False(t, ok.Response.Step.Error.Set, "step error: %s", helpers.MustMarshal(t, resp))
 	return ok
 }
@@ -433,7 +436,6 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 	loginPurpose := api.NewOptNilFlowDefinitionStepTransitionsItemPurpose(api.FlowDefinitionStepTransitionsItemPurposeLogin)
 	return api.FlowDefinition{
 		Name:       "purpose-nav-password",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",

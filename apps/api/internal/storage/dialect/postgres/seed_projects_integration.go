@@ -68,8 +68,8 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 		return fmt.Errorf("postgres.InsertFlowDefinitionAt: expected *Pool, got %T", pool)
 	}
 	_, err := p.pool.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) `+
-			`VALUES ($1, $2, $3, '1.0.0', 'draft'`+statusCast+`, '{}'`+purposeArrCast+`, '{}', $4, $4)`,
+		`INSERT INTO zitadel_nextgen.flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) `+
+			`VALUES ($1, $2, $3, '1.0.0', '{}'`+purposeArrCast+`, '{}', $4, $4)`,
 		projectID, id, name, createdAt,
 	)
 	return wrapError(err)
@@ -89,4 +89,19 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 		projectID, id, userID, encodedHash, createdAt,
 	)
 	return wrapError(err)
+}
+
+// ReactivateUser sets a deactivated user back to active so stmttest can assert
+// that authorization reads the user's status at check time (ADR 053 §4). There
+// is no product statement that reactivates a user.
+func ReactivateUser(ctx context.Context, pool database.Pool, projectID, userID string) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("postgres.ReactivateUser: expected *Pool, got %T", pool)
+	}
+	_, err := p.pool.Exec(ctx,
+		`UPDATE zitadel_nextgen.users SET status = $1, updated_at = now() WHERE project_id = $2 AND id = $3`,
+		domain.UserStatusActive.String(), projectID, userID,
+	)
+	return err
 }

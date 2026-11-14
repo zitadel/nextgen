@@ -4,7 +4,7 @@ description: |
 
   A challenge asks the user to prove one factor: a password, a TOTP code, a
   passkey assertion and so on. The client submits the proof with
-  `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
+  `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
   (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`).
 required:
   - challenge_id
@@ -18,7 +18,7 @@ properties:
     $ref: ../../../../components/schemas/challenge-method.yaml
     description: |
       The authentication method this challenge represents.
-      It determines which proof `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.
+      It determines which proof `verifyAuthAttemptChallenge` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.
   state:
     type: string
     enum:

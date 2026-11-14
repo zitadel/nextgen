@@ -20,7 +20,9 @@ export class ReactDetector implements Detector {
   readonly versionFloor = "18";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (
       !pkg ||
       hasDependency(pkg, "next") ||

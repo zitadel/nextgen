@@ -15,7 +15,7 @@ you need proven.
 ## Embedded shell smoke
 
 ```sh
-moon run e2e:console-smoke
+turbo run console-smoke --filter=@zitadel/e2e
 ```
 
 Builds the console, serves it with Vite preview, and verifies that the SPA mounts
@@ -34,7 +34,7 @@ previewing without a backend, and setting it here would hide the error state.
 ## Real-instance resource coverage
 
 ```sh
-moon run e2e:console-real
+turbo run console-real --filter=@zitadel/e2e
 ```
 
 Boots one ephemeral Zitadel instance through `@zitadel/testing`, starts the
@@ -49,7 +49,7 @@ server whatever the server does with it, so the console's API base is correct
 here by construction. That is what `console-embedded` is for.
 
 This lane boots the binary with its embedded console off (Vite serves the
-console here; see [`moon.yml`](../moon.yml)). The mux serves
+console here; see the lane's script in [`package.json`](../package.json)). The mux serves
 `/console/runtime.json` either way, and that document carries the publishable
 key the login widget needs for the sign-in exchange. The proxy forwards it like
 any other request, and the same document names the project the console signs
@@ -59,7 +59,7 @@ the client.
 ## Embedded-surface coverage
 
 ```sh
-moon run e2e:console-embedded
+turbo run console-embedded --filter=@zitadel/e2e
 ```
 
 Boots the **built Go binary** and nothing else. It serves the console at
@@ -76,7 +76,7 @@ test that needs one grants its user access through the API first.
 ## Platform-project coverage
 
 ```sh
-moon run e2e:console-platform
+turbo run console-platform --filter=@zitadel/e2e
 ```
 
 Boots the built Go binary with the platform project bootstrapped: the
@@ -92,7 +92,7 @@ its seeded users into the harness project.
 
 ```sh
 CLOUD_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… \
-  moon run e2e:console-deployment
+  turbo run console-deployment --filter=@zitadel/e2e
 ```
 
 Boots nothing: it checks a deployment of the hosted cloud, which serves the
@@ -101,7 +101,7 @@ the same origin (the repo-root `vercel.json`). That routing is what no other
 lane can see, so this one pins it: `/console/runtime.json` still reaches the
 server, the old `/ui/console` links redirect, and a deep link comes up as the
 signed-out sign-in screen with the login widget asking for an email, which
-takes the server's runtime document and its `POST /flow`. It signs nobody in,
+takes the server's runtime document and its `POST /flows`. It signs nobody in,
 so it needs no credential but Vercel's bypass secret.
 
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs it

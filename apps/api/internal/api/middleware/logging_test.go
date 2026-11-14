@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	slogctx "github.com/veqryn/slog-context"
 	slogotel "github.com/veqryn/slog-context/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -183,37 +184,34 @@ func TestWithLogging_logsTheOperationID(t *testing.T) {
 	assert.Equal(t, "getHealth", operationID)
 }
 
-// The server span ended before the line is written, so the line reads the span
-// context the tracer left in the holder. Only a sampled span gives IDs, and
-// they sit at the root of the line, not in the request group, as on every
-// other line.
+// The request line carries the IDs of the request's server span, which
+// WithServerSpan opened outside WithLogging and which is still open when the
+// line is written. Only a sampled span gives IDs, and they sit at the root of
+// the line, not in the request group, as on every other line.
 func TestWithLogging_logsTheTraceOfTheServerSpan(t *testing.T) {
-	sampled := trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID:    trace.TraceID{1},
-		SpanID:     trace.SpanID{2},
-		TraceFlags: trace.FlagsSampled,
-	})
-	unsampled := trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{3}, SpanID: trace.SpanID{4}})
 	for _, tt := range []struct {
 		name    string
-		set     *trace.SpanContext
+		sampler sdktrace.Sampler
 		wantIDs bool
 	}{
-		{name: "sampled", set: &sampled, wantIDs: true},
-		{name: "unsampled", set: &unsampled},
+		{name: "sampled", sampler: sdktrace.AlwaysSample(), wantIDs: true},
+		{name: "unsampled", sampler: sdktrace.NeverSample()},
 		{name: "no server span"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var logs bytes.Buffer
 			logger := slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
-				Prependers: []slogctx.AttrExtractor{slogctx.ExtractPrepended},
+				Prependers: []slogctx.AttrExtractor{slogotel.ExtractTraceSpanID, slogctx.ExtractPrepended},
 			}))
+			var server trace.SpanContext
+			handler := middleware.WithLogging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				server = trace.SpanContextFromContext(r.Context())
+			}))
+			if tt.sampler != nil {
+				handler = middleware.WithServerSpan(sdktrace.NewTracerProvider(sdktrace.WithSampler(tt.sampler)))(handler)
+			}
 			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(zlog.WithLoggingContext(context.Background(), logger))
-			middleware.WithLogging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-				if tt.set != nil {
-					middleware.SetServerSpanContext(r.Context(), *tt.set)
-				}
-			})).ServeHTTP(httptest.NewRecorder(), req)
+			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			var line map[string]any
 			require.NoError(t, json.Unmarshal(logs.Bytes(), &line))
@@ -227,8 +225,9 @@ func TestWithLogging_logsTheTraceOfTheServerSpan(t *testing.T) {
 				assert.NotContains(t, line, slogotel.DefaultKeySpanID)
 				return
 			}
-			assert.Equal(t, sampled.TraceID().String(), line[slogotel.DefaultKeyTraceID])
-			assert.Equal(t, sampled.SpanID().String(), line[slogotel.DefaultKeySpanID])
+			require.True(t, server.IsValid())
+			assert.Equal(t, server.TraceID().String(), line[slogotel.DefaultKeyTraceID])
+			assert.Equal(t, server.SpanID().String(), line[slogotel.DefaultKeySpanID])
 		})
 	}
 }

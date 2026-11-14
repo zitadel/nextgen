@@ -34,8 +34,15 @@ Authority (do not duplicate payload rules or the catalog table here):
   ([`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go)),
   and its webhook in the root `webhooks:` list of
   [`api/openapi/openapi-spec.yaml`](../../api/openapi/openapi-spec.yaml),
-  which the generator checks. Regenerate with `moon run server:generate`.
+  which the generator checks. Regenerate with `turbo run generate --filter=@zitadel/server`.
 - Producer allowlist:
   [`internal/audit/catalog_producers_test.go`](../audit/catalog_producers_test.go)
   — live catalog types must have a producer; do not list deferred types as
   live.
+
+## The events list reads no further than a page or a budget
+
+- Put a new `GET /events` filter into `planEventRead` (`event.go`): as part of
+  an index range, or as `match`. Never add it to a list's WHERE on its own.
+- A filter that must always fill its pages needs an index ending in
+  `(created_at, id)` on all three dialects, pinned in `TestListEvents_FilterPlans`.

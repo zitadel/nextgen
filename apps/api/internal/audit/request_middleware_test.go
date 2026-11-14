@@ -80,7 +80,7 @@ func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		w.WriteHeader(http.StatusCreated)
 	}))
-	req := httptest.NewRequest(http.MethodPost, "/flow", nil)
+	req := httptest.NewRequest(http.MethodPost, "/flows", nil)
 	req = req.WithContext(middleware.WithRequestIDContext(req.Context(), "req_flow"))
 	h.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -141,7 +141,7 @@ func TestRequestEventMiddleware_OmitsOriginWhenHeaderMissing(t *testing.T) {
 func TestRequestEventMiddleware_TruncatesOversizedClientHeaders(t *testing.T) {
 	ins, buf := startPathA(t)
 	h := WithRequestEventMiddleware(buf, stampProject("proj_1"))
-	req := httptest.NewRequest(http.MethodGet, "/flow", nil)
+	req := httptest.NewRequest(http.MethodGet, "/flows", nil)
 	req.Header.Set("User-Agent", strings.Repeat("a", maxEventUserAgentBytes-1)+"☃"+strings.Repeat("x", 2048))
 	req.Header.Set("Origin", strings.Repeat("b", maxEventOriginBytes+2048))
 	h.ServeHTTP(httptest.NewRecorder(), req)
@@ -241,6 +241,53 @@ func TestRequestEventMiddleware_RecordsTheOperationAsTheRoute(t *testing.T) {
 			require.NoError(t, json.Unmarshal(ins.events[0].Payload, &payload))
 			assert.Equal(t, tt.want, payload.RouteTemplate)
 			assert.Equal(t, tt.operationID, payload.OperationID)
+		})
+	}
+}
+
+// A request event carries its operation and status class beside the payload,
+// as the columns GET /events reads them from by index. A request refused
+// before an operation ran has a class and no operation.
+func TestRequestEventMiddleware_IndexesTheOperationAndStatusClass(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		operationID string
+		status      int
+		wantClass   domain.HTTPStatusClass
+	}{
+		{name: "a failed call", operationID: "createUser", status: http.StatusConflict, wantClass: domain.HTTPStatusClassClientError},
+		{name: "a successful call", operationID: "getMyUser", status: http.StatusOK, wantClass: domain.HTTPStatusClassSuccessful},
+		{name: "refused before an operation ran", status: http.StatusUnauthorized, wantClass: domain.HTTPStatusClassClientError},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ins, buf := startPathA(t)
+			h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.operationID != "" {
+					middleware.WithOperationIDContext(r.Context(), tt.operationID)
+				}
+				ac, _ := ActorSlotFromContext(r.Context())
+				ac.ProjectID = "proj_1"
+				w.WriteHeader(tt.status)
+			}))
+			req := httptest.NewRequest(http.MethodPost, "/users", nil)
+			h.ServeHTTP(httptest.NewRecorder(), req.WithContext(middleware.WithOperationIDContext(req.Context(), "")))
+
+			require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+			ins.mu.Lock()
+			defer ins.mu.Unlock()
+			require.Len(t, ins.events, 1)
+			ev := ins.events[0]
+			require.NotNil(t, ev.StatusClass)
+			assert.Equal(t, tt.wantClass, *ev.StatusClass)
+			if tt.operationID == "" {
+				assert.Nil(t, ev.OperationID)
+			} else {
+				require.NotNil(t, ev.OperationID)
+				assert.Equal(t, tt.operationID, *ev.OperationID)
+			}
+			var payload domain.RequestAPIPayload
+			require.NoError(t, json.Unmarshal(ev.Payload, &payload))
+			assert.Equal(t, tt.status, payload.Status, "the columns copy the payload")
 		})
 	}
 }

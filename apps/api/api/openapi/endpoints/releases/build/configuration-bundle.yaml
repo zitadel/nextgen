@@ -24,11 +24,13 @@ description: |
   - a schema without an `objectType`.
 
   Each kind is optional, and the arrays may be empty: a project that never
-  ejected its branding omits `branding`. The bundle carries at least one
-  resource. The release it builds pins at most 50 resources, which counts the
-  resources the bundle carries plus those resolved from the project. The
-  server refuses anything outside that with `rel.invalid`. Unknown keys are
-  refused.
+  ejected its branding omits `branding`, and one that never turned on its
+  OAuth authorization server omits `oauth`. `branding` and `oauth` are
+  single objects, because a project has one of each. The bundle carries at
+  least one resource. The release it builds pins at most 50 resources, which
+  counts the resources the bundle carries plus those resolved from the
+  project. The server refuses anything outside that with `rel.invalid`.
+  Unknown keys are refused.
 additionalProperties: false
 # A bundle with nothing in it is refused (`rel.invalid`, "the bundle is empty").
 minProperties: 1
@@ -98,3 +100,10 @@ properties:
       The descriptor from `.zitadel/branding/branding.json` with its template
       inlined, exactly as `POST /branding` takes it. A project has one
       branding, so this is a single object.
+  oauth:
+    $ref: ../../../components/oauth/oauth-settings.yaml
+    description: |
+      The project's OAuth settings. A project has one set of them, so this is
+      a single object, and the release is its only writer: there is no
+      per-kind create endpoint. Omit it to leave the project's OAuth
+      authorization server off.

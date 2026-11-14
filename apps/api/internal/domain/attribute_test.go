@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -326,7 +327,7 @@ func TestNewCreateAttribute_UniqueHashIsNormalized(t *testing.T) {
 	b, err := NewCreateAttribute("email", "alice@example.com", AttributeUniquenessProject)
 	require.NoError(t, err)
 
-	assert.Equal(t, a.ValueHash, b.ValueHash, "the registry sees one value")
+	assert.Equal(t, a.ValueHash, b.ValueHash, "the unique index sees one value")
 	assert.Equal(t, "Alice@Example.com", a.Value, "the stored value keeps its casing")
 }
 
@@ -347,4 +348,52 @@ func TestInvalidAttributeNames(t *testing.T) {
 			assert.Equal(t, tc.want, InvalidAttributeNames(tc.attributes))
 		})
 	}
+}
+
+func TestSearchText(t *testing.T) {
+	text, ok := SearchText("Alice@Example.COM")
+	require.True(t, ok)
+	assert.Equal(t, "alice@example.com", text)
+
+	// The folding is the one uniqueness uses, so a value found by a search is
+	// the value a unique claim compares.
+	eszett, ok := SearchText("Straße")
+	require.True(t, ok)
+	assert.Equal(t, "strasse", eszett)
+
+	long, ok := SearchText(strings.Repeat("é", SearchTextMaxRunes+10))
+	require.True(t, ok)
+	assert.Equal(t, strings.Repeat("é", SearchTextMaxRunes), long, "cut by runes, never inside one")
+
+	for _, value := range []any{"", 42, true, nil, []any{"a"}} {
+		_, ok := SearchText(value)
+		assert.False(t, ok, "%v", value)
+	}
+}
+
+func TestSearchableAttributeKeys(t *testing.T) {
+	assert.Equal(t, []AttributeKey{"email", "givenName", "name.family"}, SearchableAttributeKeys(map[string]any{
+		SchemaAnnotationIdentifier: "email",
+		SchemaAnnotationDisplay:    []any{"givenName", "name.family", 7, ""},
+	}))
+	assert.Empty(t, SearchableAttributeKeys(map[string]any{"type": "object"}))
+}
+
+func TestCreateAttributes_MarkSearchable(t *testing.T) {
+	attrs, err := CreateAttributesFromMap(map[string]any{
+		"email": "Alice@Example.com",
+		"age":   42,
+		"role":  "Admin",
+	}, nil)
+	require.NoError(t, err)
+	attrs.MarkSearchable([]AttributeKey{"email", "age"})
+
+	got := map[AttributeKey]*string{}
+	for _, attr := range attrs {
+		got[attr.Key] = attr.SearchText
+	}
+	require.NotNil(t, got["email"])
+	assert.Equal(t, "alice@example.com", *got["email"])
+	assert.Nil(t, got["age"], "only a string has search text")
+	assert.Nil(t, got["role"], "not named, so no search reads it")
 }

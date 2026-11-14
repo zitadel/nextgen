@@ -57,6 +57,10 @@ the dialect generator is the only mint path, not that create always overwrites.
 | flow definition | `flowdef` |
 | IdP connection | `idp` |
 | IdP connection revision | `idprev` |
+| application | `app` |
+| application revision | `apprev` |
+| application client row | `client` |
+| application client secret row | `csec` |
 | IdP identity link (`idp_identity_links`, storage-only) | `idplink` |
 | policy (ADR 066) | `pol` |
 | policy revision | `polrev` |
@@ -74,6 +78,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | user recovery codes row | `urc` |
 | user passkey row | `upk` |
 | authz assignment | `asgn` |
+| invitation | `inv` |
 | event (audit wide-event) | `evt` |
 | event sink | `sink` |
 | job row | `job` |
@@ -81,6 +86,8 @@ the dialect generator is the only mint path, not that create always overwrites.
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the `sch` row no longer depends on whether a `$id` is declared; a schema's resource `id` is always dialect-minted.
 >
 > Amended by [ADR 065](065-background-jobs.md): registers the `job` prefix for job rows (not an HTTP resource).
+>
+> Amended by [ADR 086](086-invitations.md): registers the `inv` prefix for invitations.
 
 Existing style mix (`brnd` / `flowdef` / `enc_key` / `upw`) stays until a
 dedicated rename PR. Do not add more without the selection rules below.
@@ -118,6 +125,7 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 | SSO provider `id` in flow definitions | Config key, not a storage PK |
 | Middleware `req_*` | Correlation only; local `RequestIDGenerator` |
 | Secrets (`sk_*`, handoff, session token material) | Cryptographic secrets, not row PKs |
+| Application client `client_id` | A column of the client row, not its primary key. It holds the value the document supplied or, when the document supplied none, a copy of the row's minted `client_*` primary key. Unique per project. The API, the OAuth endpoints and error details identify a client by `client_id` or slug; the primary key stays inside storage. `client_` and `dcr_` are reserved for server-generated values |
 
 > Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a schema's resource `id` is dialect-minted; a declared `$id` stays a document property.
 

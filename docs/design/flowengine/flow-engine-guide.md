@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit ordered capability arrays for `fields` and `actions` (entries carry a `name`, ADR 021), a keyed `gates` map, and a LiquidJS template controls layout.
 >
-> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
+> **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../apps/api/api/openapi/openapi-spec.yaml) — endpoints under `/flows`. Schemas in [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
 
 The flow engine is a **server-side state machine** that produces **Capability payloads** alongside a **LiquidJS template**. It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip it entirely and use the Session API directly.
 
@@ -22,7 +22,7 @@ sequenceDiagram
     participant Server
 
     User->>Frontend: Opens login page
-    Frontend->>Server: POST /flow { project_id, purpose: "login" }
+    Frontend->>Server: POST /flows { project_id, purpose: "login" }
     Server-->>Frontend: Step: fields=[email, x-auth-methods#password]
     User->>Frontend: Types email + password
     Frontend->>Server: submit { email: "alice@acme.com", x-auth-methods#password: "..." }
@@ -98,7 +98,7 @@ sequenceDiagram
     participant Atoms as <zl-*> Atoms
 
     App->>ZL: Mounts component
-    ZL->>ZL: POST /flow → receives capabilities + template
+    ZL->>ZL: POST /flows → receives capabilities + template
     ZL->>ZL: Loads locale dictionary (en.ts)
     ZL->>Liquid: Parse template string + inject capabilities as context
     Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
@@ -107,7 +107,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /flow/{id}/submit → receives next step
+    ZL->>ZL: POST /flows/{flow_id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -199,7 +199,7 @@ Customers who want full control "eject" this template — the Zitadel Console co
 ### The frontend loop (pseudocode)
 
 ```
-response = POST /flow { project_id, purpose, auth_request_id }
+response = POST /flows { project_id, purpose, auth_request_id }
 
 loop:
   step = response.step
@@ -222,7 +222,7 @@ loop:
 
   { action, fields } = waitForCustomEvent()
 
-  response = POST /flow/{id}/submit {
+  response = POST /flows/{flow_id}/submit {
     action: action,
     fields: fields
   }
@@ -257,7 +257,6 @@ As a definition:
 ```json
 {
   "name": "simple-login",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": { "login": "login" },
   "steps": [
@@ -385,7 +384,6 @@ A single flow definition can serve **multiple purposes** by declaring different 
 ```json
 {
   "name": "combined-auth",
-  "status": "active",
   "user_schema": "sch_01hexample",
   "purposes": {
     "login": "identify",
@@ -406,7 +404,7 @@ When a flow starts, the server resolves which definition to use:
 ```mermaid
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
-    filter["Filter: active definitions<br>whose purposes has an entry for 'login'"]
+    filter["Filter: pinned definitions<br>whose purposes has an entry for 'login'"]
     schema["If set, hard-filter by<br>user_schema_id"]
     match["Score audience:<br>app match > team match > project-wide > other scoped"]
     pick["Pick highest score<br>tie-break by created_at, then id"]
@@ -647,16 +645,9 @@ policy evaluation.
 
 ## Definition Lifecycle
 
-The shipped schema defines two statuses:
-
-| Status | Can be resolved? | How to change |
-|---|---|---|
-| `draft` | No — never selected for new flows | Publish a new revision with `POST /flow_definitions` |
-| `active` | Yes | Publish a new revision with `POST /flow_definitions` |
-
-A revision is immutable and its `status` is fixed at creation. There are no
-lifecycle verbs in the shipped spec — you change a flow by publishing a new
-revision under the same `name`, and create already runs the definition
-validator. A standalone `POST .../validate` (dead-end and reachability checks
-on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
-shipped — see [flow-engine.md](flow-engine.md#flow-definitions).
+A revision is immutable and carries no state of its own: it is served when
+the deployed release pins it. There are no lifecycle verbs in the shipped
+spec — you change a flow by publishing a new revision under the same `name`,
+and create already runs the definition validator. A standalone
+`POST .../validate` (dead-end and reachability checks on demand) and
+`POST .../simulate` (dry-run with mock input) are planned, not shipped — see [flow-engine.md](flow-engine.md#flow-definitions).

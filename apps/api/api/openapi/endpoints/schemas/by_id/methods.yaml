@@ -1,6 +1,6 @@
 get:
-  operationId: getSchemaById
-  x-zitadel-cli: schemas get
+  operationId: getSchema
+  x-zitadel-cli: schema get
   summary: Get a schema by ID
   description: |
     Returns a schema by ID. A schema ID identifies one immutable revision, so
@@ -31,4 +31,4 @@ get:
           schema:
             $ref: ../schema.yaml
     default:
-      $ref: getSchemaById-error-response.yaml
+      $ref: getSchema-error-response.yaml

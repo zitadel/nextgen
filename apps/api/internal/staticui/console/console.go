@@ -78,7 +78,7 @@ func ValidateDist() error {
 	}
 	if _, err := fs.Stat(dist, "dist/index.html"); err != nil {
 		return fmt.Errorf(
-			"console UI not embedded: run `moon run console:build` (see CONTRIBUTING.md): %w",
+			"console UI not embedded: run `turbo run build --filter=@zitadel/console` (see CONTRIBUTING.md): %w",
 			err,
 		)
 	}

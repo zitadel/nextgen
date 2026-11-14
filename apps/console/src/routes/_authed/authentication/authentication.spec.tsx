@@ -75,7 +75,6 @@ const LOGIN_FLOW = {
   updated_at: CREATED_AT,
   flow_definition: {
     name: "default-login",
-    status: "active",
     user_schema: "sch_customers",
     purposes: { login: "identifier" },
     steps: [{ name: "identifier", sso_providers: ["google"] }],
@@ -285,11 +284,15 @@ describe("identity provider detail", () => {
     expect(screen.getByText("1234.apps.example.com")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Client ID" })).toBeInTheDocument();
 
-    expect(screen.getByRole("link", { name: "Customer users" })).toHaveAttribute(
+    // What references the connection sits under its own heading, a step below
+    // the card's, and names the section it heads.
+    expect(screen.getByRole("heading", { name: "Used by", level: 3 })).toBeInTheDocument();
+    const usedBy = within(screen.getByRole("region", { name: "Used by" }));
+    expect(usedBy.getByRole("link", { name: "Customer users" })).toHaveAttribute(
       "href",
       expect.stringContaining("/schemas/sch_customers"),
     );
-    expect(screen.getByRole("link", { name: "Default login" })).toHaveAttribute(
+    expect(usedBy.getByRole("link", { name: "Default login" })).toHaveAttribute(
       "href",
       expect.stringContaining("/flow-definitions/flow_login"),
     );

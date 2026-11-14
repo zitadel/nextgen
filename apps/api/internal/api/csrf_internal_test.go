@@ -111,6 +111,7 @@ func TestCheckSessionCSRF(t *testing.T) {
 			context.WithValue(context.Background(), csrfRequestKey{}, csrfRequest{unsafe: true, originErr: errors.New("cross-origin")}),
 			api.QueryUsersOperation, domain.ErrAuthCSRFInvalid()},
 		{"exempt query read needs no token", unsafe(""), api.QueryUsersOperation, nil},
+		{"exempt invitation lookup needs no token", unsafe(""), api.LookupInvitationOperation, nil},
 		{"logout without token is refused", unsafe(""), api.RevokeMySessionOperation, domain.ErrAuthCSRFInvalid()},
 		{"logout with the session's token passes", unsafe(CSRFToken(cookie)), api.RevokeMySessionOperation, nil},
 		{"write without token is refused", unsafe(""), api.CreateTeamOperation, domain.ErrAuthCSRFInvalid()},
@@ -118,7 +119,7 @@ func TestCheckSessionCSRF(t *testing.T) {
 		{"write with the session's token passes", unsafe(CSRFToken(cookie)), api.CreateTeamOperation, nil},
 		// Deny by default: an operation that was never listed anywhere still
 		// needs the token once the cookie authenticates a write to it.
-		{"unlisted write without token is refused", unsafe(""), api.CreateBrandingOperation, domain.ErrAuthCSRFInvalid()},
+		{"unlisted write without token is refused", unsafe(""), api.PublishBrandingOperation, domain.ErrAuthCSRFInvalid()},
 		{"missing middleware state fails closed", context.Background(), api.GetMySessionOperation, domain.ErrInternal(nil)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

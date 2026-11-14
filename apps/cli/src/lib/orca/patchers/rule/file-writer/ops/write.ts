@@ -30,7 +30,7 @@ export class WriteOp extends Operation<"write"> {
 
     if (isConflict) {
       throw new ZitadelError("E_CONFLICT", `Refusing to overwrite ${source.path}`, {
-        hint: "Re-run with --force if you want the CLI to replace this file.",
+        hint: "Rerun with --force if you want the CLI to replace this file.",
         details: {
           path: source.path,
         },

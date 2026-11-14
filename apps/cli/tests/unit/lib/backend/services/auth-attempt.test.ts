@@ -34,8 +34,8 @@ describe("AuthAttemptService.prove", () => {
   /** An attempt whose proof is answered by `verify`. */
   function proving(verify: () => Promise<{ attempt_id?: string }>) {
     return service({
-      issueChallenge: async () => ({ challenge_id: "chl_1" }),
-      verifyChallengeProof: verify,
+      createAuthAttemptChallenge: async () => ({ challenge_id: "chl_1" }),
+      verifyAuthAttemptChallenge: verify,
     });
   }
 
@@ -48,15 +48,23 @@ describe("AuthAttemptService.prove", () => {
   });
 
   it("issues the challenge for the factor and answers that same challenge", async () => {
-    const issueChallenge = vi.fn(async () => ({ challenge_id: "chl_1" }));
-    const verifyChallengeProof = vi.fn(async () => ({ attempt_id: "att_1" }));
+    const createAuthAttemptChallenge = vi.fn(async () => ({ challenge_id: "chl_1" }));
+    const verifyAuthAttemptChallenge = vi.fn(async () => ({ attempt_id: "att_1" }));
 
-    await service({ issueChallenge, verifyChallengeProof }).prove("att_1", "identifier", {
-      login_name: "ada@acme.com",
-    });
+    await service({ createAuthAttemptChallenge, verifyAuthAttemptChallenge }).prove(
+      "att_1",
+      "identifier",
+      {
+        login_name: "ada@acme.com",
+      },
+    );
 
-    expect(issueChallenge).toHaveBeenCalledWith("att_1", { method: "identifier" }, FROM_ORIGIN);
-    expect(verifyChallengeProof).toHaveBeenCalledWith(
+    expect(createAuthAttemptChallenge).toHaveBeenCalledWith(
+      "att_1",
+      { method: "identifier" },
+      FROM_ORIGIN,
+    );
+    expect(verifyAuthAttemptChallenge).toHaveBeenCalledWith(
       "att_1",
       "chl_1",
       { login_name: "ada@acme.com" },
@@ -88,9 +96,9 @@ describe("AuthAttemptService.prove", () => {
 
 describe("AuthAttemptService.handoff", () => {
   it("answers the one-time token the attempt ended with", async () => {
-    const createHandoff = vi.fn(async () => ({ handoff_token: "ho_1" }));
+    const createAuthAttemptHandoff = vi.fn(async () => ({ handoff_token: "ho_1" }));
 
-    await expect(service({ createHandoff }).handoff("att_1")).resolves.toBe("ho_1");
-    expect(createHandoff).toHaveBeenCalledWith("att_1", FROM_ORIGIN);
+    await expect(service({ createAuthAttemptHandoff }).handoff("att_1")).resolves.toBe("ho_1");
+    expect(createAuthAttemptHandoff).toHaveBeenCalledWith("att_1", FROM_ORIGIN);
   });
 });

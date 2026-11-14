@@ -1,6 +1,6 @@
 post:
   operationId: createTeam
-  x-zitadel-cli: teams create
+  x-zitadel-cli: team create
   summary: Create a team
   description: |
     Creates a team in the project, with a name no other team in the project has.

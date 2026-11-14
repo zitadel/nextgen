@@ -44,7 +44,7 @@ get:
       $ref: getMyUser-error-response.yaml
 
 patch:
-  operationId: patchMyUser
+  operationId: updateMyUser
   summary: Update my user information
   description: |
     Partially updates the caller's own schema-defined attributes. The merged
@@ -85,7 +85,7 @@ patch:
         validation.
 
         Merged attributes that fail the schema answer `req.invalid`, as on
-        `PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`
+        `updateUser` (`PATCH /users/{user_id}`): `details.details.fields`
         lists the dotted path of every failing field from the request body,
         such as `attributes.address.zip` or `attributes.phones.0.fax`, never the
         rejected values. Fix the fields listed and send the patch again.
@@ -132,4 +132,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: patchMyUser-error-response.yaml
+      $ref: updateMyUser-error-response.yaml

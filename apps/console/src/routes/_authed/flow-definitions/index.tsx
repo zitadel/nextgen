@@ -18,7 +18,6 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
-import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
 import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
@@ -68,7 +67,7 @@ export interface FlowRow {
 // Mapped rather than spread so the wire's snake_case stops at the loader.
 function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
   const definition = entry.flow_definition;
-  // The embed is the `GET /schemas/{id}` envelope, so the document is one level in.
+  // The embed is the `GET /schemas/{schema_id}` envelope, so the document is one level in.
   const embed = entry.user_schema;
   return {
     id: entry.id,
@@ -142,9 +141,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
             <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
-          {/* Drafts only: the engine never selects one, and the design draws
-              only active flows. */}
-          {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{purposes}</TableCell>

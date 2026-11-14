@@ -66,7 +66,6 @@ const FLOW = {
   id: "flow_1",
   flow_definition: {
     name: "default-login",
-    status: "active",
     // Both, as the checked-in default flow definition carries them.
     purposes: { login: "identifier", register: "register" },
     steps: [],
@@ -77,7 +76,7 @@ function serveRevision(branding: unknown = PUBLISHED) {
   server.use(
     http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
     http.get(LIST_URL, () =>
-      HttpResponse.json([{ id: "brnd_1", created_at: "2026-01-01T00:00:00Z" }]),
+      HttpResponse.json({ branding: [{ id: "brnd_1", created_at: "2026-01-01T00:00:00Z" }] }),
     ),
     http.get(REVISION_URL, () =>
       HttpResponse.json({ id: "brnd_1", created_at: "2026-01-01T00:00:00Z", branding }),
@@ -120,7 +119,7 @@ describe("branding screen", () => {
   it("shows the maintained defaults when nothing has been published", async () => {
     server.use(
       http.get(FLOWS_URL, () => HttpResponse.json({ flow_definitions: [FLOW] })),
-      http.get(LIST_URL, () => HttpResponse.json([])),
+      http.get(LIST_URL, () => HttpResponse.json({ branding: [] })),
     );
     await renderAt("/branding");
 
@@ -154,6 +153,24 @@ describe("branding screen", () => {
     expect(screen.getByText(/fails AA for normal text \(4.5:1 required\)/)).toBeInTheDocument();
   });
 
+  it("narrows the preview to a phone's width", async () => {
+    // The login card stops at 384px, so the phone frame is narrower than that
+    // or switching would change nothing on screen. jsdom lays nothing out, so
+    // this asserts that the frame leaves the desktop width and caps itself to
+    // the stage; the measured width is checked in the browser.
+    serveRevision();
+    await renderAt("/branding");
+
+    const frame = (await screen.findByTestId("preview")).parentElement as HTMLElement;
+    const toggle = screen.getByRole("button", { name: "Phone width" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(frame).toHaveClass("max-w-lg");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(frame).not.toHaveClass("max-w-lg");
+    expect(frame).toHaveClass("max-w-full");
+  });
+
   it("switches the previewed journey", async () => {
     serveRevision();
     await renderAt("/branding");
@@ -168,7 +185,6 @@ describe("branding screen", () => {
       id: "flow_2",
       flow_definition: {
         name: "login-only",
-        status: "active",
         purposes: { login: "identifier" },
         steps: [],
       },
@@ -179,7 +195,7 @@ describe("branding screen", () => {
         asked = new URL(request.url).searchParams.get("revisions");
         return HttpResponse.json({ flow_definitions: [FLOW, loginOnly] });
       }),
-      http.get(LIST_URL, () => HttpResponse.json([])),
+      http.get(LIST_URL, () => HttpResponse.json({ branding: [] })),
     );
     await renderAt("/branding");
 

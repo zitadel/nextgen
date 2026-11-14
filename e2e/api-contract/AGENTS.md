@@ -7,7 +7,7 @@ root.
 
 ## How it runs
 
-- `moon run e2e:api-contract` builds the server, then runs
+- `turbo run api-contract --filter=@zitadel/e2e` builds the server, then runs
   `api-contract/global-setup.ts`: it boots an instance with
   `startLocalZitadel` (binary runtime, SQLite), fetches the spec the instance
   serves at `/api/v1/openapi.json`, and runs the pinned Schemathesis image
@@ -37,7 +37,7 @@ After fixing something, or when a change is meant to alter the baseline, rewrite
 it from a run and read the diff:
 
 ```sh
-API_CONTRACT_UPDATE_BASELINE=1 moon run e2e:api-contract
+API_CONTRACT_UPDATE_BASELINE=1 turbo run api-contract --filter=@zitadel/e2e
 ```
 
 Never add a line to hide a failure you introduced. Fix it, or fix the spec.

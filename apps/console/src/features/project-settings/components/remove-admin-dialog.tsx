@@ -6,7 +6,7 @@ import { joinAnd } from "@/lib/text";
 
 /** The grant a row's action revokes, and what the dialog must say about it. */
 export interface Removable {
-  /** Grant id — what `DELETE /grants/{id}` revokes. */
+  /** Grant id — what `DELETE /grants/{grant_id}` revokes. */
   grantId: string;
   /** Who the grant binds: the dialog's copy differs for a team's. */
   principal: "user" | "team";
@@ -17,7 +17,7 @@ export interface Removable {
 /**
  * The revoke confirmation.
  *
- * `DELETE /grants/{id}` revokes one binding on one project — the `projectId`
+ * `DELETE /grants/{grant_id}` revokes one binding on one project — the `projectId`
  * of the project page whose admins section renders this, never the console's
  * own project (#1238). It touches no other access that person holds, so
  * someone who is also in the owning team, or in a granted team, keeps the

@@ -1,5 +1,5 @@
 post:
-  operationId: removePreview
+  operationId: removeProjectPreview
   x-zitadel-cli: preview rm
   x-zitadel-destructive: true
   summary: Remove a preview
@@ -12,7 +12,7 @@ post:
     succeeds.
 
     The URL travels in the body rather than the path because an origin
-    contains `/`. Take it from `listPreviews` (`GET /projects/{project_id}/previews`).
+    contains `/`. Take it from `listProjectPreviews` (`GET /projects/{project_id}/previews`).
   tags:
     - Previews
   parameters:
@@ -35,4 +35,4 @@ post:
     '204':
       description: The URL has no live preview.
     default:
-      $ref: removePreview-error-response.yaml
+      $ref: removeProjectPreview-error-response.yaml

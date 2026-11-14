@@ -270,7 +270,7 @@ describe("createZitadelClient", () => {
   it("puts a later page's page_token in the query parameters after a path parameter", async () => {
     const { base, requests } = await twoPages("previews");
 
-    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1", { limit: 1 });
+    await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1", { limit: 1 });
 
     expect(requests.map(([path]) => path)).toEqual([
       "/api/v1/projects/proj_1/previews?limit=1",
@@ -281,7 +281,7 @@ describe("createZitadelClient", () => {
   it("puts a later page's page_token in query parameters the caller left off", async () => {
     const { base, requests } = await twoPages("previews");
 
-    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1");
+    await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1");
 
     expect(requests.map(([path]) => path)).toEqual([
       "/api/v1/projects/proj_1/previews",
@@ -323,6 +323,6 @@ describe("createZitadelClient", () => {
   it("leaves paging off a function that does not page", () => {
     const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 
-    expect("items" in client.getDeploymentById).toBe(false);
+    expect("items" in client.getDeployment).toBe(false);
   });
 });

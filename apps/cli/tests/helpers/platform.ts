@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
@@ -71,6 +72,20 @@ export interface PlatformMock {
    * own `details`.
    */
   rejectsAFlow(): void;
+
+  /**
+   * Answers as a server from before the sign-up policy: an evaluation of one,
+   * and a release build that carries one, are refused as malformed
+   * (`req.invalid`), because the server does not know the operation.
+   */
+  predatesTheSignupPolicy(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose connection
+   * changes a field fixed for the life of the connection: `rel.invalid`, with
+   * the field named in the resource's own `details`.
+   */
+  rejectsAConnection(): void;
 
   /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
@@ -153,11 +168,28 @@ export interface PlatformMock {
   admitsAHostileOriginPattern(): string;
 
   /**
+   * Answers a release build with a content hash holding a terminal escape
+   * sequence, before the colon that names its algorithm, which is the part a
+   * shortened hash keeps whole.
+   *
+   * @returns The hash it will answer with.
+   */
+  buildsAReleaseWithAHostileHash(): string;
+
+  /**
    * Answers a release revoke with an id holding a terminal escape sequence.
    *
    * @returns The id it will answer with.
    */
   revokesAHostileReleaseId(): string;
+
+  /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
 
   /**
    * Answers a user query with a page cursor holding a terminal escape
@@ -328,6 +360,32 @@ export function usePlatformMock(): PlatformMock {
       ]);
     },
 
+    predatesTheSignupPolicy() {
+      const unknownOperation = () =>
+        HttpResponse.json(
+          { code: "req.invalid", message: "the request is invalid" },
+          { status: 400 },
+        );
+      const isSignupPolicy = (policy: unknown) =>
+        typeof policy === "object" &&
+        policy !== null &&
+        "operation" in policy &&
+        policy.operation === "user.create";
+      // A handler that answers nothing leaves the request to the platform's own.
+      server.use(
+        http.post("*/policies/evaluate", async ({ request }) => {
+          return isSignupPolicy(await request.clone().json()) ? unknownOperation() : undefined;
+        }),
+        http.post("*/releases/build", async ({ request }) => {
+          const body = z
+            .object({ bundle: z.object({ policies: z.array(z.unknown()).optional() }) })
+            .safeParse(await request.clone().json());
+          const carriesOne = body.success && (body.data.bundle.policies ?? []).some(isSignupPolicy);
+          return carriesOne ? unknownOperation() : undefined;
+        }),
+      );
+    },
+
     rejectsAFlow() {
       refuseReleases([
         {
@@ -338,6 +396,19 @@ export function usePlatformMock(): PlatformMock {
           details: {
             details: 'step "register-password": on_success create_user requires "identifier"',
           },
+        },
+      ]);
+    },
+
+    rejectsAConnection() {
+      refuseReleases([
+        {
+          kind: "idp",
+          handle: "google",
+          code: "idp.field_immutable",
+          message:
+            "identity provider connection: the field is fixed for the life of the connection",
+          details: { details: { fields: ["oidc.issuer"] } },
         },
       ]);
     },
@@ -390,7 +461,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     servesAHostileOrigin() {
-      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const origin = `${PRIMARY_ORIGIN}\u001b[2Jwiped`;
       const deployment = (id: string) => {
         return {
           id,
@@ -429,6 +500,22 @@ export function usePlatformMock(): PlatformMock {
       return origin;
     },
 
+    buildsAReleaseWithAHostileHash() {
+      const hash = `sha256\u001b[2Jwiped:${"a".repeat(64)}`;
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({
+            id: "rel_1",
+            project_id: "proj_1",
+            content_hash: hash,
+            created_at: "2026-01-01T00:00:00Z",
+            revoked_at: null,
+          });
+        }),
+      );
+      return hash;
+    },
+
     revokesAHostileReleaseId() {
       const id = "rel-\u001b[2Jwiped";
       server.use(
@@ -441,6 +528,23 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
     },
 
     pagesWithAHostileCursor() {

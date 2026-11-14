@@ -1,0 +1,97 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Every operationId and
+### path parameter here must be rejected by the naming rules in redocly.yaml.
+### Each violation sits in its own operation: a rule reports once per node, so
+### two bad names sharing one would prove only that the first one failed.
+openapi: 3.1.0
+info:
+  title: naming violations
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /things:
+    get:
+      # PascalCase, as ogen would print it.
+      operationId: ListThings
+      summary: List things
+      description: Lists things.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+    post:
+      # A verb outside the allow-list.
+      operationId: makeThing
+      summary: Make a thing
+      description: Makes a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      # The path carries the ID; the name does not repeat it.
+      operationId: getThingById
+      summary: Get a thing
+      description: Gets a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+    delete:
+      operationId: delete_thing
+      summary: Delete a thing
+      description: Deletes a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}/parts/{id}:
+    get:
+      operationId: getThingPart
+      summary: Get a part
+      description: Gets a part.
+      tags:
+        - Fixture
+      parameters:
+        - name: thing_id
+          in: path
+          required: true
+          schema:
+            type: string
+        # Declared on the operation rather than the path item.
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request

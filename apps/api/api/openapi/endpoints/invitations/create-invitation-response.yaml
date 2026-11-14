@@ -1,0 +1,11 @@
+title: CreateInvitationResponse
+description: |
+  The created invitation and its one-shot `link`. Discriminate on `type`.
+oneOf:
+  - $ref: create-invitation-project-member-response.yaml
+  - $ref: create-invitation-team-member-response.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: create-invitation-project-member-response.yaml
+    team_member: create-invitation-team-member-response.yaml

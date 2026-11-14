@@ -96,7 +96,6 @@ func TestBuildRelease(t *testing.T) {
 		// Wire-valid; entry step for login is missing.
 		badFlow := api.FlowDefinition{
 			Name:       "build-bad-flow",
-			Status:     "active",
 			UserSchema: "human-user",
 			Purposes:   map[string]string{"login": "missing-step"},
 			Steps: []api.FlowDefinitionStep{{
@@ -238,6 +237,22 @@ func TestBuildRelease(t *testing.T) {
 		reused := api.Release(*again.(*api.BuildReleaseOK))
 		assert.Equal(t, v1.ID, reused.ID)
 		assert.Equal(t, idpV1, reused.Pointers[indexOfKind(reused.Pointers, api.ReleasePointerKindIdp)].RevisionID)
+
+		// The issuer is fixed for the life of the connection, down to its
+		// trailing slash. The refused field is named where the CLI's deploy
+		// hint reads it: the resource's own details.
+		slashed := helpers.OIDCConnection("google")
+		oidc := slashed.Oidc.Value
+		oidc.Issuer += "/"
+		slashed.Oidc = api.NewOptIdpConnectionOidc(oidc)
+		refused := build(t, slashed)
+		require.IsType(t, &api.BuildReleaseBadRequest{}, refused, helpers.MustMarshal(t, refused))
+		body := refused.(*api.BuildReleaseBadRequest)
+		require.Len(t, body.Details.Value.Resources, 1)
+		resource := body.Details.Value.Resources[0]
+		assert.Equal(t, api.ErrorCode(domain.ErrIDPConnectionFieldImmutable(nil).Code), resource.Code)
+		assert.Equal(t, "google", resource.Handle.Value)
+		assert.JSONEq(t, `{"fields":["oidc.issuer"]}`, string(resource.Details.Value["details"]))
 	})
 
 	t.Run("publishes a bundled policy, revising it only when its config changes", func(t *testing.T) {

@@ -1,8 +1,9 @@
-// Command launcher starts the nextgen server on Vercel's Go runtime.
+// Command launcher starts the nextgen server in the cloud's Vercel function.
 //
-// Vercel's Go framework preset runs one binary with no script in front of
-// it, so the binary itself turns the environment a Vercel function receives
-// into what the server accepts:
+// The function is a Node.js wrapper (apps/cloud/server) that runs this
+// binary as its child and forwards requests to it, so that the server's spans
+// and metrics reach Vercel (exportToWrapper). The binary itself turns the
+// environment a Vercel function receives into what the server accepts:
 //
 //   - The database (database.go). CLOUD_DATABASE_URL (pooled, through
 //     PgBouncer) and CLOUD_MIGRATOR_DATABASE_URL (direct) name PlanetScale
@@ -23,9 +24,13 @@
 //     (repo-root vercel.json) calls the server's retention trigger instead,
 //     with CRON_SECRET as its bearer token, which becomes
 //     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
+//   - The request audit events. For the same reason a request waits until
+//     its event is written (events.request.flush_wait), where a server that
+//     keeps running writes it up to a second after the response.
 //   - The deployment's shape. The listen address follows PORT, the data dir
-//     is the function's writable /tmp, and the console is a service of its own
-//     (repo-root vercel.json). The platform project is bootstrapped, logs are
+//     is the function's writable /tmp, the console is a service of its own
+//     (repo-root vercel.json), and the server keeps idle connections open
+//     for Vercel's proxy, its only client. The platform project is bootstrapped, logs are
 //     JSON and the public base is the deployment's URL unless a NEXTGEN_*
 //     variable says otherwise. The URLs Vercel serves the deployment at are
 //     added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it already names.
@@ -52,6 +57,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -77,6 +83,12 @@ const (
 	// server's /ui/console. The server derives the console's URLs (claim,
 	// dashboard) from it, so the three must agree; a test holds them together.
 	consolePath = "/console"
+
+	// requestEventFlushWait bounds how long a request waits for its audit
+	// event (events.request.flush_wait). The write takes milliseconds; the
+	// bound is for a database that does not answer, so a request then ends
+	// two seconds late instead of holding the instance.
+	requestEventFlushWait = "2s"
 )
 
 // servingParams size the pgx pool of one function instance and keep pgx off
@@ -522,16 +534,23 @@ func prepareServer(extra []string) ([]string, error) {
 	// how vercel.json routes, so a leftover variable must not move them. The
 	// request ID is Vercel's, the one its dashboard shows for the request:
 	// Vercel sets x-vercel-id on every request and replaces the ID a client
-	// sends.
+	// sends. The server's only client is Vercel's proxy in the same instance,
+	// which reuses its connections, so the server never closes an idle one:
+	// an instance wakes from a pause with its idle timer long expired, and a
+	// POST the proxy sent on the connection the server then closed was a 502.
 	for key, value := range map[string]string{
 		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
 		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
 		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
+		"NEXTGEN_SERVER_IDLE_TIMEOUT":      "0",
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err
 		}
+	}
+	if err := exportToWrapper(port); err != nil {
+		return nil, err
 	}
 	// Defaults: what makes this deployment a hosted cloud rather than a
 	// self-hosted standalone server. The console signs into the platform
@@ -543,9 +562,36 @@ func prepareServer(extra []string) ([]string, error) {
 		// The bootstrap admin administers every project (ADR 075), unless
 		// the deployment names its platform operators itself.
 		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
+		// A function runs only while it serves a request, so a request
+		// waits for its audit event to be written: a flush after the
+		// response may run minutes later, or never.
+		"NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT": requestEventFlushWait,
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err
+		}
+	}
+	// An OTLP endpoint on the environment makes that backend the telemetry
+	// sink, for spans, metrics and logs; behind the wrapper's collector none
+	// is left to name one (exportToWrapper). The OTLP SDK reads it and
+	// OTEL_EXPORTER_OTLP_HEADERS, the backend's credentials,
+	// itself, so the exporters' own endpoint stays unset; an environment
+	// without it exports nothing rather than retry localhost:4318. The batch
+	// durations are the SDK's defaults, named so the cloud's export cadence is
+	// read here rather than inherited.
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		for key, value := range map[string]string{
+			"NEXTGEN_INSTRUMENTATION_SERVICE_NAME":                   "nextgen-cloud",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
+			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION":  "5s",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
+			"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "60s",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE":              "http",
+			"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_BATCH_DURATION":    "1s",
+		} {
+			if err := setDefault(key, value); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Added to, not defaulted: a deployment names its custom domains there, and
@@ -687,4 +733,88 @@ func renderConfig(s *serving) ([]byte, error) {
 		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
 	}
 	return yaml.Marshal(config)
+}
+
+// otlpCollectorEnv names the wrapper's OTLP collector. The cloud's server
+// service is a Node.js function (apps/cloud/server) that runs this launcher
+// as its child, because only a Node.js function can add spans to Vercel
+// Tracing and report Vercel custom metrics. The wrapper sets the variable to
+// its loopback collector.
+const otlpCollectorEnv = "CLOUD_OTLP_COLLECTOR"
+
+// otlpBackendEnv is what names an OTLP backend to the SDK's exporters: where
+// it is, for every signal or for one, and its credentials.
+var otlpBackendEnv = []string{
+	"OTEL_EXPORTER_OTLP_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+	"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+	"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+}
+
+// exportToWrapper points the server's traces and metrics at the wrapper when
+// the wrapper names its collector, and keeps the server off every other
+// interface. Vercel is the telemetry sink then, and the only one: the wrapper
+// names its collector only while the environment names no OTLP backend
+// (apps/cloud/server/sink.mjs), and prints the server's log lines as Vercel's
+// logs. The settings are set, not defaulted: they follow from how the wrapper
+// runs the server.
+//
+//   - Spans go to the wrapper's collector over OTLP/HTTP, batched for at most
+//     100ms, so a request's spans arrive soon after its response.
+//   - The server continues the incoming traceparent (ADR 080). The wrapper
+//     replaces the client's trace context with Vercel's root span for the
+//     request, and the server listens on loopback only, so no caller can
+//     reach it with a traceparent of its own.
+//   - A fraction of 0 leaves sampling to Vercel: a request is traced when
+//     Vercel's sampling rules trace it and the wrapper sends a sampled
+//     traceparent, and a root the server starts itself is dropped.
+//   - Metrics go to the same collector every 100ms, as deltas: Vercel takes
+//     single data points and aggregates them itself, so the wrapper needs
+//     what happened since the last export, not a running total. The interval
+//     is short because the wrapper can only send from a request: what an
+//     instance exports after its last request waits until it serves again,
+//     and is lost if it never does. At 10s, a quarter of the sessions a burst
+//     of requests created never showed up.
+//   - What names an OTLP backend is cleared, so nothing is exported a second
+//     time, and so the exports to the wrapper stay where it serves them: an
+//     exporter given only a host takes its path from
+//     OTEL_EXPORTER_OTLP_ENDPOINT, and beside Grafana Cloud's /otlp every
+//     export went to /otlp/v1/…, which the collector answers with 404.
+func exportToWrapper(port string) error {
+	collector := os.Getenv(otlpCollectorEnv)
+	if collector == "" {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(collector)
+	if err != nil || host != "127.0.0.1" {
+		return fmt.Errorf("%s must be 127.0.0.1:<port>, the wrapper's loopback collector, got %q", otlpCollectorEnv, collector)
+	}
+	for _, key := range otlpBackendEnv {
+		if err := os.Unsetenv(key); err != nil {
+			return err
+		}
+	}
+	for key, value := range map[string]string{
+		"NEXTGEN_SERVER_ADDRESS":                                 "127.0.0.1:" + port,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT":        collector,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE":        "true",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION":  "100ms",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION":                 "0",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS":       "true",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT":       collector,
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE":       "true",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "100ms",
+		"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE":      "delta",
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }

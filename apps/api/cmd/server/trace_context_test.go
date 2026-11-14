@@ -30,7 +30,8 @@ func callerTraceparent(flags string) string {
 }
 
 // TestIncomingTraceContext pins ADR 080 against the real tracer provider and
-// sampler the server uses: an incoming traceparent is ignored unless
+// sampler the server uses, and the edge of its handler chain (withTracing):
+// an incoming traceparent is ignored unless
 // instrumentation.trace.trust_remote_spans is set, in which case the server
 // span is a child of the caller's span.
 func TestIncomingTraceContext(t *testing.T) {
@@ -123,16 +124,13 @@ func TestIncomingTraceContext(t *testing.T) {
 				gotBaggage baggage.Baggage
 				gotLogCtx  trace.SpanContext
 			)
-			// Stands in for the ogen server, which starts its server span
-			// from the request context.
-			api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Stands in for the server's mux, behind the server span.
+			mux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotBaggage = baggage.FromContext(r.Context())
 				gotLogCtx = trace.SpanContextFromContext(r.Context())
-				_, span := tp.Tracer("test").Start(r.Context(), "GET /ping", trace.WithSpanKind(trace.SpanKindServer))
-				span.End()
 			})
 			propagator := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
-			handler := withIncomingTraceContext(instrumentation.TraceConfig{TrustRemoteSpans: tt.trust}, propagator, api)
+			handler := withTracing(instrumentation.TraceConfig{TrustRemoteSpans: tt.trust}, propagator, tp, mux)
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			if tt.traceparent != "" {

@@ -11,6 +11,6 @@ Environment, all required: `PORT`, `ISSUER`, `REDIRECT_URI` (one URI),
 `127.0.0.1:<PORT>`, so `ISSUER` is `http://127.0.0.1:<PORT>/`; the trailing
 slash is part of the issuer.
 
-`moon run oidc-mock:build` writes `dist/oidc-mock`. The journey runner
+`turbo run build --filter=oidc-mock` writes `dist/oidc-mock`. The journey runner
 (`e2e/journey/scripts/run-local.mjs`) starts it for each framework lane and
 registers the lane's callback `<app>/__nextgen/idp/mock-idp/callback`.

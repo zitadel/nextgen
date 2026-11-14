@@ -1,5 +1,5 @@
 get:
-  operationId: getClaimWindow
+  operationId: getProjectClaimWindow
   summary: Get the claim window for a project
   description: |
     Returns when a project's claim window closes and whether it has already
@@ -11,9 +11,9 @@ get:
 
     The request needs no credential, because the claim page calls it before the
     developer has signed in. Holding the `challenge_id` from the claim URL that
-    `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one `completeClaim` (`POST /projects/{project_id}/claim/complete`)
+    `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one `completeProjectClaim` (`POST /projects/{project_id}/claim/complete`)
     accepts. The response reveals only the window, never the project itself.
-    Unlike `completeClaim` it spends nothing, so reloading the page is safe.
+    Unlike `completeProjectClaim` it spends nothing, so reloading the page is safe.
   tags:
     - Projects
   parameters:
@@ -43,4 +43,4 @@ get:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      $ref: getClaimWindow-error-response.yaml
+      $ref: getProjectClaimWindow-error-response.yaml

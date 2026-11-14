@@ -112,7 +112,7 @@ func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDep
 	return &unchanged, nil
 }
 
-func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
+func (h *Handler) GetDeployment(ctx context.Context, params api.GetDeploymentParams) (api.GetDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymen
 	return &resp, nil
 }
 
-func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
+func (h *Handler) ListDeploymentVariables(ctx context.Context, params api.ListDeploymentVariablesParams) (api.ListDeploymentVariablesRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	return &resp, nil
 }
 
-func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
+func (h *Handler) ListProjectPreviews(ctx context.Context, params api.ListProjectPreviewsParams) (api.ListProjectPreviewsRes, error) {
 	// A preview has no id for a list filter to scope, so access is
 	// project-wide or nothing.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
@@ -221,14 +221,14 @@ func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParam
 	return &resp, nil
 }
 
-func (h *Handler) RemovePreview(ctx context.Context, req *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+func (h *Handler) RemoveProjectPreview(ctx context.Context, req *api.RemovePreviewRequest, params api.RemoveProjectPreviewParams) (api.RemoveProjectPreviewRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
 	if err := h.deploymentService.RemovePreview(ctx, string(params.ProjectID), string(req.Origin)); err != nil {
 		return nil, err
 	}
-	return &api.RemovePreviewNoContent{}, nil
+	return &api.RemoveProjectPreviewNoContent{}, nil
 }
 
 // deploymentConflictResponse answers dep.conflict with the typed 409, whose

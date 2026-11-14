@@ -1,0 +1,236 @@
+name: artifacts
+
+# What a release ships, run the way users run it. `full-pr` builds and packs
+# every artifact on Linux arm64 but never starts the macOS server,
+# the container or a data dir an older release wrote; this workflow does.
+# It is not a required check. It tests one of two things
+# (scripts/artifacts-target.mjs decides, in `target`):
+#
+# - what this ref builds: nightly on main (04:41 UTC), on PRs that change
+#   this file or the scripts it runs, and on a dispatch without a version
+#   (`gh workflow run artifacts.yml --ref <branch>`);
+# - a published release: on a dispatch with one
+#   (`gh workflow run artifacts.yml -f version=0.6.0`), and when a person
+#   publishes the GitHub Release that release-publish drafted
+#   (docs/runbooks/manual-release.md). Its tag `v<version>` is the version.
+#   The release neither waits for these checks nor turns red when one fails,
+#   and release-publish.yml is not involved. A release published right
+#   after the npm publish waits, in each install, for its platform packages
+#   to reach the registry.
+#
+# The start, published, target and report jobs run the scripts without an install:
+# they and the modules they import take only Node built-ins.
+#
+# Jobs:
+# - binaries (built only): the five platform packages' build-binary, the
+#   release's own cross-compile, once on Linux.
+# - start: the macOS and Linux server, each on its own platform: start on an
+#   empty data dir, /readyz, stop (scripts/smoke-server.mjs). A published
+#   release is installed from npm as a customer installs it. The Windows
+#   binary is built and published but not started here.
+# - linux (built only): the container smoke (//#smoke-container) and the
+#   upgrade from the latest published release (//#smoke-upgrade).
+# - published (published only): the release's container image, and the
+#   upgrade from the release before it.
+# - report (a failed nightly or release run only): opens an issue, or
+#   comments on the one already open (scripts/artifacts-failure-issue.mjs).
+#   A pull request or a dispatch has someone watching it.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "A published @zitadel/server version to test instead of building this ref, for example 0.6.0. Leave empty to build."
+        required: false
+        default: ""
+        type: string
+  schedule:
+    - cron: "41 4 * * *"
+  pull_request:
+    paths:
+      - .github/workflows/artifacts.yml
+      - scripts/artifacts-target.mjs
+      - scripts/artifacts-failure-issue.mjs
+      - scripts/smoke-server.mjs
+      - scripts/smoke-upgrade.mjs
+      - scripts/smoke-container.mjs
+      - scripts/dev-process.mjs
+      - scripts/release-manifest.mjs
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifacts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Local cache only: these runs get no remote-cache token.
+  TURBO_CACHE: local:rw
+  TURBO_TELEMETRY_DISABLED: "1"
+
+jobs:
+  target:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.target.outputs.mode }}
+      version: ${{ steps.target.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - id: target
+        run: node scripts/artifacts-target.mjs
+        env:
+          VERSION: ${{ inputs.version || github.event.release.tag_name }}
+
+  binaries:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'build' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the release binaries
+        run: corepack pnpm exec turbo run build-binary --filter='@zitadel/server-*' --output-logs=errors-only
+
+      # Stored relative to apps/: server-<platform>/bin/.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-binaries
+          path: apps/server-*/bin/
+          if-no-files-found: error
+          retention-days: 7
+
+  start:
+    needs: [target, binaries]
+    # binaries is skipped for a published release.
+    if: ${{ !cancelled() && needs.target.result == 'success' && needs.binaries.result != 'failure' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    # A published release's install may wait up to 15 minutes for npm.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@v8
+        if: ${{ needs.target.outputs.mode == 'build' }}
+        with:
+          name: server-binaries
+          path: apps
+
+      # The script needs no dependencies. It picks this runner's binary, or
+      # installs the published version (empty when built).
+      - name: Start, check and stop the server
+        run: node scripts/smoke-server.mjs --version "$VERSION"
+        env:
+          VERSION: ${{ needs.target.outputs.version }}
+
+  linux:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'build' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Smoke the container and the upgrade
+        run: corepack pnpm exec turbo run //#smoke-container //#smoke-upgrade --continue
+
+  published:
+    needs: target
+    if: ${{ needs.target.outputs.mode == 'published' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.target.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # Every release pushes this image; a missing one fails `docker run`.
+      - name: Smoke the published container image
+        run: node scripts/smoke-container.mjs --version "$VERSION"
+
+      - name: Upgrade from the release before it
+        if: ${{ !cancelled() }}
+        run: node scripts/smoke-upgrade.mjs --to "$VERSION"
+
+  report:
+    needs: [target, binaries, start, linux, published]
+    # A job that timed out ends `cancelled`.
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'release') && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Open or update the issue for this failed run
+        run: node scripts/artifacts-failure-issue.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          NEEDS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Who a red night goes to.
+          ASSIGNEE: fforootd

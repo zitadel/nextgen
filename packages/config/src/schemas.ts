@@ -1,8 +1,8 @@
 import {
-  CreateBrandingBody,
-  CreateFlowDefinitionBody,
-  CreateIdpBody,
-  CreateSchemaBody,
+  PublishBrandingBody,
+  PublishFlowDefinitionBody,
+  PublishIdpBody,
+  PublishSchemaBody,
   EvaluatePolicyBody,
   PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
@@ -10,9 +10,12 @@ import { distance } from "fastest-levenshtein";
 import { z } from "zod";
 
 import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
+import defaultUserCreatePolicy from "../defaults/default-user-create-policy.json" with {
+  type: "json",
+};
 import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 
-const [userSchemaBody, schemaUrlBody] = CreateSchemaBody.options;
+const [userSchemaBody, schemaUrlBody] = PublishSchemaBody.options;
 const authMethodsBody = userSchemaBody.shape["x-auth-methods"];
 const AUTH_METHODS = Object.keys(authMethodsBody.shape);
 
@@ -68,8 +71,18 @@ export const schemaConfigSchema = z.discriminatedUnion("kind", [
   schemaUrlBody,
 ]);
 
-export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
-export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
+/**
+ * A `.zitadel/flows/*.json` body, strict about its top-level keys as the
+ * server is: the generated Zod drops an unknown key, so one the server refuses
+ * would pass `deploy --dry-run` and fail the deploy.
+ */
+export const flowConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  ...PublishFlowDefinitionBody.shape.flow_definition.shape,
+});
+export const createFlowDefinitionRequestSchema = PublishFlowDefinitionBody.extend({
+  flow_definition: flowConfigSchema,
+});
 
 /**
  * One `.zitadel/idps/<slug>.json` body: the connection document `POST /idps`
@@ -77,23 +90,37 @@ export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
  * states, including that `client_secret` is a `${{ NAME }}` reference and
  * never a literal.
  */
-export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
+export const idpConnectionConfigSchema = PublishIdpBody.shape.idp;
+
+// The generated publish body's branches, in the spec's order.
+const [passwordSetPolicyBody, userCreatePolicyBody] = PublishPolicyBody.options;
+
+/** A `.zitadel/policies/auth.factor.password.set.json` file, the password policy. */
+export const passwordSetPolicyFileSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: passwordSetPolicyBody.shape.operation,
+  config: z.strictObject(passwordSetPolicyBody.shape.config.shape),
+});
+
+/** A `.zitadel/policies/user.create.json` file, the sign-up policy. */
+export const userCreatePolicyFileSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: userCreatePolicyBody.shape.operation,
+  config: z.strictObject(userCreatePolicyBody.shape.config.shape),
+});
 
 /**
  * A `.zitadel/policies/<operation>.json` file: the publish body
- * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
- * generated body: a typo in a setting must fail `deploy --dry-run`, as the editor's
- * meta-schema (`policy.json`) already flags it.
- *
- * With one operation the generated body is a single object. A second
- * operation turns it into a union without `.shape`, so this stops compiling
- * and has to become a discriminated union on `operation`, strict per branch.
+ * (`POST /policies`) plus `$schema`, one branch per operation. Strict at both
+ * levels, unlike the generated body: a typo in a setting must fail
+ * `deploy --dry-run`, as the editor's meta-schema (`policy.json`) already
+ * flags it. An operation the spec adds is a branch here too, or this stops
+ * matching `PublishPolicyBody` and the policy tests fail.
  */
-export const policyConfigSchema = z.strictObject({
-  $schema: z.string().optional(),
-  operation: PublishPolicyBody.shape.operation,
-  config: z.strictObject(PublishPolicyBody.shape.config.shape),
-});
+export const policyConfigSchema = z.discriminatedUnion("operation", [
+  passwordSetPolicyFileSchema,
+  userCreatePolicyFileSchema,
+]);
 
 /**
  * The minimum password length NIST SP 800-63B-4 sets for a password that is
@@ -102,44 +129,70 @@ export const policyConfigSchema = z.strictObject({
 export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 
 /**
- * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
- * test` evaluates (`POST /policies/evaluate`), each with the operation's
- * input, the facts it would look up, and the decision it expects. `input` and
- * `facts` come from the generated evaluate body, strict like the policy file,
- * so the editor's `policy-test.json` and this check refuse the same typos.
- *
- * With one operation the generated body is a single object; a second turns
- * this into a discriminated union on `operation`, as for `policyConfigSchema`.
+ * The sign-up protection every project starts with: the server's own guard,
+ * a proof of work on every password or passkey sign-up, written down as the
+ * `user.create` policy (ADR 088 §5). `setup` writes it and the platform
+ * project deploys it; a server test keeps it equal to the guard, so deleting
+ * it loosens nothing.
  */
-export const policyTestFileSchema = z.strictObject({
-  $schema: z.string().optional(),
-  operation: EvaluatePolicyBody.shape.operation,
-  cases: z
-    .array(
-      z.strictObject({
-        name: z.string().min(1),
-        input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
-        facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
-        expect: z
-          .strictObject({
-            allowed: z.boolean(),
-            code: z.string().min(1).optional(),
-            violations: z.array(z.string().min(1)).optional(),
-          })
-          // Only a refusal carries a code or violations, so an allowed case
-          // that names one could never pass.
-          .refine(
-            (expect) =>
-              !expect.allowed || (expect.code === undefined && expect.violations === undefined),
-            "an allowed case names no code or violations",
-          ),
-      }),
-    )
-    .min(1),
-});
+export const DEFAULT_USER_CREATE_POLICY = userCreatePolicyFileSchema.parse(defaultUserCreatePolicy);
+
+/** The decision a policy test case expects. */
+const policyTestExpectSchema = z
+  .strictObject({
+    allowed: z.boolean(),
+    code: z.string().min(1).optional(),
+    violations: z.array(z.string().min(1)).optional(),
+  })
+  // Only a refusal carries a code or violations, so an allowed case that
+  // names one could never pass.
+  .refine(
+    (expect) => !expect.allowed || (expect.code === undefined && expect.violations === undefined),
+    "an allowed case names no code or violations",
+  );
+
+const [passwordSetEvaluateBody, userCreateEvaluateBody] = EvaluatePolicyBody.options;
+
+/**
+ * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policy
+ * test` evaluates (`POST /policies/evaluate`), each with the operation's
+ * input, the facts it would look up where it has any, and the decision it
+ * expects, one branch per operation. `input` and `facts` come from the
+ * generated evaluate body, strict like the policy file, so the editor's
+ * `policy-test.json` and this check refuse the same typos.
+ */
+export const policyTestFileSchema = z.discriminatedUnion("operation", [
+  z.strictObject({
+    $schema: z.string().optional(),
+    operation: passwordSetEvaluateBody.shape.operation,
+    cases: z
+      .array(
+        z.strictObject({
+          name: z.string().min(1),
+          input: z.strictObject(passwordSetEvaluateBody.shape.input.shape),
+          facts: z.strictObject(passwordSetEvaluateBody.shape.facts.unwrap().shape).optional(),
+          expect: policyTestExpectSchema,
+        }),
+      )
+      .min(1),
+  }),
+  z.strictObject({
+    $schema: z.string().optional(),
+    operation: userCreateEvaluateBody.shape.operation,
+    cases: z
+      .array(
+        z.strictObject({
+          name: z.string().min(1),
+          input: z.strictObject(userCreateEvaluateBody.shape.input.shape),
+          expect: policyTestExpectSchema,
+        }),
+      )
+      .min(1),
+  }),
+]);
 
 /** The wire shape of a branding revision (`POST /branding` request body). */
-export const brandingWireSchema = CreateBrandingBody;
+export const brandingWireSchema = PublishBrandingBody;
 
 /**
  * `{ "$file": "<path>" }`, which a `.zitadel/` file may hold in place of a
@@ -148,7 +201,7 @@ export const brandingWireSchema = CreateBrandingBody;
  */
 export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1) });
 
-const BRANDING_THEME = CreateBrandingBody.shape.theme.unwrap();
+const BRANDING_THEME = PublishBrandingBody.shape.theme.unwrap();
 const BRANDING_PALETTE = BRANDING_THEME.shape.light.unwrap().shape.palette;
 
 /**
@@ -265,20 +318,20 @@ export const brandingConfigSchema = z.strictObject({
   // must fail plan, not silently pass and get ignored by the server. The
   // editor meta-schema already rejects unknown keys; the CLI gate has to
   // agree.
-  ...CreateBrandingBody.shape,
-  logo_url: withinUrlBytes(CreateBrandingBody.shape.logo_url),
-  hero_url: withinUrlBytes(CreateBrandingBody.shape.hero_url),
+  ...PublishBrandingBody.shape,
+  logo_url: withinUrlBytes(PublishBrandingBody.shape.logo_url),
+  hero_url: withinUrlBytes(PublishBrandingBody.shape.hero_url),
   theme: BRANDING_THEME.extend({
     light: brandingThemeSide(BRANDING_THEME.shape.light),
     dark: brandingThemeSide(BRANDING_THEME.shape.dark),
   }).optional(),
-  typography: CreateBrandingBody.shape.typography
+  typography: PublishBrandingBody.shape.typography
     .unwrap()
     .extend({
       // The spec's pattern allows a comma inside a quoted name, but the server
       // splits the stack on every comma (ValidateBrandingFontFamily), so
       // `"Acme, Inc", sans-serif` reaches it and comes back refused.
-      font_family: CreateBrandingBody.shape.typography
+      font_family: PublishBrandingBody.shape.typography
         .unwrap()
         .shape.font_family.unwrap()
         .refine(isBrandingFontFamily, {
@@ -287,7 +340,7 @@ export const brandingConfigSchema = z.strictObject({
           when: whenNothingElseIsWrong,
         })
         .optional(),
-      font_url: withinUrlBytes(CreateBrandingBody.shape.typography.unwrap().shape.font_url),
+      font_url: withinUrlBytes(PublishBrandingBody.shape.typography.unwrap().shape.font_url),
     })
     .refine(
       (value) => {
@@ -311,6 +364,6 @@ export const brandingConfigSchema = z.strictObject({
     .optional(),
   $schema: z.string().optional(),
   liquid_template: z
-    .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
+    .union([PublishBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
     .optional(),
 });

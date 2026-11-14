@@ -84,8 +84,8 @@ What a user can do now and how, in a paragraph or two, then details as a list.
 ## Check and open the pull request
 
 ```sh
-moon run website:test website:build
-moon run website:start   # /changelog and /changelog/<slug> on port 3004
+turbo run test build --filter=@zitadel/website
+turbo run start --filter=@zitadel/website   # /changelog and /changelog/<slug> on port 3004
 ```
 
 Commit only the entries, on a branch from `main`, and open a pull request

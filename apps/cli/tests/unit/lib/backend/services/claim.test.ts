@@ -22,19 +22,19 @@ function refusal(status: number, code?: string, details?: unknown): BackendError
 
 describe("ClaimService.start", () => {
   it("answers the claim link the server minted", async () => {
-    const initClaim = vi.fn(async () => ({ challenge_id: "clm_1" }));
+    const createProjectClaim = vi.fn(async () => ({ challenge_id: "clm_1" }));
 
-    await expect(service({ initClaim }).start()).resolves.toMatchObject({
+    await expect(service({ createProjectClaim }).start()).resolves.toMatchObject({
       outcome: "started",
       challenge: { challenge_id: "clm_1" },
     });
-    expect(initClaim).toHaveBeenCalledWith("proj_1");
+    expect(createProjectClaim).toHaveBeenCalledWith("proj_1");
   });
 
   it("reports a project whose claim window has closed", async () => {
     await expect(
       service({
-        initClaim: async () => {
+        createProjectClaim: async () => {
           throw refusal(410, "proj.claim_window_expired");
         },
       }).start(),
@@ -44,7 +44,7 @@ describe("ClaimService.start", () => {
   it("reports a project that already belongs to a team, with its dashboard", async () => {
     await expect(
       service({
-        initClaim: async () => {
+        createProjectClaim: async () => {
           throw refusal(409, "proj.already_claimed", {
             team_id: "team_1",
             dashboard_url: "https://cloud.zitadel.com/team_1",
@@ -61,7 +61,7 @@ describe("ClaimService.start", () => {
   it("raises a conflict whose body names no team, rather than reading one out of it", async () => {
     await expect(
       service({
-        initClaim: async () => {
+        createProjectClaim: async () => {
           throw refusal(409, "proj.already_claimed");
         },
       }).start(),
@@ -71,7 +71,7 @@ describe("ClaimService.start", () => {
   it("raises any other failure", async () => {
     await expect(
       service({
-        initClaim: async () => {
+        createProjectClaim: async () => {
           throw new Error("boom");
         },
       }).start(),
@@ -81,24 +81,26 @@ describe("ClaimService.start", () => {
 
 describe("ClaimService.status", () => {
   it("answers a finished claim with what it finished as", async () => {
-    const getClaimStatus = vi.fn(async () => ({ status: "completed" as const }));
+    const getProjectClaimStatus = vi.fn(async () => ({ status: "completed" as const }));
 
-    await expect(service({ getClaimStatus }).status("clm_1")).resolves.toMatchObject({
+    await expect(service({ getProjectClaimStatus }).status("clm_1")).resolves.toMatchObject({
       outcome: "completed",
     });
-    expect(getClaimStatus).toHaveBeenCalledWith("proj_1", { challenge_id: "clm_1" });
+    expect(getProjectClaimStatus).toHaveBeenCalledWith("proj_1", { challenge_id: "clm_1" });
   });
 
   it("answers a claim nobody has followed yet as still waiting", async () => {
     await expect(
-      service({ getClaimStatus: async () => ({ status: "pending" as const }) }).status("clm_1"),
+      service({ getProjectClaimStatus: async () => ({ status: "pending" as const }) }).status(
+        "clm_1",
+      ),
     ).resolves.toEqual({ outcome: "pending" });
   });
 
   it("reports a claim window that has closed", async () => {
     await expect(
       service({
-        getClaimStatus: async () => {
+        getProjectClaimStatus: async () => {
           throw refusal(410, "proj.claim_window_expired");
         },
       }).status("clm_1"),
@@ -108,7 +110,7 @@ describe("ClaimService.status", () => {
   it("reports a link that has expired, which is not the window closing", async () => {
     await expect(
       service({
-        getClaimStatus: async () => {
+        getProjectClaimStatus: async () => {
           throw refusal(410);
         },
       }).status("clm_1"),
@@ -118,7 +120,7 @@ describe("ClaimService.status", () => {
   it("reports a link the server has never heard of", async () => {
     await expect(
       service({
-        getClaimStatus: async () => {
+        getProjectClaimStatus: async () => {
           throw refusal(404, "claim_challenge.not_found");
         },
       }).status("clm_1"),
@@ -128,7 +130,7 @@ describe("ClaimService.status", () => {
   it("reads a rate-limited poll as still waiting, so the caller keeps polling", async () => {
     await expect(
       service({
-        getClaimStatus: async () => {
+        getProjectClaimStatus: async () => {
           throw refusal(429);
         },
       }).status("clm_1"),
@@ -138,7 +140,7 @@ describe("ClaimService.status", () => {
   it("raises any other failure", async () => {
     await expect(
       service({
-        getClaimStatus: async () => {
+        getProjectClaimStatus: async () => {
           throw refusal(500);
         },
       }).status("clm_1"),

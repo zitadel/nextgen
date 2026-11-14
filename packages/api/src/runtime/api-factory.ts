@@ -117,7 +117,7 @@ export type ZitadelClientOptions = {
  *
  *     const client = createZitadelClient({ baseUrl, token });
  *     await client.createProject({ origins: [] });
- *     await client.createSchema(body, { project_id });
+ *     await client.publishSchema(body, { project_id });
  *     for await (const deployment of client.listDeployments.items({ project_id })) { … }
  */
 export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {

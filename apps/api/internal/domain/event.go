@@ -19,6 +19,54 @@ const (
 	EventCategorySignal  EventCategory = "signal"
 )
 
+// EventCategories lists every category an event is stored under. A read that
+// is split by category (events.ListEach) and names none reads each of these,
+// so a category added above joins this list.
+func EventCategories() []EventCategory {
+	return []EventCategory{
+		EventCategoryRequest,
+		EventCategoryAuth,
+		EventCategorySession,
+		EventCategoryAdmin,
+		EventCategoryEntity,
+		EventCategorySignal,
+	}
+}
+
+// HTTPStatusClass is the class of an HTTP response status, named by its
+// first digit (RFC 9110 §15).
+type HTTPStatusClass string
+
+const (
+	HTTPStatusClassInformational HTTPStatusClass = "1xx"
+	HTTPStatusClassSuccessful    HTTPStatusClass = "2xx"
+	HTTPStatusClassRedirection   HTTPStatusClass = "3xx"
+	HTTPStatusClassClientError   HTTPStatusClass = "4xx"
+	HTTPStatusClassServerError   HTTPStatusClass = "5xx"
+)
+
+// HTTPStatusClasses lists every class a request.api event is stored under. A
+// read by operation names a class for each of its ranges and reads each of
+// these when the list names none, so a class added above joins this list.
+func HTTPStatusClasses() []HTTPStatusClass {
+	return []HTTPStatusClass{
+		HTTPStatusClassInformational,
+		HTTPStatusClassSuccessful,
+		HTTPStatusClassRedirection,
+		HTTPStatusClassClientError,
+		HTTPStatusClassServerError,
+	}
+}
+
+// HTTPStatusClassOf is the class of status, and false for a status outside
+// 100–599, which HTTP defines no class for.
+func HTTPStatusClassOf(status int) (HTTPStatusClass, bool) {
+	if status < 100 || status > 599 {
+		return "", false
+	}
+	return HTTPStatusClasses()[status/100-1], true
+}
+
 // EventActorType is who triggered the event.
 type EventActorType string
 
@@ -57,10 +105,12 @@ const (
 	EventTypeSessionEstablished EventType = "session.established"
 	EventTypeSessionDeleted     EventType = "session.deleted"
 
-	EventTypeAuthAttemptCreated   EventType = "auth.attempt.created"
-	EventTypeAuthAttemptHandedOff EventType = "auth.attempt.handed_off"
-	EventTypeAuthCheckFailed      EventType = "auth.check.failed"
-	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
+	EventTypeSignupChallengeIssued   EventType = "flow.signup_challenge.issued"
+	EventTypeSignupChallengeConsumed EventType = "flow.signup_challenge.consumed"
+	EventTypeAuthAttemptCreated      EventType = "auth.attempt.created"
+	EventTypeAuthAttemptHandedOff    EventType = "auth.attempt.handed_off"
+	EventTypeAuthCheckFailed         EventType = "auth.check.failed"
+	EventTypeAuthCheckSucceeded      EventType = "auth.check.succeeded"
 
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
@@ -89,6 +139,9 @@ const (
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
+	EventTypeApplicationCreated EventType = "application.created"
+	EventTypeApplicationUpdated EventType = "application.updated"
+
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
 
@@ -106,6 +159,11 @@ const (
 
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
+
+	EventTypeInvitationCreated   EventType = "invitation.created"
+	EventTypeInvitationAccepted  EventType = "invitation.accepted"
+	EventTypeInvitationRejected  EventType = "invitation.rejected"
+	EventTypeInvitationCancelled EventType = "invitation.cancelled"
 
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"
@@ -128,6 +186,11 @@ type Event struct {
 	EntityType *string
 	EntityID   *string
 
+	// UserID is the user the event concerns, whoever acted: the user a
+	// session, a token, a sign-in check or a credential belongs to, and the
+	// user a change was made to. Nil on an event that concerns no user.
+	UserID *string
+
 	ClientID       string
 	TokenID        string
 	DelegationType string
@@ -138,6 +201,14 @@ type Event struct {
 	RequestID *string
 	SessionID *string
 	FlowID    *string
+
+	// OperationID and StatusClass copy what a request.api event's payload
+	// records, the operation and the class of the response status, into
+	// columns GET /events reads them from by index
+	// (RequestAPIPayload.Indexed). Nil on every other event. The operation is
+	// stored with its class, as one key (events.OperationStatus).
+	OperationID *string
+	StatusClass *HTTPStatusClass
 
 	Payload  json.RawMessage
 	Metadata json.RawMessage
@@ -198,6 +269,9 @@ const (
 	EventFieldRequestID
 	EventFieldSessionID
 	EventFieldFlowID
+	EventFieldOperationStatus
+	EventFieldStatusClass
+	EventFieldUserID
 )
 
 func ErrEventNotFound() Error {

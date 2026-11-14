@@ -8,7 +8,7 @@ import (
 	gen "github.com/zitadel/nextgen/internal/api/generated"
 )
 
-// CreateSchema re-marshals the decoded body before validating it, so the
+// PublishSchema re-marshals the decoded body before validating it, so the
 // generated codec must reproduce the wire document. The sso slot is the
 // one auth-methods entry with a conditional schema; ogen falls back to an
 // untyped field for shapes it cannot model and always emits those, which

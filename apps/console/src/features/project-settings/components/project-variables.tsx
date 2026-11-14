@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import type { api } from "@/api/zitadel";
 
-type Variables = Awaited<ReturnType<typeof api.getVariables>>;
+type Variables = Awaited<ReturnType<typeof api.listVariables>>;
 /** One kind's value: a scalar, or the mark that a secret is held. */
 type Value = NonNullable<Variables[string]["primary"]>;
 

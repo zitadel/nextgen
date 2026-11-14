@@ -1,11 +1,13 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Plus, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormError } from "@/components/form-error";
 import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_MENU_CELL_NARROW,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
   RESOURCE_STICKY_START,
@@ -27,30 +29,30 @@ import {
   UserIdentityCell,
 } from "@/features/users/components/user-cells";
 import { IdText } from "@/components/id-text";
-import { UsersFilter } from "@/features/users/components/users-filter";
+import { SearchField } from "@/components/search-field";
+import { ResourceFilter } from "@/components/resource-filter";
+import { usersFilters } from "@/features/users/filters";
+import { clearedFilters, isFiltered, parseDateFilter } from "@/lib/resource-filter";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
-import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
-import type { UserSchema } from "@/features/schemas/model";
+import { useRequiredProjectScope } from "@/features/projects/project-scope";
 import { columnsForUsers, fetchUsers } from "@/features/users/api";
 import {
   type ColumnGroup,
-  type SchemaOption,
   type UsersSearch,
-  OLDER_REVISIONS,
   attributeSummary,
   columnsBeyondIdentity,
+  parseUserStatus,
   pinnedColumns,
-  schemaOptions,
   toUserRow,
-  userFilter,
 } from "@/features/users/list";
 import { Page } from "@/components/layout";
+import { searchTerm } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
 import { useColumnPins } from "@/features/users/column-pins";
+import { latestDocuments, loadUsers, useUserSearch } from "@/features/users/load";
 import {
   ColumnsContextMenu,
   keepLinkMenu,
@@ -81,55 +83,27 @@ export const Route = createFileRoute("/_authed/users/")({
       search.revision !== LEGACY_LATEST
         ? search.revision
         : undefined;
-    // Both keys, even unset: the router lays this over the raw search, so a
+    // Every key, even unset: the router lays this over the raw search, so a
     // key left out would keep the URL's value.
-    return { schema, revision };
-  },
-  loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    const projectId = requireProjectScope(deps.project);
-    // The filter's options are the project's schemas at their latest revision;
-    // the chosen schema's revisions, with whether each is in use, are read for
-    // it alone. Both are chrome: unreadable, the list still renders, narrowed
-    // by what the URL carries.
-    const readingRevisions = deps.schema
-      ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
-      : Promise.resolve([]);
-    // `older` compares with the newest revision, so its users wait for it.
-    // It is read as the latest of the type, not taken from the history,
-    // which leaves out a revision the viewer may not read. Unreadable, the
-    // URL would claim a filter the list cannot apply, so it drops back to the
-    // schema alone.
-    const older = deps.revision === OLDER_REVISIONS ? deps.schema : undefined;
-    const latestId = older
-      ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
-      : undefined;
-    if (older && !latestId) {
-      throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
-    }
-    const filter = userFilter(deps, latestId);
-    const [page, options, revisions] = await Promise.all([
-      fetchUsers(projectId, undefined, true, filter),
-      fetchAllSchemas(projectId).then(schemaOptions, () => []),
-      readingRevisions,
-    ]);
     return {
-      users: page.users,
-      teamsExpanded: page.teamsExpanded,
-      nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
-      options,
-      revisions,
-      filter,
+      q: searchTerm(search.q),
+      schema,
+      revision,
+      status: parseUserStatus(search.status),
+      created: parseDateFilter(search.created),
     };
   },
+  // The search term is left out of the deps, so a new term is not a new match:
+  // past the router's pending delay a new match swaps the screen for the pending
+  // state, and the field being typed in goes with it. Staying on a match does not
+  // reload it, so the screen reads a term that comes after the load itself, once.
+  // A first load keeps the delay.
+  loaderDeps: ({ search: { q: _q, ...deps } }) => deps,
+  // `location.search` is the URL's, which `validateSearch` has not been over.
+  loader: ({ deps, location }) =>
+    loadUsers({ ...deps, q: searchTerm((location.search as { q?: unknown }).q) }),
   component: UsersScreen,
 });
-
-/** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
-function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
-  return new Map(options.map((option) => [option.latestId, option.schema]));
-}
 
 /** One fetched page, with the list state it carries besides its rows. */
 interface UsersPage {
@@ -141,10 +115,22 @@ interface UsersPage {
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
-  const loaded = Route.useLoaderData();
+  const fromRoute = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
+
+  const { loaded, searching, searchError } = useUserSearch(search, fromRoute);
+  const searchField = useRef<HTMLInputElement>(null);
+  const onSearch = useCallback(
+    (q: string) =>
+      void navigate({
+        search: (prev) => ({ ...prev, q: q || undefined }),
+        // Each pause in typing is not a place to come back to.
+        replace: true,
+      }),
+    [navigate],
+  );
 
   const [columns, setColumns] = useState(loaded.columns);
   const [teamsExpanded, setTeamsExpanded] = useState(loaded.teamsExpanded);
@@ -213,6 +199,16 @@ function UsersScreen() {
   const showAttributes = summaries.some(
     ({ summary }) => summary.entries.length > 0 || summary.more > 0,
   );
+  const filters = useMemo(
+    () => usersFilters({ options: loaded.options, revisions: loaded.revisions, search }),
+    [loaded.options, loaded.revisions, search],
+  );
+  // Latched for the screen's lifetime, as on Projects: a cleared search drops
+  // `?q=` before the full list is back, and the field must not unmount in
+  // between. A project with no users has nothing to search.
+  const [searchable, setSearchable] = useState(false);
+  const filtered = isFiltered(filters, search);
+  if (!searchable && (rows.length > 0 || search.q || filtered)) setSearchable(true);
   const scroll = useScrollEdges();
   // Each row's schema, for the identity card's title and the attributes
   // popover's field labels.
@@ -223,32 +219,33 @@ function UsersScreen() {
 
   return (
     <Page>
-      {/* No search beside the title: it is out of the page headers until there
-          is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          <UsersFilter
-            options={loaded.options}
-            revisions={loaded.revisions}
-            search={search}
-            onChange={(next) =>
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  schema: next.schema,
-                  revision: next.revision,
-                }),
-              })
-            }
+          searchable && (
+            <SearchField
+              inputRef={searchField}
+              query={search.q ?? ""}
+              onSearch={onSearch}
+              label="Search by identifier"
+              className="grow basis-48 @3xl/title-row:max-w-48"
+            />
+          )
+        }
+        below={
+          <ResourceFilter
+            filters={filters}
+            values={search}
+            onChange={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })}
           />
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
-            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                `px-2.5`, which renders the 68px control at 72px. */}
+            {/* Named for what it adds, as its sheet is titled and as Projects'
+                and Deployments' buttons are. `px-2.5!` — `Button`'s
+                `has-[>svg]:px-3` out-specifies a plain `px-2.5`. */}
             <Button className="shrink-0 gap-1.5 px-2.5!">
               <Plus aria-hidden />
-              Add
+              Add user
             </Button>
           </AddUserSheet>
         }
@@ -262,12 +259,17 @@ function UsersScreen() {
           column) stays pinned to the card's edge while the rest scrolls under
           it, so the menu is reachable at any width. Right-clicking the table
           opens the Columns menu. */}
+      <FormError message={searchError} className="mb-3" />
       <ColumnsContextMenu groups={pickable} pins={pins} onToggle={togglePin}>
         <div
           ref={scroll.ref}
           data-scroll-start={scroll.edges.start || undefined}
           data-scroll-end={scroll.edges.end || undefined}
-          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+          aria-busy={searching || undefined}
+          className={cn(
+            `${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`,
+            searching && "opacity-60",
+          )}
         >
           <Table className="text-xs" onContextMenu={keepLinkMenu} onPointerDown={keepLinkPress}>
             <TableHeader>
@@ -287,10 +289,7 @@ function UsersScreen() {
                     cell's hover card (D23). */}
                 {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
                 <ResourceHeadCell>ID</ResourceHeadCell>
-                {/* 52px: the 36px menu button and 8px either side. The cell
-                  inset the other columns take would make this pinned column
-                  84px wide for one icon. */}
-                <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
+                <ResourceMenuHead narrow className={RESOURCE_STICKY_END} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>
@@ -298,7 +297,33 @@ function UsersScreen() {
                 <ResourceEmptyRow
                   colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  {search.schema ? "No users match this filter." : "No users yet."}
+                  {loaded.q || filtered ? (
+                    // On a phone the empty table still scrolls sideways, so the
+                    // message and its control hold to the visible edge rather
+                    // than center on a width that is partly out of view.
+                    <span className="sticky left-0 flex w-fit flex-wrap items-center gap-x-3 gap-y-2 sm:static sm:mx-auto">
+                      {loaded.q ? "No users match this search." : "No users match this filter."}
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          // This button goes with the row, so focus goes first.
+                          searchField.current?.focus();
+                          void navigate({
+                            search: (prev) => ({
+                              ...prev,
+                              q: undefined,
+                              ...clearedFilters(filters),
+                            }),
+                          });
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </span>
+                  ) : (
+                    "No users yet."
+                  )}
                 </ResourceEmptyRow>
               ) : (
                 summaries.map(({ row: user, summary }) => (
@@ -351,8 +376,7 @@ function UsersScreen() {
                     <UserIdCell user={user} />
                     <TableCell
                       className={cn(
-                        RESOURCE_CELL,
-                        "px-2",
+                        RESOURCE_MENU_CELL_NARROW,
                         RESOURCE_STICKY_END,
                         RESOURCE_STICKY_BODY,
                       )}

@@ -1,9 +1,8 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The hosted cloud's add-on to the console. Mirrors
-  // apps/cloud-console/moon.yml; `lint` and `test` are the root's, and nothing
-  // builds here: the cloud's console build compiles the add-on in.
+  // The hosted cloud's add-on to the console. `lint` is the root's, and
+  // nothing builds here: the cloud's console build compiles the add-on in.
   "tasks": {
     // The add-on implements the console's contract and composes the
     // components it exports, and calls the functions' contract, all read
@@ -17,6 +16,18 @@
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/apps/console/src/**",
         "$TURBO_ROOT$/apps/cloud-functions/src/contract.ts"
+      ]
+    },
+    // The tests run the functions' contract and read the platform flow's
+    // steps (src/attribution.spec.ts), outside the package for the same reason.
+    // The contract builds the sign-in widget's paths with @zitadel/api, which
+    // the specs resolve to its dist/.
+    "test": {
+      "dependsOn": ["@zitadel/api#build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/apps/cloud-functions/src/contract.ts",
+        "$TURBO_ROOT$/packages/config/defaults/default-login.json"
       ]
     }
   }
