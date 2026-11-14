@@ -34,6 +34,7 @@ import {
   askCustomSettings,
   type Fact,
   type PromptContext,
+  refuseUnmappableClaims,
   type SetupAnswers,
   type SetupServices,
   type SsoDraft,
@@ -69,6 +70,9 @@ type Deps = Pick<
  * only shows once it is, and a developer who then finds they have no OAuth
  * application yet leaves the client id empty to drop that provider, rather
  * than cancelling setup and losing every answer.
+ *
+ * A flagged provider's claims (`--sso-claim`) are checked against the schema the answers settled on
+ * before its client id or secret is asked for, so a claim the schema cannot take costs no secret.
  *
  * `--sso` skips only the parts it answers. A flagged run that could not
  * supply the secret — it is never a flag, and only a scripted run pipes it in
@@ -203,6 +207,9 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
             kind: "catalog",
             id: name,
           });
+    if (flagged !== undefined) {
+      refuseUnmappableClaims(flagged, answers);
+    }
     const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
     if (loopback !== undefined) {
       reportWarning(loopback);

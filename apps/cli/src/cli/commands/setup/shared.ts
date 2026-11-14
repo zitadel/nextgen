@@ -63,6 +63,7 @@ import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
+  Connection,
   ConnectionExistsError,
   DiskStore,
   FileExistsError,
@@ -93,6 +94,11 @@ export const README = "README.md";
  * The renderer setup draws the widgets with when `--renderer` names none.
  */
 export const DEFAULT_RENDERER = "react";
+
+/**
+ * How `--sso-verified-claim` is spelled, for the note about a replaced default.
+ */
+const VERIFIED_FLAG = "--sso-verified-claim";
 
 /**
  * A short noun phrase for what each file the patcher writes is for, by its
@@ -854,7 +860,7 @@ export async function scaffoldOf(
                   draft.claimRequest ?? NO_CLAIM_REQUEST,
                 ),
               ),
-              "--sso-verified-claim",
+              VERIFIED_FLAG,
             );
           },
         };
@@ -866,6 +872,59 @@ export async function scaffoldOf(
   } catch (error) {
     throw setupRefusal(error, []);
   }
+}
+
+/**
+ * The preset and use case a run settles on from its flags, the defaults where
+ * a flag is left out.
+ *
+ * @param flags - The flags the invocation was given.
+ * @returns The preset and use case that decide the schema.
+ */
+export function variantOf(
+  flags: Readonly<Pick<SetupFlags, "preset" | "useCase">>,
+): Pick<SetupAnswers, "preset" | "useCase"> {
+  return {
+    preset:
+      SETUP_PRESETS.find((preset) => {
+        return preset === flags.preset;
+      }) ?? DEFAULT_SETUP_PRESET,
+    useCase:
+      SETUP_USE_CASES.find((useCase) => {
+        return useCase === flags.useCase;
+      }) ?? DEFAULT_SETUP_USE_CASE,
+  };
+}
+
+/**
+ * Refuses the claims a provider was asked to map when the schema the run will
+ * scaffold cannot take them.
+ *
+ * @remarks
+ * Called before the provider's credentials are asked for or read, so a mistake
+ * in `--sso-claim` or `--sso-verified-claim` costs no secret. The mapping is
+ * read the way {@link scaffoldOf} reads it, against the default schema of the
+ * preset and use case.
+ *
+ * @param draft - The provider and what it was asked to map.
+ * @param variant - The preset and use case that decide the schema.
+ * @throws {@link ZitadelError} With `E_VALIDATION` when a claim does not fit
+ *   the schema.
+ */
+export function refuseUnmappableClaims(
+  draft: Pick<SsoDraft, "selection" | "endpoints" | "claimRequest">,
+  variant: Pick<SetupAnswers, "preset" | "useCase">,
+): void {
+  const template = ZitadelConfig.defaultSchema(variant.preset, variant.useCase);
+  claimsOrRefuse(
+    applyRequest(
+      seedMapping(
+        Connection.forProvider(providerOf(draft.selection), template, draft.endpoints),
+        template,
+      ),
+      draft.claimRequest ?? NO_CLAIM_REQUEST,
+    ),
+  );
 }
 
 /**

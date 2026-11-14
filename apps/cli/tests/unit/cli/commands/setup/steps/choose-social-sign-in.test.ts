@@ -745,6 +745,30 @@ describe("ChooseSocialSignIn", () => {
       expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
     });
 
+    it("refuses a claim the schema cannot take without asking for the secret", async () => {
+      const error = await rejectionOf(() => {
+        return new ChooseSocialSignIn(aPromptDeps()).ask(
+          setupAnswers({
+            sso: [
+              {
+                selection: googleSelection,
+                credentials: { clientId: clientId("from-the-flag") },
+                claimRequest: {
+                  entries: [{ attribute: "notAProperty", claim: "employee_id" }],
+                  verified: [],
+                  scopes: [],
+                },
+              },
+            ],
+          }),
+          { ...CONTEXT, ssoFromFlag: true },
+        );
+      });
+
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect(password).not.toHaveBeenCalled();
+    });
+
     it("still asks once for the secret, which is never a flag", async () => {
       await new ChooseSocialSignIn(aPromptDeps()).ask(
         setupAnswers({

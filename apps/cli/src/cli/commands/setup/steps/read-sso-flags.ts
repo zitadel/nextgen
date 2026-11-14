@@ -3,8 +3,10 @@ import { CUSTOM_PROVIDER, parseClientSecret, providerOf } from "@zitadel/config/
 import {
   askCustomSettings,
   type Fact,
+  refuseUnmappableClaims,
   type SetupServices,
   ssoClaimFlags,
+  variantOf,
 } from "@/cli/commands/setup/shared";
 import {
   claimRequestFromFlags,
@@ -86,6 +88,10 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
    * terminal on stdin means nothing was piped, and reading it would block forever, so that case is
    * treated as "not supplied".
    *
+   * The claims the flags map are held to the schema the run will scaffold before the secret is
+   * read, when nobody can be asked which preset or use case it is; an interactive run holds them to
+   * it once those are answered, in `ChooseSocialSignIn`.
+   *
    * Described before the credentials are asked for, and before a project is created: a name or
    * issuer the server would refuse is a mistake in the command line. An interactive run asks for
    * the custom settings it was not given, the way it asks for a client id: `--sso` skips the
@@ -127,6 +133,9 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
       SETUP_FLAG_NAMES,
       SSO_CUSTOM_EXAMPLE,
     );
+    if (this.deps.nonInteractive) {
+      refuseUnmappableClaims({ selection, claimRequest }, variantOf(flags));
+    }
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       reportWarning(loopback);
