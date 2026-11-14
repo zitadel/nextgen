@@ -22,6 +22,14 @@ properties:
       - type: 'null'
   created_by_type:
     $ref: ../invitation-created-by-type.yaml
+  inviter:
+    description: |
+      The user who created the invitation, resolved so the accept page can
+      name them: render `display`, falling back to `identifier`, then
+      `user_id`. Null when a project secret created it.
+    oneOf:
+      - $ref: ../../../components/schemas/user-ref.yaml
+      - type: 'null'
   expires_at:
     type: string
     format: date-time

@@ -6,7 +6,9 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/inv-inviter_not_admin.yaml'
         - $ref: '../../../components/schemas/errors/inv-not_found.yaml'
         - $ref: '../../../components/schemas/errors/inv-platform_required.yaml'
         - $ref: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
@@ -19,7 +21,9 @@ content:
         mapping:
           auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          inv.inviter_not_admin: '../../../components/schemas/errors/inv-inviter_not_admin.yaml'
           inv.not_found: '../../../components/schemas/errors/inv-not_found.yaml'
           inv.platform_required: '../../../components/schemas/errors/inv-platform_required.yaml'
           inv.project_unclaimed: '../../../components/schemas/errors/inv-project_unclaimed.yaml'
@@ -32,8 +36,12 @@ content:
         $ref: '../../../components/examples/errors/auth-csrf_invalid.yaml'
       auth.unauthorized:
         $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
+      evt.invalid:
+        $ref: '../../../components/examples/errors/evt-invalid.yaml'
       internal:
         $ref: '../../../components/examples/errors/internal.yaml'
+      inv.inviter_not_admin:
+        $ref: '../../../components/examples/errors/inv-inviter_not_admin.yaml'
       inv.not_found:
         $ref: '../../../components/examples/errors/inv-not_found.yaml'
       inv.platform_required:

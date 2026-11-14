@@ -5,10 +5,13 @@ post:
     Declines a pending invitation for the signed-in user and returns the
     updated invitation with status `rejected`.
 
-    Send the plaintext token from the invitation link fragment. Metadata is
-    cleared. Every unknown or finished token answers the same opaque `404`.
+    Send the plaintext token from the invitation link fragment. The
+    invitation keeps its metadata for administrators, but this response
+    returns `metadata` as null. The inviter cannot decline their own invitation; an administrator
+    cancels it instead. Every unknown or finished token answers the same
+    opaque `404`.
     Authenticate with a platform-project user session cookie (`sessionCookie`).
-    Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+    Cookie requests follow that scheme's CSRF rules.
   tags:
     - Invitations
   security:
@@ -39,21 +42,15 @@ post:
           schema:
             $ref: ../../../components/error-details.yaml
     '403':
-      description: CSRF failed (`auth.csrf_invalid`).
+      description: |
+        The inviter cannot decline their own invitation, or CSRF failed
+        (`auth.csrf_invalid`).
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
       description: Unknown or finished invitation token.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '429':
-      description: |
-        Too many requests. Decline is rate-limited so a guessed token cannot be
-        brute-forced. Wait and retry.
       content:
         application/json:
           schema:

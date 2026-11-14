@@ -64,6 +64,8 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.NotEmpty(t, created.JourneyID)
 		// A project secret names no user.
 		assert.True(t, created.CreatedBy.IsNull())
+		assert.True(t, created.RespondedBy.IsNull())
+		assert.True(t, created.RespondedAt.IsNull())
 		link, err := url.Parse(created.Link)
 		require.NoError(t, err)
 		assert.Equal(t, "/ui/console/invitations/accept", link.Path)
@@ -79,7 +81,7 @@ func TestInvitationLifecycle(t *testing.T) {
 
 		listed, err := client.ListInvitations(t.Context(), api.ListInvitationsParams{
 			ProjectID: projectID,
-			Status:    api.NewOptInvitationStatus(api.InvitationStatusPending),
+			Status:    []api.InvitationStatus{api.InvitationStatusPending},
 		})
 		require.NoError(t, err)
 		page, ok := listed.(*api.ListInvitationsResponse)

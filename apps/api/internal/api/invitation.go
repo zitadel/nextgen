@@ -54,8 +54,8 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 		CreatedAt:     inv.CreatedAt,
 		ExpiresAt:     inv.ExpiresAt,
 		JourneyID:     inv.JourneyID,
-		AcceptedBy:    inv.AcceptedBy,
-		AcceptedAt:    inv.AcceptedAt,
+		RespondedBy:   inv.RespondedBy,
+		RespondedAt:   inv.RespondedAt,
 		Type:          api.CreateInvitationProjectMemberResponseTypeProjectMember,
 		ProjectMember: inv.ProjectMember,
 		Link:          created.Link,
@@ -77,8 +77,12 @@ func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitation
 		Limit:     int(params.Limit.Or(0)),
 		PageToken: string(params.PageToken.Or("")),
 	}
-	if v, ok := params.Status.Get(); ok {
-		req.Status = new(domain.InvitationStatus(v))
+	// Several statuses and expand=inviter land with the implementation.
+	if len(params.Status) > 1 || len(params.Expand) > 0 {
+		return nil, domain.ErrNotImplemented()
+	}
+	if len(params.Status) == 1 {
+		req.Status = new(domain.InvitationStatus(params.Status[0]))
 	}
 	if v, ok := params.Type.Get(); ok {
 		req.Type = new(domain.InvitationType(v))
@@ -160,14 +164,14 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 		resp.CreatedByType.SetToNull()
 	}
 	if inv.AcceptedBy != nil {
-		resp.AcceptedBy.SetTo(*inv.AcceptedBy)
+		resp.RespondedBy.SetTo(*inv.AcceptedBy)
 	} else {
-		resp.AcceptedBy.SetToNull()
+		resp.RespondedBy.SetToNull()
 	}
 	if inv.AcceptedAt != nil {
-		resp.AcceptedAt.SetTo(*inv.AcceptedAt)
+		resp.RespondedAt.SetTo(*inv.AcceptedAt)
 	} else {
-		resp.AcceptedAt.SetToNull()
+		resp.RespondedAt.SetToNull()
 	}
 	return resp
 }
@@ -194,6 +198,11 @@ func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationToken
 		return nil, domain.ErrInvitationProjectUnclaimed()
 	case 4:
 		return nil, domain.ErrInvitationPlatformRequired()
+	case 5:
+		return nil, domain.ErrInvitationInviterNotAdmin()
+	case 6:
+		// Accepting emits invitation.accepted.
+		return nil, domain.ErrEventInvalid(nil, nil)
 	default:
 		return nil, domain.ErrNotImplemented()
 	}
@@ -204,6 +213,11 @@ func (h *Handler) RejectInvitation(ctx context.Context, req *api.InvitationToken
 	switch invitationStubPhase {
 	case 1:
 		return nil, domain.ErrInvitationNotFound()
+	case 2:
+		return nil, domain.ErrInvitationSelfReject()
+	case 3:
+		// Declining emits invitation.rejected.
+		return nil, domain.ErrEventInvalid(nil, nil)
 	default:
 		return nil, domain.ErrNotImplemented()
 	}
@@ -219,7 +233,10 @@ func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, domain.ErrInvitationNotFound())
 	case domain.ErrInvitationNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrInvitationPermissionDenied().Code, domain.ErrInvitationSelfAccept().Code:
+	case domain.ErrInvitationPermissionDenied().Code,
+		domain.ErrInvitationSelfAccept().Code,
+		domain.ErrInvitationSelfReject().Code,
+		domain.ErrInvitationInviterNotAdmin().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrInvitationProjectUnclaimed().Code,
 		domain.ErrInvitationPendingLimit().Code,
