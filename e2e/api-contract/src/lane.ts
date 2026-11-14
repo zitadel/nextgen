@@ -175,6 +175,7 @@ export class Lane {
           ];
     const runs = await allSettled(
       parts.map(async (part) => {
+        const partStarted = Date.now();
         const instance = await this.input.instances.start();
         try {
           const credential = await instance.credentialFor(family);
@@ -188,6 +189,9 @@ export class Lane {
             phases: part.phases,
           });
           await this.keep(join(family, part.name), run);
+          this.input.log(
+            `${family}/${part.name}: ${String(part.operationIds.length)} operations in ${String(Math.round((Date.now() - partStarted) / 1000))}s`,
+          );
           return { part, run };
         } finally {
           await instance.stop();
