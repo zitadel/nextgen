@@ -709,6 +709,27 @@ describe("Flow.withFields", () => {
     ]);
   });
 
+  it("adds it to the step the register purpose starts at, whatever it is called", () => {
+    const flow = aFlow({
+      purposes: { register: "sign-up-details" },
+      steps: [
+        { name: "sign-up-details", fields: ["email"] },
+        { name: "register-sso", fields: ["email"] },
+      ],
+    });
+
+    const edit = flow.withFields(["employeeNumber"]);
+
+    expect(
+      edit.document.steps.map((step) => {
+        return step.fields;
+      }),
+    ).toEqual([
+      ["email", "employeeNumber"],
+      ["email", "employeeNumber"],
+    ]);
+  });
+
   it("does not add a field a step lists already", () => {
     const flow = registering([{ name: "register", fields: ["email", "employeeNumber"] }]);
 

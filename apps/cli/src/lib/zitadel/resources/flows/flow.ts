@@ -531,8 +531,10 @@ export class Flow extends ConfigDocument<FlowValue> {
    * details.
    *
    * @remarks
-   * Those are the `register` and `register-sso` steps that list their fields.
-   * A field a step lists already is not added twice, and every other step is
+   * Those are the step the register purpose starts at (`register` when the flow
+   * names none), which is where a provider's new users are asked for their
+   * details too, and the `register-sso` step, when they list their fields. A
+   * field a step lists already is not added twice, and every other step is
    * left as it is.
    *
    * @param names - The fields to add.
@@ -543,10 +545,15 @@ export class Flow extends ConfigDocument<FlowValue> {
     if (names.length === 0 || !Array.isArray(steps)) {
       return { document: this, changed: false, skipped: [] };
     }
+    const asking: readonly string[] = [
+      this.value.purposes.register ?? "register",
+      REGISTER_SSO_STEP,
+    ];
     const edited = steps.map((step) => {
       if (
         !isJsonObject(step) ||
-        (step.name !== "register" && step.name !== "register-sso") ||
+        typeof step.name !== "string" ||
+        !asking.includes(step.name) ||
         !Array.isArray(step.fields)
       ) {
         return step;
