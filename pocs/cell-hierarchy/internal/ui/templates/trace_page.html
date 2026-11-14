@@ -1,0 +1,32 @@
+{{define "trace_page"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>Trace (debug)</h1>
+      <p class="muted">Optional debug view of the in-memory hop ring. Primary UI shows <em>Latest hop</em> inline on the page that ran the action. Not linked from nav.</p>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+          <h2 style="margin:0">Hops</h2>
+          <form method="post" action="/trace/clear"><button class="secondary" type="submit">Clear</button></form>
+        </div>
+        <div id="trace" hx-get="/trace" hx-trigger="every 3s" hx-swap="innerHTML">
+          {{template "trace" .}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}
