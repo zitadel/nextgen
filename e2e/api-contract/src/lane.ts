@@ -46,7 +46,7 @@ const SHARD_FROM = 30;
 const SHARDS = Math.max(1, Math.floor(Number(process.env.API_CONTRACT_SHARDS)) || 1000);
 
 /** At most this many containers run at once. */
-const SLOTS = Math.max(1, availableParallelism());
+const SLOTS = 64;
 const waiting: (() => void)[] = [];
 let busy = 0;
 
