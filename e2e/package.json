@@ -44,6 +44,7 @@
     "@zitadel/testing": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "p-map": "catalog:",
+    "testcontainers": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
