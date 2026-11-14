@@ -9,12 +9,12 @@ type Undo = () => Promise<void>;
  * Told what is known right after a step finished, for a caller that reacts to
  * what a step produced without the step knowing.
  */
-export type Observer<Known extends object> = (known: Known) => void;
+type Observer<Known extends object> = (known: Known) => void;
 
 /**
  * How one run behaves.
  */
-export type RunOptions = {
+type RunOptions = {
   /**
    * Stops the run between steps when it aborts, as the person's Ctrl-C does.
    * What had finished is undone first.
@@ -32,8 +32,29 @@ export type RunOptions = {
  * What the compiler says when a step needs answers no earlier step gives: the
  * argument it asks for is this type, so the missing names are in the message.
  */
-export type Unmet<Needs extends object, State extends object> = {
+type Unmet<Needs extends object, State extends object> = {
   readonly "this step needs answers that no earlier step gives": Exclude<keyof Needs, keyof State>;
+};
+
+/**
+ * What is known inside one pass of a loop: everything the loop's own state
+ * holds, and the item the pass is for.
+ *
+ * @typeParam State - What is known where the loop starts.
+ * @typeParam Item - What the loop goes over.
+ */
+type Pass<State extends object, Item> = State & { readonly item: Item };
+
+/**
+ * What is known after a loop: what was known before it, and each pass's result,
+ * in order, under the loop's key.
+ *
+ * @typeParam State - What is known where the loop starts.
+ * @typeParam Key - The loop's name.
+ * @typeParam Inner - What each pass ends with.
+ */
+type Looped<State extends object, Key extends string, Inner extends object> = State & {
+  readonly [K in Key]: readonly Inner[];
 };
 
 /**
@@ -158,7 +179,8 @@ export class Wizard<Initial extends object, State extends object, Result> {
    *
    * @remarks
    * It does not compile when the step reads something no earlier step gives;
-   * the argument it then asks for names what is missing.
+   * the argument it then asks for names what is missing. The overload checks
+   * that, so the step is held as one that reads any object once it is running.
    *
    * The observer is told what is known, with what the step added, right after
    * the step finished. It is not told of a step that failed. If it throws, the
@@ -275,6 +297,11 @@ export class Wizard<Initial extends object, State extends object, Result> {
    * passes before it are undone, newest first, and then the steps before the
    * loop.
    *
+   * The state a loop adds is built with one assertion: a key that is only known
+   * as a type parameter is not understood by the compiler as the key of the
+   * added property, so the object it builds is told to be what the signature
+   * promises.
+   *
    * @param key - The step's name, and where the passes' results are kept.
    * @param source - The items, from what is known.
    * @param build - Builds the steps each pass runs.
@@ -285,18 +312,12 @@ export class Wizard<Initial extends object, State extends object, Result> {
     key: Key,
     source: (state: State) => readonly Item[],
     build: (
-      pass: Wizard<State & { readonly item: Item }, State & { readonly item: Item }, never>,
-    ) => Wizard<State & { readonly item: Item }, Inner, never>,
-  ): Wizard<Initial, State & { readonly [K in Key]: readonly Inner[] }, Result> {
+      pass: Wizard<Pass<State, Item>, Pass<State, Item>, never>,
+    ) => Wizard<Pass<State, Item>, Inner, never>,
+  ): Wizard<Initial, Looped<State, Key, Inner>, Result> {
     const keys = this.claim(key);
-    const pass = build(
-      Wizard.named<State & { readonly item: Item }, never>(`${this.name}.${key}`),
-    ).runner;
-    const runner: Runner<
-      Initial,
-      State & { readonly [K in Key]: readonly Inner[] },
-      Result
-    > = async (initial, options) => {
+    const pass = build(Wizard.named<Pass<State, Item>, never>(`${this.name}.${key}`)).runner;
+    const runner: Runner<Initial, Looped<State, Key, Inner>, Result> = async (initial, options) => {
       const before = await this.runner(initial, options);
       if (before.kind === "end") {
         return before;
@@ -336,12 +357,12 @@ export class Wizard<Initial extends object, State extends object, Result> {
       );
       return passes.then(
         (done) => {
-          const progress: Progress<State & { readonly [K in Key]: readonly Inner[] }, Result> = {
+          const progress: Progress<Looped<State, Key, Inner>, Result> = {
             kind: "continue",
             state: {
               ...before.state,
               [key]: done.results,
-            } as State & { readonly [K in Key]: readonly Inner[] },
+            } as Looped<State, Key, Inner>,
             undo: async (): Promise<void> => {
               await done.undo();
               await before.undo();
@@ -426,7 +447,7 @@ export class Wizard<Initial extends object, State extends object, Result> {
  * @typeParam Initial - What the run starts from.
  * @typeParam Result - What the wizard answers.
  */
-export class ReadyWizard<Initial extends object, Result> {
+class ReadyWizard<Initial extends object, Result> {
   /**
    * The wizard's name.
    */

@@ -11,11 +11,4 @@
  * be lifted out unchanged.
  */
 export { EndStep, WizardStep } from "./step";
-export {
-  type Observer,
-  ReadyWizard,
-  type RunOptions,
-  type Unmet,
-  Wizard,
-  WizardDefinitionError,
-} from "./wizard";
+export { Wizard, WizardDefinitionError } from "./wizard";

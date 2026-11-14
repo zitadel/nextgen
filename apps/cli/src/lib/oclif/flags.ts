@@ -4,8 +4,76 @@ import { type ZodType, z } from "zod";
 
 import type { Suggestion } from "@/lib/suggestion";
 
-import type { Placeholders, ValueNames } from "./refusal";
-import { type Refusal, refusalError } from "./refusal";
+import { type Placeholders, type Refusal, refusalError, type ValueNames } from "./refusal";
+
+/**
+ * A value that is present but holds nothing, trimmed.
+ *
+ * `required: true` is no help: it asks whether a token arrived in argv, and an
+ * empty one satisfies it. The way this happens is the shell, not a typo —
+ * `--client-id "$CLIENT_ID"` with the variable unset sends exactly that, the
+ * expansion dropping the value while the quotes keep the word, so argv carries
+ * `["--client-id", ""]`. Unquoted, the word vanishes and oclif refuses with
+ * "expects a value"; quoted, nothing complained and the empty string travelled
+ * on as if it were a real answer.
+ */
+export const filled = z.string().trim().min(1, "it was given an empty value");
+
+/**
+ * A whole number the value spells out in digits, which `Number` holds exactly.
+ *
+ * Digits alone are not enough, and nor is the number alone: `1e3` is not a
+ * count a person typed, while enough digits overflow to `Infinity` and past
+ * 2^53 round to a neighbour.
+ */
+export const whole = z
+  .string()
+  .trim()
+  .regex(/^-?\d+$/, "it is not a whole number")
+  .transform(Number)
+  .pipe(
+    z.number().int("it is not a whole number").safe("it is larger than a whole number can hold"),
+  );
+
+/**
+ * How a blank value is refused when a flag's refusal does not say: what to do
+ * about an empty value is to pass one or leave the flag out, which is not what
+ * to do about a value the parser would reject, so the two are worded apart.
+ */
+const BLANK_VALUE = {
+  message: "the value is empty",
+  hint: "Pass a value for {input}, or omit it entirely.",
+} as const satisfies Refusal;
+
+/**
+ * How a value a parser refused is worded when a flag's refusal does not say:
+ * the flag, then the parser's own reason.
+ */
+const REFUSED_SETTING = {
+  message: "{input}: {problem}",
+  hint: "Fix {input} and run the command again.",
+  details: {
+    flag: "{input}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * Passed as {@link ParserOptions.empty}, it refuses a blank value with the
+ * flag's own refusal, the reason being that it was given an empty value,
+ * instead of with {@link BLANK_VALUE}.
+ */
+export const AS_REFUSED = "as-refused";
+
+/**
+ * How a flag or argument given a blank value is refused.
+ */
+const EMPTY_VALUE_REFUSAL = {
+  message: "{input} was given an empty value",
+  hint: "Pass a value for {input}, or omit it entirely.",
+  details: {
+    argument: "{input}",
+  },
+} as const satisfies Refusal;
 
 /**
  * A refusal a flag or argument raises as its value parses. Its `next` entries
@@ -14,6 +82,9 @@ import { type Refusal, refusalError } from "./refusal";
  * the error.
  */
 export interface ParseRefusal extends Refusal {
+  /**
+   * The follow-ups the refusal suggests, each a whole suggestion.
+   */
   readonly next?: readonly Suggestion[];
 }
 
@@ -27,8 +98,19 @@ export interface ParseRefusal extends Refusal {
  * @typeParam T - What the value parses to.
  */
 export type Refused<T> = Readonly<{
+  /**
+   * Decides the value: what it parses to, or why it is refused.
+   */
   schema: ZodType<T, string>;
+
+  /**
+   * The wording of the refusal, with `{name}` placeholders.
+   */
   refusal: ParseRefusal;
+
+  /**
+   * What fills the placeholders besides the ones {@link read} fills.
+   */
   values?: Placeholders;
 }>;
 
@@ -156,12 +238,12 @@ function read<T>(refused: Refused<T>, value: string, input: string): T {
   if (parsed.success) {
     return parsed.data;
   }
-  const filled = {
+  const problem = {
     value,
     input,
     problem: parsed.error.issues[0]?.message ?? "it is not valid",
   } satisfies Record<Parsed, string>;
-  throw refusalError(refused.refusal, { ...refused.values, ...filled });
+  throw refusalError(refused.refusal, { ...refused.values, ...problem });
 }
 
 /**
@@ -211,35 +293,6 @@ export function taken<T, const R extends ParseRefusal, const Declared extends Re
 }
 
 /**
- * A value that is present but holds nothing, trimmed.
- *
- * `required: true` is no help: it asks whether a token arrived in argv, and an
- * empty one satisfies it. The way this happens is the shell, not a typo —
- * `--client-id "$CLIENT_ID"` with the variable unset sends exactly that, the
- * expansion dropping the value while the quotes keep the word, so argv carries
- * `["--client-id", ""]`. Unquoted, the word vanishes and oclif refuses with
- * "expects a value"; quoted, nothing complained and the empty string travelled
- * on as if it were a real answer.
- */
-export const filled = z.string().trim().min(1, "it was given an empty value");
-
-/**
- * A whole number the value spells out in digits, which `Number` holds exactly.
- *
- * Digits alone are not enough, and nor is the number alone: `1e3` is not a
- * count a person typed, while enough digits overflow to `Infinity` and past
- * 2^53 round to a neighbour.
- */
-export const whole = z
-  .string()
-  .trim()
-  .regex(/^-?\d+$/, "it is not a whole number")
-  .transform(Number)
-  .pipe(
-    z.number().int("it is not a whole number").safe("it is larger than a whole number can hold"),
-  );
-
-/**
  * What a parser that may refuse a value answers: the value it made, or what is
  * wrong with the text. Structurally the platform's own `Parsed<T>`, so a
  * parser a prompt already uses can be handed to {@link parses} and
@@ -248,37 +301,28 @@ export const whole = z
  * @typeParam T - What the text parses to.
  */
 export type Outcome<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly problem: string };
+  | Readonly<{
+      /**
+       * That the text parsed.
+       */
+      ok: true;
 
-/**
- * How a blank value is refused when a flag's refusal does not say: what to do
- * about an empty value is to pass one or leave the flag out, which is not what
- * to do about a value the parser would reject, so the two are worded apart.
- */
-export const BLANK_VALUE = {
-  message: "the value is empty",
-  hint: "Pass a value for {input}, or omit it entirely.",
-} as const satisfies Refusal;
+      /**
+       * What the text parsed to.
+       */
+      value: T;
+    }>
+  | Readonly<{
+      /**
+       * That the text did not parse.
+       */
+      ok: false;
 
-/**
- * How a value a parser refused is worded when a flag's refusal does not say:
- * the flag, then the parser's own reason.
- */
-export const REFUSED_SETTING = {
-  message: "{input}: {problem}",
-  hint: "Fix {input} and run the command again.",
-  details: {
-    flag: "{input}",
-  },
-} as const satisfies Refusal;
-
-/**
- * Passed as {@link ParserOptions.empty}, it refuses a blank value with the
- * flag's own refusal, the reason being that it was given an empty value,
- * instead of with {@link BLANK_VALUE}.
- */
-export const AS_REFUSED = "as-refused";
+      /**
+       * What is wrong with the text, worded for the person who typed it.
+       */
+      problem: string;
+    }>;
 
 /**
  * What {@link parses} and {@link accepts} may be told besides the parser.
@@ -286,7 +330,7 @@ export const AS_REFUSED = "as-refused";
  * @typeParam R - The refusal for a value the parser refuses, as it is written.
  * @typeParam Empty - The refusal for a blank value, as it is written.
  */
-export type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = Readonly<{
+type ParserOptions<R extends ParseRefusal, Empty extends ParseRefusal> = Readonly<{
   /**
    * What a value the parser refuses is refused with, asking only for what
    * {@link read} fills ({@link ReadAlone}). {@link REFUSED_SETTING} when it is
@@ -420,13 +464,7 @@ export function accepts<
 export const nonBlankString = Flags.custom<string>({
   parse: reads({
     schema: filled,
-    refusal: {
-      message: "{input} was given an empty value",
-      hint: "Pass a value for {input}, or omit it entirely.",
-      details: {
-        argument: "{input}",
-      },
-    },
+    refusal: EMPTY_VALUE_REFUSAL,
   }),
 });
 
@@ -436,13 +474,7 @@ export const nonBlankString = Flags.custom<string>({
 export const nonBlankArg = Args.custom<string>({
   parse: taken({
     schema: filled,
-    refusal: {
-      message: "{input} was given an empty value",
-      hint: "Pass a value for {input}, or omit it entirely.",
-      details: {
-        argument: "{input}",
-      },
-    },
+    refusal: EMPTY_VALUE_REFUSAL,
   }),
 });
 
