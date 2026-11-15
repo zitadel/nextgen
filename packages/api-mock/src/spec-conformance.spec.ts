@@ -2586,14 +2586,17 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
 
-    const deployed = (await (
-      await createDeployment(project.id, project.secret, {
-        release_id: release.id,
-        targets: ["https://x-acme.vercel.app"],
-      })
-    ).json()) as { targets: { expires_at: string | null }[] };
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://x-acme.vercel.app"],
+    });
 
-    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+    const listed = (await (await fetch(`${API}/projects/${project.id}/previews`)).json()) as {
+      previews: { expires_at: string }[];
+    };
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("a rollback keeps the origins it froze when one is no longer primary", async () => {
@@ -2726,14 +2729,16 @@ describe("api-mock releases and deployments", () => {
       targets: [url],
     });
     expect(deployed.status).toBe(201);
-    const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
-    expect(body.targets[0]?.origin).toBe(url);
-    expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+    const body = (await deployed.json()) as { targets: { origin: string }[] };
+    expect(body.targets).toEqual([{ origin: url }]);
 
     const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
-      previews: { origin: string }[];
+      previews: { origin: string; expires_at: string }[];
     };
     expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("refuses a deployment that mixes preview URLs with primary origins", async () => {
@@ -2855,15 +2860,12 @@ describe("api-mock releases and deployments", () => {
       ttl: "PT168H",
     });
     expect(again.status).toBe(201);
-    const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
     const expiresAgain = (
       (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
         previews: { expires_at: string }[];
       }
     ).previews[0]?.expires_at as string;
     expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
-    // The renewal reports the expiry the preview now runs on.
-    expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
   });
 
   test("pages the previews list with limit and next_page_token", async () => {
@@ -2918,10 +2920,10 @@ describe("api-mock releases and deployments", () => {
         targets: [url],
         ttl: "PT168H",
       })
-    ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
+    ).json()) as { id: string };
     const historyBefore = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
 
     const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
@@ -2945,10 +2947,9 @@ describe("api-mock releases and deployments", () => {
     // ends the preview, it does not rewrite history.
     const historyAfter = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
     expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
     expect(historyAfter.targets).toEqual(historyBefore.targets);
-    expect(historyAfter.targets[0]?.expires_at).toBe(deployed.targets[0]?.expires_at);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {

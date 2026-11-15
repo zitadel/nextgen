@@ -120,6 +120,9 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
+
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
    * does, while a deployment and the project still answer. A command that reads
@@ -647,6 +650,14 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.get("*/variables", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
     },
