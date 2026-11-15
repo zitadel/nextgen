@@ -316,6 +316,7 @@
         "!**/next-env.d.ts",
         "!**/*.gen.ts",
         "!**/*.timestamp*",
+        "!conformance/fixtures/**",
         "!apps/docs/.source/**",
         "!apps/docs/.generated/**",
         "!apps/cloud-functions/app/.well-known/workflow/**",
