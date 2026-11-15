@@ -12,6 +12,7 @@ import {
   CommandItemText,
   CommandList,
   CommandSeparator,
+  ITEM_FILLED_DESCRIPTION,
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -61,8 +62,10 @@ const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
-// filled row, so the fill is suppressed until the operator points or arrows.
-const ITEM_RESTING = "data-[selected=true]:bg-transparent";
+// filled row, so the fill is suppressed until the operator points or arrows,
+// and a description stays muted with it.
+const ITEM_RESTING =
+  "data-[selected=true]:bg-transparent data-[selected=true]:**:data-[slot=command-item-description]:text-muted-foreground";
 
 const CHIP =
   "flex h-[21px] shrink-0 items-center gap-1 rounded-sm bg-muted pl-1.5 text-xs leading-none font-medium text-foreground";
@@ -346,7 +349,9 @@ export function ComboboxContent({
                       className={cn(
                         option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
                         !navigating && ITEM_RESTING,
-                        isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
+                        isSelected &&
+                          indicator === "fill" &&
+                          `bg-accent text-accent-foreground ${ITEM_FILLED_DESCRIPTION}`,
                       )}
                       onSelect={() => {
                         onSelect(option.value);
@@ -358,7 +363,10 @@ export function ComboboxContent({
                         <span className="flex min-w-0 flex-1 items-center gap-2">
                           <Badge variant={option.chip}>{option.label}</Badge>
                           {option.description && (
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span
+                              data-slot="command-item-description"
+                              className="truncate text-xs text-muted-foreground"
+                            >
                               {option.description}
                             </span>
                           )}
