@@ -11,7 +11,7 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
   };
 });
 
-import { confirm, isCancel } from "@clack/prompts";
+import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { ConfirmFramework } from "@/cli/commands/setup/steps/confirm-framework";
 import type { SetupFlags } from "@/cli/commands/setup";
@@ -32,10 +32,6 @@ const FRAMEWORK = { id: "next", displayName: "Next.js" };
 const CLOUD = "https://preview.zitadel.com";
 
 /**
- * What a cancelled prompt answers.
- */
-const CANCEL = Symbol("cancel");
-
 /**
  * The answers setup has gathered for a passkey-first, minimal app on the
  * cloud, on port 3000, with no provider.
@@ -147,7 +143,7 @@ describe("ConfirmFramework", () => {
   });
 
   it("refuses with E_CANCELLED on Ctrl-C", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(CANCEL);
+    vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
