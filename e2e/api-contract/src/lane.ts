@@ -152,6 +152,7 @@ export class Lane {
     const ids = operations.map((operation) => {
       return operation.id;
     });
+    ids.push(...ids.splice(0, 7));
     const shared = {
       spec: this.input.specText,
       checks: CHECKS,
