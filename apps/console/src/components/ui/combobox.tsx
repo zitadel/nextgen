@@ -63,6 +63,10 @@ export const COMBOBOX_ROW = ITEM_CUSTOM;
 // the design's menu item renders transparent — a resting list must not paint a
 // filled row, so the fill is suppressed until the operator points or arrows.
 const ITEM_RESTING = "data-[selected=true]:bg-transparent";
+// A badge's tinted text is under 4.5:1 on the `accent` fill in the dark
+// theme, so a highlighted row draws it in the row's own foreground; the tint
+// keeps its colour.
+const BADGE_ON_HIGHLIGHT = "data-[selected=true]:**:data-[slot=badge]:text-accent-foreground";
 
 const CHIP =
   "flex h-[21px] shrink-0 items-center gap-1 rounded-sm bg-muted pl-1.5 text-xs leading-none font-medium text-foreground";
@@ -225,8 +229,7 @@ const FOOTER_VALUE = "combobox:footer";
 /**
  * The popover list: search field, empty state, and rows, in captioned groups
  * when asked, over an optional footer action. `selected` drives the chosen
- * affordance, which differs by usage — the project list fills the chosen row
- * (`Row · River`), while schema and role lists mark it with a Check.
+ * affordance: a Check by default, or a filled row with `indicator="fill"`.
  */
 export function ComboboxContent({
   options,
@@ -291,7 +294,15 @@ export function ComboboxContent({
   }, [search, rowsKey, rowValues, highlight]);
 
   return (
-    <PopoverContent align="start" className={cn(LIST, className)}>
+    <PopoverContent
+      align="start"
+      // Radix makes the popover a dialog, which needs a name of its own.
+      aria-label={label ?? searchPlaceholder}
+      // This stays mounted while the popover is closed, so a reopened list
+      // rests again until the operator points or arrows.
+      onCloseAutoFocus={() => setNavigating(false)}
+      className={cn(LIST, className)}
+    >
       <Command
         // The field's name: cmdk labels its input with this (`aria-labelledby`),
         // which an `aria-label` on the input would not outrank.
@@ -346,6 +357,7 @@ export function ComboboxContent({
                       className={cn(
                         option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
                         !navigating && ITEM_RESTING,
+                        navigating && BADGE_ON_HIGHLIGHT,
                         isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
                       )}
                       onSelect={() => {
