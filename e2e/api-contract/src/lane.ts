@@ -152,6 +152,7 @@ export class Lane {
     const ids = operations.map((operation) => {
       return operation.id;
     });
+    ids.reverse();
     const shared = {
       spec: this.input.specText,
       checks: CHECKS,
