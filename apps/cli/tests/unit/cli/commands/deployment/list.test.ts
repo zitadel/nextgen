@@ -110,7 +110,7 @@ describe("deployment list", () => {
       }),
     );
 
-    const result = await runCliForTest(["deployment", "list", "--json", "--cwd", cwd, "--server", SERVER]);
+    await runCliForTest(["deployment", "list", "--json", "--cwd", cwd, "--server", SERVER]);
 
     expect(asked).toEqual([]);
   });
