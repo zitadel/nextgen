@@ -11,7 +11,7 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
   };
 });
 
-import { confirm, isCancel, multiselect, password, text } from "@clack/prompts";
+import { CANCEL_SYMBOL, confirm, isCancel, multiselect, password, text } from "@clack/prompts";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { askCustomSettings } from "@/cli/commands/setup/shared";
@@ -41,11 +41,6 @@ const CLOUD = "https://preview.zitadel.com";
  * The app directory setup runs in.
  */
 const APP_DIR = "/tmp/app";
-
-/**
- * What a cancelled prompt answers.
- */
-const CANCEL = Symbol("cancel");
 
 /**
  * The redirect URI a Google provider registers when the app runs on port 4321.
@@ -170,7 +165,7 @@ function describesAcme(overrides: { issuer?: string; clientId?: string } = {}): 
  */
 function validatorOf(
   question: { validate?: Parameters<typeof text>[0]["validate"] } | undefined,
-): (value: string) => string | Error | undefined {
+): (value: string | undefined) => string | Error | undefined | Promise<string | Error | undefined> {
   const validate = question?.validate;
   if (typeof validate !== "function") {
     throw new Error("the question has no validator");
@@ -834,7 +829,7 @@ describe("ChooseSocialSignIn", () => {
   });
 
   it("refuses with E_CANCELLED on Ctrl-C at the provider question", async () => {
-    vi.mocked(multiselect).mockResolvedValueOnce(CANCEL);
+    vi.mocked(multiselect).mockResolvedValueOnce(CANCEL_SYMBOL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {

@@ -45,8 +45,8 @@
     "@angular/core": ">=17"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.8.0",
-    "@analogjs/vitest-angular": "^2.8.0",
+    "@analogjs/vite-plugin-angular": "^2.9.6",
+    "@analogjs/vitest-angular": "^2.9.6",
     "@angular/build": "catalog:",
     "@angular/common": "catalog:",
     "@angular/compiler": "catalog:",
@@ -55,8 +55,8 @@
     "@angular/platform-browser": "catalog:",
     "@angular/platform-server": "catalog:",
     "@angular/router": "catalog:",
-    "@babel/core": "^8.0.1",
-    "@testing-library/angular": "^19.4.1",
+    "@babel/core": "8.0.1",
+    "@testing-library/angular": "^19.6.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
@@ -67,6 +67,6 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "zone.js": "~0.16.0"
+    "zone.js": "~0.16.3"
   }
 }
