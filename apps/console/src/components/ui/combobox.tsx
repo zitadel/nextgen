@@ -12,6 +12,7 @@ import {
   CommandItemText,
   CommandList,
   CommandSeparator,
+  ITEM_FILLED_DESCRIPTION,
 } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -61,8 +62,10 @@ const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
-// filled row, so the fill is suppressed until the operator points or arrows.
-const ITEM_RESTING = "data-[selected=true]:bg-transparent";
+// filled row, so the fill is suppressed until the operator points or arrows,
+// and a description stays muted with it.
+const ITEM_RESTING =
+  "data-[selected=true]:bg-transparent data-[selected=true]:**:data-[slot=command-item-description]:text-muted-foreground";
 // A badge's tinted text is under 4.5:1 on the `accent` fill in the dark
 // theme, so a highlighted row draws it in the row's own foreground; the tint
 // keeps its colour.
@@ -358,7 +361,9 @@ export function ComboboxContent({
                         option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
                         !navigating && ITEM_RESTING,
                         navigating && BADGE_ON_HIGHLIGHT,
-                        isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
+                        isSelected &&
+                          indicator === "fill" &&
+                          `bg-accent text-accent-foreground ${ITEM_FILLED_DESCRIPTION}`,
                       )}
                       onSelect={() => {
                         onSelect(option.value);
@@ -370,7 +375,10 @@ export function ComboboxContent({
                         <span className="flex min-w-0 flex-1 items-center gap-2">
                           <Badge variant={option.chip}>{option.label}</Badge>
                           {option.description && (
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span
+                              data-slot="command-item-description"
+                              className="truncate text-xs text-muted-foreground"
+                            >
                               {option.description}
                             </span>
                           )}

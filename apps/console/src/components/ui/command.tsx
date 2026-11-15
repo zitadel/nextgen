@@ -164,12 +164,15 @@ function CommandSeparator({
   );
 }
 
+/** On a filled row, a {@link CommandItemText} description in the row's foreground. */
+const ITEM_FILLED_DESCRIPTION = "**:data-[slot=command-item-description]:text-accent-foreground";
+
 function CommandItem({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Item>) {
   return (
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[selected=true]:**:data-[slot=command-item-description]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -180,7 +183,9 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
 /**
  * An item's text: its label, and beneath it, when there is one, a muted line
  * that tells it from another of the same name or says where it is. One line
- * fills the row; two stack a 14px label over a 12px description.
+ * fills the row; two stack a 14px label over a 12px description. A filled row
+ * draws the description in its own foreground ({@link ITEM_FILLED_DESCRIPTION}):
+ * muted on `accent` is under 4.5:1 in the dark theme.
  */
 function CommandItemText({
   label,
@@ -192,7 +197,12 @@ function CommandItemText({
   return description ? (
     <span data-slot="command-item-text" className="flex min-w-0 flex-1 flex-col">
       <span className="truncate font-medium">{label}</span>
-      <span className="truncate text-xs leading-4 text-muted-foreground">{description}</span>
+      <span
+        data-slot="command-item-description"
+        className="truncate text-xs leading-4 text-muted-foreground"
+      >
+        {description}
+      </span>
     </span>
   ) : (
     <span data-slot="command-item-text" className="min-w-0 flex-1 truncate">
@@ -222,4 +232,5 @@ export {
   CommandItemText,
   CommandShortcut,
   CommandSeparator,
+  ITEM_FILLED_DESCRIPTION,
 };

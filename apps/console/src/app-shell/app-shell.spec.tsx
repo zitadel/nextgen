@@ -1948,6 +1948,38 @@ describe("search", () => {
     await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("proj_1"));
   });
 
+  it("copies the id of the project the pill switched to", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderShell(scopedPath("/users", "proj_1"));
+    const pill = await screen.findByRole("button", { name: /^Switch project/ });
+    await waitFor(() => expect(pill).toHaveTextContent("River"));
+    await user.click(pill);
+    const list = within(await screen.findByRole("listbox", { name: "Projects" }));
+    await user.click(list.getByRole("option", { name: /Delta/ }));
+    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
+
+    await user.click(screen.getByRole("button", { name: "Search…" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await user.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "copy",
+    );
+    await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
+
+    expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
+    await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("proj_2"));
+  });
+
   it("lists what was opened from it, until something is typed", async () => {
     server.use(
       http.post(SEARCH, async ({ request }) => {
