@@ -1,7 +1,7 @@
 "use client";
 
 import type * as React from "react";
-import { Command as CommandPrimitive } from "cmdk";
+import { Command as CommandPrimitive, useCommandState } from "cmdk";
 import { SearchIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -141,13 +141,23 @@ function CommandGroup({
   );
 }
 
+/**
+ * A hairline between groups. It sits inside the listbox, which may hold only
+ * groups and options, so it is drawn here with no role: cmdk's own separator
+ * fixes `role="separator"`. Like cmdk's, it hides while a search narrows the
+ * list unless `alwaysRender` keeps it.
+ */
 function CommandSeparator({
   className,
+  alwaysRender,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: React.ComponentProps<"div"> & { alwaysRender?: boolean }) {
+  const searching = useCommandState((state) => state.search !== "");
+  if (searching && !alwaysRender) return null;
   return (
-    <CommandPrimitive.Separator
+    <div
       data-slot="command-separator"
+      role="none"
       className={cn("-mx-1 h-px bg-border", className)}
       {...props}
     />
