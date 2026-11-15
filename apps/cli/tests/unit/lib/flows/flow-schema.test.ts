@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CreateFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { PublishFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
-/** The inner flow-definition shape; the envelope is `CreateFlowDefinitionBody`. */
-const flowDefinitionSchema = CreateFlowDefinitionBody.shape.flow_definition;
+/** The inner flow-definition shape; the envelope is `PublishFlowDefinitionBody`. */
+const flowDefinitionSchema = PublishFlowDefinitionBody.shape.flow_definition;
 
 /** A flow definition whose single step declares `fields` in the given shape. */
 function withFields(fields: unknown) {

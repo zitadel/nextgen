@@ -29,7 +29,7 @@ flowchart TD
 
 ## Walk-through
 
-1. `POST /flow` with `purpose: register` → engine returns the `signup` step.
+1. `POST /flows` with `purpose: register` → engine returns the `signup` step.
 2. The user submits `email` and `password`. Field validation runs against the
    user schema (email format, password min length, uniqueness lookup).
 3. `on_success: create_user` fires before the transition: user row + password

@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
-import { GetReleaseByIdParams } from "@/lib/backend/schemas";
+import { GetReleaseParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
@@ -16,7 +16,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
  * says what one looks like.
  */
 const RELEASE: Refused<string> = {
-  schema: z.string().trim().pipe(GetReleaseByIdParams.shape.release_id),
+  schema: z.string().trim().pipe(GetReleaseParams.shape.release_id),
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the releases to find one.",

@@ -10,7 +10,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import {
-  type GetReleaseById200,
+  type GetRelease200,
   ListEventsCategoryItem,
   ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
@@ -24,31 +24,31 @@ import {
 } from "@/lib/backend/model";
 import {
   CreateGrantBody,
-  CreateIdpBody,
+  PublishIdpBody,
   CreateTeamBody,
   CreateUserBody,
-  GetBrandingByIdResponse,
+  GetBrandingResponse,
   GetFlowDefinitionResponse,
   GetGrantResponse,
-  GetIdpByIdResponse,
+  GetIdpResponse,
   GetPolicyResponse,
   GetProjectResponse,
-  GetReleaseByIdParams,
-  GetReleaseByIdResponse,
-  GetSchemaByIdResponse,
+  GetReleaseParams,
+  GetReleaseResponse,
+  GetSchemaResponse,
   GetSessionParams,
   GetSessionResponse,
   GetTeamResponse,
-  GetUserByIDParams,
-  GetUserByIDResponse,
+  GetUserParams,
+  GetUserResponse,
   ListBrandingResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListPoliciesResponse,
   ListReleasesResponse,
   ListSchemasResponse,
-  PatchProjectBody,
-  PatchUserByIDBody,
+  UpdateProjectBody,
+  UpdateUserBody,
   PublishPolicyBody,
   QueryGrantsBody,
   QueryGrantsResponse,
@@ -85,7 +85,7 @@ import { CommandGroups } from "@/lib/oclif/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
-const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
+const USER_UPDATE_BODY = UpdateUserBody.omit({ dry_run: true });
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -157,7 +157,7 @@ export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<strin
 type FieldsOf<T> = { [K in keyof T]: unknown };
 
 // What a write must answer with: a record carrying the resource's id under
-// `Id`, or the empty answer `WriteResult` allows (`grants create` by
+// `Id`, or the empty answer `WriteResult` allows (`grant create` by
 // identifier answers 202).
 type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
 
@@ -349,7 +349,7 @@ const OPERATIONS: readonly Operation[] = [
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = async (
-  release: Pick<GetReleaseById200, "pointers">,
+  release: Pick<GetRelease200, "pointers">,
   tabulate: Tabulate,
 ): Promise<string> => {
   const { pointers } = release;
@@ -374,11 +374,11 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  * truth. Adding a backend resource is adding an entry here.
  */
 export const RESOURCES = {
-  users: resource({
+  user: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
-    idSchema: GetUserByIDParams.shape.user_id,
+    idSchema: GetUserParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
     // schema); the schema URL it replaced is identical on every row.
@@ -441,9 +441,9 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client }, id) => {
-        return client.getUserByID(id);
+        return client.getUser(id);
       },
-      response: GetUserByIDResponse,
+      response: GetUserResponse,
     }),
     create: create(CreateUserBody, ({ client, projectId }, body) => {
       return client.createUser(body, { project_id: projectId });
@@ -452,13 +452,13 @@ export const RESOURCES = {
     update: update(
       USER_UPDATE_BODY,
       ({ client }, id, body) => {
-        return client.patchUserByID(id, body);
+        return client.updateUser(id, body);
       },
       {
         // A server from before dry_run refuses the field rather than applying
         // the patch, so a dry run needs no check of the server first.
         check: ({ client }, id, body) => {
-          return client.patchUserByID(id, {
+          return client.updateUser(id, {
             ...body,
             dry_run: true,
           });
@@ -467,12 +467,12 @@ export const RESOURCES = {
     ),
     delete: {
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteUserByID(id);
+        return consent.unlock(client).deleteUser(id);
       },
     },
   }),
 
-  teams: resource({
+  team: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 2,
     singular: "team",
@@ -521,12 +521,12 @@ export const RESOURCES = {
     delete: {
       verb: "deactivate",
       call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteTeam(id);
+        return consent.unlock(client).deactivateTeam(id);
       },
     },
   }),
 
-  sessions: resource({
+  session: resource({
     group: CommandGroups.authentication,
     singular: "session",
     idSchema: GetSessionParams.shape.session_id,
@@ -578,7 +578,7 @@ export const RESOURCES = {
     },
   }),
 
-  events: resource({
+  event: resource({
     group: CommandGroups.diagnostics,
     singular: "event",
     idField: "id",
@@ -596,7 +596,7 @@ export const RESOURCES = {
       "occurred_at",
     ],
     list: list({
-      item: ListEventsResponse.shape.data.element,
+      item: ListEventsResponse.shape.events.element,
       // `GET /events` spells its filters as flat query parameters, and a range
       // as two of them. Declaring the parameter each operation travels as lets
       // the caller write the same `field=operation:value` they write for every
@@ -684,7 +684,7 @@ export const RESOURCES = {
     }),
   }),
 
-  grants: resource({
+  grant: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 3,
     singular: "grant",
@@ -749,8 +749,8 @@ export const RESOURCES = {
   // Identity provider connections. They carry ADR 063's shape already:
   // a fixed `id` shared by every revision, and a `revision_id` per revision.
   // The revision routes are not modelled here — the CLI has no grammar for a
-  // sub-resource listing yet, so `idps revisions` is deliberately absent.
-  idps: resource({
+  // sub-resource listing yet, so `idp revisions` is deliberately absent.
+  idp: resource({
     group: CommandGroups.authentication,
     singular: "identity provider connection",
     plural: "identity provider connections",
@@ -780,18 +780,18 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getIdpById(id, { project_id: projectId });
+        return client.getIdp(id, { project_id: projectId });
       },
-      response: GetIdpByIdResponse,
+      response: GetIdpResponse,
     }),
     // The body nests the connection under `idp`. Rooted there, the flags and
     // `--set` paths address the connection itself (`--oidc-issuer`), and
     // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
     // that already exists is revised rather than duplicated.
     create: create(
-      CreateIdpBody,
+      PublishIdpBody,
       ({ client, projectId }, body) => {
-        return client.createIdp(body, { project_id: projectId });
+        return client.publishIdp(body, { project_id: projectId });
       },
       {
         root: "idp",
@@ -803,7 +803,7 @@ export const RESOURCES = {
     ),
   }),
 
-  projects: resource({
+  project: resource({
     group: CommandGroups.configuration,
     singular: "project",
     idField: "id",
@@ -832,8 +832,8 @@ export const RESOURCES = {
       },
       response: GetProjectResponse,
     }),
-    update: update(PatchProjectBody, ({ client }, id, body) => {
-      return client.patchProject(id, body);
+    update: update(UpdateProjectBody, ({ client }, id, body) => {
+      return client.updateProject(id, body);
     }),
   }),
 
@@ -841,7 +841,7 @@ export const RESOURCES = {
   // files under `.zitadel/` and shipped through a release, so a write verb
   // would be a second writer over the same state; reading what the server
   // currently holds is how you check that a deploy landed.
-  schemas: resource({
+  schema: resource({
     group: CommandGroups.configuration,
     singular: "schema",
     idField: "id",
@@ -869,7 +869,7 @@ export const RESOURCES = {
           values: Object.values(ListSchemasRevisions),
           // Editing a schema mints a new revision rather than changing the old
           // one, so the unfiltered list is a history: the same object type over
-          // and over. Someone typing `schemas list` means "what schemas do I
+          // and over. Someone typing `schema list` means "what schemas do I
           // have", which is one row each. The console made the same choice.
           default: ListSchemasRevisions.latest,
         },
@@ -886,7 +886,7 @@ export const RESOURCES = {
       },
     }),
     get: get({
-      response: GetSchemaByIdResponse,
+      response: GetSchemaResponse,
       call: ({ client, projectId }, reference) => {
         const schemaService = new SchemaService(client, projectId);
         return schemaService.get(reference);
@@ -898,7 +898,7 @@ export const RESOURCES = {
     group: CommandGroups.configuration,
     singular: "release",
     plural: "releases",
-    idSchema: GetReleaseByIdParams.shape.release_id,
+    idSchema: GetReleaseParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
@@ -924,21 +924,21 @@ export const RESOURCES = {
     }),
     get: get({
       call: ({ client, projectId }, id) => {
-        return client.getReleaseById(id, { project_id: projectId });
+        return client.getRelease(id, { project_id: projectId });
       },
-      response: GetReleaseByIdResponse,
+      response: GetReleaseResponse,
       sections: async (release, tabulate) => {
         return [await releasePointers(release, tabulate)];
       },
     }),
   }),
 
-  "flow-definitions": resource({
+  "flow-definition": resource({
     group: CommandGroups.configuration,
     singular: "flow definition",
     plural: "flow definitions",
     idField: "id",
-    // Addressed by flow name as well as by revision id; see `schemas`.
+    // Addressed by flow name as well as by revision id; see `schema`.
     idArg: "flow",
     idDescription: "flow name (newest revision) or revision id",
     columns: ["id", "flow_definition.name", "created_at"],
@@ -961,7 +961,7 @@ export const RESOURCES = {
           values: Object.values(ListFlowDefinitionsRevisions),
           // Publishing under an existing name mints a new row, so the
           // unfiltered list is a history of the same flows. Same reasoning as
-          // `schemas`: a bare list is the current flows.
+          // `schema`: a bare list is the current flows.
           default: ListFlowDefinitionsRevisions.latest,
         },
       ],
@@ -994,16 +994,16 @@ export const RESOURCES = {
     heading: "id",
     detail: ["id", "created_at"],
     list: list({
-      // `GET /branding` answers with the array itself and takes no cursor, so
-      // the paging flags are not generated for it.
-      paged: false,
-      item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => {
+      item: ListBrandingResponse.shape.branding.element,
+      call: ({ client, projectId }: Platform, params: Query<"listBranding">) => {
         const brandingService = new BrandingService(client, projectId);
-        return brandingService.list();
+        return brandingService.page(params);
       },
       items: (page) => {
-        return page;
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
       },
     }),
     get: get({
@@ -1011,16 +1011,16 @@ export const RESOURCES = {
         const brandingService = new BrandingService(client, projectId);
         return brandingService.get(id);
       },
-      response: GetBrandingByIdResponse,
+      response: GetBrandingResponse,
     }),
   }),
 
   // Operation policies (ADR 066). Configuration: carried from
-  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
+  // .zitadel/policies/ by `deploy`, so only read here (`policy test` is a
   // hand-written command). A project has one
   // policy per operation, and the list shows each at its newest revision.
-  // The revision routes are not modelled, for the reason `idps` gives.
-  policies: resource({
+  // The revision routes are not modelled, for the reason `idp` gives.
+  policy: resource({
     group: CommandGroups.configuration,
     singular: "policy",
     idField: "id",
@@ -1063,7 +1063,7 @@ export const RESOURCES = {
         }
         const notFound = () => {
           return new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
-            hint: `List the project's policies with the policies list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
+            hint: `List the project's policies with the policy list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
           });
         };
         const operation = POLICY_OPERATIONS.find((known) => {
@@ -1113,14 +1113,14 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
  */
 type ResourceTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
 
-/** The ids of a registry entry's commands: `users:list`, `sessions:revoke`. */
+/** The ids of a registry entry's commands: `user:list`, `session:revoke`. */
 type IdsOf<Topic extends string, Entry> = Entry extends {
   readonly [verbs]?: infer Verb extends string;
 }
   ? `${Topic}:${Verb}`
   : never;
 
-/** Every generated resource command a run can suggest, by id (`users:get`). */
+/** Every generated resource command a run can suggest, by id (`user:get`). */
 export type ResourceTable = {
   readonly [Id in {
     [Topic in keyof typeof RESOURCES & string]: IdsOf<Topic, (typeof RESOURCES)[Topic]>;

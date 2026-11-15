@@ -10,6 +10,7 @@ import { readIfExists } from "./fs";
 import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
+import { environmentFileName } from "./secret-paths";
 import { parseServer, resolveServer, serverOrigin } from "./server";
 import type { Suggest } from "./suggestion";
 
@@ -311,7 +312,7 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   // --force replace the binding with a new project, and creating one where the
   // process environment already names a project would pair that project with
   // another's credential.
-  const boundFile = `.env.${name}.local`;
+  const boundFile = environmentFileName(name);
   const bound = environment.consulted.some((entry) => {
     return entry.source === boundFile && entry.present;
   });
@@ -399,7 +400,7 @@ export async function requireValueInteractive(
     ? await options.ask.secret(question)
     : await options.ask.text(question);
   if (environment.envFile === undefined) {
-    await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
+    await persistEnvValue(join(options.cwd, environmentFileName(name)), key, value);
   }
   return value;
 }

@@ -26,6 +26,8 @@ const NUXT_STARTER =
  * Nuxt 4 (what the starter scaffolds) puts it under `app/`; older Nuxt put it at
  * the root, so both are removed. `nuxt.config.ts` is left in place — the
  * patcher merges into it via an `edit`, which preserves whatever `nuxi` generated.
+ * It installs nothing: setup's own install step does, once, and not under
+ * `--skip-install`.
  */
 export class NuxtScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Nuxt";
@@ -52,6 +54,9 @@ export class NuxtScaffolder extends AbstractCLIScaffolder {
         "npm",
         "--no-gitInit",
         "--force",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--no-install",
       ],
       cwd,
     );

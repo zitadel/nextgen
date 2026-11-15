@@ -68,7 +68,9 @@ test("user signs in with password", async ({ page, seed }) => {
 
 `app.env` is an `AppEnvTemplate`: a serializable mapping from your app's env
 var names to `InstanceHandle` fields. `nextAppEnv` covers `@zitadel/sdk-next`
-apps; the console maps the same fields to `VITE_*`/`CONSOLE_*` names instead.
+apps, and `viteAppEnv` the React, Vue, Solid, Svelte and Qwik apps `zitadel setup`
+wires through a Vite dev proxy; the console maps the same fields to
+`VITE_*`/`CONSOLE_*` names instead.
 The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
 `withZitadel()` points at its handshake file.
 
@@ -309,7 +311,7 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 (`flowAction`/`flowField`, `clickFlowAction`/`fillFlowField`), plus
 `withZitadel(options)` returning `{ webServer }` for the config,
 `enableVirtualPasskey(page)` for non-fixture pages, and
-`nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
+`nextAppEnv`/`viteAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
 above. `identity()`, `SESSION_COOKIE_NAME`, `browserSessionCookieName` and
 `sessionCookieName` are on every entry point, so a Playwright or Vitest spec
 imports everything from its own one. Without a URL, the two functions name the cookies of

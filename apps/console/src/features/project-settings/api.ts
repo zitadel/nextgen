@@ -22,7 +22,7 @@ export async function readDeployedPasswordPolicy(
   if (releaseId === undefined) {
     return undefined;
   }
-  const release = await api.getReleaseById(releaseId, { project_id: projectId });
+  const release = await api.getRelease(releaseId, { project_id: projectId });
   const pointer = release.pointers.find(
     (candidate) => candidate.kind === "policy" && candidate.handle === PASSWORD_SET,
   );

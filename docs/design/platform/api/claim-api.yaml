@@ -120,7 +120,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/projectId"
     post:
-      operationId: initClaim
+      operationId: createProjectClaim
       summary: Start a claim challenge
       description: |
         Initiates a claim for the specified project. Returns a URL the CLI
@@ -159,7 +159,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/projectId"
     post:
-      operationId: completeClaim
+      operationId: completeProjectClaim
       summary: Complete the claim atomic transaction (browser-side)
       description: |
         Called by the browser-side claim page after the human has
@@ -204,7 +204,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/projectId"
     get:
-      operationId: getClaimStatus
+      operationId: getProjectClaimStatus
       summary: Poll the status of a claim challenge (CLI-side)
       description: |
         Called by the CLI in a polling loop after

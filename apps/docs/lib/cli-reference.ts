@@ -85,7 +85,7 @@ const taken = reference.commands.find((command) =>
 );
 if (taken) throw new Error(`zitadel ${taken.id} takes the URL of a CLI reference page`);
 
-/** A command's page: `users list` is /docs/reference/cli/users/list. */
+/** A command's page: `user list` is /docs/reference/cli/user/list. */
 export function cliCommandUrl(command: string) {
   return `${indexUrl}/${command.split(" ").join("/")}`;
 }

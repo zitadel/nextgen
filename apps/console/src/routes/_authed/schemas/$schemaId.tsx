@@ -41,7 +41,7 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   // unless `project_id` names the selected one.
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const body = await api.getSchemaById(params.schemaId, { project_id: projectId });
+    const body = await api.getSchema(params.schemaId, { project_id: projectId });
     const schema = body.schema as UserSchema;
     // The history is keyed by the document's own `objectType`, so it is read
     // after the document. A schema stored without one is a revision of

@@ -15,6 +15,7 @@ import { AuthContextProvider, useAuth } from "../react";
 function wrapper(initialSession: AuthResult) {
   let setSessionRef: ((s: AuthResult) => void) | null = null;
 
+  // biome-ignore lint/correctness/noComponentHookFactories: a fixture each test builds once, so the component keeps one identity across its renders.
   function Wrapper({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<AuthResult>(initialSession);
     setSessionRef = setSession;

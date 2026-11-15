@@ -5,7 +5,7 @@ description: |
   server answers. It has one shape in two places: the `oauth` resource of the
   bundle `buildRelease` (`POST /releases/build`) takes, which publishes it as
   a new immutable revision, and the read-only revision
-  `getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)
+  `getOAuthSettings` (`GET /oauth_settings/{oauth_settings_id}`)
   returns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`
   publishes with the rest of the bundle.
 

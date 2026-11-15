@@ -1,5 +1,5 @@
 post:
-  operationId: completeClaim
+  operationId: completeProjectClaim
   summary: Complete a project claim
   description: |
     Completes a claim by attaching the project to the signed-in developer's
@@ -8,12 +8,12 @@ post:
     A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
     so that the team's members administer it. The claim page in the browser
     calls this operation after the developer signs in, with the session cookie.
-    The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the
+    The `challenge_id` from the claim URL that `createProjectClaim` (`POST /projects/{project_id}/claim/init`) returns is the
     request's single-use, browser-safe authorization.
 
     Claims are first-claim-wins and spend the challenge. If a team already
     claimed the project, the request answers `409`. If the challenge lapsed
-    (`410` with `proj.claim_expired`), call `initClaim` again for a fresh one.
+    (`410` with `proj.claim_expired`), call `createProjectClaim` again for a fresh one.
   tags:
     - Projects
   parameters:
@@ -130,4 +130,4 @@ post:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      $ref: completeClaim-error-response.yaml
+      $ref: completeProjectClaim-error-response.yaml

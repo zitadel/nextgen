@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
 
-import { developmentIssuer } from "@/cli/commands/auth-method/sso/enable/index";
+import { ReadIssuer } from "@/cli/commands/auth-method/sso/enable/steps/read-issuer";
 import { ZitadelError } from "@/lib/errors";
 
 import { it } from "@tests/helpers/fixtures";
@@ -19,12 +19,14 @@ beforeEach(() => {
   vi.stubEnv("ZITADEL_ISSUER", "");
 });
 
-describe("developmentIssuer", () => {
+describe("ReadIssuer", () => {
   it("is the issuer the Project's environment file names", async ({ dir }) => {
     const cwd = await setUpProject(dir);
     await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=${ISSUER}\n`);
 
-    const issuer = await developmentIssuer(cwd, {});
+    const { issuer } = await new ReadIssuer({ cwd, env: process.env }).run({
+      flags: { server: undefined, env: undefined, envFile: undefined },
+    });
 
     expect(issuer).toBe(ISSUER);
   });
@@ -33,7 +35,9 @@ describe("developmentIssuer", () => {
     const cwd = await makeProject(dir);
 
     const error = await rejectionOf(() => {
-      return developmentIssuer(cwd, {}, process.env);
+      return new ReadIssuer({ cwd, env: process.env }).run({
+        flags: { server: undefined, env: undefined, envFile: undefined },
+      });
     });
 
     expect(error).toBeInstanceOf(ZitadelError);

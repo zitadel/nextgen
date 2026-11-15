@@ -175,7 +175,7 @@ beforeEach(() => {
       }),
     ),
     http.get(DEPLOYMENTS, () => HttpResponse.json({ deployments: [] })),
-    http.get(EVENTS, () => HttpResponse.json({ data: [] })),
+    http.get(EVENTS, () => HttpResponse.json({ events: [] })),
   );
 });
 
@@ -823,7 +823,7 @@ describe("settings view", () => {
 describe("events view", () => {
   beforeEach(() => {
     server.use(
-      http.get(EVENTS, () => HttpResponse.json({ data: [] })),
+      http.get(EVENTS, () => HttpResponse.json({ events: [] })),
       http.get(`${EVENTS}/evt_1`, () =>
         HttpResponse.json({
           id: "evt_1",

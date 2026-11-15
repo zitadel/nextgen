@@ -19,6 +19,7 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
 	"github.com/zitadel/nextgen/api/client"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 )
 
 // SpecValidator checks what the server under test answers against an OpenAPI
@@ -99,10 +100,14 @@ var errNoOperation = errors.New("no operation matches")
 // matches).
 func (v *SpecValidator) check(r *http.Request, status int, header http.Header, body []byte) (string, error) {
 	match := r.Clone(context.Background())
-	match.URL.Path = stripPathPrefix(r.URL.Path)
+	// Until 1.0.0 the flow operations answer at `/flow` too (ADR 077 §4): an
+	// answer there is checked as the operation's at `/flows`.
+	if target, ok := internalapi.LegacyFlowPathTarget(match.URL); ok {
+		match.URL = target
+	}
 	// The router matches the escaped path: an ID with an escaped slash, such
 	// as a schema's URL, is one segment.
-	match.URL.RawPath = stripPathPrefix(r.URL.RawPath)
+	match.URL.Path, match.URL.RawPath = stripPathPrefix(match.URL.Path), stripPathPrefix(match.URL.RawPath)
 	route, params, err := v.router.FindRoute(match)
 	if err != nil {
 		if status == http.StatusNotFound || status == http.StatusMethodNotAllowed {

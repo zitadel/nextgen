@@ -88,6 +88,32 @@ async function makeManagedViteProject(): Promise<string> {
   return cwd;
 }
 
+/** An Angular app this CLI set up: its launcher, the module the launcher wrote, and the managed root component. */
+async function makeManagedAngularProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-angular-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "src/app"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      scripts: { dev: "node zitadel-ng.cjs serve", build: "node zitadel-ng.cjs build" },
+      dependencies: { "@angular/core": "^22.0.0" },
+    }),
+  );
+  await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { demo: {} } }));
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
+  await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
+  await writeFile(join(cwd, "zitadel-ng.cjs"), `${MANAGED_MARKER}\n`);
+  await writeFile(
+    join(cwd, "src/app/zitadel-project.ts"),
+    'export const ZITADEL_PROJECT_ID = "proj-001";\n',
+  );
+  return cwd;
+}
+
 /**
  * A Nuxt 4 app as an older setup left it: the two plugins setup used to write
  * (one still managed, one the user took over) beside a managed page.
@@ -289,6 +315,32 @@ describe("eject command", () => {
     );
     // The edited config file itself is left in place.
     expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);
+  });
+
+  it("has an Angular app's scripts moved back from its launcher, among the manual steps", async () => {
+    const cwd = await makeManagedAngularProject();
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        manual_steps: expect.arrayContaining([
+          'Restore the "dev" script in package.json (setup added the script, or pinned its dev-server port), and run every script that runs "node zitadel-ng.cjs" with "ng" again',
+        ]),
+      },
+    });
+  });
+
+  it("removes an Angular app's launcher and the module it wrote", async () => {
+    const cwd = await makeManagedAngularProject();
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        files_removed: expect.arrayContaining(["zitadel-ng.cjs", "src/app/zitadel-project.ts"]),
+      },
+    });
   });
 
   it("removes the managed Nuxt plugins an older setup wrote and keeps an edited one", async () => {

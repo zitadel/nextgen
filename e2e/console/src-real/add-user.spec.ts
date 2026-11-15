@@ -59,7 +59,7 @@ async function pickSeededSchema(
 
 /** The schema the console is scoped to, straight from the API. */
 async function projectSchema(zitadel: Parameters<typeof signIn>[1]) {
-  const { schema } = await zitadel.api.getSchemaById(zitadel.handle.schemaId);
+  const { schema } = await zitadel.api.getSchema(zitadel.handle.schemaId);
   return {
     // As the picker lists it (`schemaDisplayName`).
     name: String(schema.title ?? schema.objectType ?? zitadel.handle.schemaId),

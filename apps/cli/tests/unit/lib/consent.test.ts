@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", () => ({
+  CANCEL_SYMBOL: Symbol("cancel"),
   confirm: vi.fn(),
   cancel: vi.fn(),
   isCancel: vi.fn().mockReturnValue(false),
 }));
 
-import { confirm, isCancel } from "@clack/prompts";
+import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { createZitadelClient } from "@/lib/backend";
 import { Consent, type Gate, isRefusal } from "@/lib/consent";
@@ -102,7 +103,7 @@ describe("Consent", () => {
     });
 
     it("fails with E_CANCELLED on Ctrl-C", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel"));
+      vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
       await expect(Consent.request(GATE, asked)).rejects.toMatchObject({ code: "E_CANCELLED" });
@@ -127,7 +128,7 @@ describe("Consent", () => {
     });
 
     it("does not take Ctrl-C for one", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel"));
+      vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
       expect(isRefusal(await refusalOf(asked))).toBe(false);

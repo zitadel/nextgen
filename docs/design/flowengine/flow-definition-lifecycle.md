@@ -21,5 +21,5 @@ A flow definition is an immutable revision with no state of its own. A release p
 The flow definition is validated structurally (e.g., dead steps, cyclic graphs) on POST according to the rules defined in [Flow Definition Rules](flow-definition-rules.md).
 
 **Behavioral Simulation:** 
-The `POST /flow` endpoint (with a `dry_run` option) allows developers to execute a flow definition.
+The `POST /flows` endpoint (with a `dry_run` option) allows developers to execute a flow definition.
 This is useful for testing and debugging flow definitions before they are resolved for live use.
