@@ -4,10 +4,6 @@
     "check": "Server error"
   },
   {
-    "operation": "POST /applications",
-    "check": "API rejected schema-compliant request"
-  },
-  {
     "operation": "POST /users/query",
     "check": "API rejected schema-compliant request"
   },
