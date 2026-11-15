@@ -102,6 +102,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const items = listed.items;
     const expiries = new Map<string, string>();
     if (
+      !this.jsonEnabled() &&
       items.some((deployment) => {
         return deployment.kind === "preview";
       })
@@ -120,13 +121,15 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         deployed_at: deployment.deployed_at,
         kind: deployment.kind,
         expires:
-          deployment.origins
-            .map((origin) => {
-              return expiries.get(origin);
-            })
-            .find((expiresAt) => {
-              return expiresAt !== undefined;
-            }) ?? "",
+          deployment.kind === "preview"
+            ? (deployment.origins
+                .map((origin) => {
+                  return expiries.get(origin);
+                })
+                .find((expiresAt) => {
+                  return expiresAt !== undefined;
+                }) ?? "")
+            : "",
       };
     });
     const columns = COLUMNS;

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { setupServer } from "msw/node";
 import { tmpdir } from "node:os";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -81,6 +81,38 @@ describe("deployment list", () => {
     ]);
 
     expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("does not ask for a preview's expiry under --json", async () => {
+    const cwd = await twoDeploys();
+    const asked: string[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/deployments`, () => {
+        return HttpResponse.json({
+          deployments: [
+            {
+              id: "dep_1",
+              project_id: "proj_1",
+              release_id: "rel_1",
+              kind: "preview",
+              status: "live",
+              targets: [{ origin: PREVIEW_URL }],
+              metadata: { reason: "deploy" },
+              deployed_at: "2026-01-01T00:00:00Z",
+            },
+          ],
+          next_page_token: null,
+        });
+      }),
+      http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
+        asked.push(request.url);
+        return HttpResponse.json({ previews: [], next_page_token: null });
+      }),
+    );
+
+    const result = await runCliForTest(["deployment", "list", "--json", "--cwd", cwd, "--server", SERVER]);
+
+    expect(asked).toEqual([]);
   });
 });
 
