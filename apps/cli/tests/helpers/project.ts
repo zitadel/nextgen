@@ -1329,6 +1329,19 @@ export class ScaffoldedApp {
     return this.envelopeOf<Record<string, unknown>>(result).data;
   }
 
+  /** The expiry `preview list` shows for `url`, read back as a developer would. */
+  async previewExpiry(url: string): Promise<string> {
+    const result = await this.run(["preview", "list", "--json"]);
+    const { items } = this.envelopeOf<{ items: { origin: string; expires_at: string }[] }>(
+      result,
+    ).data;
+    const found = items.find((item) => {
+      return item.origin === url;
+    });
+    expect(found, "preview list should show the preview").toBeDefined();
+    return found?.expires_at ?? "";
+  }
+
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);

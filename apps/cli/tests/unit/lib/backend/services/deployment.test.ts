@@ -83,6 +83,12 @@ describe("Deployment.servesPrimary", () => {
   });
 });
 
+describe("Deployment.kind", () => {
+  it.each(["primary", "preview"] as const)("answers the %s kind the API recorded", (kind) => {
+    expect(Deployment.of(record("dep_1", [], { kind })).kind).toBe(kind);
+  });
+});
+
 describe("Deployment.reason", () => {
   it("answers the reason the API recorded", () => {
     expect(Deployment.of(record("dep_1", [], { reason: "rollback" })).reason).toBe("rollback");

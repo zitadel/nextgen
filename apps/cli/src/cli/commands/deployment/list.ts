@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { DeploymentService } from "@/lib/backend";
+import { DeploymentService, PreviewService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -30,14 +30,24 @@ const LIMIT = {
   },
 } as const satisfies Refused<number>;
 
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+const COLUMNS = [
+  "id",
+  "release_id",
+  "reason",
+  "origins",
+  "deployed_at",
+  "kind",
+  "expires",
+] as const;
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
  * Newest first: what went live where, and when. `--origin` narrows it to one
  * origin's history; `--live` shows what each target serves now instead of the
- * full history. Like every list verb it fetches one page and reports
+ * full history. `kind` says whether a deployment served primary origins or
+ * previews, and `expires` is the live expiry of the preview URL a preview
+ * deployment made, empty once that preview is gone. Like every list verb it fetches one page and reports
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
  * walk it a page at a time.
  */
@@ -90,6 +100,17 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     );
 
     const items = listed.items;
+    const expiries = new Map<string, string>();
+    if (
+      items.some((deployment) => {
+        return deployment.kind === "preview";
+      })
+    ) {
+      const previews = await new PreviewService(client, projectId).list();
+      for (const preview of previews) {
+        expiries.set(preview.origin, preview.expires_at);
+      }
+    }
     const rows = items.map((deployment) => {
       return {
         id: deployment.id,
@@ -97,6 +118,15 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         reason: deployment.reason ?? "deploy",
         origins: deployment.origins.join(", "),
         deployed_at: deployment.deployed_at,
+        kind: deployment.kind,
+        expires:
+          deployment.origins
+            .map((origin) => {
+              return expiries.get(origin);
+            })
+            .find((expiresAt) => {
+              return expiresAt !== undefined;
+            }) ?? "",
       };
     });
     const columns = COLUMNS;

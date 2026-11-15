@@ -179,6 +179,15 @@ export class Deployment {
   }
 
   /**
+   * Whether this deployment served primary origins or preview URLs.
+   *
+   * @returns The kind the API recorded, which it always records.
+   */
+  get kind(): ListDeployments200DeploymentsItem["kind"] {
+    return this.record.kind;
+  }
+
+  /**
    * Why this deployment was made: a deploy, a rollback, a preview.
    *
    * @returns The reason the API recorded, which it always records.
