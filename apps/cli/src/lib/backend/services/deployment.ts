@@ -188,6 +188,39 @@ export class Deployment {
   }
 
   /**
+   * Whether a preview URL still serves this deployment.
+   *
+   * @returns True for a preview deployment the API reports live.
+   */
+  get servesLivePreview(): boolean {
+    return this.record.kind === "preview" && this.record.status === "live";
+  }
+
+  /**
+   * When the preview this deployment made expires. A deployment a later one
+   * replaced is not what its URL serves now, so it has no expiry of its own.
+   *
+   * @param expiries - Each live preview's expiry, by origin.
+   * @returns The earliest expiry among the origins that still have a live
+   *   preview, or an empty string when this deployment is not live or is not
+   *   a preview one.
+   */
+  expiryAmong(expiries: ReadonlyMap<string, string>): string {
+    if (!this.servesLivePreview) {
+      return "";
+    }
+    const found = this.origins.flatMap((origin) => {
+      const expiresAt = expiries.get(origin);
+      return expiresAt === undefined ? [] : [expiresAt];
+    });
+    return (
+      found.sort((first, second) => {
+        return Date.parse(first) - Date.parse(second);
+      })[0] ?? ""
+    );
+  }
+
+  /**
    * Why this deployment was made: a deploy, a rollback, a preview.
    *
    * @returns The reason the API recorded, which it always records.

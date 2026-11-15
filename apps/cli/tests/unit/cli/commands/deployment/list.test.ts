@@ -83,36 +83,185 @@ describe("deployment list", () => {
     expect(tokens).toEqual([null, "p\u001b2"]);
   });
 
-  it("does not ask for a preview's expiry under --json", async () => {
-    const cwd = await twoDeploys();
-    const asked: string[] = [];
-    server.use(
-      http.get(`${SERVER}/api/v1/deployments`, () => {
+  describe("the expiry of a preview", () => {
+    const EXPIRES = "2026-02-01T00:00:00Z";
+
+    /** A deployment record as the API lists it, with only what a test varies. */
+    const deploymentOf = (
+      id: string,
+      origin: string,
+      kind: "primary" | "preview",
+      status: "live" | "inactive" = "live",
+    ) => ({
+      id,
+      project_id: "proj_1",
+      release_id: "rel_1",
+      kind,
+      status,
+      targets: [{ origin }],
+      metadata: { reason: "deploy" },
+      deployed_at: "2026-01-01T00:00:00Z",
+    });
+
+    /** A project whose deployments list answers `deployments`; returns the previews reads. */
+    async function listing(
+      deployments: readonly ReturnType<typeof deploymentOf>[],
+      previews: () => Response = () => {
         return HttpResponse.json({
-          deployments: [
-            {
-              id: "dep_1",
-              project_id: "proj_1",
-              release_id: "rel_1",
-              kind: "preview",
-              status: "live",
-              targets: [{ origin: PREVIEW_URL }],
-              metadata: { reason: "deploy" },
-              deployed_at: "2026-01-01T00:00:00Z",
-            },
+          previews: [
+            { origin: PREVIEW_URL, expires_at: EXPIRES, created_at: "2026-01-01T00:00:00Z" },
           ],
           next_page_token: null,
         });
-      }),
-      http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
-        asked.push(request.url);
+      },
+    ): Promise<{ cwd: string; asked: string[] }> {
+      const cwd = await twoDeploys();
+      const asked: string[] = [];
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, () => {
+          return HttpResponse.json({ deployments, next_page_token: null });
+        }),
+        http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
+          asked.push(request.url);
+          return previews();
+        }),
+      );
+      return { cwd, asked };
+    }
+
+    /** The command as a script reads it, piped. */
+    const plain = (cwd: string) => {
+      return runCliForTest(["deployment", "list", "--plain", "--cwd", cwd, "--server", SERVER]);
+    };
+
+    it("prints the expiry of the live preview, reading the previews once", async () => {
+      const { cwd, asked } = await listing([deploymentOf("dep_1", PREVIEW_URL, "preview")]);
+
+      const result = await plain(cwd);
+
+      expect(result).toPrintPlainRow(
+        "dep_1",
+        "rel_1",
+        "deploy",
+        PREVIEW_URL,
+        /^2026-01-01T/,
+        "preview",
+        EXPIRES,
+      );
+      expect(asked).toHaveLength(1);
+    });
+
+    it("prints nothing for a deployment a later one replaced", async () => {
+      const { cwd } = await listing([
+        deploymentOf("dep_2", PREVIEW_URL, "preview"),
+        deploymentOf("dep_1", PREVIEW_URL, "preview", "inactive"),
+      ]);
+
+      const result = await plain(cwd);
+
+      expect(result).toPrintPlainRow(
+        "dep_1",
+        "rel_1",
+        "deploy",
+        PREVIEW_URL,
+        /^2026-01-01T/,
+        "preview",
+        "",
+      );
+    });
+
+    it("prints nothing for a primary deployment whose origin is also a live preview", async () => {
+      const { cwd } = await listing([
+        deploymentOf("dep_1", PREVIEW_URL, "primary"),
+        deploymentOf("dep_2", PREVIEW_URL, "preview"),
+      ]);
+
+      const result = await plain(cwd);
+
+      expect(result).toPrintPlainRow(
+        "dep_1",
+        "rel_1",
+        "deploy",
+        PREVIEW_URL,
+        /^2026-01-01T/,
+        "primary",
+        "",
+      );
+    });
+
+    it("prints nothing once the preview is gone", async () => {
+      const { cwd } = await listing([deploymentOf("dep_1", PREVIEW_URL, "preview")], () => {
         return HttpResponse.json({ previews: [], next_page_token: null });
-      }),
-    );
+      });
 
-    await runCliForTest(["deployment", "list", "--json", "--cwd", cwd, "--server", SERVER]);
+      const result = await plain(cwd);
 
-    expect(asked).toEqual([]);
+      expect(result).toPrintPlainRow(
+        "dep_1",
+        "rel_1",
+        "deploy",
+        PREVIEW_URL,
+        /^2026-01-01T/,
+        "preview",
+        "",
+      );
+    });
+
+    it("does not read the previews for a page of primary deployments", async () => {
+      const { cwd, asked } = await listing([deploymentOf("dep_1", PRIMARY_ORIGIN, "primary")]);
+
+      await plain(cwd);
+
+      expect(asked).toEqual([]);
+    });
+
+    it("does not read the previews for a page of replaced preview deployments", async () => {
+      const { cwd, asked } = await listing([
+        deploymentOf("dep_1", PREVIEW_URL, "preview", "inactive"),
+      ]);
+
+      await plain(cwd);
+
+      expect(asked).toEqual([]);
+    });
+
+    it("still lists the deployments, warning, when the previews cannot be read", async () => {
+      const { cwd } = await listing([deploymentOf("dep_1", PREVIEW_URL, "preview")], () => {
+        return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
+      });
+
+      const result = await plain(cwd);
+
+      expect(result).toSucceed();
+      expect(result).toPrintPlainRow(
+        "dep_1",
+        "rel_1",
+        "deploy",
+        PREVIEW_URL,
+        /^2026-01-01T/,
+        "preview",
+        "",
+      );
+      expect(result.stderr).toContain("Could not read when the previews expire");
+    });
+
+    it("does not read the previews under --json, and still lists the preview", async () => {
+      const { cwd, asked } = await listing([deploymentOf("dep_1", PREVIEW_URL, "preview")]);
+
+      const result = await runCliForTest([
+        "deployment",
+        "list",
+        "--json",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+
+      expect(result).toSucceed();
+      expect(result.stdout).toContain(PREVIEW_URL);
+      expect(asked).toEqual([]);
+    });
   });
 });
 

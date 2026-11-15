@@ -404,8 +404,10 @@ Each invocation prints one JSON object:
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
 - `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
-  live expiry of a preview deployment's URL, empty for a primary one and once
-  the preview is gone. `--json` items are the API's records, unchanged.
+  live expiry of a live preview deployment's preview (the earliest, when it made
+  several), empty for any other deployment, such as a primary one, a replaced
+  one, or one whose preview is gone. `--json` items are the API's records,
+  unchanged and without `expires`.
 - `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
   they use a GitHub pull request's title, Vercel's commit message, or a clean
   worktree's commit subject; with none, a non-interactive `deploy` fails. A

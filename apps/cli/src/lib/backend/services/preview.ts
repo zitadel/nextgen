@@ -4,6 +4,9 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 
+/** The most previews the API returns in one page, so a full read takes the fewest requests. */
+const PAGE_SIZE = 100;
+
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListProjectPreviews200PreviewsItem;
 
@@ -43,7 +46,7 @@ export class PreviewService extends ApiService {
    * @returns The previews that are still being served.
    */
   async list(): Promise<readonly LivePreview[]> {
-    return this.client.listProjectPreviews.all(this.projectId);
+    return this.client.listProjectPreviews.all(this.projectId, { limit: PAGE_SIZE });
   }
 
   /**

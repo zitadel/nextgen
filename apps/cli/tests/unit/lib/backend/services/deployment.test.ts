@@ -18,14 +18,18 @@ const CANCEL_SERVER = "http://localhost:8080";
 function record(
   id: string,
   targets: readonly { origin: string }[],
-  extra: { reason?: "deploy" | "rollback"; kind?: "primary" | "preview" } = {},
+  extra: {
+    reason?: "deploy" | "rollback";
+    kind?: "primary" | "preview";
+    status?: "live" | "inactive";
+  } = {},
 ): ListDeployments200DeploymentsItem {
   return {
     id,
     project_id: "proj_1",
     release_id: "rel_1",
     kind: extra.kind ?? "primary",
-    status: "live",
+    status: extra.status ?? "live",
     deployed_at: "2026-01-01T00:00:00Z",
     targets,
     metadata: {
@@ -86,6 +90,72 @@ describe("Deployment.servesPrimary", () => {
 describe("Deployment.kind", () => {
   it.each(["primary", "preview"] as const)("answers the %s kind the API recorded", (kind) => {
     expect(Deployment.of(record("dep_1", [], { kind })).kind).toBe(kind);
+  });
+});
+
+describe("Deployment.servesLivePreview", () => {
+  it.each([
+    ["a live preview deployment", "preview", "live", true],
+    ["a preview deployment a later one replaced", "preview", "inactive", false],
+    ["a primary deployment", "primary", "live", false],
+  ] as const)("is %s: %s", (_name, kind, status, expected) => {
+    expect(Deployment.of(record("dep_1", [], { kind, status })).servesLivePreview).toBe(expected);
+  });
+});
+
+describe("Deployment.expiryAmong", () => {
+  const FIRST = "https://pr-7.preview.acme.com";
+  const SECOND = "https://pr-7-abc.preview.acme.com";
+  const SOON = "2026-02-01T00:00:00Z";
+  const LATER = "2026-02-08T00:00:00Z";
+
+  it("answers the expiry of the preview a live deployment made", () => {
+    const deployment = Deployment.of(preview("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe(SOON);
+  });
+
+  it("answers nothing for a primary deployment whose origin is also a live preview", () => {
+    const deployment = Deployment.of(primary("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe("");
+  });
+
+  it("answers nothing for a preview deployment a later one replaced", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }], { kind: "preview", status: "inactive" }),
+    );
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe("");
+  });
+
+  it("answers nothing when its preview is gone", () => {
+    const deployment = Deployment.of(preview("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map())).toBe("");
+  });
+
+  it("answers the earliest expiry when it made several previews", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" }),
+    );
+
+    expect(
+      deployment.expiryAmong(
+        new Map([
+          [FIRST, LATER],
+          [SECOND, SOON],
+        ]),
+      ),
+    ).toBe(SOON);
+  });
+
+  it("skips an origin whose preview is gone when it made several", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" }),
+    );
+
+    expect(deployment.expiryAmong(new Map([[SECOND, LATER]]))).toBe(LATER);
   });
 });
 

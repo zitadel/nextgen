@@ -2,4 +2,4 @@
 "@zitadel/cli": minor
 ---
 
-`zitadel deployment list` shows each deployment's `kind` (primary or preview) and, for a preview, the live expiry of its URL, which is empty once the preview is gone.
+`zitadel deployment list` shows each deployment's `kind` (primary or preview) and, for a live preview deployment, the live expiry of its preview, which is empty for any other deployment.

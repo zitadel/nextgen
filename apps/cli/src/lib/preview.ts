@@ -1,3 +1,7 @@
+import { type LivePreview, PreviewService, type ZitadelClient } from "@/lib/backend";
+import { isCancellation, toZitadelError } from "@/lib/errors";
+import { reportWarning } from "@/lib/warnings";
+
 /**
  * The hosting platforms a pull-request build announces its preview URLs
  * through, in the order they are tried. Each reads its own variables off the
@@ -64,4 +68,29 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
     }
   }
   return { urls: [...urls], variablesLookedFor };
+}
+
+/**
+ * Each live preview's expiry, by origin. The deployment records none, and it is
+ * already live when this reads, so a failed read warns and reports no expiry
+ * rather than failing the run.
+ */
+export async function liveExpiries(
+  client: ZitadelClient,
+  projectId: string,
+): Promise<ReadonlyMap<string, string>> {
+  const live = await new PreviewService(client, projectId)
+    .list()
+    .catch((error: unknown): readonly LivePreview[] => {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      reportWarning(`Could not read when the previews expire: ${toZitadelError(error).message}`);
+      return [];
+    });
+  return new Map(
+    live.map((preview) => {
+      return [preview.origin, preview.expires_at] as const;
+    }),
+  );
 }

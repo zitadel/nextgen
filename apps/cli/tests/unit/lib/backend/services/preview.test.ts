@@ -14,7 +14,7 @@ describe("PreviewService.list", () => {
 
     const previews = await service({ listProjectPreviews: { all } }).list();
 
-    expect(all).toHaveBeenCalledWith("proj_1");
+    expect(all).toHaveBeenCalledWith("proj_1", { limit: 100 });
     expect(previews).toEqual([{ origin: "https://pr-7.preview.acme.com" }]);
   });
 });
