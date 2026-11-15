@@ -14,7 +14,8 @@ const SV = frameworkCli("sv");
  * boilerplate (the file-writer refuses to overwrite an unmarked file unless
  * `--force`). `svelte.config.js` and `vite.config.*` are left in place — the
  * SvelteKit integration wires auth through `src/hooks.server.ts` (a plain file
- * the patcher writes), so no config edit is needed.
+ * the patcher writes), so no config edit is needed. It installs nothing:
+ * setup's own install step does, once, and not under `--skip-install`.
  */
 export class SvelteKitScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "SvelteKit";
@@ -41,8 +42,9 @@ export class SvelteKitScaffolder extends AbstractCLIScaffolder {
         "--types",
         "ts",
         "--no-add-ons",
-        "--install",
-        "npm",
+        // Setup installs once, after it has added the SDKs, and not at all
+        // under --skip-install; an install here would ignore that flag.
+        "--no-install",
       ],
       cwd,
     );

@@ -781,9 +781,9 @@ func authzListFilterParams(ctx context.Context, r *resolver.Resolver, stmts serv
 	return params, nil
 }
 
-// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
+// requireTeamDelete gates deactivateTeam via the team's RSI. Unknown teams are
 // gone (204) for operators. Check denials (including foreign foothold misses)
-// stay permission_denied for the historical deleteTeam contract. Internal
+// stay permission_denied for the historical deactivateTeam contract. Internal
 // errors pass through unwrapped so operators see 500, not a false 403.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)

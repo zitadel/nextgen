@@ -69,13 +69,12 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		if !ok || ac == nil || ac.ProjectID == "" {
 			return
 		}
-		// This middleware runs outside the server span, so the enqueue span
-		// starts as its child from the span context the ogen tracer or the IdP
-		// callback handler stored in the holder WithLogging planted, after the
-		// server span has ended.
-		if server := middleware.GetServerSpanContext(ctx); server.IsSampled() {
+		// The request's server span is on ctx and still open: the middleware
+		// that starts it runs outside this one. A request the sampler dropped
+		// starts no span here either.
+		if trace.SpanContextFromContext(ctx).IsSampled() {
 			var span trace.Span
-			ctx, span = tracer.Start(trace.ContextWithSpanContext(ctx, server), "audit.EnqueueRequestEvent")
+			ctx, span = tracer.Start(ctx, "audit.EnqueueRequestEvent")
 			defer span.End()
 		}
 		status := sw.status

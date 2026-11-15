@@ -2,7 +2,7 @@ x-meta-schema: true
 title: Application
 description: |
   An application that authenticates its users via Zitadel, with its OAuth
-  clients. The document is the `application` field of the `createApplication`
+  clients. The document is the `application` field of the `publishApplication`
   (`POST /applications`) body.
 type: object
 required:

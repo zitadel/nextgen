@@ -47,7 +47,7 @@ const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
 const NOT_RESOURCES: Readonly<Record<string, string>> = {
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
-  flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
+  flows: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
   // Deployments are acts, not files: creating one is `zitadel deploy`'s
   // orchestration (build the release, then make it live — ADR 035), and the
@@ -76,35 +76,35 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject:
     "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
-  initClaim: "the browser claim flow; `zitadel claim` calls it",
-  getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
+  createProjectClaim: "the browser claim flow; `zitadel claim` calls it",
+  getProjectClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
   // `zitadel claim`. Either the claim flow is incomplete or they are dead
   // generated surface; recorded as a question rather than implied to be owned.
-  completeClaim: "part of the claim flow, but currently called by no command — unresolved",
-  getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  completeProjectClaim: "part of the claim flow, but currently called by no command — unresolved",
+  getProjectClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
-  listPreviews: "previews are listed by `zitadel preview` (#1312)",
-  removePreview: "previews are removed by `zitadel preview` (#1312)",
+  listProjectPreviews: "previews are listed by `zitadel preview` (#1312)",
+  removeProjectPreview: "previews are removed by `zitadel preview` (#1312)",
 
   // Individual resource writes are not made here: `deploy` sends the whole
   // `.zitadel/` as one release bundle (ADR 035), so the per-kind create
   // endpoints are never called by the CLI.
-  createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
-  createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  publishSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  publishBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
   // `deploy` builds a release from the `.zitadel/` bundle via `buildRelease`
   // (`POST /releases/build`); pinning pre-existing revision ids with
   // `createRelease` is not a CLI flow.
   createRelease:
     "the CLI builds from a bundle via buildRelease, not by pinning revision ids (ADR 035)",
-  createFlowDefinition:
+  publishFlowDefinition:
     "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
   getMyUser: "the end user's own view of themselves, on their own credential",
-  patchMyUser: "the end user's own view of themselves, on their own credential",
+  updateMyUser: "the end user's own view of themselves, on their own credential",
   getMyUserSchema: "the end user's own view of themselves, on their own credential",
   listMyTeams: "the end user's own view of themselves, on their own credential",
   listMyPasskeys: "the end user's own view of themselves, on their own credential",
@@ -119,22 +119,22 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // Session and passkey protocol, driven by the SDKs and the login flow.
   createSession: "a session is minted for an end user by the SDKs and the login flow",
   exchangeHandoff: "part of the login handoff protocol",
-  beginUserPasskeyRegistration:
+  createUserPasskeyRegistration:
     "WebAuthn registration needs an authenticator, which a terminal is not",
-  finishUserPasskeyRegistration:
+  completeUserPasskeyRegistration:
     "WebAuthn registration needs an authenticator, which a terminal is not",
 
   // ADR 063's revision routes. The CLI has no grammar for a sub-resource
-  // listing (`idps revisions <id>`) and inventing verbs for one resource is
+  // listing (`idp revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
   // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
   publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
-  getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+  getIdpRevision: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
-    "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
+    "a dry run `policy test` sends per case from commands/policy/test.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -143,8 +143,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
   listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
   getUserPasswordState: "not yet exposed — follow-up, a user sub-resource read",
-  addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
-  removeOrigin:
+  addProjectOrigin:
+    "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
+  removeProjectOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
   createInvitation: "not yet exposed — `zitadel invitation create` lands with #2858",
@@ -245,7 +246,7 @@ const PIPELINE_SOURCES: readonly string[] = [
 
 /**
  * The client operations each standalone command calls, read from its source
- * and keyed by its command (`variables set`). The registry's evidence is which
+ * and keyed by its command (`variable set`). The registry's evidence is which
  * client properties its verbs touch; a `client.<operation>(` call site, or a
  * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment
@@ -321,7 +322,7 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
 const standaloneOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await standaloneCommandOperations()).values()].flatMap((called) => [...called]));
 
-/** The client operations each registry verb invokes, keyed by its command (`teams deactivate`). */
+/** The client operations each registry verb invokes, keyed by its command (`team deactivate`). */
 const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
   const operations = new Map<string, ReadonlySet<string>>();
 
@@ -361,6 +362,40 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
 /** The client operations the registry's verbs actually invoke. */
 const calledOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await verbOperations()).values()].flatMap((called) => [...called]));
+
+/**
+ * The collections each registry topic's verbs reach, from the operations they
+ * call. A topic is a command's noun, in the singular (`user`), and a
+ * collection is a URL's, in the plural (`users`), so the two are matched by
+ * what the commands call, never by spelling.
+ */
+const topicCollections = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
+  const operations = clientOperations();
+  const collections = new Map<string, Set<string>>();
+  for (const [command, called] of await verbOperations()) {
+    const topic = command.split(" ")[0] ?? "";
+    const reached = collections.get(topic) ?? new Set<string>();
+    for (const operation of called) {
+      const collection = operations.get(operation);
+      if (collection !== undefined) reached.add(collection);
+    }
+    collections.set(topic, reached);
+  }
+  return collections;
+};
+
+/** The collections the registry's commands reach. */
+const registryCollections = async (): Promise<ReadonlySet<string>> =>
+  new Set([...(await topicCollections()).values()].flatMap((reached) => [...reached]));
+
+/**
+ * Topics spelled like the collection they read, and why. A command's noun is
+ * singular (`zitadel user list`, docs/design/glossary.md §11), so a topic that
+ * matches its collection's plural is a resource named the old way.
+ */
+const SAME_AS_ITS_COLLECTION: Readonly<Record<string, string>> = {
+  branding: "a mass noun: a project has branding, not brandings",
+};
 
 const SPEC_ENDPOINTS = join(
   import.meta.dirname,
@@ -419,10 +454,10 @@ describe("the CLI covers the API client", () => {
   });
 
   it("has a registry entry, or a reason, for every collection", async () => {
-    const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
+    const reached = await registryCollections();
     const unaccounted = [...new Set(clientOperations().values())].filter(
       (collection) =>
-        !topics.has(collection) && !(collection in NOT_RESOURCES) && !(collection in STANDALONE),
+        !reached.has(collection) && !(collection in NOT_RESOURCES) && !(collection in STANDALONE),
     );
 
     expect(
@@ -432,15 +467,15 @@ describe("the CLI covers the API client", () => {
     ).toEqual([]);
   });
 
-  it("exposes every collection the API itself calls a resource", () => {
+  it("exposes every collection the API itself calls a resource", async () => {
     // A query endpoint is the API declaring this to be a resource (ADR 031),
     // so unlike the checks above this one accepts no reason: the answer is not
     // a judgement, and a new resource that follows the convention is detected
     // without anyone having to classify it.
     const operations = clientOperations();
-    const topics = new Set(Object.keys(RESOURCES).map((topic) => topic.replaceAll("-", "_")));
+    const reached = await registryCollections();
     const missing = [...queryCollections(operations)].filter(
-      (collection) => !topics.has(collection),
+      (collection) => !reached.has(collection),
     );
 
     expect(
@@ -457,6 +492,22 @@ describe("the CLI covers the API client", () => {
         `"${collection}" has a query endpoint, so it cannot be listed in NOT_RESOURCES`,
       ).toBe(false);
     }
+  });
+
+  it("names every resource in the singular", async () => {
+    const plural = [...(await topicCollections())]
+      .filter(([topic, reached]) => reached.has(topic.replaceAll("-", "_")))
+      .map(([topic]) => topic);
+
+    expect(
+      plural.filter((topic) => !(topic in SAME_AS_ITS_COLLECTION)),
+      "A resource command names its noun in the singular (`zitadel user list`, docs/design/glossary.md §11). " +
+        "Rename the registry entry, or add it to SAME_AS_ITS_COLLECTION with the reason its noun has no singular.",
+    ).toEqual([]);
+    expect(
+      Object.keys(SAME_AS_ITS_COLLECTION).filter((topic) => !plural.includes(topic)),
+      "SAME_AS_ITS_COLLECTION lists a topic that no longer matches its collection — delete the entry",
+    ).toEqual([]);
   });
 
   it("calls nothing the client does not offer", async () => {
@@ -503,13 +554,13 @@ describe("the CLI covers the API client", () => {
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
   // Reads the project to resolve the preview URLs it deploys to; the deploy
   // itself is `POST /deployments`, which names `deployment create`.
-  "preview index": "projects get",
+  "preview index": "project get",
   // Builds a release from `.zitadel/` exactly as `deploy` does, without
   // deploying it, so `POST /releases/build` names `deploy`.
   "release create": "deploy",
-  // Reads the project to report its origin patterns; `projects get` is the
+  // Reads the project to report its origin patterns; `project get` is the
   // command the reference shows for `GET /projects/{id}`.
-  "origin list": "projects get",
+  "origin list": "project get",
 };
 
 describe("the spec names the command behind each operation", () => {

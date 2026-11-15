@@ -3,14 +3,17 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
+import type { SetupFlags } from "@/cli/commands/setup";
 import {
-  ensureInitialCommit,
-  gitReport,
   INITIAL_COMMIT_SUBJECT,
-  inspectWorktree,
-  unavailableWarning,
-} from "@/cli/commands/setup/initial-commit";
+  type InitialCommitOutcome,
+  MakeInitialCommit,
+} from "@/cli/commands/setup/steps/make-initial-commit";
+import { inspectWorktree } from "@/cli/commands/setup/shared";
+import { Ui } from "@/lib/ui";
 import { it } from "@tests/helpers/fixtures";
+import { recordLog } from "@tests/helpers/log";
+import { takeReportedWarnings } from "@/lib/warnings";
 import {
   commitAll,
   commitSubjects,
@@ -180,12 +183,34 @@ function withNoGitIdentity(): void {
   vi.stubEnv("EMAIL", undefined);
 }
 
-describe("ensureInitialCommit", () => {
+/**
+ * Puts the scaffolded project in `cwd` under version control, as setup's step does, with what
+ * the step narrates set aside.
+ *
+ * @param cwd - The project directory.
+ * @returns What the step did.
+ */
+async function makeInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
+  const log = recordLog();
+  try {
+    return (
+      await new MakeInitialCommit({
+        cwd,
+        dryRun: false,
+        ui: new Ui({ interactive: false, force: false }),
+      }).run({ flags: { git: true } as SetupFlags })
+    ).commit;
+  } finally {
+    log.stop();
+  }
+}
+
+describe("MakeInitialCommit", () => {
   describe("in a directory that is not a repository", () => {
     it("creates one with a single commit", async ({ dir }) => {
       await aProject(dir);
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ kind: "created", sha: expect.stringMatching(SHA) });
     });
@@ -193,7 +218,7 @@ describe("ensureInitialCommit", () => {
     it("gives the commit a conventional subject and no trailer", async ({ dir }) => {
       await aProject(dir);
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect((await git(dir, "log", "--format=%B", "-1")).trim()).toBe(INITIAL_COMMIT_SUBJECT);
     });
@@ -201,7 +226,7 @@ describe("ensureInitialCommit", () => {
     it("tracks the project's files", async ({ dir }) => {
       await aProject(dir, PAGE);
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect(await trackedFiles(dir)).toContain("app/page.tsx");
     });
@@ -209,7 +234,7 @@ describe("ensureInitialCommit", () => {
     it("respects the .gitignore the scaffold wrote", async ({ dir }) => {
       await aProject(dir, { ".gitignore": "node_modules\n", "node_modules/left/index.js": "" });
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect(await trackedFiles(dir)).not.toContain("node_modules/left/index.js");
     });
@@ -219,7 +244,7 @@ describe("ensureInitialCommit", () => {
       async (path, { dir }) => {
         await aProject(dir, { [path]: "a-secret-value\n" });
 
-        await ensureInitialCommit(dir);
+        await makeInitialCommit(dir);
 
         expect(await trackedFiles(dir)).not.toContain(path);
       },
@@ -228,7 +253,7 @@ describe("ensureInitialCommit", () => {
     it("commits .env.example, which carries no secret", async ({ dir }) => {
       await aProject(dir, { ".env.example": "ZITADEL_URL=\n" });
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect(await trackedFiles(dir)).toContain(".env.example");
     });
@@ -239,7 +264,7 @@ describe("ensureInitialCommit", () => {
       await aProject(dir);
       withAnEmptyGitIdentity();
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
@@ -248,7 +273,7 @@ describe("ensureInitialCommit", () => {
       await aProject(dir);
       withNoGitIdentity();
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
@@ -257,7 +282,7 @@ describe("ensureInitialCommit", () => {
       it("reports there was nothing to commit", async ({ dir }) => {
         await write(dir, { ".env": "SECRET=1\n" });
 
-        const outcome = await ensureInitialCommit(dir);
+        const outcome = await makeInitialCommit(dir);
 
         expect(outcome).toEqual({
           kind: "unavailable",
@@ -269,7 +294,7 @@ describe("ensureInitialCommit", () => {
       it("stages nothing, so a later commit cannot pick up what it left", async ({ dir }) => {
         await write(dir, { ".env": "SUPER_SECRET=1\n" });
 
-        await ensureInitialCommit(dir);
+        await makeInitialCommit(dir);
 
         expect(await stagedFiles(dir)).toEqual([]);
       });
@@ -281,7 +306,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, PAGE);
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({
         kind: "committed",
@@ -294,7 +319,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, PAGE);
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect(await commitSubjects(dir)).toEqual([INITIAL_COMMIT_SUBJECT, DEVELOPERS_WORK]);
     });
@@ -303,7 +328,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, PAGE);
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ guessedIdentity: false });
     });
@@ -312,7 +337,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, PAGE);
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect((await git(dir, "log", "--format=%ae", "-1")).trim()).toBe(DEVELOPERS_EMAIL);
     });
@@ -321,7 +346,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, { ".env": "SECRET=1\n" });
 
-      await ensureInitialCommit(dir);
+      await makeInitialCommit(dir);
 
       expect(await trackedFiles(dir)).not.toContain(".env");
     });
@@ -332,7 +357,7 @@ describe("ensureInitialCommit", () => {
         await aRepository(dir);
         await write(dir, { [name]: "SUPER_SECRET=hunter2\n", ...PAGE });
 
-        await ensureInitialCommit(dir);
+        await makeInitialCommit(dir);
 
         expect(await trackedFiles(dir)).not.toContain(name);
       },
@@ -342,7 +367,7 @@ describe("ensureInitialCommit", () => {
       await aRepository(dir);
       await write(dir, { ".env": "SECRET=1\n" });
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ kind: "unavailable", createdRepository: false });
     });
@@ -351,7 +376,7 @@ describe("ensureInitialCommit", () => {
       it("keeps the secret out of the commit", async ({ dir }) => {
         await aRepositoryTrackingASecretFile(dir);
 
-        await ensureInitialCommit(dir);
+        await makeInitialCommit(dir);
 
         expect(await git(dir, "show", "HEAD:.env.local")).not.toContain("hunter2");
       });
@@ -359,7 +384,7 @@ describe("ensureInitialCommit", () => {
       it("leaves the secret's change in the working tree, uncommitted", async ({ dir }) => {
         await aRepositoryTrackingASecretFile(dir);
 
-        await ensureInitialCommit(dir);
+        await makeInitialCommit(dir);
 
         expect((await git(dir, "status", "--porcelain", "--", ".env.local")).trim()).toBe(
           "M .env.local",
@@ -372,7 +397,7 @@ describe("ensureInitialCommit", () => {
         const project = await aMonorepo(dir);
         await write(project, { ".env": "SUPER_SECRET=hunter2\n" });
 
-        await ensureInitialCommit(project);
+        await makeInitialCommit(project);
 
         expect(await trackedFiles(project)).not.toContain(".env");
       });
@@ -380,7 +405,7 @@ describe("ensureInitialCommit", () => {
       it("leaves a sibling package's staged work out of its commit", async ({ dir }) => {
         const project = await aMonorepoWithStagedSiblingWork(dir);
 
-        await ensureInitialCommit(project);
+        await makeInitialCommit(project);
 
         expect(await headChanges(dir)).not.toContain(SIBLING_FILE);
       });
@@ -388,7 +413,7 @@ describe("ensureInitialCommit", () => {
       it("leaves that sibling's work staged, exactly as it was", async ({ dir }) => {
         const project = await aMonorepoWithStagedSiblingWork(dir);
 
-        await ensureInitialCommit(project);
+        await makeInitialCommit(project);
 
         expect(await stagedFiles(dir)).toContain(SIBLING_FILE);
       });
@@ -400,7 +425,7 @@ describe("ensureInitialCommit", () => {
       await aProject(dir);
       await aGitThatFails(other, "git: not available\\n");
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toEqual({
         kind: "unavailable",
@@ -413,7 +438,7 @@ describe("ensureInitialCommit", () => {
       await aProject(dir);
       await aGitThatFails(other, "fatal: one\\nhint: two\\n");
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toEqual({
         kind: "unavailable",
@@ -429,7 +454,7 @@ describe("ensureInitialCommit", () => {
         "warning: LF will be replaced by CRLF\\nfatal: adding files failed\\n",
       );
 
-      const outcome = await ensureInitialCommit(dir);
+      const outcome = await makeInitialCommit(dir);
 
       expect(outcome).toMatchObject({ reason: "fatal: adding files failed" });
     });
@@ -644,66 +669,27 @@ describe("inspectWorktree", () => {
   });
 });
 
-describe("gitReport", () => {
-  it("reports a repository setup created and committed into", () => {
-    const report = gitReport({
-      kind: "created",
-      sha: "abc",
-      guessedIdentity: false,
-      invented: false,
-    });
+describe("the warning for a commit that could not be made", () => {
+  it("names the reason the commit could not be made", async ({ dir, other }) => {
+    await aProject(dir);
+    await aGitThatFails(other, "fatal: one\\n");
+    takeReportedWarnings();
 
-    expect(report).toEqual({ initialized: true, commit: "abc" });
-  });
+    await makeInitialCommit(dir);
 
-  it("reports a commit into a repository that already existed", () => {
-    const report = gitReport({
-      kind: "committed",
-      sha: "abc",
-      guessedIdentity: false,
-      invented: false,
-    });
-
-    expect(report).toEqual({ initialized: false, commit: "abc" });
-  });
-
-  it("reports a repository setup created even when its commit failed", () => {
-    const report = gitReport({ kind: "unavailable", reason: "r", createdRepository: true });
-
-    expect(report).toEqual({ initialized: true, commit: null });
-  });
-
-  it("reports no repository and no commit when the commit failed in an existing one", () => {
-    const report = gitReport({ kind: "unavailable", reason: "r", createdRepository: false });
-
-    expect(report).toEqual({ initialized: false, commit: null });
-  });
-
-  it("reports nothing when setup skipped git", () => {
-    const report = gitReport({ kind: "skipped" });
-
-    expect(report).toEqual({ initialized: false, commit: null });
-  });
-});
-
-describe("unavailableWarning", () => {
-  it("names the reason the commit could not be made", () => {
-    const warning = unavailableWarning({ reason: "fatal: one", createdRepository: false });
-
-    expect(warning).toBe(
+    expect(takeReportedWarnings()).toEqual([
       "Could not commit the scaffolded project (fatal: one); the first release records no commit, so the next deploy cannot show a diff.",
+    ]);
+  });
+
+  it("says when setup left a new, empty repository behind", async ({ dir }) => {
+    await write(dir, { ".env": "SECRET=1\n" });
+    takeReportedWarnings();
+
+    await makeInitialCommit(dir);
+
+    expect(takeReportedWarnings().join("\n")).toContain(
+      "Setup created a new, empty git repository here.",
     );
-  });
-
-  it("names a missing reason rather than leaving it blank", () => {
-    const warning = unavailableWarning({ reason: "", createdRepository: false });
-
-    expect(warning).toContain("(git gave no reason)");
-  });
-
-  it("says when setup left a new, empty repository behind", () => {
-    const warning = unavailableWarning({ reason: "fatal: one", createdRepository: true });
-
-    expect(warning).toContain("Setup created a new, empty git repository here.");
   });
 });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { Origins } from "@/lib/backend";
+import { ZITADEL_GITIGNORE } from "@/lib/gitignore";
 import { stableStringify } from "@/lib/json";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
 import { DEFAULT_SERVER } from "@/lib/server";
@@ -21,6 +22,7 @@ import {
 } from "./guidance";
 import type {
   ConfigWiringStatus,
+  DevelopmentServerUrl,
   EjectActions,
   Patcher,
   PatchContext,
@@ -56,6 +58,9 @@ const LOCAL_SERVER_ENV_COMMENT = [
   "configures the local server that `zitadel start` runs, for example",
   "NEXTGEN_INSTRUMENTATION_LOG_LEVEL=debug.",
 ];
+
+/** What the CLI reads, as opposed to `.env.local`, which the app reads. */
+const DEVELOPMENT_ENV_FILE = ".env.development.local";
 
 export abstract class AbstractRulePatcher implements Patcher {
   abstract canPatch(framework: string): boolean;
@@ -323,7 +328,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
-      { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
+      { kind: "append-gitignore", rules: ZITADEL_GITIGNORE },
       {
         kind: "write",
         path: ".zitadel/secret",
@@ -365,7 +370,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       // What the CLI reads, as opposed to `.env.local`, which the app reads.
       {
         kind: "merge-env",
-        path: ".env.development.local",
+        path: DEVELOPMENT_ENV_FILE,
         mode: 0o600,
         // The CLI's own file: a value a prompt saved here before setup ran
         // must give way to the project setup just created.
@@ -389,6 +394,21 @@ export abstract class AbstractRulePatcher implements Patcher {
       },
       ...guidanceOps(ctx),
     ];
+  }
+
+  /**
+   * The `ZITADEL_URL` a Vite app's dev proxy reads from its env files once
+   * {@link baseOps} ran. They write it to `.env.development.local`, replacing a
+   * value on setup and adding a missing one on repair, and Vite ranks that
+   * file above the others, so the rest of the chain never decides it. It is
+   * the value the file holds when `doctor` read one there, and `ctx.server`,
+   * the server `zitadel.json` names, otherwise.
+   */
+  protected developmentServerUrl(ctx: PatchContext): DevelopmentServerUrl {
+    const held = ctx.developmentServerUrl;
+    return held === undefined
+      ? { value: ctx.server, file: DEVELOPMENT_ENV_FILE, held: false }
+      : { value: held, file: DEVELOPMENT_ENV_FILE, held: true };
   }
 
   /**

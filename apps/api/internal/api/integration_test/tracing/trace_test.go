@@ -63,7 +63,7 @@ func (f fixture) patchUser(tb testing.TB, nickname string) {
 	tb.Helper()
 	req := &api.PatchUserRequest{}
 	require.NoError(tb, req.UnmarshalJSON([]byte(`{"attributes":{"nickname":"`+nickname+`"}}`)))
-	resp, err := f.client.PatchUserByID(tb.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(f.userID)})
+	resp, err := f.client.UpdateUser(tb.Context(), req, api.UpdateUserParams{UserID: api.UserID(f.userID)})
 	require.NoError(tb, err)
 	require.IsType(tb, &api.User{}, resp)
 }
@@ -84,9 +84,11 @@ func child(t *testing.T, spans tracetest.SpanStubs, parent tracetest.SpanStub, n
 // ones ogen sets on the server span. A new key needs a decision first.
 var allowedAttributes = map[attribute.Key]bool{
 	"db.system.name": true,
-	"error.type":     true,
-	"cache.hit":      true,
-	"key.kind":       true,
+	// The verb of a pgx query, the one piece of a statement a span carries.
+	"db.operation.name": true,
+	"error.type":        true,
+	"cache.hit":         true,
+	"key.kind":          true,
 
 	// The hashing limiter's, on password.Hash and password.Verify: the bytes
 	// a hash reserved and the seconds it waited for them.
@@ -100,6 +102,22 @@ var allowedAttributes = map[attribute.Key]bool{
 }
 
 var sqlKeyword = regexp.MustCompile(`(?i)\b(select|insert|update|delete|from|where|values)\b`)
+
+// sqlVerb is what a db.operation.name holds: one word in upper case.
+var sqlVerb = regexp.MustCompile(`^[A-Z]+$`)
+
+// operations returns the db.operation.name of every pgx query in spans.
+func operations(spans tracetest.SpanStubs) []string {
+	var names []string
+	for _, s := range spans {
+		for _, a := range s.Attributes {
+			if s.Name == "pgx.query" && a.Key == "db.operation.name" {
+				names = append(names, a.Value.AsString())
+			}
+		}
+	}
+	return names
+}
 
 func TestAuthenticatedRequestTrace(t *testing.T) {
 	if spanExporter == nil {
@@ -121,7 +139,7 @@ func TestAuthenticatedRequestTrace(t *testing.T) {
 	}
 	require.Len(t, roots, 1)
 	server := roots[0]
-	assert.Equal(t, "PatchUserByID", server.Name)
+	assert.Equal(t, "UpdateUser", server.Name)
 	assert.Equal(t, trace.SpanKindServer, server.SpanKind)
 
 	// Authentication: the token key resolves cold through the project KEK and
@@ -133,12 +151,18 @@ func TestAuthenticatedRequestTrace(t *testing.T) {
 	kek := child(t, spans, tokenKey, "KeyService.GetCrypter")
 	assert.Contains(t, kek.Attributes, attribute.Bool("cache.hit", false))
 	assert.Contains(t, child(t, spans, kek, "KeyService.unwrapKey").Attributes, attribute.String("key.kind", "master"))
-	child(t, spans, child(t, spans, introspect, "tokenStatements.GetTokenByID"), "pgx.query")
+	readToken := child(t, spans, child(t, spans, introspect, "tokenStatements.GetTokenByID"), "pgx.query")
+	assert.Contains(t, readToken.Attributes, attribute.String("db.operation.name", "SELECT"))
 
 	// The operation: its statements, with the audit event in its transaction.
 	apply := child(t, spans, child(t, spans, server, "UserService.PatchUser"), "UserService.ApplyActions")
 	child(t, spans, apply, "userStatements.PatchUser")
-	child(t, spans, child(t, spans, apply, "eventStatements.InsertEvent"), "pgx.query")
+	insertEvent := child(t, spans, child(t, spans, apply, "eventStatements.InsertEvent"), "pgx.query")
+	// The statement's first word: this insert reads what it inserts in a CTE.
+	assert.Contains(t, insertEvent.Attributes, attribute.String("db.operation.name", "WITH"))
+	// The queries no statement span is the parent of, which the verb tells
+	// apart: pgx opens and closes the transaction itself.
+	assert.Subset(t, operations(spans), []string{"BEGIN", "COMMIT"})
 
 	assertNoSecrets(t, spans, f.secret, nickname)
 
@@ -166,13 +190,13 @@ func TestAuthenticatedRequestTrace(t *testing.T) {
 	spanExporter.Reset()
 	req := &api.PatchUserRequest{}
 	require.NoError(t, req.UnmarshalJSON([]byte(`{"attributes":{"nickname":"`+nickname+`"}}`)))
-	resp, err := f.client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: "user_does-not-exist"})
+	resp, err := f.client.UpdateUser(t.Context(), req, api.UpdateUserParams{UserID: "user_does-not-exist"})
 	require.NoError(t, err)
-	require.IsType(t, &api.PatchUserByIDNotFound{}, resp)
-	notFound := resp.(*api.PatchUserByIDNotFound)
+	require.IsType(t, &api.UpdateUserNotFound{}, resp)
+	notFound := resp.(*api.UpdateUserNotFound)
 	require.NotEmpty(t, notFound.Message)
 	spans = spanExporter.GetSpans()
-	server = child(t, spans, tracetest.SpanStub{}, "PatchUserByID")
+	server = child(t, spans, tracetest.SpanStub{}, "UpdateUser")
 	assert.Contains(t, server.Attributes, attribute.String("error.type", string(notFound.Code)))
 	assertNoSecrets(t, spans, f.secret, nickname, notFound.Message)
 }
@@ -190,6 +214,10 @@ func assertNoSecrets(t *testing.T, spans tracetest.SpanStubs, secrets ...string)
 			value := a.Value.Emit()
 			for _, secret := range secrets {
 				assert.NotContains(t, value, secret, "%s: %s carries a secret or request value", s.Name, a.Key)
+			}
+			if a.Key == "db.operation.name" {
+				assert.Regexp(t, sqlVerb, value, "%s: %s holds more than a verb", s.Name, a.Key)
+				continue
 			}
 			assert.False(t, sqlKeyword.MatchString(value), "%s: %s=%q looks like SQL", s.Name, a.Key, value)
 		}

@@ -70,18 +70,18 @@ func TestCreateSchema(t *testing.T) {
 				err := apiSchema.UnmarshalJSON([]byte(tc.schema))
 				require.NoError(t, err)
 
-				req := api.CreateSchemaReq{
-					Type:       api.UserSchemaCreateSchemaReq,
+				req := api.PublishSchemaReq{
+					Type:       api.UserSchemaPublishSchemaReq,
 					UserSchema: apiSchema,
 				}
-				params := api.CreateSchemaParams{
+				params := api.PublishSchemaParams{
 					ProjectID: api.ProjectID(project.ID),
 				}
 
-				resp, err := client.CreateSchema(t.Context(), req, params)
+				resp, err := client.PublishSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
+				assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
 	})
@@ -110,18 +110,18 @@ func TestCreateSchema(t *testing.T) {
 			err = apiSchema.UnmarshalJSON(body)
 			require.NoError(t, err)
 
-			req := api.CreateSchemaReq{
-				Type:       api.UserSchemaCreateSchemaReq,
+			req := api.PublishSchemaReq{
+				Type:       api.UserSchemaPublishSchemaReq,
 				UserSchema: apiSchema,
 			}
-			params := api.CreateSchemaParams{
+			params := api.PublishSchemaParams{
 				ProjectID: api.ProjectID(project.ID),
 			}
 
-			resp, err := client.CreateSchema(t.Context(), req, params)
+			resp, err := client.PublishSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
+			require.IsType(t, &api.PublishSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.PublishSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
@@ -157,19 +157,19 @@ func TestCreateSchema(t *testing.T) {
 			require.NoError(t, err)
 			harness.SetProjectSecretOnApiClient(t, client, project)
 
-			req := api.CreateSchemaReq{
-				Type:       api.UserSchemaCreateSchemaReq,
+			req := api.PublishSchemaReq{
+				Type:       api.UserSchemaPublishSchemaReq,
 				UserSchema: apiSchema,
 			}
-			params := api.CreateSchemaParams{
+			params := api.PublishSchemaParams{
 				ProjectID: api.ProjectID(project.ID),
 			}
 
-			resp, err := client.CreateSchema(t.Context(), req, params)
+			resp, err := client.PublishSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-			assert.Equal(t, http.StatusConflict, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
+			require.IsType(t, &api.PublishSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusConflict, resp.(*api.PublishSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("password without a designated identifier is rejected with the rule named", func(t *testing.T) {
@@ -194,13 +194,13 @@ func TestCreateSchema(t *testing.T) {
 			apiSchema := api.UserSchema{}
 			require.NoError(t, apiSchema.UnmarshalJSON([]byte(schema)))
 
-			resp, err := client.CreateSchema(t.Context(), api.CreateSchemaReq{
-				Type:       api.UserSchemaCreateSchemaReq,
+			resp, err := client.PublishSchema(t.Context(), api.PublishSchemaReq{
+				Type:       api.UserSchemaPublishSchemaReq,
 				UserSchema: apiSchema,
-			}, api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)})
+			}, api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)})
 			assert.NoError(t, err)
-			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
+			require.IsType(t, &api.PublishSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.PublishSchemaErrorResponseStatusCode).StatusCode)
 			// The rule text must reach the client, not vanish into an
 			// unserialized Parent.
 			assert.Contains(t, helpers.MustMarshal(t, resp), "x-identifier")
@@ -238,8 +238,8 @@ func TestGetSchema(t *testing.T) {
 			schemaID := harness.CreateUserSchema(t, project, string(schemaJSON))
 			require.True(t, strings.HasPrefix(schemaID, "sch_"), "want managed sch_* id, got %q", schemaID)
 
-			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID: schemaID,
+			resp, err := client.GetSchema(t.Context(), api.GetSchemaParams{
+				SchemaID: schemaID,
 			})
 			assert.NoError(t, err)
 
@@ -281,25 +281,25 @@ func TestGetSchema(t *testing.T) {
 
 			// The project's own secret may read the schema, but not as part of
 			// another project.
-			resp, err := ownerClient.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        schemaID,
+			resp, err := ownerClient.GetSchema(t.Context(), api.GetSchemaParams{
+				SchemaID:  schemaID,
 				ProjectID: api.NewOptProjectID(api.ProjectID(other.ID)),
 			})
 			assert.NoError(t, err)
-			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
+			require.IsType(t, &api.GetSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("schema not found", func(t *testing.T) {
 			t.Parallel()
 
-			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID: "does-not-exist",
+			resp, err := client.GetSchema(t.Context(), api.GetSchemaParams{
+				SchemaID: "does-not-exist",
 			})
 			assert.NoError(t, err)
 
-			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
+			require.IsType(t, &api.GetSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaErrorResponseStatusCode).StatusCode)
 		})
 	})
 }
@@ -385,14 +385,14 @@ func TestSchemaRevisions(t *testing.T) {
 				err := sch.UnmarshalJSON([]byte(rev))
 				require.NoError(t, err)
 
-				resp, err := client.CreateSchema(
+				resp, err := client.PublishSchema(
 					t.Context(),
-					api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-					api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+					api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+					api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 				)
 				require.NoError(t, err)
-				if assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp)) {
-					lastCreatedID = resp.(*api.CreateSchemaResponse).ID
+				if assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp)) {
+					lastCreatedID = resp.(*api.Schema).ID
 				}
 			}
 
@@ -459,14 +459,14 @@ func TestSchemaKindFilter(t *testing.T) {
           }
         }`, objectType, helpers.BuiltinSchemaBaseURL))))
 
-	created, err := client.CreateSchema(
+	created, err := client.PublishSchema(
 		t.Context(),
-		api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
-		api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+		api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+		api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 	)
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateSchemaResponse{}, created, helpers.MustMarshal(t, created))
-	createdID := created.(*api.CreateSchemaResponse).ID
+	require.IsType(t, &api.Schema{}, created, helpers.MustMarshal(t, created))
+	createdID := created.(*api.Schema).ID
 
 	list := func(t *testing.T, params api.ListSchemasParams) []api.Schema {
 		t.Helper()
@@ -491,4 +491,50 @@ func TestSchemaKindFilter(t *testing.T) {
 	// The kind filter neither drops the schema nor adds anything to it: the same
 	// query without a kind returns the same single row.
 	assert.Len(t, list(t, base), 1)
+}
+
+// Publishing answers with the stored schema, so a caller needs no second read
+// to learn what the server kept: the answer is what getSchema returns.
+func TestPublishSchemaReturnsTheStoredSchema(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	sch := api.UserSchema{}
+	require.NoError(t, sch.UnmarshalJSON([]byte(fmt.Sprintf(
+		`{
+          "title": "published",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "objectType": %q,
+          "metaSchema": "%s/user-schema.json",
+          "kind": "user-schema",
+          "type": "object",
+          "x-auth-methods": {
+            "passkey": { "enabled": true }
+          },
+          "properties": {
+            "givenName": { "type": "string" }
+          }
+        }`, "published-"+strings.ToLower(helpers.ProjectName()), helpers.BuiltinSchemaBaseURL))))
+
+	published, err := client.PublishSchema(
+		t.Context(),
+		api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+		api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
+	)
+	require.NoError(t, err)
+	require.IsType(t, &api.Schema{}, published, helpers.MustMarshal(t, published))
+	created := published.(*api.Schema)
+	assert.NotEmpty(t, created.ID)
+	assert.False(t, created.Metadata.CreatedAt.IsZero(), "the answer carries when the schema was created")
+
+	read, err := client.GetSchema(t.Context(), api.GetSchemaParams{SchemaID: created.ID})
+	require.NoError(t, err)
+	require.IsType(t, &api.Schema{}, read, helpers.MustMarshal(t, read))
+	assert.JSONEq(t, helpers.MustMarshal(t, read), helpers.MustMarshal(t, created))
 }

@@ -49,7 +49,7 @@ func TestInvitationLifecycle(t *testing.T) {
 	}
 	get := func(t *testing.T, id api.InvitationID) api.GetInvitationRes {
 		t.Helper()
-		resp, err := client.GetInvitation(t.Context(), api.GetInvitationParams{ID: id, ProjectID: projectID})
+		resp, err := client.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: id, ProjectID: projectID})
 		require.NoError(t, err)
 		return resp
 	}
@@ -90,12 +90,12 @@ func TestInvitationLifecycle(t *testing.T) {
 		}
 		assert.Contains(t, ids, created.ID)
 
-		cancelled, err := client.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: created.ID, ProjectID: projectID})
+		cancelled, err := client.CancelInvitation(t.Context(), api.CancelInvitationParams{InvitationID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CancelInvitationNoContent{}, cancelled, helpers.MustMarshal(t, cancelled))
 		require.IsType(t, &api.GetInvitationNotFound{}, get(t, created.ID))
 
-		again, err := client.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: created.ID, ProjectID: projectID})
+		again, err := client.CancelInvitation(t.Context(), api.CancelInvitationParams{InvitationID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CancelInvitationNotFound{}, again, helpers.MustMarshal(t, again))
 
@@ -173,8 +173,8 @@ func invitationEvents(t *testing.T, client *helpers.ApiClient, projectID api.Pro
 	require.NoError(t, err)
 	page, ok := resp.(*api.ListEventsResponse)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
-	events := make([]invitationEvent, 0, len(page.Data))
-	for _, event := range page.Data {
+	events := make([]invitationEvent, 0, len(page.Events))
+	for _, event := range page.Events {
 		raw, err := event.MarshalJSON()
 		require.NoError(t, err)
 		var decoded invitationEvent

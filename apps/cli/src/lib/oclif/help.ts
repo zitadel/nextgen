@@ -5,6 +5,7 @@ import { showSkillsHint } from "@/lib/skills-hint";
 import { suggesterFor } from "@/lib/suggestion";
 
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
+import { aliasedCommands, aliasedNouns } from "./plural-aliases";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
 type GroupedCommand = Command.Loadable & { group?: CommandGroup; groupOrder?: number };
@@ -22,13 +23,28 @@ const PLUGIN_SUMMARIES: Readonly<Record<string, string>> = {
 
 /**
  * Root help in the style of `gh --help`: a tagline, usage, the commands under
- * headed groups, then flags and examples. A family of commands (`users`,
+ * headed groups, then flags and examples. A family of commands (`user`,
  * `release`) is one row, and its own help lists the operations. Only
  * {@link showRootHelp} is replaced; per-command and per-topic help
- * (`start --help`, `schemas --help`) stay oclif's own, with a pointer back to
- * the root screen added. Wired in via `oclif.helpClass` in `package.json`.
+ * (`start --help`, `schema --help`) stay oclif's own, with a pointer back to
+ * the root screen added. Help asked for under a plural the commands answer to
+ * (`users --help`, `users list --help`) is the help of the noun and of its
+ * command, spelled as they are declared. Wired in via `oclif.helpClass` in
+ * `package.json`.
  */
 export default class ZitadelHelp extends Help {
+  override async showHelp(argv: string[]): Promise<void> {
+    const nouns = aliasedNouns(this.config.commands);
+    const subject = argv.findIndex((word) => {
+      return !word.startsWith("-");
+    });
+    await super.showHelp(
+      argv.map((word, at) => {
+        return at === subject ? (nouns.get(word) ?? word) : word;
+      }),
+    );
+  }
+
   protected override async showRootHelp(): Promise<void> {
     const { bin } = this.config;
     const commands = this.rootCommands();
@@ -81,7 +97,9 @@ export default class ZitadelHelp extends Help {
   }
 
   override async showCommandHelp(command: Command.Loadable): Promise<void> {
-    await super.showCommandHelp(command);
+    const id = aliasedCommands(this.config.commands).get(command.id);
+    const declared = id === undefined ? undefined : this.config.findCommand(id);
+    await super.showCommandHelp(declared ?? command);
     this.log(exploreAllCommands(this.config.version));
   }
 
@@ -114,8 +132,8 @@ export default class ZitadelHelp extends Help {
   }
 
   /**
-   * The rows of one group. Commands sharing a first word (`users create`,
-   * `users get`) are one row named for it, described by the topic when it has
+   * The rows of one group. Commands sharing a first word (`user create`,
+   * `user get`) are one row named for it, described by the topic when it has
    * a description and otherwise by the command of that name; a command on its
    * own keeps its name. Rows follow `groupOrder` (the lowest of a family's
    * commands), then the name.

@@ -3,7 +3,7 @@ import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
 
 import { ClaimService } from "@/lib/backend";
-import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
+import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
 import { requireValue } from "@/lib/environment";
@@ -122,7 +122,7 @@ const WINDOW_CLOSED_REFUSAL = {
 } as const satisfies Refusal;
 
 const CHALLENGE_ID: Refused<string> = {
-  schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
+  schema: z.string().trim().regex(getProjectClaimStatusQueryChallengeIdRegExp),
   refusal: {
     message:
       "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
@@ -230,7 +230,7 @@ export default class Claim extends EnvironmentCommand {
     }
 
     // `--dry-run` promises to mutate neither files nor the platform, so it has
-    // to stop before `initClaim`: minting a challenge is a platform write, and
+    // to stop before `createProjectClaim`: minting a challenge is a platform write, and
     // a developer who then finished the browser step would really claim the
     // project while this run deliberately skipped recording it — the local file
     // and the platform would disagree, which is worse than not previewing at

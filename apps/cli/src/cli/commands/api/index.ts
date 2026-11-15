@@ -232,7 +232,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
 
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
-    "<%= config.bin %> api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
+    "<%= config.bin %> api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",

@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authed/releases/$releaseId")({
     const projectId = requireProjectScope(deps.project);
     // Scoped to the selected project: an id of another project reads as not
     // found, exactly as an unknown one does.
-    const release = await api.getReleaseById(params.releaseId, { project_id: projectId });
+    const release = await api.getRelease(params.releaseId, { project_id: projectId });
     // Every pointer in parallel: a release pins a handful, and each read
     // fails soft inside `resolvePointer`, so one unreadable revision costs
     // its row's document, not the screen.

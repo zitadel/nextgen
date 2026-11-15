@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("NuxtScaffolder", () => {
-  it("runs nuxi init on a starter commit then removes the starter app.vue", async () => {
+  it("runs nuxi init on a starter commit without an install, then removes the starter app.vue", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new NuxtScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "nuxt");
@@ -44,6 +44,7 @@ describe("NuxtScaffolder", () => {
       "npm",
       "--no-gitInit",
       "--force",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     // Nuxt 4 puts app.vue under app/; older Nuxt at the root — both removed.

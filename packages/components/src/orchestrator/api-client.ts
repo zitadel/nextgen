@@ -2,9 +2,9 @@
  * Thin wrappers around the orval-generated `@zitadel/api` fetch
  * functions for the API operations the orchestrator drives:
  *
- * - `POST   /flow`              — `createFlow`
- * - `POST   /flow/{id}/submit`  — `submitFlowStep`
- * - `GET    /flow/{id}`         — `getFlowStep`
+ * - `POST   /flows`              — `createFlow`
+ * - `POST   /flows/{flow_id}/submit`  — `submitFlowStep`
+ * - `GET    /flows/{flow_id}`         — `getFlowStep`
  * - `POST   /sessions/exchange` — `exchangeHandoff`
  * - `GET    /sessions/me`       — `getMySession`
  * - `GET    /sessions/me/csrf`  — `getMySessionCsrfToken`

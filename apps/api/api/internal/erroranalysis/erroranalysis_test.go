@@ -187,11 +187,11 @@ func TestHandlerAuthzGatePropagatesResourceAccessErrors(t *testing.T) {
 	methods := analyzeRepo(t)
 
 	cases := map[string][]string{
-		"Handler.GetBrandingById": {
+		"Handler.GetBranding": {
 			"domain.ErrBrandingNotFound",
 			"domain.ErrBrandingPermissionDenied",
 		},
-		"Handler.CreateBranding": {
+		"Handler.PublishBranding": {
 			"domain.ErrBrandingPermissionDenied",
 		},
 		"Handler.QueryUsers": {

@@ -48,7 +48,7 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 		assert.Equal(t, own.Session.SessionID, linked)
 	})
 
-	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
 		FlowDefinition: combinedPasswordFlowDefinition(apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)),
 	})
