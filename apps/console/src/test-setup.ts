@@ -1,6 +1,7 @@
 import { format } from "node:util";
 
 import { cleanup, configure } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
@@ -30,6 +31,14 @@ afterEach(_resetConfigForTesting);
 // Reads cached for the signed-in person (`GET /users/me/projects`) would
 // otherwise carry one test's mocked answer into the next.
 beforeEach(clearSessionCaches);
+
+// Sonner keeps its toasts in one module-level store and replays the ones not
+// dismissed to every `Toaster` that mounts, so a toast a test left on screen
+// would appear in the next test's. Registered before the console guard below,
+// so it runs after the guard's cleanup, once no `Toaster` is subscribed.
+afterEach(() => {
+  toast.dismiss();
+});
 
 // Every spec answers requests from the one server (`src/test/msw.ts`), and a
 // request no handler answers fails the test that made it rather than reaching

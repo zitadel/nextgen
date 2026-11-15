@@ -11,7 +11,7 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
   };
 });
 
-import { confirm, isCancel } from "@clack/prompts";
+import { CANCEL_SYMBOL, confirm, isCancel } from "@clack/prompts";
 
 import { ConfirmFramework } from "@/cli/commands/setup/steps/confirm-framework";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
@@ -37,11 +37,6 @@ const CLOUD = "https://preview.zitadel.com";
  * The app directory setup runs in.
  */
 const APP_DIR = "/tmp/app";
-
-/**
- * What a cancelled prompt answers.
- */
-const CANCEL = Symbol("cancel");
 
 /**
  * How the wizard asks: interactively, without `--force`.
@@ -168,7 +163,7 @@ describe("ConfirmFramework", () => {
   });
 
   it("refuses with E_CANCELLED on Ctrl-C", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(CANCEL);
+    vi.mocked(confirm).mockResolvedValueOnce(CANCEL_SYMBOL);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     const error = await rejectionOf(() => {
