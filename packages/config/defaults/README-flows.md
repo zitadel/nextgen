@@ -140,8 +140,10 @@ zitadel api setUserPassword <user-id> --input password.json
 rm password.json
 ```
 
-Console shows the user's ID on their page under **Users**. The password
-must meet the project's password policy. Give it to the user over a
+Console shows the user's ID on their page under **Users**. In a terminal
+the command prints `No content (204)` when it succeeds. A password that
+breaks the project's password policy fails with `The password does not
+meet the password policy.` and changes nothing. Give it to the user over a
 channel you trust, and tell your users how to reach you, for example
 with a link next to the login component.
 

@@ -269,7 +269,6 @@ That changes `.zitadel/schemas/customers.json` and checks the flows whose `user_
 
 Open your app's sign-in page after the deploy. Sign up with a new email using the method you enabled, sign out, and sign in again. A method you disabled no longer shows a button or field.
 
-
 ## Set a new password for a user
 
 A login flow can't offer a "Forgot your password?" link yet: the server doesn't run the `recovery` purpose, and it sends no reset email. To let a user who forgot their password back in, set a new one for them from your app's directory. Put the password in a file, such as `password.json`, so it stays out of your shell history:
