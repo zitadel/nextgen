@@ -91,20 +91,24 @@ const ANOTHER_CONNECTION = anOidcConnection({ slug: "something-else" });
  * reads them.
  */
 const QUESTION = {
-  slug: "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-  displayName: "What name should the sign-in button show? For example Acme SSO.",
-  issuer: "What is the issuer URL of the provider?",
-  scopes: "Which scopes should we request? Separate them with spaces.",
-  clientId: "What is the client ID of your Acme SSO OAuth app?",
+  slug: "What would you like to call this connection? Pick a short ID for your config files, such as acme-sso. Use lowercase letters, numbers and hyphens.",
+  displayName:
+    "What should the sign-in button say? Enter the provider's name as your users know it, such as Acme SSO.",
+  issuer:
+    "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
+  scopes:
+    "Which scopes should we request? Scopes decide what user information the provider sends back. Separate them with spaces; openid is required.",
+  clientId:
+    "What is the client ID of your Acme SSO OAuth app? Copy it from the application you just created.",
   secret:
-    "What is the client secret of your Acme SSO OAuth app? It will be stored on the project as ACME_SSO_CLIENT_SECRET.",
-  claims: 'Should any other claims be mapped from "Acme SSO"?',
+    "What is the client secret of your Acme SSO OAuth app? Copy it from the same place. We store it in your project as ACME_SSO_CLIENT_SECRET.",
+  claims: "Map more claims from Acme SSO?",
 };
 
 /**
  * What a person picks to keep the claims the connection maps by default.
  */
-const KEEP_CLAIMS = "No, keep these";
+const KEEP_CLAIMS = "No, continue";
 
 /**
  * The exit codes the CLI ends a refused run with.
@@ -706,13 +710,13 @@ describe("auth-method sso enable", () => {
         "an optional one",
         { favouriteColour: { type: "string" } },
         [],
-        "- favouriteColour is optional, so it can stay empty.",
+        "Not filled by Acme SSO (optional): favouriteColour.",
       ],
       [
         "a required one",
         { companyName: { type: "string" } },
         ["companyName"],
-        "- companyName is required, so sign-up will have to ask for it.",
+        "• companyName, so sign-up will have to ask for it.",
       ],
       [
         "an object whose members are required",
@@ -724,7 +728,7 @@ describe("auth-method sso enable", () => {
           },
         },
         ["address"],
-        "- address is required, so sign-up will have to ask for it.",
+        "• address, so sign-up will have to ask for it.",
       ],
     ] as const)("lists %s", async ([, properties, required, line], { dir }) => {
       const cwd = await setUpProject(dir, {
@@ -756,9 +760,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain(
-        "- companyName is required, but this connection does not create users.",
-      );
+      expect(result.stdout).toContain("• companyName, but this connection does not create users.");
       expect(result.stdout).toContain(
         "Acme SSO does not create users in Zitadel, so these claims are not used to fill one:",
       );
@@ -777,7 +779,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It always counts as");
+      expect(result.stdout).toContain("(always verified)");
     });
 
     it("says a mapped attribute nothing verifies is not verified", async ({ dir }) => {
@@ -791,7 +793,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("It is not treated as");
+      expect(result.stdout).toContain("(not verified)");
     });
 
     it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
@@ -834,7 +836,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("- nick\\x1b[2Jname is optional");
+      expect(result.stdout).toContain("(optional): nick\\x1b[2Jname.");
     });
 
     it("prints a display name as text in the title", async ({ dir }) => {
@@ -908,13 +910,11 @@ describe("auth-method sso enable", () => {
   describe("with --provider custom in a script", () => {
     it.for([
       "When someone signs in with Acme SSO for the first time, Zitadel fills in their new user",
-      "- email comes from the provider's email claim.",
-      "It counts as verified",
-      "email_verified is true.",
+      "• email ← email (verified when email_verified is true)",
       "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
-      "This connection is used by default-human-user",
-      "To change which claim fills an attribute, edit claim_mapping in",
-      ".zitadel/idps/acme-sso.json and run deploy.",
+      "Changes here affect everyone who signs in through default-human-user.",
+      "To change a mapping later, edit claim_mapping in",
+      ".zitadel/idps/acme-sso.json, then deploy.",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 
@@ -1300,22 +1300,22 @@ describe("auth-method sso enable asking for claims at a terminal", () => {
 
     const { asked } = await enterWith(cwd, [
       ...CREDENTIALS,
-      "Yes, map another claim",
+      "Yes, add another",
       "employee_id",
       "Integer",
       "staffNumber",
       "employee",
-      "No",
+      "No, leave it unverified",
       KEEP_CLAIMS,
     ]);
 
     expect(asked.slice(2)).toEqual([
       QUESTION.claims,
-      "Which claim should be read?",
+      "Which Acme SSO claim do you want to use? Enter the name exactly as the provider sends it, such as phone_number.",
       "What type of value is it?",
-      "Which user attribute should it map to?",
-      'Which scope makes "Acme SSO" send it? Leave blank if none.',
-      'Does "Acme SSO" confirm that staffNumber is verified?',
+      "Which Zitadel attribute should store employee_id?",
+      "Does Acme SSO need an extra scope to send employee_id? Enter its name, such as phone. Leave blank if it sends it by default.",
+      "Treat staffNumber as verified? Choose yes only if Acme SSO has already confirmed it belongs to the user.",
       QUESTION.claims,
     ]);
   });
@@ -1324,12 +1324,12 @@ describe("auth-method sso enable asking for claims at a terminal", () => {
     const cwd = await aProject(dir);
     await enterWith(cwd, [
       ...CREDENTIALS,
-      "Yes, map another claim",
+      "Yes, add another",
       "employee_id",
       "Integer",
       "staffNumber",
       "employee",
-      "Yes, trust the provider",
+      "Yes, trust Acme SSO",
       KEEP_CLAIMS,
     ]);
 
@@ -1344,7 +1344,7 @@ describe("auth-method sso enable asking for claims at a terminal", () => {
     const cwd = await aProject(dir);
     await enterWith(cwd, [
       ...CREDENTIALS,
-      "Yes, map another claim",
+      "Yes, add another",
       "department",
       "Text",
       "Create a new attribute",

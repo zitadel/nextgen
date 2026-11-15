@@ -399,10 +399,10 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       const verifiedBy = new Map(
         verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
           if (claim === true) {
-            return [[property, "always counts as verified"]];
+            return [[property, "always verified"]];
           }
           if (typeof claim === "string") {
-            return [[property, `counts as verified when ${text(claim)} is true`]];
+            return [[property, `verified when ${text(claim)} is true`]];
           }
           return [];
         }),
@@ -415,11 +415,8 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                 ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
                 : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
               ...mappings.map(({ property, claim }) => {
-                const verified = verifiedBy.get(property) ?? "is not treated as verified";
-                return [
-                  `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
-                  `  It ${verified}.`,
-                ].join("\n");
+                const verified = verifiedBy.get(property) ?? "not verified";
+                return `• ${text(property)} ← ${text(claim)} (${verified})`;
               }),
             ],
         scopes.length === 0
@@ -430,24 +427,44 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
         unmapped.length === 0
           ? []
           : [
-              "These attributes have no claim yet:",
-              ...unmapped.map(({ property, required }) => {
-                if (!required) {
-                  return `- ${text(property)} is optional, so it can stay empty.`;
-                }
-                return createsUsers
-                  ? `- ${text(property)} is required, so sign-up will have to ask for it.`
-                  : `- ${text(property)} is required, but this connection does not create users.`;
-              }),
+              ...(unmapped.some(({ required }) => {
+                return !required;
+              })
+                ? [
+                    `Not filled by ${text(connection.displayName)} (optional): ${CONJUNCTION.format(
+                      unmapped
+                        .filter(({ required }) => {
+                          return !required;
+                        })
+                        .map(({ property }) => {
+                          return text(property);
+                        }),
+                    )}.`,
+                  ]
+                : []),
+              ...(unmapped.some(({ required }) => {
+                return required;
+              })
+                ? [
+                    `No claim fills these required attributes of ${text(connection.displayName)}:`,
+                    ...unmapped
+                      .filter(({ required }) => {
+                        return required;
+                      })
+                      .map(({ property }) => {
+                        return createsUsers
+                          ? `• ${text(property)}, so sign-up will have to ask for it.`
+                          : `• ${text(property)}, but this connection does not create users.`;
+                      }),
+                  ]
+                : []),
             ],
         usedBy.length === 0
           ? []
           : [
-              `This connection is used by ${CONJUNCTION.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+              `Changes here affect everyone who signs in through ${CONJUNCTION.format(usedBy.map(text))}.`,
             ],
-        [
-          `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
-        ],
+        [`To change a mapping later, edit claim_mapping in ${text(connection.path)}, then deploy.`],
       ].filter((lines) => {
         return lines.length > 0;
       });

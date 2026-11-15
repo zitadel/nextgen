@@ -205,7 +205,8 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
             ? {
                 issuer: await this.deps.ask.text({
                   name: "issuer",
-                  message: "What is the issuer URL of the provider?",
+                  message:
+                    "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
                   parse: parseIssuer,
                   initialValue: idpProvider(selection.id).issuer,
                 }),
@@ -228,8 +229,8 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       name: "client id",
       message:
         flagged === undefined
-          ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to skip.`
-          : `What is the client ID of your ${entry.displayName} OAuth app?`,
+          ? `What is the client ID of your ${entry.displayName} OAuth app? Copy it from the application you just created. Leave it empty to skip.`
+          : `What is the client ID of your ${entry.displayName} OAuth app? Copy it from the application you just created.`,
       parse:
         flagged === undefined
           ? (value: string): Parsed<ClientId | undefined> => {
@@ -259,7 +260,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
       flagged?.credentials.secret ??
       (await this.deps.ask.secret({
         name: "client secret",
-        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(entry.slug).clientSecret}.`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? Copy it from the same place. We store it in your project as ${credentialVariables(entry.slug).clientSecret}.`,
         parse: parseClientSecret,
       }));
     return [

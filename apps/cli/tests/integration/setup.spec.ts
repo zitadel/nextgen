@@ -2398,7 +2398,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("- email comes from the provider's email claim.");
+        expect(result).toPrint("• email ← email");
       });
 
       it("says which schemas sign in through the connection", async () => {
@@ -2406,7 +2406,9 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("This connection is used by default-human-user");
+        expect(result).toPrint(
+          "Changes here affect everyone who signs in through default-human-user.",
+        );
       });
 
       it("says which scopes it asks the provider for", async () => {
@@ -2424,7 +2426,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
+        expect(result).toPrint("To change a mapping later, edit claim_mapping in");
       });
     });
   });

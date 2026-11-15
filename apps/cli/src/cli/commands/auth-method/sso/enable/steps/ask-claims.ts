@@ -140,7 +140,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     const state = needs.mapping;
     const provider = needs.provider.displayName;
     const rows = [
-      ["User attribute", `Claim from "${plain(provider)}"`, "Verified"],
+      ["Zitadel attribute", `${plain(provider)} claim`, "Marked verified"],
       ...Object.entries(state.mapping).map(([attribute, claim]) => {
         const source = state.verified[attribute];
         const verified =
@@ -161,7 +161,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     });
     log.info(
       [
-        `${plain(provider)} maps these claims to user attributes by default`,
+        `Fill in new users from ${plain(provider)}. A claim is a piece of information about the user that the provider sends, such as their email. When someone first signs in, we copy these into their new user:`,
         ...rows.map(([attribute, claim, verified]) => {
           return `${(attribute ?? "").padEnd(widths[0] ?? 0)}  ${(claim ?? "").padEnd(widths[1] ?? 0)}  ${verified}`;
         }),
@@ -198,15 +198,15 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
   private async askMore(before: MappingState, provider: string): Promise<ClaimRequest> {
     const more = await this.deps.ask.select({
       name: "whether to map another claim",
-      message: `Should any other claims be mapped from "${plain(provider)}"?`,
+      message: `Map more claims from ${plain(provider)}?`,
       options: [
         {
           value: false,
-          label: "No, keep these",
+          label: "No, continue",
         },
         {
           value: true,
-          label: "Yes, map another claim",
+          label: "Yes, add another",
         },
       ],
       initialValue: false,
@@ -216,7 +216,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     }
     const claim = await this.deps.ask.text({
       name: "claim",
-      message: "Which claim should be read?",
+      message: `Which ${plain(provider)} claim do you want to use? Enter the name exactly as the provider sends it, such as phone_number.`,
       placeholder: "employee_id",
       parse: (value): Parsed<string> => {
         const named = parseClaimName(value);
@@ -267,7 +267,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
         ? CREATE
         : await this.deps.ask.select<string | typeof CREATE>({
             name: "user attribute",
-            message: "Which user attribute should it map to?",
+            message: `Which Zitadel attribute should store ${plain(claim)}?`,
             options: [
               ...candidates.map((one) => {
                 return {
@@ -318,7 +318,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     const suggested = standardClaim(claim)?.scope;
     const extra = await this.deps.ask.text({
       name: "scope",
-      message: `Which scope makes "${plain(provider)}" send it? Leave blank if none.`,
+      message: `Does ${plain(provider)} need an extra scope to send ${plain(claim)}? Enter its name, such as phone. Leave blank if it sends it by default.`,
       parse: (value): Parsed<readonly string[]> => {
         return escaped(parseScopeList(value));
       },
@@ -345,11 +345,11 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     const how = unique
       ? await this.deps.ask.select<Verification>({
           name: "verification",
-          message: `Does "${plain(provider)}" confirm that ${plain(attribute)} is verified?`,
+          message: `Treat ${plain(attribute)} as verified? Choose yes only if ${plain(provider)} has already confirmed it belongs to the user.`,
           options: [
             {
               value: "none",
-              label: "No",
+              label: "No, leave it unverified",
               hint: "new users confirm it themselves",
             },
             {
@@ -358,7 +358,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
             },
             {
               value: "trust",
-              label: "Yes, trust the provider",
+              label: `Yes, trust ${plain(provider)}`,
             },
           ],
           initialValue: "none",
@@ -386,7 +386,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
               },
             ];
     log.info(
-      `"${plain(claim)}" now maps to "${plain(attribute)}"${chosen === CREATE ? ", a new attribute in your user schema" : ""}.`,
+      `${plain(claim)} now fills ${plain(attribute)}${chosen === CREATE ? ", a new attribute in your user schema" : ""}.`,
     );
     if (chosen === CREATE) {
       const words = attribute

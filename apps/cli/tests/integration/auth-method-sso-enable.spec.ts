@@ -425,7 +425,7 @@ describe("auth-method sso enable", () => {
                 ],
               ],
               next_actions: [
-                `Deploy it to make ${provider.displayName} sign-in available in your app, then reload the app and test it`,
+                `Deploy to turn on ${provider.displayName} sign-in, then reload your app and try it`,
               ],
               next_commands: [
                 expectedPublicCliCommand(
@@ -722,9 +722,7 @@ describe("auth-method sso enable", () => {
                   app.path,
                 ],
               ],
-              next_actions: [
-                "Deploy it to make Google sign-in available in your app, then reload the app and test it",
-              ],
+              next_actions: ["Deploy to turn on Google sign-in, then reload your app and try it"],
               next_commands: [
                 expectedPublicCliCommand(
                   `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -786,9 +784,7 @@ describe("auth-method sso enable", () => {
                   app.path,
                 ],
               ],
-              next_actions: [
-                "Deploy it to make Google sign-in available in your app, then reload the app and test it",
-              ],
+              next_actions: ["Deploy to turn on Google sign-in, then reload your app and try it"],
               next_commands: [
                 expectedPublicCliCommand(
                   `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -1178,7 +1174,7 @@ describe("auth-method sso enable", () => {
                 ],
               ],
               next_actions: [
-                `Deploy it to make ${HOSTILE_DISPLAY_NAME} sign-in available in your app, then reload the app and test it`,
+                `Deploy to turn on ${HOSTILE_DISPLAY_NAME} sign-in, then reload your app and try it`,
               ],
               next_commands: [
                 expectedPublicCliCommand(
@@ -1636,7 +1632,7 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toPrint(
-          "Callback URI   http://localhost:3000/__nextgen/idp/google/callback",
+          "Redirect URL   http://localhost:3000/__nextgen/idp/google/callback",
         );
       });
 
@@ -1654,7 +1650,7 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toSayOnce(
-          "Deploy it to make Google sign-in available in your app, then reload the app and test it",
+          "Deploy to turn on Google sign-in, then reload your app and try it",
         );
       });
 
@@ -1732,7 +1728,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoDryRun(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the provider's email claim");
+        expect(result).toPrint("email ← email");
       });
 
       it("shows the mapping a developer edited when enabled again, not a regenerated one", async () => {
@@ -1744,7 +1740,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("email comes from the provider's mail claim");
+        expect(result).toPrint("email ← mail");
       });
     });
   });

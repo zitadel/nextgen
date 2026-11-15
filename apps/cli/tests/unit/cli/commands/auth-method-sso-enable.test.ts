@@ -379,7 +379,7 @@ describe("auth-method sso enable", () => {
     it.for([
       "Google sign-in is configured locally",
       "Its credentials are stored in your project.",
-      "Deploy it to make Google sign-in available in your app, then reload the app and test it",
+      "Deploy to turn on Google sign-in, then reload your app and try it",
       expectedPublicCliCommand("deploy --dry-run"),
     ])("says %s", async (line, { dir }) => {
       const cwd = await aProject(dir);
@@ -590,7 +590,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.for(["Acme SSO sign-in is configured locally", "then reload the app and test it"])(
+    it.for(["Acme SSO sign-in is configured locally", "then reload your app and try it"])(
       "says %s",
       async (line, { dir }) => {
         const cwd = await aProject(dir);
@@ -709,18 +709,6 @@ describe("auth-method sso enable", () => {
       });
 
       expect(result.stdout + result.stderr).not.toContain("Project   ");
-    });
-
-    it("still says which schema it is editing", async ({ dir }) => {
-      const cwd = await aProject(dir);
-
-      const result = await withStdin(SECRET, () => {
-        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
-      });
-
-      expect(result.stdout + result.stderr).toContain(
-        "Editing .zitadel/schemas/default-human-user.json",
-      );
     });
 
     it("prints the callback URI to register, without --json", async ({ dir }) => {
@@ -842,7 +830,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain("Each preview URL needs its own callback URI");
+      expect(result.stdout).toContain("Each preview URL needs its own redirect URL");
     });
 
     it("lists the preview callback URI pattern", async ({ dir }) => {
@@ -914,7 +902,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).not.toContain("Each preview URL needs its own callback URI");
+      expect(result.stdout).not.toContain("Each preview URL needs its own redirect URL");
     });
   });
 
@@ -1068,8 +1056,8 @@ describe("auth-method sso enable", () => {
 
   describe("with --dry-run and no credentials", () => {
     it.for([
-      "Google needs an OAuth application.",
-      `Callback URI   ${CALLBACK_URI}`,
+      "Google has to know about your app before it lets anyone sign in. Create an OAuth application there and give it the redirect URL below. Google sends people back to that address after they sign in.",
+      `Redirect URL   ${CALLBACK_URI}`,
       "Create it at   https://console.cloud.google.com/apis/credentials",
       `Would write ${CONNECTION_FILE}`,
       `Would write ${SCHEMA_FILE}`,
@@ -1114,7 +1102,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run on a configured Project", () => {
-    it.for([`Callback URI   ${CALLBACK_URI}`, "Would store GOOGLE_CLIENT_ID on the project"])(
+    it.for([`Redirect URL   ${CALLBACK_URI}`, "Would store GOOGLE_CLIENT_ID on the project"])(
       "says %s",
       async (line, { dir }) => {
         const cwd = await aProjectWithGoogle(dir);
@@ -1161,8 +1149,8 @@ describe("auth-method sso enable", () => {
 
   describe("with --dry-run for a custom provider", () => {
     it.for([
-      "Callback URI   http://localhost:3000/__nextgen/idp/acme-sso/callback",
-      "Register it as a client at https://sso.acme.example, with the callback URI above.",
+      "Redirect URL   http://localhost:3000/__nextgen/idp/acme-sso/callback",
+      "Create it in your provider's admin console as an OpenID Connect (OAuth) application. It gives you a client ID and a client secret, which we ask for next.",
       "Would write .zitadel/idps/acme-sso.json",
       "Would store ACME_SSO_CLIENT_ID and ACME_SSO_CLIENT_SECRET on the project",
     ])("says %s", async (line, { dir }) => {

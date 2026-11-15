@@ -109,9 +109,7 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
         },
         next: unpublished
           ? {
-              actions: [
-                `Deploy it to make ${name} sign-in available in your app, then reload the app and test it`,
-              ],
+              actions: [`Deploy to turn on ${name} sign-in, then reload your app and try it`],
               commands: followUps.commands,
             }
           : { commands: followUps.commands },

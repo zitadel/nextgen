@@ -111,31 +111,33 @@ describe("AskClaims", () => {
 
   describe("the table of what is mapped by default", () => {
     it("heads the columns with the provider the claims come from", async () => {
-      const { said } = await walked(needsFor(STATE), "No, keep these");
+      const { said } = await walked(needsFor(STATE), "No, continue");
 
-      expect(said.split("\n")[1]).toBe('User attribute  Claim from "Acme SSO"  Verified');
+      expect(said.split("\n")[1]).toBe("Zitadel attribute  Acme SSO claim  Marked verified");
     });
 
     it("says who vouches for each attribute, aligned under the header", async () => {
-      const { said } = await walked(needsFor(STATE), "No, keep these");
+      const { said } = await walked(needsFor(STATE), "No, continue");
 
       expect(said.split("\n").slice(2)).toEqual([
-        "email           email                  yes, by email_verified",
-        "phoneNumber     phone_number           yes, trusted",
-        "givenName       given_name             no",
+        "email              email           yes, by email_verified",
+        "phoneNumber        phone_number    yes, trusted",
+        "givenName          given_name      no",
       ]);
     });
 
     it("is only the header for a mapping with nothing in it", async () => {
-      const { said } = await walked(needsFor({ ...STATE, mapping: {} }), "No, keep these");
+      const { said } = await walked(needsFor({ ...STATE, mapping: {} }), "No, continue");
 
       expect(said.split("\n")).toHaveLength(2);
     });
 
     it("names the provider the claims come from above the table", async () => {
-      const { said } = await walked(needsFor(STATE), "No, keep these");
+      const { said } = await walked(needsFor(STATE), "No, continue");
 
-      expect(said.split("\n")[0]).toBe("Acme SSO maps these claims to user attributes by default");
+      expect(said.split("\n")[0]).toBe(
+        "Fill in new users from Acme SSO. A claim is a piece of information about the user that the provider sends, such as their email. When someone first signs in, we copy these into their new user:",
+      );
     });
   });
 
@@ -148,13 +150,13 @@ describe("AskClaims", () => {
     };
 
     it("spells out every control character a file or a provider wrote", async () => {
-      const { said } = await walked(needsFor(hostile, `Evil${HOSTILE}`), "No, keep these");
+      const { said } = await walked(needsFor(hostile, `Evil${HOSTILE}`), "No, continue");
 
       expect(said).not.toContain("\u001b");
     });
 
     it("keeps the characters readable", async () => {
-      const { said } = await walked(needsFor(hostile, `Evil${HOSTILE}`), "No, keep these");
+      const { said } = await walked(needsFor(hostile, `Evil${HOSTILE}`), "No, continue");
 
       expect(said).toContain(`Evil${SPELLED}`);
     });
@@ -177,13 +179,13 @@ describe("AskClaims", () => {
           },
           `Evil${HOSTILE}`,
         ),
-        "Yes, map another claim",
+        "Yes, add another",
         "organization",
         "Text",
         "Create a new attribute",
         "employeeNumber",
         "",
-        "No, keep these",
+        "No, continue",
       );
     }
 
@@ -202,13 +204,13 @@ describe("AskClaims", () => {
     it("refuses a claim a property already uses, naming that property escaped", async () => {
       const { talk } = await walked(
         needsFor({ ...STATE, mapping: { [`name${HOSTILE}`]: "employee_id" }, verified: {} }),
-        "Yes, map another claim",
+        "Yes, add another",
         "employee_id",
         "organization",
         "Text",
         "employeeNumber",
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       expect(talk.shown()).toContain(
@@ -219,13 +221,13 @@ describe("AskClaims", () => {
     it("still says why a scope is refused", async () => {
       const { talk } = await walked(
         needsFor({ ...STATE, attributes: [] }),
-        "Yes, map another claim",
+        "Yes, add another",
         "organization",
         "Text",
         "employeeNumber",
         'bad"scope',
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       expect(talk.shown()).toContain('bad"scope is not a valid scope');
@@ -241,12 +243,12 @@ describe("AskClaims", () => {
           mapping: { email: "email" },
           verified: {},
         }),
-        "Yes, map another claim",
+        "Yes, add another",
         "mail",
         "Text",
         "email",
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       expect(result.answered).toMatchObject({
@@ -260,10 +262,10 @@ describe("AskClaims", () => {
     it("says a new attribute would be text and moves on without creating one", async () => {
       const { said, result } = await walked(
         needsFor({ ...STATE, mapping: {}, verified: {} }),
-        "Yes, map another claim",
+        "Yes, add another",
         "employee_id",
         "Integer",
-        "No, keep these",
+        "No, continue",
       );
 
       expect([
@@ -303,12 +305,12 @@ describe("AskClaims", () => {
     async function offered(state: MappingState, answer: string): Promise<string> {
       const { talk } = await walked(
         needsFor(state),
-        "Yes, map another claim",
+        "Yes, add another",
         "employee_id",
         "Text",
         answer,
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       return talk.options()[3]?.join("\n") ?? "";
@@ -371,13 +373,13 @@ describe("AskClaims", () => {
     it("is refused, naming the property it fills", async () => {
       const { talk } = await walked(
         needsFor({ ...STATE, mapping: { givenName: "given_name" }, verified: {} }),
-        "Yes, map another claim",
+        "Yes, add another",
         "given_name",
         "organization",
         "Text",
         "employeeNumber",
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       expect(talk.shown()).toContain("given_name already fills givenName");
@@ -395,12 +397,12 @@ describe("AskClaims", () => {
     ])("is labelled on the login form as %s is: %s", async (name, label) => {
       const { said } = await walked(
         needsFor({ ...STATE, mapping: {}, verified: {} }),
-        "Yes, map another claim",
+        "Yes, add another",
         "organization",
         "Text",
         name,
         "",
-        "No, keep these",
+        "No, continue",
       );
 
       expect(said).toContain(`The login form will label it "${label}".`);

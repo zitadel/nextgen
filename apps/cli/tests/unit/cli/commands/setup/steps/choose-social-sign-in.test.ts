@@ -68,10 +68,13 @@ const EVERYTHING = {
  * How each custom connection setting's question begins.
  */
 const QUESTIONS = {
-  slug: "What would you like to call this connection?",
-  displayName: "What name should the sign-in button show?",
-  issuer: "What is the issuer URL of the provider?",
-  scopes: "Which scopes should we request?",
+  slug: "What would you like to call this connection? Pick a short ID for your config files, such as acme-sso. Use lowercase letters, numbers and hyphens.",
+  displayName:
+    "What should the sign-in button say? Enter the provider's name as your users know it, such as Acme SSO.",
+  issuer:
+    "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
+  scopes:
+    "Which scopes should we request? Scopes decide what user information the provider sends back. Separate them with spaces; openid is required.",
 };
 
 /**
@@ -349,7 +352,7 @@ describe("ChooseSocialSignIn", () => {
       await socialFor(setupAnswers());
 
       expect(vi.mocked(password).mock.calls[0]?.[0].message).toBe(
-        "What is the client secret of your Google OAuth app? It will be stored on the project as GOOGLE_CLIENT_SECRET.",
+        "What is the client secret of your Google OAuth app? Copy it from the same place. We store it in your project as GOOGLE_CLIENT_SECRET.",
       );
     });
 
@@ -433,7 +436,7 @@ describe("ChooseSocialSignIn", () => {
       await socialFor(setupAnswers());
 
       expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
-        "What is the client ID of your Google OAuth app? Leave it empty to skip.",
+        "What is the client ID of your Google OAuth app? Copy it from the application you just created. Leave it empty to skip.",
       );
     });
 
@@ -801,7 +804,7 @@ describe("ChooseSocialSignIn", () => {
       });
 
       expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
-        "What is the client ID of your Google OAuth app?",
+        "What is the client ID of your Google OAuth app? Copy it from the application you just created.",
       );
     });
 

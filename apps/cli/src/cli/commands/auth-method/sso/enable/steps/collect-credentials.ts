@@ -92,7 +92,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
     if (!needs.preview.created) {
       const secret = await this.deps.ask.secret({
         name: "client secret",
-        message: `What is the client secret of your ${provider.displayName} OAuth app?`,
+        message: `What is the client secret of your ${provider.displayName} OAuth app? Copy it from the same place.`,
         parse: parseClientSecret,
         stdin: true,
         optional: true,
@@ -111,7 +111,8 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
         ? {
             issuer: await this.deps.ask.text({
               name: "issuer",
-              message: "What is the issuer URL of the provider?",
+              message:
+                "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
               parse: parseIssuer,
               initialValue: idpProvider(needs.selection.id).issuer,
             }),
@@ -119,7 +120,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
         : undefined;
     const clientId = await this.deps.ask.text({
       name: `client id for ${provider.displayName}`,
-      message: `What is the client ID of your ${provider.displayName} OAuth app?`,
+      message: `What is the client ID of your ${provider.displayName} OAuth app? Copy it from the application you just created.`,
       flag: "--client-id",
       parse: parseClientId,
       given: needs.flags.clientId,
@@ -128,7 +129,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
     const secretVariable = needs.names.clientSecret;
     const secret = await this.deps.ask.secret({
       name: `client secret for ${secretVariable}`,
-      message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,
+      message: `What is the client secret of your ${provider.displayName} OAuth app? Copy it from the same place. We store it in your project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
       retry: this.retryFor(needs, clientId, true),

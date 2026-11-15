@@ -1008,14 +1008,15 @@ export async function askCustomSettings(
 ): Promise<Required<CustomFlagValues>> {
   const displayName = await ask.text({
     name: "display name",
-    message: "What name should the sign-in button show? For example Acme SSO.",
+    message:
+      "What should the sign-in button say? Enter the provider's name as your users know it, such as Acme SSO.",
     parse: parseDisplayName,
     given: given.displayName,
   });
   const slug = await ask.text({
     name: "connection name",
     message:
-      "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+      "What would you like to call this connection? Pick a short ID for your config files, such as acme-sso. Use lowercase letters, numbers and hyphens.",
     parse: (value) => {
       return parseConnectionSlug(value, RESERVED_SLUGS);
     },
@@ -1024,13 +1025,15 @@ export async function askCustomSettings(
   });
   const issuer = await ask.text({
     name: "issuer",
-    message: "What is the issuer URL of the provider?",
+    message:
+      "What is the provider's issuer URL? This is the base address of its OpenID Connect service, such as https://sso.acme.example. Its admin console or docs list it.",
     parse: parseIssuer,
     given: given.issuer,
   });
   const scopes = await ask.text({
     name: "scopes",
-    message: "Which scopes should we request? Separate them with spaces.",
+    message:
+      "Which scopes should we request? Scopes decide what user information the provider sends back. Separate them with spaces; openid is required.",
     parse: parseScopes,
     given: given.scopes,
     initialValue: DEFAULT_SCOPES.join(" "),

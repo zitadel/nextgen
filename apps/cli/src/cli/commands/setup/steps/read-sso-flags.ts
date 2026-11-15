@@ -166,7 +166,7 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
           clientId: flags.ssoClientId,
           secret: await this.deps.ask.secret({
             name: "client secret",
-            message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
+            message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app? Copy it from the same place.`,
             parse: parseClientSecret,
             stdin: true,
             retry: pipedFrom(
