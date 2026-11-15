@@ -152,6 +152,7 @@ export class Lane {
     const ids = operations.map((operation) => {
       return operation.id;
     });
+    // repeat of an unchanged run
     const shared = {
       spec: this.input.specText,
       checks: CHECKS,
