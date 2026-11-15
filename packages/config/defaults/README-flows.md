@@ -123,6 +123,28 @@ with the action it belongs to. If you remove the login entry step, point
 
 Guide: https://preview.zitadel.com/docs/guides/sign-in-methods
 
+### Help a user who forgot their password
+
+A flow can't offer a "Forgot your password?" link yet: the server
+doesn't run the `recovery` purpose, and it sends no reset email. To let
+a user back in, set a new password for them from this project's
+directory. Put it in a file, such as `password.json`, so it stays out of
+your shell history:
+
+```json
+{ "password": "<new password>" }
+```
+
+```sh
+zitadel api setUserPassword <user-id> --input password.json
+rm password.json
+```
+
+Console shows the user's ID on their page under **Users**. The password
+must meet the project's password policy. Give it to the user over a
+channel you trust, and tell your users how to reach you, for example
+with a link next to the login component.
+
 ### Link sign-in and sign-up
 
 Pair a `kind: navigate` action with a transition that declares a local
