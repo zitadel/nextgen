@@ -1,3 +1,4 @@
+import type { GitignoreRule } from "@/lib/gitignore";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { sdkVersionForCli } from "@/lib/public-cli";
@@ -54,10 +55,15 @@ export const SIGNED_IN_SPEC = "e2e/signed-in.spec.ts";
 export const TEST_SCRIPT = { name: "test:e2e", command: "playwright test" } as const;
 
 /**
- * What a test run leaves in the app: the kit's handshake file, which holds the
- * test project's secret, and Playwright's results and report.
+ * What a test run leaves in the app, kept out of git: the kit's handshake
+ * file, which holds the test project's secret, and Playwright's results and
+ * report, each named by a file the run writes in it.
  */
-export const TEST_RUN_OUTPUTS = [".zitadel-testing/", "test-results/", "playwright-report/"];
+export const TEST_RUN_OUTPUTS: ReadonlyArray<GitignoreRule> = [
+  { path: ".zitadel-testing/handshake.json", ignored: true, entry: ".zitadel-testing/" },
+  { path: "test-results/.last-run.json", ignored: true, entry: "test-results/" },
+  { path: "playwright-report/index.html", ignored: true, entry: "playwright-report/" },
+];
 
 /**
  * The variables that move the run's two ports, and their defaults: apart
@@ -133,7 +139,7 @@ export function testSuitePlan(input: {
       { kind: "mkdir", path: "e2e" },
       { kind: "write", path: SIGN_IN_SPEC, contents: SIGN_IN },
       { kind: "write", path: SIGNED_IN_SPEC, contents: SIGNED_IN },
-      { kind: "append-gitignore", entries: TEST_RUN_OUTPUTS },
+      { kind: "append-gitignore", rules: TEST_RUN_OUTPUTS },
       ...(input.scripts.has(TEST_SCRIPT.name)
         ? []
         : [{ kind: "edit", path: "package.json", edit: withTestScript } as const]),

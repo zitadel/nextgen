@@ -1,0 +1,76 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Every name here is
+### legitimate and must not trip a naming rule: an allowed verb alone or
+### followed by camelCase words, acronyms included, a noun-first webhook
+### operationId, and an `id` that is not a path parameter.
+openapi: 3.1.0
+info:
+  title: naming clean
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /search:
+    get:
+      operationId: search
+      summary: Search
+      description: Searches.
+      tags:
+        - Fixture
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}:
+    parameters:
+      - name: thing_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getThingCsrfToken
+      summary: Get a thing's token
+      description: Gets a thing's token.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+    post:
+      operationId: publishThing
+      summary: Publish a thing
+      description: Publishes a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+webhooks:
+  thing.created:
+    post:
+      # Webhook operationIds name the event, noun first, and are generated.
+      operationId: thingCreated
+      summary: thing.created
+      description: A thing was created.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok

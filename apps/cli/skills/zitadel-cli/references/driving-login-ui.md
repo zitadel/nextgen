@@ -95,15 +95,15 @@ set through the API use the policy the deployed release carries, so deploying
 without the file switches it off. The API call gets the release that serves
 its `Origin`, and the console or a caller with no `Origin`, such as the CLI,
 the newest primary deployment's. With no `Origin` and no primary deployment,
-that call answers `409` with `rel.no_default`. `policies list` and
-`policies get <id|operation>` read them back. A policy's cases live beside it
+that call answers `409` with `rel.no_default`. `policy list` and
+`policy get <id|operation>` read them back. A policy's cases live beside it
 in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
 `input` in the operation's terms (`{"password": "…"}`), optional `facts` the
 operation would look up (`self_service`, `history_matches`), and the expected
 decision (`allowed`, optionally `code` and exactly the `violations`). The
 decision and rules hold in the login too; `code` is the API's answer, and a
 flow shows each rule as `error.x-auth-methods#password_<rule>` instead.
-`policies test [operation]` evaluates every case on the server against the
+`policy test [operation]` evaluates every case on the server against the
 sibling policy file, or with `--release <id>` against the revision that
 release pins; a missing policy is tested as none. It fails with `E_VALIDATION`
 (exit 3) when a case does not hold, `data`/`details` carrying `source`,

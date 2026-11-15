@@ -76,7 +76,7 @@ there, not a new color at the call site.
 ## Tests
 
 - Test wording and layout in a unit test of the renderer, as
-  [`report.test.ts`](../tests/unit/commands/doctor/report.test.ts) does.
+  [`report.test.ts`](../tests/unit/cli/commands/doctor/report.test.ts) does.
 - In a spec, assert only what a user would notice, with `toPrint`
   ([`tests/AGENTS.md`](../tests/AGENTS.md)).
 - A test sees no color: `picocolors` is off without a terminal. Check a colored

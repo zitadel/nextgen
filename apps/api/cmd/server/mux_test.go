@@ -130,8 +130,10 @@ func TestBuildHTTPMuxServesTheConsoleBesideTheAPI(t *testing.T) {
 
 // The API answers under /api/v1, and until 1.0.0 at the root, where a
 // response for an operation says it is deprecated (ADR 077). The probes
-// answer at the root for good. `/api/flow` is the base the embedded console
-// once called: under no prefix the API serves, it is no operation of the root
+// answer at the root for good. The flow operations' old `/flow` path reaches
+// its mount as `/flows`, deprecated on both mounts, and no other path is
+// rewritten on the way. `/api/flow` is the base the embedded console once
+// called: under no prefix the API serves, it is no operation of the root
 // alias either, and stays a 404.
 func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 	requireEmbeddedUI(t)
@@ -140,9 +142,12 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 	for _, tt := range []struct {
 		method, path, mount string
 		deprecated          bool
+		reaches             string // the path the mount receives, when not path
 	}{
 		{method: http.MethodGet, path: "/api/v1/users/me", mount: "api"},
-		{method: http.MethodPost, path: "/api/v1/flow", mount: "api"},
+		{method: http.MethodPost, path: "/api/v1/flows", mount: "api"},
+		{method: http.MethodPost, path: "/api/v1/flow", mount: "api", deprecated: true, reaches: "/api/v1/flows"},
+		{method: http.MethodGet, path: "/api/v1/flow_definitions", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1/livez", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1", mount: "api"},
 		{method: http.MethodGet, path: "/api/v1/", mount: "api"},
@@ -154,7 +159,8 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 		{method: http.MethodPost, path: "/livez", mount: "probes"},
 
 		{method: http.MethodGet, path: "/users/me", mount: "root", deprecated: true},
-		{method: http.MethodPost, path: "/flow", mount: "root", deprecated: true},
+		{method: http.MethodPost, path: "/flows", mount: "root", deprecated: true},
+		{method: http.MethodPost, path: "/flow", mount: "root", deprecated: true, reaches: "/flows"},
 		{method: http.MethodGet, path: "/sessions/me", mount: "root", deprecated: true},
 		{method: http.MethodOptions, path: "/users/me", mount: "root"},
 		{method: http.MethodPost, path: "/sessions/me/csrf", mount: "root"},
@@ -170,7 +176,11 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 		name := tt.method + " " + tt.path
 		rec := serve(t, mux, tt.method, tt.path)
 		assert.Equal(t, tt.mount, rec.Header().Get("X-Test-Handler"), name)
-		assert.Equal(t, tt.path, rec.Header().Get("X-Test-Path"), "%s must reach its mount unrewritten", name)
+		if tt.reaches == "" {
+			assert.Equal(t, tt.path, rec.Header().Get("X-Test-Path"), "%s must reach its mount unrewritten", name)
+		} else {
+			assert.Equal(t, tt.reaches, rec.Header().Get("X-Test-Path"), name)
+		}
 		assert.Equal(t, tt.deprecated, rec.Header().Get("Deprecation") != "", "%s: Deprecation", name)
 	}
 }

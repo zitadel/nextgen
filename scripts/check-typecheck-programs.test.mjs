@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { vacuousTscTargets } from "./check-typecheck-programs.mjs";
+import { parseTsconfig, vacuousTscTargets } from "./check-typecheck-programs.mjs";
 
 /** Treats exactly `tsconfig.json` as solution-style, everything else as real. */
 const solutionIsDefault = (target) => target === "tsconfig.json";
@@ -75,4 +75,19 @@ test("every vacuous segment of a chain is reported", () => {
     vacuousTscTargets("tsc --noEmit -p tsconfig.json && tsc --noEmit", solutionIsDefault),
     ["tsconfig.json", "tsconfig.json"],
   );
+});
+
+test("a tsconfig with block comments and trailing commas reads as TypeScript reads it", () => {
+  const config = parseTsconfig(`{
+  "compilerOptions": {
+    /* a block comment, as create-qwik writes one */
+    "strict": true, // a line comment
+  },
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }],
+}
+`);
+  assert.deepEqual(config.files, []);
+  assert.deepEqual(config.references, [{ path: "./tsconfig.app.json" }]);
+  assert.equal(config.compilerOptions.strict, true);
 });

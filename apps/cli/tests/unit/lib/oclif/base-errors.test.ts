@@ -344,7 +344,7 @@ describe("the follow-ups of a failure raised while a flag parsed", () => {
 
 describe("a failure whose follow-up cannot be rendered", () => {
   const broken = new ZitadelError("E_VALIDATION", "Not running", {
-    nextCommands: [resourceSuggestion("events", "create"), { id: "start" }],
+    nextCommands: [resourceSuggestion("event", "create"), { id: "start" }],
   });
 
   it("is still reported, with its code and message", async () => {

@@ -617,7 +617,7 @@ describe("Tabulatable", () => {
   });
 
   it("is given its columns by a COLUMNS constant in every list command", async () => {
-    const root = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+    const root = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
     const without: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {

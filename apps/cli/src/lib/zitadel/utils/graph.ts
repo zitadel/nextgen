@@ -31,11 +31,8 @@ export function walk<Node>(
   };
   enqueue(start);
   // The list grows as nodes are found, and the loop follows it to the end.
-  for (let index = 0; index < reached.length; index += 1) {
-    const node = reached[index];
-    if (node !== undefined) {
-      enqueue(next(node));
-    }
+  for (const node of reached) {
+    enqueue(next(node));
   }
   return reached;
 }

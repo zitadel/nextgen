@@ -1,4 +1,7 @@
-import { CreateIdpBody, CreateUserBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import {
+  PublishIdpBody,
+  CreateUserBody,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -12,8 +15,8 @@ import {
 import { fragmentOf } from "@/lib/oclif/crud/assign";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 
-const connection = documentSchemaOf(CreateIdpBody, "idp");
-const connectionFields = describeBody(CreateIdpBody, { root: "idp" });
+const connection = documentSchemaOf(PublishIdpBody, "idp");
+const connectionFields = describeBody(PublishIdpBody, { root: "idp" });
 const user = documentSchemaOf(CreateUserBody);
 const userFields = describeBody(CreateUserBody);
 const set = (raw: string) => readAssignment(raw, connection, connectionFields);

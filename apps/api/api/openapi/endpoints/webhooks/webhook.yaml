@@ -4,7 +4,7 @@ description: |
   A webhook of a project: a URL the server POSTs the project's events to,
   and the event types it gets. It never carries the signing secret, which
   only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
-  (`POST /webhooks/{id}/rotate_secret`) return.
+  (`POST /webhooks/{webhook_id}/rotate_secret`) return.
 
   A webhook is failing when `last_error_at` is later than
   `last_delivered_at`, or is set while `last_delivered_at` is `null`: its
@@ -43,7 +43,7 @@ properties:
       Whether the server sends events to the webhook. The server sets it to
       `false` itself when the endpoint has failed for 3 days without a
       success, or answers `410`. Set it back to `true` with `updateWebhook`
-      (`PATCH /webhooks/{id}`).
+      (`PATCH /webhooks/{webhook_id}`).
     example: true
   last_delivered_at:
     description: |

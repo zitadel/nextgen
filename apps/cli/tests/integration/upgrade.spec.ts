@@ -431,7 +431,7 @@ describe("upgrade", () => {
           source: "",
           code: "E_NETWORK",
           message: "Could not look up the latest Zitadel release",
-          hint: "Check the connection to the npm registry, then rerun.",
+          hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
           next_commands: [newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION)],
         });
       });
