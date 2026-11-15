@@ -1,4 +1,4 @@
-import {defineConfig, loadEnv} from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import solid from 'vite-plugin-solid'
 
 export default defineConfig({

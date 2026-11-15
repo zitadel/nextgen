@@ -1,2 +1,7 @@
 # The kit's handshake file, which each lane writes beside its config.
 .zitadel-testing/
+# TanStack Start's route tree. setup writes it only after an install, and
+# fixtures are generated with --skip-install, so the lane's `vite dev` writes
+# it; the drift check compares only what setup writes. Named for the one
+# fixture, so a route tree setup itself writes elsewhere stays checked.
+fixtures/tanstack-start/src/routeTree.gen.ts
