@@ -100,7 +100,7 @@ export class BrokenFilesError extends ConfigError {
       }),
     );
     const lines = problems.map((entry) => {
-      return `  - ${entry.path}: ${entry.problem}`;
+      return `  • ${entry.path}: ${entry.problem}`;
     });
     super(
       [
@@ -615,7 +615,7 @@ export class BrokenFlowsError extends ConfigError {
     });
     const lines = [...uses.map(BrokenFlowsError.useLine), ...unexplainedLines];
     const listed = lines.map((line) => {
-      return `  - ${line}`;
+      return `  • ${line}`;
     });
     const issues = input.issues.map((item): JsonObject => {
       const issue = item.issue;

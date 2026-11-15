@@ -135,7 +135,7 @@ describe("deployment create at a terminal", () => {
       expect(res.exitCode).toBe(0);
       const shown = stripAnsi(res.stdout);
       expect(shown).toContain("Deployed rel_1 · project proj_test");
-      expect(shown).not.toContain(`- ${PRIMARY_ORIGIN}`);
+      expect(shown).not.toContain(`• ${PRIMARY_ORIGIN}`);
     });
 
     it("names the origins in one sentence, not a list", async () => {

@@ -491,7 +491,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           message:
             "Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
-            '  - .zitadel/flows/default-human-user-login.json: step "password" collects password\n' +
+            '  • .zitadel/flows/default-human-user-login.json: step "password" collects password\n' +
             "    Left with no field or sign-in method. Targeted by identifier.submit.",
         });
       });
@@ -580,9 +580,9 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           message:
             "Disabling passkey in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
-            '  - .zitadel/flows/default-human-user-login.json: step "passkey-first" offers passkey (action "passkey")\n' +
+            '  • .zitadel/flows/default-human-user-login.json: step "passkey-first" offers passkey (action "passkey")\n' +
             "    Left with no field or sign-in method. Entry step of purposes.login.\n" +
-            '  - .zitadel/flows/default-human-user-login.json: step "identifier" offers passkey (action "passkey")\n' +
+            '  • .zitadel/flows/default-human-user-login.json: step "identifier" offers passkey (action "passkey")\n' +
             '    Still has field "email".',
         });
       });

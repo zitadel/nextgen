@@ -263,7 +263,7 @@ describe("auth-method password disable", () => {
             command: "auth-method:password:disable",
             source: "",
             code: "E_VALIDATION",
-            message: `Disabling password in ${SCHEMA_FILE} would break a login flow that still uses it:\n  - ${FLOW_FILE}: step "password" collects password\n    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.\n  - ${FLOW_FILE}: step "register-password" collects password\n    Left with no field or sign-in method. Targeted by register.submit.`,
+            message: `Disabling password in ${SCHEMA_FILE} would break a login flow that still uses it:\n  • ${FLOW_FILE}: step "password" collects password\n    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.\n  • ${FLOW_FILE}: step "register-password" collects password\n    Left with no field or sign-in method. Targeted by register.submit.`,
             hint: `Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
             details: {
               file: SCHEMA_FILE,
