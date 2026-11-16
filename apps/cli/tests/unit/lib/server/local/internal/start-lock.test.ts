@@ -8,7 +8,7 @@ import {
   tryLock,
   UNWRITTEN_LOCK_MS,
   withStartLock,
-} from "@/lib/local-server/internal/start-lock";
+} from "@/lib/server/local/internal/start-lock";
 import { ManualClock } from "@tests/fixtures/clock";
 import { it } from "@tests/fixtures";
 

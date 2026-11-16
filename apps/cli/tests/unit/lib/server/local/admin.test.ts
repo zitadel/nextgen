@@ -11,8 +11,8 @@ import {
   findLocalAdminDir,
   findLocalAdminFor,
   readLocalAdmin,
-} from "@/lib/local-server/admin-credential";
-import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
+} from "@/lib/server/local/admin-credential";
+import { writeRuntimeMetadata } from "@/lib/server/local/runtime";
 import { it } from "@tests/fixtures";
 
 /** What `zitadel start` records beside the local admin: which server it started. */

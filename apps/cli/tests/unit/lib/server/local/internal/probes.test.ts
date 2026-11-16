@@ -2,8 +2,8 @@ import { tmpdir } from "node:os";
 
 import { describe, expect } from "vitest";
 
-import { defaultClaimsDir, TcpPorts } from "@/lib/local-server/internal/probes";
-import { it } from "@tests/unit/lib/local-server/occupied-port";
+import { defaultClaimsDir, TcpPorts } from "@/lib/server/local/internal/probes";
+import { it } from "@tests/unit/lib/server/local/occupied-port";
 
 describe("defaultClaimsDir", () => {
   it("is inside the temp directory, so a claim never lands in a project", () => {

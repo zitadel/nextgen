@@ -9,7 +9,7 @@ import {
   LOCAL_DEFAULTS,
   loadEnvFiles,
   loadProjectEnv,
-} from "@/lib/local-server/env-vars";
+} from "@/lib/server/local/env-vars";
 import { it } from "@tests/fixtures";
 
 /**

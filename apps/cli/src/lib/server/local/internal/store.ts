@@ -3,7 +3,7 @@ import {
   type RuntimeMetadata,
   readRuntimeMetadata,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import type { ServerStore } from "./lifecycle";
 
 /** The record type of one backend. */

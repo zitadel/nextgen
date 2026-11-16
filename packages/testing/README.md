@@ -464,5 +464,5 @@ on top, in intended order:
 Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
 credentials) — UI-driven passkey ceremonies are covered today by
 `enableVirtualPasskey`. Independent refactor: extract
-`apps/cli/src/lib/local-server` into a shared package and swap the lifecycle
+`apps/cli/src/lib/server/local` into a shared package and swap the lifecycle
 shell-out for imports.

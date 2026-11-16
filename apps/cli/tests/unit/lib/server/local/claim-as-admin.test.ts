@@ -3,8 +3,8 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import type { LocalAdmin } from "@/lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
+import type { LocalAdmin } from "@/lib/server/local/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/server/local/claim-as-admin";
 
 const signal = new AbortController().signal;
 

@@ -7,8 +7,8 @@ import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
   runtimeSummary,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Connection,

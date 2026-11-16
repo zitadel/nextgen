@@ -3,20 +3,20 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
-import { DockerLauncher } from "@/lib/local-server/internal/docker-launcher";
+import { BinaryLauncher } from "@/lib/server/local/internal/binary-launcher";
+import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server/local/server";
 import type { Daemons } from "@tests/fixtures/daemon";
 import { aFakeServerBinary } from "@tests/helpers/local-server";
 import { forcedConsent } from "@tests/helpers/consent";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { aSuggest } from "@tests/helpers/suggestions";
-import { it } from "@tests/unit/lib/local-server/occupied-port";
+import { it } from "@tests/unit/lib/server/local/occupied-port";
 
 /** The start a refused start would offer again. */
 const RETRY = aSuggest()({ id: "start" });

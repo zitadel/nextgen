@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
  * oclif layer that runs a command, and the local server, which is refactored
  * apart from this rule.
  */
-const MAY_RENDER = ["lib/suggestion/", "lib/oclif/", "lib/local-server/"];
+const MAY_RENDER = ["lib/suggestion/", "lib/oclif/", "lib/server/local/"];
 
 /**
  * What renders a suggestion, as `lib/suggestion` exports it.

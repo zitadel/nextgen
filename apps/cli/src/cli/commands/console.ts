@@ -2,10 +2,10 @@ import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
-import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-credential";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import { consoleSignInUrl } from "@/lib/local-server/sign-in";
+import { findLocalAdminDir, readLocalAdmin } from "@/lib/server/local/admin-credential";
+import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server";
+import { consoleSignInUrl } from "@/lib/server/local/sign-in";
 import { Server } from "@/lib/server";
 import { section, log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";

@@ -4,9 +4,9 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import type { LocalAdmin } from "@/lib/local-server/admin-credential";
+import type { LocalAdmin } from "@/lib/server/local/admin-credential";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
-import { adminSessionCookie, consoleSignInUrl } from "@/lib/local-server/sign-in";
+import { adminSessionCookie, consoleSignInUrl } from "@/lib/server/local/sign-in";
 
 const signal = new AbortController().signal;
 

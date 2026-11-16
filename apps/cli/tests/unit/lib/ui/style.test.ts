@@ -14,7 +14,7 @@ const SRC = join(import.meta.dirname, "../../../../src");
  * is the one place the CLI draws, and the server log, which is told whether to
  * color by its caller instead of asking the terminal.
  */
-const MAY_IMPORT = new Set(["lib/local-server/server-log.ts"]);
+const MAY_IMPORT = new Set(["lib/server/local/server-log.ts"]);
 const UI_PACKAGE = "lib/ui/";
 
 describe("the palette", () => {

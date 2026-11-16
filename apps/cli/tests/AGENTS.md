@@ -233,7 +233,7 @@ it stays here deliberately rather than by oversight.
     started, and `pidLog()` is a path for a program to append the ids it
     starts to. Every group gets `SIGTERM`, then `SIGKILL`,
     when the test ends. It knows nothing of Zitadel.
-  - `occupiedPort(host?)` (`tests/unit/lib/local-server/occupied-port.ts`) holds
+  - `occupiedPort(host?)` (`tests/unit/lib/server/local/occupied-port.ts`) holds
     a TCP listener on a port the OS picks and returns the port, for a test of
     what the CLI does on a port that is taken.
 - A fixture lives in `tests/fixtures/`, in the file named for what it provides (`http.ts`,
