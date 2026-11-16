@@ -77,26 +77,6 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
 }
 
 /**
- * The `variable set` arguments that publish a variable as its field needs it.
- *
- * @remarks
- * A preview freezes the preview kind alone, so the value it lacks is set for
- * that kind.
- *
- * @param variable - The variable.
- * @param secret - Whether the field needs a secret variable.
- * @param mode - The publish the variable is for.
- * @returns The arguments.
- */
-function variableSet(variable: string, secret: boolean, mode: PipelineMode): Suggestion {
-  return {
-    id: "variable:set",
-    args: { name: variable },
-    flags: { secret, preview: mode === "preview" },
-  };
-}
-
-/**
  * Refuse a connection whose variables are not what the engine needs: they
  * exist, the client id is a plain one it can put in the authorize URL, the
  * client secret is a secret one, and they are not one and the same.
@@ -148,7 +128,11 @@ function checkCredentialVariables(
     const field = use.field;
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    const setCommand = variableSet(variable, wantsSecret, ctx.mode);
+    const setCommand: Suggestion = {
+      id: "variable:set",
+      args: { name: variable },
+      flags: { secret: wantsSecret, preview: ctx.mode === "preview" },
+    };
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
       throw new ZitadelError(

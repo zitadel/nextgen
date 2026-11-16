@@ -1,10 +1,6 @@
 import { providerOf, selectionName } from "@zitadel/config/idp";
 
-import {
-  type EnableServices,
-  type Fact,
-  republishCommand,
-} from "@/cli/commands/auth-method/sso/enable/shared";
+import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import {
   callbackUriFor,
   CredentialDelivery,
@@ -95,7 +91,11 @@ export class PlanChange extends WizardStep<
       connection,
       reused,
       republish: (missing) => {
-        return republishCommand(this.deps.suggest, missing);
+        return this.deps.suggest({
+          id: "variable:set",
+          args: { name: missing.name },
+          flags: { secret: missing.secret },
+        });
       },
     });
     const callbackUri = callbackUriFor(needs.issuer, connection.slug);

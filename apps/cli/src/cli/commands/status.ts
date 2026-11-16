@@ -342,24 +342,29 @@ function nextActionsFor(
   // `claim`: the local record may be stale (claimed from another machine
   // reads detached), and the server resolves the grant before the window,
   // so the command is the authoritative check, never a guaranteed failure.
-  const guidance = new Guidance(suggest);
   const claim =
     project.claim?.kind === "detached"
       ? project.claim.claimable
         ? [
-            guidance.claimNudge(
+            Claim.nudge(
+              suggest({ id: "claim" }),
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
             ),
           ]
-        : [guidance.claimWindowClosedNudge()]
+        : [
+            Claim.windowClosedNudge(
+              suggest({ id: "claim" }),
+              suggest({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } }),
+            ),
+          ]
       : [];
   if (users === "none") {
     return [Guidance.verifyLogin(project.issuer), ...claim];
   }
   if (users === "some") {
     return [
-      ...guidance.customizeAndPublish(),
-      ...(offersTests ? [guidance.tests()] : []),
+      ...new Guidance(suggest).customizeAndPublish(),
+      ...(offersTests ? [new Guidance(suggest).tests()] : []),
       ...claim,
     ];
   }
@@ -398,7 +403,7 @@ function nextCommandsFor(
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(new Guidance(suggest).claimCommand());
+      commands.push(suggest({ id: "claim" }));
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a

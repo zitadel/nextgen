@@ -9,7 +9,6 @@ import {
   type Fact,
   pickWrittenFile,
   relativeDisplayPath as relativeDisplay,
-  republishCommand,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { Claim } from "@/lib/claim";
@@ -274,7 +273,6 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             commands: [],
           };
     const deadline = this.deps.dryRun ? undefined : Claim.deadline(project.created_at);
-    const guidance = new Guidance(this.deps.suggest);
     const claimNudge =
       !ownedByLocalAdmin &&
       (Claim.state({
@@ -283,9 +281,9 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       }).kind === "detached" ||
         (isLocal && (this.deps.dryRun || hostsPlatform)))
         ? {
-            actions: [guidance.claimNudge(deadline)],
-            boxActions: [guidance.claimBoxNudge(deadline)],
-            commands: [guidance.claimCommand()],
+            actions: [Claim.nudge(this.deps.suggest({ id: "claim" }), deadline)],
+            boxActions: [Claim.boxNudge(this.deps.suggest({ id: "claim" }), deadline)],
+            commands: [this.deps.suggest({ id: "claim" })],
           }
         : {
             actions: [],
@@ -668,7 +666,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
           actions: [
             ...deployStep.actions,
             ...installOutcome.nextActions,
-            guidance.branding(),
+            new Guidance(this.deps.suggest).branding(),
             ...consoleStep.actions,
             ...ssoStep.actions,
             ...claimNudge.actions,
@@ -692,7 +690,11 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                 ];
               }),
             ).map((missing) => {
-              return republishCommand(this.deps.suggest, missing);
+              return this.deps.suggest({
+                id: "variable:set",
+                args: { name: missing.name },
+                flags: { secret: missing.secret },
+              });
             }),
             ...deployStep.commands,
             ...installOutcome.nextCommands,

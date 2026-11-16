@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { startedServer } from "@/cli/commands/local-server/started";
 import { createZitadelClient } from "@/lib/backend";
+import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
@@ -757,13 +758,15 @@ export function advisoryForWarnings(
         `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
-      const guidance = new Guidance(local);
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? guidance.claimWindowClosedNudge()
-          : guidance.claimNudge(undefined),
-        guidance.claimCommand(),
+          ? Claim.windowClosedNudge(
+              local({ id: "claim" }),
+              local({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } }),
+            )
+          : Claim.nudge(local({ id: "claim" }), undefined),
+        local({ id: "claim" }),
       );
     }
   }
