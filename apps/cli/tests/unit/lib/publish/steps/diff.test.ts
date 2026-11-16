@@ -14,9 +14,13 @@ import { aStepContext } from "@tests/helpers/step-context";
  */
 type Live = Readonly<{
   /**
-   * Where it is live; a target with an expiry is a preview.
+   * Where it is live.
    */
-  targets: { origin: string; expires_at?: string }[];
+  targets: { origin: string }[];
+  /**
+   * Whether it went to primary origins or preview URLs; primary when omitted.
+   */
+  kind?: "primary" | "preview";
   /**
    * The commit its release was built from.
    */
@@ -42,9 +46,9 @@ const PRIMARY = { origin: PRIMARY_ORIGIN };
 const SECOND_PRIMARY = { origin: "https://www.acme.com" };
 
 /**
- * A preview origin, which expires.
+ * A preview origin.
  */
-const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
+const PREVIEW = { origin: "https://pr-7.acme.com" };
 
 /**
  * A commit that is in no repository.
@@ -79,6 +83,7 @@ function aRunIn(
           return live.map((deployment, index) => {
             return aDeployment({
               id: `dep_${index}`,
+              kind: deployment.kind ?? "primary",
               targets: deployment.targets,
               release_id: deployment.release ?? "rel_1",
               release: {
@@ -165,7 +170,7 @@ describe("diffStep", () => {
     it("never takes a live preview as the baseline", async ({ dir }) => {
       const result = await diffStep.run(
         aRunIn(dir, [
-          { targets: [PREVIEW], sha: "ffffffffffffffff" },
+          { targets: [PREVIEW], kind: "preview", sha: "ffffffffffffffff" },
           { targets: [PRIMARY], sha: FOREIGN_SHA },
         ]),
       );

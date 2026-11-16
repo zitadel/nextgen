@@ -169,16 +169,13 @@ export class Deployment {
   }
 
   /**
-   * Whether this deployment serves a primary origin. A preview deployment's
-   * targets carry an expiry; it is never the baseline, the guard or the thing a
-   * bare rollback undoes.
+   * Whether this deployment serves a primary origin. A preview deployment is
+   * never the baseline, the guard or the thing a bare rollback undoes.
    *
-   * @returns True when at least one target never expires.
+   * @returns True when the API recorded it as a primary deployment.
    */
   get servesPrimary(): boolean {
-    return this.targets.some((target) => {
-      return target.expires_at == null;
-    });
+    return this.record.kind === "primary";
   }
 
   /**

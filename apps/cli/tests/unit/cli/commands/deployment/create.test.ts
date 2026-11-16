@@ -102,7 +102,7 @@ describe("deployment create at a terminal", () => {
         HttpResponse.json({
           id: "dep_1",
           release_id: "rel_1",
-          targets: origins.map((origin) => ({ origin, expires_at: null })),
+          targets: origins.map((origin) => ({ origin })),
           metadata: { reason: "deploy" },
           deployed_at: "2026-01-01T00:00:00.000Z",
         }),
