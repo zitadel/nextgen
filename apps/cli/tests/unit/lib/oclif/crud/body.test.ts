@@ -8,7 +8,7 @@ import { it } from "@tests/fixtures";
 
 describe("readRawBody", () => {
   it("parses --data", async () => {
-    await expect(readRawBody({ data: '{"name":"x"}' }, "team create")).resolves.toEqual({
+    await expect(readRawBody({ data: '{"name":"x"}' }, "team", "create")).resolves.toEqual({
       name: "x",
     });
   });
@@ -16,24 +16,25 @@ describe("readRawBody", () => {
   it("reads --file", async ({ dir }) => {
     const file = join(dir, "team.json");
     await writeFile(file, '{"name":"from-file"}');
-    await expect(readRawBody({ file }, "team create")).resolves.toEqual({ name: "from-file" });
+    await expect(readRawBody({ file }, "team", "create")).resolves.toEqual({ name: "from-file" });
   });
 
   it("rejects a non-object body", async () => {
-    await expect(readRawBody({ data: "[1]" }, "team create")).rejects.toThrow();
+    await expect(readRawBody({ data: "[1]" }, "team", "create")).rejects.toThrow();
   });
 
   it("returns undefined when no source was given, leaving that call to the command", async () => {
-    await expect(readRawBody({}, "team create")).resolves.toBeUndefined();
+    await expect(readRawBody({}, "team", "create")).resolves.toBeUndefined();
   });
 
   it("refuses `--file -` when stdin is a terminal, rather than waiting on it", async ({
     terminal: _terminal,
   }) => {
-    await expect(readRawBody({ file: "-" }, "user create")).rejects.toMatchObject({
+    await expect(readRawBody({ file: "-" }, "user", "create")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: "--file - reads the body from a pipe, but nothing is piped in",
-      hint: expect.stringContaining("cat body.json | zitadel user create"),
+      hint: "Pipe a body in and pass --file -, or pass it with --file <path> or --data '<json>'.",
+      nextCommands: [{ id: "user:create", flags: { file: "<path>" } }],
     });
   });
 });
@@ -44,14 +45,14 @@ describe("the body as it arrives", () => {
     // field flags and `--set`, against the schema that says what each value
     // is; reading it judges nothing.
     await expect(
-      readRawBody({ data: '{"attributes":{"password":"hunter2"}}' }, "user create"),
+      readRawBody({ data: '{"attributes":{"password":"hunter2"}}' }, "user", "create"),
     ).resolves.toEqual({ attributes: { password: "hunter2" } });
   });
 
   it("returns the same body from a file, which never reaches argv", async ({ dir }) => {
     const file = join(dir, "body.json");
     await writeFile(file, '{"attributes":{"password":"hunter2"}}');
-    await expect(readRawBody({ file }, "user create")).resolves.toEqual({
+    await expect(readRawBody({ file }, "user", "create")).resolves.toEqual({
       attributes: { password: "hunter2" },
     });
   });

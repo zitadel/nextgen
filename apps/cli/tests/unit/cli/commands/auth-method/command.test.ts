@@ -497,6 +497,7 @@ describe("AuthMethodCommand", () => {
               cwd,
             ],
             expect.anything(),
+            expect.anything(),
           ],
         },
       });
@@ -537,6 +538,7 @@ describe("AuthMethodCommand", () => {
               "--cwd",
               cwd,
             ],
+            expect.anything(),
             expect.anything(),
           ],
         },

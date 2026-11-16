@@ -948,6 +948,9 @@ describe("auth-method sso disable", () => {
             expectedPublicCliCommand(
               `auth-method passkey enable --schema default-human-user --cwd ${dir}`,
             ),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' --schema default-human-user --cwd ${dir}`,
+            ),
           ],
         });
       });
@@ -1014,6 +1017,17 @@ describe("auth-method sso disable", () => {
               ],
               ["auth-method", "password", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],
               ["auth-method", "passkey", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],
+              [
+                "auth-method",
+                "sso",
+                "enable",
+                "--provider",
+                "<name>",
+                "--schema",
+                DEFAULT_SCHEMA,
+                "--cwd",
+                dir,
+              ],
             ],
           },
         });

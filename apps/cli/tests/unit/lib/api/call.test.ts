@@ -179,9 +179,12 @@ describe("ApiCall.request", () => {
     );
   });
 
-  it("quotes the placeholder in the example it offers for a path parameter", () => {
+  it("offers the call with the path parameter left to fill in, as a command, not in its hint", () => {
     expect(() => requestFor("getUser", ["user_id=user_1"], { positionals: ["user_1"] })).toThrow(
-      expect.objectContaining({ hint: "For example: zitadel api getUser '<user_id>'" }),
+      expect.objectContaining({
+        hint: "Give it after the operation, as the command under Next does.",
+        nextCommands: [{ id: "api", args: { operation: "getUser" }, rest: ["<user_id>"] }],
+      }),
     );
   });
 

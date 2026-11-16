@@ -124,7 +124,7 @@ const LAST_WAY_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
   hint:
-    `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. ` +
+    "Enable another method first, with one of the commands under Next. " +
     "If the schema's users are only managed through the API, ask a person first: Disable passkey anyway? " +
     "Nobody will be able to sign in to default-human-user. " +
     "Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).",
@@ -505,7 +505,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
             "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
-            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            "A dry run of deploy checks the edited flow; then run the command again.",
         });
       });
 
@@ -596,7 +596,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
             "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
-            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            "A dry run of deploy checks the edited flow; then run the command again.",
         });
       });
     });
@@ -662,6 +662,9 @@ describe("auth-method password and passkey", () => {
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
             ),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' --schema default-human-user --cwd ${dir}`,
+            ),
           ],
         });
       });
@@ -676,6 +679,9 @@ describe("auth-method password and passkey", () => {
           next_commands: [
             expectedPublicCliCommand(
               `auth-method passkey disable --schema default-human-user --force --cwd ${dir}`,
+            ),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' --schema default-human-user --cwd ${dir}`,
             ),
           ],
         });
@@ -693,6 +699,9 @@ describe("auth-method password and passkey", () => {
           next_commands: [
             expectedPublicCliCommand(`auth-method passkey disable ${option} --force --cwd ${dir}`),
             expectedPublicCliCommand(`auth-method password enable ${option} --cwd ${dir}`),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' ${option} --cwd ${dir}`,
+            ),
           ],
         });
       });
@@ -710,6 +719,17 @@ describe("auth-method password and passkey", () => {
             suggested_args: [
               ["auth-method", "passkey", "disable", "--schema", name, "--force", "--cwd", dir],
               ["auth-method", "password", "enable", "--schema", name, "--cwd", dir],
+              [
+                "auth-method",
+                "sso",
+                "enable",
+                "--provider",
+                "<name>",
+                "--schema",
+                name,
+                "--cwd",
+                dir,
+              ],
             ],
           },
         });
@@ -918,6 +938,9 @@ describe("auth-method password and passkey", () => {
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
+            ),
+            expectedPublicCliCommand(
+              `auth-method sso enable --provider '<name>' --schema default-human-user --cwd ${dir}`,
             ),
           ],
         });

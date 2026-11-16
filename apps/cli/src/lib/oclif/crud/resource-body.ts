@@ -117,7 +117,7 @@ const MISSING_FIELDS_REFUSAL = {
 } as const satisfies Refusal;
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
-  const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
+  const raw = await readRawBody(flags, source.topic, source.verb);
   const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   const fromFlags = bodyFromFlags(source.fields, flags);
   const assignments = (flags.set ?? []) as readonly Assignment[];

@@ -212,7 +212,12 @@ describe("auth-method passkey disable", () => {
             source: "",
             code: "E_VALIDATION",
             message: `Disabling passkey in ${SCHEMA_FILE} would break a login flow that still uses it:\n  - ${FLOW_FILE}: step "passkey-first" offers passkey (action "passkey")\n    Left with no field or sign-in method. Entry step of purposes.login. Targeted by register.sign_in (via purposes.login).\n  - ${FLOW_FILE}: step "identifier" offers passkey (action "passkey")\n    Still has field "email".\n  - ${FLOW_FILE}: step "password" offers passkey (action "passkey")\n    Still has field "x-auth-methods#password".\n  - ${FLOW_FILE}: step "register" offers passkey (action "passkey_register")\n    Still has field "email".`,
-            hint: `Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. Delete a step left with no field or sign-in method: retarget the transitions listed for it (one marked via purposes.<key> follows that key instead), and point the purposes key it is the entry step of at another step. ${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
+            hint: `Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. Delete a step left with no field or sign-in method: retarget the transitions listed for it (one marked via purposes.<key> follows that key instead), and point the purposes key it is the entry step of at another step. A dry run of deploy checks the edited flow; then run the command again.`,
+            next_commands: [
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
             details: {
               file: SCHEMA_FILE,
               issues: [
@@ -320,13 +325,16 @@ describe("auth-method passkey disable", () => {
             source: "",
             code: "E_CONFIRMATION_REQUIRED",
             message: `${SCHEMA_FILE} would have no way to sign in left`,
-            hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
+            hint: `Enable another method first, with one of the commands under Next. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
                 `auth-method passkey disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `auth-method password enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `auth-method sso enable --provider '<name>' --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
             details: {
@@ -350,6 +358,19 @@ describe("auth-method passkey disable", () => {
                   "auth-method",
                   "password",
                   "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+                [
+                  "auth-method",
+                  "sso",
+                  "enable",
+                  "--provider",
+                  "<name>",
                   "--schema",
                   SCHEMA,
                   "--server",

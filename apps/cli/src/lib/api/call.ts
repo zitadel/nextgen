@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { Cmd } from "@/lib/cmd";
 import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject } from "@/lib/json";
 import type { ApiRequest, Operation, Target } from "@/lib/backend";
@@ -93,7 +92,10 @@ export class ApiCall {
           "E_VALIDATION",
           "--input - reads the body from a pipe, but nothing is piped in",
           {
-            hint: "Pipe a body in (`cat body.json | zitadel api … --input -`), or pass --input <path>.",
+            hint: "Pipe a body in and pass --input -, or pass --input <path>.",
+            nextCommands: [
+              { id: "api", args: { operation: "<operation>" }, flags: { input: "<path>" } },
+            ],
           },
         );
       }
@@ -213,7 +215,10 @@ export class ApiCall {
             : `${head} is a ${parameter.in} parameter, which the CLI does not send`,
           parameter.in === "path"
             ? {
-                hint: `For example: zitadel api ${Cmd.quote(operation.id)} ${Cmd.quote(`<${head}>`)}`,
+                hint: "Give it after the operation, as the command under Next does.",
+                nextCommands: [
+                  { id: "api", args: { operation: operation.id }, rest: [`<${head}>`] },
+                ],
               }
             : {},
         );
