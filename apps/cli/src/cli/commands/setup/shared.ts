@@ -41,6 +41,7 @@ import {
   type SecretOutcome,
   selectionFromFlags,
   ssoEnableFlags,
+  type Unpublished,
 } from "@/lib/idp";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
@@ -1499,4 +1500,20 @@ export function promptContext(
     passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
     developmentBuild: Runtime.current().isDevelopment(),
   };
+}
+
+/**
+ * The `variable set` that publishes a credential the project never received,
+ * rendered for the run that reports it.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @param missing - The credential the project lacks.
+ * @returns The command.
+ */
+export function republishCommand(suggest: Suggest, missing: Unpublished): SuggestedCommand {
+  return suggest({
+    id: "variable:set",
+    args: { name: missing.name },
+    flags: { secret: missing.secret },
+  });
 }

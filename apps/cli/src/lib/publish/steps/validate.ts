@@ -125,7 +125,7 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
         ? {
             nextCommands: [
               { id: "variable:set", args: { name: "NAME" }, flags: { secret: true } },
-            ] as const,
+            ],
           }
         : {}),
       details: {

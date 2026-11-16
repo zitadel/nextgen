@@ -3,6 +3,7 @@ import {
   type EnableServices,
   type Fact,
   payload,
+  republishCommand,
 } from "@/cli/commands/auth-method/sso/enable/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
@@ -57,11 +58,7 @@ export class ShowResult extends WizardStep<"result", Fact<"answer">, Needs> {
     const followUps = this.deps.followUps(
       unpublished,
       needs.delivery.unpublishedOf(needs.published).map((missing) => {
-        return this.deps.suggest({
-          id: "variable:set",
-          args: { name: missing.name },
-          flags: { secret: missing.secret },
-        });
+        return republishCommand(this.deps.suggest, missing);
       }),
     );
     if (!this.deps.isJson) {

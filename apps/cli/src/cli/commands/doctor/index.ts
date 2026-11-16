@@ -757,12 +757,13 @@ export function advisoryForWarnings(
         `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
+      const guidance = new Guidance(local);
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? new Guidance(local).claimWindowClosedNudge()
-          : new Guidance(local).claimNudge(undefined),
-        new Guidance(local).claimCommand(),
+          ? guidance.claimWindowClosedNudge()
+          : guidance.claimNudge(undefined),
+        guidance.claimCommand(),
       );
     }
   }

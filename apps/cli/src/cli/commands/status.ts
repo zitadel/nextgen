@@ -342,23 +342,24 @@ function nextActionsFor(
   // `claim`: the local record may be stale (claimed from another machine
   // reads detached), and the server resolves the grant before the window,
   // so the command is the authoritative check, never a guaranteed failure.
+  const guidance = new Guidance(suggest);
   const claim =
     project.claim?.kind === "detached"
       ? project.claim.claimable
         ? [
-            new Guidance(suggest).claimNudge(
+            guidance.claimNudge(
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
             ),
           ]
-        : [new Guidance(suggest).claimWindowClosedNudge()]
+        : [guidance.claimWindowClosedNudge()]
       : [];
   if (users === "none") {
     return [Guidance.verifyLogin(project.issuer), ...claim];
   }
   if (users === "some") {
     return [
-      ...new Guidance(suggest).customizeAndPublish(),
-      ...(offersTests ? [new Guidance(suggest).tests()] : []),
+      ...guidance.customizeAndPublish(),
+      ...(offersTests ? [guidance.tests()] : []),
       ...claim,
     ];
   }

@@ -455,7 +455,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         data: {
           next_commands: expect.arrayContaining([
-            expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
+            expect.stringMatching(/variable set GOOGLE_CLIENT_SECRET --secret .*--cwd /),
           ]),
         },
       });

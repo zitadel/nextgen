@@ -10,6 +10,7 @@ import type {
   GivenCredentials,
   ProviderChoice,
   PublishedCredentials,
+  Unpublished,
 } from "@/lib/idp";
 import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
@@ -460,4 +461,20 @@ export function drawMapping(change: DocumentChange<Connection>): void {
       })
       .join("\n"),
   );
+}
+
+/**
+ * The `variable set` that publishes a credential the project never received,
+ * rendered for the run that reports it.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @param missing - The credential the project lacks.
+ * @returns The command.
+ */
+export function republishCommand(suggest: Suggest, missing: Unpublished): SuggestedCommand {
+  return suggest({
+    id: "variable:set",
+    args: { name: missing.name },
+    flags: { secret: missing.secret },
+  });
 }

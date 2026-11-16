@@ -1,6 +1,11 @@
 import { type ConnectionSlug, credentialVariables, providerOf } from "@zitadel/config/idp";
 
-import type { Fact, SetupServices, SsoAnswer } from "@/cli/commands/setup/shared";
+import {
+  type Fact,
+  republishCommand,
+  type SetupServices,
+  type SsoAnswer,
+} from "@/cli/commands/setup/shared";
 import { createZitadelClient, VariableService, VariableWrite } from "@/lib/backend";
 import {
   publishClientId,
@@ -186,16 +191,12 @@ export class PublishCredentials extends WizardStep<
     reportClientIdOutcome(
       idVariable,
       clientId,
-      this.deps.suggest({ id: "variable:set", args: { name: idVariable } }),
+      republishCommand(this.deps.suggest, { name: idVariable, secret: false }),
     );
     reportSecretOutcome(
       secret,
       false,
-      this.deps.suggest({
-        id: "variable:set",
-        args: { name: secret.name },
-        flags: { secret: true },
-      }),
+      republishCommand(this.deps.suggest, { name: secret.name, secret: true }),
     );
     return [
       [
