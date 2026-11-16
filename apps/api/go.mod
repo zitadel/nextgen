@@ -10,6 +10,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.62.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.38.0
 	github.com/KimMachineGun/automemlimit v1.0.1
+	github.com/ahmetb/go-linq/v5 v5.0.0
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/go-faker/faker/v4 v4.12.0

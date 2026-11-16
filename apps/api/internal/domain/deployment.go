@@ -80,9 +80,9 @@ func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the deployment it replaces does not match expected_deployment_id", details, nil)
 }
 
-// DeploymentVariablesMissingDetails names the kind whose values the deployment
-// would freeze and every referenced name that kind does not hold.
-type DeploymentVariablesMissingDetails struct {
+// DeploymentVariablesDetails names the kind whose values the deployment would
+// freeze and every referenced name of that kind a deploy refuses.
+type DeploymentVariablesDetails struct {
 	Kind  string   `json:"kind"`
 	Names []string `json:"names"`
 }
@@ -95,7 +95,22 @@ func ErrDeploymentVariablesMissing(kind DeploymentOriginKind, names []string) Er
 	return newError(
 		PrefixDeployment.ErrorCodePrefix("variables_missing"),
 		"deployment: the release references variables its kind has no value for",
-		DeploymentVariablesMissingDetails{Kind: kind.String(), Names: sorted},
+		DeploymentVariablesDetails{Kind: kind.String(), Names: sorted},
+		nil,
+	)
+}
+
+// ErrDeploymentVariablesNotSecret refuses a deploy whose release names, as a
+// client secret of an application client or an identity provider, variables
+// the frozen set holds as plain values. names is
+// sorted so the wire order is stable.
+func ErrDeploymentVariablesNotSecret(kind DeploymentOriginKind, names []string) Error {
+	sorted := slices.Clone(names)
+	slices.Sort(sorted)
+	return newError(
+		PrefixDeployment.ErrorCodePrefix("variables_not_secret"),
+		"deployment: the release names plain variables as client secrets",
+		DeploymentVariablesDetails{Kind: kind.String(), Names: sorted},
 		nil,
 	)
 }

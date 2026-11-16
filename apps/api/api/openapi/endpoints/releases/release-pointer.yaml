@@ -32,6 +32,8 @@ properties:
         separate resources a release pins separately
       - `policy` — the policy's `operation`, so a project's password policy
         is one resource however often it is revised
+      - `application` — the application's `slug`, so `shop` and `blog` are
+        separate resources a release pins separately
 
       Resources inside a release reference each other by handle, not by
       revision ID. The same handle therefore names the same resource in every

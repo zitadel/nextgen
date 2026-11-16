@@ -18,7 +18,7 @@ func webClient(redirectURIs ...string) domain.ApplicationClientDocument {
 	}
 }
 
-func TestValidateApplicationDocument(t *testing.T) {
+func TestValidateRegisteredApplication(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -110,7 +110,7 @@ func TestValidateApplicationDocument(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := domain.ValidateApplicationDocument(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.clients})
+			err := domain.ValidateRegisteredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: tt.clients})
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 				return
@@ -122,6 +122,71 @@ func TestValidateApplicationDocument(t *testing.T) {
 				require.True(t, ok)
 				assert.Equal(t, tt.want, de.Details)
 			}
+		})
+	}
+}
+
+func TestValidateRegisteredApplicationRefusesASecretVariable(t *testing.T) {
+	t.Parallel()
+
+	client := webClient("https://shop.example.com/cb")
+	client.Secret = new("${{ SHOP_WEB_SECRET }}")
+	err := domain.ValidateRegisteredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: []domain.ApplicationClientDocument{client}})
+	require.ErrorIs(t, err, domain.ErrApplicationInvalid(nil, nil))
+	var de domain.Error
+	require.True(t, errors.As(err, &de))
+	assert.Equal(t, map[string]string{
+		"/clients/0/secret": "only a client declared in a release names its secret; the server generates a registered client's secret",
+	}, de.Details)
+}
+
+func TestValidateDeclaredApplication(t *testing.T) {
+	t.Parallel()
+
+	declared := func(clientID, secret *string) domain.ApplicationClientDocument {
+		client := webClient("https://shop.example.com/cb")
+		client.Type = "confidential"
+		client.ClientID, client.Secret = clientID, secret
+		return client
+	}
+	withoutRedirect := declared(new("shop-web"), new("${{ SHOP_WEB_SECRET }}"))
+	withoutRedirect.RedirectURIs = nil
+	tests := []struct {
+		name   string
+		client domain.ApplicationClientDocument
+		want   map[string]string
+	}{
+		{
+			name:   "a client with its client_id and secret variable passes",
+			client: declared(new("shop-web"), new("${{ SHOP_WEB_SECRET }}")),
+		},
+		{
+			name:   "a client without its client_id or secret variable",
+			client: declared(nil, nil),
+			want: map[string]string{
+				"/clients/0/client_id": "a client declared in a release sets its client_id",
+				"/clients/0/secret":    "a confidential client declared in a release names the variable holding its secret",
+			},
+		},
+		{
+			name:   "the rules both writers share still hold",
+			client: withoutRedirect,
+			want:   map[string]string{"/clients/0/redirect_uris": "authorization_code requires at least one redirect URI"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := domain.ValidateDeclaredApplication(domain.ApplicationDocument{Slug: "shop", Name: "Shop", Clients: []domain.ApplicationClientDocument{tt.client}})
+			if tt.want == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, domain.ErrApplicationInvalid(nil, nil))
+			var de domain.Error
+			require.True(t, errors.As(err, &de))
+			assert.Equal(t, tt.want, de.Details)
 		})
 	}
 }
@@ -206,6 +271,76 @@ func TestApplicationClientsToCreate(t *testing.T) {
 			var de domain.Error
 			ok := errors.As(err, &de)
 			require.True(t, ok)
+			assert.Equal(t, tt.wantDetails, de.Details)
+		})
+	}
+}
+
+// A release checks clients against every client the application ever
+// stored: it may drop one and declare it again, never under another
+// client_id.
+func TestDeclaredClientsToCreate(t *testing.T) {
+	t.Parallel()
+
+	stored := []*domain.ApplicationClient{
+		{Slug: "web", ClientID: "shop-web"},
+		{Slug: "api", ClientID: "shop-api"},
+	}
+
+	tests := []struct {
+		name        string
+		stored      []*domain.ApplicationClient
+		document    []domain.ApplicationClientDocument
+		want        []string
+		wantErr     error
+		wantDetails any
+	}{
+		{
+			name:     "on create every client is new",
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			want:     []string{"web"},
+		},
+		{
+			name:     "a dropped client is not an error",
+			stored:   stored,
+			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+		},
+		{
+			name:     "a client declared again under its client_id is not created again",
+			stored:   stored,
+			document: []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api")}, {Slug: "cli", ClientID: new("shop-cli")}},
+			want:     []string{"cli"},
+		},
+		{
+			name:        "a client declared again under another client_id",
+			stored:      stored,
+			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
+			wantErr:     domain.ErrApplicationFieldImmutable(nil),
+			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
+		},
+		{
+			name:     "a new client with a reserved prefix",
+			stored:   stored,
+			document: []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("client_mine")}},
+			wantErr:  domain.ErrApplicationInvalid(nil, nil),
+			wantDetails: map[string]string{
+				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := domain.DeclaredClientsToCreate(tt.stored, domain.ApplicationDocument{Clients: tt.document})
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+				return
+			}
+			require.ErrorIs(t, err, tt.wantErr)
+			var de domain.Error
+			require.True(t, errors.As(err, &de))
 			assert.Equal(t, tt.wantDetails, de.Details)
 		})
 	}

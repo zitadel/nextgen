@@ -309,7 +309,7 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 	validator, err := domain.NewSchemaValidator("https://example.com/api/schemas")
 	require.NoError(t, err)
 	return applicationFixture{
-		svc:      service.NewApplicationService(service.NewPool(pool), validator, &countingSecrets{}),
+		svc:      service.NewApplicationService(service.NewPool(pool), validator, &countingSecrets{}, nil, nil),
 		pool:     poolStmts,
 		tx:       txStmts,
 		events:   events,

@@ -1021,10 +1021,28 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 		"GONE":  api.NewVariableScalarVariableInput(api.NewStringVariableScalar("gone")),
 		"ZEBRA": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("zebra")),
 	})
+	// The connection's client_secret names GONE, so a plain value refuses
+	// the deploy as well.
+	plain := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentBadRequest{}, plain, helpers.MustMarshal(t, plain))
+	notSecret, ok := plain.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesNotSecret()
+	require.True(t, ok, helpers.MustMarshal(t, plain))
+	assert.Equal(t, api.DeploymentVariablesNotSecretDetails{
+		Kind:  api.DeploymentKindPrimary,
+		Names: []string{"GONE"},
+	}, notSecret.Details)
+	assert.Zero(t, fixture.deploymentCount(t))
+
+	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
+		"GONE": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+			Value:  api.NewStringVariableScalar("gone"),
+			Secret: true,
+		}),
+	})
 	deployed := fixture.deploy(t, releaseID)
 	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
 	assert.Equal(t, api.Variables{
-		"GONE":  api.NewVariableScalarVariable(api.NewStringVariableScalar("gone")),
+		"GONE":  api.NewSecretVariableVariable(api.SecretVariable{Secret: true}),
 		"ZEBRA": api.NewVariableScalarVariable(api.NewStringVariableScalar("zebra")),
 	}, fixture.frozenVariables(t, deployed.(*api.CreateDeploymentCreated).ID))
 	assert.Equal(t, 1, fixture.deploymentCount(t))

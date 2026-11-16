@@ -34,20 +34,29 @@ export function releaseStatus(release: { revoked_at: string | null }): ReleaseSt
 }
 
 /**
- * The pointer kinds in the order the detail lists them, with the heading over
- * each group and what the document viewer's footer calls one document.
+ * Each pointer kind's heading over its group and what the document viewer's
+ * footer calls one document, in the order the detail lists them. Keyed by
+ * kind, so a kind the API adds fails the type check until it is listed here.
  */
+const POINTER_KIND_LABELS: Record<ReleasePointerKind, { label: string; noun: string }> = {
+  schema: { label: "User schemas", noun: "schema" },
+  flow_definition: { label: "Login flows", noun: "definition" },
+  branding: { label: "Branding", noun: "branding" },
+  idp: { label: "Identity providers", noun: "connection" },
+  application: { label: "Applications", noun: "application" },
+  oauth: { label: "OAuth settings", noun: "settings" },
+  policy: { label: "Policies", noun: "policy" },
+};
+
+/** The pointer kinds in the order the detail lists them. */
 export const POINTER_KINDS: readonly {
   kind: ReleasePointerKind;
   label: string;
   noun: string;
-}[] = [
-  { kind: "schema", label: "User schemas", noun: "schema" },
-  { kind: "flow_definition", label: "Login flows", noun: "definition" },
-  { kind: "branding", label: "Branding", noun: "branding" },
-  { kind: "idp", label: "Identity providers", noun: "connection" },
-  { kind: "policy", label: "Policies", noun: "policy" },
-];
+}[] = (Object.keys(POINTER_KIND_LABELS) as ReleasePointerKind[]).map((kind) => ({
+  kind,
+  ...POINTER_KIND_LABELS[kind],
+}));
 
 /** A pointer with the revision it names read, or not. */
 export interface ResolvedPointer {
@@ -69,9 +78,9 @@ export interface ResolvedPointer {
  * screen: the release is still what the operator came for, and the handle
  * still says which resource the pointer pins.
  *
- * Schema, identity provider and policy ids are unique per project only, so
- * those reads name the selected project; the flow and branding reads take the
- * revision id alone.
+ * Schema, identity provider, application and policy ids are unique per
+ * project only, so those reads name the selected project; the flow, branding
+ * and OAuth settings reads take the revision id alone.
  */
 export async function resolvePointer(
   pointer: ReleasePointer,
@@ -101,6 +110,16 @@ export async function resolvePointer(
         const body = await api.getIdpRevision(pointer.revision_id, { project_id: projectId });
         return { ...base, name: handleName(pointer), document: body.definition };
       }
+      case "application": {
+        const body = await api.getApplicationRevisionById(pointer.revision_id, {
+          project_id: projectId,
+        });
+        return { ...base, name: body.definition.name, document: body.definition };
+      }
+      case "oauth": {
+        const body = await api.getOAuthSettingsById(pointer.revision_id);
+        return { ...base, name: handleName(pointer), document: body.oauth };
+      }
       case "policy": {
         const revision = await api.getPolicyRevision(pointer.revision_id, {
           project_id: projectId,
@@ -120,9 +139,10 @@ export async function resolvePointer(
 }
 
 /**
- * The name a pointer takes from its handle. Branding, identity providers and
- * policies are always named this way, so their rows read the same whether or
- * not the revision could be read; schemas and flows fall back to it.
+ * The name a pointer takes from its handle. Branding, identity providers,
+ * OAuth settings and policies are always named this way, so their rows read
+ * the same whether or not the revision could be read; schemas, flows and
+ * applications fall back to it.
  */
 function handleName(pointer: ReleasePointer): string {
   return pointer.kind === "policy" ? policyDisplayName(pointer.handle) : humanise(pointer.handle);

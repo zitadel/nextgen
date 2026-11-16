@@ -292,6 +292,8 @@ paths:
     $ref: endpoints/applications/methods.yaml
   /applications/{application_id}:
     $ref: endpoints/applications/by_id/methods.yaml
+  /applications/revisions/{revision_id}:
+    $ref: endpoints/applications/revisions/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
   /policies/evaluate:

@@ -199,8 +199,10 @@ var webhookByEventType = map[string]webhookDoc{
 		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
 
-	"application.created": {description: "A registered application was created."},
-	"application.updated": {description: "A registered application was revised. The payload holds the new " +
+	"application.created": {description: "An application was created, through the API or by the release build " +
+		"that first declared it."},
+	"application.updated": {description: "An application was revised, through the API or by a release build. " +
+		"The payload holds the new " +
 		"revision, the name when it changed, and the clients the revision added."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
