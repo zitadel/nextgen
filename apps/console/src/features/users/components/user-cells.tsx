@@ -67,18 +67,16 @@ export function UserIdentityCell({
         sticky && [RESOURCE_STICKY_START, RESOURCE_STICKY_BODY],
       )}
     >
-      <span className="flex min-w-0 items-center">
-        {card ? (
-          <HoverCard openDelay={400} closeDelay={100}>
-            <HoverCardTrigger asChild>{link}</HoverCardTrigger>
-            <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
-              <UserIdentityCard user={user} context={card} />
-            </HoverCardContent>
-          </HoverCard>
-        ) : (
-          link
-        )}
-      </span>
+      {card ? (
+        <HoverCard openDelay={400} closeDelay={100}>
+          <HoverCardTrigger asChild>{link}</HoverCardTrigger>
+          <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
+            <UserIdentityCard user={user} context={card} />
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        link
+      )}
       {user.secondary && (
         <span className="text-muted-foreground mt-0.5 block min-w-0 truncate text-xs">
           {user.secondary}
@@ -130,7 +128,7 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           )}
         </p>
       </div>
-      <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-2.5 leading-4.5">
+      <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 pt-2.5 leading-4.5">
         <dt className="text-muted-foreground">Signs in with</dt>
         <dd className="min-w-0 truncate">
           {user.identifier ? (

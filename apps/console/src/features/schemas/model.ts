@@ -172,6 +172,23 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
   return objectFields(schema, [], field(schema, "x-identifier"));
 }
 
+/**
+ * Every property name a schema collects, nested ones too, each as its key and
+ * its dotted path (`email`, `contact.email`): what a schema search matches.
+ */
+export function schemaPropertyNames(schema: UserSchema): string[] {
+  const names = new Set<string>();
+  const walk = (fields: SchemaField[]) => {
+    for (const entry of fields) {
+      names.add(entry.key).add(entry.attributePath);
+      if (entry.kind === "object") walk(entry.fields);
+      if (entry.kind === "array") walk([entry.item]);
+    }
+  };
+  walk(schemaFields(schema));
+  return [...names];
+}
+
 function objectFields(node: UserSchema, path: string[], identifier?: string): SchemaField[] {
   const required = new Set(readRequiredOrder(node));
   const properties = readProperties(node);

@@ -11,7 +11,7 @@ import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
 import { useRequiredProjectScope } from "@/features/projects/project-scope";
 import { fetchAllSchemas } from "@/features/schemas/api";
-import { schemaDisplayName, schemaFields } from "@/features/schemas/model";
+import { schemaDisplayName, schemaFields, schemaPropertyNames } from "@/features/schemas/model";
 import {
   draftValue,
   formRoot,
@@ -85,6 +85,7 @@ function AddUserForm({
               id,
               schema,
               name: schemaDisplayName(schema, id),
+              keywords: schemaPropertyNames(schema),
             }) satisfies SchemaOption,
         );
         if (cancelled) return;

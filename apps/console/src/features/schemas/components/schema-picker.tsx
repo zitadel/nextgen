@@ -8,13 +8,15 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@/components/ui/combobox";
-import { schemaFields, type UserSchema } from "@/features/schemas/model";
+import type { UserSchema } from "@/features/schemas/model";
 
 /** A schema plus the id needed to reference it in the created user's `schema`. */
 export interface SchemaOption {
   id: string;
   schema: UserSchema;
   name: string;
+  /** The property names it collects, nested ones too, which search matches. */
+  keywords: string[];
 }
 
 /** Searchable schema picker, composed from the shared Combobox. */
@@ -57,7 +59,7 @@ export function SchemaPicker({
           value: option.id,
           label: option.name,
           // Typing a property name finds the schemas that collect it.
-          keywords: schemaFields(option.schema).map((field) => field.key),
+          keywords: option.keywords,
         }))}
         selected={selected ? [selected.id] : []}
         searchPlaceholder="Search schemas"

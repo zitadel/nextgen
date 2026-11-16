@@ -34,8 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  * - Trigger: default, multiple or invalid, each resting, active, focused or
  *   disabled. `h-9`, `gap-1.5`,
  *   `pl-2.5 pr-1 py-1`, `rounded-md`, `border-input`, `shadow-xs`,
- *   `bg-background dark:bg-input/30`; optional inline addon glyph at 50% opacity;
- *   trailing 24px box holding a 12px chevron.
+ *   `bg-background dark:bg-input/30`; trailing 24px box holding a 12px chevron.
  * - List: `rounded-md`, `bg-popover`,
  *   `shadow-md`, hairline in `foreground/10`.
  * - Menu item: one-line (32px) and two-line (48px, label over description).
@@ -94,7 +93,6 @@ export function ComboboxTrigger({
   open,
   disabled,
   invalid,
-  addon,
   className,
   children,
   onOpen,
@@ -106,8 +104,6 @@ export function ComboboxTrigger({
   open: boolean;
   disabled?: boolean;
   invalid?: boolean;
-  /** Optional inline glyph, rendered at 50% opacity per the addon slot. */
-  addon?: ReactNode;
   onOpen: () => void;
 }) {
   return (
@@ -143,11 +139,6 @@ export function ComboboxTrigger({
         }
       }}
     >
-      {addon && (
-        <span className="flex shrink-0 items-center opacity-50" aria-hidden>
-          {addon}
-        </span>
-      )}
       {children}
       <ComboboxChevron />
     </div>
