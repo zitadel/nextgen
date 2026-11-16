@@ -5,21 +5,18 @@ import { z } from "zod";
 import { ClaimService } from "@/lib/backend";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
-import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
-import { requireValue } from "@/lib/environment";
+import { Claim as ClaimWindow } from "@/lib/claim";
 import { ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/log";
+import { section, log, warnings } from "@/lib/ui";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
-import { normalizePublicCliCommand } from "@/lib/public-cli";
-import { isLoopbackUrl } from "@/lib/server";
+import { Server } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { section } from "@/lib/ui";
-import { reportWarning } from "@/lib/warnings";
+import { Project } from "@/lib/project";
+import { Spelling } from "@/lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -117,7 +114,7 @@ const WAIT_STOPPED_REFUSAL = {
  * window, so suggesting `claim` again would send the user in a circle.
  */
 const WINDOW_CLOSED_REFUSAL = {
-  message: `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+  message: `This project was not claimed within ${ClaimWindow.WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
   hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
 } as const satisfies Refusal;
 
@@ -209,23 +206,23 @@ export default class Claim extends EnvironmentCommand {
       !this.nonInteractive
         ? await this.connect()
         : undefined;
-    const projectId = prompted?.projectId ?? requireValue(this.environment, "ZITADEL_PROJECT_ID");
+    const projectId = prompted?.projectId ?? this.environment.require("ZITADEL_PROJECT_ID");
     // `.zitadel/secret` is a local cache of the claim, used only when it records
     // this very project; the durable record is the platform grant (ADR 046).
-    const localSecret = (await hasZitadelSecret(this.cwd))
-      ? await readZitadelSecret(this.cwd)
+    const localSecret = (await Project.at(this.cwd).hasSecret())
+      ? await Project.at(this.cwd).secret()
       : undefined;
-    const localRecord = localSecret?.project_id === projectId ? localSecret : undefined;
+    const localRecord = localSecret?.data.project_id === projectId ? localSecret : undefined;
 
     // The local record is authoritative enough to skip the round trip: the
     // platform enforces first-claim-wins anyway, so re-asking could only ever
     // return the same answer at the cost of a request. An env project with no
     // matching local record falls through and lets the platform answer.
-    if (localRecord && isAttached(localRecord)) {
+    if (localRecord && ClaimWindow.isAttached(localRecord.data)) {
       return this.alreadyClaimed({
         project_id: projectId,
-        team_id: localRecord.team_id,
-        claimed_at: localRecord.claimed_at,
+        team_id: localRecord.data.team_id,
+        claimed_at: localRecord.data.claimed_at,
       });
     }
 
@@ -307,8 +304,11 @@ export default class Claim extends EnvironmentCommand {
       // on a remote origin — the exact confusion this warning names. Cloud
       // servers legitimately use a console origin different from the API one,
       // so only a loopback API paired with a non-loopback claim page warns.
-      if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
-        reportWarning(
+      if (
+        Server.at(this.meta.source).isLoopback() &&
+        !Server.at(challenge.claim_url).isLoopback()
+      ) {
+        warnings.report(
           `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
             "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
         );
@@ -367,11 +367,9 @@ export default class Claim extends EnvironmentCommand {
     // platform grant is the durable record, and a rerun resolves it through the
     // idempotent already-claimed response rather than a stale local one.
     if (localRecord) {
-      await writeZitadelSecret(this.cwd, {
-        ...localRecord,
-        claimed_at: completed.claimed_at,
-        team_id: completed.team_id,
-      });
+      await localRecord
+        .with({ claimed_at: completed.claimed_at, team_id: completed.team_id })
+        .write();
     }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
@@ -526,7 +524,7 @@ export default class Claim extends EnvironmentCommand {
         next: [
           {
             text: "Wait for the browser step to finish with:",
-            command: normalizePublicCliCommand(wait, this.cliVersion),
+            command: Spelling.at(this.cliVersion).normalizeCommand(wait),
           },
         ],
       },

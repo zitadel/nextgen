@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { PM } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 import { InstallError } from "@/lib/upgrade/errors";
 import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
@@ -74,13 +75,14 @@ describe("PackageInstaller.install", () => {
 
   it("wraps a package manager that runs and exits non-zero, with the exit as the cause", async () => {
     const dir = await project({ "@zitadel/api": "1.0.0" });
-    const run: PlannedInstall["run"] = {
-      command: "npm",
-      verb: "run",
-      operands: [],
-      args: ["exec", "--", "node", "-e", "process.exit(3)"],
-      display: "npm exec -- node -e process.exit(3)",
-    };
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@zitadel/api": "1.0.0" },
+        scripts: { exits: 'node -e "process.exit(3)"' },
+      }),
+    );
+    const run = PM.named("npm").script("exits");
     const install: PlannedInstall = { run, shown: run };
 
     const error = await rejectionOf(() => {

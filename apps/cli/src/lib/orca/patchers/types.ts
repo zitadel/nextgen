@@ -33,6 +33,12 @@ export type PatchContext = PatchView &
     issuer: string;
     server: string;
     cliVersion: string;
+    /**
+     * The version a scaffold writes for the `@zitadel/*` packages it adds: the CLI's own exact
+     * version on the release train, else its dist-tag. Derived from `cliVersion` where each context
+     * is built.
+     */
+    sdkVersion: string;
     scaffoldedFramework?: boolean;
     /**
      * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in

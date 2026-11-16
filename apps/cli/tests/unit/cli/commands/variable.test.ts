@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import VariableRm from "@/cli/commands/variable/rm";
 import VariableSet from "@/cli/commands/variable/set";
-import { DEFAULT_SERVER } from "@/lib/server";
+import { Server } from "@/lib/server";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
@@ -35,7 +35,7 @@ async function makeProject(): Promise<string> {
   return cwd;
 }
 
-const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", DEFAULT_SERVER];
+const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", Server.DEFAULT];
 
 /** Writes a `zitadel.json`, for the runs that exercise server resolution. */
 async function writeConfig(cwd: string, config: unknown): Promise<void> {
@@ -43,7 +43,7 @@ async function writeConfig(cwd: string, config: unknown): Promise<void> {
 }
 
 /** The plain rendering: no `--json`. */
-const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", DEFAULT_SERVER, "--non-interactive"];
+const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", Server.DEFAULT, "--non-interactive"];
 
 /** Run as though stdout were a terminal; under the test runner it is a pipe. */
 async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
@@ -267,7 +267,7 @@ describe("variable list", () => {
     // draw for, whatever the stream is.
     const piped = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
     const terminal = await asPerson(() =>
-      runCliForTest(["variable", "list", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+      runCliForTest(["variable", "list", "--cwd", cwd, "--server", Server.DEFAULT]),
     );
 
     expect(piped.exitCode).toBe(0);
@@ -283,7 +283,7 @@ describe("variable list", () => {
   it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {
     const cwd = await makeProject();
     await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
-    await writeFile(join(cwd, ".env.local"), `ZITADEL_URL=${DEFAULT_SERVER}\n`);
+    await writeFile(join(cwd, ".env.local"), `ZITADEL_URL=${Server.DEFAULT}\n`);
     const hits: unknown[] = [];
     server.use(
       http.get("*/variables", ({ request }) => {
@@ -295,7 +295,7 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", "--cwd", cwd, "--json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(hits.at(-1)).toBe(DEFAULT_SERVER);
+    expect(hits.at(-1)).toBe(Server.DEFAULT);
   });
 });
 
@@ -609,7 +609,7 @@ describe("variable set", () => {
       expect(json.hint).toContain("Pipe it in on stdin.");
       // The server this run was pointed at, before the redirection: without
       // it the piped secret would land in the default project's store.
-      expect(retry).toContain(`--server ${DEFAULT_SERVER}`);
+      expect(retry).toContain(`--server ${Server.DEFAULT}`);
       expect(retry.endsWith(" < value.txt")).toBe(true);
     } finally {
       if (original) {
@@ -1022,7 +1022,7 @@ describe("variable rm asked on a terminal", () => {
   const removingOn = (serverUrl: string, cwd: string, ...answers: Answer[]) =>
     removingWith([], serverUrl, cwd, ...answers);
   const removing = (cwd: string, ...answers: Answer[]) =>
-    removingOn(DEFAULT_SERVER, cwd, ...answers);
+    removingOn(Server.DEFAULT, cwd, ...answers);
   const watchingDeletes = () => {
     const seen = { deleted: false };
     server.use(
@@ -1049,7 +1049,7 @@ describe("variable rm asked on a terminal", () => {
     const cwd = await makeProject();
     watchingDeletes();
 
-    const { talk } = await removingWith(["--preview"], DEFAULT_SERVER, cwd, true);
+    const { talk } = await removingWith(["--preview"], Server.DEFAULT, cwd, true);
 
     expect(talk.asked()).toEqual([
       "Remove the preview value of SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
@@ -1078,7 +1078,7 @@ describe("variable rm asked on a terminal", () => {
         "--cwd",
         cwd,
         "--server",
-        DEFAULT_SERVER,
+        Server.DEFAULT,
         "--force",
       ]),
     );
@@ -1098,7 +1098,7 @@ describe("variable rm asked on a terminal", () => {
         "--cwd",
         cwd,
         "--server",
-        DEFAULT_SERVER,
+        Server.DEFAULT,
         "--force",
       ]),
     );
@@ -1140,7 +1140,7 @@ describe("variable set asked on a terminal", () => {
         "--cwd",
         cwd,
         "--server",
-        DEFAULT_SERVER,
+        Server.DEFAULT,
       ]),
     );
 
@@ -1161,7 +1161,7 @@ describe("variable rm", () => {
     ]);
 
     const json = parseJson(res.stdout) as { next_commands?: string[] };
-    expect(json.next_commands?.[0]).toContain(`--server ${DEFAULT_SERVER}`);
+    expect(json.next_commands?.[0]).toContain(`--server ${Server.DEFAULT}`);
   });
 
   it("keeps --preview in the suggested --force retry, so it removes the override", async () => {

@@ -6,39 +6,37 @@ import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 import { byName, type ByName } from "@/lib/names";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
-import { log } from "@/lib/log";
+import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
-import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
-import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
-import { statusColor } from "@/lib/style";
+import { Server } from "@/lib/server";
 import {
-  type Again,
+  Spelling,
+  commandOf,
   declaredOf,
+  helpOf,
+  isSuggestion,
+  spelled,
+  type Again,
   type FlagNameOf,
   type LooseNext,
-  helpOf,
-  commandOf,
-  isSuggestion,
   type Scope,
   type Suggest,
   type Suggested,
   type SuggestedCommand,
-  spelled,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
-import { processUserAgent, useUserAgent } from "@/lib/user-agent";
-import { claimSkills, eligibleForSkills } from "@/lib/skills-hint";
+import { Runtime } from "@/lib/runtime";
+import { Skills } from "@/lib/skills";
 import type { Presentation, Summary } from "@/lib/ui";
 import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
-import { takeReportedWarnings } from "@/lib/warnings";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -87,7 +85,7 @@ const FORCE_COLOR: FlagVariable = {
  * flags (`./reference.ts`).
  */
 export const FLAG_VARIABLES: readonly FlagVariable[] = [
-  SERVER_VARIABLE,
+  Server.VARIABLE,
   NO_COLOR,
   FORCE_COLOR,
   DO_NOT_TRACK,
@@ -423,10 +421,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected override async init(): Promise<void> {
     // A fresh invocation starts with no warnings, even when an earlier one in
     // the same process (a test run, say) failed before emitting its own.
-    takeReportedWarnings();
+    warnings.take();
     await super.init();
     this.listenForInterrupt();
-    useUserAgent(processUserAgent(this.config.version));
+    Runtime.current().useUserAgent(Runtime.userAgentFor(this.config.version));
   }
 
   /**
@@ -673,10 +671,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     });
     this.skillsOffered =
       this.summarises() && !this.meta.dryRun
-        ? await eligibleForSkills({
-            env: process.env,
-            interactive: !this.meta.nonInteractive,
-          })
+        ? await new Skills(process.env, !this.meta.nonInteractive).eligible()
         : false;
     this.settled = true;
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
@@ -695,7 +690,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Promise<{ value: string }> {
     return options.resolveServer === false
       ? { value: options.source ?? "" }
-      : await resolveServer({ cwd, serverFlag });
+      : await Server.resolve({ cwd, serverFlag });
   }
 
   /**
@@ -865,7 +860,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
-    const reported = takeReportedWarnings();
+    const reported = warnings.take();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
   }
@@ -913,7 +908,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       return undefined;
     }
 
-    return hostUnlessDefault(this.meta.source);
+    return Server.at(this.meta.source).hostUnlessDefault();
   }
 
   /**
@@ -958,12 +953,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
       : [
           {
             text: OVERVIEW,
-            command: publicCliCommand("", this.config.version),
+            command: Spelling.at(this.config.version).command(""),
           },
         ];
     const skills =
       this.skillsOffered && changed
-        ? [claimSkills(process.env, this.suggest({ id: "skills:add" }))]
+        ? [
+            new Skills(process.env, !this.meta.nonInteractive).claim(
+              this.suggest({ id: "skills:add" }),
+            ),
+          ]
         : [];
     return {
       ...summary,
@@ -1059,7 +1058,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       );
     }
     if (this.jsonEnabled()) {
-      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
+      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), warnings.take()));
     } else if (zitadelError.code === "E_CANCELLED") {
       this.ui.stop(zitadelError);
     } else {
@@ -1186,7 +1185,7 @@ function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): Com
     ...stated,
     next: {
       ...stated.next,
-      commands: normalizePublicCliCommands(stated.next.commands, meta.cliVersion),
+      commands: Spelling.at(meta.cliVersion).normalizeCommands(stated.next.commands),
     },
   } as CommandResult;
 }
@@ -1286,7 +1285,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     source: meta.source,
     code: error.code,
     message: error.message,
-    hint: error.hint === undefined ? undefined : spellOutCommands(error.hint, meta.cliVersion),
+    hint: error.hint === undefined ? undefined : Spelling.at(meta.cliVersion).spellOut(error.hint),
     next_commands: error.nextCommands === undefined ? undefined : renderedCommands(error),
     details: error.details,
   };
@@ -1335,10 +1334,10 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // Only the label is coloured, so there is nothing for the spelling to undo.
   const commands = renderedCommands(error);
   return {
-    title: `Error: ${escapeControlCharacters(spellOutCommands(error.message, meta.cliVersion))} (${error.code})`,
+    title: `Error: ${escapeControlCharacters(Spelling.at(meta.cliVersion).spellOut(error.message))} (${error.code})`,
     sections: [],
     lines: error.hint
-      ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
+      ? [escapeControlCharacters(Spelling.at(meta.cliVersion).spellOut(error.hint))]
       : [],
     ...(commands.length === 0
       ? {}
@@ -1385,7 +1384,7 @@ function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelE
  * the label is coloured, so there is nothing for the spelling to undo.
  */
 function warningLine(warning: string): string {
-  return `${statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
+  return `${style.statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
 }
 
 /** The last step of every box: where to find every command. */

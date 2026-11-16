@@ -4,7 +4,7 @@ import { vi } from "vitest";
  * A stand-in for `@clack/prompts`, for a unit test that drives a command's
  * prompts: `vi.mock("@clack/prompts", async () => (await import("<here>")).clackDouble())`.
  * Every prompt is a mock the test answers, and nothing is cancelled until it
- * says so: a cancelled prompt answers `CANCEL_SYMBOL`. `lib/input.ts` is the
+ * says so: a cancelled prompt answers `CANCEL_SYMBOL`. `lib/ui/asker.ts` is the
  * only module that asks, so a double of this package is a double of the one
  * function.
  */

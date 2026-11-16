@@ -1,20 +1,8 @@
 import pTimeout from "p-timeout";
 
 import { UserService } from "@/lib/backend";
-import {
-  type ClaimState,
-  claimAction,
-  claimCommand,
-  claimState,
-  claimWindowClosedAction,
-} from "@/lib/claim-state";
+import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import {
-  customizeAndPublishActions,
-  exploreAllCommands,
-  testsAction,
-  verifyLoginAction,
-} from "@/lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
@@ -31,16 +19,15 @@ import {
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { resolveCwd } from "@/lib/paths";
 import {
-  hasZitadelConfig,
-  hasZitadelSecret,
-  readFrameworkId,
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-} from "@/lib/project";
-import { type Suggest, type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
+  Guidance,
+  Spelling,
+  WHAT_CHANGED,
+  type Suggest,
+  type SuggestedCommand,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { supportsTestSuite } from "@/lib/test-kit";
+import { Project } from "@/lib/project";
+import { TestKit } from "@/lib/test-kit";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -154,7 +141,7 @@ export default class Status extends EnvironmentCommand {
             ].join(", ")}.`,
           ),
         ],
-        overview: exploreAllCommands(this.cliVersion),
+        overview: Spelling.at(this.cliVersion).exploreAllCommands(),
       },
       next: {
         actions: nextActionsFor(
@@ -170,8 +157,8 @@ export default class Status extends EnvironmentCommand {
 
   /** Whether `tests add` writes a suite for the framework `zitadel.json` records. */
   private async offersTests(): Promise<boolean> {
-    const framework = readFrameworkId(await readZitadelConfig(this.cwd).catch(() => ({})));
-    return framework !== undefined && supportsTestSuite(framework);
+    const framework = (await Project.at(this.cwd).configOrEmpty()).frameworkId;
+    return framework !== undefined && new TestKit(framework).supported();
   }
 }
 
@@ -218,7 +205,7 @@ async function projectStatus(
   // one, or a file: its project is whatever it resolves, never setup's.
   named: { name: string; envFile?: string } | undefined,
 ): Promise<ProjectStatus> {
-  if (!(await hasZitadelConfig(cwd))) {
+  if (!(await Project.at(cwd).hasConfig())) {
     return {
       lifecycle: "not-configured",
       message: "zitadel.json has not been created yet.",
@@ -241,8 +228,8 @@ async function projectStatus(
         };
   }
 
-  const config = await readZitadelConfig(cwd);
-  const secret = (await hasZitadelSecret(cwd)) ? await readZitadelSecret(cwd) : undefined;
+  const config = await Project.at(cwd).config();
+  const secret = (await Project.at(cwd).hasSecret()) ? await Project.at(cwd).secret() : undefined;
   // The resolved environment decides the project when it names one — a
   // `status --env production` reads the project from `.env.production.local`,
   // which the local `.zitadel/secret` need not back. Only a config that
@@ -252,12 +239,13 @@ async function projectStatus(
   if (secret === undefined && resolvedProjectId === undefined) {
     return {
       lifecycle: "orphaned-config",
-      project_id: typeof config.project === "string" ? config.project : undefined,
+      project_id: typeof config.data.project === "string" ? config.data.project : undefined,
       message: "zitadel.json exists but .zitadel/secret is missing.",
     };
   }
 
-  const projectId = resolvedProjectId ?? String(config.project ?? secret?.project_id ?? "");
+  const projectId =
+    resolvedProjectId ?? String(config.data.project ?? secret?.data.project_id ?? "");
   // The claim record lives in `.zitadel/secret`, which belongs to the local
   // project. It describes `projectId` only when the resolved environment points
   // at that same project; a `--env` aimed at another project has no local claim
@@ -266,10 +254,10 @@ async function projectStatus(
   // `status --server local` rewrites the source for the health probe but does
   // not move the project, so the source would answer the wrong question.
   const claim =
-    secret !== undefined && projectId === secret.project_id
-      ? claimState({
-          secret,
-          server: readProjectServer(config),
+    secret !== undefined && projectId === secret.data.project_id
+      ? Claim.state({
+          secret: secret.data,
+          server: config.server,
         })
       : ({ kind: "not-applicable" } as const);
   return {
@@ -358,20 +346,20 @@ function nextActionsFor(
     project.claim?.kind === "detached"
       ? project.claim.claimable
         ? [
-            claimAction(
+            Claim.nudge(
               suggest,
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
             ),
           ]
-        : [claimWindowClosedAction(suggest)]
+        : [Claim.windowClosedNudge(suggest)]
       : [];
   if (users === "none") {
-    return [verifyLoginAction(project.issuer), ...claim];
+    return [Guidance.verifyLogin(project.issuer), ...claim];
   }
   if (users === "some") {
     return [
-      ...customizeAndPublishActions(suggest),
-      ...(offersTests ? [testsAction(suggest)] : []),
+      ...new Guidance(suggest).customizeAndPublish(),
+      ...(offersTests ? [new Guidance(suggest).tests()] : []),
       ...claim,
     ];
   }
@@ -410,7 +398,7 @@ function nextCommandsFor(
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(claimCommand(suggest));
+      commands.push(Claim.command(suggest));
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a

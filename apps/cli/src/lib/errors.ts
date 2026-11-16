@@ -536,11 +536,6 @@ function isZodLikeError(error: unknown): boolean {
   );
 }
 
-/** Whether a caught error is the given `errno` code. */
-export function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
-}
-
 /** The message of a caught value, whatever it is. */
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) {

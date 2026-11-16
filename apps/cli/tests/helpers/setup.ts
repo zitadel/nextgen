@@ -1,5 +1,4 @@
 import type { SetupServices } from "@/cli/commands/setup/shared";
-import { asker } from "@/lib/input";
 import { Ui } from "@/lib/ui";
 import { write } from "@tests/helpers/git-repo";
 import { parseJson } from "@tests/helpers/run-cli";
@@ -59,7 +58,7 @@ export function aPromptDeps(
 > {
   const audience = { interactive: true, force: false };
   return {
-    ask: asker(audience),
+    ask: Ui.asker(audience),
     cwd,
     dryRun: false,
     nonInteractive: false,

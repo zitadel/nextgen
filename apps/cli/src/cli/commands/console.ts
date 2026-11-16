@@ -5,12 +5,11 @@ import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-cred
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { consoleSignInUrl } from "@/lib/local-server/sign-in";
-import { log } from "@/lib/log";
+import { section, log } from "@/lib/ui";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { section } from "@/lib/ui";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL = {

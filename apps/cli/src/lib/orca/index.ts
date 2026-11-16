@@ -1,15 +1,19 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { isErrno, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { pathExists, readDirIfExists } from "@/lib/fs";
 import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
+import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
+import { ScaffoldManifestFile } from "./scaffold-manifest";
+import type { ScaffoldManifest } from "@/lib/sync/types";
 import { scaffolders } from "./scaffolders";
 import type { Scaffolder } from "./scaffolders/types";
 
@@ -67,6 +71,52 @@ type ScaffoldStash = Readonly<{
  * internal to that patcher. Registries are injected so tests can supply fakes.
  */
 export class Orca {
+  /**
+   * Whether a file's text says the CLI generated it and still owns it, which is what `doctor` and
+   * `eject` ask before they touch a file.
+   *
+   * @param contents - The file's text.
+   * @returns `true` when the text carries the managed-file marker.
+   */
+  static isManaged(contents: string): boolean {
+    return new ManagedFile(contents).isManaged();
+  }
+
+  /**
+   * The content hash of one scaffolded file, as the scaffold manifest records
+   * it: of the raw text, answering "are these still the bytes setup wrote?".
+   *
+   * @param contents - The file's text.
+   * @returns The hash.
+   */
+  static scaffoldHash(contents: string): string {
+    return ScaffoldManifestFile.hash(contents);
+  }
+
+  /**
+   * Reads the scaffold manifest from `.zitadel/state.json`.
+   *
+   * @param cwd - The project's directory.
+   * @returns The manifest, or `undefined` when it is missing or malformed,
+   *   which sends the doctor's managed-files check into its template-derived
+   *   fallback.
+   */
+  static readManifest(cwd: string): Promise<ScaffoldManifest | undefined> {
+    return new ScaffoldManifestFile(cwd).read();
+  }
+
+  /**
+   * Records which managed app files `setup` wrote, with each one's hash and
+   * ownership class, in `.zitadel/state.json`.
+   *
+   * @param options - What setup wrote, and where.
+   */
+  static writeManifest(
+    options: { cwd: string } & Parameters<ScaffoldManifestFile["write"]>[0],
+  ): Promise<void> {
+    return new ScaffoldManifestFile(options.cwd).write(options);
+  }
+
   private readonly detectors: ReadonlyArray<Detector>;
   private readonly scaffolders: ReadonlyArray<Scaffolder>;
   private readonly patchers: ReadonlyArray<Patcher>;

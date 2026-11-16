@@ -16,7 +16,7 @@ import { isCancel, select, text } from "@clack/prompts";
 import { ChooseServer } from "@/cli/commands/setup/steps/choose-server";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import { LocalServer } from "@/lib/local-server/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { aPromptDeps } from "@tests/helpers/setup";
@@ -49,7 +49,7 @@ const APP_DIR = "/tmp/app";
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = asker({ interactive: true, force: false });
+const ask = Ui.asker({ interactive: true, force: false });
 
 /**
  * The boxes a prompt drew, as setup's own context would have drawn them.

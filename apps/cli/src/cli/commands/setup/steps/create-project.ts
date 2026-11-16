@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { type CreatedProject, createZitadelClient, ProjectService } from "@/lib/backend";
 import { toZitadelError, ZitadelError } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -107,7 +107,7 @@ export class CreateProject extends WizardStep<"project", Fact<"project" | "retry
           }
         : await new ProjectService(
             createZitadelClient({
-              userAgent: userAgent(),
+              userAgent: Runtime.current().userAgent(),
               baseUrl: answers.server,
               signal: this.deps.signal,
             }),

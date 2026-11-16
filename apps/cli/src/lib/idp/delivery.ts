@@ -5,7 +5,7 @@ import {
 } from "@zitadel/config/idp";
 
 import type { Suggest } from "@/lib/suggestion";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui/warnings";
 import type { Connection, Credential } from "@/lib/zitadel";
 
 import {
@@ -114,7 +114,7 @@ export class CredentialDelivery {
     const names = this.names;
     const path = this.run.connection.path;
     if (given.clientId !== undefined && names.clientId === undefined) {
-      reportWarning(
+      warnings.report(
         `${path} holds its client id directly, so nothing was published. Edit the file to change it.`,
       );
     }

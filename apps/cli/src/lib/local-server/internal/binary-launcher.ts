@@ -10,15 +10,16 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
-import { addCommandFor } from "@/lib/package-manager";
-import { CLI_PACKAGE_NAME } from "@/lib/public-cli";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
+import { PM } from "@/lib/pm";
 import { suggestedCommandOf } from "@/lib/suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
 import type { LogSink } from "@/lib/local-server/server-log";
 import { type Clock, realClock, stopSignal } from "./clock";
 import { type Launched, type Launcher, launched } from "./lifecycle";
+import { CliPackage } from "@/lib/upgrade";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -36,7 +37,7 @@ const SERVER_PROGRAM = "nextgen";
  * since the hints that go with it say npm installs @zitadel/server and its
  * platform package.
  */
-const REINSTALL = suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]));
+const REINSTALL = suggestedCommandOf(PM.named("npm").add([`${CliPackage.NAME}@latest`]));
 
 const require = createRequire(import.meta.url);
 

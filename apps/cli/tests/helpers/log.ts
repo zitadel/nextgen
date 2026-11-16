@@ -1,4 +1,4 @@
-import { installLogSink, type LogLevel } from "@/lib/log";
+import { log, type LogLevel } from "@/lib/ui/log";
 
 /** One line of narration, as the code under test said it. */
 export interface Said {
@@ -15,7 +15,7 @@ export interface Said {
  */
 export function recordLog(): { said: Said[]; stop: () => void } {
   const said: Said[] = [];
-  const stop = installLogSink((level, text) => {
+  const stop = log.install((level, text) => {
     said.push({ level, text });
   });
   return { said, stop };

@@ -229,5 +229,5 @@ it stays here deliberately rather than by oversight.
   any connection off loopback.
 - A unit test answers the platform with `usePlatformServer()`
   ([helpers/platform-project.ts](helpers/platform-project.ts)); a spec with
-  `usePlatformMock()`. A command without `--server` talks to `DEFAULT_SERVER`,
+  `usePlatformMock()`. A command without `--server` talks to `Server.DEFAULT`,
   the real platform, so it needs the same.

@@ -12,7 +12,7 @@ import {
 } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
   DiskStore,
@@ -326,7 +326,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     }
     const fromRelease = await this.policiesFromRelease(releaseService, policyService, release);
     if (fromRelease.revoked) {
-      reportWarning(`Release ${release} is revoked, so no origin serves its policies.`);
+      warnings.report(`Release ${release} is revoked, so no origin serves its policies.`);
     }
     return fromRelease.policies;
   }

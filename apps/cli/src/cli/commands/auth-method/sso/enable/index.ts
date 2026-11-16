@@ -13,14 +13,14 @@ import {
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { isDevelopmentBuild } from "@/lib/build-channel";
+import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
 import { type Admitted, CommandGroups, type CommandResult, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { accepts, parses } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 
 import { BuildChange } from "./steps/build-change";
@@ -180,7 +180,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         .step(
           new PlanChange({
             ask: this.ask,
-            developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+            developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
             suggest: this.suggest,
           }),
         )
@@ -234,7 +234,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           { flags },
           {
             onUndoError: (key, error) => {
-              reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },
           },
         ),
