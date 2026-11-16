@@ -1,6 +1,6 @@
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
-import { SIGN_IN_PREFIX } from "./contract";
+import { FLOW_COLLECTIONS, SIGN_IN_PREFIX } from "./contract";
 import { passProtection, zitadelServer } from "./zitadel";
 
 /** A BotID verdict, as `checkBotId()` answers it. */
@@ -9,21 +9,34 @@ export interface BotVerdict {
   isVerifiedBot: boolean;
 }
 
+/** What follows a flow collection in a submit: one flow's id, then `submit`. */
+const SUBMIT_OF_ONE_FLOW = /^\/[^/]+\/submit$/;
+
 /**
  * The widget's two calls that start or advance a sign-in or sign-up: what a
- * bot would script, with or without the API prefix. Everything else under
- * the prefix (sessions, CSRF, a flow's state) passes unchecked.
+ * bot would script, with or without the API prefix, on either of the
+ * collections the server answers them at (`FLOW_COLLECTIONS`). The old
+ * `/flow` is the same write as `/flows` for as long as the server answers it.
+ * Everything else under the prefix (sessions, CSRF, a flow's state, the flow
+ * definitions) passes unchecked.
  */
 export function isFlowWrite(method: string, path: string): boolean {
+  if (method !== "POST") return false;
   const operation = path.startsWith(`${API_PREFIX}/`) ? path.slice(API_PREFIX.length) : path;
-  return method === "POST" && (operation === "/flow" || /^\/flow\/[^/]+\/submit$/.test(operation));
+  return FLOW_COLLECTIONS.some(
+    (collection) =>
+      operation === collection ||
+      (operation.startsWith(`${collection}/`) &&
+        SUBMIT_OF_ONE_FLOW.test(operation.slice(collection.length))),
+  );
 }
 
 /**
  * A path as the widget spells it: segments of unreserved characters, none
  * empty, no trailing slash. Every path of the API fits, ids included. The
- * server routes the path it decodes, so `/%66low` is its `/flow`; any other
- * spelling is refused before `isFlowWrite` reads it, never guessed at.
+ * server routes the path it decodes, so `/%66lows` is its `/flows` and
+ * `/%66low` its `/flow`; any other spelling is refused before `isFlowWrite`
+ * reads it, never guessed at.
  */
 const PLAIN_PATH = /^(\/[A-Za-z0-9._~-]+)+$/;
 

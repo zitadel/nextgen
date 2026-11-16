@@ -126,7 +126,7 @@ function DeleteUserForm({
   // Kept open on failure: the operator has already typed the confirmation, and
   // closing would discard both that and the reason it failed.
   const remove = useSubmit(async () => {
-    await api.deleteUserByID(userId);
+    await api.deleteUser(userId);
     // Raised before the dialog closes, from the root-mounted toaster, so it
     // outlives this subtree — the caller may navigate away on `onDeleted`.
     toast.success(`${name} deleted`);

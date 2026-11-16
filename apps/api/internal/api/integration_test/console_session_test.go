@@ -48,7 +48,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.True(t, slices.ContainsFunc(listed.Schemas, func(s api.Schema) bool { return s.ID == seeded }),
 			"the platform project is seeded with defaults: %s", helpers.MustMarshal(t, listed.Schemas))
 
-		got, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: seeded})
+		got, err := session.GetSchema(t.Context(), api.GetSchemaParams{SchemaID: seeded})
 		require.NoError(t, err)
 		require.IsType(t, &api.Schema{}, got, helpers.MustMarshal(t, got))
 	})
@@ -61,7 +61,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		require.NotEmpty(t, listed.FlowDefinitions, "the platform project is seeded with defaults")
 
-		got, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: listed.FlowDefinitions[0].ID})
+		got, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{FlowDefinitionID: listed.FlowDefinitions[0].ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowDefinitionResponse{}, got, helpers.MustMarshal(t, got))
 	})
@@ -72,9 +72,9 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, secret, console)
-		created, err := secret.CreateBranding(t.Context(), &api.Branding{
+		created, err := secret.PublishBranding(t.Context(), &api.Branding{
 			Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
-		}, api.CreateBrandingParams{ProjectID: projectID})
+		}, api.PublishBrandingParams{ProjectID: projectID})
 		require.NoError(t, err)
 		revision, ok := created.(*api.BrandingRevisionResponse)
 		require.True(t, ok, helpers.MustMarshal(t, created))
@@ -83,11 +83,11 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.ListBrandingResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		require.True(t, slices.ContainsFunc(*listed, func(item api.ListBrandingResponseItem) bool {
+		require.True(t, slices.ContainsFunc(listed.Branding, func(item api.BrandingRevisionSummary) bool {
 			return item.ID == revision.ID
 		}), helpers.MustMarshal(t, listed))
 
-		got, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
+		got, err := session.GetBranding(t.Context(), api.GetBrandingParams{BrandingID: revision.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, got, helpers.MustMarshal(t, got))
 	})
@@ -130,7 +130,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
 		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
 
-		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: ownedID, ReleaseID: created.ID})
+		got, err := session.GetRelease(t.Context(), api.GetReleaseParams{ProjectID: ownedID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 
@@ -219,7 +219,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, secret, owned)
 
 		origin := api.ProjectOrigin{Pattern: "https://console-session-origin.example.com", Kind: api.ProjectOriginKindPrimary}
-		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: ownedID})
+		added, err := session.AddProjectOrigin(t.Context(), &origin, api.AddProjectOriginParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
 		project, err := session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
@@ -227,25 +227,25 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.ProjectDetailResponse{}, project, helpers.MustMarshal(t, project))
 		require.Contains(t, project.(*api.ProjectDetailResponse).Origins, origin)
 
-		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: ownedID})
+		removed, err := session.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{Pattern: origin.Pattern}, api.RemoveProjectOriginParams{ProjectID: ownedID})
 		require.NoError(t, err)
-		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+		require.IsType(t, &api.RemoveProjectOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
 		project, err = session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.NotContains(t, project.(*api.ProjectDetailResponse).Origins, origin)
 
-		written, err := secret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+		written, err := secret.SetVariables(t.Context(), api.UpdateVariablesRequest{
 			"SESSION_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("shown")),
 			"SESSION_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
 				Value: api.NewStringVariableScalar("never-shown"), Secret: true,
 			}),
-		}, api.UpdateVariablesParams{ProjectID: ownedID})
+		}, api.SetVariablesParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
 
 		// The session reads every name with its value per kind, the secret held.
 		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
-		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: ownedID})
+		listed, err := session.ListVariables(t.Context(), api.ListVariablesParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
 		variables := *listed.(*api.VariablesByKind)
@@ -279,9 +279,9 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		combined, ok := resp.(*api.ListEventsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Empty(t, combined.Data)
+		assert.Empty(t, combined.Events)
 
-		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: projectID})
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{EventID: "evt_missing", ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
 	})
@@ -319,7 +319,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		user, ok := created.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, created))
 
-		got, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: user.ID})
+		got, err := session.GetUser(t.Context(), api.GetUserParams{UserID: user.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
@@ -327,16 +327,16 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.UserPasswordState{}, password, helpers.MustMarshal(t, password))
 
-		patched, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		patched, err := session.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Patched"},
-		}), api.PatchUserByIDParams{UserID: user.ID})
+		}), api.UpdateUserParams{UserID: user.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
 		assert.Equal(t, "Patched", userProp(t, *patched.(*api.User), "nickname"))
 
-		deleted, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: user.ID})
+		deleted, err := session.DeleteUser(t.Context(), api.DeleteUserParams{UserID: user.ID})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteUserByIDNoContent{}, deleted, helpers.MustMarshal(t, deleted))
+		require.IsType(t, &api.DeleteUserNoContent{}, deleted, helpers.MustMarshal(t, deleted))
 	})
 
 	// Editor is the least PATCH asks for; the admin grant above would also
@@ -348,9 +348,9 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		harness.SeedProjectEditor(t, edited.ID, claimerID)
 		targetID, _ := harness.CreateUserOwnedByTeam(t, edited.ID)
 
-		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := session.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Patched"},
-		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		}), api.UpdateUserParams{UserID: api.UserID(targetID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "Patched", userProp(t, *resp.(*api.User), "nickname"))
@@ -407,7 +407,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 		assert.True(t, denied.Response.IsEvtNotFound(), helpers.MustMarshal(t, resp))
 
-		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: otherID})
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{EventID: "evt_missing", ProjectID: otherID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
 	})
@@ -422,10 +422,10 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 
 	t.Run("cannot read another project's user", func(t *testing.T) {
 		foreignUserID, _ := harness.CreateUserOwnedByTeam(t, other.ID)
-		resp, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(foreignUserID)})
+		resp, err := session.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserByIDNotFound).Code)
+		require.IsType(t, &api.GetUserNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserNotFound).Code)
 
 		passkeys, err := session.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
@@ -450,21 +450,21 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, otherSecret, other)
 
 	t.Run("cannot delete another project's user", func(t *testing.T) {
-		resp, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(foreignUserID)})
+		resp, err := session.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.DeleteUserByIDNotFound).Code)
+		require.IsType(t, &api.DeleteUserNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.DeleteUserNotFound).Code)
 	})
 
 	t.Run("cannot patch another project's user", func(t *testing.T) {
 		// Its own target: the delete above must not decide this answer.
 		targetID, _ := harness.CreateUserOwnedByTeam(t, other.ID)
-		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := session.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Patched"},
-		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		}), api.UpdateUserParams{UserID: api.UserID(targetID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.PatchUserByIDNotFound).Code)
+		require.IsType(t, &api.UpdateUserNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.UpdateUserNotFound).Code)
 	})
 
 	// A viewer finds the user, so the refusal is the write check, not not-found.
@@ -474,12 +474,12 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		harness.SeedProjectViewer(t, viewed.ID, strangerID)
 		targetID, _ := harness.CreateUserOwnedByTeam(t, viewed.ID)
 
-		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+		resp, err := session.UpdateUser(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Patched"},
-		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		}), api.UpdateUserParams{UserID: api.UserID(targetID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchUserByIDForbidden{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.PatchUserByIDForbidden).Code)
+		require.IsType(t, &api.UpdateUserForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.UpdateUserForbidden).Code)
 	})
 
 	t.Run("cannot update another project's team", func(t *testing.T) {
@@ -500,8 +500,8 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.IsType(t, &api.QueryIdpsNotFound{}, listed, helpers.MustMarshal(t, listed))
 		assert.Equal(t, notFound, listed.(*api.QueryIdpsNotFound).Code)
 		got := stranger.get(t, connection.ID)
-		require.IsType(t, &api.GetIdpByIdNotFound{}, got, helpers.MustMarshal(t, got))
-		assert.Equal(t, notFound, got.(*api.GetIdpByIdNotFound).Code)
+		require.IsType(t, &api.GetIdpNotFound{}, got, helpers.MustMarshal(t, got))
+		assert.Equal(t, notFound, got.(*api.GetIdpNotFound).Code)
 	})
 
 	t.Run("cannot list or read another project's releases", func(t *testing.T) {
@@ -516,7 +516,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		// unknown release does: no existence oracle on the project either.
 		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
 
-		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: otherID, ReleaseID: created.ID})
+		got, err := session.GetRelease(t.Context(), api.GetReleaseParams{ProjectID: otherID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		status, code, _, ok = errorResponseParts(t, got)
 		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, got))
@@ -545,16 +545,16 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	t.Run("cannot add or remove another project's origins, nor read its variables", func(t *testing.T) {
 		// Every op is project-scoped: the miss is the resource's own not
 		// found, which says nothing about the project.
-		added, err := session.AddOrigin(t.Context(), &api.ProjectOrigin{
+		added, err := session.AddProjectOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://stranger.example.com", Kind: api.ProjectOriginKindPrimary,
-		}, api.AddOriginParams{ProjectID: otherID})
+		}, api.AddProjectOriginParams{ProjectID: otherID})
 		require.NoError(t, err)
 		assertAuthzError(t, added, domain.ErrOriginNotFound().Code)
-		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: "https://stranger.example.com"}, api.RemoveOriginParams{ProjectID: otherID})
+		removed, err := session.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{Pattern: "https://stranger.example.com"}, api.RemoveProjectOriginParams{ProjectID: otherID})
 		require.NoError(t, err)
 		assertAuthzError(t, removed, domain.ErrOriginNotFound().Code)
 
-		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: otherID})
+		listed, err := session.ListVariables(t.Context(), api.ListVariablesParams{ProjectID: otherID})
 		require.NoError(t, err)
 		assertAuthzError(t, listed, domain.ErrVariableNotFound().Code)
 		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: otherID, VariableName: "ANY"})
@@ -573,10 +573,10 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		schemaID := harness.CreateUserSchema(t, other, string(schemaJSON))
 
-		resp, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: schemaID})
+		resp, err := session.GetSchema(t.Context(), api.GetSchemaParams{SchemaID: schemaID})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-		denied := resp.(*api.GetSchemaByIdErrorResponseStatusCode)
+		require.IsType(t, &api.GetSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.GetSchemaErrorResponseStatusCode)
 		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 		assert.True(t, denied.Response.IsSchNotFound(), helpers.MustMarshal(t, resp))
 	})
@@ -588,7 +588,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, listed))
 		require.NotEmpty(t, flows.FlowDefinitions)
 
-		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: flows.FlowDefinitions[0].ID})
+		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{FlowDefinitionID: flows.FlowDefinitions[0].ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetFlowDefinitionErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
 		denied := resp.(*api.GetFlowDefinitionErrorResponseStatusCode)
@@ -597,14 +597,14 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	})
 
 	t.Run("cannot read another project's branding", func(t *testing.T) {
-		created, err := otherSecret.CreateBranding(t.Context(), &api.Branding{
+		created, err := otherSecret.PublishBranding(t.Context(), &api.Branding{
 			Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
-		}, api.CreateBrandingParams{ProjectID: otherID})
+		}, api.PublishBrandingParams{ProjectID: otherID})
 		require.NoError(t, err)
 		revision, ok := created.(*api.BrandingRevisionResponse)
 		require.True(t, ok, helpers.MustMarshal(t, created))
 
-		resp, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
+		resp, err := session.GetBranding(t.Context(), api.GetBrandingParams{BrandingID: revision.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("brnd.not_found"), resp.(*api.ErrorDetails).Code)
@@ -700,7 +700,7 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 
 	t.Run("user", func(t *testing.T) {
 		t.Parallel()
-		resp, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		resp, err := session.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(customerUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
@@ -768,9 +768,9 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	t.Run("user delete", func(t *testing.T) {
 		t.Parallel()
 		doomedID, _ := harness.CreateUserOwnedByTeam(t, customer.ID)
-		resp, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(doomedID)})
+		resp, err := session.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(doomedID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.DeleteUserByIDNoContent{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.DeleteUserNoContent{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("schema", func(t *testing.T) {
@@ -783,8 +783,8 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 
 		// Schema ids are unique per project only (the seeded default carries
 		// the same $id everywhere), so the session names the project.
-		resp, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-			ID:        schemas.Schemas[0].ID,
+		resp, err := session.GetSchema(t.Context(), api.GetSchemaParams{
+			SchemaID:  schemas.Schemas[0].ID,
 			ProjectID: api.NewOptProjectID(customerProjectID),
 		})
 		require.NoError(t, err)
@@ -801,21 +801,21 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, listed))
 		require.NotEmpty(t, flows.FlowDefinitions)
 
-		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: flows.FlowDefinitions[0].ID})
+		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{FlowDefinitionID: flows.FlowDefinitions[0].ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("branding", func(t *testing.T) {
 		t.Parallel()
-		created, err := customerSecret.CreateBranding(t.Context(), &api.Branding{
+		created, err := customerSecret.PublishBranding(t.Context(), &api.Branding{
 			Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
-		}, api.CreateBrandingParams{ProjectID: customerProjectID})
+		}, api.PublishBrandingParams{ProjectID: customerProjectID})
 		require.NoError(t, err)
 		revision, ok := created.(*api.BrandingRevisionResponse)
 		require.True(t, ok, helpers.MustMarshal(t, created))
 
-		resp, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
+		resp, err := session.GetBranding(t.Context(), api.GetBrandingParams{BrandingID: revision.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
@@ -830,7 +830,7 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
-		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(customer.ID), RevisionID: created.RevisionID})
+		revision, err := session.GetIdpRevision(t.Context(), api.GetIdpRevisionParams{ProjectID: api.ProjectID(customer.ID), RevisionID: created.RevisionID})
 		require.NoError(t, err)
 		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
@@ -843,7 +843,7 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
 		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
-		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: customerProjectID, ReleaseID: created.ID})
+		got, err := session.GetRelease(t.Context(), api.GetReleaseParams{ProjectID: customerProjectID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 	})
@@ -851,19 +851,19 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	t.Run("origins and variables", func(t *testing.T) {
 		t.Parallel()
 		origin := api.ProjectOrigin{Pattern: "https://granted-origin.example.com", Kind: api.ProjectOriginKindPreview}
-		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: customerProjectID})
+		added, err := session.AddProjectOrigin(t.Context(), &origin, api.AddProjectOriginParams{ProjectID: customerProjectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
-		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: customerProjectID})
+		removed, err := session.RemoveProjectOrigin(t.Context(), &api.RemoveProjectOriginReq{Pattern: origin.Pattern}, api.RemoveProjectOriginParams{ProjectID: customerProjectID})
 		require.NoError(t, err)
-		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+		require.IsType(t, &api.RemoveProjectOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
 
-		written, err := customerSecret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+		written, err := customerSecret.SetVariables(t.Context(), api.UpdateVariablesRequest{
 			"GRANTED_READ": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("granted")),
-		}, api.UpdateVariablesParams{ProjectID: customerProjectID})
+		}, api.SetVariablesParams{ProjectID: customerProjectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
-		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: customerProjectID})
+		listed, err := session.ListVariables(t.Context(), api.ListVariablesParams{ProjectID: customerProjectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
 		require.Contains(t, *listed.(*api.VariablesByKind), "GRANTED_READ")
@@ -877,9 +877,9 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		strangerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
 		stranger := sessionClientForUser(t, strangerID)
 
-		user, err := stranger.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		user, err := stranger.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(customerUserID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserByIDNotFound{}, user, helpers.MustMarshal(t, user))
+		require.IsType(t, &api.GetUserNotFound{}, user, helpers.MustMarshal(t, user))
 
 		team, err := stranger.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(customerTeamID)})
 		require.NoError(t, err)
@@ -895,9 +895,9 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, secret, console)
 
-		resp, err := secret.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		resp, err := secret.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(customerUserID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.GetUserNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }
 
@@ -1087,17 +1087,17 @@ func TestConsoleSessionByIDTeamFilterNeedsProjectRead(t *testing.T) {
 	require.NoError(t, err)
 	session.SetSessionToken(cookie.Value)
 
-	read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(memberID)})
+	read, err := session.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(memberID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, read, "the grant reads the user: %s", helpers.MustMarshal(t, read))
 
-	byTeam, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+	byTeam, err := session.GetUser(t.Context(), api.GetUserParams{
 		UserID: api.UserID(memberID),
 		TeamID: api.NewOptTeamID(api.TeamID(teamID)),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.GetUserByIDErrorResponseStatusCode{}, byTeam, helpers.MustMarshal(t, byTeam))
-	refused := byTeam.(*api.GetUserByIDErrorResponseStatusCode)
+	require.IsType(t, &api.GetUserErrorResponseStatusCode{}, byTeam, helpers.MustMarshal(t, byTeam))
+	refused := byTeam.(*api.GetUserErrorResponseStatusCode)
 	assert.Equal(t, http.StatusForbidden, refused.StatusCode)
 	assert.True(t, refused.Response.IsUserPermissionDenied(), helpers.MustMarshal(t, byTeam))
 
@@ -1159,7 +1159,7 @@ func TestConsoleSessionProjectViewerReadsMemberships(t *testing.T) {
 	})
 
 	t.Run("by id with team_id", func(t *testing.T) {
-		read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+		read, err := session.GetUser(t.Context(), api.GetUserParams{
 			UserID: api.UserID(memberID),
 			TeamID: api.NewOptTeamID(api.TeamID(teamID)),
 		})
@@ -1170,12 +1170,12 @@ func TestConsoleSessionProjectViewerReadsMemberships(t *testing.T) {
 
 		// Past the gate, the parameter answers the membership question: not a
 		// member of that team is 404, not 403.
-		miss, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+		miss, err := session.GetUser(t.Context(), api.GetUserParams{
 			UserID: api.UserID(memberID),
 			TeamID: api.NewOptTeamID(api.TeamID(otherTeamID)),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserByIDNotFound{}, miss, helpers.MustMarshal(t, miss))
+		require.IsType(t, &api.GetUserNotFound{}, miss, helpers.MustMarshal(t, miss))
 	})
 }
 

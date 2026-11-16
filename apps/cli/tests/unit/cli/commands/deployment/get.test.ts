@@ -1,0 +1,167 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { HttpResponse, http } from "msw";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
+
+import { asTerminal } from "@tests/fixtures/terminal";
+import { runCliForTest } from "@tests/helpers/run-cli";
+import DeploymentGet from "@/cli/commands/deployment/get";
+import { it } from "@tests/fixtures";
+import { parseArg } from "@tests/helpers/inputs";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+
+const SERVER = "https://api.zitadel.cloud";
+
+const DEPLOYMENT = {
+  id: "dep_1",
+  project_id: "proj_test",
+  release_id: "rel_1",
+  targets: [{ origin: PRIMARY_ORIGIN }],
+  kind: "primary",
+  status: "live",
+  metadata: { reason: "deploy" },
+  deployed_at: "2026-01-01T00:00:00.000Z",
+};
+
+const FROZEN = { HOST: "app.acme.com", TOKEN: { secret: true } };
+
+/**
+ * Builds a project the deployment can be read from.
+ *
+ * @param server - The server that answers for the platform.
+ * @param cwd - The directory to build the project in.
+ * @param variableReads - Receives the URL of each request for the frozen set, which only a terminal makes.
+ * @returns Once the project is built.
+ */
+async function aProject(
+  server: SetupServer,
+  cwd: string,
+  variableReads: string[] = [],
+): Promise<void> {
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await writeFile(
+    join(cwd, ".zitadel/secret"),
+    JSON.stringify({
+      project_id: "proj_test",
+      project_secret: "sk_test",
+      preview_secret: "pk_test",
+      preview_origins: [],
+      created_at: "2026-01-01T00:00:00.000Z",
+    }),
+  );
+  server.use(
+    http.get(`${SERVER}/api/v1/deployments/dep_1`, () => HttpResponse.json(DEPLOYMENT)),
+    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, ({ request }) => {
+      variableReads.push(request.url);
+      return HttpResponse.json(FROZEN);
+    }),
+  );
+}
+
+const read = (cwd: string) =>
+  runCliForTest([
+    "deployment",
+    "get",
+    "dep_1",
+    "--cwd",
+    cwd,
+    "--server",
+    SERVER,
+    "--non-interactive",
+    "--no-telemetry",
+  ]);
+
+describe("deployment get", () => {
+  it("lays the record out the way every other get does", async ({ server, dir: cwd }) => {
+    await aProject(server, cwd);
+
+    const res = await asTerminal(() => read(cwd));
+
+    expect(res.exitCode).toBe(0);
+    // At the left margin, headed by what identifies it, and carrying the id
+    // the record is addressed by.
+    expect(res.stdout).toContain("dep_1");
+    expect(res.stdout).toMatch(/^id {2,}dep_1$/m);
+    // The fields themselves, as against the hand-rolled view that indented
+    // every one of them two spaces under the identifier.
+    expect(res.stdout).not.toMatch(/^ {2}(id|release|reason|origins|deployed)/m);
+  });
+
+  it("names each field as the wire names it, not in words of its own", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await aProject(server, cwd);
+
+    const res = await asTerminal(() => read(cwd));
+
+    expect(res.stdout).toMatch(/^release_id {2,}rel_1$/m);
+    expect(res.stdout).toMatch(/^deployed_at {2,}2026-01-01T00:00:00\.000Z$/m);
+    expect(res.stdout).not.toContain("deployed  ");
+    expect(res.stdout).not.toMatch(/^release {2,}/m);
+  });
+
+  it("tables the set the deployment froze under the fields, a secret masked", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await aProject(server, cwd);
+
+    const res = await asTerminal(() => read(cwd));
+
+    // A block under a record is headed at the margin with its table indented
+    // under it, the way a release's pointers are.
+    expect(res.stdout).toMatch(/^variables$/m);
+    expect(res.stdout).toMatch(/^ {2,}HOST {2,}app\.acme\.com$/m);
+    expect(res.stdout).toMatch(/^ {2,}TOKEN {2,}\(secret\)$/m);
+  });
+
+  it("gives a pipe the record itself, as every other get does", async ({ server, dir: cwd }) => {
+    await aProject(server, cwd);
+
+    const res = await read(cwd);
+
+    expect(JSON.parse(res.stdout)).toMatchObject({ id: "dep_1", kind: "primary" });
+  });
+
+  it("asks for the frozen set only for the rendering that names it", async ({
+    server,
+    dir: cwd,
+  }) => {
+    const variableReads: string[] = [];
+    await aProject(server, cwd, variableReads);
+
+    await read(cwd);
+    expect(variableReads).toHaveLength(0);
+
+    await asTerminal(() => read(cwd));
+    expect(variableReads).toHaveLength(1);
+  });
+});
+
+const DEPLOYMENT_ID = "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6";
+
+describe("deployment_id", () => {
+  it("takes a deployment id, trimmed", async () => {
+    await expect(
+      parseArg(DeploymentGet.args.deployment_id, ` ${DEPLOYMENT_ID}\n`, "deployment_id"),
+    ).resolves.toBe(DEPLOYMENT_ID);
+  });
+
+  it.each([
+    ["a release id", "rel_01M6KPFXAE68N6G2X1HN5XD29R"],
+    ["a blank", "   "],
+    ["a prefix alone", "dep_"],
+    ["a space inside", "dep_has space"],
+  ])("refuses %s, saying what a deployment id is and where to list them", async (_, value) => {
+    await expect(
+      parseArg(DeploymentGet.args.deployment_id, value, "deployment_id"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("must be a deployment ID"),
+      hint: "List the deployments to find one.",
+    });
+  });
+});

@@ -185,13 +185,13 @@ func TestPlatformOperatorReadsUnclaimedEvents(t *testing.T) {
 		t.Helper()
 		require.Equal(t, http.StatusOK, status, raw)
 		var page struct {
-			Data []struct {
+			Events []struct {
 				ID string `json:"id"`
-			} `json:"data"`
+			} `json:"events"`
 		}
 		require.NoError(t, json.Unmarshal([]byte(raw), &page))
-		ids := make([]string, 0, len(page.Data))
-		for _, ev := range page.Data {
+		ids := make([]string, 0, len(page.Events))
+		for _, ev := range page.Events {
 			ids = append(ids, ev.ID)
 		}
 		return ids

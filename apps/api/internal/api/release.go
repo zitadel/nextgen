@@ -298,7 +298,7 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	return &reused, nil
 }
 
-func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdParams) (api.GetReleaseByIdRes, error) {
+func (h *Handler) GetRelease(ctx context.Context, params api.GetReleaseParams) (api.GetReleaseRes, error) {
 	// Releases are addressed by a path id, but the read is scoped to the
 	// project the caller named, so a release of another project reads as an
 	// unknown id rather than a forbidden one and is no existence oracle.

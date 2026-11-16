@@ -58,7 +58,7 @@ func expandSchemasInUse(t *testing.T, a opArgs) {
 }
 
 func askTeamMembership(t *testing.T, a opArgs) {
-	argOf[api.GetUserByIDParams](t, a).TeamID = api.NewOptTeamID("team_asked")
+	argOf[api.GetUserParams](t, a).TeamID = api.NewOptTeamID("team_asked")
 }
 
 // A session mints no scopes: a project-wide gate stands in for them, and a
@@ -86,9 +86,9 @@ var laterCheckRows = []laterCheckRow{
 
 	// Reading a user's memberships asks a session for read on the user's
 	// whole project (requireMembershipReadIn); a secret is not asked again.
-	{op: "GetUserByID", variant: "team_id", principal: sessionPrincipal, expand: askTeamMembership, second: true, refused: userCodes.denied, mentions: "team_membership.read"},
-	{op: "GetUserByID", variant: "team_id", principal: sessionPrincipal, expand: askTeamMembership, second: true, secondAllows: true},
-	{op: "GetUserByID", variant: "team_id", principal: secretPrincipal, expand: askTeamMembership},
+	{op: "GetUser", variant: "team_id", principal: sessionPrincipal, expand: askTeamMembership, second: true, refused: userCodes.denied, mentions: "team_membership.read"},
+	{op: "GetUser", variant: "team_id", principal: sessionPrincipal, expand: askTeamMembership, second: true, secondAllows: true},
+	{op: "GetUser", variant: "team_id", principal: secretPrincipal, expand: askTeamMembership},
 	{op: "ListUserTeams", principal: sessionPrincipal, second: true, refused: userCodes.denied, mentions: "team_membership.read"},
 	{op: "ListUserTeams", principal: sessionPrincipal, second: true, secondAllows: true},
 	{op: "ListUserTeams", principal: secretPrincipal},
@@ -101,7 +101,7 @@ func reachService(t *testing.T, f *gateFixture, op string) func(*testing.T) {
 	switch op {
 	case "QueryUsers":
 		return userServiceReached(f, "ListUsers")
-	case "GetUserByID":
+	case "GetUser":
 		return userServiceReached(f, "GetUserByID")
 	case "ListUserTeams":
 		return userServiceReached(f, "ListUserTeams")

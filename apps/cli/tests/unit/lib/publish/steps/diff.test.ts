@@ -4,7 +4,7 @@ import type { StepContext, StepResult } from "@/lib/publish/pipeline";
 import { diffStep } from "@/lib/publish/steps/diff";
 import { DiskStore } from "@/lib/zitadel";
 import { aConfig } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
 import { aDeployment, PROJECT_ID, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
@@ -14,9 +14,13 @@ import { aStepContext } from "@tests/helpers/step-context";
  */
 type Live = Readonly<{
   /**
-   * Where it is live; a target with an expiry is a preview.
+   * Where it is live.
    */
-  targets: { origin: string; expires_at?: string }[];
+  targets: { origin: string }[];
+  /**
+   * Whether it went to primary origins or preview URLs; primary when omitted.
+   */
+  kind?: "primary" | "preview";
   /**
    * The commit its release was built from.
    */
@@ -42,9 +46,9 @@ const PRIMARY = { origin: PRIMARY_ORIGIN };
 const SECOND_PRIMARY = { origin: "https://www.acme.com" };
 
 /**
- * A preview origin, which expires.
+ * A preview origin.
  */
-const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
+const PREVIEW = { origin: "https://pr-7.acme.com" };
 
 /**
  * A commit that is in no repository.
@@ -79,6 +83,7 @@ function aRunIn(
           return live.map((deployment, index) => {
             return aDeployment({
               id: `dep_${index}`,
+              kind: deployment.kind ?? "primary",
               targets: deployment.targets,
               release_id: deployment.release ?? "rel_1",
               release: {
@@ -165,7 +170,7 @@ describe("diffStep", () => {
     it("never takes a live preview as the baseline", async ({ dir }) => {
       const result = await diffStep.run(
         aRunIn(dir, [
-          { targets: [PREVIEW], sha: "ffffffffffffffff" },
+          { targets: [PREVIEW], kind: "preview", sha: "ffffffffffffffff" },
           { targets: [PRIMARY], sha: FOREIGN_SHA },
         ]),
       );
@@ -241,12 +246,10 @@ describe("diffStep", () => {
   });
 
   describe("--json", () => {
-    it("writes nothing to stdout", async ({ dir }) => {
-      const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-
+    it("writes nothing to stdout", async ({ dir, terminal }) => {
       await diffStep.run(aRunIn(dir, [], { json: true }));
 
-      expect(stdout).not.toHaveBeenCalled();
+      expect(terminal.shown()).toBe("");
     });
 
     it("reports each changed file against the live commit", async ({ dir }) => {

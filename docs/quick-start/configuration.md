@@ -226,7 +226,17 @@ instrumentation:
   it is zero, and the exporter keeps one CPU core busy even when the server
   is idle.
 - A traced request keeps all of its spans, including one span per database
-  statement.
+  statement. On PostgreSQL each query on the wire has a `pgx.query` span of
+  its own, with the first word of the statement (`SELECT`, `INSERT`, `BEGIN`,
+  `COMMIT`) as `db.operation.name`, and a wait of a millisecond or more for a
+  pooled connection has a `pgx.acquire` span. No span carries SQL text,
+  arguments or error messages.
+- Every request has one server span, with `http.request.method` and
+  `http.response.status_code`. It starts before any middleware runs and ends
+  when the response is written. The span of an API operation is named after
+  the operation (`GetMyUser`) and carries `http.route`. The span of any other
+  request, such as a `404`, a `405`, the OpenAPI document or a console file,
+  is named after its method and has no `http.route`.
 
 With `trust_remote_spans` off (the default), an incoming `traceparent`,
 `tracestate` or `baggage` header is ignored and every request starts a new

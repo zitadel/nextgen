@@ -1,9 +1,9 @@
 import { log } from "@clack/prompts";
 
-import { log as narration } from "@/lib/log";
 import { Once } from "@/lib/once";
 
 import { stripColumnMarks } from "./layout";
+import { log as narration } from "./log";
 import { GUIDE, MARK } from "./marks";
 import { DrawnSpinner } from "./spinner";
 

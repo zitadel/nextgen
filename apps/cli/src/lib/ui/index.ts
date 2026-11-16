@@ -42,6 +42,12 @@
  * - {@link Questions} — the one way a command asks a person something, one
  *   method per kind of question ({@link TextQuestion} and its siblings) and
  *   never a `kind` string. A command reaches it as `this.ask`.
+ * - {@link log} and {@link warnings} — what a command or a library says
+ *   without a `Ui` at hand: one process-wide narration and one list of
+ *   warnings, which the running command's chain draws and drains.
+ * - {@link style} — the palette every fragment of human output is painted with.
+ * - {@link Ui.asker} and {@link Ui.wrap} — the question engine bound to a
+ *   session, and the wrapping of a box's content, for a caller with no chain.
  * - {@link Ui.note} something the person must act on, and {@link Ui.task} for
  *   work that takes a moment.
  *
@@ -50,7 +56,11 @@
  * sink and the spinners are reached through {@link Ui} alone: a caller that
  * could render a frame itself could render one that does not match.
  */
+export type { Session } from "./asker";
 export type { Audience } from "./audience";
+export type { BoxAction } from "./box";
+export type { LogLevel, LogSink } from "./log";
+export { log } from "./log";
 export type { Presentation } from "./presentation";
 export type { Report, Step } from "./progress";
 export type {
@@ -66,6 +76,8 @@ export type {
   YesNoQuestion,
 } from "./questions";
 export type { Spinner } from "./spinner";
+export { style } from "./style";
 export type { Fact, Section, Summary } from "./summary";
 export { section } from "./summary";
 export { Ui } from "./ui";
+export { warnings } from "./warnings";

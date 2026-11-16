@@ -1,4 +1,4 @@
-name: id
+name: invitation_id
 in: path
 required: true
 description: |

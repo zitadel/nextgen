@@ -68,7 +68,8 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.SpecChecked(t, h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next))))
 		}, h.withServerLog, h.EnsureAPIServers(t))
-		h.testServer.value = httptest.NewServer(mux)
+		// In front of every mount, as on the production server (withTracing).
+		h.testServer.value = httptest.NewServer(middleware.WithServerSpan(otel.GetTracerProvider())(mux))
 	}
 	return h.testServer.value
 }

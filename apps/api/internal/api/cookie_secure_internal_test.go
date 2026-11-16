@@ -261,7 +261,7 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 	handler := WithRequestHostMiddleware(inner)
 
 	t.Run("plain http localhost", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/flow", nil)
+		req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/flows", nil)
 		req.Host = "localhost:8080"
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
@@ -271,7 +271,7 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 	})
 
 	t.Run("plain http non-loopback keeps secure", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "http://app.example.com/flow", nil)
+		req := httptest.NewRequest(http.MethodGet, "http://app.example.com/flows", nil)
 		req.Host = "app.example.com"
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
@@ -281,7 +281,7 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 	})
 
 	t.Run("forwarded https", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/flow", nil)
+		req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/flows", nil)
 		req.Host = "localhost:8080"
 		req.Header.Set("X-Forwarded-Proto", "https")
 		req.Header.Set("X-Forwarded-Host", "app.example.com")
@@ -301,7 +301,7 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 func TestWithRequestHostMiddleware_ForwardedLists(t *testing.T) {
 	t.Parallel()
 
-	req := httptest.NewRequest(http.MethodGet, "http://backend:8080/flow", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://backend:8080/flows", nil)
 	req.Header.Set("X-Forwarded-Proto", "https, http")
 	req.Header.Set("X-Forwarded-Host", "app.example.com, lb.internal")
 
