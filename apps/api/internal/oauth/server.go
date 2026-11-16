@@ -62,7 +62,7 @@ func New(cfg Config) *Handlers {
 	)
 	opHandler := op.RegisterServer(opServer{settings: cfg.Settings, clients: cfg.Clients, authRequests: cfg.AuthRequests}, opEndpoints(),
 		op.WithTenantPrefix(Prefix),
-		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, withErrorPages, s.withIssuer),
+		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, withoutLoggedState, withErrorPages, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),
 	)
 	return &Handlers{Metadata: metadata, OP: opHandler}

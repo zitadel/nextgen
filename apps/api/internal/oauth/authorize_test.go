@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 const (
@@ -256,6 +259,84 @@ func TestAuthorizeShowsTheErrorPage(t *testing.T) {
 
 			assertErrorPage(t, rec, tt.wantStatus)
 			assert.Empty(t, store.stored)
+		})
+	}
+}
+
+// The page of a refusal says what was refused.
+func TestAuthorizeErrorPageSentence(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		set  map[string]string
+		want string
+	}{
+		{name: "unknown_client", set: map[string]string{"client_id": "nobody"}, want: "unknown client"},
+		{name: "unregistered_redirect_uri", set: map[string]string{"redirect_uri": "https://evil.example/callback"}, want: "redirect_uri"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: &authRequests{}})
+
+			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", browser)
+
+			assertErrorPage(t, rec, http.StatusBadRequest)
+			assert.Contains(t, rec.Body.String(), tt.want)
+		})
+	}
+}
+
+// Each error the endpoint answers gets one `api error` line, a fault at
+// ERROR. The library logs the redirect it answers a refusal with, and the
+// client's state in it stays out of the log.
+func TestAuthorizeLogs(t *testing.T) {
+	// Not parallel: the library logs through the default logger.
+	tests := []struct {
+		name      string
+		clients   ClientResolver
+		headers   map[string]string
+		set       map[string]string
+		wantLevel string
+		// wantCause is in the api error line, wantLine anywhere in the log.
+		wantCause string
+		wantLine  string
+	}{
+		{name: "refusal", set: map[string]string{"prompt": "none", "state": "secret-state"}, wantLevel: "INFO", wantLine: "auth request redirect"},
+		{name: "unknown_client", set: map[string]string{"client_id": "nobody"}, wantLevel: "INFO", wantCause: "unknown client"},
+		// The library refuses these itself, between the server's two checks.
+		{name: "unregistered_redirect_uri", set: map[string]string{"redirect_uri": "https://evil.example/callback"}, wantLevel: "INFO", wantCause: "redirect_uri is missing in the client configuration"},
+		{name: "unregistered_redirect_uri_from_a_program", headers: https, set: map[string]string{"redirect_uri": "https://evil.example/callback"}, wantLevel: "INFO"},
+		{name: "clients_fail", clients: failing{errors.New("boom")}, wantLevel: "ERROR", wantCause: "boom"},
+		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantLevel: "ERROR"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			previous := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(previous) })
+			slog.SetDefault(zlog.NewLogger(zlog.NewHandler(slog.LevelDebug, nil, slog.NewJSONHandler(&logs, nil))))
+			if tt.clients == nil {
+				tt.clients = shop
+			}
+			if tt.headers == nil {
+				tt.headers = browser
+			}
+			mux := newMux(t, Config{Settings: deployed, Clients: tt.clients, AuthRequests: &authRequests{}})
+
+			send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", tt.headers)
+
+			var apiErrors []string
+			for line := range strings.Lines(logs.String()) {
+				if strings.Contains(line, `"msg":"api error"`) {
+					apiErrors = append(apiErrors, line)
+				}
+			}
+			require.Len(t, apiErrors, 1, logs.String())
+			assert.Contains(t, apiErrors[0], `"level":"`+tt.wantLevel+`"`)
+			assert.Contains(t, apiErrors[0], tt.wantCause)
+			assert.Contains(t, logs.String(), tt.wantLine)
+			assert.NotContains(t, logs.String(), "secret-state")
 		})
 	}
 }

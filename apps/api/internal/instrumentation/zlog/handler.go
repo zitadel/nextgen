@@ -34,6 +34,16 @@ func (h Handler) Handle(ctx context.Context, record slog.Record) error {
 	if h.stream != StreamUnspecified && !slices.Contains(h.streams, h.stream) {
 		return nil
 	}
+	if keys, _ := ctx.Value(withoutAttrsKey{}).([]string); len(keys) > 0 {
+		kept := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+		record.Attrs(func(attr slog.Attr) bool {
+			if attr, ok := withoutAttrs(attr, keys); ok {
+				kept.AddAttrs(attr)
+			}
+			return true
+		})
+		record = kept
+	}
 	return h.handler.Handle(ctx, record)
 }
 
@@ -55,3 +65,22 @@ func (h Handler) WithGroup(name string) slog.Handler {
 }
 
 var _ slog.Handler = (*Handler)(nil)
+
+// withoutAttrs returns attr without the attributes named keys inside it, or
+// false when attr itself is one of them.
+func withoutAttrs(attr slog.Attr, keys []string) (slog.Attr, bool) {
+	if slices.Contains(keys, attr.Key) {
+		return attr, false
+	}
+	value := attr.Value.Resolve()
+	if value.Kind() != slog.KindGroup {
+		return attr, true
+	}
+	var kept []slog.Attr
+	for _, member := range value.Group() {
+		if member, ok := withoutAttrs(member, keys); ok {
+			kept = append(kept, member)
+		}
+	}
+	return slog.Attr{Key: attr.Key, Value: slog.GroupValue(kept...)}, true
+}

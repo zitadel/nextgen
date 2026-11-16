@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,6 +20,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 const (
@@ -42,8 +46,23 @@ type AuthRequestStore interface {
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
 }
 
+// answeredErrorKey is the context key of the error an opServer method
+// returned, kept for withErrorPages to log with its cause.
+type answeredErrorKey struct{}
+
+// errorWriter records an error status and the body the library writes after
+// it. With page set it holds both back, so the error page can take their
+// place.
+type errorWriter struct {
+	http.ResponseWriter
+	page   bool
+	status int
+	body   bytes.Buffer
+}
+
 // VerifyAuthRequest finds the issuer and the client.
-func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.AuthRequest]) (*op.ClientRequest[oidc.AuthRequest], error) {
+func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.AuthRequest]) (_ *op.ClientRequest[oidc.AuthRequest], err error) {
+	defer func() { keepError(ctx, err) }()
 	issuer, ok := IssuerFromContext(ctx)
 	if !ok {
 		return nil, metadataError(issuerError(ctx))
@@ -87,7 +106,8 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 // Authorize stores the request and sends the browser to the issuer's login
 // page with the request's handle, binding the handle to the browser with a
 // cookie (ADR 081 §8).
-func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRequest]) (*op.Redirect, error) {
+func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRequest]) (_ *op.Redirect, err error) {
+	defer func() { keepError(ctx, err) }()
 	req := r.Data
 	c := r.Client.(*client)
 	if err := checkAuthRequest(req, c); err != nil {
@@ -123,6 +143,34 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	login.RawQuery = url.Values{"auth_request": {request.ID}}.Encode()
 	header := http.Header{"Set-Cookie": {bindingCookie(issuer, request.ID, nonce)}}
 	return &op.Redirect{URL: login.String(), Header: header}, nil
+}
+
+// keepError hands the error an opServer method returns to withErrorPages.
+func keepError(ctx context.Context, err error) {
+	if kept, ok := ctx.Value(answeredErrorKey{}).(*error); ok && err != nil {
+		*kept = err
+	}
+}
+
+// logError writes the line an error an endpoint answers gets (ADR 030): err
+// when an opServer method returned one, or else the library's own refusal,
+// read from the status and body it answered with. The library logs both too,
+// but without the request id.
+func logError(ctx context.Context, err error, status int, body []byte) {
+	if err == nil {
+		if status == 0 {
+			return
+		}
+		refusal := new(oidc.Error)
+		// A body that is not the library's JSON leaves the line without a description.
+		_ = json.Unmarshal(body, refusal)
+		err = refusal
+	}
+	if oauthErr, ok := errors.AsType[*oidc.Error](err); !ok || oauthErr.ErrorType == oidc.ServerError || oauthErr.ErrorType == temporarilyUnavailable {
+		errlog.LogFault(ctx, err)
+		return
+	}
+	errlog.Log(ctx, domain.ErrRequestInvalid().WithParent(err))
 }
 
 // checkAuthRequest refuses what this server cannot serve. The redirect URI
@@ -219,47 +267,56 @@ func bindingCookie(issuer Issuer, handle, nonce string) string {
 	}).String()
 }
 
-// withErrorPages answers a browser navigation's error with the error page
-// instead of the library's JSON (ADR 076). A program keeps the JSON. The
-// Accept header decides, and Vary says so to caches.
-func withErrorPages(next http.Handler) http.Handler {
+// withoutLoggedState keeps the client's state out of the log. The library
+// logs it with a refusal twice: in the redirect URL and on the error.
+func withoutLoggedState(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Vary", "Accept")
-		if !errorpage.Wants(r) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		next.ServeHTTP(&errorPageWriter{ResponseWriter: w, r: r}, r)
+		next.ServeHTTP(w, r.WithContext(zlog.WithoutAttrs(r.Context(), "url", "state")))
 	})
 }
 
-// errorPageWriter writes the error page in place of an error status and
-// drops the body the library writes after it.
-type errorPageWriter struct {
-	http.ResponseWriter
-	r        *http.Request
-	replaced bool
+// withErrorPages answers a browser navigation's error with the error page
+// instead of the library's JSON (ADR 076). A program keeps the JSON. The
+// Accept header decides, and Vary says so to caches. Either way the error is
+// logged once.
+func withErrorPages(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
+		var answered error
+		ew := &errorWriter{ResponseWriter: w, page: errorpage.Wants(r)}
+		next.ServeHTTP(ew, r.WithContext(context.WithValue(r.Context(), answeredErrorKey{}, &answered)))
+		logError(r.Context(), answered, ew.status, ew.body.Bytes())
+		if ew.page && ew.status != 0 {
+			errorpage.Write(w, r, errorPageFor(ew.status, ew.body.Bytes()))
+		}
+	})
 }
 
-func (w *errorPageWriter) WriteHeader(status int) {
-	if status < http.StatusBadRequest {
-		w.ResponseWriter.WriteHeader(status)
-		return
+func (w *errorWriter) WriteHeader(status int) {
+	if status >= http.StatusBadRequest {
+		w.status = status
+		if w.page {
+			return
+		}
 	}
-	w.replaced = true
-	errorpage.Write(w.ResponseWriter, w.r, errorPageFor(status))
+	w.ResponseWriter.WriteHeader(status)
 }
 
-func (w *errorPageWriter) Write(b []byte) (int, error) {
-	if w.replaced {
-		return len(b), nil
+func (w *errorWriter) Write(b []byte) (int, error) {
+	if w.status != 0 {
+		w.body.Write(b)
+		if w.page {
+			return len(b), nil
+		}
 	}
 	return w.ResponseWriter.Write(b)
 }
 
-// errorPageFor is the page for status, in ADR 076 §4's words. A refusal has
-// no sentence: the library's description can quote the request.
-func errorPageFor(status int) errorpage.Page {
+// errorPageFor builds the error page for status (ADR 076 §4). body is the
+// JSON the library answered with. For a 4xx the page shows its
+// error_description. In oidc v3.52.0 no description quotes the request on an
+// endpoint that shows a page, and the template escapes it.
+func errorPageFor(status int, body []byte) errorpage.Page {
 	switch {
 	case status == http.StatusNotFound:
 		return errorpage.NotFound(nil)
@@ -270,7 +327,12 @@ func errorPageFor(status int) errorpage.Page {
 			Description: "The server could not complete this request. Try again in a moment.",
 		}
 	default:
-		return errorpage.Page{Status: status, Title: "Request failed"}
+		var refusal struct {
+			Description string `json:"error_description"`
+		}
+		// A body that is not the library's JSON leaves the page without a sentence.
+		_ = json.Unmarshal(body, &refusal)
+		return errorpage.Page{Status: status, Title: "Request failed", Description: refusal.Description}
 	}
 }
 
