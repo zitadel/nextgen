@@ -72,6 +72,7 @@ same TX (shared `request_id`).
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
 | **Application** | `slug`, `name`, `client_ids[]` (the clients the write created), `revision_id` | Application document body, client secrets and their hashes |
+| **Auth request** | `client_id` | `redirect_uri`, `state`, the code challenge (request input); `scopes`, the issuer, the deployment and the release (on the stored request) |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
