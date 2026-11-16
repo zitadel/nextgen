@@ -430,8 +430,8 @@ Each invocation prints one JSON object:
 - `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
   live expiry of a live preview deployment's preview (the earliest, when it still
   serves several), empty for any other deployment, such as a primary one, a replaced
-  one, or one whose preview is gone. It is also empty when the previews could
-  not be read, and a warning says so. `--json` items are the API's records,
+  one, or one whose preview is gone. It is also empty when the live view or the
+  previews could not be read, and a warning says so. `--json` items are the API's records,
   unchanged and without `expires`: read a preview's expiry as JSON with
   `preview list --json`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
