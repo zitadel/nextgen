@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { execa } from "execa";
 
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { Skills } from "@/lib/skills";
 import { style } from "@/lib/ui";
@@ -47,8 +48,8 @@ type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
 export default class Upgrade extends BaseCommand {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 2;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

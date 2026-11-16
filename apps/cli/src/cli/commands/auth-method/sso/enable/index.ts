@@ -22,7 +22,8 @@ import {
   parseScopeList,
   parseVerifiedEntry,
 } from "@/lib/idp";
-import { type Admitted, CommandGroups, type CommandResult, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, CommandResult, JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { accepts, parses } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -77,7 +78,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   /**
    * The group the command index lists it under.
    */
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+
+  /**
+   * Where the command sits in its group.
+   */
+  static override groupOrder = 1;
 
   /**
    * The examples `--help` shows.

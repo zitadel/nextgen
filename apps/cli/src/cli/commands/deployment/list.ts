@@ -2,13 +2,8 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { type Deployment, DeploymentService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
@@ -58,7 +53,8 @@ const COLUMNS = [
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> deployment list",

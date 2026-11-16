@@ -3,11 +3,13 @@
   "bin": "zitadel",
   "groups": [
     "Getting started",
-    "Local development",
-    "Users and teams",
-    "Authentication",
-    "Configuration and releases",
-    "Diagnostics and utilities"
+    "Local server",
+    "Users and access",
+    "Sign-in",
+    "Project settings",
+    "Releases",
+    "API and events",
+    "CLI"
   ],
   "globalFlags": [
     {
@@ -255,54 +257,6 @@
       ]
     },
     {
-      "id": "start",
-      "group": "Getting started",
-      "description": "Start a local Zitadel server.",
-      "args": [],
-      "flags": [
-        {
-          "name": "image",
-          "description": "Container image to run.",
-          "type": "option"
-        },
-        {
-          "name": "port",
-          "description": "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
-          "type": "option"
-        },
-        {
-          "name": "runtime",
-          "description": "Local runtime backend.",
-          "type": "option",
-          "options": [
-            "binary",
-            "docker"
-          ]
-        }
-      ],
-      "examples": []
-    },
-    {
-      "id": "status",
-      "group": "Getting started",
-      "description": "Summarize the local Zitadel server and project state.",
-      "args": [],
-      "flags": [
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": []
-    },
-    {
       "id": "claim",
       "group": "Getting started",
       "description": "Claim this project to make it permanent. Opens a browser to create an account or sign in.",
@@ -364,6 +318,56 @@
       ]
     },
     {
+      "id": "doctor",
+      "group": "Getting started",
+      "description": "Verify local runtime and project state.",
+      "args": [],
+      "flags": [
+        {
+          "name": "fix",
+          "description": "Repair missing files and stale managed wiring.",
+          "type": "boolean"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "image",
+          "description": "Container image to check.",
+          "type": "option"
+        },
+        {
+          "name": "port",
+          "description": "Local HTTP port to check. Defaults to the port this directory's server uses.",
+          "type": "option"
+        },
+        {
+          "name": "runtime",
+          "description": "Local runtime backend.",
+          "type": "option",
+          "options": [
+            "binary",
+            "docker"
+          ]
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": []
+    },
+    {
       "id": "skills add",
       "group": "Getting started",
       "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
@@ -379,29 +383,97 @@
       ]
     },
     {
-      "id": "console",
-      "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
+      "id": "tests add",
+      "group": "Getting started",
+      "description": "Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to @zitadel/testing. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.",
       "args": [],
       "flags": [
         {
-          "name": "no-open",
-          "description": "Print the sign-in link instead of opening a browser.",
+          "name": "force",
+          "char": "f",
+          "description": "Replace a test file that differs from this CLI's version of it.",
+          "type": "boolean"
+        },
+        {
+          "name": "skip-install",
+          "description": "Do not install the new dev dependencies.",
           "type": "boolean"
         }
       ],
       "examples": [
         {
-          "command": "console"
+          "command": "tests add"
         },
         {
-          "command": "console --no-open"
+          "command": "tests add --skip-install"
         }
       ]
     },
     {
+      "id": "start",
+      "group": "Local server",
+      "description": "Start a local Zitadel server.",
+      "args": [],
+      "flags": [
+        {
+          "name": "image",
+          "description": "Container image to run.",
+          "type": "option"
+        },
+        {
+          "name": "port",
+          "description": "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
+          "type": "option"
+        },
+        {
+          "name": "runtime",
+          "description": "Local runtime backend.",
+          "type": "option",
+          "options": [
+            "binary",
+            "docker"
+          ]
+        }
+      ],
+      "examples": []
+    },
+    {
+      "id": "stop",
+      "group": "Local server",
+      "description": "Stop the local Zitadel server.",
+      "args": [],
+      "flags": [
+        {
+          "name": "all",
+          "description": "Stop all discovered CLI-managed local Zitadel runtime processes.",
+          "type": "boolean"
+        }
+      ],
+      "examples": []
+    },
+    {
+      "id": "status",
+      "group": "Local server",
+      "description": "Summarize the local Zitadel server and project state.",
+      "args": [],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": []
+    },
+    {
       "id": "logs",
-      "group": "Local development",
+      "group": "Local server",
       "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
@@ -438,22 +510,29 @@
       ]
     },
     {
-      "id": "stop",
-      "group": "Local development",
-      "description": "Stop the local Zitadel server.",
+      "id": "console",
+      "group": "Local server",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
-          "name": "all",
-          "description": "Stop all discovered CLI-managed local Zitadel runtime processes.",
+          "name": "no-open",
+          "description": "Print the sign-in link instead of opening a browser.",
           "type": "boolean"
         }
       ],
-      "examples": []
+      "examples": [
+        {
+          "command": "console"
+        },
+        {
+          "command": "console --no-open"
+        }
+      ]
     },
     {
       "id": "reset",
-      "group": "Local development",
+      "group": "Local server",
       "description": "Delete the local Zitadel server runtime and data.",
       "args": [],
       "flags": [
@@ -468,7 +547,7 @@
     },
     {
       "id": "eject",
-      "group": "Local development",
+      "group": "Local server",
       "description": "Remove managed files and local Zitadel state.",
       "aliases": [
         "uninstall"
@@ -485,35 +564,8 @@
       "examples": []
     },
     {
-      "id": "tests add",
-      "group": "Local development",
-      "description": "Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to @zitadel/testing. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.",
-      "args": [],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Replace a test file that differs from this CLI's version of it.",
-          "type": "boolean"
-        },
-        {
-          "name": "skip-install",
-          "description": "Do not install the new dev dependencies.",
-          "type": "boolean"
-        }
-      ],
-      "examples": [
-        {
-          "command": "tests add"
-        },
-        {
-          "command": "tests add --skip-install"
-        }
-      ]
-    },
-    {
       "id": "user create",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Create a user.",
       "args": [],
       "flags": [
@@ -581,7 +633,7 @@
     },
     {
       "id": "user delete",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Delete a user by id.",
       "args": [
         {
@@ -617,7 +669,7 @@
     },
     {
       "id": "user get",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Get one user by id.",
       "args": [
         {
@@ -655,7 +707,7 @@
     },
     {
       "id": "user list",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "List users.",
       "args": [],
       "flags": [
@@ -727,7 +779,7 @@
     },
     {
       "id": "user update",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Update a user by id.",
       "args": [
         {
@@ -798,7 +850,7 @@
     },
     {
       "id": "team create",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Create a team.",
       "args": [],
       "flags": [
@@ -859,7 +911,7 @@
     },
     {
       "id": "team deactivate",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Deactivate a team by id.",
       "args": [
         {
@@ -895,7 +947,7 @@
     },
     {
       "id": "team get",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Get one team by id.",
       "args": [
         {
@@ -933,7 +985,7 @@
     },
     {
       "id": "team list",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "List teams.",
       "args": [],
       "flags": [
@@ -1005,7 +1057,7 @@
     },
     {
       "id": "team update",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Update a team by id.",
       "args": [
         {
@@ -1069,7 +1121,7 @@
     },
     {
       "id": "grant create",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Create a grant.",
       "args": [],
       "flags": [
@@ -1165,7 +1217,7 @@
     },
     {
       "id": "grant delete",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Delete a grant by id.",
       "args": [
         {
@@ -1201,7 +1253,7 @@
     },
     {
       "id": "grant get",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "Get one grant by id.",
       "args": [
         {
@@ -1239,7 +1291,7 @@
     },
     {
       "id": "grant list",
-      "group": "Users and teams",
+      "group": "Users and access",
       "description": "List grants.",
       "args": [],
       "flags": [
@@ -1310,8 +1362,154 @@
       ]
     },
     {
+      "id": "session get",
+      "group": "Users and access",
+      "description": "Get one session by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "session id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "session get <id>"
+        },
+        {
+          "command": "session get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "session list",
+      "group": "Users and access",
+      "description": "List sessions.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), state (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sort",
+          "description": "Sort as field:direction (asc|desc). Fields: created_at, user_id.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "session list --json"
+        },
+        {
+          "command": "session list --all --json"
+        },
+        {
+          "command": "session list --filter created_at=equals:<value> --sort created_at:desc"
+        }
+      ]
+    },
+    {
+      "id": "session revoke",
+      "group": "Users and access",
+      "description": "Revoke a session by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "session id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Revoke the session without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "session revoke <id> --force --json"
+        }
+      ]
+    },
+    {
       "id": "auth-method passkey disable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Disable passkey sign-in for a user schema.",
       "args": [],
       "flags": [
@@ -1338,7 +1536,7 @@
     },
     {
       "id": "auth-method passkey enable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Enable passkey sign-in for a user schema.",
       "args": [],
       "flags": [
@@ -1359,7 +1557,7 @@
     },
     {
       "id": "auth-method password disable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Disable password sign-in for a user schema.",
       "args": [],
       "flags": [
@@ -1386,7 +1584,7 @@
     },
     {
       "id": "auth-method password enable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Enable password sign-in for a user schema.",
       "args": [],
       "flags": [
@@ -1407,7 +1605,7 @@
     },
     {
       "id": "auth-method sso disable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Remove an identity provider from a user schema.",
       "args": [],
       "flags": [
@@ -1439,7 +1637,7 @@
     },
     {
       "id": "auth-method sso enable",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Add an identity provider to a user schema.",
       "args": [],
       "flags": [
@@ -1531,7 +1729,7 @@
     },
     {
       "id": "idp create",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Create an identity provider connection.",
       "args": [],
       "flags": [
@@ -1723,7 +1921,7 @@
     },
     {
       "id": "idp get",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "Get one identity provider connection by id.",
       "args": [
         {
@@ -1761,7 +1959,7 @@
     },
     {
       "id": "idp list",
-      "group": "Authentication",
+      "group": "Sign-in",
       "description": "List identity provider connections.",
       "args": [],
       "flags": [
@@ -1832,13 +2030,13 @@
       ]
     },
     {
-      "id": "session get",
-      "group": "Authentication",
-      "description": "Get one session by id.",
+      "id": "schema get",
+      "group": "Sign-in",
+      "description": "Get one schema by object type (current revision) or revision id.",
       "args": [
         {
-          "name": "id",
-          "description": "session id",
+          "name": "schema",
+          "description": "object type (current revision) or revision id",
           "required": true
         }
       ],
@@ -1862,17 +2060,17 @@
       ],
       "examples": [
         {
-          "command": "session get <id>"
+          "command": "schema get <schema>"
         },
         {
-          "command": "session get <id> --json"
+          "command": "schema get <schema> --json"
         }
       ]
     },
     {
-      "id": "session list",
-      "group": "Authentication",
-      "description": "List sessions.",
+      "id": "schema list",
+      "group": "Sign-in",
+      "description": "List schemas.",
       "args": [],
       "flags": [
         {
@@ -1903,14 +2101,9 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), state (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: object_type (equals), kind (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
-        },
-        {
-          "name": "sort",
-          "description": "Sort as field:direction (asc|desc). Fields: created_at, user_id.",
-          "type": "option"
         },
         {
           "name": "plain",
@@ -1931,187 +2124,19 @@
       ],
       "examples": [
         {
-          "command": "session list --json"
+          "command": "schema list --json"
         },
         {
-          "command": "session list --all --json"
+          "command": "schema list --all --json"
         },
         {
-          "command": "session list --filter created_at=equals:<value> --sort created_at:desc"
-        }
-      ]
-    },
-    {
-      "id": "session revoke",
-      "group": "Authentication",
-      "description": "Revoke a session by id.",
-      "args": [
-        {
-          "name": "id",
-          "description": "session id",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Revoke the session without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "session revoke <id> --force --json"
-        }
-      ]
-    },
-    {
-      "id": "deploy",
-      "group": "Configuration and releases",
-      "description": "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.",
-      "args": [],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "message",
-          "char": "m",
-          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
-          "type": "option"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "deploy -m 'add phone_number to human-user'"
-        },
-        {
-          "command": "deploy --dry-run"
-        },
-        {
-          "command": "deploy -m 'move users to the new schema' --force"
-        }
-      ]
-    },
-    {
-      "id": "preview",
-      "group": "Configuration and releases",
-      "description": "Deploy a release from .zitadel/ to a pull-request build's preview URLs.",
-      "args": [],
-      "flags": [
-        {
-          "name": "origin",
-          "description": "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
-          "type": "option",
-          "multiple": true
-        },
-        {
-          "name": "ttl",
-          "description": "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
-          "type": "option"
-        },
-        {
-          "name": "message",
-          "char": "m",
-          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
-          "type": "option"
-        },
-        {
-          "name": "strict",
-          "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "preview"
-        },
-        {
-          "command": "preview --origin https://acme-git-sso-acmeinc.vercel.app"
-        },
-        {
-          "command": "preview --ttl 24h"
-        },
-        {
-          "command": "preview -m 'add phone_number to human-user'"
-        }
-      ]
-    },
-    {
-      "id": "pull",
-      "group": "Configuration and releases",
-      "description": "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.",
-      "args": [
-        {
-          "name": "target",
-          "description": "What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id (dep_…)."
-        }
-      ],
-      "flags": [
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "pull"
-        },
-        {
-          "command": "pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
-        },
-        {
-          "command": "pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+          "command": "schema list --filter object_type=equals:<value>"
         }
       ]
     },
     {
       "id": "branding eject",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.",
       "args": [],
       "flags": [
@@ -2131,7 +2156,7 @@
     },
     {
       "id": "branding get",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "Get one branding revision by id.",
       "args": [
         {
@@ -2169,7 +2194,7 @@
     },
     {
       "id": "branding list",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "List branding revisions.",
       "args": [],
       "flags": [
@@ -2226,289 +2251,8 @@
       ]
     },
     {
-      "id": "deployment create",
-      "group": "Configuration and releases",
-      "description": "Deploy an existing release to the project's origins.",
-      "args": [],
-      "flags": [
-        {
-          "name": "release",
-          "description": "The release id to deploy.",
-          "type": "option",
-          "required": true
-        },
-        {
-          "name": "message",
-          "char": "m",
-          "description": "A short summary of why this deploys.",
-          "type": "option"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
-        }
-      ]
-    },
-    {
-      "id": "deployment get",
-      "group": "Configuration and releases",
-      "description": "Read one deployment by id.",
-      "args": [
-        {
-          "name": "deployment_id",
-          "description": "The deployment to read.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
-        }
-      ]
-    },
-    {
-      "id": "deployment list",
-      "group": "Configuration and releases",
-      "description": "List the project's deployments, newest first.",
-      "args": [],
-      "flags": [
-        {
-          "name": "origin",
-          "description": "Only deployments that targeted this origin.",
-          "type": "option"
-        },
-        {
-          "name": "live",
-          "description": "What each target serves now, not the full history.",
-          "type": "boolean"
-        },
-        {
-          "name": "limit",
-          "description": "Page size (server default 20, max 100).",
-          "type": "option",
-          "min": 1,
-          "max": 100
-        },
-        {
-          "name": "page-token",
-          "description": "Continue from a previous page's next_page_token.",
-          "type": "option"
-        },
-        {
-          "name": "all",
-          "char": "a",
-          "description": "Fetch every page instead of one.",
-          "type": "boolean",
-          "exclusive": [
-            "page-token"
-          ]
-        },
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "deployment list"
-        },
-        {
-          "command": "deployment list --all"
-        },
-        {
-          "command": "deployment list --live"
-        },
-        {
-          "command": "deployment list --origin https://app.acme.com"
-        }
-      ]
-    },
-    {
-      "id": "deployment rollback",
-      "group": "Configuration and releases",
-      "description": "Roll back to an earlier deployment.",
-      "args": [
-        {
-          "name": "deployment_id",
-          "description": "The deployment to roll back to. Omit to undo the last deploy."
-        }
-      ],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "message",
-          "char": "m",
-          "description": "A short summary of why this rolls back.",
-          "type": "option"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "deployment rollback"
-        },
-        {
-          "command": "deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
-        },
-        {
-          "command": "deployment rollback --force"
-        }
-      ]
-    },
-    {
-      "id": "env",
-      "group": "Configuration and releases",
-      "description": "Show which server and project resolve, and where each value came from.",
-      "args": [],
-      "flags": [
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "env"
-        },
-        {
-          "command": "env --env production"
-        },
-        {
-          "command": "env --env-file ./infra/acme-staging.env"
-        }
-      ]
-    },
-    {
-      "id": "env add",
-      "group": "Configuration and releases",
-      "description": "Bind an environment to a project, creating the project if needed.",
-      "args": [
-        {
-          "name": "name",
-          "description": "The environment name, e.g. production.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "project",
-          "description": "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
-          "type": "option"
-        },
-        {
-          "name": "app-url",
-          "description": "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
-          "type": "option"
-        },
-        {
-          "name": "force",
-          "description": "Overwrite an existing .env.<name>.local.",
-          "type": "boolean"
-        }
-      ],
-      "examples": [
-        {
-          "command": "env add production --server https://api.zitadel.cloud --app-url https://app.acme.com"
-        },
-        {
-          "command": "env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T"
-        }
-      ]
-    },
-    {
-      "id": "env list",
-      "group": "Configuration and releases",
-      "description": "List the environments bound in this directory's .env files.",
-      "args": [],
-      "flags": [
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "env list"
-        },
-        {
-          "command": "env list --plain"
-        }
-      ]
-    },
-    {
       "id": "flow-definition get",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "Get one flow definition by flow name (newest revision) or revision id.",
       "args": [
         {
@@ -2546,7 +2290,7 @@
     },
     {
       "id": "flow-definition list",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "List flow definitions.",
       "args": [],
       "flags": [
@@ -2612,122 +2356,8 @@
       ]
     },
     {
-      "id": "origin add",
-      "group": "Configuration and releases",
-      "description": "Add an origin pattern to the project.",
-      "args": [
-        {
-          "name": "pattern",
-          "description": "The origin pattern to add.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "kind",
-          "description": "What the pattern is for.",
-          "type": "option",
-          "required": true,
-          "options": [
-            "primary",
-            "preview"
-          ]
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "origin add https://app.acme.com --kind primary"
-        },
-        {
-          "command": "origin add 'https://*-acme.vercel.app' --kind preview"
-        }
-      ]
-    },
-    {
-      "id": "origin list",
-      "group": "Configuration and releases",
-      "description": "List the origin patterns on the project.",
-      "args": [],
-      "flags": [
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "origin list"
-        },
-        {
-          "command": "origin list --plain"
-        }
-      ]
-    },
-    {
-      "id": "origin rm",
-      "group": "Configuration and releases",
-      "description": "Remove an origin pattern from the project.",
-      "args": [
-        {
-          "name": "pattern",
-          "description": "The origin pattern to remove.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Remove the pattern without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "origin rm https://app.acme.com"
-        },
-        {
-          "command": "origin rm https://app.acme.com --force"
-        }
-      ]
-    },
-    {
       "id": "policy get",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "Get one policy by policy id or operation.",
       "args": [
         {
@@ -2765,7 +2395,7 @@
     },
     {
       "id": "policy list",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "List policies.",
       "args": [],
       "flags": [
@@ -2832,7 +2462,7 @@
     },
     {
       "id": "policy test",
-      "group": "Configuration and releases",
+      "group": "Sign-in",
       "description": "Run the test cases in .zitadel/policies/ against the policies.\n\nA policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.\n\nThe server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.",
       "args": [
         {
@@ -2874,103 +2504,8 @@
       ]
     },
     {
-      "id": "preview list",
-      "group": "Configuration and releases",
-      "description": "List the project's live previews, newest first.",
-      "args": [],
-      "flags": [
-        {
-          "name": "limit",
-          "description": "Page size (server default 20, max 100).",
-          "type": "option",
-          "min": 1,
-          "max": 100
-        },
-        {
-          "name": "page-token",
-          "description": "Continue from a previous page's next_page_token.",
-          "type": "option"
-        },
-        {
-          "name": "all",
-          "char": "a",
-          "description": "Fetch every page instead of one.",
-          "type": "boolean",
-          "exclusive": [
-            "page-token"
-          ]
-        },
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "preview list"
-        },
-        {
-          "command": "preview list --all"
-        },
-        {
-          "command": "preview list --plain"
-        }
-      ]
-    },
-    {
-      "id": "preview rm",
-      "group": "Configuration and releases",
-      "description": "Remove a live preview from the project.",
-      "args": [
-        {
-          "name": "url",
-          "description": "The preview URL to remove.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Remove the preview without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app"
-        },
-        {
-          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app --force"
-        }
-      ]
-    },
-    {
       "id": "project get",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Get one project by id.",
       "args": [
         {
@@ -3008,7 +2543,7 @@
     },
     {
       "id": "project list",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "List projects.",
       "args": [],
       "flags": [
@@ -3080,7 +2615,7 @@
     },
     {
       "id": "project update",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Update a project by id.",
       "args": [
         {
@@ -3200,17 +2735,11 @@
       ]
     },
     {
-      "id": "release create",
-      "group": "Configuration and releases",
-      "description": "Build a release from .zitadel/ without deploying it.",
+      "id": "env",
+      "group": "Project settings",
+      "description": "Show which server and project resolve, and where each value came from.",
       "args": [],
       "flags": [
-        {
-          "name": "message",
-          "char": "m",
-          "description": "A short summary of what this release changes.",
-          "type": "option"
-        },
         {
           "name": "env",
           "char": "e",
@@ -3225,83 +2754,59 @@
       ],
       "examples": [
         {
-          "command": "release create"
+          "command": "env"
         },
         {
-          "command": "release create -m 'add phone_number to human-user'"
+          "command": "env --env production"
+        },
+        {
+          "command": "env --env-file ./infra/acme-staging.env"
         }
       ]
     },
     {
-      "id": "release get",
-      "group": "Configuration and releases",
-      "description": "Get one release by id.",
+      "id": "env add",
+      "group": "Project settings",
+      "description": "Bind an environment to a project, creating the project if needed.",
       "args": [
         {
-          "name": "id",
-          "description": "release id",
+          "name": "name",
+          "description": "The environment name, e.g. production.",
           "required": true
         }
       ],
       "flags": [
         {
-          "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "name": "project",
+          "description": "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
           "type": "option"
         },
         {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "name": "app-url",
+          "description": "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
           "type": "option"
         },
         {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
+          "name": "force",
+          "description": "Overwrite an existing .env.<name>.local.",
+          "type": "boolean"
         }
       ],
       "examples": [
         {
-          "command": "release get <id>"
+          "command": "env add production --server https://api.zitadel.cloud --app-url https://app.acme.com"
         },
         {
-          "command": "release get <id> --json"
+          "command": "env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T"
         }
       ]
     },
     {
-      "id": "release list",
-      "group": "Configuration and releases",
-      "description": "List releases.",
+      "id": "env list",
+      "group": "Project settings",
+      "description": "List the environments bound in this directory's .env files.",
       "args": [],
       "flags": [
-        {
-          "name": "limit",
-          "description": "Page size (server default 20, max 100).",
-          "type": "option",
-          "min": 1,
-          "max": 100
-        },
-        {
-          "name": "page-token",
-          "description": "Continue from a previous page's next_page_token.",
-          "type": "option"
-        },
-        {
-          "name": "all",
-          "char": "a",
-          "description": "Fetch every page instead of one.",
-          "type": "boolean",
-          "exclusive": [
-            "page-token"
-          ]
-        },
-        {
-          "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-          "type": "option"
-        },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
@@ -3321,21 +2826,96 @@
       ],
       "examples": [
         {
-          "command": "release list --json"
+          "command": "env list"
         },
         {
-          "command": "release list --all --json"
+          "command": "env list --plain"
         }
       ]
     },
     {
-      "id": "release revoke",
-      "group": "Configuration and releases",
-      "description": "Revoke a release so its content is never served again.",
+      "id": "origin add",
+      "group": "Project settings",
+      "description": "Add an origin pattern to the project.",
       "args": [
         {
-          "name": "release_id",
-          "description": "The release to revoke.",
+          "name": "pattern",
+          "description": "The origin pattern to add.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "kind",
+          "description": "What the pattern is for.",
+          "type": "option",
+          "required": true,
+          "options": [
+            "primary",
+            "preview"
+          ]
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "origin add https://app.acme.com --kind primary"
+        },
+        {
+          "command": "origin add 'https://*-acme.vercel.app' --kind preview"
+        }
+      ]
+    },
+    {
+      "id": "origin list",
+      "group": "Project settings",
+      "description": "List the origin patterns on the project.",
+      "args": [],
+      "flags": [
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "origin list"
+        },
+        {
+          "command": "origin list --plain"
+        }
+      ]
+    },
+    {
+      "id": "origin rm",
+      "group": "Project settings",
+      "description": "Remove an origin pattern from the project.",
+      "args": [
+        {
+          "name": "pattern",
+          "description": "The origin pattern to remove.",
           "required": true
         }
       ],
@@ -3343,7 +2923,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Revoke the release without the confirmation prompt. Required when non-interactive.",
+          "description": "Remove the pattern without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3360,121 +2940,16 @@
       ],
       "examples": [
         {
-          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+          "command": "origin rm https://app.acme.com"
         },
         {
-          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force"
-        }
-      ]
-    },
-    {
-      "id": "schema get",
-      "group": "Configuration and releases",
-      "description": "Get one schema by object type (current revision) or revision id.",
-      "args": [
-        {
-          "name": "schema",
-          "description": "object type (current revision) or revision id",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
-          "type": "option"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "schema get <schema>"
-        },
-        {
-          "command": "schema get <schema> --json"
-        }
-      ]
-    },
-    {
-      "id": "schema list",
-      "group": "Configuration and releases",
-      "description": "List schemas.",
-      "args": [],
-      "flags": [
-        {
-          "name": "limit",
-          "description": "Page size (server default 20, max 100).",
-          "type": "option",
-          "min": 1,
-          "max": 100
-        },
-        {
-          "name": "page-token",
-          "description": "Continue from a previous page's next_page_token.",
-          "type": "option"
-        },
-        {
-          "name": "all",
-          "char": "a",
-          "description": "Fetch every page instead of one.",
-          "type": "boolean",
-          "exclusive": [
-            "page-token"
-          ]
-        },
-        {
-          "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-          "type": "option"
-        },
-        {
-          "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: object_type (equals), kind (equals), revisions (equals; values all|latest).",
-          "type": "option",
-          "multiple": true
-        },
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "schema list --json"
-        },
-        {
-          "command": "schema list --all --json"
-        },
-        {
-          "command": "schema list --filter object_type=equals:<value>"
+          "command": "origin rm https://app.acme.com --force"
         }
       ]
     },
     {
       "id": "variable get",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Get one variable from the project.",
       "args": [
         {
@@ -3515,7 +2990,7 @@
     },
     {
       "id": "variable list",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "List the variables entered on the project.",
       "args": [],
       "flags": [
@@ -3555,7 +3030,7 @@
     },
     {
       "id": "variable resolve",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Show the variables a deployment froze, the live one by default.",
       "args": [
         {
@@ -3603,7 +3078,7 @@
     },
     {
       "id": "variable rm",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Remove one variable from the project.",
       "args": [
         {
@@ -3650,7 +3125,7 @@
     },
     {
       "id": "variable set",
-      "group": "Configuration and releases",
+      "group": "Project settings",
       "description": "Set one variable on the project.",
       "args": [
         {
@@ -3713,58 +3188,8 @@
       ]
     },
     {
-      "id": "doctor",
-      "group": "Diagnostics and utilities",
-      "description": "Verify local runtime and project state.",
-      "args": [],
-      "flags": [
-        {
-          "name": "fix",
-          "description": "Repair missing files and stale managed wiring.",
-          "type": "boolean"
-        },
-        {
-          "name": "force",
-          "char": "f",
-          "description": "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "image",
-          "description": "Container image to check.",
-          "type": "option"
-        },
-        {
-          "name": "port",
-          "description": "Local HTTP port to check. Defaults to the port this directory's server uses.",
-          "type": "option"
-        },
-        {
-          "name": "runtime",
-          "description": "Local runtime backend.",
-          "type": "option",
-          "options": [
-            "binary",
-            "docker"
-          ]
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": []
-    },
-    {
       "id": "upgrade",
-      "group": "Diagnostics and utilities",
+      "group": "Project settings",
       "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
       "args": [],
       "flags": [],
@@ -3778,8 +3203,695 @@
       ]
     },
     {
+      "id": "deploy",
+      "group": "Releases",
+      "description": "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.",
+      "args": [],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Deploy even when the release leaves existing users unable to sign in, without asking. Required for that when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deploy -m 'add phone_number to human-user'"
+        },
+        {
+          "command": "deploy --dry-run"
+        },
+        {
+          "command": "deploy -m 'move users to the new schema' --force"
+        }
+      ]
+    },
+    {
+      "id": "preview",
+      "group": "Releases",
+      "description": "Deploy a release from .zitadel/ to a pull-request build's preview URLs.",
+      "args": [],
+      "flags": [
+        {
+          "name": "origin",
+          "description": "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "ttl",
+          "description": "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
+          "type": "option"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
+          "name": "strict",
+          "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview"
+        },
+        {
+          "command": "preview --origin https://acme-git-sso-acmeinc.vercel.app"
+        },
+        {
+          "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
+        }
+      ]
+    },
+    {
+      "id": "preview list",
+      "group": "Releases",
+      "description": "List the project's live previews, newest first.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview list"
+        },
+        {
+          "command": "preview list --all"
+        },
+        {
+          "command": "preview list --plain"
+        }
+      ]
+    },
+    {
+      "id": "preview rm",
+      "group": "Releases",
+      "description": "Remove a live preview from the project.",
+      "args": [
+        {
+          "name": "url",
+          "description": "The preview URL to remove.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the preview without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app"
+        },
+        {
+          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app --force"
+        }
+      ]
+    },
+    {
+      "id": "pull",
+      "group": "Releases",
+      "description": "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.",
+      "args": [
+        {
+          "name": "target",
+          "description": "What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id (dep_…)."
+        }
+      ],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "pull"
+        },
+        {
+          "command": "pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        },
+        {
+          "command": "pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+        }
+      ]
+    },
+    {
+      "id": "release create",
+      "group": "Releases",
+      "description": "Build a release from .zitadel/ without deploying it.",
+      "args": [],
+      "flags": [
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release create"
+        },
+        {
+          "command": "release create -m 'add phone_number to human-user'"
+        }
+      ]
+    },
+    {
+      "id": "release get",
+      "group": "Releases",
+      "description": "Get one release by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "release id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release get <id>"
+        },
+        {
+          "command": "release get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "release list",
+      "group": "Releases",
+      "description": "List releases.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release list --json"
+        },
+        {
+          "command": "release list --all --json"
+        }
+      ]
+    },
+    {
+      "id": "release revoke",
+      "group": "Releases",
+      "description": "Revoke a release so its content is never served again.",
+      "args": [
+        {
+          "name": "release_id",
+          "description": "The release to revoke.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Revoke the release without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        },
+        {
+          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force"
+        }
+      ]
+    },
+    {
+      "id": "deployment create",
+      "group": "Releases",
+      "description": "Deploy an existing release to the project's origins.",
+      "args": [],
+      "flags": [
+        {
+          "name": "release",
+          "description": "The release id to deploy.",
+          "type": "option",
+          "required": true
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this deploys.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        }
+      ]
+    },
+    {
+      "id": "deployment get",
+      "group": "Releases",
+      "description": "Read one deployment by id.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+        }
+      ]
+    },
+    {
+      "id": "deployment list",
+      "group": "Releases",
+      "description": "List the project's deployments, newest first.",
+      "args": [],
+      "flags": [
+        {
+          "name": "origin",
+          "description": "Only deployments that targeted this origin.",
+          "type": "option"
+        },
+        {
+          "name": "live",
+          "description": "What each target serves now, not the full history.",
+          "type": "boolean"
+        },
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment list"
+        },
+        {
+          "command": "deployment list --all"
+        },
+        {
+          "command": "deployment list --live"
+        },
+        {
+          "command": "deployment list --origin https://app.acme.com"
+        }
+      ]
+    },
+    {
+      "id": "deployment rollback",
+      "group": "Releases",
+      "description": "Roll back to an earlier deployment.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment rollback"
+        },
+        {
+          "command": "deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+        },
+        {
+          "command": "deployment rollback --force"
+        }
+      ]
+    },
+    {
+      "id": "event get",
+      "group": "API and events",
+      "description": "Get one event by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "event id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "event get <id>"
+        },
+        {
+          "command": "event get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "event list",
+      "group": "API and events",
+      "description": "List events.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sort",
+          "description": "Sort as field:direction (asc|desc). Fields: occurred_at.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "event list --json"
+        },
+        {
+          "command": "event list --all --json"
+        },
+        {
+          "command": "event list --filter category=equals:<value> --sort occurred_at:desc"
+        }
+      ]
+    },
+    {
       "id": "api",
-      "group": "Diagnostics and utilities",
+      "group": "API and events",
       "description": "Call any operation of the Zitadel API, with this project's server and project secret.",
       "args": [
         {
@@ -3853,7 +3965,7 @@
     },
     {
       "id": "api ls",
-      "group": "Diagnostics and utilities",
+      "group": "API and events",
       "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
@@ -3889,118 +4001,8 @@
       ]
     },
     {
-      "id": "event get",
-      "group": "Diagnostics and utilities",
-      "description": "Get one event by id.",
-      "args": [
-        {
-          "name": "id",
-          "description": "event id",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "fields",
-          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
-          "type": "option"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "event get <id>"
-        },
-        {
-          "command": "event get <id> --json"
-        }
-      ]
-    },
-    {
-      "id": "event list",
-      "group": "Diagnostics and utilities",
-      "description": "List events.",
-      "args": [],
-      "flags": [
-        {
-          "name": "limit",
-          "description": "Page size (server default 20, max 100).",
-          "type": "option",
-          "min": 1,
-          "max": 100
-        },
-        {
-          "name": "page-token",
-          "description": "Continue from a previous page's next_page_token.",
-          "type": "option"
-        },
-        {
-          "name": "all",
-          "char": "a",
-          "description": "Fetch every page instead of one.",
-          "type": "boolean",
-          "exclusive": [
-            "page-token"
-          ]
-        },
-        {
-          "name": "fields",
-          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-          "type": "option"
-        },
-        {
-          "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), user_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
-          "type": "option",
-          "multiple": true
-        },
-        {
-          "name": "sort",
-          "description": "Sort as field:direction (asc|desc). Fields: occurred_at.",
-          "type": "option"
-        },
-        {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
-          "type": "option"
-        }
-      ],
-      "examples": [
-        {
-          "command": "event list --json"
-        },
-        {
-          "command": "event list --all --json"
-        },
-        {
-          "command": "event list --filter category=equals:<value> --sort occurred_at:desc"
-        }
-      ]
-    },
-    {
       "id": "resources",
-      "group": "Diagnostics and utilities",
+      "group": "API and events",
       "description": "List the resources this CLI manages.\n\nShows what can be done to each.",
       "args": [],
       "flags": [
