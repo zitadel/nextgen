@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -17,7 +17,7 @@ const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;col
  * sits in a JS comment.
  */
 export function hooksServerTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
 import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
 
@@ -39,7 +39,7 @@ export const handle = createNextgenHandle({
  */
 export function layoutTemplate(): string {
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   let { children } = $props();
 </script>
 
@@ -61,7 +61,7 @@ export function layoutTemplate(): string {
 
 /** `src/routes/+page.svelte` — the landing chooser linking to login/register/profile. */
 export function indexPageTemplate(): string {
-  return `<!-- ${MANAGED_MARKER} -->
+  return `<!-- ${ManagedFile.MARKER} -->
 <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
   <section style="width:100%;max-width:560px">
     <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
@@ -103,7 +103,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   import { onMount } from "svelte";
   import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 
@@ -138,7 +138,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
 /** `src/routes/profile/+page.svelte` — the signed-in view: the "signed in as" session card, with sign-out. */
 export function profilePageTemplate(): string {
   return `<script lang="ts">
-  ${MANAGED_MARKER}
+  ${ManagedFile.MARKER}
   import { onMount } from "svelte";
   import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 

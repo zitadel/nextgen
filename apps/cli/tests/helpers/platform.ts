@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  rejectInvitation,
   completeClaimChallenge,
   resetPlatformStore,
   setupPlatformHandlers,
@@ -121,6 +122,9 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
+
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
    * does, while a deployment and the project still answer. A command that reads
@@ -185,6 +189,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -231,6 +243,14 @@ export interface PlatformMock {
    */
   acceptsInvitation(invitationId: string): void;
 
+  /**
+   * Declines the invitation, as the person it was for following its link and
+   * declining would.
+   *
+   * @param invitationId - The invitation to decline.
+   */
+  declinesInvitation(invitationId: string): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -270,8 +290,8 @@ function hostileInvitation(id: string, metadata: { name: string } | null): Recor
     created_at: "2026-01-01T00:00:00Z",
     expires_at: "2026-01-04T00:00:00Z",
     journey_id: "journey_1",
-    accepted_by: null,
-    accepted_at: null,
+    responded_by: null,
+    responded_at: null,
   };
 }
 
@@ -565,6 +585,23 @@ export function usePlatformMock(): PlatformMock {
       return id;
     },
 
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
+    },
+
     pagesWithAHostileCursor() {
       const cursor = "cur-\u001b[2Jwiped";
       server.use(
@@ -669,6 +706,14 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+        ),
+      );
+    },
+
     cannotReadConnections() {
       server.use(
         http.get("*/idps/:id", () =>
@@ -706,6 +751,10 @@ export function usePlatformMock(): PlatformMock {
 
     acceptsInvitation(invitationId) {
       acceptInvitation(invitationId);
+    },
+
+    declinesInvitation(invitationId) {
+      rejectInvitation(invitationId);
     },
 
     recovers() {

@@ -4,8 +4,8 @@ import { BaseCommand } from "@/lib/oclif/base";
 import { aConfigAt } from "@tests/helpers/suggestions";
 import { prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
-import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
-import { offTerminal } from "@tests/helpers/terminal";
+import { warnings } from "@/lib/ui";
+import { offTerminal } from "@tests/fixtures/terminal";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {
@@ -48,7 +48,7 @@ class WarningCommand extends BaseCommand {
 }
 
 function makeCommand(): WarningCommand {
-  takeReportedWarnings();
+  warnings.take();
   return new WarningCommand([], aConfigAt("0.0.0-test"));
 }
 
@@ -116,7 +116,7 @@ describe("BaseCommand warnings", () => {
 
   it("carries a reported warning into the envelope", async () => {
     const cmd = makeCommand();
-    reportWarning("reported early");
+    warnings.report("reported early");
 
     const envelope = await cmd.finish({
       summary: { title: "Done", sections: [] },
@@ -130,7 +130,7 @@ describe("BaseCommand warnings", () => {
 
   it("does not print a reported warning a second time", async () => {
     const cmd = makeCommand();
-    reportWarning("reported early");
+    warnings.report("reported early");
 
     await cmd.finish({
       summary: { title: "Done", sections: [] },
@@ -144,7 +144,7 @@ describe("BaseCommand warnings", () => {
 
   it("carries a reported warning into a skipped envelope", async () => {
     const cmd = makeCommand();
-    reportWarning("reported early");
+    warnings.report("reported early");
 
     const envelope = await cmd.finish({
       summary: { title: "Done", sections: [] },
@@ -170,7 +170,7 @@ describe("BaseCommand warnings", () => {
   it("carries a reported warning into an error envelope", async () => {
     const cmd = makeCommand();
     cmd.jsonEnabled = () => true;
-    reportWarning("reported early");
+    warnings.report("reported early");
 
     await cmd.fail(new Error("boom"));
 

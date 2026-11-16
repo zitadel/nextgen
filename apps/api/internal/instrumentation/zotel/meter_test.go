@@ -47,7 +47,7 @@ func TestMeterViews_HTTPAttributesAreBounded(t *testing.T) {
 		attribute.String("server.address", "example.test"),
 	}
 	ogen := []attribute.KeyValue{
-		otelogen.OperationID("GetUserByID"),
+		otelogen.OperationID("getUser"),
 		attribute.String("http.request.method", "GET"),
 		attribute.String("http.route", "/users/{user_id}"),
 		attribute.Int("http.response.status_code", 200),

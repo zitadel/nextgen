@@ -7,7 +7,7 @@ import { aConfigAt } from "@tests/helpers/suggestions";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
@@ -344,7 +344,7 @@ describe("the follow-ups of a failure raised while a flag parsed", () => {
 
 describe("a failure whose follow-up cannot be rendered", () => {
   const broken = new ZitadelError("E_VALIDATION", "Not running", {
-    nextCommands: [resourceSuggestion("events", "create"), { id: "start" }],
+    nextCommands: [resourceSuggestion("event", "create"), { id: "start" }],
   });
 
   it("is still reported, with its code and message", async () => {

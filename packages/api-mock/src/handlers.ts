@@ -2,9 +2,9 @@ import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
- * Drives an xstate `flowMachine` actor. `POST /flow` resets the actor and
- * starts a new walk; `POST /flow/{id}/submit` advances the actor and returns
- * the matching step fixture; `GET /flow/{id}` re-renders the current step;
+ * Drives an xstate `flowMachine` actor. `POST /flows` resets the actor and
+ * starts a new walk; `POST /flows/{flow_id}/submit` advances the actor and returns
+ * the matching step fixture; `GET /flows/{flow_id}` re-renders the current step;
  * `GET /__nextgen/idp/callback` (and `/idp/callback`) is the provider's return.
  *
  * Branding is applied by `withBranding` (overlay set via `applyBranding`).
@@ -364,7 +364,7 @@ export function setupMockHandlers(
    * has no `id_token` either, so an `email` query parameter stands in for its
    * email claim, falling back to the address the flow already captured.
    * Either way the browser goes back with `303` to the `return_target` of the
-   * `sso` submission, where `GET /flow/{id}` shows the result.
+   * `sso` submission, where `GET /flows/{flow_id}` shows the result.
    */
   function idpCallback({ request }: { request: Request }): Response {
     const noStore = { "Cache-Control": "private, no-store" };
@@ -397,7 +397,7 @@ export function setupMockHandlers(
    *
    * Reads `capturedFields.email` from the actor snapshot to look up the user's
    * registered credentials in `authn`, then selects and renders the matching
-   * step fixture. Called after every state transition and on `GET /flow/{id}`.
+   * step fixture. Called after every state transition and on `GET /flows/{flow_id}`.
    */
   /**
    * The non-branding overlays: identity providers and the passkey offer on the
@@ -490,9 +490,9 @@ export function setupMockHandlers(
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
     // with whatever it is given, and the refusal below is a 400.
-    http.post("*/flow/:id/submit", async ({ params, request }) => {
+    http.post("*/flows/:flow_id/submit", async ({ params, request }) => {
       const ok = (step: CreateFlow201) => HttpResponse.json(step, { status: 200 });
-      const flowId = String(params.id);
+      const flowId = String(params.flow_id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
       const delayed = submitDelay;
@@ -674,7 +674,7 @@ export function setupMockHandlers(
       );
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
-      captured.push({ kind: "getFlowStep", flowId: String(params.id) });
+      captured.push({ kind: "getFlowStep", flowId: String(params.flowId) });
       const response = await currentResponse();
       // As on the server, only GET prepares the announced signup challenge.
       if (response.step.gates.signup_pow) {

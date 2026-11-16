@@ -169,6 +169,12 @@ export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
 }
 
+// The server commands that do one thing and exit. `pnpm run server` and
+// `pnpm run server-debug` build no console for them and add no --migrate.
+export function isOneShotServerCommand(args) {
+  return ["migrate", "seed", "completion"].includes(args[0]);
+}
+
 // Node loads the entry script from its real path: import.meta.url has every
 // symlink resolved, argv[1] keeps the path as given. Compare real paths, or a
 // script started through a symlink (macOS's /tmp links to /private/tmp) skips

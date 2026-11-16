@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 import { CONFIG_DIRECTORIES, ConfigError, FileExistsError, type JsonObject } from "@/lib/zitadel";
 import type { Store } from "@/lib/zitadel/storage/backend/store";
 import { BACKENDS } from "@tests/helpers/storage/backend/backends";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { aBrandingReferencing } from "@tests/helpers/stores";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 

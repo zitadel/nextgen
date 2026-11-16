@@ -1,7 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
@@ -38,9 +39,9 @@ const NO_ID_REFUSAL = {
 } as const satisfies Refusal;
 
 /** How a cancel of an invitation that has already finished is refused. */
-const NOT_PENDING_REFUSAL = {
+const NOT_CANCELLABLE_REFUSAL = {
   message: "{id} is {status}, so there is nothing to cancel",
-  hint: "Only a pending invitation can be cancelled.",
+  hint: "Only a pending or declined invitation can be cancelled.",
   next: [{ id: "invitation:list", flags: { status: "pending" } }],
 } as const satisfies Refusal;
 
@@ -53,13 +54,14 @@ const NOTHING_PENDING_REFUSAL = {
 
 /**
  * `zitadel invitation cancel [invitation_id]` — cancel a pending invitation,
- * so its link can no longer be redeemed. Without an id it offers the pending
+ * so its link can no longer be redeemed, or remove a declined one. Without an
+ * id it offers the pending
  * invitations to pick from.
  */
 export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   static override description = "Cancel a pending invitation so its link stops working.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 4;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 8;
   static override examples = [
     "<%= config.bin %> invitation cancel",
     "<%= config.bin %> invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J",
@@ -90,7 +92,9 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
         verb: "cancel",
         name: `cancel ${invitationId}`,
         message: ({ invitation }) => {
-          return `Cancel ${describe(invitation)} so its link stops working?`;
+          return invitation.status === "pending"
+            ? `Cancel ${describe(invitation)} so its link stops working?`
+            : `Cancel ${describe(invitation)} and remove its record?`;
         },
         // A bare cancel picked its invitation, which a retry must name.
         arguments: [invitationId],
@@ -108,7 +112,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
           const connection = await this.connect();
           const invitation =
             typeof target === "string"
-              ? await this.readPending(
+              ? await this.readCancellable(
                   new InvitationService(connection.client, connection.projectId),
                   target,
                 )
@@ -118,11 +122,18 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
-          this.trackEvent(INVITATION_CANCELLED, {
-            role: invitationGrant(invitation),
-            invitation_journey_id: invitation.journey_id,
-          });
-          const title = `Cancelled ${escapeControlCharacters(invitation.id)}; its link no longer works`;
+          // A declined journey already ended with invitation_rejected.
+          if (invitation.status === "pending") {
+            this.trackEvent(INVITATION_CANCELLED, {
+              role: invitationGrant(invitation),
+              invitation_journey_id: invitation.journey_id,
+            });
+          }
+          const id = escapeControlCharacters(invitation.id);
+          const title =
+            invitation.status === "pending"
+              ? `Cancelled ${id}; its link no longer works`
+              : `Cancelled ${id}; its record is removed`;
           return {
             status: "ok",
             data: deletedData({ title, id: invitation.id }),
@@ -162,16 +173,16 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 
   /**
    * The invitation the command line named, read before anyone is asked, so
-   * the question can name it and one that is no longer pending is refused:
+   * the question can name it and one a cancel cannot delete is refused:
    * the server answers that cancel with the same 404 as a miss.
    */
-  private async readPending(
+  private async readCancellable(
     invitationService: InvitationService,
     invitationId: string,
   ): Promise<Invitation> {
     const invitation = await invitationService.get(invitationId);
-    if (invitation.status !== "pending") {
-      throw refusalError(NOT_PENDING_REFUSAL, {
+    if (invitation.status !== "pending" && invitation.status !== "rejected") {
+      throw refusalError(NOT_CANCELLABLE_REFUSAL, {
         id: invitation.id,
         status: invitation.status,
       });

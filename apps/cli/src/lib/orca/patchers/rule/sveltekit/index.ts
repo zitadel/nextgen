@@ -1,6 +1,5 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "@/lib/public-cli";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
@@ -99,12 +98,12 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }

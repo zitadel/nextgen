@@ -55,7 +55,7 @@ export { CreateOperation, DeleteOperation, GetOperation, ListOperation, UpdateOp
 
 /**
  * Builds the command classes for every registry entry, keyed by oclif command
- * id (`users:list`), ready to spread into an explicit command table. oclif's
+ * id (`user:list`), ready to spread into an explicit command table. oclif's
  * help, manifest, autocomplete, and README generation read them exactly as
  * they read hand-written classes.
  */

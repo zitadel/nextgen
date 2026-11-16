@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params api.CreateBrandingParams) (api.CreateBrandingRes, error) {
+func (h *Handler) PublishBranding(ctx context.Context, req *api.Branding, params api.PublishBrandingParams) (api.PublishBrandingRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -31,12 +31,12 @@ func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params 
 	return brandingRevisionResponse(branding), nil
 }
 
-func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByIdParams) (api.GetBrandingByIdRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, params.ID, brandingAccess, opRead)
+func (h *Handler) GetBranding(ctx context.Context, params api.GetBrandingParams) (api.GetBrandingRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, params.BrandingID, brandingAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	branding, err := h.brandingService.Get(ctx, projectID, params.ID)
+	branding, err := h.brandingService.Get(ctx, projectID, params.BrandingID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,16 +48,23 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 	if err != nil {
 		return nil, err
 	}
-	brandings, err := h.brandingService.List(ctx, string(params.ProjectID))
+	result, err := h.brandingService.List(ctx, service.ListBrandingInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
 	if err != nil {
 		return nil, err
 	}
-	resp := make(api.ListBrandingResponse, 0, len(brandings))
-	for _, b := range brandings {
-		resp = append(resp, api.ListBrandingResponseItem{
+	resp := api.ListBrandingResponse{Branding: make([]api.BrandingRevisionSummary, len(result.Items))}
+	for i, b := range result.Items {
+		resp.Branding[i] = api.BrandingRevisionSummary{
 			ID:        b.ID,
 			CreatedAt: b.CreatedAt,
-		})
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
 	}
 	return &resp, nil
 }

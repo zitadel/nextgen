@@ -163,7 +163,7 @@ func (f *ssoCallbackFixture) submitSSO(t *testing.T, flow ssoFlow) (authorize *u
 	body, err := submission.MarshalJSON()
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.APIBaseURL(t)+"/flow/"+flow.id+"/submit", strings.NewReader(string(body)))
+		harness.APIBaseURL(t)+"/flows/"+flow.id+"/submit", strings.NewReader(string(body)))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", "https://login.example.test")
@@ -276,7 +276,7 @@ func TestSSOCallbackEventsJoinTheLoginFlow(t *testing.T) {
 	page, ok := listed.(*api.ListEventsResponse)
 	require.True(t, ok, helpers.MustMarshal(t, listed))
 	var types []string
-	for _, event := range page.Data {
+	for _, event := range page.Events {
 		raw, err := event.MarshalJSON()
 		require.NoError(t, err)
 		var envelope struct {

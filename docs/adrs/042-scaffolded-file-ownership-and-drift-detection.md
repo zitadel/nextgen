@@ -73,7 +73,7 @@ adopted — a Next 15→16 upgrade converges instead of failing forever.
 Beyond whole files, the check verifies the managed *config wirings* — the
 merges the CLI applies into user-owned config files (the Vite and Nuxt
 dev-proxy/runtime merges, Angular's `angular.json` `proxyConfig` and auth
-routes, the Angular `dev` script). Each merging transform is idempotent by
+routes). Each merging transform is idempotent by
 contract (it only adds what is missing), so running it against the current
 content is a structural probe: a changed output means the wiring is absent.
 Verification is total — every labelled wiring gets a verdict: `applied`,
@@ -140,7 +140,7 @@ warnings.
 
 The files in `.zitadel/meta/` are a third kind of scaffolded file, beside the
 two classes above: CLI-owned generated output. Each is a pure function of the
-CLI version (`projectMetaSchemas` in `apps/cli/src/lib/meta-schemas.ts`), a
+CLI version (`MetaSchemas.of` in `apps/cli/src/lib/meta-schemas/meta-schemas.ts`), a
 dialect spec that editors read through a `$schema` pointer and agents read
 before an edit. No command and not the server reads them: `deploy` validates
 with the CLI's own Zod and the server with its embedded copy. They are JSON,

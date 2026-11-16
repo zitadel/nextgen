@@ -50,7 +50,7 @@ func (h *Handler) GetGrant(ctx context.Context, params api.GetGrantParams) (api.
 	includePrincipal := slices.Contains(params.Expand, api.GrantExpandPrincipal)
 	// A literal, not the method value: gen_openapi_errors follows a func
 	// literal argument, so the operation lists user.permission_denied.
-	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.ID, includePrincipal, func(ctx context.Context, home string) error {
+	grant, err := h.grantService.Get(ctx, string(params.ProjectID), params.GrantID, includePrincipal, func(ctx context.Context, home string) error {
 		return h.requirePrincipalRead(ctx, home)
 	})
 	if err != nil {
@@ -122,7 +122,7 @@ func (h *Handler) DeleteGrant(ctx context.Context, params api.DeleteGrantParams)
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), grantAccess, opDelete); err != nil {
 		return nil, err
 	}
-	if err := h.grantService.Revoke(ctx, string(params.ProjectID), params.ID); err != nil {
+	if err := h.grantService.Revoke(ctx, string(params.ProjectID), params.GrantID); err != nil {
 		return nil, err
 	}
 	return &api.DeleteGrantNoContent{}, nil

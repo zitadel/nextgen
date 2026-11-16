@@ -1,7 +1,7 @@
 x-meta-schema: true
 title: PolicyTest
 description: |
-  A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
+  A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policy
   test` evaluates against the policy in the sibling `<operation>.json`, or
   against the one a release pins. Each case states the operation's input
   and, where it matters, the facts the operation would look up, and the

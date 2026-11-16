@@ -102,7 +102,7 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	// The _zflow cookie is flow state, not a session credential: its absence
 	// must stay a structural 400, not become a 401. The details name the
 	// missing parameter.
-	req := httptest.NewRequest(http.MethodPost, "/flow/flow_123/submit", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/flows/flow_123/submit", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -298,23 +298,23 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.SearchOperation,
 		api.GetTeamOperation,
 		api.CreateUserOperation,
-		api.GetUserByIDOperation,
-		api.PatchUserByIDOperation,
-		api.DeleteUserByIDOperation,
+		api.GetUserOperation,
+		api.UpdateUserOperation,
+		api.DeleteUserOperation,
 		api.CreateTeamOperation,
 		api.UpdateTeamOperation,
 		api.ListSchemasOperation,
-		api.GetSchemaByIdOperation,
+		api.GetSchemaOperation,
 		api.ListFlowDefinitionsOperation,
 		api.GetFlowDefinitionOperation,
 		api.ListBrandingOperation,
-		api.GetBrandingByIdOperation,
+		api.GetBrandingOperation,
 		api.QueryIdpsOperation,
-		api.GetIdpByIdOperation,
+		api.GetIdpOperation,
 		api.ListReleasesOperation,
-		api.GetReleaseByIdOperation,
+		api.GetReleaseOperation,
 		api.ListDeploymentsOperation,
-		api.GetDeploymentByIdOperation,
+		api.GetDeploymentOperation,
 		api.CreateDeploymentOperation,
 		api.RollbackDeploymentOperation,
 		api.RevokeReleaseOperation,

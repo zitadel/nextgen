@@ -2,8 +2,8 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import { brandingAssetWarnings, resolvePublicAddresses } from "@/lib/publish/steps/asset-probe";
-import { useUserAgent } from "@/lib/user-agent";
-import { it } from "@tests/helpers/fixtures";
+import { Runtime } from "@/lib/runtime";
+import { it } from "@tests/fixtures";
 
 /**
  * The resolver the probe asks, answered by each test.
@@ -54,7 +54,7 @@ describe("brandingAssetWarnings", () => {
   });
 
   it("identifies the CLI to asset hosts", async ({ server }) => {
-    useUserAgent("zitadel-cli/1.0.0");
+    Runtime.current().useUserAgent("zitadel-cli/1.0.0");
     const agents: (string | null)[] = [];
     server.use(
       http.head(LOGO, ({ request }) => {

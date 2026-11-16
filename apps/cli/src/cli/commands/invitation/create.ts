@@ -9,7 +9,8 @@ import {
   invitationRole,
 } from "@/lib/backend";
 import { createInvitationBodyOneOneMetadataNameMax } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -82,8 +83,8 @@ const REPLACES_ACCEPTED_REFUSAL = {
  */
 export default class InvitationCreate extends Promptable(EnvironmentCommand) {
   static override description = "Invite someone into the project with a link to share.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 1;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 5;
   static override examples = [
     "<%= config.bin %> invitation create",
     '<%= config.bin %> invitation create --name "John Doe" --relation editor',
