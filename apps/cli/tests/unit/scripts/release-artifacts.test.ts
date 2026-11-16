@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/fixtures";
 
 type PlatformPackage = {
   goos: string;
@@ -79,28 +80,15 @@ type ReleaseArtifactsModule = {
   }) => Promise<void>;
 };
 
-const tempDirs: string[] = [];
-
 async function loadModule(): Promise<ReleaseArtifactsModule> {
   return (await import(
     new URL("../../../../../scripts/release-artifacts.mjs", import.meta.url).href
   )) as ReleaseArtifactsModule;
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
 describe("release artifact helpers", () => {
-  it("stamps the runtime metadata package in release binaries", async () => {
+  it("stamps the runtime metadata package in release binaries", async ({ dir: repoRoot }) => {
     const { buildServerBinaries } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-build-"));
-    tempDirs.push(repoRoot);
     const calls: Array<{ command: string; args: string[] }> = [];
 
     await buildServerBinaries({
@@ -135,10 +123,8 @@ describe("release artifact helpers", () => {
     });
   });
 
-  it("reads the server npm package as the product version source", async () => {
+  it("reads the server npm package as the product version source", async ({ dir: repoRoot }) => {
     const { readServerRelease } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));
-    tempDirs.push(repoRoot);
     await mkdir(join(repoRoot, "apps/server"), { recursive: true });
     await writeFile(
       join(repoRoot, "apps/server/package.json"),
@@ -181,10 +167,8 @@ describe("release artifact helpers", () => {
     expect(() => validateSemver("v1.2.3")).toThrow("invalid release version");
   });
 
-  it("builds a release binary into the path it is given", async () => {
+  it("builds a release binary into the path it is given", async ({ dir: repoRoot }) => {
     const { buildServerBinaries } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-binary-"));
-    tempDirs.push(repoRoot);
     const output = join(repoRoot, "apps/server-darwin-arm64/bin/nextgen");
     const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
 
@@ -205,10 +189,10 @@ describe("release artifact helpers", () => {
     await expect(stat(join(repoRoot, "apps/server-darwin-arm64/bin"))).resolves.toBeDefined();
   });
 
-  it("collects the platform packages' binaries into the release directory", async () => {
+  it("collects the platform packages' binaries into the release directory", async ({
+    dir: repoRoot,
+  }) => {
     const { collectServerBinaries } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-collect-"));
-    tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     await mkdir(join(repoRoot, "apps/server-linux-arm64/bin"), { recursive: true });
     await writeFile(join(repoRoot, "apps/server-linux-arm64/bin/nextgen"), "server-binary");
@@ -232,10 +216,8 @@ describe("release artifact helpers", () => {
     expect((await stat(collected)).mode & 0o111).toBeGreaterThan(0);
   });
 
-  it("names each platform package whose binary is missing", async () => {
+  it("names each platform package whose binary is missing", async ({ dir: repoRoot }) => {
     const { assertServerBinaries } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-missing-"));
-    tempDirs.push(repoRoot);
     await mkdir(join(repoRoot, "apps/server-linux-x64/bin"), { recursive: true });
     await writeFile(join(repoRoot, "apps/server-linux-x64/bin/nextgen"), "server-binary");
 
@@ -260,10 +242,10 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow(/^missing server binaries: @zitadel\/server-win32-x64\. /);
   });
 
-  it("compresses every platform archive at once and lists checksums in platform order", async () => {
+  it("compresses every platform archive at once and lists checksums in platform order", async ({
+    dir: repoRoot,
+  }) => {
     const { createArchives, SERVER_PLATFORMS } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-archives-"));
-    tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     await writeFile(join(repoRoot, "LICENSE"), "license");
     await writeFile(join(repoRoot, "README.md"), "readme");
@@ -318,10 +300,8 @@ describe("release artifact helpers", () => {
     );
   });
 
-  it("rejects incomplete local release artifacts", async () => {
+  it("rejects incomplete local release artifacts", async ({ dir: repoRoot }) => {
     const { verifyLocalArtifacts } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-artifacts-"));
-    tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     await mkdir(outDir, { recursive: true });
 
@@ -339,13 +319,13 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow("missing release artifacts");
   });
 
-  it("rejects packing public packages before release build output exists", async () => {
+  it("rejects packing public packages before release build output exists", async ({
+    dir: repoRoot,
+  }) => {
     const { packPublicPackages } = await loadModule();
     const manifest = (await import(
       new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
     )) as { PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string }> };
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
-    tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
       await mkdir(join(repoRoot, pkg.dir), { recursive: true });
@@ -365,15 +345,13 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow(/requires .+\/dist before packing/);
   });
 
-  it("packs the CLI release tarball", async () => {
+  it("packs the CLI release tarball", async ({ dir: repoRoot }) => {
     const { packPublicPackages } = await loadModule();
     const manifest = (await import(
       new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
     )) as {
       PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string }>;
     };
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
-    tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
       await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
@@ -399,10 +377,10 @@ describe("release artifact helpers", () => {
     expect(cliPack).toBeDefined();
   });
 
-  it("packs only the given directories into the given tarball directory", async () => {
+  it("packs only the given directories into the given tarball directory", async ({
+    dir: repoRoot,
+  }) => {
     const { packPublicPackages } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
-    tempDirs.push(repoRoot);
     const tarballsDir = join(repoRoot, "registry/npm-packages");
     await mkdir(join(repoRoot, "packages/sdk-core/dist"), { recursive: true });
     await writeFile(

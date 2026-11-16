@@ -4,7 +4,7 @@ import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
 import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
@@ -18,16 +18,13 @@ import {
   stagedFiles,
   write,
 } from "@tests/helpers/git-repo";
+import { removeTree } from "@tests/fixtures/scratch";
 
 const exec = promisify(execFile);
 
 const scratch = new GitScratch();
 
 beforeEach(isolateGit);
-
-afterEach(async () => {
-  await scratch.cleanup();
-});
 
 /** What `staging` holds staged against the last commit. */
 async function staged(staging: StagingArea): Promise<string[]> {
@@ -496,19 +493,17 @@ describe("StagingArea", () => {
       const cwd = await scratch.committed({ "a.txt": "a\n" });
       const folder = { path: "" };
 
-      try {
-        const result = await StagingArea.temporary(new Git(cwd), async (staging) => {
-          folder.path = dirname(await indexOf(staging));
-          await writeFile(join(folder.path, "held"), "");
-          await chmod(folder.path, 0o500);
-          return "done";
-        });
+      onTestFinished(() => {
+        return removeTree(folder.path);
+      });
+      const result = await StagingArea.temporary(new Git(cwd), async (staging) => {
+        folder.path = dirname(await indexOf(staging));
+        await writeFile(join(folder.path, "held"), "");
+        await chmod(folder.path, 0o500);
+        return "done";
+      });
 
-        expect(result).toBe("done");
-      } finally {
-        await chmod(folder.path, 0o755);
-        await rm(folder.path, { recursive: true, force: true });
-      }
+      expect(result).toBe("done");
     },
   );
 

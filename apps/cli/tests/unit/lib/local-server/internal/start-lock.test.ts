@@ -1,8 +1,7 @@
-import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
   clearStale,
@@ -10,46 +9,43 @@ import {
   UNWRITTEN_LOCK_MS,
   withStartLock,
 } from "@/lib/local-server/internal/start-lock";
-import { ManualClock } from "@tests/helpers/clock";
+import { ManualClock } from "@tests/fixtures/clock";
+import { it } from "@tests/fixtures";
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function lockPath(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-lock-"));
-  dirs.push(dir);
+/**
+ * Where a start lock lives under a directory.
+ *
+ * @param dir - The directory the lock's `local` folder is in.
+ * @returns The lock file's path.
+ */
+function lockPath(dir: string): string {
   return join(dir, "local", "start.lock");
 }
 
 describe("tryLock", () => {
-  it("takes a lock nobody has", async () => {
-    const lock = await lockPath();
+  it("takes a lock nobody has", async ({ dir }) => {
+    const lock = lockPath(dir);
 
     await expect(tryLock(lock)).resolves.toBeTypeOf("function");
   });
 
-  it("does not take a lock a live start has, and does not wait for it", async () => {
-    const lock = await lockPath();
+  it("does not take a lock a live start has, and does not wait for it", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
 
     await expect(tryLock(lock)).resolves.toBeUndefined();
   });
 
-  it("takes the lock again once it is released", async () => {
-    const lock = await lockPath();
+  it("takes the lock again once it is released", async ({ dir }) => {
+    const lock = lockPath(dir);
     const release = await tryLock(lock);
     await release?.();
 
     await expect(tryLock(lock)).resolves.toBeTypeOf("function");
   });
 
-  it("takes over a lock whose owner is gone", async () => {
-    const lock = await lockPath();
+  it("takes over a lock whose owner is gone", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -58,8 +54,8 @@ describe("tryLock", () => {
 });
 
 describe("tryLock when two starts find the same dead owner", () => {
-  it("lets only one of them take the lock", async () => {
-    const lock = await lockPath();
+  it("lets only one of them take the lock", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -68,8 +64,8 @@ describe("tryLock when two starts find the same dead owner", () => {
     expect(taken.filter((release) => release !== undefined)).toHaveLength(1);
   });
 
-  it("leaves the lock of the one that won", async () => {
-    const lock = await lockPath();
+  it("leaves the lock of the one that won", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -78,8 +74,8 @@ describe("tryLock when two starts find the same dead owner", () => {
     await expect(readFile(lock, "utf8")).resolves.toBe(String(process.pid));
   });
 
-  it("does not leave the file it cleared the lock with behind", async () => {
-    const lock = await lockPath();
+  it("does not leave the file it cleared the lock with behind", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -90,8 +86,8 @@ describe("tryLock when two starts find the same dead owner", () => {
 });
 
 describe("clearStale", () => {
-  it("leaves a lock that has another owner by the time it is cleared", async () => {
-    const lock = await lockPath();
+  it("leaves a lock that has another owner by the time it is cleared", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
 
     await clearStale(lock, 2147483000);
@@ -99,8 +95,8 @@ describe("clearStale", () => {
     await expect(readFile(lock, "utf8")).resolves.toBe(String(process.pid));
   });
 
-  it("removes a lock that still has the stale owner", async () => {
-    const lock = await lockPath();
+  it("removes a lock that still has the stale owner", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -109,8 +105,8 @@ describe("clearStale", () => {
     await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("does nothing while another start is clearing", async () => {
-    const lock = await lockPath();
+  it("does nothing while another start is clearing", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "2147483000");
     await writeFile(`${lock}.clearing`, String(process.pid));
@@ -119,8 +115,8 @@ describe("clearStale", () => {
     await expect(readFile(lock, "utf8")).resolves.toBe("2147483000");
   });
 
-  it("clears the way of a start that died while clearing", async () => {
-    const lock = await lockPath();
+  it("clears the way of a start that died while clearing", async ({ dir }) => {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(`${lock}.clearing`, "2147483000");
 
@@ -131,8 +127,15 @@ describe("clearStale", () => {
 });
 
 describe("a lock with no owner in it", () => {
-  async function emptyLock(ageMs: number): Promise<string> {
-    const lock = await lockPath();
+  /**
+   * A lock file with no owner written into it, as old as given.
+   *
+   * @param dir - The directory the lock is made under.
+   * @param ageMs - How long ago it was last touched, in milliseconds.
+   * @returns The lock file's path.
+   */
+  async function emptyLock(dir: string, ageMs: number): Promise<string> {
+    const lock = lockPath(dir);
     await tryLock(lock);
     await writeFile(lock, "");
     const then = new Date(Date.now() - ageMs);
@@ -140,20 +143,24 @@ describe("a lock with no owner in it", () => {
     return lock;
   }
 
-  it("is left alone when it is new, because its start may be about to write its pid", async () => {
-    await expect(tryLock(await emptyLock(0))).resolves.toBeUndefined();
+  it("is left alone when it is new, because its start may be about to write its pid", async ({
+    dir,
+  }) => {
+    await expect(tryLock(await emptyLock(dir, 0))).resolves.toBeUndefined();
   });
 
-  it("is taken over once it has stayed empty, because its start died before writing", async () => {
-    await expect(tryLock(await emptyLock(UNWRITTEN_LOCK_MS + 1000))).resolves.toBeTypeOf(
+  it("is taken over once it has stayed empty, because its start died before writing", async ({
+    dir,
+  }) => {
+    await expect(tryLock(await emptyLock(dir, UNWRITTEN_LOCK_MS + 1000))).resolves.toBeTypeOf(
       "function",
     );
   });
 });
 
 describe("releasing a lock", () => {
-  it("does not remove a lock that someone else holds now", async () => {
-    const lock = await lockPath();
+  it("does not remove a lock that someone else holds now", async ({ dir }) => {
+    const lock = lockPath(dir);
     const release = await tryLock(lock);
     await writeFile(lock, "2147483000");
 
@@ -164,16 +171,16 @@ describe("releasing a lock", () => {
 });
 
 describe("withStartLock", () => {
-  it("runs the work and removes the lock", async () => {
-    const lock = await lockPath();
+  it("runs the work and removes the lock", async ({ dir }) => {
+    const lock = lockPath(dir);
 
     await expect(withStartLock(lock, async () => "done")).resolves.toBe("done");
 
     await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("removes the lock when the work fails", async () => {
-    const lock = await lockPath();
+  it("removes the lock when the work fails", async ({ dir }) => {
+    const lock = lockPath(dir);
 
     await expect(
       withStartLock(lock, async () => {
@@ -184,16 +191,16 @@ describe("withStartLock", () => {
     await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("holds the lock while the work runs", async () => {
-    const lock = await lockPath();
+  it("holds the lock while the work runs", async ({ dir }) => {
+    const lock = lockPath(dir);
 
     await withStartLock(lock, async () => {
       await expect(readFile(lock, "utf8")).resolves.toBe(String(process.pid));
     });
   });
 
-  it("makes a second start wait until the first has finished", async () => {
-    const lock = await lockPath();
+  it("makes a second start wait until the first has finished", async ({ dir }) => {
+    const lock = lockPath(dir);
     const events: string[] = [];
     const begun: (() => void)[] = [];
     const firstHasBegun = new Promise<void>((resolve) => begun.push(resolve));
@@ -219,16 +226,16 @@ describe("withStartLock", () => {
     expect(events).toEqual(["first begins", "first ends", "second begins"]);
   });
 
-  it("takes over a lock whose owner is gone", async () => {
-    const lock = await lockPath();
+  it("takes over a lock whose owner is gone", async ({ dir }) => {
+    const lock = lockPath(dir);
     await withStartLock(lock, async () => undefined);
     await writeFile(lock, "2147483000");
 
     await expect(withStartLock(lock, async () => "taken")).resolves.toBe("taken");
   });
 
-  it("gives up with a way out when a live start never finishes", async () => {
-    const lock = await lockPath();
+  it("gives up with a way out when a live start never finishes", async ({ dir }) => {
+    const lock = lockPath(dir);
     const release = await tryLock(lock);
 
     await expect(

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ManualClock } from "@tests/helpers/clock";
+import { ManualClock } from "@tests/fixtures/clock";
 
 import {
   claimFreePort,

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect } from "vitest";
 import { createOrca } from "@/lib/orca";
 import { detectors } from "@/lib/orca/detectors";
 import type { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { git, ignoredByGit, isolateGit } from "@tests/helpers/git-repo";
 import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { aPatchContext } from "@tests/helpers/patch-context";

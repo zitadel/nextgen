@@ -11,7 +11,7 @@ import { callbackUriFor } from "@/lib/idp";
 import { Ui, log, warnings } from "@/lib/ui";
 import { forced } from "@tests/helpers/check-context";
 import { aGoogleConnection } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { aNextApp } from "@tests/helpers/setup";

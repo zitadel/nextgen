@@ -1,48 +1,49 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { AngularDetector } from "@/lib/orca/detectors/angular";
+import { it } from "@tests/fixtures";
 
-const dirs: string[] = [];
-
-async function project(deps: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "angular-detect-"));
-  dirs.push(cwd);
+/**
+ * Writes a `package.json` with the given dependencies into a directory.
+ *
+ * @param cwd - The directory to write it in.
+ * @param deps - The dependencies it declares.
+ * @returns The directory, for the detector to look at.
+ */
+async function project(cwd: string, deps: Record<string, string>): Promise<string> {
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: deps }));
   return cwd;
 }
 
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("AngularDetector", () => {
-  it("recognises an Angular app and reports appDir 'src/app'", async () => {
-    const facts = await new AngularDetector().detect(await project({ "@angular/core": "^18" }));
+  it("recognises an Angular app and reports appDir 'src/app'", async ({ dir }) => {
+    const facts = await new AngularDetector().detect(
+      await project(dir, { "@angular/core": "^18" }),
+    );
     expect(facts?.id).toBe("angular");
     expect(facts?.appDir).toBe("src/app");
   });
 
-  it("returns null without @angular/core", async () => {
-    expect(await new AngularDetector().detect(await project({ react: "^18" }))).toBeNull();
+  it("returns null without @angular/core", async ({ dir }) => {
+    expect(await new AngularDetector().detect(await project(dir, { react: "^18" }))).toBeNull();
   });
 
-  it("refuses Angular older than 17 (templates use @if)", async () => {
+  it("refuses Angular older than 17 (templates use @if)", async ({ dir }) => {
     await expect(
-      new AngularDetector().detect(await project({ "@angular/core": "^16.2.0" })),
+      new AngularDetector().detect(await project(dir, { "@angular/core": "^16.2.0" })),
     ).rejects.toMatchObject({
       code: "E_UNSUPPORTED_PROJECT_SHAPE",
       message: expect.stringContaining("Angular 17 and newer"),
     });
   });
 
-  it("still detects when the version range has no parseable major", async () => {
-    const facts = await new AngularDetector().detect(await project({ "@angular/core": "latest" }));
+  it("still detects when the version range has no parseable major", async ({ dir }) => {
+    const facts = await new AngularDetector().detect(
+      await project(dir, { "@angular/core": "latest" }),
+    );
     expect(facts?.id).toBe("angular");
   });
 });

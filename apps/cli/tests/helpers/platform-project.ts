@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -12,6 +11,7 @@ import { Server } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = Server.DEFAULT;
@@ -50,14 +50,14 @@ const Created = z.object({
 });
 
 /**
- * A Next.js app directory bound to a project through `.zitadel/secret`. The
- * caller removes it.
+ * A Next.js app directory bound to a project through `.zitadel/secret`. It is
+ * removed when the test ends.
  */
 export async function aProjectDirectory(
   prefix: string,
   project: { id: string; secret: string },
 ): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), prefix));
+  const cwd = await scratchDir(prefix);
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -266,20 +266,18 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
 }
 
 /**
- * An msw server answering as the mock platform for the calling suite, and the
- * project directories it removes after each test.
+ * An msw server answering as the mock platform for the calling suite. The
+ * directories {@link aProjectDirectory} makes are removed when their test ends.
+ *
+ * @returns The server, to add per-test handlers to with `server.use`.
  */
-export function usePlatformServer(): { server: ReturnType<typeof setupServer>; dirs: string[] } {
+export function usePlatformServer(): { server: ReturnType<typeof setupServer> } {
   const server = setupServer(...setupPlatformHandlers());
-  const dirs: string[] = [];
   beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
   afterAll(() => server.close());
-  afterEach(async () => {
+  afterEach(() => {
     server.resetHandlers();
     resetPlatformStore();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
   });
-  return { server, dirs };
+  return { server };
 }

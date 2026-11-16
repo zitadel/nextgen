@@ -8,7 +8,7 @@ import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { CliPackage } from "@/lib/upgrade";
 

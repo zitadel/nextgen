@@ -7,9 +7,9 @@ import { ZitadelError } from "@/lib/errors";
 import { createOrca } from "@/lib/orca";
 import type { PackageCommand, Runner } from "@/lib/pm";
 import type { Suggest } from "@/lib/suggestion";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
-import { recordLog, type Said } from "@tests/helpers/log";
+import { recordLog, type Said } from "@tests/fixtures/log";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

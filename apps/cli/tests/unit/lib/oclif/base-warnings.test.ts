@@ -5,7 +5,7 @@ import { aConfigAt } from "@tests/helpers/suggestions";
 import { prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import { warnings } from "@/lib/ui";
-import { offTerminal } from "@tests/helpers/terminal";
+import { offTerminal } from "@tests/fixtures/terminal";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {

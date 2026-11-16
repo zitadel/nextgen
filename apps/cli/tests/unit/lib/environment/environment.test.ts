@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { Environment } from "@/lib/environment";
 import type { Questions } from "@/lib/ui";

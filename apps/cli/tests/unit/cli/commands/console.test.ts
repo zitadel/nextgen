@@ -1,8 +1,7 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import {
@@ -10,22 +9,11 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
+import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
-const tempDirs: string[] = [];
-
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("console", () => {
-  it("points at `zitadel start` when no local admin exists", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(cwd);
-
+  it("points at `zitadel start` when no local admin exists", async ({ dir: cwd }) => {
     const res = await runCliForTest(["console", "--cwd", cwd, "--json", "--no-open"], {
       HOME: cwd,
       USERPROFILE: cwd,
@@ -44,9 +32,7 @@ describe("console", () => {
     expect(json.next_commands.at(-1)).toMatch(/ start --cwd \S+$/);
   });
 
-  it("names the server the directory recorded even where it refuses", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(cwd);
+  it("names the server the directory recorded even where it refuses", async ({ dir: cwd }) => {
     await writeRuntimeMetadata(cwd, {
       schema_version: 1,
       backend: "docker",
@@ -69,9 +55,9 @@ describe("console", () => {
     expect((parseJson(res.stdout) as { source: string }).source).toBe("http://localhost:3000");
   });
 
-  it("signs in as the admin of a parent directory when run from an app inside it", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(parent);
+  it("signs in as the admin of a parent directory when run from an app inside it", async ({
+    dir: parent,
+  }) => {
     const { admin } = await ensureLocalAdmin(parent);
     const app = join(parent, "my-app");
     await mkdir(app);
@@ -83,9 +69,7 @@ describe("console", () => {
     expect(json.data.signed_in_as).toBe(admin.email);
   });
 
-  it("names the sign-in link it would mint on a dry run", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(parent);
+  it("names the sign-in link it would mint on a dry run", async ({ dir: parent }) => {
     await ensureLocalAdmin(parent);
 
     const res = await runCliForTest(["console", "--cwd", parent, "--json", "--dry-run"]);

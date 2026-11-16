@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Plugin } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { COMMAND_GROUPS } from "@/lib/oclif/groups";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import {
   expectedPublicCliCommand,
@@ -92,9 +92,13 @@ Examples
  * and an `oclif.manifest.json` generated the way `build` (`oclif manifest`)
  * generates it, so oclif loads commands from the manifest instead of scanning
  * `dist/commands`. `node_modules` is linked so the plugins resolve.
+ *
+ * @param root - The empty directory to lay the package out in.
+ * @returns The manifest's path and the package root.
  */
-async function stagePublishedPackage(): Promise<{ manifestPath: string; root: string }> {
-  const root = await mkdtemp(join(tmpdir(), "zitadel-cli-published-"));
+async function stagePublishedPackage(
+  root: string,
+): Promise<{ manifestPath: string; root: string }> {
   await Promise.all([
     writeFile(join(root, "package.json"), await readFile(join(cliPackageRoot, "package.json"))),
     symlink(join(cliPackageRoot, "dist"), join(root, "dist")),
@@ -224,8 +228,8 @@ describe("root help", () => {
 });
 
 describe("root help from the published manifest", () => {
-  it("renders the same groups when commands load from oclif.manifest.json", async () => {
-    const { root } = await stagePublishedPackage();
+  it("renders the same groups when commands load from oclif.manifest.json", async ({ dir }) => {
+    const { root } = await stagePublishedPackage(dir);
 
     const { exitCode, stdout, stderr } = await runCliForTest(["--help"], {}, root);
 
@@ -234,8 +238,8 @@ describe("root help from the published manifest", () => {
     expect(stripAnsi(stdout)).toBe(ROOT_HELP);
   });
 
-  it("reads the groups from the manifest, not from dist", async () => {
-    const { manifestPath, root } = await stagePublishedPackage();
+  it("reads the groups from the manifest, not from dist", async ({ dir }) => {
+    const { manifestPath, root } = await stagePublishedPackage(dir);
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
       commands: Record<string, { group?: string; groupOrder?: number }>;
     };

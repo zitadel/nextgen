@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { ApiCall } from "@/lib/api";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";

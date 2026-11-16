@@ -5,7 +5,7 @@ import type { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
 import Logs from "@/cli/commands/logs";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";

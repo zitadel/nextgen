@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import DeploymentCreate from "@/cli/commands/deployment/create";
+import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { HttpResponse, http } from "msw";
-import { asTerminal } from "@tests/helpers/terminal";
+import type { SetupServer } from "msw/node";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { join } from "node:path";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { setupServer } from "msw/node";
-import { tmpdir } from "node:os";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 describe("-m", () => {
@@ -71,21 +71,20 @@ describe("--release", () => {
 
 describe("deployment create at a terminal", () => {
   const SERVER = "https://api.zitadel.cloud";
-  const server = setupServer();
-  const dirs: string[] = [];
 
-  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-  afterAll(() => server.close());
-  afterEach(async () => {
-    server.resetHandlers();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  async function aProject(origins: readonly string[]): Promise<string> {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-create-"));
-    dirs.push(cwd);
+  /**
+   * A project directory holding a secret, with the server answering a deployment with the origins.
+   *
+   * @param cwd - The directory to make the project in.
+   * @param server - The server the CLI is pointed at.
+   * @param origins - The origins the deployment is live on.
+   * @returns The project directory.
+   */
+  async function aProject(
+    cwd: string,
+    server: SetupServer,
+    origins: readonly string[],
+  ): Promise<string> {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/secret"),
@@ -127,8 +126,11 @@ describe("deployment create at a terminal", () => {
     );
 
   describe("deployment create", () => {
-    it("answers with one clause, and never a list item spliced into the footer", async () => {
-      const cwd = await aProject([PRIMARY_ORIGIN]);
+    it("answers with one clause, and never a list item spliced into the footer", async ({
+      dir,
+      server,
+    }) => {
+      const cwd = await aProject(dir, server, [PRIMARY_ORIGIN]);
 
       const res = await deploy(cwd);
 
@@ -138,8 +140,8 @@ describe("deployment create at a terminal", () => {
       expect(shown).not.toContain(`- ${PRIMARY_ORIGIN}`);
     });
 
-    it("names the origins in one sentence, not a list", async () => {
-      const cwd = await aProject([PRIMARY_ORIGIN, "https://admin.acme.com"]);
+    it("names the origins in one sentence, not a list", async ({ dir, server }) => {
+      const cwd = await aProject(dir, server, [PRIMARY_ORIGIN, "https://admin.acme.com"]);
 
       const res = await deploy(cwd);
 

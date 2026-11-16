@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { Orca } from "@/lib/orca";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("Orca.scaffoldHash", () => {
   it("hashes the raw text, so the same bytes give the same hash", () => {

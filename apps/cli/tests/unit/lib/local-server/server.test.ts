@@ -1,11 +1,7 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createServer, type Server } from "node:net";
-
-import { afterEach, describe, expect, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
 import { DockerLauncher } from "@/lib/local-server/internal/docker-launcher";
@@ -15,50 +11,39 @@ import {
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/helpers/local-server";
+import type { Daemons } from "@tests/fixtures/daemon";
+import { aFakeServerBinary } from "@tests/helpers/local-server";
 import { forcedConsent } from "@tests/helpers/consent";
-import { it } from "@tests/helpers/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { aSuggest } from "@tests/helpers/suggestions";
+import { it } from "@tests/unit/lib/local-server/occupied-port";
 
 /** The start a refused start would offer again. */
 const RETRY = aSuggest()({ id: "start" });
-
-const dirs: string[] = [];
-const children: ChildProcess[] = [];
-const held: Server[] = [];
-
-useLocalServers();
-
-afterEach(async () => {
-  for (const server of held.splice(0)) {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-  for (const child of children.splice(0)) {
-    child.kill("SIGKILL");
-  }
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function directory(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-local-server-"));
-  dirs.push(dir);
-  return dir;
-}
 
 const at = (cwd: string) => {
   return LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
 };
 
-/** A record whose process is long gone, in a directory that has data. */
-async function directoryWithAGoneServer(): Promise<string> {
-  return directoryRecording(2_147_483_000, "nextgen --migrate");
+/**
+ * Records, in a directory that has data, a server whose process is long gone.
+ *
+ * @param cwd - The directory.
+ * @returns Once the record is written.
+ */
+async function directoryWithAGoneServer(cwd: string): Promise<void> {
+  await directoryRecording(cwd, 2_147_483_000, "nextgen --migrate");
 }
 
-async function directoryRecording(pid: number, command: string): Promise<string> {
-  const cwd = await directory();
+/**
+ * Records a binary server in a directory that has data.
+ *
+ * @param cwd - The directory.
+ * @param pid - The process the record names.
+ * @param command - The command the record says it was started with.
+ * @returns Once the record is written.
+ */
+async function directoryRecording(cwd: string, pid: number, command: string): Promise<void> {
   await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
   await writeRuntimeMetadata(
     cwd,
@@ -69,20 +54,21 @@ async function directoryRecording(pid: number, command: string): Promise<string>
       data_dir: join(cwd, LOCAL_DATA_DIR),
     }),
   );
-  return cwd;
 }
 
 describe("LocalServer", () => {
   describe("status", () => {
-    it("is missing for a directory that never started a server", async () => {
-      await expect(at(await directory()).status()).resolves.toMatchObject({
+    it("is missing for a directory that never started a server", async ({ dir }) => {
+      await expect(at(dir).status()).resolves.toMatchObject({
         lifecycle: "missing",
         healthy: false,
       });
     });
 
-    it("is stopped when the recorded process is gone", async () => {
-      await expect(at(await directoryWithAGoneServer()).status()).resolves.toMatchObject({
+    it("is stopped when the recorded process is gone", async ({ dir }) => {
+      await directoryWithAGoneServer(dir);
+
+      await expect(at(dir).status()).resolves.toMatchObject({
         lifecycle: "stopped",
         process: { pid: 2_147_483_000, running: false },
       });
@@ -90,31 +76,33 @@ describe("LocalServer", () => {
   });
 
   describe("stop", () => {
-    it("reports nothing stopped for a directory that never started a server", async () => {
-      await expect(at(await directory()).stop()).resolves.toMatchObject({
+    it("reports nothing stopped for a directory that never started a server", async ({ dir }) => {
+      await expect(at(dir).stop()).resolves.toMatchObject({
         runtime: undefined,
         stopped: false,
       });
     });
 
-    it("reports nothing stopped where Docker is not installed", async () => {
-      vi.stubEnv("PATH", await directory());
+    it("reports nothing stopped where Docker is not installed", async ({ dir, other }) => {
+      vi.stubEnv("PATH", other);
 
-      await expect(at(await directory()).stop()).resolves.toMatchObject({
+      await expect(at(dir).stop()).resolves.toMatchObject({
         runtime: undefined,
         stopped: false,
       });
     });
 
-    it("reports nothing stopped when the recorded process is already gone", async () => {
-      await expect(at(await directoryWithAGoneServer()).stop()).resolves.toMatchObject({
+    it("reports nothing stopped when the recorded process is already gone", async ({ dir }) => {
+      await directoryWithAGoneServer(dir);
+
+      await expect(at(dir).stop()).resolves.toMatchObject({
         stopped: false,
         outcome: { status: "stale" },
       });
     });
 
-    it("keeps the data and the record", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("keeps the data and the record", async ({ dir: cwd }) => {
+      await directoryWithAGoneServer(cwd);
 
       await at(cwd).stop();
 
@@ -124,11 +112,6 @@ describe("LocalServer", () => {
   });
 
   describe("a recorded pid that now belongs to another program", () => {
-    const aliveProgram = (): ChildProcess => {
-      const child = spawn("sleep", ["60"], { stdio: "ignore" });
-      children.push(child);
-      return child;
-    };
     const exists = (pid: number): boolean => {
       try {
         process.kill(pid, 0);
@@ -138,42 +121,49 @@ describe("LocalServer", () => {
       }
     };
 
-    it.skipIf(process.platform === "win32")("is not signalled by stop", async () => {
-      const child = aliveProgram();
-      const cwd = await directoryRecording(child.pid ?? 0, "/opt/zitadel/nextgen --migrate");
+    it.skipIf(process.platform === "win32")(
+      "is not signalled by stop",
+      async ({ dir: cwd, daemon }) => {
+        const child = await daemon.spawn("sleep", ["60"]);
+        await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
 
-      await expect(at(cwd).stop()).resolves.toMatchObject({
-        stopped: false,
-        outcome: { status: "stale" },
-      });
-      expect(exists(child.pid ?? 0)).toBe(true);
-    });
+        await expect(at(cwd).stop()).resolves.toMatchObject({
+          stopped: false,
+          outcome: { status: "stale" },
+        });
+        expect(exists(child.pid)).toBe(true);
+      },
+    );
 
-    it.skipIf(process.platform === "win32")("is not reported as the running server", async () => {
-      const child = aliveProgram();
-      const cwd = await directoryRecording(child.pid ?? 0, "/opt/zitadel/nextgen --migrate");
+    it.skipIf(process.platform === "win32")(
+      "is not reported as the running server",
+      async ({ dir: cwd, daemon }) => {
+        const child = await daemon.spawn("sleep", ["60"]);
+        await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
 
-      await expect(at(cwd).status()).resolves.toMatchObject({
-        process: { running: false },
-      });
-    });
+        await expect(at(cwd).status()).resolves.toMatchObject({
+          process: { running: false },
+        });
+      },
+    );
 
     it.skipIf(process.platform === "win32")(
       "is stopped when it is the recorded server",
-      async () => {
-        const child = aliveProgram();
-        const exited = new Promise((resolve) => child.once("exit", resolve));
-        const cwd = await directoryRecording(child.pid ?? 0, "/bin/sleep 60");
+      async ({ dir: cwd, daemon }) => {
+        const child = await daemon.spawn("sleep", ["60"]);
+        await directoryRecording(cwd, child.pid, "/bin/sleep 60");
 
         await expect(at(cwd).stop()).resolves.toMatchObject({ stopped: true });
-        await exited;
+        await child.stop();
       },
     );
   });
 
   describe("reset", () => {
-    it("deletes the data and the record, even when the recorded process is gone", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("deletes the data and the record, even when the recorded process is gone", async ({
+      dir: cwd,
+    }) => {
+      await directoryWithAGoneServer(cwd);
 
       await at(cwd).reset(await forcedConsent());
 
@@ -181,8 +171,8 @@ describe("LocalServer", () => {
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
     });
 
-    it("refuses without consent, and deletes nothing", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("refuses without consent, and deletes nothing", async ({ dir: cwd }) => {
+      await directoryWithAGoneServer(cwd);
 
       await expect(at(cwd).reset({} as never)).rejects.toThrow(
         "A destructive operation ran without consent",
@@ -192,15 +182,17 @@ describe("LocalServer", () => {
   });
 
   describe("logs", () => {
-    it("refuses a directory that never started a server, and says how to start one", async () => {
-      await expect(at(await directory()).logs({ tail: 10 })).rejects.toMatchObject({
+    it("refuses a directory that never started a server, and says how to start one", async ({
+      dir,
+    }) => {
+      await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
         code: "E_VALIDATION",
         hint: "Run `zitadel start` first.",
       });
     });
 
-    it("reads the end of the server's log", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("reads the end of the server's log", async ({ dir: cwd }) => {
+      await directoryWithAGoneServer(cwd);
       await writeFile(join(cwd, "server.log"), "one\ntwo\nthree\n");
 
       const { lines } = await at(cwd).logs({ tail: 2 });
@@ -208,8 +200,8 @@ describe("LocalServer", () => {
       expect(lines.map((line) => line.text)).toEqual(["two", "three"]);
     });
 
-    it("picks the last lines at a level from the whole log", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("picks the last lines at a level from the whole log", async ({ dir: cwd }) => {
+      await directoryWithAGoneServer(cwd);
       await writeFile(
         join(cwd, "server.log"),
         "level=WARN msg=first\nlevel=WARN msg=second\nlevel=INFO msg=a\nlevel=INFO msg=b\n",
@@ -220,8 +212,7 @@ describe("LocalServer", () => {
       expect(lines.map((line) => line.text)).toEqual(["level=WARN msg=second"]);
     });
 
-    it("reads all of a container's log to pick the lines at a level", async () => {
-      const cwd = await directory();
+    it("reads all of a container's log to pick the lines at a level", async ({ dir: cwd }) => {
       await writeRuntimeMetadata(cwd, aDockerRecord());
       const read = vi
         .spyOn(DockerLauncher, "readLogs")
@@ -233,8 +224,10 @@ describe("LocalServer", () => {
       expect(lines.map((line) => line.text)).toEqual(["level=ERROR msg=a"]);
     });
 
-    it("prints the end of the log at a level, then each line at it the server writes", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("prints the end of the log at a level, then each line at it the server writes", async ({
+      dir: cwd,
+    }) => {
+      await directoryWithAGoneServer(cwd);
       vi.spyOn(BinaryLauncher, "followLogs").mockImplementation(async (_path, sink) => {
         sink.existing("level=WARN msg=old\nlevel=ERROR msg=recent\nlevel=INFO msg=a\n");
         sink.appended("level=INFO msg=b\nlevel=WARN msg=ne");
@@ -256,8 +249,10 @@ describe("LocalServer", () => {
       ]);
     });
 
-    it("prints the end of the log and stops when the run was interrupted before it began", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("prints the end of the log and stops when the run was interrupted before it began", async ({
+      dir: cwd,
+    }) => {
+      await directoryWithAGoneServer(cwd);
       await writeFile(join(cwd, "server.log"), "level=INFO msg=first\nlevel=INFO msg=last\n");
       const printed: string[] = [];
 
@@ -311,21 +306,26 @@ describe("LocalServer", () => {
       );
     }
 
-    async function directoryWithARunningServer(): Promise<string> {
-      const child = spawn("sleep", ["60"], { stdio: "ignore" });
-      children.push(child);
-      return directoryRecording(child.pid ?? 0, "/bin/sleep 60");
+    async function directoryWithARunningServer(cwd: string, daemon: Daemons): Promise<void> {
+      const child = await daemon.spawn("sleep", ["60"]);
+      await directoryRecording(cwd, child.pid, "/bin/sleep 60");
     }
 
-    it("is the URL the directory's record names, when that server runs and answers", async () => {
-      const cwd = await directoryWithARunningServer();
+    it("is the URL the directory's record names, when that server runs and answers", async ({
+      dir: cwd,
+      daemon,
+    }) => {
+      await directoryWithARunningServer(cwd, daemon);
       answeringAt(url);
 
       await expect(LocalServer.resolveUrl(cwd)).resolves.toBe(url);
     });
 
-    it("is the server of the nearest parent directory that started one", async () => {
-      const cwd = await directoryWithARunningServer();
+    it("is the server of the nearest parent directory that started one", async ({
+      dir: cwd,
+      daemon,
+    }) => {
+      await directoryWithARunningServer(cwd, daemon);
       const app = join(cwd, "my-app");
       await mkdir(app);
       answeringAt(url);
@@ -333,8 +333,10 @@ describe("LocalServer", () => {
       await expect(LocalServer.resolveUrl(app)).resolves.toBe(url);
     });
 
-    it("is not a server that answers at the recorded URL after the recorded one is gone", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("is not a server that answers at the recorded URL after the recorded one is gone", async ({
+      dir: cwd,
+    }) => {
+      await directoryWithAGoneServer(cwd);
       answeringAt(url);
 
       await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
@@ -342,10 +344,12 @@ describe("LocalServer", () => {
       });
     });
 
-    it("is not a server that answers at the recorded URL when the process is another program", async () => {
-      const child = spawn("sleep", ["60"], { stdio: "ignore" });
-      children.push(child);
-      const cwd = await directoryRecording(child.pid ?? 0, "/opt/zitadel/nextgen --migrate");
+    it("is not a server that answers at the recorded URL when the process is another program", async ({
+      dir: cwd,
+      daemon,
+    }) => {
+      const child = await daemon.spawn("sleep", ["60"]);
+      await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
       answeringAt(url);
 
       await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
@@ -353,8 +357,8 @@ describe("LocalServer", () => {
       });
     });
 
-    it("is not a server that runs but does not answer", async () => {
-      const cwd = await directoryWithARunningServer();
+    it("is not a server that runs but does not answer", async ({ dir: cwd, daemon }) => {
+      await directoryWithARunningServer(cwd, daemon);
       answeringAt();
 
       await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
@@ -362,37 +366,43 @@ describe("LocalServer", () => {
       });
     });
 
-    it("is not whatever answers on the default port when the directory started none", async () => {
+    it("is not whatever answers on the default port when the directory started none", async ({
+      dir,
+    }) => {
       answeringAt("http://localhost:8080");
 
-      await expect(LocalServer.resolveUrl(await directory())).rejects.toMatchObject({
+      await expect(LocalServer.resolveUrl(dir)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
         hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
       });
     });
 
-    it("is found as a URL for optional UI when the server runs and answers", async () => {
-      const cwd = await directoryWithARunningServer();
+    it("is found as a URL for optional UI when the server runs and answers", async ({
+      dir: cwd,
+      daemon,
+    }) => {
+      await directoryWithARunningServer(cwd, daemon);
       answeringAt(url);
 
       await expect(LocalServer.detectUrl(cwd)).resolves.toBe(url);
     });
 
-    it("is not found for optional UI when the recorded server is gone", async () => {
-      const cwd = await directoryWithAGoneServer();
+    it("is not found for optional UI when the recorded server is gone", async ({ dir: cwd }) => {
+      await directoryWithAGoneServer(cwd);
       answeringAt(url);
 
       await expect(LocalServer.detectUrl(cwd)).resolves.toBeUndefined();
     });
 
-    it("is not found for optional UI when the directory started none", async () => {
+    it("is not found for optional UI when the directory started none", async ({ dir }) => {
       answeringAt(url);
 
-      await expect(LocalServer.detectUrl(await directory())).resolves.toBeUndefined();
+      await expect(LocalServer.detectUrl(dir)).resolves.toBeUndefined();
     });
 
-    it("is not found, and not an error, for optional UI when the record cannot be read", async () => {
-      const cwd = await directory();
+    it("is not found, and not an error, for optional UI when the record cannot be read", async ({
+      dir: cwd,
+    }) => {
       await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
       await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
 
@@ -403,8 +413,7 @@ describe("LocalServer", () => {
   describe("starting over the server the other backend left", () => {
     const none = { values: {}, injected: [] };
 
-    async function directoryRecordingContainer(port: number): Promise<string> {
-      const cwd = await directory();
+    async function directoryRecordingContainer(cwd: string, port: number): Promise<void> {
       await writeRuntimeMetadata(
         cwd,
         aDockerRecord({
@@ -413,39 +422,34 @@ describe("LocalServer", () => {
           data_dir: join(cwd, LOCAL_DATA_DIR),
         }),
       );
-      return cwd;
     }
 
-    function holdAPort(): Promise<number> {
-      return new Promise((resolve) => {
-        const server = createServer();
-        held.push(server);
-        server.listen({ port: 0 }, () => {
-          const address = server.address();
-          resolve(typeof address === "object" && address ? address.port : 0);
-        });
-      });
-    }
-
-    it("leaves it running when the port it is asked to move to is held", async ({ port }) => {
-      const cwd = await directoryRecordingContainer(port);
+    it("leaves it running when the port it is asked to move to is held", async ({
+      port,
+      dir: cwd,
+      occupiedPort,
+    }) => {
+      await directoryRecordingContainer(cwd, port);
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
-        at(cwd).start({ backend: "binary", env: none }, { port: await holdAPort(), retry: RETRY }),
+        at(cwd).start(
+          { backend: "binary", env: none },
+          { port: await occupiedPort(), retry: RETRY },
+        ),
       ).rejects.toMatchObject({ code: "E_PORT_IN_USE" });
 
       expect(remove).not.toHaveBeenCalled();
     });
 
-    it("keeps the port the directory had", async ({ port }) => {
-      const cwd = await directoryRecordingContainer(port);
+    it("keeps the port the directory had", async ({ port, dir: cwd, daemon }) => {
+      await directoryRecordingContainer(cwd, port);
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));
 
       const { runtime } = await at(cwd).start({ backend: "binary", env: none }, { retry: RETRY });
 
-      trackLocalServer(runtime.backend === "binary" ? runtime.pid : 0);
+      daemon.adopt(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);
     });
   });

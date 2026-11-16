@@ -2,7 +2,7 @@ import { describe, expect } from "vitest";
 
 import { PlanConfiguration } from "@/cli/commands/setup/steps/plan-configuration";
 import { createOrca } from "@/lib/orca";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 type Needs = Parameters<PlanConfiguration["run"]>[0];
 

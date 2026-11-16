@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Repository } from "@/lib/git";
 import {
@@ -19,10 +19,6 @@ import {
 const scratch = new GitScratch();
 
 beforeEach(isolateGit);
-
-afterEach(async () => {
-  await scratch.cleanup();
-});
 
 /** Opens `dir`, failing the test when it is in no repository. */
 async function open(dir: string): Promise<Repository> {
@@ -231,11 +227,7 @@ describe("Repository.create", () => {
     async () => {
       const cwd = await scratch.directory();
       vi.stubEnv("PATH", await gitThatLeavesAnUnremovableRepository());
-      try {
-        await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
-      } finally {
-        await chmod(join(cwd, ".git"), 0o755);
-      }
+      await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
     },
   );
 });

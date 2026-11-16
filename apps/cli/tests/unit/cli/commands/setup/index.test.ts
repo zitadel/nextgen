@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { parseEnv } from "node:util";
 
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
@@ -47,8 +46,8 @@ import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
 import { aPatchContext } from "@tests/helpers/patch-context";
-import { recordLog } from "@tests/helpers/log";
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { recordLog } from "@tests/fixtures/log";
+import { it, type Serve } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { parseFlag } from "@tests/helpers/inputs";
 import { usePlatformServer } from "@tests/helpers/platform-project";
@@ -63,7 +62,7 @@ import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
 import { aSuggest } from "@tests/helpers/suggestions";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 /** The CLI's commands, which a run reads to render what it suggests. */
@@ -3712,7 +3711,7 @@ describe("SettleAnswers", () => {
 });
 
 describe("ClaimOwnership", () => {
-  it.each([
+  it.for([
     {
       situation: "a runtime document naming the platform project",
       answer: () => {
@@ -3743,11 +3742,11 @@ describe("ClaimOwnership", () => {
     },
   ])(
     "is $hosts for $situation, failing closed so setup never nudges into a claim that would fail",
-    async ({ answer, hosts }) => {
+    async ({ answer, hosts }, { dir }) => {
       server.use(http.get(`${LOCAL_SERVER}/console/runtime.json`, answer));
 
       const owned = await new ClaimOwnership({
-        cwd: join(tmpdir(), "zitadel-no-local-admin"),
+        cwd: join(dir, "zitadel-no-local-admin"),
         dryRun: false,
         signal: new AbortController().signal,
         suggest: aSuggest(),

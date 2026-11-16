@@ -17,7 +17,7 @@ import {
   projectIdModuleEdit,
 } from "@/lib/orca/patchers/rule/angular/templates";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 import { CliPackage } from "@/lib/upgrade";

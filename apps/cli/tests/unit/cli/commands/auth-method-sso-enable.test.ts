@@ -15,7 +15,7 @@ import {
   schemaIdOf,
 } from "@tests/helpers/auth-method";
 import { aGoogleConnection, type DocumentsByName } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import {
   defaultSchema,
@@ -28,7 +28,7 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asOneLine } from "@tests/helpers/terminal";
+import { asOneLine } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /**

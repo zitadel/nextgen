@@ -1,10 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { loadOrCreateIdentity, telemetryConfigDir } from "@/lib/telemetry/identity";
+import { it } from "@tests/fixtures";
 
 const { homedir } = vi.hoisted(() => {
   return { homedir: vi.fn<() => string>() };
@@ -13,21 +13,6 @@ const { homedir } = vi.hoisted(() => {
 vi.mock("node:os", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:os")>();
   return { ...actual, homedir };
-});
-
-const dirs: string[] = [];
-
-function freshConfigHome(): string {
-  const dir = mkdtempSync(join(tmpdir(), "ztel-"));
-  dirs.push(dir);
-  return dir;
-}
-
-afterEach(() => {
-  for (const dir of dirs) {
-    rmSync(dir, { recursive: true, force: true });
-  }
-  dirs.length = 0;
 });
 
 describe("telemetryConfigDir", () => {
@@ -51,8 +36,8 @@ describe("telemetryConfigDir", () => {
 });
 
 describe("loadOrCreateIdentity", () => {
-  it("mints and persists an id on first run, then reuses it", () => {
-    const env = { XDG_CONFIG_HOME: freshConfigHome() };
+  it("mints and persists an id on first run, then reuses it", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
 
     const first = loadOrCreateIdentity(env);
     expect(first.isFirstRun).toBe(true);
@@ -68,8 +53,8 @@ describe("loadOrCreateIdentity", () => {
     expect(stored.distinctId).toBe(first.distinctId);
   });
 
-  it("recovers from a corrupt store by minting a fresh id", () => {
-    const env = { XDG_CONFIG_HOME: freshConfigHome() };
+  it("recovers from a corrupt store by minting a fresh id", ({ dir }) => {
+    const env = { XDG_CONFIG_HOME: dir };
     loadOrCreateIdentity(env);
     const file = join(env.XDG_CONFIG_HOME, "zitadel", "cli", "telemetry.json");
     writeFileSync(file, "{not json");
@@ -89,10 +74,9 @@ describe("loadOrCreateIdentity", () => {
     expect(identity.distinctId).toMatch(/[0-9a-f-]{36}/);
   });
 
-  it("fails open to an ephemeral id when the config dir is unwritable", () => {
+  it("fails open to an ephemeral id when the config dir is unwritable", ({ dir }) => {
     // Point XDG at a path whose parent is a file, so mkdir throws ENOTDIR.
-    const base = freshConfigHome();
-    const fileAsParent = join(base, "afile");
+    const fileAsParent = join(dir, "afile");
     writeFileSync(fileAsParent, "x");
 
     const identity = loadOrCreateIdentity({ XDG_CONFIG_HOME: fileAsParent });

@@ -10,7 +10,7 @@ import type { SetupFlags } from "@/cli/commands/setup";
 import { DetectFramework } from "@/cli/commands/setup/steps/detect-framework";
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

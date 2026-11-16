@@ -10,7 +10,7 @@ reclassified until it is one.
 - **Unit tests** (`tests/unit/**/*.test.ts`) import from `src/` (or read a
   checked-in file) and mirror its layout: `src/lib/idp/credentials.ts` →
   `tests/unit/lib/idp/credentials.test.ts`. One file may cover a cohesive
-  directory if the mirror path stays obvious. Doubles are fine.
+  directory if the mirror path stays obvious.
 - A rule about the code rather than its behaviour is a unit test that reads
   `src/**` and names the rule, beside the module that owns it:
   `layering.test.ts` for what `lib/oclif` may import, `names-declared.test.ts`
@@ -44,7 +44,7 @@ reclassified until it is one.
   runner, which keeps that knowledge in its own spec.
 - A spec's own `rendered for a terminal` group runs whatever the fixture gives
   it, which is a pipe unless the test wraps the run in `asTerminal` or
-  `onTerminalReadingAFile` (`helpers/terminal.ts`, whose `RENDERINGS` table is
+  `onTerminalReadingAFile` (`fixtures/terminal.ts`, whose `RENDERINGS` table is
   the colour/no-colour pair). Do not read the group's name as proof a terminal
   was involved.
 - The binary's own behaviour (unknown command, server resolution) is
@@ -199,16 +199,57 @@ it stays here deliberately rather than by oversight.
   a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
   record or variables answer with `helpers/records.ts`, and a client with
   `fakeClient`.
-- Extend the shared builders rather than adding one to a test file; a double
-  only one file needs, such as a fake platform's answers, stays in that file.
-- A temporary directory is the `dir` fixture (`helpers/fixtures.ts`); a git
-  repository is built with `helpers/git-repo.ts`.
+- Extend the shared builders rather than adding one to a test file; a builder
+  only one file needs stays in that file.
+- A test that must create something and clean it up asks for a fixture in its
+  callback (`it("…", async ({ dir, server }) => { … })`) and never creates or
+  removes the thing itself: no `mkdtemp`, no `rm` in an `afterEach`, no
+  `try`/`finally` cleanup, no module-level array a hook empties, no `let` a hook
+  assigns. Import `it` from `@tests/fixtures`, never from `vitest`, in
+  a test that uses one.
+  - `dir` is a fresh temp directory, `other` a second one; both are removed when
+    the test ends, permissions a test took away included. A git repository is
+    built with `helpers/git-repo.ts`.
+  - `server` is an empty msw server that fails a request nothing handled; add
+    handlers with `server.use(...)`. `serve(handler, host?)` starts an HTTP
+    server on a free port and returns its URL.
+  - `port` is a port from this worker's block, for a test that hands one to the
+    CLI.
+  - `terminal` puts the run at a terminal: `shown()`, `plain()`, `errors()`,
+    `keyboard` and `rawModes()` read and drive it, `stdin(value)` pipes a value
+    into stdin as a non-terminal, `tty(on)` sets whether stdout is a terminal,
+    `columns(n)` its width and `platform(name)` the platform the process
+    reports. Everything is given back when the test ends. A test that does not
+    name it keeps the runner's own streams.
+  - `clock` fakes the timers before the test and restores them after:
+    `advance(ms)`, `advanceAsync(ms)`, `next()`, `runAll()`, `runAllAsync()`,
+    `runPending()`, `pending()` and `only(...timers)` for a test that fakes just
+    some. `ManualClock` is a different thing: an injected clock for code that
+    takes one.
+  - `daemon` owns processes. `spawn(command, args, { cwd, env, ready })` starts
+    one in its own process group and returns `{ pid, output(), stop() }` once
+    `ready` (a pattern in its output, or a `{ port }` that accepts a
+    connection) is met; `adopt(pid)` takes over a process the code under test
+    started, and `pidLog()` is a path for a program to append the ids it
+    starts to. Every group gets `SIGTERM`, then `SIGKILL`,
+    when the test ends. It knows nothing of Zitadel.
+  - `occupiedPort(host?)` (`tests/unit/lib/local-server/occupied-port.ts`) holds
+    a TCP listener on a port the OS picks and returns the port, for a test of
+    what the CLI does on a port that is taken.
+- A fixture lives in `tests/fixtures/`, in the file named for what it provides (`http.ts`,
+  `log.ts`, `terminal.ts`, `clock.ts`, `daemon.ts`), defined with
+  `test.extend`. Vitest cannot merge extended tests, so each extends the one
+  before it and `fixtures/index.ts` adds `dir` and `other` and exports the CLI's one
+  `it`. A fixture only one test file uses stays in that file; when a second file
+  in the folder needs it, it goes in a file in that folder. A helper that makes a
+  directory, server or process for a test registers its removal with
+  `onTestFinished` itself (`scratchDir` in `fixtures/scratch.ts`), so its caller
+  has nothing to clean up.
 - Catch a refusal with `thrownBy` or `rejectionOf` (`helpers/thrown-value.ts`),
   then assert its class with `toBeInstanceOf`, then the fields that matter with
   `toMatchObject`. No `toThrow`, no `rejects`, no `try`/`catch`.
 - No casts, no non-null `!`, no `any`: a double that needs one is the wrong
   double; build it with `fakeClient` or a real class. `as const` is not a cast.
-- Observe a real collaborator with `vi.spyOn` on it, not a hand-rolled recorder.
 - No sleeps or time-bounded waits: a test that orders work holds promises it
   settles itself, and one that waits on time uses `ManualClock`.
 - Stub the environment with `vi.stubEnv`, never by writing `process.env`.
@@ -222,7 +263,10 @@ it stays here deliberately rather than by oversight.
 - A port handed to the CLI comes from the `port` fixture, or `nextPort()` where a helper picks one
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
-  Never retry on that. A listener held for the whole test may bind port 0.
+  Never retry on that. A listener held for the whole test is `occupiedPort`
+  (port 0, closed when the test ends) or `serve` for HTTP.
+- A process a test starts is `daemon.spawn`; one the code under test starts is
+  `daemon.adopt`. A test never kills a pid itself.
 - `runCliForTest` runs the built CLI, out of reach of any spy on `src/`: pin
   the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
