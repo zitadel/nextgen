@@ -31,7 +31,8 @@ const NAME_PROVIDER_REFUSAL = {
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 1;
 
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",

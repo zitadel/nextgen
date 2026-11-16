@@ -221,7 +221,8 @@ function quote(value: string): string {
 export default class Api extends Destructive(EnvironmentCommand) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",

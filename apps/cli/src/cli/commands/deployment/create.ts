@@ -56,7 +56,8 @@ const MESSAGE = {
  */
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",

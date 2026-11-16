@@ -34,7 +34,8 @@ const DEPLOYMENT_ID: Refused<string> = {
  */
 export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Read one deployment by id.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = ["<%= config.bin %> deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"];
   static override args = {

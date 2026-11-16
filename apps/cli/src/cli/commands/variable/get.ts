@@ -19,7 +19,8 @@ import { variableNameArg } from "./name";
  */
 export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Get one variable from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID",

@@ -19,8 +19,8 @@ import { type Fact, section } from "@/lib/ui";
  */
 export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 4;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 6;
 
   static override flags = {
     force: Flags.boolean({

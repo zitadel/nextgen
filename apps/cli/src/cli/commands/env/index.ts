@@ -24,7 +24,8 @@ const REDACTED = "••••••••";
 export default class Env extends Tabulatable(EnvironmentCommand) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> env",

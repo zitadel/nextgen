@@ -56,7 +56,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       {
         zebra: aCommand(),
-        start: aCommand({ group: CommandGroups.localDevelopment }),
+        start: aCommand({ group: CommandGroups.localServer }),
         claim: aCommand({ groupOrder: 2 }),
         setup: aCommand({ groupOrder: 1 }),
       },
@@ -68,7 +68,7 @@ describe("cliReference", () => {
       ["setup", CommandGroups.gettingStarted],
       ["claim", CommandGroups.gettingStarted],
       ["zebra", CommandGroups.gettingStarted],
-      ["start", CommandGroups.localDevelopment],
+      ["start", CommandGroups.localServer],
     ]);
   });
 

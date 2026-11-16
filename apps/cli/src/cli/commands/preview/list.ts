@@ -44,7 +44,8 @@ const LIMIT = {
  */
 export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> preview list",

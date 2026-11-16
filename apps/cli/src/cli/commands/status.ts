@@ -38,7 +38,7 @@ import { TestKit } from "@/lib/test-kit";
  */
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
-  static override group = CommandGroups.gettingStarted;
+  static override group = CommandGroups.localServer;
   static override groupOrder = 3;
 
   protected override async toMeta(

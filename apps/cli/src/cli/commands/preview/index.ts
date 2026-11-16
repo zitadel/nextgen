@@ -234,7 +234,7 @@ export async function refusePrimaryOrigins(
 export default class Preview extends PreviewCommand {
   static override description =
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
   static override groupOrder = 2;
 
   static override examples = [

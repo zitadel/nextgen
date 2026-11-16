@@ -20,7 +20,8 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
  */
 export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable list",

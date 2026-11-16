@@ -20,7 +20,8 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> resources",

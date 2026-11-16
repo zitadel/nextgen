@@ -6,7 +6,8 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
  */
 export default class AuthMethodPasskeyEnable extends AuthMethodCommand {
   static override description = "Enable passkey sign-in for a user schema.";
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 1;
 
   static override examples = [
     "<%= config.bin %> auth-method passkey enable",

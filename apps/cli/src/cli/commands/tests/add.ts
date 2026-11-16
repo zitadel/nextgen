@@ -74,7 +74,8 @@ type Manifest = Readonly<{
 export default class TestsAdd extends BaseCommand {
   static override description =
     `Add end-to-end tests of the sign-in to this app.\n\nWrites playwright.config.mts, a test of the sign-in (e2e/sign-in.spec.ts) and a test that starts signed in (e2e/signed-in.spec.ts), wired to ${TestKit.PACKAGE}. Adds it and @playwright/test as dev dependencies, and a test:e2e script unless the app has one. Each test run boots its own Zitadel server and project. Supports Next.js apps. A file that differs from this CLI's version of it, including one an earlier CLI wrote, is refused unless --force replaces it.`;
-  static override group = CommandGroups.localDevelopment;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 5;
 
   static override flags = {
     force: Flags.boolean({

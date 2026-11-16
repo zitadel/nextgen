@@ -31,7 +31,8 @@ const URL = {
  */
 export default class PreviewRm extends Destructive(PreviewCommand) {
   static override description = "Remove a live preview from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app",

@@ -122,8 +122,7 @@ export default class ZitadelHelp extends Help {
   private commandsOf(commands: readonly GroupedCommand[], group: CommandGroup): GroupedCommand[] {
     return commands.filter((command) => {
       return (
-        command.group === group ||
-        (command.group === undefined && group === CommandGroups.diagnostics)
+        command.group === group || (command.group === undefined && group === CommandGroups.cli)
       );
     });
   }

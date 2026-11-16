@@ -132,7 +132,8 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  */
 export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",

@@ -81,7 +81,8 @@ const MESSAGE = {
  */
 export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
   static override description = "Roll back to an earlier deployment.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> deployment rollback",

@@ -23,7 +23,8 @@ import { warnings } from "@/lib/ui";
  */
 export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",

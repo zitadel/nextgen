@@ -13,7 +13,8 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  */
 export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {

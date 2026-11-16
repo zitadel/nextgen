@@ -62,7 +62,8 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 1;
 
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",

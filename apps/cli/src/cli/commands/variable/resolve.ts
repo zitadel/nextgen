@@ -63,7 +63,8 @@ const COLUMNS = ["name", "value"] as const;
  */
 export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   static override description = "Show the variables a deployment froze, the live one by default.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable resolve",

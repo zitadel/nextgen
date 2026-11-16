@@ -28,7 +28,8 @@ const ORIGIN_KINDS = ["primary", "preview"] as const;
  */
 export default class OriginAdd extends EnvironmentCommand {
   static override description = "Add an origin pattern to the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin add https://app.acme.com --kind primary",

@@ -15,7 +15,7 @@ export default class SkillsAdd extends BaseCommand {
   static override description =
     "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.";
   static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 5;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

@@ -58,7 +58,8 @@ const COLUMNS = [
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> deployment list",

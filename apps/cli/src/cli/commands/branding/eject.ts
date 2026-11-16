@@ -114,7 +114,8 @@ function isRetiredDesign(value: string): boolean {
 export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 4;
 
   static override flags = {
     force: Flags.boolean({

@@ -63,8 +63,8 @@ const PORT = {
  */
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
-  static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 1;
 
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),

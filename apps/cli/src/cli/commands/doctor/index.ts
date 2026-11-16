@@ -131,8 +131,8 @@ type Checking = Readonly<{
  */
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 1;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 3;
 
   static override flags = relatedFlags(
     {

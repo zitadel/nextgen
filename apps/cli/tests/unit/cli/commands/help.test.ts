@@ -27,52 +27,56 @@ Run a command below. Use \`zitadel <command> --help\` to see its options.
 
 Getting started
   setup            Create a Zitadel project and scaffold local auth
-  start            Start a local Zitadel server
-  status           Summarize the local Zitadel server and project state
   claim            Claim this project to make it permanent
+  doctor           Verify local runtime and project state
   skills           Give coding agents the Zitadel skills
-
-Local development
-  console          Open the local console, signed in as the local admin
-  logs             Show local Zitadel server logs
-  stop             Stop the local Zitadel server
-  reset            Delete the local Zitadel server runtime and data
-  eject            Remove managed files and local Zitadel state
   tests            Add end-to-end tests of the sign-in
 
-Users and teams
+Local server
+  start            Start a local Zitadel server
+  stop             Stop the local Zitadel server
+  status           Summarize the local Zitadel server and project state
+  logs             Show local Zitadel server logs
+  console          Open the local console, signed in as the local admin
+  reset            Delete the local Zitadel server runtime and data
+  eject            Remove managed files and local Zitadel state
+
+Users and access
   user             Create and manage users
   team             Create and manage teams
   grant            Manage access grants
-
-Authentication
-  auth-method      Configure how users sign in
-  idp              Manage identity provider connections
   session          View and revoke sessions
 
-Configuration and releases
+Sign-in
+  auth-method      Configure how users sign in
+  idp              Manage identity provider connections
+  schema           View user schemas
+  branding         Manage the login branding
+  flow-definition  View login flows
+  policy           View and test policies
+
+Project settings
+  project          View and update projects
+  env              Show and bind environments
+  origin           Manage the project's allowed origins
+  variable         Manage project variables
+  upgrade          Upgrade this project to the latest Zitadel release
+
+Releases
   deploy           Apply your local configuration to Zitadel
   preview          Deploy and manage pull-request preview URLs
   pull             Rebuild your .zitadel/ files from a release
-  branding         Manage the login branding
-  deployment       Deploy releases and roll them back
-  env              Show and bind environments
-  flow-definition  View login flows
-  origin           Manage the project's allowed origins
-  policy           View and test policies
-  project          View and update projects
   release          Build and manage releases
-  schema           View user schemas
-  variable         Manage project variables
+  deployment       Deploy releases and roll them back
 
-Diagnostics and utilities
-  doctor           Verify local runtime and project state
-  upgrade          Upgrade this project to the latest Zitadel release
+API and events
+  event            View events
   api              Call any operation of the Zitadel API
+  resources        List the resources this CLI manages
+
+CLI
   autocomplete     Display autocomplete installation instructions
   commands         List all zitadel commands
-  event            View events
-  resources        List the resources this CLI manages
   search           Search for a command
   version          Show the CLI version
   which            Show which plugin a command is in
@@ -254,6 +258,6 @@ describe("root help from the published manifest", () => {
 
     const text = stripAnsi(stdout);
     expect(text).not.toContain("Getting started\n  setup ");
-    expect(text).toMatch(/Diagnostics and utilities\n(?:.*\n)* {2}setup {2}/);
+    expect(text).toMatch(/CLI\n(?:.*\n)* {2}setup {2}/);
   });
 });
