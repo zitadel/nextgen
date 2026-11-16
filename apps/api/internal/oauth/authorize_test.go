@@ -287,6 +287,18 @@ func TestAuthorizeErrorPageSentence(t *testing.T) {
 	}
 }
 
+// The other endpoints quote the request in their descriptions, so their
+// pages show no sentence.
+func TestErrorPageSentenceOnlyOnAuthorize(t *testing.T) {
+	t.Parallel()
+	mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: &authRequests{}})
+
+	rec := send(t, mux, http.MethodGet, "/oauth/proj_123/token?grant_type=quoted-value", "app.example.com", browser)
+
+	assertErrorPage(t, rec, http.StatusBadRequest)
+	assert.NotContains(t, rec.Body.String(), "quoted-value")
+}
+
 // Each error the endpoint answers gets one `api error` line, a fault at
 // ERROR. The library logs the redirect it answers a refusal with, and the
 // client's state in it stays out of the log.

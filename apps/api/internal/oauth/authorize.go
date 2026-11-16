@@ -289,7 +289,13 @@ func withErrorPages(next http.Handler) http.Handler {
 		next.ServeHTTP(ew, r.WithContext(context.WithValue(r.Context(), answeredErrorKey{}, &answered)))
 		logError(r.Context(), answered, ew.status, ew.body.Bytes())
 		if ew.page && ew.status != 0 {
-			errorpage.Write(w, r, errorPageFor(ew.status, ew.body.Bytes()))
+			body := ew.body.Bytes()
+			// The token and revocation endpoints quote the request in their
+			// descriptions, so their pages get no sentence.
+			if !strings.HasSuffix(r.URL.Path, AuthorizePath) {
+				body = nil
+			}
+			errorpage.Write(w, r, errorPageFor(ew.status, body))
 		}
 	})
 }
@@ -315,9 +321,10 @@ func (w *errorWriter) Write(b []byte) (int, error) {
 }
 
 // errorPageFor builds the error page for status (ADR 076 §4). body is the
-// JSON the library answered with. For a 4xx the page shows its
-// error_description. In oidc v3.52.0 no description quotes the request on an
-// endpoint that shows a page, and the template escapes it.
+// JSON the library answered with, or nil for a page without a sentence. For
+// a 4xx the page shows its error_description. In oidc v3.52.0 the
+// authorization endpoint's descriptions are fixed texts, and the template
+// escapes them.
 func errorPageFor(status int, body []byte) errorpage.Page {
 	switch {
 	case status == http.StatusNotFound:
