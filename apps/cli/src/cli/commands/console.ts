@@ -1,10 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
+import { Environment } from "@/lib/environment";
 import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-credential";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { consoleSignInUrl } from "@/lib/local-server/sign-in";
+import { Server } from "@/lib/server";
 import { section, log } from "@/lib/ui";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -19,13 +21,31 @@ const NO_LOCAL_ADMIN_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * `zitadel console` — open the local console signed in as the local
- * admin `zitadel start` created. Every run mints a fresh one-time link, so the
- * command is also how you get back in after the session ends.
+ * The server the project in `cwd` names (`ZITADEL_URL`, from the environment or
+ * the project's `.env` files), or `undefined` when it names none or its
+ * environment cannot be read, which is for `connect()` to say, not for a command
+ * that only opens a page.
+ *
+ * @param cwd - The directory the run addresses.
+ * @returns The server's address, if the project names one.
+ */
+async function projectServerOf(cwd: string): Promise<string | undefined> {
+  const environment = await Environment.resolve({ cwd, env: process.env }).catch(() => undefined);
+
+  return environment?.values.ZITADEL_URL?.value;
+}
+
+/**
+ * `zitadel console` — open the console of the server the project uses. Where a
+ * local server was started that is the local console, signed in as the local
+ * admin `zitadel start` created; every run mints a fresh one-time link, so the
+ * command is also how you get back in after the session ends. Otherwise, for a
+ * project on a cloud or self-hosted server, it is that server's console, where
+ * you sign in yourself.
  */
 export default class Console extends BaseCommand {
   static override description =
-    "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
+    "Open the console of the server the project uses.\n\nWhere a local server was started, the console opens signed in as the local admin the start command created: run this in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 1;
 
@@ -35,7 +55,7 @@ export default class Console extends BaseCommand {
   ];
   static override flags = {
     "no-open": Flags.boolean({
-      description: "Print the sign-in link instead of opening a browser.",
+      description: "Print the link instead of opening a browser.",
     }),
   };
 
@@ -50,12 +70,28 @@ export default class Console extends BaseCommand {
    * admin it created, so both are read from there.
    */
   protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
-    const localDir = (await findLocalAdminDir(cwd)) ?? cwd;
-    return (await readRuntimeMetadata(localDir))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+    const found = await findLocalAdminDir(cwd);
+    if (found === undefined) {
+      const named = await projectServerOf(cwd);
+      if (named !== undefined) {
+        return named;
+      }
+    }
+
+    return (await readRuntimeMetadata(found ?? cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
   }
 
   protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
-    const localDir = (await findLocalAdminDir(this.cwd)) ?? this.cwd;
+    // A local admin means a server was started here, and it is the console that
+    // was asked for. Without one, a project on a server that is not on this
+    // machine has only that server's console to open.
+    const found = await findLocalAdminDir(this.cwd);
+    const named = found === undefined ? await projectServerOf(this.cwd) : undefined;
+    if (named !== undefined && !Server.at(named).isLoopback()) {
+      return this.openRemote(Server.at(named).consoleUrl(), flags.noOpen);
+    }
+
+    const localDir = found ?? this.cwd;
     const admin = await readLocalAdmin(localDir);
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
@@ -108,6 +144,51 @@ export default class Console extends BaseCommand {
         actions: [
           `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
         ],
+      },
+    });
+  }
+
+  /**
+   * Opens the console of a server that is not on this machine. There is no
+   * local admin to sign in as, so the page is the server's own and the
+   * developer signs in there; a dry run opens nothing, as it would not for a
+   * local server.
+   */
+  private async openRemote(consoleUrl: string, noOpen: boolean): Promise<JsonEnvelope> {
+    if (this.dryRun) {
+      const title = "Would open the console (dry run)";
+
+      return this.emit({
+        status: "ok",
+        data: {
+          title,
+          dry_run: true,
+          console_url: consoleUrl,
+        },
+        summary: {
+          title,
+          sections: [section(undefined, ["Console", escapeControlCharacters(consoleUrl)])],
+        },
+        next: { commands: [await this.realRun()] },
+      });
+    }
+
+    log.plain(`The console of this project's server:`);
+    log.plain(escapeControlCharacters(consoleUrl));
+    const opened = noOpen || this.nonInteractive ? false : (await openInBrowser(consoleUrl)).opened;
+
+    const title = "Console";
+
+    return this.emit({
+      status: "ok",
+      data: {
+        title,
+        console_url: consoleUrl,
+        browser_opened: opened,
+      },
+      summary: {
+        title,
+        sections: [],
       },
     });
   }

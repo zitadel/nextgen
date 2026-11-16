@@ -737,7 +737,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin.
+Open the console of the server the project uses.
 
 ```
 USAGE
@@ -752,17 +752,18 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --no-open          Print the sign-in link instead of opening a browser.
+      --no-open          Print the link instead of opening a browser.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin.
+  Open the console of the server the project uses.
 
-  The local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local
-  admin is read from the nearest .zitadel/local/ on the way up.
+  Where a local server was started, the console opens signed in as the local admin the start command created: run this
+  in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the
+  way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.
 
 EXAMPLES
   $ zitadel console

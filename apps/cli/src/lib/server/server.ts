@@ -156,6 +156,36 @@ export class Server {
   }
 
   /**
+   * Whether this is Zitadel's hosted cloud: the default server or a host under
+   * `zitadel.cloud`.
+   *
+   * @returns `true` when the address is a hosted cloud's.
+   */
+  isCloud(): boolean {
+    try {
+      const { hostname } = new URL(this.address);
+      return (
+        hostname === new URL(Server.DEFAULT).hostname ||
+        hostname === "zitadel.cloud" ||
+        hostname.endsWith(".zitadel.cloud")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Where this server's console is: `/console/` on the hosted cloud, which
+   * serves it apart from the API, and `/ui/console/` on any other server.
+   *
+   * @returns The console's address, with its trailing slash.
+   * @throws {ZitadelError} `E_VALIDATION` when the address is not an http(s) URL.
+   */
+  consoleUrl(): string {
+    return `${Server.origin(this.address)}${this.isCloud() ? "/console/" : "/ui/console/"}`;
+  }
+
+  /**
    * The host of a server, for an ending that says where a run happened, or
    * `undefined` for the default server, which a reader does not need told, and
    * for an address that is not a URL.
