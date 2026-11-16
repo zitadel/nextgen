@@ -1,27 +1,28 @@
-import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "@/cli/commands/branding/eject";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { BRANDING_DESIGN_INFO } from "@/lib/zitadel";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
-const tempDirs: string[] = [];
-
-async function makeProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-branding-eject-"));
-  tempDirs.push(cwd);
+/**
+ * Makes a directory a Zitadel project.
+ *
+ * @param cwd - The directory.
+ * @returns Once the project's files are written.
+ */
+async function makeProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
-  return cwd;
 }
 
 function eject(cwd: string, ...extra: string[]) {
@@ -29,18 +30,11 @@ function eject(cwd: string, ...extra: string[]) {
   return runCliForTest(["branding", "eject", "--cwd", cwd, "--json", ...extra]);
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
 describe("branding eject", () => {
-  it("scaffolds descriptor, template, README, and the dialect meta-schema", async () => {
-    const cwd = await makeProject();
+  it("scaffolds descriptor, template, README, and the dialect meta-schema", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     const res = await eject(cwd);
     expect(res.exitCode, res.stderr).toBe(0);
@@ -83,8 +77,8 @@ describe("branding eject", () => {
     expect(meta).not.toMatch(/`zitadel /);
   });
 
-  it("writes the dialect meta-schema byte for byte as setup does", async () => {
-    const cwd = await makeProject();
+  it("writes the dialect meta-schema byte for byte as setup does", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     await eject(cwd);
 
@@ -95,8 +89,8 @@ describe("branding eject", () => {
     expect(meta).toBe(expected?.contents);
   });
 
-  it("replaces an outdated dialect meta-schema with this version's", async () => {
-    const cwd = await makeProject();
+  it("replaces an outdated dialect meta-schema with this version's", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/meta/branding.json"), '{"title": "an older dialect"}\n');
 
@@ -110,8 +104,8 @@ describe("branding eject", () => {
     expect(meta).toBe(expected?.contents);
   });
 
-  it("writes nothing through a dialect meta-schema that is a symlink", async () => {
-    const cwd = await makeProject();
+  it("writes nothing through a dialect meta-schema that is a symlink", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
     await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
     await symlink("../secret", join(cwd, ".zitadel/meta/branding.json"));
@@ -125,8 +119,10 @@ describe("branding eject", () => {
     expect((await lstat(join(cwd, ".zitadel/meta/branding.json"))).isSymbolicLink()).toBe(true);
   });
 
-  it("--design minimal writes the card-less template on the centered layout", async () => {
-    const cwd = await makeProject();
+  it("--design minimal writes the card-less template on the centered layout", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     const res = await eject(cwd, "--design", "minimal");
     expect(res.exitCode, res.stderr).toBe(0);
@@ -141,11 +137,12 @@ describe("branding eject", () => {
     expect(template).not.toContain("<zl-card");
   });
 
-  it("refuses page-layout designs with a pointer to the app (#1039)", async () => {
+  it("refuses page-layout designs with a pointer to the app (#1039)", async ({ dir }) => {
     // split, split-right and hero were page chrome around the default card;
     // that layout belongs in the embedding app, not the widget template.
     for (const design of ["split", "split-right", "hero"]) {
-      const cwd = await makeProject();
+      const cwd = join(dir, design);
+      await makeProject(cwd);
       const res = await eject(cwd, "--design", design);
       expect(res.exitCode, design).toBe(3);
       const json = parseJson(res.stdout) as {
@@ -165,8 +162,10 @@ describe("branding eject", () => {
     }
   });
 
-  it("carries an unknown design as typed, leaving the terminal to spell out an escape sequence in it", async () => {
-    const cwd = await makeProject();
+  it("carries an unknown design as typed, leaving the terminal to spell out an escape sequence in it", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     const res = await eject(cwd, "--design", "x\u001b[31m");
 
@@ -174,8 +173,8 @@ describe("branding eject", () => {
     expect(json.message).toBe('Unknown design "x\u001b[31m"');
   });
 
-  it("rejects an unknown design and lists the catalog", async () => {
-    const cwd = await makeProject();
+  it("rejects an unknown design and lists the catalog", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await eject(cwd, "--design", "nope");
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
@@ -184,16 +183,16 @@ describe("branding eject", () => {
     expect(json.hint).toBe("Pick one of: centered, minimal.");
   });
 
-  it("--dry-run names the files it would write on the terminal", async () => {
-    const cwd = await makeProject();
+  it("--dry-run names the files it would write on the terminal", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await runCliForTest(["branding", "eject", "--cwd", cwd, "--dry-run"]);
 
     expect(res.stdout).toContain(".zitadel/branding/login.liquid");
   });
 
-  it("--dry-run suggests the real command, with the design it was given", async () => {
-    const cwd = await makeProject();
+  it("--dry-run suggests the real command, with the design it was given", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await eject(cwd, "--dry-run", "--design", "minimal");
 
@@ -204,8 +203,8 @@ describe("branding eject", () => {
     });
   });
 
-  it("--dry-run writes no file and says what it would eject", async () => {
-    const cwd = await makeProject();
+  it("--dry-run writes no file and says what it would eject", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await eject(cwd, "--dry-run");
 
@@ -224,8 +223,8 @@ describe("branding eject", () => {
     await expect(readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8")).rejects.toThrow();
   });
 
-  it("counts the files a re-run with --force left unchanged", async () => {
-    const cwd = await makeProject();
+  it("counts the files a re-run with --force left unchanged", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await eject(cwd);
 
     const res = await runCliForTest([
@@ -241,8 +240,8 @@ describe("branding eject", () => {
     expect(res.stdout).toContain("Files: 2 written, 2 unchanged");
   });
 
-  it("refuses to overwrite existing files without --force", async () => {
-    const cwd = await makeProject();
+  it("refuses to overwrite existing files without --force", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await eject(cwd);
 
     const res = await eject(cwd);
@@ -250,8 +249,8 @@ describe("branding eject", () => {
     expect(res.stdout + res.stderr).toContain("E_CONFLICT");
   });
 
-  it("writes no descriptor when the template is already there", async () => {
-    const cwd = await makeProject();
+  it("writes no descriptor when the template is already there", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/branding/login.liquid"), "mine");
 
@@ -260,8 +259,8 @@ describe("branding eject", () => {
     await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 
-  it("--force replaces the scaffolded files with the chosen design", async () => {
-    const cwd = await makeProject();
+  it("--force replaces the scaffolded files with the chosen design", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await eject(cwd);
 
     const res = await eject(cwd, "--design", "minimal", "--force");
@@ -271,10 +270,7 @@ describe("branding eject", () => {
     expect(template).toBe(getDefaultBrandingConfig("minimal").template);
   });
 
-  it("fails with a setup hint outside a Zitadel project", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-branding-eject-bare-"));
-    tempDirs.push(cwd);
-
+  it("fails with a setup hint outside a Zitadel project", async ({ dir: cwd }) => {
     const res = await eject(cwd);
     expect(res.exitCode).not.toBe(0);
     expect(res.stdout + res.stderr).toContain("not a Zitadel project");
@@ -292,8 +288,8 @@ describe("branding eject asked on a terminal", () => {
     };
   };
 
-  it("asks which design to start from, offering each design", async () => {
-    const cwd = await makeProject();
+  it("asks which design to start from, offering each design", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const { talk, done } = ejecting(cwd, BRANDING_DESIGN_INFO.minimal.label);
     await done;
@@ -307,8 +303,8 @@ describe("branding eject asked on a terminal", () => {
     );
   });
 
-  it("scaffolds the design that was chosen", async () => {
-    const cwd = await makeProject();
+  it("scaffolds the design that was chosen", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     await ejecting(cwd, BRANDING_DESIGN_INFO.minimal.label).done;
 
@@ -317,8 +313,8 @@ describe("branding eject asked on a terminal", () => {
     );
   });
 
-  it("scaffolds the default design when it is the one chosen", async () => {
-    const cwd = await makeProject();
+  it("scaffolds the default design when it is the one chosen", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     await ejecting(cwd, BRANDING_DESIGN_INFO.centered.label).done;
 
@@ -327,8 +323,8 @@ describe("branding eject asked on a terminal", () => {
     );
   });
 
-  it("refuses a file that is already there, naming --force", async () => {
-    const cwd = await makeProject();
+  it("refuses a file that is already there, naming --force", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const args = ["--cwd", cwd, "--design", "minimal", "--json"];
     await asTerminal(() => BrandingEject.run(args, cliPackageRoot));
     const printed: string[] = [];
@@ -344,8 +340,8 @@ describe("branding eject asked on a terminal", () => {
     });
   });
 
-  it("fails, scaffolding nothing, when the person walks away", async () => {
-    const cwd = await makeProject();
+  it("fails, scaffolding nothing, when the person walks away", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     await expect(ejecting(cwd).done).rejects.toThrow();
 

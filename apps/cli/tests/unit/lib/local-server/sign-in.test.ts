@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import type { LocalAdmin } from "@/lib/local-server/admin-credential";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";

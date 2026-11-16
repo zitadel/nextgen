@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { asStepsShown } from "@/lib/oclif/next-steps";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { json, prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import type { SuggestedCommand } from "@/lib/suggestion";

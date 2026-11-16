@@ -1,9 +1,7 @@
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import {
   LOCAL_ADMIN_EMAIL,
@@ -15,21 +13,7 @@ import {
   readLocalAdmin,
 } from "@/lib/local-server/admin-credential";
 import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
-
-const tempDirs: string[] = [];
-
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function tempCwd(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-admin-"));
-  tempDirs.push(cwd);
-  return cwd;
-}
+import { it } from "@tests/fixtures";
 
 /** What `zitadel start` records beside the local admin: which server it started. */
 async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
@@ -48,12 +32,13 @@ async function recordStartedServer(dir: string, serverUrl: string): Promise<void
 }
 
 describe("local admin", () => {
-  it("has no admin before start creates one", async () => {
-    expect(await readLocalAdmin(await tempCwd())).toBeUndefined();
+  it("has no admin before start creates one", async ({ dir }) => {
+    expect(await readLocalAdmin(dir)).toBeUndefined();
   });
 
-  it("finds the admin in the directory start ran in, from there or from inside it", async () => {
-    const cwd = await tempCwd();
+  it("finds the admin in the directory start ran in, from there or from inside it", async ({
+    dir: cwd,
+  }) => {
     await ensureLocalAdmin(cwd);
     const nested = join(cwd, "apps", "web");
     await mkdir(nested, { recursive: true });
@@ -62,8 +47,7 @@ describe("local admin", () => {
     expect(await findLocalAdminDir(nested)).toBe(cwd);
   });
 
-  it("finds no admin directory when none of the parents has one", async () => {
-    const cwd = await tempCwd();
+  it("finds no admin directory when none of the parents has one", async ({ dir: cwd }) => {
     // The search ends at the home directory; pinning it keeps the developer's
     // own `~/.zitadel/local` out of the test.
     vi.stubEnv("HOME", cwd);
@@ -72,8 +56,9 @@ describe("local admin", () => {
     expect(await findLocalAdminDir(cwd)).toBeUndefined();
   });
 
-  it("gives a server the admin its own start created, under either loopback name", async () => {
-    const cwd = await tempCwd();
+  it("gives a server the admin its own start created, under either loopback name", async ({
+    dir: cwd,
+  }) => {
     const { admin } = await ensureLocalAdmin(cwd);
     await recordStartedServer(cwd, "http://localhost:8081");
     const app = join(cwd, "my-app");
@@ -83,8 +68,7 @@ describe("local admin", () => {
     expect(await findLocalAdminFor(app, "http://127.0.0.1:8081")).toEqual(admin);
   });
 
-  it("gives a server no admin that another server's start created", async () => {
-    const cwd = await tempCwd();
+  it("gives a server no admin that another server's start created", async ({ dir: cwd }) => {
     vi.stubEnv("HOME", cwd);
     vi.stubEnv("USERPROFILE", cwd);
     await ensureLocalAdmin(cwd);
@@ -93,8 +77,7 @@ describe("local admin", () => {
     expect(await findLocalAdminFor(cwd, "http://localhost:9000")).toBeUndefined();
   });
 
-  it("looks past another server's admin to the right one further up", async () => {
-    const outer = await tempCwd();
+  it("looks past another server's admin to the right one further up", async ({ dir: outer }) => {
     const { admin } = await ensureLocalAdmin(outer);
     await recordStartedServer(outer, "http://localhost:8081");
     const inner = join(outer, "sandbox");
@@ -105,9 +88,7 @@ describe("local admin", () => {
     expect(await findLocalAdminFor(inner, "http://localhost:8081")).toEqual(admin);
   });
 
-  it("creates the credential and its bootstrap user document", async () => {
-    const cwd = await tempCwd();
-
+  it("creates the credential and its bootstrap user document", async ({ dir: cwd }) => {
     const { admin, userFile } = await ensureLocalAdmin(cwd);
 
     // A fixed local identity, never inferred from Git config.
@@ -144,8 +125,9 @@ describe("local admin", () => {
 
   // `zitadel reset` keeps admin.json and deleting the file alone orphans the
   // imported password, so the advice has to name both steps.
-  it("points a malformed credential at deleting the file and resetting the data", async () => {
-    const cwd = await tempCwd();
+  it("points a malformed credential at deleting the file and resetting the data", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{ truncated");
 
@@ -166,8 +148,7 @@ describe("local admin", () => {
   // imported; minting a replacement would split the password in two.
   it.skipIf(process.getuid?.() === 0)(
     "refuses an unreadable credential instead of replacing it",
-    async () => {
-      const cwd = await tempCwd();
+    async ({ dir: cwd }) => {
       const { admin } = await ensureLocalAdmin(cwd);
       await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
@@ -180,9 +161,7 @@ describe("local admin", () => {
     },
   );
 
-  it("names the schema under the server's configured schema base", async () => {
-    const cwd = await tempCwd();
-
+  it("names the schema under the server's configured schema base", async ({ dir: cwd }) => {
     const { userFile } = await ensureLocalAdmin(cwd, "https://schemas.example.test/api/schemas/");
 
     const doc = JSON.parse(await readFile(userFile, "utf8")) as { header: { schema_url: string } };
@@ -191,9 +170,9 @@ describe("local admin", () => {
     );
   });
 
-  it("replaces the bootstrap document without leaving a staging file behind", async () => {
-    const cwd = await tempCwd();
-
+  it("replaces the bootstrap document without leaving a staging file behind", async ({
+    dir: cwd,
+  }) => {
     await ensureLocalAdmin(cwd);
     await ensureLocalAdmin(cwd);
 
@@ -201,9 +180,7 @@ describe("local admin", () => {
     expect(entries.filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 
-  it("keeps the same credential on later starts", async () => {
-    const cwd = await tempCwd();
-
+  it("keeps the same credential on later starts", async ({ dir: cwd }) => {
     const first = await ensureLocalAdmin(cwd);
     const second = await ensureLocalAdmin(cwd);
 
@@ -214,9 +191,7 @@ describe("local admin", () => {
   // Two starts in one directory must not each mint a password: the server would
   // import one hash while the CLI kept the other credential, and every console
   // handoff would fail.
-  it("mints one credential when two starts race", async () => {
-    const cwd = await tempCwd();
-
+  it("mints one credential when two starts race", async ({ dir: cwd }) => {
     const [first, second] = await Promise.all([ensureLocalAdmin(cwd), ensureLocalAdmin(cwd)]);
 
     const stored = await readLocalAdmin(cwd);

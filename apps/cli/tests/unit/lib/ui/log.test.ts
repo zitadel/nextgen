@@ -1,37 +1,20 @@
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 
 import { log } from "@/lib/ui/log";
-
-import { recordLog } from "@tests/helpers/log";
+import { it } from "@tests/fixtures";
+import { recordLog } from "@tests/fixtures/log";
 
 describe("log", () => {
-  it("writes a line plainly when no command has installed a sink, so code outside a command is heard", () => {
-    const written: string[] = [];
-    const out = process.stdout.write;
-    const err = process.stderr.write;
-    process.stdout.write = ((chunk: string) => {
-      written.push(`out:${chunk}`);
-      return true;
-    }) as typeof process.stdout.write;
-    process.stderr.write = ((chunk: string) => {
-      written.push(`err:${chunk}`);
-      return true;
-    }) as typeof process.stderr.write;
-    try {
-      log.plain("the skills offer");
-      log.info("a statement");
-      log.warn("a warning");
-      log.debug("a detail nobody asked for");
-    } finally {
-      process.stdout.write = out;
-      process.stderr.write = err;
-    }
+  it("writes a line plainly when no command has installed a sink, so code outside a command is heard", ({
+    terminal,
+  }) => {
+    log.plain("the skills offer");
+    log.info("a statement");
+    log.warn("a warning");
+    log.debug("a detail nobody asked for");
 
-    expect(written).toEqual([
-      "out:the skills offer\n",
-      "out:a statement\n",
-      "err:Warning: a warning\n",
-    ]);
+    expect(terminal.shown()).toBe("the skills offer\na statement\n");
+    expect(terminal.errors()).toBe("Warning: a warning\n");
   });
 
   it.each([

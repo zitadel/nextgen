@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { PatchApp } from "@/cli/commands/setup/steps/patch-app";
 import { warnings } from "@/lib/ui";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { aQuestionDeps } from "@tests/helpers/setup";
 
 describe("PatchApp undo", () => {

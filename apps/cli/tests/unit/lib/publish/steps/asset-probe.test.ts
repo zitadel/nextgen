@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { brandingAssetWarnings, resolvePublicAddresses } from "@/lib/publish/steps/asset-probe";
 import { Runtime } from "@/lib/runtime";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * The resolver the probe asks, answered by each test.

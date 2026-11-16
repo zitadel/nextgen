@@ -2,23 +2,24 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import { updateNotice } from "@/cli/hooks/notice";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
-const server = setupServer();
-
-/** `it` with the project directory the notice is read for, and the two ways a test sets it up. */
+/**
+ * `it` with the project directory the notice is read for, the registry answering with a newer
+ * version, and the two ways a test sets it up.
+ */
 const it = test.extend<{
   notice: (cliVersion: string, env?: NodeJS.ProcessEnv) => ReturnType<typeof updateNotice>;
   pins: (dependencies: Record<string, string>) => Promise<void>;
 }>({
-  notice: ({ dir }, use) => {
+  notice: ({ dir, server }, use) => {
+    server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
     return use((cliVersion, env = {}) => {
       return updateNotice({
         cliVersion,
@@ -34,15 +35,6 @@ const it = test.extend<{
       return writeFile(join(dir, "package.json"), JSON.stringify({ dependencies }));
     });
   },
-});
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-beforeEach(() => {
-  server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
-});
-afterEach(() => {
-  server.resetHandlers();
 });
 
 describe("updateNotice", () => {
@@ -92,13 +84,13 @@ describe("updateNotice", () => {
     await expect(notice("2.0.0")).resolves.toBeUndefined();
   });
 
-  it("says nothing when the lookup found nothing", async ({ notice }) => {
+  it("says nothing when the lookup found nothing", async ({ notice, server }) => {
     server.use(http.get(REGISTRY, () => HttpResponse.error()));
 
     await expect(notice("1.0.0")).resolves.toBeUndefined();
   });
 
-  it("does not ask when the check is off", async ({ notice }) => {
+  it("does not ask when the check is off", async ({ notice, server }) => {
     server.use(
       http.get(REGISTRY, () => {
         throw new Error("the registry was asked");

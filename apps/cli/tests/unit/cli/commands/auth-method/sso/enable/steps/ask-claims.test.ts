@@ -6,8 +6,8 @@ import { Ui } from "@/lib/ui";
 import { displayName } from "@tests/helpers/idp-values";
 import { anAcmeSsoProvider } from "@tests/helpers/connections";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { recordLog } from "@tests/helpers/log";
-import { asTerminal } from "@tests/helpers/terminal";
+import { recordLog } from "@tests/fixtures/log";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /**
  * What a hostile value carries: an OSC sequence that would set the window title

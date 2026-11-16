@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
 import { ZitadelError } from "@/lib/errors";
 import {
@@ -149,13 +149,9 @@ describe("findUpward", () => {
       await mkdir(join(app, ".zitadel/local"), { recursive: true });
       await chmod(join(app, ".zitadel/local"), 0o000);
 
-      try {
-        await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
-          code: "E_VALIDATION",
-        });
-      } finally {
-        await chmod(join(app, ".zitadel/local"), 0o700);
-      }
+      await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
     },
   );
 

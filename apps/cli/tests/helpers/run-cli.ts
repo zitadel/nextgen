@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { format } from "node:util";
 
 import { Command, type Config, run } from "@oclif/core";
+import { vi } from "vitest";
 
 import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
 import { cliPackageRoot } from "./oclif-build";
@@ -39,7 +40,9 @@ export async function runCliForTest(
   const settled: NodeJS.ProcessEnv = { FORCE_COLOR: "", NO_COLOR: "", ...env };
   const overlaid = Object.keys(settled);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, settled);
+  for (const [key, value] of Object.entries(settled)) {
+    vi.stubEnv(key, value);
+  }
 
   const exitCode = await commandSeeing(argv[0], machine)
     .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
@@ -47,12 +50,7 @@ export async function runCliForTest(
     .finally(() => {
       output.restore();
       for (const key of overlaid) {
-        const prior = previous.get(key);
-        if (prior === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = prior;
-        }
+        vi.stubEnv(key, previous.get(key));
       }
     });
 

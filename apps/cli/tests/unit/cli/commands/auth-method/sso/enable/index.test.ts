@@ -2,7 +2,7 @@ import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Config, Errors } from "@oclif/core";
-import { describe, expect } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
@@ -15,7 +15,7 @@ import {
   aUserSchema,
   type DocumentsByName,
 } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import { parseFlag } from "@tests/helpers/inputs";
 import {
@@ -30,7 +30,7 @@ import {
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -1023,6 +1023,9 @@ describe("auth-method sso enable when the schema cannot be written", () => {
     server.events.on("request:start", ({ request }) => {
       sent.push(`${request.method} ${new URL(request.url).pathname}`);
     });
+    onTestFinished(() => {
+      server.events.removeAllListeners();
+    });
     const schemaFile = join(cwd, ".zitadel/schemas/default-human-user.json");
     await chmod(schemaFile, 0o400);
     await chmod(join(cwd, ".zitadel/schemas"), 0o500);
@@ -1044,10 +1047,6 @@ describe("auth-method sso enable when the schema cannot be written", () => {
           CONFIG,
         );
       });
-    }).finally(async () => {
-      await chmod(join(cwd, ".zitadel/schemas"), 0o700);
-      await chmod(schemaFile, 0o600);
-      server.events.removeAllListeners();
     });
 
     expect(failure).toMatchObject({ code: "EEXIT", oclif: { exit: 1 } });

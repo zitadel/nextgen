@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { PM } from "@/lib/pm";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("PM.manifest", () => {
   it("returns the typed contents of package.json", async ({ dir }) => {

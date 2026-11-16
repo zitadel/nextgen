@@ -1,30 +1,12 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { RuntimeFileStore } from "@/lib/local-server/internal/store";
 import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
+import { it } from "@tests/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("RuntimeFileStore", () => {
-  async function folder(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-store-"));
-    dirs.push(dir);
-    return dir;
-  }
-
-  it("reads back what it wrote", async () => {
-    const cwd = await folder();
+  it("reads back what it wrote", async ({ dir: cwd }) => {
     const store = new RuntimeFileStore(cwd, "binary");
 
     await store.write(aBinaryRecord({ pid: 4242, port: 8081 }));
@@ -32,12 +14,11 @@ describe("RuntimeFileStore", () => {
     await expect(store.read()).resolves.toMatchObject({ pid: 4242, port: 8081 });
   });
 
-  it("reads nothing from a directory that has no record", async () => {
-    await expect(new RuntimeFileStore(await folder(), "binary").read()).resolves.toBeUndefined();
+  it("reads nothing from a directory that has no record", async ({ dir }) => {
+    await expect(new RuntimeFileStore(dir, "binary").read()).resolves.toBeUndefined();
   });
 
-  it("does not treat a Docker record as a binary server", async () => {
-    const cwd = await folder();
+  it("does not treat a Docker record as a binary server", async ({ dir: cwd }) => {
     const docker = aDockerRecord();
     await writeRuntimeMetadata(cwd, docker);
 

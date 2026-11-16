@@ -1,21 +1,14 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { PM, type PMName } from "@/lib/pm";
+import { scratchDir } from "@tests/fixtures/scratch";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
 async function tempProject(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-pm-"));
-  dirs.push(dir);
+  const dir = await scratchDir("zitadel-pm-");
   await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
   return dir;
 }

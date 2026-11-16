@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
 import { localRuntimePaths } from "@/lib/local-server/runtime";
 import { Server } from "@/lib/server";

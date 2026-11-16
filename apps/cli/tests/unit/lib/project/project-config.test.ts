@@ -1,26 +1,16 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { Server } from "@/lib/server";
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-
-const tempDirs: string[] = [];
+import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-shared-test-"));
-  tempDirs.push(dir);
-  return dir;
+  return scratchDir("zitadel-shared-test-");
 }
-
-afterEach(async () => {
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
-  tempDirs.length = 0;
-});
 
 describe("Project.hasConfig", () => {
   it("is true when zitadel.json exists, false otherwise", async () => {

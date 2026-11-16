@@ -1,6 +1,6 @@
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { aMachineThatCannotBeRead, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 

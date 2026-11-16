@@ -1,6 +1,7 @@
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { http, HttpResponse } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+import { it } from "@tests/fixtures";
 import {
   aProjectWithTwoDeploys,
   aReleaseServedOn,
@@ -9,20 +10,17 @@ import {
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { join } from "node:path";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { setupServer } from "msw/node";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 import type { Answer } from "@tests/helpers/fake-client";
 import { aDeployment, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server: platformServer } = usePlatformServer();
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
 async function twoDeploys(): Promise<string> {
   const { cwd } = await aProjectWithTwoDeploys("zitadel-deployment-list-");
-  dirs.push(cwd);
   return cwd;
 }
 
@@ -61,7 +59,7 @@ describe("deployment list", () => {
   it("follows a cursor back as the server wrote it with --all", async () => {
     const cwd = await twoDeploys();
     const tokens: (string | null)[] = [];
-    server.use(
+    platformServer.use(
       http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
         const token = new URL(request.url).searchParams.get("page_token");
         tokens.push(token);
@@ -115,7 +113,6 @@ describe("deployment list", () => {
         primary: false,
         preview: true,
       });
-      dirs.push(served.cwd);
       return {
         cwd: served.cwd,
         row: (expires: string | RegExp) => {
@@ -127,7 +124,7 @@ describe("deployment list", () => {
     /** Records every read of the previews and lets the mock answer it. */
     const watchingPreviews = (): string[] => {
       const asked: string[] = [];
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
           asked.push(request.url);
         }),
@@ -137,7 +134,7 @@ describe("deployment list", () => {
 
     /** Makes the mock refuse to list the previews. */
     const refusingPreviews = () => {
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/projects/:projectId/previews`, () => {
           return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
         }),
@@ -149,7 +146,7 @@ describe("deployment list", () => {
       deployments: readonly Answer<ListDeployments200DeploymentsItem>[],
       served = deployments,
     ) => {
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
           const live = new URL(request.url).searchParams.get("live") === "true";
           return HttpResponse.json({
@@ -162,7 +159,7 @@ describe("deployment list", () => {
 
     /** Makes the mock refuse the live view and answer the history as it does. */
     const refusingLiveView = () => {
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
           const live = new URL(request.url).searchParams.get("live") === "true";
           return live
@@ -175,7 +172,7 @@ describe("deployment list", () => {
     /** Records every read of the deployments and lets the mock answer it. */
     const watchingDeployments = (): string[] => {
       const asked: string[] = [];
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
           asked.push(request.url);
         }),
@@ -185,7 +182,7 @@ describe("deployment list", () => {
 
     /** Makes the mock list a live preview for each origin, expiring as given. */
     const previewsExpiring = (expiries: Readonly<Record<string, string>>) => {
-      server.use(
+      platformServer.use(
         http.get(`${SERVER}/api/v1/projects/:projectId/previews`, () => {
           return HttpResponse.json({
             previews: Object.entries(expiries).map(([origin, expiresAt]) => {
@@ -370,17 +367,6 @@ describe("deployment list", () => {
 
 describe("deployment list at a terminal", () => {
   const SERVER = "https://api.zitadel.cloud";
-  const server = setupServer();
-  const dirs: string[] = [];
-
-  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-  afterAll(() => server.close());
-  afterEach(async () => {
-    server.resetHandlers();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
 
   const deployment = (id: string) => ({
     id,
@@ -390,9 +376,13 @@ describe("deployment list at a terminal", () => {
     deployed_at: "2026-01-01T00:00:00.000Z",
   });
 
-  async function aProject(): Promise<string> {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-deployment-list-"));
-    dirs.push(cwd);
+  /**
+   * Binds a temp directory to a project through `.zitadel/secret`.
+   *
+   * @param cwd - The directory to bind.
+   * @returns The directory.
+   */
+  async function aProject(cwd: string): Promise<string> {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/secret"),
@@ -422,8 +412,11 @@ describe("deployment list at a terminal", () => {
     );
 
   describe("deployment list", () => {
-    it("says so, as the closing clause beside the place it ran, when it finds nothing", async () => {
-      const cwd = await aProject();
+    it("says so, as the closing clause beside the place it ran, when it finds nothing", async ({
+      dir,
+      server,
+    }) => {
+      const cwd = await aProject(dir);
       server.use(
         http.get(`${SERVER}/api/v1/deployments`, () =>
           HttpResponse.json({ deployments: [], next_page_token: null }),
@@ -436,8 +429,11 @@ describe("deployment list at a terminal", () => {
       expect(res.stdout).toContain("No deployments found ·");
     });
 
-    it("counts what it found in the same words every other list counts in", async () => {
-      const cwd = await aProject();
+    it("counts what it found in the same words every other list counts in", async ({
+      dir,
+      server,
+    }) => {
+      const cwd = await aProject(dir);
       server.use(
         http.get(`${SERVER}/api/v1/deployments`, () =>
           HttpResponse.json({

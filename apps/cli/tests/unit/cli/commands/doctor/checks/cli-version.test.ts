@@ -2,7 +2,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
 import { checkCliVersion } from "@/cli/commands/doctor/checks/cli-version";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /**

@@ -1,9 +1,10 @@
 import { Readable } from "node:stream";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { Operation } from "@/lib/backend";
 import { ApiCall } from "@/lib/api";
+import { it } from "@tests/fixtures";
 
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
@@ -213,30 +214,16 @@ describe("urlOn", () => {
 });
 
 describe("ApiCall.readInput", () => {
-  const original = Object.getOwnPropertyDescriptor(process, "stdin");
-
-  /** Replaces the process's stdin with a pipe that carries `bytes`. */
-  const pipe = (bytes: Buffer): void => {
-    Object.defineProperty(process, "stdin", {
-      value: Readable.from([bytes]),
-      configurable: true,
-    });
-  };
-
-  afterEach(() => {
-    if (original !== undefined) {
-      Object.defineProperty(process, "stdin", original);
-    }
-  });
-
-  it("reads a body piped in", async () => {
-    pipe(Buffer.from('{"a":1}\n'));
+  it("reads a body piped in", async ({ terminal }) => {
+    terminal.stdin(Readable.from([Buffer.from('{"a":1}\n')]));
 
     expect(await ApiCall.readInput("-")).toEqual({ a: 1 });
   });
 
-  it("reads a body piped in with a UTF-8 byte-order mark in front of it", async () => {
-    pipe(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a":1}\n')]));
+  it("reads a body piped in with a UTF-8 byte-order mark in front of it", async ({ terminal }) => {
+    terminal.stdin(
+      Readable.from([Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a":1}\n')])]),
+    );
 
     expect(await ApiCall.readInput("-")).toEqual({ a: 1 });
   });
