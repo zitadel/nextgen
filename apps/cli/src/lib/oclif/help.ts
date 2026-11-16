@@ -21,6 +21,12 @@ const PLUGIN_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The order of oclif's own utilities in the CLI group, which declare no
+ * `groupOrder` of their own to read it from.
+ */
+const UTILITY_ORDER: readonly string[] = ["commands", "search", "autocomplete", "version", "which"];
+
+/**
  * Root help in the style of `gh --help`: a tagline, usage, the commands under
  * headed groups, then flags and examples. A family of commands (`user`,
  * `release`) is one row, and its own help lists the operations. Only
@@ -143,7 +149,9 @@ export default class ZitadelHelp extends Help {
     const rows = [...families].map(([family, members]): Row => {
       const order = Math.min(
         ...members.map((member) => {
-          return member.groupOrder ?? Number.MAX_SAFE_INTEGER;
+          const utility = UTILITY_ORDER.indexOf(member.id);
+
+          return member.groupOrder ?? (utility === -1 ? Number.MAX_SAFE_INTEGER : utility + 1);
         }),
       );
       const isFamily = members.some((member) => {

@@ -168,9 +168,9 @@ API and events
   resources        List the resources this CLI manages
 
 CLI
-  autocomplete     Display autocomplete installation instructions
   commands         List all zitadel commands
   search           Search for a command
+  autocomplete     Display autocomplete installation instructions
   version          Show the CLI version
   which            Show which plugin a command is in
 
