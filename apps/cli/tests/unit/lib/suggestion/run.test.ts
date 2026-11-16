@@ -191,10 +191,8 @@ describe("RunSuggestions#rerun", () => {
       { type: "flag", flag: "set", input: `oidc.client_secret=${CANARY}` },
     ]);
 
-    expect([shown.includes("https://idp.example.com/token"), shown.includes(CANARY)]).toEqual([
-      true,
-      false,
-    ]);
+    expect(shown).toContain("oidc.token_endpoint=https://idp.example.com/token");
+    expect(shown).not.toContain(CANARY);
   });
 
   it("keeps the words of a flag that holds no secret", () => {
