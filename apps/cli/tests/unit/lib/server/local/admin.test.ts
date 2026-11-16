@@ -198,4 +198,13 @@ describe("local admin", () => {
     expect(first.admin).toEqual(stored);
     expect(second.admin).toEqual(stored);
   });
+
+  it("leaves nothing beside the credential once it is written", async ({ dir: cwd }) => {
+    await Promise.all([ensureLocalAdmin(cwd), ensureLocalAdmin(cwd)]);
+
+    expect((await readdir(join(cwd, ".zitadel/local"))).sort()).toEqual([
+      "admin-user.json",
+      "admin.json",
+    ]);
+  });
 });

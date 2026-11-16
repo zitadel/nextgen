@@ -49,7 +49,9 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
-  const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
+  // `ww`: without it `ps` cuts each command at `COLUMNS`, and a long install path loses the
+  // `bin/nextgen` that marks a server before the full command is ever read.
+  const listed = await runPs(["axww", "-o", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
     .then(parsePsRows)
     .then(
       (rows) => {
@@ -153,8 +155,24 @@ function isRuntimeCandidate(command: string): boolean {
   );
 }
 
+/** The JavaScript runtimes `@zitadel/server`'s wrapper script runs under. */
+const SCRIPT_RUNTIMES = new Set(["node", "nodejs", "bun", "deno"]);
+
+/**
+ * Whether `command` runs `@zitadel/server`'s wrapper script: a JavaScript
+ * runtime whose script is `zitadel-server.js`. Naming the file is not enough,
+ * since `stop --all` signals every match: `tail -f …/zitadel-server.js` or an
+ * editor holding it open is not a server.
+ */
 function isServerWrapper(command: string): boolean {
-  return command.includes("zitadel-server.js");
+  const [program, ...rest] = commandTokens(command);
+  if (!program || !SCRIPT_RUNTIMES.has(basename(program).replace(/\.exe$/, ""))) {
+    return false;
+  }
+  const script = rest.find((token) => {
+    return !token.startsWith("-") && token !== "run";
+  });
+  return script !== undefined && basename(script) === "zitadel-server.js";
 }
 
 function isServerBinary(command: string): boolean {

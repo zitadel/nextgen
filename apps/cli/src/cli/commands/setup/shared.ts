@@ -26,6 +26,7 @@ import {
   slugFromDisplayName,
 } from "@zitadel/config/idp";
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+import semver from "semver";
 
 import type { CreatedProject } from "@/lib/backend";
 import type { Consent, Gate } from "@/lib/consent";
@@ -46,7 +47,9 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import type { ResolvedServer } from "@/lib/server";
+import { LocalServer, type ResolvedServer } from "@/lib/server";
+import { readNearestRuntimeMetadata, sameLocalServer } from "@/lib/server/local/runtime";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -1499,4 +1502,89 @@ export function promptContext(
     passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
     developmentBuild: Runtime.current().isDevelopment(),
   };
+}
+
+/** How a local server another CLI release started is refused. */
+const SERVER_VERSION_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
+  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
+  next: ["{start}", "{setup}"],
+  details: {
+    server_url: "{serverUrl}",
+    server_version: "{running}",
+    cli_server_version: "{expected}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * Refuses a local server another CLI release started, when it is the server
+ * this run is about.
+ *
+ * @remarks
+ * `start` restarts such a server, but one left running stays that release's
+ * until `start` runs again, and its API is that release's: setup would create
+ * the project, then fail deploying the default schema and flow, and `--force`
+ * would not help. Only a binary runtime records the version it runs, and only
+ * release versions are compared: an override records `override`, which says
+ * nothing about its API. An unreadable `runtime.json` is doctor's to report,
+ * not setup's. The start command names the server's own directory, so the
+ * typed `--cwd` is not added to it.
+ *
+ * Both the server `--server` pins and the one the wizard's question picks are
+ * checked, so a run that chose a local server interactively is held to the
+ * same version as one that named it.
+ *
+ * @param input - Where setup runs, the server it is about, and the flags a
+ *   rerun keeps.
+ * @throws {@link ZitadelError} When the nearest local server runs another
+ *   release.
+ */
+export async function refuseOutdatedLocalServer(
+  input: Readonly<{
+    cwd: string;
+    serverUrl: string;
+    flags: Parameters<typeof retryOptionsFromFlags>[0];
+  }>,
+): Promise<void> {
+  const { cwd, serverUrl, flags } = input;
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
+    return undefined;
+  });
+  const runtime = nearest?.runtime;
+  const expected = LocalServer.bundledVersion();
+  if (
+    !nearest ||
+    runtime?.backend !== "binary" ||
+    !sameLocalServer(runtime.server_url, serverUrl) ||
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return;
+  }
+  throw refusalError(
+    SERVER_VERSION_REFUSAL,
+    {
+      running: runtime.server_version,
+      expected,
+      serverUrl: runtime.server_url,
+      where:
+        nearest.dir === cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `,
+    },
+    {
+      start:
+        nearest.dir === cwd
+          ? { id: "start" }
+          : {
+              id: "start",
+              flags: { cwd: nearest.dir },
+            },
+      setup: {
+        id: "setup",
+        flags: setupRetryFlags(retryOptionsFromFlags(flags)),
+      },
+    },
+  );
 }

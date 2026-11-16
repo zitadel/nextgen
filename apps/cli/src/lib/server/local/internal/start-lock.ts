@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { link, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
@@ -50,9 +51,7 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
       return async () => {
         // Only the owner's own lock is removed, so a release that comes after
         // someone else has taken the lock over cannot remove theirs.
-        if ((await readOwner(lockFile)) === process.pid) {
-          await rm(lockFile, { force: true });
-        }
+        await removeIfOwnedBy(lockFile, process.pid);
       };
     } catch (error) {
       if (!isErrno(error, "EEXIST")) {
@@ -102,6 +101,10 @@ async function isUnwritten(lockFile: string): Promise<boolean> {
  * itself is exclusive (a second file, created the same way), and the owner is
  * read again once it is held: if the lock has a different owner by then, it is
  * not the stale one and stays. `false` when another start is clearing it.
+ *
+ * A guard whose own owner died is recovered the same way a lock is released:
+ * only if it is still that dead owner's, so a start that saw it a moment ago
+ * cannot remove the live guard another start has made since.
  */
 export async function clearStale(
   lockFile: string,
@@ -116,18 +119,52 @@ export async function clearStale(
     }
     const clearing = await readOwner(guardFile);
     if (clearing === undefined ? await isUnwritten(guardFile) : !isAlive(clearing)) {
-      await rm(guardFile, { force: true });
+      await removeIfOwnedBy(guardFile, clearing);
     }
     return false;
   }
   try {
-    if ((await readOwner(lockFile)) === staleOwner) {
-      await rm(lockFile, { force: true });
-    }
+    await removeIfOwnedBy(lockFile, staleOwner);
   } finally {
-    await rm(guardFile, { force: true });
+    await removeIfOwnedBy(guardFile, process.pid);
   }
   return true;
+}
+
+/**
+ * Removes `file` only while `owner` holds it; `undefined` stands for an owner
+ * that never wrote its pid, and only once it has stayed that way
+ * ({@link isUnwritten}).
+ *
+ * Reading the owner and then removing the file would remove whatever is there
+ * by the time of the removal, which may be a live lock made in between. So the
+ * file is first moved aside, which takes that very file and no other, and the
+ * owner is read from what was moved. A file someone else owns is linked back,
+ * which never replaces one made in the meantime.
+ */
+export async function removeIfOwnedBy(file: string, owner: number | undefined): Promise<void> {
+  const aside = `${file}.${process.pid}.${randomBytes(6).toString("hex")}.aside`;
+  try {
+    await rename(file, aside);
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return;
+    }
+    throw error;
+  }
+  try {
+    const found = await readOwner(aside);
+    if (found === owner && (owner !== undefined || (await isUnwritten(aside)))) {
+      return;
+    }
+    await link(aside, file).catch((error: unknown) => {
+      if (!isErrno(error, "EEXIST")) {
+        throw error;
+      }
+    });
+  } finally {
+    await rm(aside, { force: true });
+  }
 }
 
 async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {

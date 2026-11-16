@@ -22,7 +22,7 @@ beforeEach(() => {
 describe("discoverManagedRuntimeProcesses", () => {
   it("returns only CLI-managed local runtime processes", async () => {
     whenPs((args) => {
-      if (args[0] === "axo") {
+      if (args[0] === "axww") {
         return [
           " 123 1 /usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
           " 234 123 /tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen",
@@ -59,7 +59,7 @@ describe("discoverManagedRuntimeProcesses", () => {
 
   it("strips environment markers without joining adjacent command tokens", async () => {
     whenPs((args) =>
-      args[0] === "axo"
+      args[0] === "axww"
         ? " 567 1 /usr/local/bin/nextgen\n"
         : "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen FOO=1 --serve",
     );
@@ -75,7 +75,7 @@ describe("discoverManagedRuntimeProcesses", () => {
 
   it("reports a process's command without the environment it ran with", async () => {
     whenPs((args) => {
-      if (args[0] === "axo") {
+      if (args[0] === "axww") {
         return " 678 1 /usr/local/bin/nextgen --serve\n";
       }
       return args[0] === "eww"
@@ -88,6 +88,53 @@ describe("discoverManagedRuntimeProcesses", () => {
     expect(discovery.processes.map((processInfo) => processInfo.command)).toEqual([
       "/usr/local/bin/nextgen --serve",
     ]);
+  });
+
+  it("lists every process with its whole command, however wide the terminal", async () => {
+    whenPs(() => "");
+
+    await discoverManagedRuntimeProcesses();
+
+    expect(mockExeca.mock.calls[0]?.[1]).toEqual(["axww", "-o", "pid=,ppid=,command="]);
+  });
+
+  it.each([
+    [
+      "a pager following its file",
+      "tail -f /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    ],
+    [
+      "an editor holding it open",
+      "vim /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    ],
+    [
+      "a tool node runs on it",
+      "/usr/local/bin/node /tmp/app/node_modules/.bin/prettier zitadel-server.js",
+    ],
+  ])("leaves out %s, which only names the wrapper script", async (_, command) => {
+    whenPs((args) => {
+      return args[0] === "axww" ? ` 789 1 ${command}\n` : "";
+    });
+
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery.processes).toEqual([]);
+  });
+
+  it.each([
+    [
+      "with runtime flags",
+      "/usr/local/bin/node --enable-source-maps /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js start",
+    ],
+    ["under bun", "/opt/bun/bin/bun /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js"],
+  ])("finds the wrapper run %s", async (_, command) => {
+    whenPs((args) => {
+      return args[0] === "axww" ? ` 890 1 ${command}\n` : "";
+    });
+
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery.processes).toMatchObject([{ kind: "server-wrapper", pid: 890 }]);
   });
 
   it("reports unsupported discovery instead of throwing", async () => {

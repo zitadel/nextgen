@@ -3,7 +3,7 @@ import { Server } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
-import { promptContext } from "@/cli/commands/setup/shared";
+import { promptContext, refuseOutdatedLocalServer } from "@/cli/commands/setup/shared";
 
 /**
  * The value the choice select returns when the person picks "Custom URL".
@@ -42,7 +42,8 @@ type Deps = Pick<
  * `setup --server local`. Without one, the local option is still listed,
  * disabled, saying how to get it, so the choice is visible before it is
  * available. Picking a server writes its URL directly to `answers.server`;
- * picking "Custom URL" still asks for a validated URL.
+ * picking "Custom URL" still asks for a URL, validated and normalised to its
+ * origin the way `--server` is.
  */
 export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   /**
@@ -66,8 +67,13 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   /**
    * Ask the question, or leave the answers as they are when nothing can be asked.
    *
+   * @remarks
+   * A server picked here was not there for the preconditions to check, so a local one another CLI
+   * release started is refused as soon as it is picked. One `--server` pinned was checked already.
+   *
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with this question's settled.
+   * @throws {@link ZitadelError} When the picked server is a local one another CLI release started.
    */
   async run(needs: Needs): Promise<Fact<"answers">> {
     if (this.deps.nonInteractive || this.deps.dryRun) {
@@ -75,8 +81,16 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
         answers: needs.answers,
       };
     }
+    const answers = await this.ask(needs.answers, promptContext(needs, this.deps));
+    if (!this.deps.serverFlag) {
+      await refuseOutdatedLocalServer({
+        cwd: this.deps.cwd,
+        serverUrl: answers.server,
+        flags: needs.flags,
+      });
+    }
     return {
-      answers: await this.ask(needs.answers, promptContext(needs, this.deps)),
+      answers,
     };
   }
 
@@ -139,17 +153,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
               name: "server URL",
               message: "What is the URL of your Zitadel server?",
               placeholder: "https://zitadel.internal",
-              parse: (value) => {
-                return URL.canParse(value)
-                  ? {
-                      ok: true,
-                      value,
-                    }
-                  : {
-                      ok: false,
-                      problem: "Must be a valid URL",
-                    };
-              },
+              parse: Server.parse,
             })
           : choice,
     };

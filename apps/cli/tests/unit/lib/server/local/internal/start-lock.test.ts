@@ -1,10 +1,11 @@
-import { readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
 import {
   clearStale,
+  removeIfOwnedBy,
   tryLock,
   UNWRITTEN_LOCK_MS,
   withStartLock,
@@ -123,6 +124,62 @@ describe("clearStale", () => {
     await clearStale(lock, 2147483000);
 
     await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+describe("removeIfOwnedBy", () => {
+  /** An owner that is not running. */
+  const DEAD_OWNER = 2147483000;
+
+  /** A different owner, which made the file after the dead one was seen. */
+  const NEWER_OWNER = 2147483001;
+
+  /**
+   * A file holding `owner`, in a folder of its own.
+   *
+   * @param dir - The directory to make it under.
+   * @param owner - What the file holds.
+   * @returns The file's path.
+   */
+  async function aFileOwnedBy(dir: string, owner: string): Promise<string> {
+    const file = lockPath(dir);
+    await mkdir(join(dir, "local"), { recursive: true });
+    await writeFile(file, owner);
+    return file;
+  }
+
+  it("removes the file while the owner it was asked about still has it", async ({ dir }) => {
+    const file = await aFileOwnedBy(dir, String(DEAD_OWNER));
+
+    await removeIfOwnedBy(file, DEAD_OWNER);
+
+    await expect(stat(file)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("leaves the file another owner has made since", async ({ dir }) => {
+    const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
+
+    await removeIfOwnedBy(file, DEAD_OWNER);
+
+    await expect(readFile(file, "utf8")).resolves.toBe(String(NEWER_OWNER));
+  });
+
+  it("leaves nothing beside the file it put back", async ({ dir }) => {
+    const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
+
+    await removeIfOwnedBy(file, DEAD_OWNER);
+
+    await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock"]);
+  });
+
+  it("leaves a file with no owner yet, because its owner may be about to write", async ({
+    dir,
+  }) => {
+    const file = await aFileOwnedBy(dir, "");
+
+    await removeIfOwnedBy(file, undefined);
+
+    await expect(stat(file)).resolves.toBeDefined();
   });
 });
 

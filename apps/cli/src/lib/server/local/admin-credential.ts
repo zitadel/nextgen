@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
+import { isErrno } from "@/lib/errno";
 import { ZitadelError, errorMessage } from "@/lib/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
@@ -188,14 +189,41 @@ async function createLocalAdmin(cwd: string): Promise<LocalAdmin> {
   return won ? candidate : ((await readLocalAdmin(cwd)) ?? candidate);
 }
 
-/** Writes owner-only, reporting `false` when another run got there first. */
+/** How a filesystem that cannot hard-link answers `link`. */
+const NO_HARD_LINKS = ["ENOTSUP", "EPERM", "ENOSYS", "EOPNOTSUPP"] as const;
+
+/**
+ * Writes owner-only, reporting `false` when another run got there first.
+ *
+ * The content is written in full to a staging file and then linked into
+ * place. A link never replaces a file, so only one run can win, and the file
+ * appears with all of its content: a run that loses reads the winner's whole
+ * credential, never the empty or partial file an exclusive create shows while
+ * it is still being written. A filesystem without hard links falls back to the
+ * exclusive create.
+ */
 async function writePrivateIfAbsent(path: string, content: string): Promise<boolean> {
+  const staging = `${path}.${randomBytes(6).toString("hex")}.tmp`;
   try {
-    await writeFile(path, content, { mode: 0o600, flag: "wx" });
+    await writeFile(staging, content, { mode: 0o600, flag: "wx" });
+    await SecretFile.enforceMode(staging, 0o600);
+    await link(staging, path).catch((error: unknown) => {
+      if (
+        !NO_HARD_LINKS.some((code) => {
+          return isErrno(error, code);
+        })
+      ) {
+        throw error;
+      }
+      return writeFile(path, content, { mode: 0o600, flag: "wx" }).then(() => {
+        return SecretFile.enforceMode(path, 0o600);
+      });
+    });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if (isErrno(error, "EEXIST")) return false;
     throw error;
+  } finally {
+    await rm(staging, { force: true });
   }
-  await SecretFile.enforceMode(path, 0o600);
   return true;
 }
