@@ -447,29 +447,6 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
   lookup returns the creator as a user reference, as the members list does.
   It is null when a project secret created the invitation.
 
-## Amendment (2026-11-12): `invitation_cancelled`
-
-§9 sends no event when a pending invitation is cancelled. Cancel deletes the
-row, so a cancelled journey ends at `invitation_created` and counts against
-the 72-hour acceptance rate as an invitation nobody opened, the same error
-`invitation_rejected` was added to avoid.
-
-| Event | Sent by | When |
-|---|---|---|
-| `invitation_cancelled` | the console's invitations list; `zitadel invitation cancel` | after the API confirms the cancel |
-
-- It carries `role` and `invitation_journey_id`, like the other three.
-- A replace sends no `invitation_cancelled`: the new invitation keeps the
-  journey, so the journey goes on.
-- The cancel answers `204` with no body, so `zitadel invitation cancel
-  <invitation_id>` reads the invitation before it asks to confirm. The
-  question names who the invitation is for and its role, and the event takes
-  its role and journey from that read. A cancel with no id picks from the
-  pending list, which it has already read.
-- Cancelling a declined invitation sends none: its journey already ended
-  with `invitation_rejected`.
-- The 72-hour acceptance rate leaves out cancelled journeys.
-
 ## Amendment (2026-11-13): a decline keeps the metadata, and the list's filters
 
 This replaces §4's erasure rule for declines and §4's cancel rule, and the

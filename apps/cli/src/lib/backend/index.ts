@@ -77,7 +77,6 @@ export {
   type Invitation,
   type InvitationInput,
   type InvitationPageQuery,
-  invitationGrant,
   type InvitationRelation,
   invitationRole,
   InvitationService,
