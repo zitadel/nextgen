@@ -160,7 +160,8 @@ test("an unfiltered invitation list names every status, as the request lists the
       invitationRequest({}),
     ) ?? "";
 
-  expect(sample).toContain(
+  // A long command wraps one flag per line; join them to read it as typed.
+  expect(sample.replace(/ \\\n\s+/g, " ")).toContain(
     `${cli} invitation list --status pending --status accepted --status rejected --status expired`,
   );
 });
