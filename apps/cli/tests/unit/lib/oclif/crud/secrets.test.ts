@@ -5,7 +5,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { findCredential, redactCredentials, type References } from "@/lib/oclif/crud";
+import { findCredential, isSecretKey, redactCredentials, type References } from "@/lib/oclif/crud";
 import { refuseSecret } from "@/lib/oclif/crud/secrets";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 
@@ -14,6 +14,29 @@ const references: References = {
   example: "'${{ NAME }}'",
 };
 const connection = (PublishIdpBody as unknown as { shape: { idp: ZodLike } }).shape.idp;
+
+describe("isSecretKey", () => {
+  it.each(["password", "api_key", "userToken", "client_secret", "PRIVATE_KEY", "access-token"])(
+    "reads %s as a credential's name",
+    (key) => {
+      expect(isSecretKey(key)).toBe(true);
+    },
+  );
+
+  it.each(["passwordless", "tokenizer", "email", "display_name", "revocationEndpoint"])(
+    "does not read %s as one",
+    (key) => {
+      expect(isSecretKey(key)).toBe(false);
+    },
+  );
+
+  it.each(["token_endpoint", "token_url", "secret_uri"])(
+    "reads %s as one too: only a value that is an address lets it through",
+    (key) => {
+      expect(isSecretKey(key)).toBe(true);
+    },
+  );
+});
 
 describe("a credential-named key, by what it holds", () => {
   const schema = z.object({

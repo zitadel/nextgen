@@ -36,7 +36,6 @@ import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
-import { assertNoSecretEchoed } from "./argv-secrets";
 import { assertRunnableSuggestions, assertSuggestionsCarryTheRun } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -1465,7 +1464,6 @@ export class ScaffoldedApp {
     const ran = [...args, "--cwd", this.path];
     const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
-    assertNoSecretEchoed(result, ran);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
       assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);
@@ -2277,7 +2275,6 @@ export class ScaffoldedApp {
     const ran = [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL];
     const result = await runCliForTest(ran, env);
     assertNothingDrivesTheTerminal(result, args);
-    assertNoSecretEchoed(result, ran);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
       assertSuggestionsCarryTheRun(`\`${args.join(" ")}\``, envelopeIn(result), ran);

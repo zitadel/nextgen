@@ -3,7 +3,6 @@ import type { Interfaces } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import type { PackageCommand } from "@/lib/pm";
-import { isSecretValue } from "@/lib/secret-key";
 import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
@@ -617,59 +616,6 @@ const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
  */
 export function withoutCredentials(word: string): string {
   return word.replace(CREDENTIALS, "$1");
-}
-
-/** Whether a parsed JSON value holds a literal secret under a credential's key. */
-function holdsSecret(value: unknown, key = ""): boolean {
-  if (Array.isArray(value)) {
-    return value.some((item) => {
-      return holdsSecret(item, key);
-    });
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.entries(value).some(([name, nested]) => {
-      return holdsSecret(nested, name);
-    });
-  }
-
-  return isSecretValue(key, value);
-}
-
-/** `name=value` or `path:=json`, the shape of `--field` and `--set`. */
-const ASSIGNMENT = /^([^=:\s]+)(:?=)([\s\S]*)$/;
-
-/**
- * `word` as a suggestion may print it, with a placeholder where it is a literal
- * secret: the value of a flag or argument named like a credential, the value of
- * a `name=value` assignment whose name reads as one, and a JSON document with
- * a literal secret under a credential's key. A platform reference
- * (`${{ NAME }}`), an address, a number and a setting about credentials stay. A suggestion repeats what the run was
- * given, and the run's output goes to terminals and CI logs, so a typed
- * secret must never travel into it.
- *
- * @param name - The flag or argument the word was given to, as code or the command line spells it.
- * @param word - The word as it was typed.
- * @returns The word, or a placeholder for it.
- */
-export function withoutSecret(name: string, word: string): string {
-  if (isSecretValue(name, word)) {
-    return `<${spelled(name)}>`;
-  }
-  const assignment = ASSIGNMENT.exec(word);
-  if (assignment !== null && isSecretValue(assignment[1] ?? "", assignment[3])) {
-    return `${assignment[1]}${assignment[2]}<value>`;
-  }
-  if (/^\s*[[{]/.test(word)) {
-    try {
-      if (holdsSecret(JSON.parse(word))) {
-        return "<json>";
-      }
-    } catch {
-      return word;
-    }
-  }
-
-  return word;
 }
 
 /** `envFile` as `env-file`: a name as code reads it, spelled as the command line takes it. */

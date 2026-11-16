@@ -33,7 +33,6 @@ const GENERIC = [
   "lib/ui",
   "lib/terminal-text",
   "lib/runtime",
-  "lib/secret-key",
 ];
 
 /**

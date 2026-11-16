@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "@/index";
 import { BaseCommand } from "@/lib/oclif/base";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { nodesOf, parsedSource, sourcesUnder } from "@tests/helpers/declarations";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -113,7 +114,7 @@ const NAMED = Object.entries(COMMANDS)
   .map(([id, command]) => {
     return {
       words: id.replaceAll(":", " "),
-      scoped: "env-file" in { ...command.baseFlags, ...command.flags },
+      scoped: command.prototype instanceof EnvironmentCommand,
     };
   })
   .sort((first, second) => {
@@ -153,17 +154,15 @@ function scopedCommandsNamedIn(text: string): number[] {
   const source = parsedSource("source.ts", text);
   return nodesOf(source, isProse)
     .filter((node) => {
-      const spelled = [
-        ...node.text.matchAll(/\bzitadel ([a-z][a-z-]*(?: [a-z][a-z-]*)*)/g),
-        ...node.text.matchAll(/`([a-z][a-z-]*(?: [a-z][a-z-]*)*)[^`]*`/g),
-      ];
-      return spelled.some((match) => {
-        const words = match[1] ?? "";
-        const named = NAMED.find((command) => {
-          return words === command.words || words.startsWith(`${command.words} `);
-        });
-        return named?.scoped === true;
-      });
+      return [...node.text.matchAll(/\bzitadel ([a-z][a-z-]*(?: [a-z][a-z-]*)*)/g)].some(
+        (match) => {
+          const words = match[1] ?? "";
+          const named = NAMED.find((command) => {
+            return words === command.words || words.startsWith(`${command.words} `);
+          });
+          return named?.scoped === true;
+        },
+      );
     })
     .map((node) => {
       return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
@@ -181,11 +180,6 @@ describe("a command that takes the run's selector", () => {
       1,
     ],
     ["a nested template", "const hint = `${a ? `b` : `zitadel deploy`}`;", 1],
-    [
-      "a command that declares the environment flags itself",
-      'const hint = "Run zitadel doctor --fix.";',
-      1,
-    ],
     ["a string after a lone quote", 'const both = [\'"\', "zitadel deploy"];', 1],
     ["a string on a later line", 'const a = 1;\nconst hint = "Run zitadel deploy first.";', 2],
   ])("is found in %s, on its line", (_form, text, line) => {

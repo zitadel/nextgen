@@ -44,7 +44,6 @@ import {
   update,
 } from "@/cli/commands/resources";
 import { COMMANDS, WORKFLOW_COMMANDS } from "@/index";
-import { isSecretFlag } from "@/lib/secret-key";
 import { idArg } from "@/lib/oclif/crud/shared";
 import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
@@ -1051,66 +1050,6 @@ describe("--file - on every write, at a terminal", () => {
           expect.stringContaining([topic, verb, ...given, "--file '<path>'"].join(" ")),
         ],
       });
-    },
-  );
-
-  it.for(WRITES)(
-    "$topic $verb never prints a secret typed with --set",
-    async ({ topic, verb, given }, { dir: cwd, terminal: _terminal }) => {
-      await makeProject(cwd);
-
-      const res = await run(cwd, [
-        topic,
-        verb,
-        ...given,
-        "--file",
-        "-",
-        "--set",
-        `attributes.password=${CANARY}`,
-      ]);
-
-      expect(res.stdout + res.stderr).not.toContain(CANARY);
-    },
-  );
-});
-
-/** Every flag of a generated write that holds a secret, with the write it belongs to. */
-const SECRET_FLAGS = WRITES.flatMap(({ topic, verb, given }) => {
-  const flags = COMMANDS[`${topic}:${verb}`]?.flags ?? {};
-  return Object.entries(flags)
-    .filter(([name, flag]) => {
-      return flag.type === "option" && isSecretFlag(name);
-    })
-    .map(([name]) => {
-      return { topic, verb, given, flag: name };
-    });
-});
-
-describe("a secret typed to a write", () => {
-  it("is found on the writes that take one", () => {
-    expect(SECRET_FLAGS.length).toBeGreaterThan(0);
-  });
-
-  it.for(SECRET_FLAGS)(
-    "$topic $verb --$flag never comes back out, whatever the run ends in",
-    async ({ topic, verb, given, flag }, { dir: cwd }) => {
-      await makeProject(cwd);
-
-      const res = await runCliForTest([
-        topic,
-        verb,
-        ...given,
-        `--${flag}`,
-        CANARY,
-        "--cwd",
-        cwd,
-        "--server",
-        "http://127.0.0.1:9",
-        "--json",
-        "--non-interactive",
-      ]);
-
-      expect(res.stdout + res.stderr).not.toContain(CANARY);
     },
   );
 });

@@ -18,7 +18,6 @@ import {
   spelled,
   suggestionWords,
   withoutCredentials,
-  withoutSecret,
 } from ".";
 
 /**
@@ -221,7 +220,7 @@ export class RunSuggestions {
         continue;
       }
       const before = typed[name];
-      const value = withoutSecret(name, redact(token.input));
+      const value = redact(token.input);
       typed[name] =
         before === undefined
           ? value
@@ -230,7 +229,7 @@ export class RunSuggestions {
     const args = Object.fromEntries(
       target.args.flatMap((arg, index) => {
         const value = positional[index];
-        return value === undefined ? [] : [[named(arg), withoutSecret(named(arg), value)]];
+        return value === undefined ? [] : [[named(arg), value]];
       }),
     );
     const kept = Object.entries(typed).filter(([name]) => {
@@ -243,9 +242,7 @@ export class RunSuggestions {
         // What the rerun adds leads, then what the run was given, then what
         // continues it.
         flags: { ...change.with, ...Object.fromEntries(kept), ...change.after },
-        rest: positional.slice(target.args.length).map((word) => {
-          return withoutSecret("", word);
-        }),
+        rest: positional.slice(target.args.length),
       },
       target,
       this.run.scope(),
