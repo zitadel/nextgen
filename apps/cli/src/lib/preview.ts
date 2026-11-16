@@ -1,5 +1,6 @@
 import { PreviewService, type ZitadelClient } from "@/lib/backend";
-import { readingOptionally } from "@/lib/optional-read";
+import { isCancellation, toZitadelError } from "@/lib/errors";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * The hosting platforms a pull-request build announces its preview URLs
@@ -70,13 +71,15 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
 }
 
 /**
- * A read of when previews expire, which warns and answers `none` when it fails
- * instead of failing what it decorates.
+ * A read that decorates a listing with when previews expire, which warns and
+ * answers `none` when it fails instead of failing the listing.
  *
  * @remarks
  * A deployment records no expiry of its own, so a caller that shows one reads
- * it from the previews. The caller sees `none` either way, so it cannot tell a
- * failed read from an origin whose preview is gone; the warning says which.
+ * it from the previews. The expiry decorates what the caller shows, so a
+ * failed read reports no expiry rather than failing the run. The caller sees
+ * `none` either way, so it cannot tell a failed read from an origin whose
+ * preview is gone; the warning says which.
  *
  * @param read - The read that finds out, which may fail.
  * @param none - What to answer when it fails.
@@ -84,7 +87,13 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
  * @throws ZitadelError `E_CANCELLED` when the run was cancelled while reading.
  */
 export async function readingExpiries<T>(read: () => Promise<T>, none: T): Promise<T> {
-  return readingOptionally("when the previews expire", read, none);
+  return read().catch((error: unknown): T => {
+    if (isCancellation(error)) {
+      throw error;
+    }
+    reportWarning(`Could not read when the previews expire: ${toZitadelError(error).message}`);
+    return none;
+  });
 }
 
 /**

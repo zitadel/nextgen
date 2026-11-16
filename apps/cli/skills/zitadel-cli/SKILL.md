@@ -435,9 +435,8 @@ Each invocation prints one JSON object:
   unchanged and without `expires`: read a preview's expiry as JSON with
   `preview list --json`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
-  terminal it also shows the variables the deployment froze, secrets masked, or
-  warns that it could not read them and shows the record alone. Read them as
-  JSON with `variable resolve <id>`.
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve <id>`.
 - `variable resolve` reads the variables a deployment froze: the one live on the
   project (narrowed with `--origin` when several are live), or any deployment
   named by `variable resolve <deployment_id>`. A deployment id together with

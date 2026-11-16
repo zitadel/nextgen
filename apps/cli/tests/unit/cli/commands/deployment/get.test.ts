@@ -128,49 +128,15 @@ describe("deployment get", () => {
     expect(JSON.parse(res.stdout)).toMatchObject({ id: "dep_1", kind: "primary" });
   });
 
-  it("asks for no frozen set for a pipe", async () => {
+  it("asks for the frozen set only for the rendering that names it", async () => {
     const variableReads: string[] = [];
     const cwd = await aProject(variableReads);
 
-    const res = await read(cwd);
-
-    expect(res.exitCode).toBe(0);
+    await read(cwd);
     expect(variableReads).toHaveLength(0);
-  });
-
-  it("asks for the frozen set for a terminal", async () => {
-    const variableReads: string[] = [];
-    const cwd = await aProject(variableReads);
 
     await asTerminal(() => read(cwd));
-
     expect(variableReads).toHaveLength(1);
-  });
-
-  it("still shows the record when the frozen set cannot be read", async () => {
-    const cwd = await aProject();
-    server.use(
-      http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, () => {
-        return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
-      }),
-    );
-
-    const res = await asTerminal(() => read(cwd));
-
-    expect(res.stdout).toMatch(/^id {2,}dep_1$/m);
-  });
-
-  it("warns when the frozen set cannot be read", async () => {
-    const cwd = await aProject();
-    server.use(
-      http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, () => {
-        return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
-      }),
-    );
-
-    const res = await asTerminal(() => read(cwd));
-
-    expect(res.stderr).toContain("Could not read the variables the deployment froze");
   });
 });
 
