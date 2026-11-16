@@ -82,10 +82,10 @@ require("node:child_process")
  * the server and its process group are then killed.
  *
  * `onTestFinished` callbacks run in reverse order of registration, so this
- * teardown runs before the removal of any directory that was registered earlier
- * (a `scratchDir`, or the `dir` fixture, whose teardown runs after every
- * `onTestFinished` callback). Call it after the directory exists, so the record is
- * still there to be read when the server is stopped.
+ * teardown runs before the removal of a `scratchDir` made earlier. They run after
+ * the fixtures are torn down, so the directory must not come from the `dir` fixture:
+ * it would be gone before the record is read. Call it after the directory exists, so
+ * the record is still there to be read when the server is stopped.
  *
  * @param dir - The directory the test starts a server in.
  */

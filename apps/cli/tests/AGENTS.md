@@ -229,8 +229,9 @@ it stays here deliberately rather than by oversight.
   - `daemon` owns processes. `spawn(command, args, { cwd, env, ready })` starts
     one in its own process group and returns `{ pid, output(), stop() }` once
     `ready` (a pattern in its output, or a `{ port }` that accepts a
-    connection) is met; `adopt(pid)` and `adoptFile(path)` take over processes
-    the code under test started. Every group gets `SIGTERM`, then `SIGKILL`,
+    connection) is met; `adopt(pid)` takes over a process the code under test
+    started, and `pidLog()` is a path for a program to append the ids it
+    starts to. Every group gets `SIGTERM`, then `SIGKILL`,
     when the test ends. It knows nothing of Zitadel.
   - `occupiedPort(host?)` (`tests/unit/lib/local-server/occupied-port.ts`) holds
     a TCP listener on a port the OS picks and returns the port, for a test of

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { connect } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { test as base } from "./clock";
 
@@ -46,10 +48,14 @@ export interface Daemons {
   /** Takes over a process the code under test started, to be ended with the test. */
   adopt(pid: number): void;
   /**
-   * Takes over every process whose id is on a line of a file a program wrote, such as a log of the
-   * helpers it started. The file is read when the test ends; one that is not there names no one.
+   * A path, in a directory of the daemon's own, for a program to append the ids of the processes it
+   * starts to, one on each line, such as a log of the helpers it started. When the test ends every
+   * process named in it is ended. The directory outlives the test's own, so the log is still there
+   * to be read.
+   *
+   * @returns The path of a new log, which holds no one until the program writes to it.
    */
-  adoptFile(path: string): void;
+  pidLog(): string;
 }
 
 /** How long a process gets to leave after `SIGTERM`, and again after `SIGKILL`, in milliseconds. */
@@ -288,7 +294,8 @@ export const test = base.extend<{ daemon: Daemons }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   async daemon({}, use) {
     const pids = new Set<number>();
-    const files = new Set<string>();
+    const logs: string[] = [];
+    const home = await mkdtemp(join(tmpdir(), "daemon-"));
     await use({
       async spawn(command, args, options = {}) {
         return start(command, args, options, (pid) => {
@@ -298,11 +305,13 @@ export const test = base.extend<{ daemon: Daemons }>({
       adopt(pid) {
         pids.add(pid);
       },
-      adoptFile(path) {
-        files.add(path);
+      pidLog() {
+        const path = join(home, `pids-${String(logs.length)}.log`);
+        logs.push(path);
+        return path;
       },
     });
-    for (const path of files) {
+    for (const path of logs) {
       for (const pid of await pidsIn(path)) {
         pids.add(pid);
       }
@@ -312,5 +321,6 @@ export const test = base.extend<{ daemon: Daemons }>({
         return end(pid);
       }),
     );
+    await rm(home, { recursive: true, force: true });
   },
 });

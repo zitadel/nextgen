@@ -87,6 +87,9 @@ const BUSINESS_SCHEMA = {
 };
 
 afterEach(() => {
+  // The config puts globals back only after the file's own hooks, and `localStorage.clear()` below
+  // needs the real storage back first.
+  vi.unstubAllGlobals();
   localStorage.clear();
 });
 

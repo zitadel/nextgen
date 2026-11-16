@@ -1129,8 +1129,7 @@ async function fakeDocker(
   const binDir = join(parent, "fake-docker");
   await mkdir(binDir, { recursive: true });
   const logPath = join(binDir, "docker.log");
-  const healthPidLog = join(binDir, "docker-health-pids.log");
-  daemon.adoptFile(healthPidLog);
+  const healthPidLog = daemon.pidLog();
   const dockerPath = join(binDir, "docker");
   await writeFile(
     dockerPath,
@@ -1283,8 +1282,7 @@ async function fakeExitingServerWithForeignHealth(
 ): Promise<{ binPath: string }> {
   const binDir = join(parent, "fake-server-exit");
   await mkdir(binDir, { recursive: true });
-  const healthPidLog = join(binDir, "foreign-health-pids.log");
-  daemon.adoptFile(healthPidLog);
+  const healthPidLog = daemon.pidLog();
   const binPath = join(binDir, "zitadel-server");
   await writeFile(
     binPath,

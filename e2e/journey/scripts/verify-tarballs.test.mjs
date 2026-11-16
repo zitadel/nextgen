@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { vi } from "vitest";
+
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { test } from "./fixtures.mjs";
@@ -13,6 +15,9 @@ import { packageName } from "./lib.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const script = join(here, "verify-tarballs.mjs");
+
+// The tarball sets are built inside the first test that asks for them, which takes several seconds.
+vi.setConfig({ testTimeout: 30_000 });
 
 // The script resolves required package names from the repo manifests, so the
 // fixture tarballs must carry the real names. Fabricate one minimal valid

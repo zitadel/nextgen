@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 
 import { describe, expect } from "vitest";
 
@@ -156,18 +156,16 @@ describe("daemon", () => {
       expect(runs(left.adopted ?? 0)).toBe(false);
     });
 
-    it("is given a file that names a process", async ({ daemon, dir }) => {
+    it("is given a log that names a process", async ({ daemon }) => {
       const child = spawn(process.execPath, ["-e", STAY], { detached: true, stdio: "ignore" });
       child.unref();
       left.listed = child.pid ?? 0;
-      const log = join(dir, "pids.log");
-      await writeFile(log, `${String(left.listed)}\n`);
-      daemon.adoptFile(log);
+      await writeFile(daemon.pidLog(), `${String(left.listed)}\n`);
 
       expect(runs(left.listed)).toBe(true);
     });
 
-    it("has ended the process the file named", () => {
+    it("has ended the process the log named", () => {
       expect(runs(left.listed ?? 0)).toBe(false);
     });
   });
