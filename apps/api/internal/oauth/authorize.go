@@ -32,8 +32,10 @@ const (
 	// noScope stands in for a missing scope. No client allows it, so the
 	// library drops it.
 	noScope = "urn:zitadel:no-scope"
-	// maxStateBytes bounds the state every request stores. No spec sets a
-	// limit; this one is chosen, and raising it later breaks no client.
+	// maxStateBytes bounds the state every request stores, since any caller
+	// can start a request. No spec sets a limit. This one leaves room for
+	// clients that encrypt their sign-in's properties into state, and raising
+	// it later breaks no client.
 	maxStateBytes = 2048
 	// temporarilyUnavailable tells the client it may retry (RFC 6749
 	// §4.1.2.1). The library has no constructor for it.
