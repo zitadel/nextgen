@@ -159,6 +159,69 @@ describe("Deployment.expiryAmong", () => {
   });
 });
 
+describe("DeploymentService.servingLivePreviews", () => {
+  const FIRST = "https://pr-7.preview.acme.com";
+  const SECOND = "https://pr-8.preview.acme.com";
+
+  it("narrows a live preview deployment to the origins the live view still serves", async () => {
+    const page = [
+      Deployment.of(record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" })),
+    ];
+    const deploymentService = serviceListing([
+      record("dep_2", [{ origin: SECOND }], { kind: "preview" }),
+      record("dep_1", [{ origin: FIRST }], { kind: "preview" }),
+    ]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect(serving.get("dep_1")?.origins).toEqual([FIRST]);
+  });
+
+  it("leaves out a deployment the live view no longer lists", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = serviceListing([]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual([]);
+  });
+
+  it("answers only the page's live preview deployments", async () => {
+    const page = [
+      Deployment.of(primary("dep_3")),
+      Deployment.of(record("dep_2", [{ origin: SECOND }], { kind: "preview", status: "inactive" })),
+      Deployment.of(preview("dep_1", FIRST)),
+    ];
+    const deploymentService = serviceListing([
+      primary("dep_3"),
+      record("dep_2", [{ origin: SECOND }], { kind: "preview", status: "inactive" }),
+      preview("dep_1", FIRST),
+    ]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual(["dep_1"]);
+  });
+
+  it("reads nothing for a page with no live preview deployment", async () => {
+    const page = [Deployment.of(primary("dep_1"))];
+    const deploymentService = new DeploymentService(fakeClient({}), "proj_1");
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual([]);
+  });
+
+  it("reads nothing when the page is the live view", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = new DeploymentService(fakeClient({}), "proj_1");
+
+    const serving = await deploymentService.servingLivePreviews(page, true);
+
+    expect(serving.get("dep_1")?.origins).toEqual([FIRST]);
+  });
+});
+
 describe("Deployment.reason", () => {
   it("answers the reason the API recorded", () => {
     expect(Deployment.of(record("dep_1", [], { reason: "rollback" })).reason).toBe("rollback");

@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { DeploymentService } from "@/lib/backend";
+import { type Deployment, DeploymentService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -51,9 +51,10 @@ const COLUMNS = [
  * walk it a page at a time.
  *
  * `kind` says whether a deployment served primary origins or previews.
- * `expires` is the live expiry of the preview a live preview deployment made,
- * the earliest when it made several, and empty for any other deployment. It is
- * also empty, with a warning, when the previews cannot be read.
+ * `expires` is the live expiry of the preview a live preview deployment made
+ * on the origins it still serves, the earliest when it serves several, and
+ * empty for any other deployment. It is also empty, with a warning, when the
+ * previews cannot be read.
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
@@ -103,12 +104,16 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       },
     );
 
-    const livePreviewOrigins = this.isJson
-      ? []
-      : listed.items.flatMap((deployment) => {
-          return deployment.servesLivePreview ? deployment.origins : [];
-        });
-    const expiries = await liveExpiries(client, projectId, livePreviewOrigins);
+    const serving = this.isJson
+      ? new Map<string, Deployment>()
+      : await deploymentService.servingLivePreviews(listed.items, flags.live === true);
+    const expiries = await liveExpiries(
+      client,
+      projectId,
+      [...serving.values()].flatMap((deployment) => {
+        return deployment.origins;
+      }),
+    );
 
     const items = listed.items;
     const rows = items.map((deployment) => {
@@ -119,7 +124,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         origins: deployment.origins.join(", "),
         deployed_at: deployment.deployed_at,
         kind: deployment.kind,
-        expires: deployment.expiryAmong(expiries),
+        expires: serving.get(deployment.id)?.expiryAmong(expiries) ?? "",
       };
     });
     const columns = COLUMNS;

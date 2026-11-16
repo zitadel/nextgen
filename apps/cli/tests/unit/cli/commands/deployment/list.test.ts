@@ -90,8 +90,13 @@ describe("deployment list", () => {
     const TIME = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
     /** What `--plain` prints for a preview deployment, its expiry cell left to the test. */
-    const previewRow = (id: string, releaseId: string, expires: string | RegExp) => {
-      return [id, releaseId, "deploy", PREVIEW_URL, TIME, "preview", expires];
+    const previewRow = (
+      id: string,
+      releaseId: string,
+      expires: string | RegExp,
+      origins = PREVIEW_URL,
+    ) => {
+      return [id, releaseId, "deploy", origins, TIME, "preview", expires];
     };
 
     /** A preview deployment, live unless a later one replaced it. */
@@ -139,11 +144,32 @@ describe("deployment list", () => {
       );
     };
 
-    /** Makes the mock list `deployments` in place of the project's own. */
-    const listingInstead = (deployments: readonly Answer<ListDeployments200DeploymentsItem>[]) => {
+    /** Makes the mock list `deployments` as the history, and `served` as the live view. */
+    const listingInstead = (
+      deployments: readonly Answer<ListDeployments200DeploymentsItem>[],
+      served = deployments,
+    ) => {
       server.use(
-        http.get(`${SERVER}/api/v1/deployments`, () => {
-          return HttpResponse.json({ deployments, next_page_token: null });
+        http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
+          const live = new URL(request.url).searchParams.get("live") === "true";
+          return HttpResponse.json({
+            deployments: live ? served : deployments,
+            next_page_token: null,
+          });
+        }),
+      );
+    };
+
+    /** Makes the mock list a live preview for each origin, expiring as given. */
+    const previewsExpiring = (expiries: Readonly<Record<string, string>>) => {
+      server.use(
+        http.get(`${SERVER}/api/v1/projects/:projectId/previews`, () => {
+          return HttpResponse.json({
+            previews: Object.entries(expiries).map(([origin, expiresAt]) => {
+              return { origin, expires_at: expiresAt, created_at: "2026-01-01T00:00:00Z" };
+            }),
+            next_page_token: null,
+          });
         }),
       );
     };
@@ -182,6 +208,33 @@ describe("deployment list", () => {
       const result = await plain(cwd);
 
       expect(result).toPrintPlainRow(...previewRow("dep_1", "rel_1", ""));
+    });
+
+    it("prints a partly replaced deployment the expiry of the origin it still serves", async () => {
+      const kept = "https://x-acme.vercel.app";
+      const lost = "https://y-acme.vercel.app";
+      const { cwd } = await aLivePreview();
+      listingInstead(
+        [
+          aDeployment({ id: "dep_2", kind: "preview", targets: [{ origin: lost }] }),
+          aDeployment({
+            id: "dep_1",
+            kind: "preview",
+            targets: [{ origin: kept }, { origin: lost }],
+          }),
+        ],
+        [
+          aDeployment({ id: "dep_2", kind: "preview", targets: [{ origin: lost }] }),
+          aDeployment({ id: "dep_1", kind: "preview", targets: [{ origin: kept }] }),
+        ],
+      );
+      previewsExpiring({ [kept]: "2026-02-08T00:00:00Z", [lost]: "2026-02-01T01:00:00Z" });
+
+      const result = await plain(cwd);
+
+      expect(result).toPrintPlainRow(
+        ...previewRow("dep_1", "rel_1", "2026-02-08T00:00:00Z", `${kept}, ${lost}`),
+      );
     });
 
     it.each([

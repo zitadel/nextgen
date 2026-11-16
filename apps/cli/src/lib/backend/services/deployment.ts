@@ -201,10 +201,9 @@ export class Deployment {
    * replaced is not what its URL serves now, so it has no expiry of its own.
    *
    * @remarks
-   * The API does not say which of its origins a deployment still serves, only
-   * whether it serves any. A deployment that kept one origin and lost another
-   * to a later deployment can therefore show the later deployment's expiry,
-   * when that is the earlier one.
+   * It reads the deployment's own origins, so ask it of the deployment as the
+   * live view lists it ({@link DeploymentService.servingLivePreviews}), whose
+   * origins are only those it still serves.
    *
    * @param expiries - Each live preview's expiry, by origin.
    * @returns The earliest expiry among the origins that still have a live
@@ -310,6 +309,51 @@ export class DeploymentService extends ApiService {
       }),
       next: collected.next,
     };
+  }
+
+  /**
+   * The live preview deployments on a page, each narrowed to the origins it
+   * still serves.
+   *
+   * @remarks
+   * The history names every origin a deployment was made live on, and the live
+   * view only those it still serves. A deployment a later one replaced on some
+   * of its origins is therefore asked of the live view, so what is said of it
+   * covers only what it serves.
+   *
+   * @param deployments - A page of deployments.
+   * @param isLiveView - Whether the page is itself the live view, whose targets
+   *   are already the ones served, so nothing more is read.
+   * @returns The page's live preview deployments as the live view lists them,
+   *   by id. One the live view no longer lists is absent. Nothing is read when
+   *   the page has none.
+   */
+  async servingLivePreviews(
+    deployments: readonly Deployment[],
+    isLiveView: boolean,
+  ): Promise<ReadonlyMap<string, Deployment>> {
+    const wanted = new Set(
+      deployments
+        .filter((deployment) => {
+          return deployment.servesLivePreview;
+        })
+        .map((deployment) => {
+          return deployment.id;
+        }),
+    );
+    if (wanted.size === 0) {
+      return new Map();
+    }
+    const view = isLiveView ? deployments : await this.list({ live: true });
+    return new Map(
+      view
+        .filter((deployment) => {
+          return wanted.has(deployment.id);
+        })
+        .map((deployment) => {
+          return [deployment.id, deployment] as const;
+        }),
+    );
   }
 
   /**
