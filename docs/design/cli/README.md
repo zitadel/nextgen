@@ -47,12 +47,12 @@ A resource command performs a direct operation on a resource:
 zitadel <resource> <verb> [id] [flags]
 ```
 
-Resource names are plural:
+Resource names are singular; the plural runs the same command and is never shown ([glossary §11](../glossary.md#11-cli-grammar)):
 
 ```bash
-zitadel users create
-zitadel teams list
-zitadel projects get <id>
+zitadel user create
+zitadel team list
+zitadel project get <id>
 ```
 
 Resource commands use a consistent set of CRUD verbs where their meaning matches:
@@ -68,7 +68,7 @@ delete
 Meaningful IAM lifecycle actions can use explicit verbs when they communicate something different from standard CRUD:
 
 ```bash
-zitadel sessions revoke <id>
+zitadel session revoke <id>
 zitadel sso connections activate <id>
 ```
 
@@ -119,52 +119,61 @@ Usage
 Run a command below. Use `zitadel <command> --help` to see its options.
 
 Getting started
-  setup             Create a Zitadel project and scaffold local auth
-  start             Start a local Zitadel server
-  status            Summarize the local Zitadel server and project state
-  claim             Claim this project to make it permanent
+  setup            Create a Zitadel project and scaffold local auth
+  claim            Claim this project to make it permanent
+  doctor           Verify local runtime and project state
+  skills           Give coding agents the Zitadel skills
+  tests            Add end-to-end tests of the sign-in
 
-Local development
-  console           Open the local console, signed in as the local admin
-  logs              Show local Zitadel server logs
-  stop              Stop the local Zitadel server
-  reset             Delete the local Zitadel server runtime and data
-  eject             Remove managed files and local Zitadel state
+Local server
+  start            Start a local Zitadel server
+  stop             Stop the local Zitadel server
+  status           Summarize the local Zitadel server and project state
+  logs             Show local Zitadel server logs
+  console          Open the console of the server the project uses
+  reset            Delete the local Zitadel server runtime and data
+  eject            Remove managed files and local Zitadel state
 
-Users and teams
-  users             Create and manage users
-  teams             Create and manage teams
-  grants            Manage access grants
+Users and access
+  user             Create and manage users
+  team             Create and manage teams
+  grant            Manage access grants
+  session          View and revoke sessions
+  invitation       Invite people into the project with a link
 
-Authentication
-  auth-method       Configure how users sign in
-  idps              Manage identity provider connections
-  sessions          View and revoke sessions
+Sign-in
+  auth-method      Configure how users sign in
+  idp              Manage identity provider connections
+  schema           View user schemas
+  branding         Manage the login branding
+  flow-definition  View login flows
+  policy           View and test policies
 
-Configuration and releases
-  deploy            Apply your local configuration to Zitadel
-  pull              Rebuild your .zitadel/ files from a release
-  branding          Manage the login branding
-  deployment        Deploy releases and roll them back
-  env               Show and bind environments
-  flow-definitions  View login flows
-  origin            Manage the project's allowed origins
-  policies          View policies
-  projects          View and update projects
-  release           Build and manage releases
-  schemas           View user schemas
-  variable          Manage project variables
+Project settings
+  project          View and update projects
+  env              Show and bind environments
+  origin           Manage the project's allowed origins
+  variable         Manage project variables
+  upgrade          Upgrade this project to the latest Zitadel release
 
-Diagnostics and utilities
-  doctor            Verify local runtime and project state
-  api               Call any operation of the Zitadel API
-  autocomplete      Display autocomplete installation instructions
-  commands          List all zitadel commands
-  events            View events
-  resources         List the resources this CLI manages
-  search            Search for a command
-  version           Show the CLI version
-  which             Show which plugin a command is in
+Releases
+  deploy           Apply your local configuration to Zitadel
+  preview          Deploy and manage pull-request preview URLs
+  pull             Rebuild your .zitadel/ files from a release
+  release          Build and manage releases
+  deployment       Deploy releases and roll them back
+
+API and events
+  event            View events
+  api              Call any operation of the Zitadel API
+  resources        List the resources this CLI manages
+
+CLI
+  commands         List all zitadel commands
+  search           Search for a command
+  autocomplete     Display autocomplete installation instructions
+  version          Show the CLI version
+  which            Show which plugin a command is in
 
 Flags
   --help      Show help for command
@@ -176,14 +185,14 @@ Examples
   $ zitadel doctor
 ```
 
-A family of commands is one row, so the screen stays short as commands are added; its own help (`zitadel users --help`) lists the operations. `zitadel commands` remains the flat list of every command.
+A family of commands is one row, so the screen stays short as commands are added; its own help (`zitadel user --help`) lists the operations. `zitadel commands` remains the flat list of every command.
 
 Each level provides help for the commands available beneath it:
 
 ```bash
 zitadel --help
-zitadel schemas --help
-zitadel schemas list --help
+zitadel schema --help
+zitadel schema list --help
 ```
 
 ## Interaction model
@@ -216,7 +225,7 @@ Examples include:
 ```text
 deploy
 promote
-rollback
+deployment rollback
 reset
 eject
 <resource> delete
@@ -272,6 +281,6 @@ Guidance is shown only when it helps the user complete or recover from the curre
 - [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) — capability dicts + Liquid templates + `text_key` localization
 - [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
 - [User Schema Integration](../flowengine/user-schema.md)
-- [Resource Commands](resource-commands.md) — the imperative `users` / `teams` / `sessions` / `events` / `grants` / `projects` surface and its conventions
+- [Resource Commands](resource-commands.md) — the imperative `user` / `team` / `session` / `event` / `grant` / `project` surface and its conventions
 - [CLI source](../../../apps/cli)
 - [CLI agent guidance](../../../apps/cli/skills/zitadel-cli/SKILL.md)

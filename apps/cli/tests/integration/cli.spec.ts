@@ -11,7 +11,7 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 
@@ -39,12 +39,12 @@ async function typescriptFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-/** Every command id the source suggests through `publicCliCommand` or copy. */
+/** Every command id the source suggests through `Spelling#command` or copy. */
 async function suggestedCommandIds(): Promise<Set<string>> {
   const commands = new Set<string>();
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
-    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+    for (const match of source.matchAll(/Spelling\.at\([^)]*\)\.command\(\s*(["`])([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
@@ -423,16 +423,16 @@ describe("the cli", () => {
     describe("for a command that does not exist", () => {
       describe("--json", () => {
         it("prints one error envelope naming the command and the topic's help", async () => {
-          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
           expect(parseJson(result.stdout)).toEqual({
             status: "error",
             cli_version: cliVersion.version,
-            command: "teams:delete",
+            command: "team:delete",
             source: "",
             code: "E_VALIDATION",
-            message: "teams delete is not a zitadel command",
-            next_commands: [expectedPublicCliCommand("teams --help")],
+            message: "team delete is not a zitadel command",
+            next_commands: [expectedPublicCliCommand("team --help")],
           });
         });
 
@@ -490,6 +490,22 @@ describe("the cli", () => {
             "DEPLOY",
             "DEPLOY is not a zitadel command",
             ["deploy --help"],
+            127,
+          ],
+          [
+            "the plural of a noun alone",
+            ["policies"],
+            "policies",
+            "policies is not a zitadel command",
+            ["policy --help"],
+            127,
+          ],
+          [
+            "a word after a plural that is no command of its noun",
+            ["policies", "lst"],
+            "policy:lst",
+            "policy lst is not a zitadel command",
+            ["policy list --help", "policy --help"],
             127,
           ],
           [
@@ -697,7 +713,7 @@ describe("the cli", () => {
         });
 
         it("writes nothing to stderr", async () => {
-          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
+          const result = await runCliForTest(["team", "delete", "x", "--json"]);
 
           expect(result.stderr).toBe("");
         });
@@ -705,21 +721,21 @@ describe("the cli", () => {
 
       describe("piped", () => {
         it("prints the error on stderr", async () => {
-          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
           expect(result.stderr).toBe(
             [
-              "Error: teams delete is not a zitadel command (E_VALIDATION)",
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
-              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              `  $ ${expectedPublicCliCommand("team --help")}`,
               "",
             ].join("\n"),
           );
         });
 
         it("prints nothing on stdout", async () => {
-          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
+          const result = await offTerminal(() => runCliForTest(["team", "delete", "x"]));
 
           expect(result.stdout).toBe("");
         });
@@ -728,15 +744,15 @@ describe("the cli", () => {
       describe("rendered for a terminal", () => {
         it("prints the error and offers no prompt to run another command", async () => {
           const result = await asTerminal(() =>
-            runCliForTest(["teams", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
+            runCliForTest(["team", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
           );
 
           expect(result.stderr).toBe(
             [
-              "Error: teams delete is not a zitadel command (E_VALIDATION)",
+              "Error: team delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
-              `  $ ${expectedPublicCliCommand("teams --help")}`,
+              `  $ ${expectedPublicCliCommand("team --help")}`,
               "",
             ].join("\n"),
           );

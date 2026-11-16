@@ -126,7 +126,7 @@ the target catalog for the planned paths in
 
 | Permission | Endpoints / intended operations | Notes |
 |---|---|---|
-| `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
+| `branding.read` | `GET /branding`, `GET /branding/{branding_id}` | Read/list immutable branding revisions. |
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
 | `policy.read` | `GET /policies/revisions/{revision_id}` | Read operation policy revisions. |
 | `policy.write` | `POST /policies` | Publish a new immutable policy revision. |
@@ -251,9 +251,9 @@ grant them via `team.write`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `application.read` | `GET /applications/{id}`; `POST /applications/query` (#2789), `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
+| `application.read` | `GET /applications/{application_id}`; `POST /applications/query` (#2789), `GET /applications/{application_id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
 | `application.write` | `POST /applications` | Create + revise: the `slug` in the submitted document decides whether it creates a registered application or appends a revision to an existing one in the project. A new client's secret is returned once. |
-| `application.delete` | `DELETE /applications/{id}` | **Not yet exposed** — target shape. |
+| `application.delete` | `DELETE /applications/{application_id}` | **Not yet exposed** — target shape. |
 
 ### Identity providers
 
@@ -261,9 +261,9 @@ grant them via `team.write`.
 
 | Permission | Endpoints | Notes                                                                                                                                                         |
 |---|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `idp.read` | `POST /idps/query`, `GET /idps/{id}`, `GET /idps/{id}/revisions`, `GET /idps/revisions/{revision_id}` | Get + list; list is project-scoped. Config files reference a connection by `slug`; the query resolves one with `equals` on `slug`, as teams resolve a name. Revision reads carry the same scope as the get. |
+| `idp.read` | `POST /idps/query`, `GET /idps/{idp_id}`, `GET /idps/{idp_id}/revisions`, `GET /idps/revisions/{revision_id}` | Get + list; list is project-scoped. Config files reference a connection by `slug`; the query resolves one with `equals` on `slug`, as teams resolve a name. Revision reads carry the same scope as the get. |
 | `idp.write` | `POST /idps` | Create + revise: the `slug` in the submitted document decides whether it creates a connection or appends a revision to an existing connection in the project. |
-| `idp.delete` | `DELETE /idps/{id}` | **Not yet exposed** — target shape.                                                                                                                           |
+| `idp.delete` | `DELETE /idps/{idp_id}` | **Not yet exposed** — target shape.                                                                                                                           |
 
 ### App groups
 
@@ -287,9 +287,9 @@ assignment). This is the `/grants` management resource — **not** OAuth
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `grant.create` | `POST /grants` | Bind a principal to an application, role, or permission at a scope. |
-| `grant.read` | `GET /grants/{id}` | |
-| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an application grant). |
-| `grant.delete` | `DELETE /grants/{id}` | Revoke access. |
+| `grant.read` | `GET /grants/{grant_id}` | |
+| `grant.write` | `PATCH /grants/{grant_id}` | Update an existing binding (e.g. role change on an application grant). |
+| `grant.delete` | `DELETE /grants/{grant_id}` | Revoke access. |
 
 ### Schemas (user schemas)
 
@@ -299,14 +299,14 @@ User profile / directory schema definitions. URL stays `/schemas`; permission
 prefix is `schema.*` for now. Rename to `user_schema.*` is optional if another
 schema type appears — same compound-type rule as `team_membership`. Endpoints
 are in [`resource-map.md`](resource-map.md#user-schemas); create, list, and get
-exist today (`schema.write` covers create) — `PATCH`/`DELETE /schemas/{id}` are
+exist today (`schema.write` covers create) — `PATCH`/`DELETE /schemas/{schema_id}` are
 not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `schema.read` | `GET /schemas`, `GET /schemas/{id}` | Get + list; list is project-scoped. |
-| `schema.write` | `POST /schemas`, `PATCH /schemas/{id}` | Create + manage. `POST /schemas` exists (OpenAPI `schema.write`); `PATCH` **not yet exposed**. |
-| `schema.delete` | `DELETE /schemas/{id}` | **Not yet exposed** — target shape. |
+| `schema.read` | `GET /schemas`, `GET /schemas/{schema_id}` | Get + list; list is project-scoped. |
+| `schema.write` | `POST /schemas`, `PATCH /schemas/{schema_id}` | Create + manage. `POST /schemas` exists (OpenAPI `schema.write`); `PATCH` **not yet exposed**. |
+| `schema.delete` | `DELETE /schemas/{schema_id}` | **Not yet exposed** — target shape. |
 
 ### Flow definitions
 
@@ -314,9 +314,9 @@ not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `flow_definition.read` | `GET /flow_definitions`, `GET /flow_definitions/{id}` | Get + list. Validate / simulate read-only probes are **planned**, not yet exposed. |
+| `flow_definition.read` | `GET /flow_definitions`, `GET /flow_definitions/{flow_definition_id}` | Get + list. Validate / simulate read-only probes are **planned**, not yet exposed. |
 | `flow_definition.write` | `POST /flow_definitions` | Publishes a new revision. A revision's status is fixed at creation, so there are no lifecycle verbs. |
-| `flow_definition.delete` | — | `DELETE /flow_definitions/{id}` was removed in [#530](https://github.com/zitadel/nextgen/issues/530); the scope stays until retirement is decided ([#536](https://github.com/zitadel/nextgen/issues/536)). |
+| `flow_definition.delete` | — | `DELETE /flow_definitions/{flow_definition_id}` was removed in [#530](https://github.com/zitadel/nextgen/issues/530); the scope stays until retirement is decided ([#536](https://github.com/zitadel/nextgen/issues/536)). |
 
 ### Sessions
 
@@ -357,7 +357,7 @@ not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `events.read` | `GET /events/{id}`, `GET /events` | All audit categories (`request`, `auth`, `session`, `admin`, `entity`, `signal`). Filter with `category` / `event_type`. |
+| `events.read` | `GET /events/{event_id}`, `GET /events` | All audit categories (`request`, `auth`, `session`, `admin`, `entity`, `signal`). Filter with `category` / `event_type`. |
 
 ### Imports
 

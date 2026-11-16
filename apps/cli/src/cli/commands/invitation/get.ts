@@ -1,7 +1,8 @@
 import { Args } from "@oclif/core";
 
 import { InvitationService, invitationRole } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { json } from "@/lib/oclif/rendering";
@@ -32,8 +33,8 @@ const INVITATION_ID: Refused<string> = {
  */
 export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Read one invitation by id.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 3;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 7;
   static override examples = ["<%= config.bin %> invitation get inv_01JCQK5R7T9V1X3Z5B7D9F1H3J"];
   static override args = {
     invitation_id: Args.custom<string>({ parse: taken(INVITATION_ID) })({
@@ -76,8 +77,8 @@ export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
             "status",
             "created_at",
             "expires_at",
-            "accepted_by",
-            "accepted_at",
+            "responded_by",
+            "responded_at",
           ],
           {
             id: invitation.id,
@@ -86,8 +87,8 @@ export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
             status: invitation.status,
             created_at: invitation.created_at,
             expires_at: invitation.expires_at,
-            accepted_by: invitation.accepted_by ?? "",
-            accepted_at: invitation.accepted_at ?? "",
+            responded_by: invitation.responded_by ?? "",
+            responded_at: invitation.responded_at ?? "",
           },
         ).split("\n"),
       },

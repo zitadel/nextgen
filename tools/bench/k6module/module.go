@@ -130,7 +130,7 @@ func (m *ModuleInstance) Submetrics() []string {
 	return harness.Submetrics()
 }
 
-// Login runs the whole login journey — POST /flow, submit identifier, submit
+// Login runs the whole login journey — POST /flows, submit identifier, submit
 // password — and returns the handoff token. One JavaScript call, three
 // requests, each tagged with its own operation id.
 func (m *ModuleInstance) Login() (harness.LoginResult, error) {

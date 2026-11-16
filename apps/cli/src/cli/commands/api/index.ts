@@ -1,13 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  buildRequest,
-  type PathValues,
-  pathValuesOf,
-  readInput,
-  withPathValues,
-} from "@/lib/api-request";
+import { ApiCall, type PathValues } from "@/lib/api";
 import {
   type ApiRequest,
   type ApiResponse,
@@ -19,11 +13,11 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/log";
-import { DEFAULT_SERVER } from "@/lib/server";
+import { log } from "@/lib/ui";
+import { Server } from "@/lib/server";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
-  CommandGroups,
   CREDENTIALS,
   EnvironmentCommand,
   type JsonEnvelope,
@@ -35,7 +29,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -152,7 +146,7 @@ export function pathValuesFromWords(
   named: boolean,
   projectId: string | undefined,
 ): PathValues {
-  return pathValuesOf(target, argv.slice(named ? 1 : 0), projectId);
+  return ApiCall.to(target).pathValues(argv.slice(named ? 1 : 0), projectId);
 }
 
 /**
@@ -168,10 +162,9 @@ export async function requestOf(
   }>,
   projectId: string | undefined,
 ): Promise<ApiRequest> {
-  return buildRequest({
-    target,
+  return ApiCall.to(target).request({
     fields: flags.field ?? [],
-    input: await readInput(flags.input),
+    input: await ApiCall.readInput(flags.input),
     projectId,
   });
 }
@@ -228,11 +221,12 @@ function quote(value: string): string {
 export default class Api extends Destructive(EnvironmentCommand) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
-    "<%= config.bin %> api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
+    "<%= config.bin %> api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
     "<%= config.bin %> api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json",
     "<%= config.bin %> api listEvents -F category=auth --paginate --json",
     "<%= config.bin %> api createTeam -F name=Support --dry-run",
@@ -338,7 +332,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
       ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
     ].join(" ");
     refuseUnforced(built, this.meta, question);
-    const request = withPathValues(
+    const request = ApiCall.to(target).fill(
       built,
       await this.pathValues(
         target,
@@ -477,14 +471,14 @@ export default class Api extends Destructive(EnvironmentCommand) {
     }
     const { values } = this.environment;
     const named = values.ZITADEL_URL?.value;
-    const server = named ?? DEFAULT_SERVER;
+    const server = named ?? Server.DEFAULT;
     const projectId = named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value;
     this.ui.ranAgainst(projectId, server);
     return {
       server,
       projectId,
       client: createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: server,
         token: undefined,
         signal: this.signal,

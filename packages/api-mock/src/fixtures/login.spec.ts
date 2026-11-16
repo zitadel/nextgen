@@ -6,7 +6,7 @@
  * fixture that drifts from the OpenAPI spec (e.g. a missing required `kind`)
  * stays invisible at render time. The wire shape is also never validated by
  * the standalone `spec-conformance.spec.ts` server test, which exercises the
- * flow-*definition* endpoints, not the runtime `POST /flow` responses.
+ * flow-*definition* endpoints, not the runtime `POST /flows` responses.
  *
  * This test closes that gap: every step builder is parsed against the
  * orval-generated `GetFlowStepResponse` zod (the runtime flow envelope — wire

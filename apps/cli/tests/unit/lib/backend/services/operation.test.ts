@@ -1,9 +1,9 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
-import { buildRequest, pathValuesOf, schemaOf, withPathValues } from "@/lib/api-request";
+import { ApiCall } from "@/lib/api";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
 import { toZitadelError } from "@/lib/errors";
 import { forcedConsent } from "@tests/helpers/consent";
@@ -40,13 +40,13 @@ const sendAll = async (
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
   const target = Operation.named(ref);
-  return withPathValues(
-    buildRequest({
-      target,
+  const call = ApiCall.to(target);
+  return call.fill(
+    call.request({
       fields,
       projectId: "proj_1",
     }),
-    pathValuesOf(target, positionals, "proj_1").values,
+    call.pathValues(positionals, "proj_1").values,
   );
 };
 
@@ -107,7 +107,13 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal, await forcedConsent()),
+      send(
+        SERVER,
+        "s",
+        requestFor("deactivateTeam", [], ["team_1"]),
+        signal,
+        await forcedConsent(),
+      ),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
@@ -116,8 +122,8 @@ describe("OperationService.call", () => {
 
   it("refuses a destructive operation without consent", async () => {
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal),
-    ).rejects.toThrow("deleteTeam is destructive: reach it through allowDestructive");
+      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
+    ).rejects.toThrow("deactivateTeam is destructive: reach it through allowDestructive");
   });
 
   it("sends nothing for a destructive operation without consent", async ({ server }) => {
@@ -129,7 +135,7 @@ describe("OperationService.call", () => {
       }),
     );
 
-    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal).catch(
+    await send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal).catch(
       () => undefined,
     );
 
@@ -144,7 +150,7 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"]), signal),
+      send(SERVER, "s", requestFor("setVariables", ["FOO:=null", "project_id=proj_1"]), signal),
     ).resolves.toMatchObject({ status: 200 });
   });
 
@@ -382,7 +388,7 @@ describe("Operation.all, over the whole table", () => {
   // it cannot find would leave every field of that operation untyped.
   it("finds the generated body schema of every operation that takes a body", () => {
     const missing = OPERATIONS.filter(
-      (operation) => operation.body !== null && schemaOf(operation, "Body") === undefined,
+      (operation) => operation.body !== null && ApiCall.schemaOf(operation, "Body") === undefined,
     ).map((operation) => operation.id);
 
     expect(missing).toEqual([]);
@@ -392,7 +398,7 @@ describe("Operation.all, over the whole table", () => {
     const missing = OPERATIONS.filter(
       (operation) =>
         operation.parameters.some((parameter) => parameter.in === "query") &&
-        schemaOf(operation, "QueryParams") === undefined,
+        ApiCall.schemaOf(operation, "QueryParams") === undefined,
     ).map((operation) => operation.id);
 
     expect(missing).toEqual([]);
@@ -402,8 +408,9 @@ describe("Operation.all, over the whole table", () => {
   // body otherwise, which only works while no name is both.
   it("has no query parameter named like a top-level field of the same operation's body", () => {
     const clashes = OPERATIONS.flatMap((operation) => {
-      const shape = (schemaOf(operation, "Body") as { shape?: Record<string, unknown> } | undefined)
-        ?.shape;
+      const shape = (
+        ApiCall.schemaOf(operation, "Body") as { shape?: Record<string, unknown> } | undefined
+      )?.shape;
       return operation.parameters
         .filter(
           (parameter) => parameter.in === "query" && shape && Object.hasOwn(shape, parameter.name),
@@ -417,7 +424,7 @@ describe("Operation.all, over the whole table", () => {
 
 describe("Operation.named", () => {
   it("finds an operation by its id, in any case", () => {
-    expect(Operation.named("getuserbyid").operation.id).toBe("GetUserByID");
+    expect(Operation.named("getuser").operation.id).toBe("getUser");
   });
 
   it("suggests the operation a typo meant", () => {
@@ -461,11 +468,11 @@ describe("Operation.named", () => {
   });
 
   it("takes GET among a path's methods without -X", () => {
-    expect(Operation.named("/users/user_1").operation.id).toBe("GetUserByID");
+    expect(Operation.named("/users/user_1").operation.id).toBe("getUser");
   });
 
   it("takes the method -X names", () => {
-    expect(Operation.named("/users/user_1", "DELETE").operation.id).toBe("DeleteUserByID");
+    expect(Operation.named("/users/user_1", "DELETE").operation.id).toBe("deleteUser");
   });
 
   it("asks for -X where a path has several methods and no GET", () => {
@@ -505,7 +512,7 @@ describe("Operation.uncallable", () => {
 
 describe("Operation.pathParameters", () => {
   it("lists the parameters in the order the path has them", () => {
-    expect(operationById("finishUserPasskeyRegistration").pathParameters).toEqual([
+    expect(operationById("completeUserPasskeyRegistration").pathParameters).toEqual([
       "user_id",
       "registration_id",
     ]);
@@ -516,8 +523,8 @@ describe("Operation.all", () => {
   it("finds an operation by a word of its id, path, summary or tag, in any case", () => {
     expect(Operation.all({ filter: "PASSKEY" }).map((operation) => operation.id)).toEqual([
       "listUserPasskeys",
-      "beginUserPasskeyRegistration",
-      "finishUserPasskeyRegistration",
+      "createUserPasskeyRegistration",
+      "completeUserPasskeyRegistration",
       "listMyPasskeys",
     ]);
   });

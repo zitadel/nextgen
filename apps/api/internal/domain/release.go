@@ -16,7 +16,7 @@ const (
 
 // ReleasePointerKind is the kind of resource a release pointer pins. The wire
 // value is flow_definition rather than flow: the API serves runtime flows at
-// /flow and their definitions at /flow_definitions, and a release pins the
+// /flows and their definitions at /flow_definitions, and a release pins the
 // latter (ADR 035, amended 2026-09-02).
 //
 //go:generate go tool enumer -type ReleasePointerKind -transform snake -trimprefix ReleasePointerKind -sql

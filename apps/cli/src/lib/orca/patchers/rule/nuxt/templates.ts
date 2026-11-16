@@ -1,9 +1,9 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
-  return `<!-- ${MANAGED_MARKER} -->
+  return `<!-- ${ManagedFile.MARKER} -->
 <template>
   <NuxtPage />
 </template>
@@ -29,7 +29,7 @@ body {
  */
 export function indexPageTemplate(): string {
   return `<script setup lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 await navigateTo("/login", { replace: true });
 </script>
 
@@ -88,7 +88,7 @@ const { $zitadelBusinessLocales: businessLocales } = useNuxtApp();`
     : '<main style="color-scheme: dark">';
   const wrapperClose = widget ? "</div>" : "</main>";
   return `<script setup lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 ${PROJECT_SETUP}${localesSetup}
 </script>
 
@@ -145,7 +145,7 @@ export function profilePageTemplate(ctx: PatchContext): string {
       />`
     : `<zitadel-session variant="page" :project="project" post-sign-out-url="/login" />`;
   return `<script setup lang="ts">
-${MANAGED_MARKER}
+${ManagedFile.MARKER}
 ${PROJECT_SETUP}
 </script>
 

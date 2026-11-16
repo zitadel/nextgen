@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { aSuggest } from "@tests/helpers/suggestions";
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 import {
   aDeployment,
   holdingVariables,
@@ -72,7 +71,6 @@ function aDryRunOf(cwd: string): PrepareRequest {
     compare: false,
     json: true,
     color: false,
-    suggest: aSuggest(),
   };
 }
 

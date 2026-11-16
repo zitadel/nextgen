@@ -2,9 +2,9 @@ type: object
 # Pagination follows ADR 027 / ADR 049.
 description: A page of events.
 required:
-  - data
+  - events
 properties:
-  data:
+  events:
     description: |
       The events of this page. A filter the server matches event by event can
       leave it shorter than `limit`, or empty, while more events remain:

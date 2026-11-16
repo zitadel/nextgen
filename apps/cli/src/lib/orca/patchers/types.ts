@@ -33,6 +33,12 @@ export type PatchContext = PatchView &
     issuer: string;
     server: string;
     cliVersion: string;
+    /**
+     * The version a scaffold writes for the `@zitadel/*` packages it adds: the CLI's own exact
+     * version on the release train, else its dist-tag. Derived from `cliVersion` where each context
+     * is built.
+     */
+    sdkVersion: string;
     scaffoldedFramework?: boolean;
     /**
      * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in
@@ -56,7 +62,20 @@ export type PatchContext = PatchView &
      * that existed before the record, so legacy restores stay full-page.
      */
     posture?: ScaffoldPosture;
+    /**
+     * `ZITADEL_URL` as `.env.development.local` holds it, which `doctor`
+     * reads so a repair never moves an app onto a server the file names
+     * (`AbstractRulePatcher.developmentServerUrl`). Setup leaves it out.
+     */
+    developmentServerUrl?: string;
   }>;
+
+/**
+ * `ZITADEL_URL` as a Vite app's development env files give it once setup's
+ * base ops ran: the value `file` holds when `held`, or the one the ops are
+ * about to write there. `value` may be empty.
+ */
+export type DevelopmentServerUrl = Readonly<{ value: string; file: string; held: boolean }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
 export type PatchExecOptions = Readonly<{

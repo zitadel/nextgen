@@ -594,7 +594,7 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     expect(typeof body.message).toBe("string");
   });
 
-  test("POST /schemas returns 201 with a schema id", async () => {
+  test("POST /schemas returns 201 with the stored schema", async () => {
     const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -613,9 +613,11 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     const body = (await res.json()) as Record<string, unknown>;
     expect(typeof body.id).toBe("string");
     expect((body.id as string).startsWith("sch_")).toBe(true);
+    expect(body.schema).toMatchObject({ kind: "user-schema", objectType: "conformance" });
+    expect(typeof (body.metadata as Record<string, unknown>).created_at).toBe("string");
   });
 
-  test("GET /schemas/:id looks up by id without project_id", async () => {
+  test("GET /schemas/:schema_id looks up by id without project_id", async () => {
     const create = await fetch(`${API}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -641,7 +643,7 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     expect(ownerGet.status).toBe(200);
   });
 
-  test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
+  test("GET /schemas/:schema_id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
     // (title, description). The mock must do the same,
@@ -994,7 +996,7 @@ describe("api-mock spec conformance — sessions, projects, schemas and flow def
     expect(row).toEqual(detail);
   });
 
-  test("GET /flow_definitions/:id reads a definition back", async () => {
+  test("GET /flow_definitions/:flow_definition_id reads a definition back", async () => {
     const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1020,7 +1022,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     return { id: body.id, projectSecret: body.project_secret };
   }
 
-  async function initClaim(projectId: string, secret: string): Promise<Response> {
+  async function createProjectClaim(projectId: string, secret: string): Promise<Response> {
     return fetch(`${API}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${secret}` },
@@ -1057,7 +1059,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
     const project = await createProject("claim-init");
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(201);
     // orval emits no `*Response` zod for a 201 body — validate structurally,
     // mirroring the POST /projects test above.
@@ -1072,7 +1074,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     // response body, so the snapshot is its only route to the id the
     // completion and expiry mutators take.
     const project = await createProject("claim-snapshot");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     expect(snapshotPlatformStore().claimChallengeIds).toContain(challenge_id);
@@ -1080,7 +1082,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status is pending before completion", async () => {
     const project = await createProject("claim-status-pending");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, project.projectSecret);
@@ -1096,7 +1098,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("GET /projects/:id/claim/status with a foreign project secret returns 403", async () => {
     const project = await createProject("claim-status-owner");
     const other = await createProject("claim-status-foreign");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await claimStatus(project.id, challenge_id, other.projectSecret);
@@ -1107,7 +1109,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("full flow: init → complete with session cookie → status completed", async () => {
     const project = await createProject("claim-full-flow");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1135,7 +1137,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/init returns 409 once the project is claimed", async () => {
     const project = await createProject("claim-already-claimed");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1144,7 +1146,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
       body: JSON.stringify({ challenge_id }),
     });
 
-    const res = await initClaim(project.id, project.projectSecret);
+    const res = await createProjectClaim(project.id, project.projectSecret);
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string; details: Record<string, unknown> };
     expect(body.code).toBe("proj.already_claimed");
@@ -1154,7 +1156,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("an expired challenge makes status and complete return 410", async () => {
     const project = await createProject("claim-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimChallenge(challenge_id);
 
@@ -1178,11 +1180,11 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const project = await createProject("claim-window-expired");
     // Mint the challenge while the window is open, then close it: complete
     // must refuse even a live challenge once the project is too old.
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     expireClaimWindow(project.id);
 
-    const reinit = await initClaim(project.id, project.projectSecret);
+    const reinit = await createProjectClaim(project.id, project.projectSecret);
     expect(reinit.status).toBe(410);
     const reinitBody = (await reinit.json()) as Record<string, unknown>;
     expect(reinitBody.code).toBe("proj.claim_window_expired");
@@ -1225,7 +1227,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
     const project = await createProject("claim-complete-no-cookie");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1240,7 +1242,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete without the CSRF token returns 403", async () => {
     const project = await createProject("claim-complete-no-csrf");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1279,7 +1281,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/init with another project's secret returns 404", async () => {
     const project = await createProject("claim-init-owner");
     const other = await createProject("claim-init-foreign");
-    const res = await initClaim(project.id, other.projectSecret);
+    const res = await createProjectClaim(project.id, other.projectSecret);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("proj.not_found");
@@ -1287,7 +1289,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("GET /projects/:id/claim/status without a bearer token returns 401", async () => {
     const project = await createProject("claim-status-no-bearer");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const res = await fetch(
@@ -1300,7 +1302,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete with a customer-project session returns 401", async () => {
     const project = await createProject("claim-complete-ineligible");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     // A session for the customer project, not the platform project, must not
@@ -1319,7 +1321,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   test("POST /projects/:id/claim/complete on a mismatched project returns 404", async () => {
     const project = await createProject("claim-complete-path-a");
     const other = await createProject("claim-complete-path-b");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -1333,7 +1335,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("a claim challenge is single-use: a second completion returns 409", async () => {
     const project = await createProject("claim-single-use");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     const url = `${API}/projects/${project.id}/claim/complete`;
@@ -1355,7 +1357,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // that landed stays reported as completed even after its challenge's TTL.
   test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
-    const init = await initClaim(project.id, project.projectSecret);
+    const init = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${API}/projects/${project.id}/claim/complete`, {
@@ -1379,9 +1381,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
   // never a false "can no longer be claimed" verdict.
   test("a pending challenge on a project claimed elsewhere reports completed", async () => {
     const project = await createProject("claim-cross-challenge-status");
-    const first = await initClaim(project.id, project.projectSecret);
+    const first = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
-    const second = await initClaim(project.id, project.projectSecret);
+    const second = await createProjectClaim(project.id, project.projectSecret);
     const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
 
     const cookie = await platformSessionCookie();
@@ -2585,14 +2587,17 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
 
-    const deployed = (await (
-      await createDeployment(project.id, project.secret, {
-        release_id: release.id,
-        targets: ["https://x-acme.vercel.app"],
-      })
-    ).json()) as { targets: { expires_at: string | null }[] };
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://x-acme.vercel.app"],
+    });
 
-    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+    const listed = (await (await fetch(`${API}/projects/${project.id}/previews`)).json()) as {
+      previews: { expires_at: string }[];
+    };
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("a rollback keeps the origins it froze when one is no longer primary", async () => {
@@ -2725,14 +2730,16 @@ describe("api-mock releases and deployments", () => {
       targets: [url],
     });
     expect(deployed.status).toBe(201);
-    const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
-    expect(body.targets[0]?.origin).toBe(url);
-    expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+    const body = (await deployed.json()) as { targets: { origin: string }[] };
+    expect(body.targets).toEqual([{ origin: url }]);
 
     const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
-      previews: { origin: string }[];
+      previews: { origin: string; expires_at: string }[];
     };
     expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+    expect(new Date(listed.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 
   test("refuses a deployment that mixes preview URLs with primary origins", async () => {
@@ -2783,21 +2790,21 @@ describe("api-mock releases and deployments", () => {
       ttl: "PT168H",
     });
 
-    const removePreview = () =>
+    const removeProjectPreview = () =>
       fetch(`${BASE}/projects/${project.id}/previews/remove`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
         body: JSON.stringify({ origin: url }),
       });
 
-    expect((await removePreview()).status).toBe(204);
+    expect((await removeProjectPreview()).status).toBe(204);
     const afterFirst = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
       previews: unknown[];
     };
     expect(afterFirst.previews).toHaveLength(0);
 
     // Idempotent: removing an already-gone preview still answers 204.
-    expect((await removePreview()).status).toBe(204);
+    expect((await removeProjectPreview()).status).toBe(204);
   });
 
   test("lets a release whose only preview was removed be revoked", async () => {
@@ -2854,15 +2861,12 @@ describe("api-mock releases and deployments", () => {
       ttl: "PT168H",
     });
     expect(again.status).toBe(201);
-    const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
     const expiresAgain = (
       (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
         previews: { expires_at: string }[];
       }
     ).previews[0]?.expires_at as string;
     expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
-    // The renewal reports the expiry the preview now runs on.
-    expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
   });
 
   test("pages the previews list with limit and next_page_token", async () => {
@@ -2917,10 +2921,10 @@ describe("api-mock releases and deployments", () => {
         targets: [url],
         ttl: "PT168H",
       })
-    ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
+    ).json()) as { id: string };
     const historyBefore = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
 
     const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
@@ -2944,10 +2948,9 @@ describe("api-mock releases and deployments", () => {
     // ends the preview, it does not rewrite history.
     const historyAfter = (await (
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
-    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    ).json()) as { deployed_at: string; targets: { origin: string }[] };
     expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
     expect(historyAfter.targets).toEqual(historyBefore.targets);
-    expect(historyAfter.targets[0]?.expires_at).toBe(deployed.targets[0]?.expires_at);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
@@ -3329,6 +3332,45 @@ describe("api-mock releases and deployments", () => {
       });
     });
 
+    describe("the deployments of one release", () => {
+      /**
+       * The ids of the deployments a list narrowed to one release answers.
+       *
+       * @param projectId - The project.
+       * @param releaseId - The release to narrow the list to.
+       * @param live - List the live view instead of the history.
+       * @returns The deployment ids, newest first.
+       */
+      async function ofRelease(projectId: string, releaseId: string, live = false) {
+        const view = live ? "&live=true" : "";
+        const response = await fetch(
+          `${BASE}/deployments?project_id=${projectId}&release_id=${releaseId}${view}`,
+        );
+        const listed = (await response.json()) as { deployments: { id: string }[] };
+
+        return listed.deployments.map((deployment) => {
+          return deployment.id;
+        });
+      }
+
+      test("lists every deployment of the release in the history, superseded ones included", async () => {
+        const { project, release, primary, preview } = await aReleaseServedTwice("release-history");
+        const replacement = await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id)).toEqual([preview.id, primary.id]);
+        expect(await ofRelease(project.id, replacement.release.id)).toEqual([
+          replacement.deployment.id,
+        ]);
+      });
+
+      test("lists only the live deployments that serve the release in the live view", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("release-live");
+        await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id, true)).toEqual([preview.id]);
+      });
+    });
+
     describe("a deployment's status", () => {
       test("is live for a preview deployment while its preview serves", async () => {
         const { project, preview } = await aReleaseServedTwice("status-preview-live");
@@ -3692,15 +3734,15 @@ describe("api-mock error paths — each refusal a handler names", () => {
 
   describe("the login flow", () => {
     const start = async (purpose: "login" | "register") => {
-      const res = await send("POST", "/flow", { purpose, project_id: "proj_error_paths" });
+      const res = await send("POST", "/flows", { purpose, project_id: "proj_error_paths" });
       expect(res.status).toBe(201);
       return (await res.json()) as { id: string; session_token: string };
     };
 
     test("starts, reads back and advances a sign-in", async () => {
       const flow = await start("login");
-      expect((await send("GET", `/flow/${flow.id}`)).status).toBe(200);
-      const next = await send("POST", `/flow/${flow.id}/submit`, {
+      expect((await send("GET", `/flows/${flow.id}`)).status).toBe(200);
+      const next = await send("POST", `/flows/${flow.id}/submit`, {
         session_token: flow.session_token,
         action: "submit",
         fields: { email: "error-paths@example.com" },
@@ -3716,14 +3758,14 @@ describe("api-mock error paths — each refusal a handler names", () => {
         fields: {},
         sso_provider_id: "google",
       };
-      await expectRefusal(await send("POST", `/flow/${flow.id}/submit`, sso), 400, "req.invalid");
-      const redirect = await send("POST", `/flow/${flow.id}/submit`, {
+      await expectRefusal(await send("POST", `/flows/${flow.id}/submit`, sso), 400, "req.invalid");
+      const redirect = await send("POST", `/flows/${flow.id}/submit`, {
         ...sso,
         return_target: `${BASE}/login`,
       });
       expect(redirect.status).toBe(200);
       await expectRefusal(
-        await send("POST", `/flow/${flow.id}/submit`, { action: "submit", fields: {} }),
+        await send("POST", `/flows/${flow.id}/submit`, { action: "submit", fields: {} }),
         400,
         "flow.invalid_action",
       );
@@ -3732,7 +3774,7 @@ describe("api-mock error paths — each refusal a handler names", () => {
     test("refuses a sign-up without its proof of work", async () => {
       const flow = await start("register");
       const password = (await (
-        await send("POST", `/flow/${flow.id}/submit`, {
+        await send("POST", `/flows/${flow.id}/submit`, {
           session_token: flow.session_token,
           action: "submit",
           fields: { email: "error-paths-signup@example.com", given_name: "E", family_name: "P" },
@@ -3740,7 +3782,7 @@ describe("api-mock error paths — each refusal a handler names", () => {
       ).json()) as { id: string; session_token: string; step: { name: string } };
       expect(password.step.name).toBe("register-password");
       await expectRefusal(
-        await send("POST", `/flow/${password.id}/submit`, {
+        await send("POST", `/flows/${password.id}/submit`, {
           session_token: password.session_token,
           action: "submit",
           fields: { [PASSWORD_FIELD]: "hunter2-hunter2" },
@@ -3787,13 +3829,13 @@ describe("api-mock error paths — each refusal a handler names", () => {
     // submitFlowStep's 400 is either shape: this is the step with its error,
     // the server-transport tests above send the error envelope.
     test("refuses a submit as the same step with an error when told to", async () => {
-      const start = await call("POST", "/flow", {
+      const start = await call("POST", "/flows", {
         purpose: "login",
         project_id: "proj_in_process",
       });
       const flow = (await start.json()) as { id: string; session_token: string };
       mock.rejectNextSubmit("error.invalid_credentials");
-      const res = await call("POST", `/flow/${flow.id}/submit`, {
+      const res = await call("POST", `/flows/${flow.id}/submit`, {
         session_token: flow.session_token,
         action: "submit",
         fields: { email: "in-process@example.com" },

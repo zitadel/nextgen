@@ -20,7 +20,7 @@ import {
   writeProject,
 } from "@tests/helpers/auth-method";
 import { authMethods, type ConfigDocuments } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { readJson } from "@tests/helpers/local-project";
 import {
   expectedPublicCliCommand,

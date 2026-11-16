@@ -9,7 +9,7 @@ import { ZitadelError } from "@/lib/errors";
 import { ZitadelConfig } from "@/lib/zitadel";
 import { aCheckContext } from "@tests/helpers/check-context";
 import { anOidcConnection, aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";

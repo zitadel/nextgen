@@ -44,10 +44,10 @@ describe("PublishedConfiguration.fetchReleaseIdOfDeployment", () => {
   it("answers the release one deployment made live", async () => {
     const configuration = new PublishedConfiguration(
       fakeClient({
-        getDeploymentById: async () => {
+        getDeployment: async () => {
           return aDeployment({ release_id: "rel_3" });
         },
-        getDeploymentVariables: async () => {
+        listDeploymentVariables: async () => {
           return {};
         },
       }),
@@ -61,10 +61,10 @@ describe("PublishedConfiguration.fetchReleaseIdOfDeployment", () => {
 });
 
 describe("PublishedConfiguration.fetchRelease", () => {
-  const getReleaseById = vi.fn(async () => {
+  const getRelease = vi.fn(async () => {
     return { id: "rel_1", pointers: [{ kind: "schema" as const, revision_id: "sch_1" }] };
   });
-  const configuration = new PublishedConfiguration(fakeClient({ getReleaseById }), PROJECT_ID);
+  const configuration = new PublishedConfiguration(fakeClient({ getRelease }), PROJECT_ID);
 
   it("reads the release with the revisions it pins", async () => {
     const release = await configuration.fetchRelease("rel_1");
@@ -75,7 +75,7 @@ describe("PublishedConfiguration.fetchRelease", () => {
   it("reads it from the project", async () => {
     await configuration.fetchRelease("rel_1");
 
-    expect(getReleaseById).toHaveBeenCalledWith("rel_1", { project_id: PROJECT_ID });
+    expect(getRelease).toHaveBeenCalledWith("rel_1", { project_id: PROJECT_ID });
   });
 });
 
@@ -83,7 +83,7 @@ describe("PublishedConfiguration.placeRevision", () => {
   it("answers a schema's document", async () => {
     const configuration = new PublishedConfiguration(
       fakeClient({
-        getSchemaById: async () => {
+        getSchema: async () => {
           return { schema: { objectType: "human-user" } };
         },
       }),

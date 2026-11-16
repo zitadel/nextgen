@@ -1,7 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type Invitation, InvitationService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
@@ -48,8 +49,8 @@ const NOTHING_PENDING_REFUSAL = {
  */
 export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   static override description = "Cancel a pending invitation so its link stops working.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 4;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 8;
   static override examples = [
     "<%= config.bin %> invitation cancel",
     "<%= config.bin %> invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J",

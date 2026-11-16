@@ -163,7 +163,7 @@ describe("claim page", () => {
         }),
       ),
       http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
-      http.get("*/api/v1/events", () => HttpResponse.json({ data: [] })),
+      http.get("*/api/v1/events", () => HttpResponse.json({ events: [] })),
     );
     stubComplete(() => {
       claimed = true;

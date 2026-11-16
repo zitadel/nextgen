@@ -1,31 +1,19 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
+import { ensureLocalAdmin } from "@/lib/server/local/admin-credential";
 import {
   localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
+import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
-const tempDirs: string[] = [];
-
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("console", () => {
-  it("points at `zitadel start` when no local admin exists", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(cwd);
-
+  it("points at `zitadel start` when no local admin exists", async ({ dir: cwd }) => {
     const res = await runCliForTest(["console", "--cwd", cwd, "--json", "--no-open"], {
       HOME: cwd,
       USERPROFILE: cwd,
@@ -44,9 +32,7 @@ describe("console", () => {
     expect(json.next_commands.at(-1)).toMatch(/ start --cwd \S+$/);
   });
 
-  it("names the server the directory recorded even where it refuses", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(cwd);
+  it("names the server the directory recorded even where it refuses", async ({ dir: cwd }) => {
     await writeRuntimeMetadata(cwd, {
       schema_version: 1,
       backend: "docker",
@@ -69,9 +55,9 @@ describe("console", () => {
     expect((parseJson(res.stdout) as { source: string }).source).toBe("http://localhost:3000");
   });
 
-  it("signs in as the admin of a parent directory when run from an app inside it", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(parent);
+  it("signs in as the admin of a parent directory when run from an app inside it", async ({
+    dir: parent,
+  }) => {
     const { admin } = await ensureLocalAdmin(parent);
     const app = join(parent, "my-app");
     await mkdir(app);
@@ -83,9 +69,7 @@ describe("console", () => {
     expect(json.data.signed_in_as).toBe(admin.email);
   });
 
-  it("names the sign-in link it would mint on a dry run", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-console-"));
-    tempDirs.push(parent);
+  it("names the sign-in link it would mint on a dry run", async ({ dir: parent }) => {
     await ensureLocalAdmin(parent);
 
     const res = await runCliForTest(["console", "--cwd", parent, "--json", "--dry-run"]);
@@ -95,5 +79,103 @@ describe("console", () => {
       dry_run: true,
       title: "Would mint a console sign-in link (dry run)",
     });
+  });
+
+  it.for([
+    ["a cloud project", "https://preview.zitadel.com", "https://preview.zitadel.com/console/"],
+    ["a self-hosted project", "https://auth.example.com", "https://auth.example.com/ui/console/"],
+  ])(
+    "prints the console of %s without needing a local server",
+    async ([, server, url], { dir }) => {
+      const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+        HOME: dir,
+        USERPROFILE: dir,
+        ZITADEL_URL: server,
+      });
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        status: string;
+        source: string;
+        data: { console_url: string; browser_opened: boolean };
+      };
+      expect(json.status).toBe("ok");
+      expect(json.source).toBe(server);
+      expect(json.data).toMatchObject({ console_url: url, browser_opened: false });
+      expect(res.stdout).not.toContain("start");
+    },
+  );
+
+  it("opens nothing on a dry run against a cloud project", async ({ dir }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "https://preview.zitadel.com",
+    });
+
+    const json = parseJson(res.stdout) as { data: { dry_run: boolean; console_url: string } };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      console_url: "https://preview.zitadel.com/console/",
+    });
+  });
+
+  it("still asks for a local admin when the project's server is on this machine", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "http://localhost:8080",
+    });
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toBe(
+      "No local admin in this directory or its parents",
+    );
+  });
+
+  it("keeps to the local console when a local server was started, whatever the project names", async ({
+    dir,
+  }) => {
+    const { admin } = await ensureLocalAdmin(dir);
+
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "https://preview.zitadel.com",
+    });
+
+    expect((parseJson(res.stdout) as { data: { signed_in_as: string } }).data.signed_in_as).toBe(
+      admin.email,
+    );
+  });
+
+  it("prints the console of the server --server names, over the one the project names", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(
+      ["console", "--cwd", dir, "--json", "--no-open", "--server", "https://preview.zitadel.com"],
+      { HOME: dir, USERPROFILE: dir, ZITADEL_URL: "https://auth.example.com" },
+    );
+
+    expect((parseJson(res.stdout) as { data: { console_url: string } }).data.console_url).toBe(
+      "https://preview.zitadel.com/console/",
+    );
+  });
+
+  it("names a server that is not a URL instead of saying no local admin exists", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "not a url",
+    });
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).not.toBe(
+      "No local admin in this directory or its parents",
+    );
   });
 });

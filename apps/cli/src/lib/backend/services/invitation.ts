@@ -115,7 +115,7 @@ export class InvitationService extends ApiService {
   async pending(): Promise<readonly Invitation[]> {
     return this.client.listInvitations.all({
       project_id: this.projectId,
-      status: "pending",
+      status: ["pending"],
     });
   }
 

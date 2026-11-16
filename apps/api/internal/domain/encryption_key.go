@@ -281,6 +281,14 @@ func NewMasterKeys(keys []MasterKey) (*MasterKeys, error) {
 	}, nil
 }
 
+// Rotating reports whether a master key is configured beside the one that
+// encrypts: the only state in which a key wrapped by another master key can be
+// unwrapped, and so re-wrapped by the current one. With one master key there is
+// nothing a re-wrap could move.
+func (ks MasterKeys) Rotating() bool {
+	return len(ks.Keys) > 0
+}
+
 func (ks MasterKeys) Encrypt(decrypted string) (string, error) {
 	return ks.EncryptionKey.Encrypt(decrypted)
 }

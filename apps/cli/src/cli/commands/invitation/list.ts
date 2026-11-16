@@ -7,13 +7,8 @@ import {
   type InvitationStatus,
   type InvitationType,
 } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
@@ -23,7 +18,7 @@ import { ListInvitationsQueryParams } from "@/lib/backend/schemas";
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
 
 /** The statuses `--status` narrows to, as the API declares them. */
-const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().options;
+const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().element.options;
 
 /** The types `--type` narrows to, as the API declares them. */
 const TYPES = ListInvitationsQueryParams.shape.type.unwrap().options;
@@ -52,8 +47,8 @@ const LIMIT = {
  */
 export default class InvitationList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's invitations, newest first.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 2;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 6;
   static override examples = [
     "<%= config.bin %> invitation list",
     "<%= config.bin %> invitation list --status pending",
@@ -94,7 +89,7 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
     const invitationService = new InvitationService(client, projectId);
     const listed = await invitationService.page(
       {
-        status: flags.status,
+        status: flags.status === undefined ? undefined : [flags.status],
         type: flags.type,
         limit: flags.limit,
         page_token: flags.pageToken,

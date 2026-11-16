@@ -61,7 +61,7 @@ export type HeldVariable = GetVariable200["primary"];
 export const SECRET_VARIABLE: HeldVariable = { secret: true };
 
 /**
- * The project's variables, as `getVariables` answers them.
+ * The project's variables, as `listVariables` answers them.
  *
  * @param held - The values, by variable name.
  * @param kind - The one kind that holds them; left out, every kind does.
@@ -72,7 +72,7 @@ export function holdingVariables(
   kind?: "primary" | "preview",
 ): ClientStubs {
   return {
-    getVariables: async (params) => {
+    listVariables: async (params) => {
       const asked = params.kind ?? "primary";
       if (kind !== undefined && asked !== kind) {
         return {};

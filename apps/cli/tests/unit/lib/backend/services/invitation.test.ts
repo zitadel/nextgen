@@ -81,7 +81,7 @@ describe("InvitationService.pending", () => {
 
     await service.pending();
 
-    expect(all).toHaveBeenCalledWith({ project_id: PROJECT, status: "pending" });
+    expect(all).toHaveBeenCalledWith({ project_id: PROJECT, status: ["pending"] });
   });
 });
 

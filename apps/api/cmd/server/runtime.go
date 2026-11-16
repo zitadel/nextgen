@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -63,6 +64,10 @@ func serverMasterKeyDir(cfg ServerConfig) (string, error) {
 	return path, nil
 }
 
+// errNoMasterKey is a start with no master key configured, none in the master
+// key directory, and generation off.
+var errNoMasterKey = errors.New("no master key")
+
 func ensureServerMasterKey(cfg *ServerConfig) error {
 	masterKeyDir, err := serverMasterKeyDir(*cfg)
 	if err != nil {
@@ -83,10 +88,10 @@ func ensureServerMasterKey(cfg *ServerConfig) error {
 	if len(cfg.MasterKeys) == 0 {
 		if !cfg.GenerateMasterKey {
 			return fmt.Errorf(
-				"no master key: server.master_keys is unset and %s holds no key file, "+
+				"%w: server.master_keys is unset and %s holds no key file, "+
 					"while master key generation is off (--%s / server.generate_master_key: false). "+
 					"Configure server.master_keys, or place a key file in that directory",
-				masterKeyDir, flagDisableMasterKeyGeneration)
+				errNoMasterKey, masterKeyDir, flagDisableMasterKeyGeneration)
 		}
 
 		filePath, err := createMasterKey(masterKeyDir)

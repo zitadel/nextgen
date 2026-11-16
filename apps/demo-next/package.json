@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@zitadel/sdk-next": "workspace:*",
-    "next": "^16.3.8",
+    "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

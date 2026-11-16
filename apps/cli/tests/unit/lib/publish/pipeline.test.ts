@@ -50,12 +50,12 @@ describe("runSteps", () => {
 
   it("returns the lockouts every step found, in order", async () => {
     const runs: string[] = [];
-    const first = aStep("first", runs, {}, { lockouts: ["a"] });
-    const second = aStep("second", runs, {}, { lockouts: ["b"] });
+    const first = aStep("first", runs, {}, { lockouts: [{ message: "a" }] });
+    const second = aStep("second", runs, {}, { lockouts: [{ message: "b" }] });
 
     const outcome = await runSteps([first, aStep("silent", runs), second], aStepContext());
 
-    expect(outcome.lockouts).toEqual(["a", "b"]);
+    expect(outcome.lockouts).toEqual([{ message: "a" }, { message: "b" }]);
   });
 
   it("hands a later step what an earlier one learned", async () => {

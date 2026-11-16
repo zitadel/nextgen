@@ -233,6 +233,7 @@ async function fillPasswords(page: Page): Promise<boolean> {
 async function bodyText(page: Page): Promise<string> {
   const text = await page
     .locator("body")
+    // biome-ignore lint/performance/useDomNodeTextContent: Playwright's Locator.innerText, the page's rendered text, not the DOM property.
     .innerText()
     .catch(() => "");
   return text.replace(/\s+/g, " ").trim();

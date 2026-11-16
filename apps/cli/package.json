@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -36,7 +36,7 @@
       "target": "./dist/index.mjs",
       "identifier": "COMMANDS"
     },
-    "helpClass": "./dist/lib/oclif/help",
+    "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
       "finally": "./dist/hooks/version-notice"
@@ -54,25 +54,25 @@
       "@oclif/plugin-version"
     ],
     "topics": {
-      "users": {
+      "user": {
         "description": "Create and manage users."
       },
-      "teams": {
+      "team": {
         "description": "Create and manage teams."
       },
-      "sessions": {
+      "session": {
         "description": "View and revoke sessions."
       },
-      "events": {
+      "event": {
         "description": "View events."
       },
-      "grants": {
+      "grant": {
         "description": "Manage access grants."
       },
-      "projects": {
+      "project": {
         "description": "View and update projects."
       },
-      "schemas": {
+      "schema": {
         "description": "View user schemas."
       },
       "branding": {
@@ -108,13 +108,13 @@
       "variable": {
         "description": "Manage project variables."
       },
-      "idps": {
+      "idp": {
         "description": "Manage identity provider connections."
       },
-      "flow-definitions": {
+      "flow-definition": {
         "description": "View login flows."
       },
-      "policies": {
+      "policy": {
         "description": "View and test policies."
       },
       "env": {
@@ -158,10 +158,11 @@
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
     "fastest-levenshtein": "catalog:",
+    "ignore": "^7.0.14",
     "is-wsl": "catalog:",
     "jsonc-parser": "catalog:",
-    "magicast": "^0.5.3",
-    "mixpanel": "^0.18.1",
+    "magicast": "^0.5.5",
+    "mixpanel": "^0.24.0",
     "open": "catalog:",
     "p-reduce": "catalog:",
     "p-retry": "catalog:",
@@ -172,7 +173,7 @@
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
     "sort-keys": "catalog:",
-    "undici": "^7.30.1",
+    "undici": "^7.30.2",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:"
   },

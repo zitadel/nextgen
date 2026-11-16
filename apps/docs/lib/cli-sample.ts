@@ -19,7 +19,7 @@ export const cli = "npx @zitadel/cli@latest";
 /** What the CLI needs before it runs a resource command. */
 const context = "# Run where `zitadel setup` wrote .zitadel/secret.";
 
-/** The command the spec names for an operation, without the binary: `users create`. */
+/** The command the spec names for an operation, without the binary: `user create`. */
 export function namedCliCommand(operation: OperationObject): string | undefined {
   const command: unknown = (operation as Record<string, unknown>)["x-zitadel-cli"];
   return typeof command === "string" ? command : undefined;
@@ -27,7 +27,7 @@ export function namedCliCommand(operation: OperationObject): string | undefined 
 
 /**
  * The command that runs an operation, without the binary: the one the spec
- * names (`users create`), else `api` for one `zitadel api` can call.
+ * names (`user create`), else `api` for one `zitadel api` can call.
  */
 export function cliCommand(
   operation: OperationObject,
@@ -187,14 +187,16 @@ function variables(
 
 // The invitation commands take flags, not `--data`: `create` says a project
 // invitation with `--relation`, `--name` and `--replaces`, and `list` filters
-// with `--status` and `--type`. A team invitation has no flag yet, so it is
+// with `--status`, once per status, and `--type`. A team invitation has no flag yet, so it is
 // `undefined` and the sample is the api call.
 function invitationFlags(verb: string, request: RequestData): string[] | undefined {
   if (verb === "list") {
-    const status = request.query.status?.values[0];
+    const statuses = request.query.status?.values ?? [];
     const type = request.query.type?.values[0];
     return [
-      ...(typeof status === "string" ? [`--status ${word(status)}`] : []),
+      ...statuses.flatMap((status) =>
+        typeof status === "string" ? [`--status ${word(status)}`] : [],
+      ),
       ...(typeof type === "string" ? [`--type ${word(type)}`] : []),
       ...listFlags(request),
     ];

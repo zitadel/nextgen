@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
+import { CliPackage } from "./cli-package";
 import { isCI } from "@/lib/ci";
-import { CLI_PACKAGE_NAME, npmDistTagForCliVersion } from "@/lib/public-cli";
 import { telemetryConfigDir } from "@/lib/telemetry/identity";
 
 import { Cache } from "./cache";
@@ -44,8 +44,8 @@ export function releaseChannel(cliVersion: string, env: NodeJS.ProcessEnv): Rele
   const file = directory === undefined ? undefined : join(directory, "update-check.json");
 
   return new ReleaseChannel({
-    packageName: CLI_PACKAGE_NAME,
-    distTag: npmDistTagForCliVersion(cliVersion),
+    packageName: CliPackage.NAME,
+    distTag: CliPackage.at(cliVersion).distTag(),
     registry,
     cache: new Cache(file),
   });
