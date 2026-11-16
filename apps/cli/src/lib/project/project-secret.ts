@@ -101,7 +101,7 @@ export class ProjectSecret {
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
-          hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
+          hint: "Set the project up first, or restore its secret.",
           nextCommands: [{ id: "setup" }, { id: "doctor", flags: { fix: true } }],
         });
       }

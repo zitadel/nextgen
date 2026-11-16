@@ -412,7 +412,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
       // The run again with --force, on the schema it resolved (a dry run's stays
       // a preview, since --force with --dry-run writes nothing), then enabling
-      // each method the schema could take instead.
+      // each method the schema could take instead, then a social sign-in provider.
       const retry = await this.rerun<RetryFlags>({
         with: { ...naming, schema: target.schemaFlag, force: true },
       });
@@ -693,7 +693,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 type NoSignInLeftRefusal = {
   readonly error: NoSignInLeftError;
   readonly question: string;
-  /** The exact re-run first, then enabling each method the schema could take instead. */
+  /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
   readonly json: boolean;
 };
@@ -703,7 +703,7 @@ type NoSignInLeftRefusal = {
  *
  * @remarks
  * The exact re-run comes first, then enabling each method the schema could
- * take instead. Only `--json` names `details.suggested_args`: a person reads
+ * take instead, then a social sign-in provider. Only `--json` names `details.suggested_args`: a person reads
  * the same commands under Next.
  *
  * @param input - The run, the refusal, the question a person would be asked,
@@ -717,7 +717,7 @@ function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
     : ".";
   // Its --force retry is a consent only a person may give, as every gate's is.
   throw new ZitadelError("E_CONFIRMATION_REQUIRED", error.message, {
-    hint: `Enable another method first, with one of the commands under Next. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
+    hint: `Enable another method first. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
     details: {
       question: input.question,
       file: error.path,

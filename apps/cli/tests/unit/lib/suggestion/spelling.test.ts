@@ -4,8 +4,6 @@ import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { sourceFiles } from "@tests/helpers/source-files";
-import { COMMANDS as COMMAND_TABLE } from "@/index";
-import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { Spelling } from "@/lib/suggestion";
 
 describe("Spelling#command", () => {
@@ -245,39 +243,5 @@ describe("the CLI names itself once in human output", () => {
       literals(line).some((literal) => /\bzitadel [a-z]/.test(literal));
 
     expect(await offenders(offends)).toEqual([]);
-  });
-
-  it("names no project-scoped command in prose, which would run without the run's selector", async () => {
-    const ids = Object.keys(COMMAND_TABLE)
-      .map((id) => id.replaceAll(":", " "))
-      .sort((a, b) => b.length - a.length);
-    const scoped = new Set(
-      Object.entries(COMMAND_TABLE)
-        .filter(([, command]) => command.prototype instanceof EnvironmentCommand)
-        .map(([id]) => id.replaceAll(":", " ")),
-    );
-    const files = await sourceFiles(join(COMMANDS, "../.."));
-    const found = await Promise.all(
-      files.map(async (file) => {
-        const name = relative(join(COMMANDS, "../.."), file).split(sep).join("/");
-        const lines = blankComments(await readFile(file, "utf8")).split("\n");
-        return lines.flatMap((line, index) => {
-          const named = literals(line).some((literal) => {
-            return [...literal.matchAll(/\bzitadel ((?:[a-z][a-z-]*)(?: [a-z][a-z-]*)*)/g)].some(
-              (match) => {
-                const words = match[1] ?? "";
-                // The longest command the words begin with is the one named:
-                // `api ls` is not `api`.
-                const named = ids.find((id) => words === id || words.startsWith(`${id} `));
-                return named !== undefined && scoped.has(named);
-              },
-            );
-          });
-          return named ? [`${name}:${index + 1}`] : [];
-        });
-      }),
-    );
-
-    expect(found.flat().sort()).toEqual([]);
   });
 });

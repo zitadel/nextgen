@@ -43,7 +43,7 @@ describe("Project.secret", () => {
       const zerr = error as ZitadelError;
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
-      expect(zerr.hint).toContain("zitadel doctor --fix");
+      expect(zerr.hint).toBe("Set the project up first, or restore its secret.");
       expect(zerr.nextCommands).toEqual([{ id: "setup" }, { id: "doctor", flags: { fix: true } }]);
     }
   });

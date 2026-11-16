@@ -10,6 +10,7 @@ import { mergeDocuments, typedValue } from "@/lib/oclif/crud/document";
 import { describeBody } from "@/lib/oclif/crud/fields";
 import type { Schema } from "@/lib/oclif/crud/types";
 import { nodeAt, unwrap, type ZodLike } from "@/lib/oclif/crud/zod";
+import type { Suggested } from "@/lib/suggestion";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
@@ -77,11 +78,14 @@ export class ApiCall {
    * its end would look like a hang, so `-` with nothing piped in is refused.
    *
    * @param source - The path, `-` for stdin, or undefined when none was given.
+   * @param retry - The run again with `--input <path>`, which the refusal
+   *   suggests; it keeps the operation and every field the run was given.
    * @returns The document, or undefined when no source was given.
    * @throws {ZitadelError} E_VALIDATION when `-` is given with nothing piped in, or the document is no JSON object.
    */
   static async readInput(
     source: string | undefined,
+    retry: () => Promise<Suggested>,
   ): Promise<Readonly<Record<string, unknown>> | undefined> {
     if (source === undefined) {
       return undefined;
@@ -93,9 +97,7 @@ export class ApiCall {
           "--input - reads the body from a pipe, but nothing is piped in",
           {
             hint: "Pipe a body in and pass --input -, or pass --input <path>.",
-            nextCommands: [
-              { id: "api", args: { operation: "<operation>" }, flags: { input: "<path>" } },
-            ],
+            nextCommands: [await retry()],
           },
         );
       }
@@ -214,12 +216,7 @@ export class ApiCall {
             ? `${head} is a path parameter of ${operation.id}; give it as an argument`
             : `${head} is a ${parameter.in} parameter, which the CLI does not send`,
           parameter.in === "path"
-            ? {
-                hint: "Give it after the operation, as the command under Next does.",
-                nextCommands: [
-                  { id: "api", args: { operation: operation.id }, rest: [`<${head}>`] },
-                ],
-              }
+            ? { hint: "Give it after the operation, in the order the path declares them." }
             : {},
         );
       }

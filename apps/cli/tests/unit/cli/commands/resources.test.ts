@@ -974,6 +974,22 @@ describe("--file -", () => {
     expect(json.message).toBe("--file - reads the body from a pipe, but nothing is piped in");
     expect(json.hint).toContain("--data");
   });
+
+  it.for([
+    [["user", "create", "--file", "-"], "user create --file '<path>'"],
+    [["user", "update", "user_1", "--file", "-"], "user update user_1 --file '<path>'"],
+  ])(
+    "suggests the run again with a path for %j",
+    async ([args, command], { dir: cwd, terminal: _terminal }) => {
+      await makeProject(cwd);
+
+      const res = await run(cwd, args as string[]);
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        next_commands: [expect.stringContaining(command as string)],
+      });
+    },
+  );
 });
 
 describe("piped output", () => {

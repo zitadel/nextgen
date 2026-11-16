@@ -3,7 +3,7 @@ import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject } from "@/lib/json";
-import { resourceSuggestion } from "@/lib/suggestion";
+import type { Suggested } from "@/lib/suggestion";
 
 import type { Json } from "./types";
 
@@ -11,17 +11,22 @@ import type { Json } from "./types";
  * The raw body of a write, from `--data` (inline), `--file <path>`, or
  * `--file -` (stdin). Returns `undefined` when none of them was given: the
  * caller decides whether that is an error, since a body can also be assembled
- * from the field flags and `--set`. `topic` and `verb` name the command the
- * stdin refusal suggests running again.
+ * from the field flags and `--set`.
  *
  * Nothing here judges the content: `--data` is on the command line like any
  * flag, so the write command checks it for credentials together with the
  * field flags and `--set`, against the schema that says what each value is.
+ *
+ * @param flags - The run's flags: `data`, `file`.
+ * @param retry - The run again with `--file <path>`, which keeps the resource
+ *   id and every other flag the run was given. Only a refusal builds it.
+ * @returns The body the flags give, or `undefined` when they give none.
+ * @throws {@link ZitadelError} With `E_VALIDATION` when `--file -` is given
+ *   and nothing is piped in, or when the body is not a JSON object.
  */
 export const readRawBody = async (
   flags: Json,
-  topic: string,
-  verb: "create" | "update",
+  retry: () => Promise<Suggested>,
 ): Promise<Json | undefined> => {
   if (typeof flags.data === "string") {
     return parseJsonObject(flags.data, "--data");
@@ -36,7 +41,7 @@ export const readRawBody = async (
         "--file - reads the body from a pipe, but nothing is piped in",
         {
           hint: "Pipe a body in and pass --file -, or pass it with --file <path> or --data '<json>'.",
-          nextCommands: [resourceSuggestion(topic, verb, { flags: { file: "<path>" } })],
+          nextCommands: [await retry()],
         },
       );
     }

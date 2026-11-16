@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
@@ -174,6 +174,9 @@ const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
   );
 };
 
+/** The flag a write's stdin refusal asks to be given a path instead. */
+type FileFlag = { file: Interfaces.OptionFlag<string | undefined> };
+
 type WriteInput = OperationInput<
   Json,
   Record<string, string>,
@@ -207,6 +210,9 @@ abstract class WriteOperation<
         document: documentSchemaOf(spec.schema, spec.root),
         fields,
         references: options.references,
+        retry: () => {
+          return this.rerun<FileFlag>({ with: { file: "<path>" } });
+        },
       },
       flags,
     );

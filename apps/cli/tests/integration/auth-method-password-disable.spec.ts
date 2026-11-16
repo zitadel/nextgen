@@ -167,7 +167,7 @@ describe("auth-method password disable", () => {
             source: "",
             code: "E_CONFIRMATION_REQUIRED",
             message: `${SCHEMA_FILE} would have no way to sign in left`,
-            hint: `Enable another method first, with one of the commands under Next. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
+            hint: `Enable another method first. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
                 `auth-method password disable --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,

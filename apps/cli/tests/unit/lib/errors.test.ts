@@ -10,7 +10,7 @@ import {
   isCancellation,
   toZitadelError,
 } from "@/lib/errors";
-import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import { BrokenFlowsError, ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -133,6 +133,27 @@ describe("toZitadelError", () => {
       "do this",
       { file: "a.json" },
     ]);
+  });
+
+  it.each([
+    [
+      "a method still in use",
+      { kind: "method-in-use", uses: [] },
+      [{ id: "deploy", flags: { dryRun: true } }],
+    ],
+    ["a change that breaks a flow", { kind: "broken" }, undefined],
+  ] as const)("gives %s its follow-up", (_name, report, next) => {
+    const result = toZitadelError(
+      new BrokenFlowsError({
+        ...report,
+        file: "default-human-user.json",
+        heading: "A login flow would break:",
+        hint: "Fix it.",
+        issues: [],
+      }),
+    );
+
+    expect(result.nextCommands).toEqual(next);
   });
 
   it("leaves out the hint and details a ConfigError has none of", () => {

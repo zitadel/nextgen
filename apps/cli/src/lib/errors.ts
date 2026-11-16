@@ -274,9 +274,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
-      // A flow a change broke is checked again with a dry run of deploy, which
-      // the library cannot name: it knows no command.
-      ...(error instanceof BrokenFlowsError
+      // The steps still using a method are checked again with a dry run of
+      // deploy, which the library cannot name: it knows no command.
+      ...(error instanceof BrokenFlowsError && error.kind === "method-in-use"
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),
     });

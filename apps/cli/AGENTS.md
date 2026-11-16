@@ -170,12 +170,16 @@
 - Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
-- Quote a command in a `hint:` as `` `zitadel …` ``; the base command spells it
+- Quote a command that takes no environment flags (`start`, `stop`, `reset`, `logs`, `setup`)
+  in a `hint:` as `` `zitadel …` ``; the base command spells it
   out as the `npx @zitadel/cli@<version> …` form and takes the other backticks
   off (`Spelling#spellOut`). Only a `hint:` line may do this: a message, a
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
   `src/cli/commands`.
+- Never name a command that takes `--env-file` in a string, a `hint:` included: prose drops
+  `--env`, `--env-file` and `--server`, so it goes in `nextCommands`.
+  `tests/unit/lib/oclif/environment-flags.test.ts` walks every string under `src` for one.
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per

@@ -6,11 +6,14 @@ import { describeBody } from "@/lib/oclif/crud";
 import { documentSchemaOf } from "@/lib/oclif/crud/fields";
 import { resourceBody } from "@/lib/oclif/crud/resource-body";
 
+const RETRY = () => Promise.resolve({ id: "setup" } as const);
+
 const resolve = (flags: Record<string, unknown>) => {
   return resourceBody(
     {
       topic: "team",
       verb: "create",
+      retry: RETRY,
       root: undefined,
       schema: CreateTeamBody,
       document: documentSchemaOf(CreateTeamBody, undefined),
@@ -70,6 +73,7 @@ describe("resourceBody", () => {
           {
             topic: "team",
             verb: "create",
+            retry: RETRY,
             root: undefined,
             schema,
             document: documentSchemaOf(schema, undefined),
