@@ -1518,8 +1518,32 @@ const SERVER_VERSION_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * Refuses a local server another CLI release started, when it is the server
- * this run is about.
+ * The nearest local server another CLI release started.
+ */
+export type OutdatedLocalServer = Readonly<{
+  /**
+   * The directory `start` ran in.
+   */
+  dir: string;
+
+  /**
+   * The server's URL, as `start` recorded it.
+   */
+  serverUrl: string;
+
+  /**
+   * The server version it runs.
+   */
+  running: string;
+
+  /**
+   * The server version this CLI ships.
+   */
+  expected: string;
+}>;
+
+/**
+ * Finds the local server nearest to `cwd` when another CLI release started it.
  *
  * @remarks
  * `start` restarts such a server, but one left running stays that release's
@@ -1528,17 +1552,49 @@ const SERVER_VERSION_REFUSAL = {
  * would not help. Only a binary runtime records the version it runs, and only
  * release versions are compared: an override records `override`, which says
  * nothing about its API. An unreadable `runtime.json` is doctor's to report,
- * not setup's. The start command names the server's own directory, so the
- * typed `--cwd` is not added to it.
+ * not setup's.
  *
- * Both the server `--server` pins and the one the wizard's question picks are
- * checked, so a run that chose a local server interactively is held to the
- * same version as one that named it.
+ * @param cwd - Where setup runs.
+ * @returns The server, or `undefined` when the nearest one is this CLI's own
+ *   release or says nothing about its version.
+ */
+export async function outdatedLocalServer(cwd: string): Promise<OutdatedLocalServer | undefined> {
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
+    return undefined;
+  });
+  const runtime = nearest?.runtime;
+  const expected = LocalServer.bundledVersion();
+  if (
+    !nearest ||
+    runtime?.backend !== "binary" ||
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return undefined;
+  }
+  return {
+    dir: nearest.dir,
+    serverUrl: runtime.server_url,
+    running: runtime.server_version,
+    expected,
+  };
+}
+
+/**
+ * Refuses a local server another CLI release started, when `--server` makes it
+ * the server this run is about.
+ *
+ * @remarks
+ * The start command names the server's own directory, so the typed `--cwd` is
+ * not added to it. A run without `--server` is about the cloud until the
+ * wizard asks, and its question does not offer such a server.
  *
  * @param input - Where setup runs, the server it is about, and the flags a
  *   rerun keeps.
- * @throws {@link ZitadelError} When the nearest local server runs another
- *   release.
+ * @throws {@link ZitadelError} When the nearest local server is the one the
+ *   run is about and runs another release.
  */
 export async function refuseOutdatedLocalServer(
   input: Readonly<{
@@ -1548,38 +1604,26 @@ export async function refuseOutdatedLocalServer(
   }>,
 ): Promise<void> {
   const { cwd, serverUrl, flags } = input;
-  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
-    return undefined;
-  });
-  const runtime = nearest?.runtime;
-  const expected = LocalServer.bundledVersion();
-  if (
-    !nearest ||
-    runtime?.backend !== "binary" ||
-    !sameLocalServer(runtime.server_url, serverUrl) ||
-    expected === undefined ||
-    !semver.valid(expected) ||
-    !semver.valid(runtime.server_version) ||
-    runtime.server_version === expected
-  ) {
+  const outdated = await outdatedLocalServer(cwd);
+  if (!outdated || !sameLocalServer(outdated.serverUrl, serverUrl)) {
     return;
   }
   throw refusalError(
     SERVER_VERSION_REFUSAL,
     {
-      running: runtime.server_version,
-      expected,
-      serverUrl: runtime.server_url,
+      running: outdated.running,
+      expected: outdated.expected,
+      serverUrl: outdated.serverUrl,
       where:
-        nearest.dir === cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `,
+        outdated.dir === cwd ? "" : `Run start in ${outdated.dir}, where the server was started. `,
     },
     {
       start:
-        nearest.dir === cwd
+        outdated.dir === cwd
           ? { id: "start" }
           : {
               id: "start",
-              flags: { cwd: nearest.dir },
+              flags: { cwd: outdated.dir },
             },
       setup: {
         id: "setup",

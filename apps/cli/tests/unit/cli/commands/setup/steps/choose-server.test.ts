@@ -18,12 +18,10 @@ vi.mock("@/lib/server/local/server", async (importOriginal) => {
 
 import { isCancel, select, text } from "@clack/prompts";
 
-import type { SetupFlags } from "@/cli/commands/setup";
 import { ChooseServer } from "@/cli/commands/setup/steps/choose-server";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { createOrca } from "@/lib/orca";
 import { writeRuntimeMetadata } from "@/lib/server/local/runtime";
 import { Ui } from "@/lib/ui";
 import { LocalServer } from "@/lib/server/local/server";
@@ -114,21 +112,6 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
     useCase: "minimal",
     sso: [],
     ...overrides,
-  };
-}
-
-/**
- * What the step is given when it runs for an interactive setup of a Next.js app.
- *
- * @returns The step's needs.
- */
-function aNeed(): Parameters<ChooseServer["run"]>[0] {
-  return {
-    flags: {} as SetupFlags,
-    orca: createOrca(),
-    app: { framework: "next", devPort: 3000 },
-    scaffoldedFramework: false,
-    answers: setupAnswers(),
   };
 }
 
@@ -328,43 +311,63 @@ describe("ChooseServer", () => {
     });
   });
 
-  describe("when a local server another CLI release started is picked", () => {
-    it("refuses it before anything is created", async ({ dir }) => {
-      await startedLocally(dir, OLDER_VERSION);
-      vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
-      vi.mocked(select).mockResolvedValueOnce(LOCAL);
-
-      const refused = await rejectionOf(() => {
-        return new ChooseServer(aPromptDeps(dir)).run(aNeed());
-      });
-
-      expect(refused).toBeInstanceOf(ZitadelError);
-      expect(refused).toMatchObject({
-        code: "E_CONFLICT",
-        details: { server_url: LOCAL, server_version: OLDER_VERSION },
-      });
-    });
-
-    it("lets the cloud be picked instead", async ({ dir }) => {
+  describe("when the detected local server was started by another CLI release", () => {
+    it("lists it as unavailable, and says to restart it", async ({ dir }) => {
       await startedLocally(dir, OLDER_VERSION);
       vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
-      const settled = await new ChooseServer(aPromptDeps(dir)).run(aNeed());
+      await new ChooseServer(aPromptDeps(dir)).ask(setupAnswers(), { ...CONTEXT, cwd: dir });
 
-      expect(settled.answers.server).toBe(CLOUD);
+      expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toEqual({
+        value: "__local_outdated__",
+        label: "Local server (http://localhost:8080)",
+        hint: "runs 1.0.0, this CLI ships 1.2.3 — restart it first",
+        disabled: true,
+      });
+    });
+
+    it("preselects the cloud", async ({ dir }) => {
+      await startedLocally(dir, OLDER_VERSION);
+      vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
+      vi.mocked(select).mockResolvedValueOnce(CLOUD);
+
+      await new ChooseServer(aPromptDeps(dir)).ask(setupAnswers(), { ...CONTEXT, cwd: dir });
+
+      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: CLOUD });
+    });
+
+    it.for([
+      { how: "as start recorded it", url: LOCAL },
+      { how: "under its other loopback name", url: "http://127.0.0.1:8080" },
+    ])("refuses its URL entered as a custom one, $how", async ({ url }, { dir }) => {
+      await startedLocally(dir, OLDER_VERSION);
+      vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
+      vi.mocked(select).mockResolvedValueOnce(CUSTOM_SERVER);
+      vi.mocked(text).mockResolvedValueOnce(url);
+
+      const refused = await rejectionOf(() => {
+        return new ChooseServer(aPromptDeps(dir)).ask(setupAnswers(), { ...CONTEXT, cwd: dir });
+      });
+
+      expect(refused).toBeInstanceOf(ZitadelError);
+      expect(refused).toMatchObject({
+        code: "E_VALIDATION",
+        message:
+          "That local server runs 1.0.0, but this CLI ships 1.2.3. Restart it first, or enter another URL",
+      });
     });
   });
 
-  describe("when a local server of this CLI's own version is picked", () => {
-    it("writes it", async ({ dir }) => {
+  describe("when the detected local server is this CLI's own release", () => {
+    it("offers it", async ({ dir }) => {
       await startedLocally(dir, BUNDLED_VERSION);
       vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce(LOCAL);
       vi.mocked(select).mockResolvedValueOnce(LOCAL);
 
-      const settled = await new ChooseServer(aPromptDeps(dir)).run(aNeed());
+      await new ChooseServer(aPromptDeps(dir)).ask(setupAnswers(), { ...CONTEXT, cwd: dir });
 
-      expect(settled.answers.server).toBe(LOCAL);
+      expect(vi.mocked(select).mock.calls[0]?.[0].options[1]).toMatchObject({ value: LOCAL });
     });
   });
 });

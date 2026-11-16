@@ -1,11 +1,10 @@
-import { link, mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
   clearStale,
-  removeIfOwnedBy,
   tryLock,
   UNWRITTEN_LOCK_MS,
   withStartLock,
@@ -13,16 +12,8 @@ import {
 import { ManualClock } from "@tests/fixtures/clock";
 import { it } from "@tests/fixtures";
 
-// Real file system calls, with `link` replaceable per test: a file moved aside
-// is linked back, and not every filesystem has hard links.
-vi.mock("node:fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, link: vi.fn(actual.link) };
-});
-
-afterEach(() => {
-  vi.mocked(link).mockClear();
-});
+/** The pid of a start that is no longer running. */
+const DEAD_OWNER = 2147483000;
 
 /**
  * Where a start lock lives under a directory.
@@ -127,93 +118,55 @@ describe("clearStale", () => {
     await expect(readFile(lock, "utf8")).resolves.toBe("2147483000");
   });
 
-  it("clears the way of a start that died while clearing", async ({ dir }) => {
-    const lock = lockPath(dir);
-    await tryLock(lock);
-    await writeFile(`${lock}.clearing`, "2147483000");
+  describe("when a start died while clearing", () => {
+    /**
+     * A lock a dead start left, with the guard of another start that died
+     * while clearing it.
+     *
+     * @param dir - The directory the lock is made under.
+     * @returns The lock file's path.
+     */
+    async function aLockSomeoneDiedClearing(dir: string): Promise<string> {
+      const lock = lockPath(dir);
+      await tryLock(lock);
+      await writeFile(lock, String(DEAD_OWNER));
+      await writeFile(`${lock}.clearing`, String(DEAD_OWNER));
+      return lock;
+    }
 
-    await clearStale(lock, 2147483000);
+    it("still removes the lock", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
 
-    await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
-  });
-});
+      await clearStale(lock, DEAD_OWNER);
 
-describe("removeIfOwnedBy", () => {
-  /** An owner that is not running. */
-  const DEAD_OWNER = 2147483000;
-
-  /** A different owner, which made the file after the dead one was seen. */
-  const NEWER_OWNER = 2147483001;
-
-  /**
-   * A file holding `owner`, in a folder of its own.
-   *
-   * @param dir - The directory to make it under.
-   * @param owner - What the file holds.
-   * @returns The file's path.
-   */
-  async function aFileOwnedBy(dir: string, owner: string): Promise<string> {
-    const file = lockPath(dir);
-    await mkdir(join(dir, "local"), { recursive: true });
-    await writeFile(file, owner);
-    return file;
-  }
-
-  it("removes the file while the owner it was asked about still has it", async ({ dir }) => {
-    const file = await aFileOwnedBy(dir, String(DEAD_OWNER));
-
-    await removeIfOwnedBy(file, DEAD_OWNER);
-
-    await expect(stat(file)).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("leaves the file another owner has made since", async ({ dir }) => {
-    const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
-
-    await removeIfOwnedBy(file, DEAD_OWNER);
-
-    await expect(readFile(file, "utf8")).resolves.toBe(String(NEWER_OWNER));
-  });
-
-  it("leaves nothing beside the file it put back", async ({ dir }) => {
-    const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
-
-    await removeIfOwnedBy(file, DEAD_OWNER);
-
-    await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock"]);
-  });
-
-  describe("when the filesystem has no hard links", () => {
-    /** How a filesystem that cannot hard-link answers `link`. */
-    const NO_HARD_LINKS = Object.assign(new Error("operation not supported"), { code: "ENOTSUP" });
-
-    it("still leaves the file another owner has made since", async ({ dir }) => {
-      const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
-      vi.mocked(link).mockRejectedValueOnce(NO_HARD_LINKS);
-
-      await removeIfOwnedBy(file, DEAD_OWNER);
-
-      await expect(readFile(file, "utf8")).resolves.toBe(String(NEWER_OWNER));
+      await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
     });
 
-    it("leaves nothing beside the file it put back", async ({ dir }) => {
-      const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
-      vi.mocked(link).mockRejectedValueOnce(NO_HARD_LINKS);
+    it("leaves the dead start's guard, so no start that saw it can remove a live one", async ({
+      dir,
+    }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
 
-      await removeIfOwnedBy(file, DEAD_OWNER);
+      await clearStale(lock, DEAD_OWNER);
 
-      await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock"]);
+      await expect(readFile(`${lock}.clearing`, "utf8")).resolves.toBe(String(DEAD_OWNER));
     });
-  });
 
-  it("leaves a file with no owner yet, because its owner may be about to write", async ({
-    dir,
-  }) => {
-    const file = await aFileOwnedBy(dir, "");
+    it("leaves nothing of its own behind", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
 
-    await removeIfOwnedBy(file, undefined);
+      await clearStale(lock, DEAD_OWNER);
 
-    await expect(stat(file)).resolves.toBeDefined();
+      await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock.clearing"]);
+    });
+
+    it("does nothing while the start that took over from it is clearing", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
+      await writeFile(`${lock}.clearing.2`, String(process.pid));
+
+      await expect(clearStale(lock, DEAD_OWNER)).resolves.toBe(false);
+      await expect(readFile(lock, "utf8")).resolves.toBe(String(DEAD_OWNER));
+    });
   });
 });
 

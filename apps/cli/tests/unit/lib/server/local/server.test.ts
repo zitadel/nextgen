@@ -1,13 +1,15 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
+import { ensureLocalAdmin, type LocalAdmin } from "@/lib/server/local/admin-credential";
 import { BinaryLauncher } from "@/lib/server/local/internal/binary-launcher";
 import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
+  localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
 import { LocalServer } from "@/lib/server/local/server";
@@ -17,6 +19,21 @@ import { forcedConsent } from "@tests/helpers/consent";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { it } from "@tests/unit/lib/server/local/occupied-port";
+
+// The real credential code, replaceable per test: what it does while it runs
+// is how a test sees that the start lock is held around it.
+vi.mock("@/lib/server/local/admin-credential", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/local/admin-credential")>();
+  return { ...actual, ensureLocalAdmin: vi.fn(actual.ensureLocalAdmin) };
+});
+
+/** A local admin, for a test that is not about its fields. */
+const AN_ADMIN: LocalAdmin = {
+  email: "admin@zitadel.localhost",
+  password: "not-a-real-password",
+  user_id: "user_localadmin",
+  team_id: "team_localadmin",
+};
 
 /** The start a refused start would offer again. */
 const RETRY = aSuggest()({ id: "start" });
@@ -57,6 +74,36 @@ async function directoryRecording(cwd: string, pid: number, command: string): Pr
 }
 
 describe("LocalServer", () => {
+  describe("ensureAdmin", () => {
+    it("creates the directory's local admin", async ({ dir }) => {
+      const { admin } = await at(dir).ensureAdmin();
+
+      expect(admin).toMatchObject({ email: "admin@zitadel.localhost" });
+    });
+
+    it("holds the directory's start lock while it does, so a second start waits", async ({
+      dir,
+    }) => {
+      const heldBy: string[] = [];
+      vi.mocked(ensureLocalAdmin).mockImplementationOnce(async () => {
+        heldBy.push(await readFile(join(localRuntimePaths(dir).runtimeDir, "start.lock"), "utf8"));
+        return { admin: AN_ADMIN, userFile: "" };
+      });
+
+      await at(dir).ensureAdmin();
+
+      expect(heldBy).toEqual([String(process.pid)]);
+    });
+
+    it("gives the lock back", async ({ dir }) => {
+      await at(dir).ensureAdmin();
+
+      await expect(
+        stat(join(localRuntimePaths(dir).runtimeDir, "start.lock")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+  });
+
   describe("status", () => {
     it("is missing for a directory that never started a server", async ({ dir }) => {
       await expect(at(dir).status()).resolves.toMatchObject({

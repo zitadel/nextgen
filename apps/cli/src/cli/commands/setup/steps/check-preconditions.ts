@@ -115,7 +115,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
    *
    * A local server another CLI release started is refused when `--server` names it
    * ({@link refuseOutdatedLocalServer}). Without `--server` the run is about the cloud until the
-   * wizard asks, so the server it picks is checked once picked.
+   * wizard asks, and its question does not offer such a server.
    *
    * @param needs - The flags.
    * @returns What was settled about the run.

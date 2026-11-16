@@ -1,11 +1,15 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { execa } from "execa";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("execa", () => ({ execa: vi.fn() }));
 
 const mockExeca = vi.mocked(execa);
 
 import { discoverManagedRuntimeProcesses } from "@/lib/server/local/processes";
+import { it } from "@tests/fixtures";
 
 /** Answers each `ps` the code runs from `impl`, which gets its arguments and returns its stdout. */
 function whenPs(impl: (args: readonly string[]) => string): void {
@@ -13,6 +17,18 @@ function whenPs(impl: (args: readonly string[]) => string): void {
     expect(file).toBe("ps");
     return Promise.resolve({ stdout: impl(args), stderr: "", exitCode: 0 });
   }) as never);
+}
+
+/**
+ * An empty file at `path`, in a folder made for it.
+ *
+ * @param path - Where the file goes.
+ * @returns The path.
+ */
+async function aFileAt(path: string): Promise<string> {
+  await mkdir(join(path, ".."), { recursive: true });
+  await writeFile(path, "");
+  return path;
 }
 
 beforeEach(() => {
@@ -135,6 +151,58 @@ describe("discoverManagedRuntimeProcesses", () => {
     const discovery = await discoverManagedRuntimeProcesses();
 
     expect(discovery.processes).toMatchObject([{ kind: "server-wrapper", pid: 890 }]);
+  });
+
+  it.each([
+    ["a module to require first", "--require ./hook.js"],
+    ["a module to preload", "-r dotenv/config"],
+    ["a subcommand and its flags", "run --allow-all"],
+  ])("finds the wrapper a runtime is given %s before", async (_, options) => {
+    whenPs((args) => {
+      return args[0] === "axww"
+        ? ` 901 1 /usr/local/bin/node ${options} /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js\n`
+        : "";
+    });
+
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery.processes).toMatchObject([{ kind: "server-wrapper", pid: 901 }]);
+  });
+
+  describe("when a path has a space in it", () => {
+    it("finds the wrapper installed under it", async ({ dir }) => {
+      const script = await aFileAt(join(dir, "Jane Doe/app/bin/zitadel-server.js"));
+      whenPs((args) => {
+        return args[0] === "axww" ? ` 912 1 /usr/local/bin/node ${script} start\n` : "";
+      });
+
+      const discovery = await discoverManagedRuntimeProcesses();
+
+      expect(discovery.processes).toMatchObject([{ kind: "server-wrapper", pid: 912 }]);
+    });
+
+    it("finds the wrapper a runtime installed under it runs", async ({ dir }) => {
+      const runtime = await aFileAt(join(dir, "Jane Doe/bin/node"));
+      whenPs((args) => {
+        return args[0] === "axww" ? ` 923 1 ${runtime} /tmp/app/bin/zitadel-server.js\n` : "";
+      });
+
+      const discovery = await discoverManagedRuntimeProcesses();
+
+      expect(discovery.processes).toMatchObject([{ kind: "server-wrapper", pid: 923 }]);
+    });
+
+    it("leaves out a tool node runs on a wrapper under it", async ({ dir }) => {
+      const tool = await aFileAt(join(dir, "bin/prettier"));
+      const script = await aFileAt(join(dir, "Jane Doe/app/bin/zitadel-server.js"));
+      whenPs((args) => {
+        return args[0] === "axww" ? ` 934 1 /usr/local/bin/node ${tool} ${script}\n` : "";
+      });
+
+      const discovery = await discoverManagedRuntimeProcesses();
+
+      expect(discovery.processes).toEqual([]);
+    });
   });
 
   it("reports unsupported discovery instead of throwing", async () => {

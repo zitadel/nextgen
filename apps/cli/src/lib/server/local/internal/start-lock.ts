@@ -1,5 +1,4 @@
-import { randomBytes } from "node:crypto";
-import { link, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
@@ -51,7 +50,9 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
       return async () => {
         // Only the owner's own lock is removed, so a release that comes after
         // someone else has taken the lock over cannot remove theirs.
-        await removeIfOwnedBy(lockFile, process.pid);
+        if ((await readOwner(lockFile)) === process.pid) {
+          await rm(lockFile, { force: true });
+        }
       };
     } catch (error) {
       if (!isErrno(error, "EEXIST")) {
@@ -98,97 +99,67 @@ async function isUnwritten(lockFile: string): Promise<boolean> {
  * Removes the lock of a dead owner. Two starts that both saw the same dead owner
  * must not both remove it: the first would then take the lock, and the second,
  * removing it a moment later, would remove the first's live one. So removal
- * itself is exclusive (a second file, created the same way), and the owner is
- * read again once it is held: if the lock has a different owner by then, it is
- * not the stale one and stays. `false` when another start is clearing it.
- *
- * A guard whose own owner died is recovered the same way a lock is released:
- * only if it is still that dead owner's, so a start that saw it a moment ago
- * cannot remove the live guard another start has made since.
+ * itself is exclusive (a guard, see {@link takeGuard}), and the owner is read
+ * again once it is held: if the lock has a different owner by then, it is not
+ * the stale one and stays. `false` when another start is clearing it.
  */
 export async function clearStale(
   lockFile: string,
   staleOwner: number | undefined,
 ): Promise<boolean> {
-  const guardFile = `${lockFile}.clearing`;
-  try {
-    await createOwned(guardFile);
-  } catch (error) {
-    if (!isErrno(error, "EEXIST")) {
-      throw error;
-    }
-    const clearing = await readOwner(guardFile);
-    if (clearing === undefined ? await isUnwritten(guardFile) : !isAlive(clearing)) {
-      await removeIfOwnedBy(guardFile, clearing);
-    }
+  const release = await takeGuard(`${lockFile}.clearing`);
+  if (!release) {
     return false;
   }
   try {
-    await removeIfOwnedBy(lockFile, staleOwner);
+    if ((await readOwner(lockFile)) === staleOwner) {
+      await rm(lockFile, { force: true });
+    }
   } finally {
-    await removeIfOwnedBy(guardFile, process.pid);
+    await release();
   }
   return true;
 }
 
-/**
- * Removes `file` only while `owner` holds it; `undefined` stands for an owner
- * that never wrote its pid, and only once it has stayed that way
- * ({@link isUnwritten}).
- *
- * Reading the owner and then removing the file would remove whatever is there
- * by the time of the removal, which may be a live lock made in between. So the
- * file is first moved aside, which takes that very file and no other, and the
- * owner is read from what was moved. A file someone else owns is put back
- * ({@link putBack}).
- */
-export async function removeIfOwnedBy(file: string, owner: number | undefined): Promise<void> {
-  const aside = `${file}.${process.pid}.${randomBytes(6).toString("hex")}.aside`;
-  try {
-    await rename(file, aside);
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return;
-    }
-    throw error;
-  }
-  const found = await readOwner(aside);
-  if (found === owner && (owner !== undefined || (await isUnwritten(aside)))) {
-    await rm(aside, { force: true });
-    return;
-  }
-  await putBack(aside, file);
-}
+/** How many starts may have died while clearing one lock before the next stops trying to clear it. */
+const GUARD_GENERATIONS = 32;
 
 /**
- * Puts a file moved aside back where it was, never over one made there since:
- * that one is newer and stays, and the moved one is dropped.
+ * Takes the guard that makes clearing a lock exclusive, or `undefined` while a
+ * live start has it.
  *
- * A link never replaces a file, so it is the way back wherever the filesystem
- * has hard links. Where it does not, the file is renamed back once nothing is
- * there; the moved file is never removed before it is back, so a filesystem
- * that refuses the link cannot cost its owner the lock.
+ * The guard is a file created exclusively, like the lock. A start that died
+ * while holding it leaves it behind, and that file is never removed: a file
+ * can only be removed by its path, so a start that saw the dead owner a moment
+ * ago could remove the live guard another start has made there since, and two
+ * starts would clear at once. A dead guard is passed over instead, for the
+ * next file in line. A file is only reached past dead ones, and dead ones stay,
+ * so one live start holds the guard at a time. Only the holder removes its own
+ * file. Each start that dies while clearing costs one small file.
  */
-async function putBack(aside: string, file: string): Promise<void> {
-  try {
-    await link(aside, file);
-  } catch (error) {
-    if (!isErrno(error, "EEXIST") && !(await exists(file))) {
-      await rename(aside, file);
-      return;
+async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | undefined> {
+  for (const file of [
+    guardFile,
+    ...Array.from({ length: GUARD_GENERATIONS - 1 }, (_, index) => {
+      return `${guardFile}.${index + 2}`;
+    }),
+  ]) {
+    try {
+      await createOwned(file);
+      return async () => {
+        await rm(file, { force: true });
+      };
+    } catch (error) {
+      if (!isErrno(error, "EEXIST")) {
+        throw error;
+      }
+    }
+    const holder = await readOwner(file);
+    if (holder === undefined ? !(await isUnwritten(file)) : isAlive(holder)) {
+      return undefined;
     }
   }
-  await rm(aside, { force: true });
-}
-
-/** Whether anything is at `path`. */
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
+  return undefined;
 }
 
 async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {
