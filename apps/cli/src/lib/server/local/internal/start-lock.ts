@@ -139,8 +139,8 @@ export async function clearStale(
  * Reading the owner and then removing the file would remove whatever is there
  * by the time of the removal, which may be a live lock made in between. So the
  * file is first moved aside, which takes that very file and no other, and the
- * owner is read from what was moved. A file someone else owns is linked back,
- * which never replaces one made in the meantime.
+ * owner is read from what was moved. A file someone else owns is put back
+ * ({@link putBack}).
  */
 export async function removeIfOwnedBy(file: string, owner: number | undefined): Promise<void> {
   const aside = `${file}.${process.pid}.${randomBytes(6).toString("hex")}.aside`;
@@ -152,18 +152,42 @@ export async function removeIfOwnedBy(file: string, owner: number | undefined): 
     }
     throw error;
   }
+  const found = await readOwner(aside);
+  if (found === owner && (owner !== undefined || (await isUnwritten(aside)))) {
+    await rm(aside, { force: true });
+    return;
+  }
+  await putBack(aside, file);
+}
+
+/**
+ * Puts a file moved aside back where it was, never over one made there since:
+ * that one is newer and stays, and the moved one is dropped.
+ *
+ * A link never replaces a file, so it is the way back wherever the filesystem
+ * has hard links. Where it does not, the file is renamed back once nothing is
+ * there; the moved file is never removed before it is back, so a filesystem
+ * that refuses the link cannot cost its owner the lock.
+ */
+async function putBack(aside: string, file: string): Promise<void> {
   try {
-    const found = await readOwner(aside);
-    if (found === owner && (owner !== undefined || (await isUnwritten(aside)))) {
+    await link(aside, file);
+  } catch (error) {
+    if (!isErrno(error, "EEXIST") && !(await exists(file))) {
+      await rename(aside, file);
       return;
     }
-    await link(aside, file).catch((error: unknown) => {
-      if (!isErrno(error, "EEXIST")) {
-        throw error;
-      }
-    });
-  } finally {
-    await rm(aside, { force: true });
+  }
+  await rm(aside, { force: true });
+}
+
+/** Whether anything is at `path`. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 

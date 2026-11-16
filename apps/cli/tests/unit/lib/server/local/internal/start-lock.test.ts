@@ -1,7 +1,7 @@
-import { mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import {
   clearStale,
@@ -12,6 +12,17 @@ import {
 } from "@/lib/server/local/internal/start-lock";
 import { ManualClock } from "@tests/fixtures/clock";
 import { it } from "@tests/fixtures";
+
+// Real file system calls, with `link` replaceable per test: a file moved aside
+// is linked back, and not every filesystem has hard links.
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, link: vi.fn(actual.link) };
+});
+
+afterEach(() => {
+  vi.mocked(link).mockClear();
+});
 
 /**
  * Where a start lock lives under a directory.
@@ -170,6 +181,29 @@ describe("removeIfOwnedBy", () => {
     await removeIfOwnedBy(file, DEAD_OWNER);
 
     await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock"]);
+  });
+
+  describe("when the filesystem has no hard links", () => {
+    /** How a filesystem that cannot hard-link answers `link`. */
+    const NO_HARD_LINKS = Object.assign(new Error("operation not supported"), { code: "ENOTSUP" });
+
+    it("still leaves the file another owner has made since", async ({ dir }) => {
+      const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
+      vi.mocked(link).mockRejectedValueOnce(NO_HARD_LINKS);
+
+      await removeIfOwnedBy(file, DEAD_OWNER);
+
+      await expect(readFile(file, "utf8")).resolves.toBe(String(NEWER_OWNER));
+    });
+
+    it("leaves nothing beside the file it put back", async ({ dir }) => {
+      const file = await aFileOwnedBy(dir, String(NEWER_OWNER));
+      vi.mocked(link).mockRejectedValueOnce(NO_HARD_LINKS);
+
+      await removeIfOwnedBy(file, DEAD_OWNER);
+
+      await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock"]);
+    });
   });
 
   it("leaves a file with no owner yet, because its owner may be about to write", async ({
