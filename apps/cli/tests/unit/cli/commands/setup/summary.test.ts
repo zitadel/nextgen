@@ -11,8 +11,7 @@ import {
 import type { InitialCommitOutcome } from "@/cli/commands/setup/steps/make-initial-commit";
 import { ShowResult } from "@/cli/commands/setup/steps/show-result";
 import type { CommandResult } from "@/lib/oclif";
-import { path as stylePath } from "@/lib/style";
-import { type Section, Ui } from "@/lib/ui";
+import { type Section, Ui, style } from "@/lib/ui";
 import type { ScaffoldedProvider } from "@/lib/zitadel";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
@@ -412,7 +411,7 @@ describe("ShowResult", () => {
         sectionsOf(answer)
           .find((section) => section.heading === "Installed")
           ?.facts.find(([label]) => label === "Package") ?? [];
-      expect(value).toContain(stylePath("package.json"));
+      expect(value).toContain(style.path("package.json"));
       expect(value).not.toContain("\\x1b");
     });
   });

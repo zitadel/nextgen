@@ -22,7 +22,7 @@ import {
 
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -194,7 +194,7 @@ export class ChooseSocialSignIn extends WizardStep<"socialSignIn", Fact<"answers
     }
     const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
     if (loopback !== undefined) {
-      reportWarning(loopback);
+      warnings.report(loopback);
     }
     const entry = providerOf(selection);
     const endpoints: ConnectionEndpoints | undefined =

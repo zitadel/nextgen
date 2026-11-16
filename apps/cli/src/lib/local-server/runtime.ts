@@ -4,15 +4,16 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
-import { isTrainVersion } from "@/lib/public-cli";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 import { isLoopbackHost } from "@/lib/host";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
+import { CliPackage } from "@/lib/upgrade";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -48,7 +49,7 @@ export async function readPlatformRuntime(
 ): Promise<{ publishable_key: string } | undefined> {
   try {
     const res = await fetch(new URL("/console/runtime.json", serverUrl), {
-      headers: { "user-agent": userAgent() },
+      headers: { "user-agent": Runtime.current().userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
@@ -183,7 +184,7 @@ export function localServerUrl(port: number): string {
 
 export function defaultLocalServerImageForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
-  if (isTrainVersion(normalized)) {
+  if (CliPackage.isTrain(normalized)) {
     return `${LOCAL_SERVER_IMAGE_NAME}:${normalized}`;
   }
   return DEFAULT_LOCAL_SERVER_IMAGE;
@@ -387,7 +388,7 @@ export async function checkLocalServerHealth(
   try {
     const readyUrl = new URL("/readyz", serverUrl);
     const response = await fetch(readyUrl, {
-      headers: { "user-agent": userAgent() },
+      headers: { "user-agent": Runtime.current().userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
     // Only the status is wanted; the body is read to the end so the abort timer has

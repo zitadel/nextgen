@@ -20,12 +20,13 @@ import {
 } from "@/lib/orca/patchers/rule/angular/templates";
 import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
 import type { PatchContext, PatchExecOptions } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { aProxyConfApp, type DevApp } from "@tests/helpers/vite";
+import { CliPackage } from "@/lib/upgrade";
 
 /** The bearer hook setup writes: the exchange with and without the API prefix. */
 const BEARER = `/* zitadel:proxy:v3 */
@@ -67,6 +68,7 @@ function ctx(projectId = "proj-1"): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };
 }
 
@@ -107,7 +109,7 @@ function sessionCookieVerdict(): NonNullable<Extract<FileOp, { kind: "edit" }>["
 }
 
 /** The managed proxy.conf.cjs the first CLI alphas wrote: it read zitadel.json, and had no `env`. */
-const FIRST_ALPHA_PROXY_CONF = `${MANAGED_MARKER}
+const FIRST_ALPHA_PROXY_CONF = `${ManagedFile.MARKER}
 const { readFileSync } = require("node:fs");
 
 const config = JSON.parse(readFileSync("zitadel.json", "utf8"));
@@ -223,16 +225,16 @@ describe("AngularPatcher.plan", () => {
 
   it("writes the managed root component, template, and proxy config", () => {
     const plan = new AngularPatcher().plan(ctx());
-    expect(writeContents(plan, "src/app/app.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/app/app.ts")).toContain(ManagedFile.MARKER);
     const appHtml = writeContents(plan, "src/app/app.html");
-    expect(appHtml).toContain(MANAGED_MARKER);
+    expect(appHtml).toContain(ManagedFile.MARKER);
     expect(appHtml).toContain(`[postSignInUrl]="'/profile'"`);
     expect(appHtml).toContain(`[postSignOutUrl]="'/login'"`);
     expect(plan.ops.some((op) => op.kind === "edit" && op.path === "src/app/app.routes.ts")).toBe(
       true,
     );
     const proxy = proxyConfigEdit()(undefined);
-    expect(proxy).toContain(MANAGED_MARKER);
+    expect(proxy).toContain(ManagedFile.MARKER);
     expect(proxy).toContain(BEARER);
     // The backend by its own name, the app's origin in X-Forwarded-*.
     expect(proxy).toContain("    changeOrigin: true,\n    xfwd: true,\n");
@@ -347,7 +349,7 @@ describe("AngularPatcher.plan", () => {
   });
 
   it("leaves an unmanaged proxy without the session-cookie hooks", () => {
-    const custom = bearerOnlyProxyConf().replace(`${MANAGED_MARKER}\n`, "");
+    const custom = bearerOnlyProxyConf().replace(`${ManagedFile.MARKER}\n`, "");
 
     expect(sessionCookieEdit()(custom)).toBe(custom);
   });
@@ -382,7 +384,7 @@ describe("AngularPatcher.plan", () => {
   });
 
   it("leaves an unmanaged proxy that keeps the browser's Host alone", () => {
-    const custom = previousProxyConf().replace(`${MANAGED_MARKER}\n`, "");
+    const custom = previousProxyConf().replace(`${ManagedFile.MARKER}\n`, "");
 
     expect(proxyConfigEdit()(custom)).toBe(custom);
   });
@@ -482,7 +484,7 @@ describe("AngularPatcher.plan", () => {
 
   it("leaves an unmanaged proxy alone, and reads it as unknown while it knows only the bare exchange", () => {
     const custom = proxyConfigEdit()(undefined)
-      .replace(`${MANAGED_MARKER}\n`, "")
+      .replace(`${ManagedFile.MARKER}\n`, "")
       .replace(BEARER, V2_BEARER);
 
     expect(proxyConfApiPrefixEdit()(custom)).toBe(custom);

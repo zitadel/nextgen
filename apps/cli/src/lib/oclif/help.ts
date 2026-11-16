@@ -1,8 +1,7 @@
 import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/core";
 
-import { exploreAllCommands } from "@/lib/journey-guidance";
-import { showSkillsHint } from "@/lib/skills-hint";
-import { suggesterFor } from "@/lib/suggestion";
+import { Skills } from "@/lib/skills";
+import { Spelling, suggesterFor } from "@/lib/suggestion";
 
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
 import { aliasedCommands, aliasedNouns } from "./plural-aliases";
@@ -87,11 +86,9 @@ export default class ZitadelHelp extends Help {
     ];
     // Only a bare `zitadel`, not `zitadel --help` or an unknown command's help.
     if (process.argv.length <= 2) {
-      await showSkillsHint({
-        env: process.env,
-        interactive: Boolean(process.stdout.isTTY && process.stdin.isTTY),
-        skillsAdd: suggesterFor(this.config, {}, this.config.version)({ id: "skills:add" }),
-      });
+      await new Skills(process.env, Boolean(process.stdout.isTTY && process.stdin.isTTY)).showHint(
+        suggesterFor(this.config, {}, this.config.version)({ id: "skills:add" }),
+      );
     }
     this.log(sections.join("\n\n"));
   }
@@ -100,12 +97,12 @@ export default class ZitadelHelp extends Help {
     const id = aliasedCommands(this.config.commands).get(command.id);
     const declared = id === undefined ? undefined : this.config.findCommand(id);
     await super.showCommandHelp(declared ?? command);
-    this.log(exploreAllCommands(this.config.version));
+    this.log(Spelling.at(this.config.version).exploreAllCommands());
   }
 
   override async showTopicHelp(topic: Interfaces.Topic): Promise<void> {
     await super.showTopicHelp(topic);
-    this.log(exploreAllCommands(this.config.version));
+    this.log(Spelling.at(this.config.version).exploreAllCommands());
   }
 
   /**

@@ -1854,11 +1854,7 @@ function deploymentResponse(
     id: deployment.id,
     project_id: deployment.projectId,
     release_id: deployment.releaseId,
-    targets: targets.map((target) =>
-      target.expiresAt === null
-        ? { origin: target.origin }
-        : { origin: target.origin, expires_at: target.expiresAt },
-    ),
+    targets: targets.map((target) => ({ origin: target.origin })),
     kind: deploymentKind(deployment),
     status,
     deployed_at: deployment.deployedAt,
@@ -2489,7 +2485,11 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const origin = record.origin;
+      const releaseId = query.data.release_id;
       const live = liveRaw === "true";
+      const ofRelease = (deployment: DeploymentRecord): boolean => {
+        return releaseId === undefined || deployment.releaseId === releaseId;
+      };
 
       const deployments = projectDeployments(query.data.project_id);
       const served = servedOrigins(query.data.project_id, deployments);
@@ -2500,13 +2500,16 @@ export function setupPlatformHandlers() {
         if (origin !== undefined) {
           asked = servedOn(query.data.project_id, origin, served);
         }
-        items = liveGroups(served, asked).map((group) => {
+        const groups = liveGroups(served, asked).filter((group) => {
+          return ofRelease(group.deployment);
+        });
+        items = groups.map((group) => {
           return deploymentResponse(group.deployment, serving, group.targets, {
             release: expandRelease,
           });
         });
       } else {
-        let named = deployments;
+        let named = deployments.filter(ofRelease);
         if (origin !== undefined) {
           named = named.filter((deployment) => {
             return deployment.targets.some((target) => {

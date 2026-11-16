@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "@/cli/commands/branding/eject";
-import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { MetaSchemas } from "@/lib/meta-schemas";
 import { BRANDING_DESIGN_INFO } from "@/lib/zitadel";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
@@ -88,7 +88,7 @@ describe("branding eject", () => {
 
     await eject(cwd);
 
-    const expected = projectMetaSchemas(cliVersion.version).find(
+    const expected = MetaSchemas.of(cliVersion.version).files.find(
       (file) => file.path === ".zitadel/meta/branding.json",
     );
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
@@ -103,7 +103,7 @@ describe("branding eject", () => {
     const res = await eject(cwd);
 
     expect(res.exitCode, res.stderr).toBe(0);
-    const expected = projectMetaSchemas(cliVersion.version).find(
+    const expected = MetaSchemas.of(cliVersion.version).files.find(
       (file) => file.path === ".zitadel/meta/branding.json",
     );
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");

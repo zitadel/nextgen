@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { DeploymentService } from "@/lib/backend";
+import { type Deployment, DeploymentService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -10,6 +10,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
@@ -30,7 +31,15 @@ const LIMIT = {
   },
 } as const satisfies Refused<number>;
 
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+const COLUMNS = [
+  "id",
+  "release_id",
+  "reason",
+  "origins",
+  "deployed_at",
+  "kind",
+  "expires",
+] as const;
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -40,6 +49,12 @@ const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as cons
  * full history. Like every list verb it fetches one page and reports
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
  * walk it a page at a time.
+ *
+ * `kind` says whether a deployment served primary origins or previews.
+ * `expires` is the live expiry of the preview a live preview deployment made
+ * on the origins it still serves, the earliest when it serves several, and
+ * empty for any other deployment. It is also empty, with a warning, when the
+ * live view or the previews cannot be read.
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
@@ -89,6 +104,17 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       },
     );
 
+    const serving = this.isJson
+      ? new Map<string, Deployment>()
+      : await PreviewExpiries.reading(() => {
+          return deploymentService.servingLivePreviews(listed.items, flags.live === true);
+        }, new Map<string, Deployment>());
+    const expiries = await PreviewExpiries.of(client, projectId).live(
+      [...serving.values()].flatMap((deployment) => {
+        return deployment.origins;
+      }),
+    );
+
     const items = listed.items;
     const rows = items.map((deployment) => {
       return {
@@ -97,6 +123,8 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         reason: deployment.reason ?? "deploy",
         origins: deployment.origins.join(", "),
         deployed_at: deployment.deployed_at,
+        kind: deployment.kind,
+        expires: serving.get(deployment.id)?.expiryAmong(expiries) ?? "",
       };
     });
     const columns = COLUMNS;

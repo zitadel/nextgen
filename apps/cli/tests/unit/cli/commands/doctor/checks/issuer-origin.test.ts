@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { IssuerOriginCheck } from "@/cli/commands/doctor/checks";
 import { createZitadelClient } from "@/lib/backend";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
@@ -159,7 +159,7 @@ function projectAnswers(answer: () => Response): void {
 }
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 describe("IssuerOriginCheck.run", () => {
@@ -321,7 +321,7 @@ describe("IssuerOriginCheck.fix", () => {
 
       await check.fix(aCheckContext(dir, { consent: forced() }));
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(warnings.take()).toEqual([
         `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       ]);
     });

@@ -10,11 +10,10 @@ import {
   type SecretPublisher,
   storeClientSecret,
 } from "@/lib/idp";
-import { log } from "@/lib/log";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
+import { log, warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -93,7 +92,7 @@ export class PublishCredentials extends WizardStep<
         ? undefined
         : new VariableService(
             createZitadelClient({
-              userAgent: userAgent(),
+              userAgent: Runtime.current().userAgent(),
               baseUrl: answers.server,
               token: project.project_secret,
               signal: this.deps.signal,
@@ -187,7 +186,7 @@ export class PublishCredentials extends WizardStep<
     });
     this.deps.signal.throwIfAborted();
     if (answer.endpoints?.issuer !== undefined) {
-      reportWarning(
+      warnings.report(
         `${providerOf(answer.selection).displayName} points at ` +
           `${answer.endpoints.issuer}, not the provider`,
       );
@@ -241,11 +240,11 @@ export class PublishCredentials extends WizardStep<
         return;
       }
       case "deferred": {
-        reportWarning(`${name} was not published to the project. Publish it with: ${republish}`);
+        warnings.report(`${name} was not published to the project. Publish it with: ${republish}`);
         return;
       }
       case "failed": {
-        reportWarning(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+        warnings.report(`${name} could not be published. Sign-in fails until it is: ${republish}`);
         return;
       }
     }

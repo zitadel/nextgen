@@ -18,7 +18,7 @@ import {
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
 import { andTheRest, pipedFrom } from "@/lib/suggestion";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -138,7 +138,7 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
     }
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
-      reportWarning(loopback);
+      warnings.report(loopback);
     }
     if (flags.ssoClientId === undefined) {
       return {

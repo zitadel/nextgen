@@ -1,6 +1,7 @@
 import { execa } from "execa";
 
-import { ZitadelError, isErrno } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 
 import {
   EMPTY_ENV,

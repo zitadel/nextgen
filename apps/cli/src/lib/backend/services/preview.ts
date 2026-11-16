@@ -4,6 +4,9 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 
+/** The most previews the API returns in one page, so a search takes the fewest requests. */
+const PAGE_SIZE = 100;
+
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListProjectPreviews200PreviewsItem;
 
@@ -44,6 +47,39 @@ export class PreviewService extends ApiService {
    */
   async list(): Promise<readonly LivePreview[]> {
     return this.client.listProjectPreviews.all(this.projectId);
+  }
+
+  /**
+   * Read when some previews expire, without reading more of the list than it
+   * takes. The API cannot filter previews by origin, so this walks the pages
+   * and stops at the first one that completes the answer. An origin with no
+   * live preview never completes it, so asking for one reads every page.
+   *
+   * @param origins - The preview origins to look for.
+   * @returns The expiry of each origin that still has a live preview, by
+   *   origin. An origin with no live preview is absent. No request is made
+   *   for an empty set.
+   */
+  async expiries(origins: ReadonlySet<string>): Promise<ReadonlyMap<string, string>> {
+    const found = new Map<string, string>();
+    if (origins.size === 0) {
+      return found;
+    }
+    const paging = new Paging(pagedFunctions.listProjectPreviews);
+    const pages = this.client.listProjectPreviews.pages(this.projectId, {
+      limit: PAGE_SIZE,
+    });
+    for await (const page of pages) {
+      for (const preview of paging.items(page)) {
+        if (origins.has(preview.origin)) {
+          found.set(preview.origin, preview.expires_at);
+        }
+      }
+      if (found.size === origins.size) {
+        break;
+      }
+    }
+    return found;
   }
 
   /**

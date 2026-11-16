@@ -1,7 +1,7 @@
 import { posix } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { isEnvironmentName } from "@/lib/environment";
+import { Environment } from "@/lib/environment";
 
 import { nonBlankString } from "./flags";
 import { refusalError } from "./refusal";
@@ -15,7 +15,7 @@ import { refusalError } from "./refusal";
 const environmentNameFlag = Flags.custom<string>({
   parse: async (given) => {
     const input = given.trim();
-    if (!isEnvironmentName(input)) {
+    if (!Environment.isName(input)) {
       throw refusalError(
         {
           message: '"{value}" is not a usable environment name',

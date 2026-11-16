@@ -11,8 +11,8 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { readingFrom, type SuggestInput, WHAT_CHANGED } from "@/lib/suggestion";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
-import { reportWarning } from "@/lib/warnings";
+import { VariableView, type VariableType } from "@/lib/variable";
+import { warnings } from "@/lib/ui";
 
 import { variableNameArg } from "./name";
 
@@ -79,7 +79,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       description: "Store the value encrypted. It can be replaced later but never read back.",
     }),
     as: Flags.option({
-      options: VARIABLE_TYPES,
+      options: VariableView.TYPES,
       default: "string",
       description: "Store the value as this JSON type.",
     })(),
@@ -103,7 +103,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     if (write.secret && args.value !== undefined) {
       throw refusalError(SECRET_VALUE_REFUSAL, {});
     }
-    if (args.value !== undefined && !parseVariableValue(args.value, flags.as).ok) {
+    if (args.value !== undefined && !VariableView.parse(args.value, flags.as).ok) {
       throw refusalError(VALUE_TYPE_REFUSAL, {
         value: args.value,
         as: flags.as,
@@ -166,7 +166,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         "value.txt",
       ),
       parse: (raw: string) => {
-        return parseVariableValue(raw, flags.as);
+        return VariableView.parse(raw, flags.as);
       },
     };
     const value = write.secret
@@ -206,7 +206,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         // reported as unknown, not as empty: the value is on the project either
         // way, and saying it holds nothing would be wrong.
         for (const unverified of written.unverified) {
-          reportWarning(
+          warnings.report(
             `${args.name} was set, but what it now holds in the ${unverified.kind} kind could not be read: ${errorMessage(unverified.cause)}`,
           );
         }
@@ -333,7 +333,7 @@ function stateCell(state: KindState): string {
   if (!state.held) {
     return "(not set)";
   }
-  return heldCell(
+  return VariableView.held(
     state.secret
       ? {
           secret: true,

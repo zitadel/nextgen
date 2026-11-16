@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PublishCredentials } from "@/cli/commands/setup/steps/publish-credentials";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { acmeSelection, clientId, clientSecret, secretVariable } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
 
@@ -48,7 +48,7 @@ function depsFor(overrides: Partial<Deps> = {}): Deps {
 }
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 describe("PublishCredentials", () => {
@@ -64,7 +64,7 @@ describe("PublishCredentials", () => {
   it("warns with a runnable command for each, and marks the secret as one", async () => {
     await new PublishCredentials(depsFor()).run(NEEDS);
 
-    const [idWarning, secretWarning] = takeReportedWarnings();
+    const [idWarning, secretWarning] = warnings.take();
     expect(idWarning).toMatch(
       /ACME_CLIENT_ID was not published to the project\. .*npx .+ variable set ACME_CLIENT_ID$/,
     );
@@ -77,13 +77,13 @@ describe("PublishCredentials", () => {
       depsFor({ suggest: aSuggest({ env: "production" }, "1.0.0-alpha.23") }),
     ).run(NEEDS);
 
-    expect(takeReportedWarnings()[0]).toContain("variable set ACME_CLIENT_ID --env production");
+    expect(warnings.take()[0]).toContain("variable set ACME_CLIENT_ID --env production");
   });
 
   it("publishes nothing on a dry run", async () => {
     const { ssoOutcomes } = await new PublishCredentials(depsFor({ dryRun: true })).run(NEEDS);
 
     expect(ssoOutcomes.size).toBe(0);
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(warnings.take()).toEqual([]);
   });
 });

@@ -63,6 +63,7 @@ export function SchemaPicker({
         }))}
         selected={selected ? [selected.id] : []}
         searchPlaceholder="Search schemas"
+        label="Schemas"
         emptyLabel="No schemas found."
         onSelect={onSelect}
         onClose={() => setOpen(false)}

@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { PublishCredentials } from "@/cli/commands/auth-method/sso/enable/steps/publish-credentials";
 import { createZitadelClient } from "@/lib/backend";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { Environment } from "@/lib/environment";
+import { warnings } from "@/lib/ui";
 import { Connection } from "@/lib/zitadel";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { anAcmeSsoConnection } from "@tests/helpers/connections";
 import { clientId, clientSecret, idVariable, secretVariable } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
+
+/**
+ * The environment the run resolved, as it would be with nothing set.
+ */
+const ENVIRONMENT = await Environment.resolve({ cwd: "/tmp/app", env: {} });
 
 /**
  * What the step reads from the steps before it.
@@ -70,12 +76,7 @@ function needsFor(input: {
       }),
       projectId: "proj_1",
       server: "http://localhost:1",
-      environment: {
-        cwd: "/tmp/app",
-        name: { value: "development", source: "default" },
-        values: {},
-        consulted: [],
-      },
+      environment: ENVIRONMENT,
     },
     names,
     given: input.given,
@@ -94,7 +95,7 @@ function needsFor(input: {
 }
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 describe("PublishCredentials", () => {
@@ -124,7 +125,7 @@ describe("PublishCredentials", () => {
       clientId: "deferred",
       secret: { name: secretVariable("acme-sso"), published: "deferred" },
     });
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining("ACME_SSO_CLIENT_ID was not published to the project"),
       expect.stringContaining("ACME_SSO_CLIENT_SECRET was not published to the project"),
     ]);
@@ -139,7 +140,7 @@ describe("PublishCredentials", () => {
       suggest: aSuggest({}, "1.0.0-alpha.23"),
     }).run(needsFor({ connection: ACME, given: GIVEN, signal: run.signal }));
 
-    const [idWarning, secretWarning] = takeReportedWarnings();
+    const [idWarning, secretWarning] = warnings.take();
     expect(idWarning).toMatch(/Publish it with: npx .+ variable set ACME_SSO_CLIENT_ID$/);
     expect(idWarning).not.toContain("--secret");
     expect(secretWarning).toContain("variable set ACME_SSO_CLIENT_SECRET --secret");
@@ -154,7 +155,7 @@ describe("PublishCredentials", () => {
       suggest: aSuggest({ env: "production" }, "1.0.0-alpha.23"),
     }).run(needsFor({ connection: ACME, given: GIVEN, signal: run.signal }));
 
-    expect(takeReportedWarnings()[0]).toContain("variable set ACME_SSO_CLIENT_ID --env production");
+    expect(warnings.take()[0]).toContain("variable set ACME_SSO_CLIENT_ID --env production");
   });
 
   it("reports a refused publish as failed, and warns how to retry", async () => {
@@ -169,7 +170,7 @@ describe("PublishCredentials", () => {
       .run(needsFor({ connection: ACME, given: GIVEN, signal: interrupted.signal }))
       .catch(() => {});
 
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining("ACME_SSO_CLIENT_ID could not be published"),
       expect.stringContaining("ACME_SSO_CLIENT_SECRET could not be published"),
     ]);
@@ -185,7 +186,7 @@ describe("PublishCredentials", () => {
     }).run(needsFor({ connection: ACME, given: NOTHING_GIVEN, reused: true, signal: run.signal }));
 
     expect(published).toEqual({ clientId: undefined, secret: undefined });
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(warnings.take()).toEqual([]);
   });
 
   it("says a client id held as a value was not published, and does not send it", async () => {
@@ -199,7 +200,7 @@ describe("PublishCredentials", () => {
 
     expect(published.clientId).toBeUndefined();
     expect(published.secret).toEqual({ name: secretVariable("google"), published: "deferred" });
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining(".zitadel/idps/google.json holds its client id directly"),
       expect.stringContaining("GOOGLE_CLIENT_SECRET was not published to the project"),
     ]);
@@ -221,7 +222,7 @@ describe("PublishCredentials", () => {
       }),
     );
 
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining("ACME_SSO_CLIENT_SECRET has no value yet"),
     ]);
   });

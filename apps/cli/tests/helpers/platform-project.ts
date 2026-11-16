@@ -8,13 +8,13 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
-import { DEFAULT_SERVER } from "@/lib/server";
+import { Server } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The platform the unit tests' msw server answers for. */
-export const PLATFORM_URL = DEFAULT_SERVER;
+export const PLATFORM_URL = Server.DEFAULT;
 
 /**
  * POSTs to the mock platform as a project's secret, and returns the parsed
@@ -240,7 +240,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
-                targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
+                kind: "primary",
+                targets: [{ origin: PRIMARY_ORIGIN }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },
@@ -252,9 +253,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
               {
                 id: "dep_preview",
                 release_id: "rel_preview",
-                targets: [
-                  { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
-                ],
+                kind: "preview",
+                targets: [{ origin: "https://pr-1.acme.com" }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-02T00:00:00.000Z",
               },

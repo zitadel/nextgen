@@ -1,5 +1,5 @@
 import { LocalServer } from "@/lib/local-server/server";
-import { DEFAULT_SERVER } from "@/lib/server";
+import { Server } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
@@ -90,8 +90,8 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
       message: "Which Zitadel server should your app use?",
       options: [
         {
-          value: DEFAULT_SERVER,
-          label: `Zitadel Cloud (${new URL(DEFAULT_SERVER).host})`,
+          value: Server.DEFAULT,
+          label: `Zitadel Cloud (${new URL(Server.DEFAULT).host})`,
         },
         detected
           ? {
@@ -110,7 +110,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
           label: "Custom URL (self-hosted)",
         },
       ],
-      initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
+      initialValue: detected ?? answers.server ?? Server.DEFAULT,
     });
     return {
       answers: {

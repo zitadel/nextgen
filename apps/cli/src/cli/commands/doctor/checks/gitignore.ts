@@ -2,15 +2,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { errorMessage, isErrno } from "@/lib/errors";
-import {
-  brokenRules,
-  entriesToAppend,
-  type GitignoreRule,
-  ZITADEL_GITIGNORE,
-} from "@/lib/gitignore";
+import { errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project, type GitignoreRule } from "@/lib/project";
 
 /**
  * Verifies `.gitignore` ignores every file that holds a secret and keeps
@@ -42,13 +38,12 @@ export class GitignoreCheck implements SanityCheck {
   async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, this.path);
     const existing = (await readText(path)) ?? "";
-    const safe = await holdsNamesOnly(ctx.cwd, ZITADEL_GITIGNORE);
-    const missing = entriesToAppend(
-      existing,
-      ZITADEL_GITIGNORE.filter((rule) => {
+    const safe = await holdsNamesOnly(ctx.cwd, Project.gitignore().rules);
+    const missing = Project.gitignore(
+      Project.gitignore().rules.filter((rule) => {
         return isIgnoredByRule(rule) || safe;
       }),
-    );
+    ).entriesToAppend(existing);
     if (missing.length === 0 || ctx.dryRun) {
       return;
     }
@@ -62,7 +57,7 @@ export class GitignoreCheck implements SanityCheck {
     if (text === undefined) {
       return { ...base, status: "fail", message: `${this.path} was not found` };
     }
-    const broken = brokenRules(text);
+    const broken = Project.gitignore().broken(text);
     const exposed = broken.filter(isIgnoredByRule);
     if (exposed.length > 0) {
       return {

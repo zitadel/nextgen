@@ -5,7 +5,7 @@ import { ZitadelError } from "@/lib/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 
 /**
  * Signing the local admin in without a browser.
@@ -127,7 +127,7 @@ async function signIn(
     );
   }
   const client = createZitadelClient({
-    userAgent: userAgent(),
+    userAgent: Runtime.current().userAgent(),
     baseUrl: serverUrl,
     token: runtime.publishable_key,
     signal,

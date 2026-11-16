@@ -1,9 +1,9 @@
 import pc from "picocolors";
 
-import { command, dim, strong } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import { Facts, Frame, stripColumnMarks } from "./layout";
+import { style } from "./style";
 import type { Presentation } from "./presentation";
 import { NEXT_LABEL, type Summary } from "./summary";
 import type { Where } from "./where";
@@ -132,7 +132,7 @@ export class Ending {
     }
 
     return [
-      strong(NEXT_LABEL),
+      style.strong(NEXT_LABEL),
       ...steps.flatMap((step) => {
         return [
           ...(step.text === NEXT_LABEL
@@ -145,7 +145,7 @@ export class Ending {
           ...(step.command === undefined
             ? []
             : step.command.split("\n").map((one) => {
-                return `  ${dim("$")} ${command(one)}`;
+                return `  ${style.dim("$")} ${style.command(one)}`;
               })),
         ];
       }),

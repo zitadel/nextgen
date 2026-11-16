@@ -8,7 +8,6 @@ import {
   errorMessage,
   failureText,
   isCancellation,
-  isErrno,
   toZitadelError,
 } from "@/lib/errors";
 import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
@@ -559,19 +558,6 @@ describe("resources the platform rejected", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,
     );
-  });
-});
-
-describe("isErrno", () => {
-  it("matches an error carrying the given code", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "ENOENT" }), "ENOENT")).toBe(true);
-  });
-
-  it("does not match another code, a missing code or a non-object", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "EACCES" }), "ENOENT")).toBe(false);
-    expect(isErrno(new Error("no code"), "ENOENT")).toBe(false);
-    expect(isErrno(undefined, "ENOENT")).toBe(false);
-    expect(isErrno("ENOENT", "ENOENT")).toBe(false);
   });
 });
 

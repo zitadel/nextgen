@@ -1,4 +1,4 @@
-import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
+import { Environment, type EnvironmentKey } from "@/lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -35,7 +35,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
   protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;
 
-    const resolved = ENVIRONMENT_KEYS.flatMap((key) => {
+    const resolved = Environment.KEYS.flatMap((key) => {
       const entry = values[key];
       if (!entry) {
         return [];

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { PlanChange } from "@/cli/commands/auth-method/sso/enable/steps/plan-change";
 import { createZitadelClient, Origins } from "@/lib/backend";
+import { Environment } from "@/lib/environment";
 import type { JsonObject } from "@/lib/zitadel";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import { CUSTOMERS_PROJECT, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
@@ -12,6 +13,11 @@ import {
   idVariable,
   secretVariable,
 } from "@tests/helpers/idp-values";
+
+/**
+ * The environment the run resolved, as it would be with nothing set.
+ */
+const ENVIRONMENT = await Environment.resolve({ cwd: "/tmp/app", env: {} });
 
 /**
  * What the step reads from what is known.
@@ -45,12 +51,7 @@ function needsHolding(connection: JsonObject, selection: ProviderSelection = acm
       }),
       projectId: "proj_1",
       server: "http://localhost:1",
-      environment: {
-        cwd: "/tmp/app",
-        name: { value: "development", source: "default" },
-        values: {},
-        consulted: [],
-      },
+      environment: ENVIRONMENT,
     },
     origins: Origins.wrap([]),
     issuer: "http://localhost:3000",

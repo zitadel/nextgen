@@ -7,7 +7,7 @@ import {
   claimsOrRefuse,
   seedMapping,
 } from "@/lib/idp";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";
 
@@ -56,7 +56,7 @@ export class ReadClaims extends WizardStep<
     const existing = needs.target.config.connections.resolveExisting(plain, needs.options);
     if (existing !== undefined) {
       if (asksForClaims(claimRequest)) {
-        reportWarning(
+        warnings.report(
           `${existing.path} already exists, so the claims you gave were not applied. Edit claim_mapping in the file to change them.`,
         );
       }
@@ -71,7 +71,7 @@ export class ReadClaims extends WizardStep<
     );
     const claims = choiceOf(mapping, VERIFIED_FLAG);
     for (const note of claims.notes) {
-      reportWarning(note);
+      warnings.report(note);
     }
     return {
       claimRequest,

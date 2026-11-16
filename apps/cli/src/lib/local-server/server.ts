@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui/log";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";

@@ -4,10 +4,9 @@ import { join } from "node:path";
 import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { Origins } from "@/lib/backend";
-import { ZITADEL_GITIGNORE } from "@/lib/gitignore";
 import { stableStringify } from "@/lib/json";
-import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
-import { DEFAULT_SERVER } from "@/lib/server";
+import { MetaSchemas } from "@/lib/meta-schemas";
+import { Server } from "@/lib/server";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
@@ -31,6 +30,7 @@ import type {
   PatchView,
 } from "@/lib/orca/patchers/types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
+import { Project } from "@/lib/project";
 
 /**
  * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
@@ -70,7 +70,7 @@ export abstract class AbstractRulePatcher implements Patcher {
    * write the editor meta-schemas into `.zitadel/meta/`.
    *
    * The meta-schemas are CLI-owned generated output, so they are not in the
-   * plan: {@link writeMetaSchemas} writes them, as it does for `doctor --fix`
+   * plan: {@link MetaSchemas.write} writes them, as it does for `doctor --fix`
    * and `branding eject`, replacing an outdated copy without `force` and
    * never writing through a symlink. What it wrote joins the plan's result,
    * with paths on disk as the file-writer reports them.
@@ -84,7 +84,7 @@ export abstract class AbstractRulePatcher implements Patcher {
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     await this.preflight(ctx, opts.cwd);
     const result = await new FileWriter(opts).scaffold(this.plan(ctx));
-    const meta = await writeMetaSchemas(opts.cwd, projectMetaSchemas(ctx.cliVersion), {
+    const meta = await MetaSchemas.of(ctx.cliVersion).write(opts.cwd, {
       dryRun: opts.dryRun,
     });
     const metaFiles = meta.written.map((artifact) => {
@@ -328,7 +328,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
       { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
-      { kind: "append-gitignore", rules: ZITADEL_GITIGNORE },
+      { kind: "append-gitignore", rules: Project.gitignore().rules },
       {
         kind: "write",
         path: ".zitadel/secret",
@@ -484,11 +484,11 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
   };
 }
 
-/** Normalizes a server URL to its origin, falling back to {@link DEFAULT_SERVER}. */
+/** Normalizes a server URL to its origin, falling back to {@link Server.DEFAULT}. */
 function resolveServerOrigin(source: string): string {
   try {
     return new URL(source).origin;
   } catch {
-    return DEFAULT_SERVER;
+    return Server.DEFAULT;
   }
 }

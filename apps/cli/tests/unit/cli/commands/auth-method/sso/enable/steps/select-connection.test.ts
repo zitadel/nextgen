@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { SelectConnection } from "@/cli/commands/auth-method/sso/enable/steps/select-connection";
 import { ConfigError, ConflictError } from "@/lib/zitadel";
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import { aConfig, aStore, anOidcConnection } from "@tests/helpers/config";
 import { CUSTOMERS_PROJECT, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -23,7 +23,7 @@ const ACME_SSO_FILE = ".zitadel/idps/acme-sso.json";
  * The step, asking nothing: every setting is given, or read from the file.
  */
 const STEP = new SelectConnection({
-  ask: asker({
+  ask: Ui.asker({
     interactive: false,
     force: false,
     stdin: Object.assign(Readable.from([]), { isTTY: true }),

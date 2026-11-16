@@ -2,12 +2,12 @@ import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
 import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
-import { asker } from "@/lib/input";
-import { log as logger } from "@/lib/log";
 
 import type { Audience } from "./audience";
+import { Asker } from "./asker";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
+import { log as logger } from "./log";
 import { GUIDE, MARK } from "./marks";
 import type { Narratable } from "./narration";
 import type { Presentation } from "./presentation";
@@ -242,7 +242,7 @@ export class Chain implements Drawing, Narratable {
     };
 
     return this.presentation === "plain"
-      ? asker({
+      ? Asker.for({
           ...session,
           guide: false,
           around: async (draw) => {
@@ -254,7 +254,7 @@ export class Chain implements Drawing, Narratable {
             }
           },
         })
-      : asker({
+      : Asker.for({
           ...session,
           around: async (draw) => {
             const resume = DrawnSpinner.pause();

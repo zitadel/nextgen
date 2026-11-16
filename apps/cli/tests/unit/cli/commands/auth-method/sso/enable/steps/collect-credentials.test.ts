@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { CollectCredentials } from "@/cli/commands/auth-method/sso/enable/steps/collect-credentials";
 import { ZitadelError } from "@/lib/errors";
 import { NO_CLAIM_REQUEST } from "@/lib/idp";
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import type { Questions } from "@/lib/ui";
 import { Connection } from "@/lib/zitadel";
 import { aConfig, aGoogleConnection } from "@tests/helpers/config";
@@ -64,7 +64,7 @@ function asking(piped: string | undefined): Questions {
     piped === undefined
       ? Object.assign(Readable.from([]), { isTTY: true })
       : Readable.from([piped]);
-  return asker({ interactive: false, force: false, stdin });
+  return Ui.asker({ interactive: false, force: false, stdin });
 }
 
 /**

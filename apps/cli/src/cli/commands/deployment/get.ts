@@ -9,7 +9,7 @@ import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is
@@ -64,7 +64,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
               await this.tabulate(
                 ["name", "value"],
                 variables.map((variable) => {
-                  return variableCell(variable);
+                  return VariableView.of(variable).cell();
                 }),
               )
             )

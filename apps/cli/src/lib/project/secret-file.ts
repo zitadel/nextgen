@@ -1,0 +1,58 @@
+import { chmod, writeFile } from "node:fs/promises";
+
+import { warnings } from "@/lib/ui/warnings";
+
+/** A file that may carry a credential is owner read/write only. */
+const SECRET_MODE = 0o600;
+
+/**
+ * A file that may hold a credential. The mode, the chmod-failure policy and
+ * the write are decided here once, rather than re-decided, or forgotten, at
+ * each place the CLI writes one.
+ */
+export class SecretFile {
+  /** Where it is. */
+  readonly path: string;
+
+  /**
+   * @param path - The file's path.
+   */
+  constructor(path: string) {
+    this.path = path;
+  }
+
+  /**
+   * `writeFile`'s `mode` applies only when it creates the file and is masked by
+   * the umask, so this re-asserts the intended mode after a write. A filesystem
+   * that cannot chmod (FAT/exFAT, some bind mounts) must not fail the write:
+   * the content is already on disk and the next run would read it back without
+   * re-prompting, so a throw would be one confusing failure followed by silent
+   * success with the same file. It warns once that the file could not be locked
+   * down, and proceeds. This is the only place the CLI calls `chmod` after a
+   * write: a bare `chmod(...).catch(() => undefined)` hides the failure from
+   * the user and the JSON envelope, and a lint rule (`no-swallowed-chmod`)
+   * rejects it.
+   *
+   * @param path - The file.
+   * @param mode - The mode it must have.
+   */
+  static async enforceMode(path: string, mode: number): Promise<void> {
+    try {
+      await chmod(path, mode);
+    } catch (error) {
+      warnings.report(
+        `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
+      );
+    }
+  }
+
+  /**
+   * Writes the file, creating or overwriting it, held at `0600`.
+   *
+   * @param contents - What it holds.
+   */
+  async write(contents: string): Promise<void> {
+    await writeFile(this.path, contents, { mode: SECRET_MODE });
+    await SecretFile.enforceMode(this.path, SECRET_MODE);
+  }
+}

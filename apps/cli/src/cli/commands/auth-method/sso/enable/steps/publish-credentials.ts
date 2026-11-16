@@ -7,10 +7,9 @@ import {
   type SecretPublisher,
   storeClientSecret,
 } from "@/lib/idp";
-import { log } from "@/lib/log";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { log, warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -100,7 +99,7 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
           };
     const { clientId: idVariable, clientSecret: secretVariable } = needs.names;
     if (needs.given.clientId !== undefined && idVariable === undefined) {
-      reportWarning(
+      warnings.report(
         `${needs.summary.connection.path} holds its client id directly, so nothing was published. Edit the file to change it.`,
       );
     }
@@ -178,14 +177,14 @@ export class PublishCredentials extends WizardStep<"publish", Fact<"published">,
       }
       case "deferred": {
         if (noValue) {
-          reportWarning(`${name} has no value yet. Publish it with: ${republish}`);
+          warnings.report(`${name} has no value yet. Publish it with: ${republish}`);
           return;
         }
-        reportWarning(`${name} was not published to the project. Publish it with: ${republish}`);
+        warnings.report(`${name} was not published to the project. Publish it with: ${republish}`);
         return;
       }
       case "failed": {
-        reportWarning(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+        warnings.report(`${name} could not be published. Sign-in fails until it is: ${republish}`);
         return;
       }
     }

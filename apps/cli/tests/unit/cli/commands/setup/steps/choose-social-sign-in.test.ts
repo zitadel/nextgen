@@ -18,11 +18,9 @@ import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { ChooseSocialSignIn } from "@/cli/commands/setup/steps/choose-social-sign-in";
 import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
-import type { Ui } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
-import { asker } from "@/lib/input";
+import { Ui, warnings } from "@/lib/ui";
 import { LocalServer } from "@/lib/local-server/server";
-import { takeReportedWarnings } from "@/lib/warnings";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -80,7 +78,7 @@ const QUESTIONS = {
 /**
  * How the wizard asks: interactively, without `--force`.
  */
-const ask = asker({ interactive: true, force: false });
+const ask = Ui.asker({ interactive: true, force: false });
 
 /**
  * The boxes the step drew.
@@ -490,25 +488,25 @@ describe("ChooseSocialSignIn", () => {
     });
 
     it("warns about an issuer on this machine that was typed in, naming the allow list", async () => {
-      takeReportedWarnings();
+      warnings.take();
       vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
       describesAcme({ issuer: "http://localhost:9100" });
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
       await socialFor(setupAnswers());
 
-      expect(takeReportedWarnings().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+      expect(warnings.take().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
     });
 
     it("says nothing about an issuer elsewhere", async () => {
-      takeReportedWarnings();
+      warnings.take();
       vi.mocked(multiselect).mockResolvedValueOnce(["custom"]);
       describesAcme();
       vi.mocked(password).mockResolvedValueOnce("acme-secret");
 
       await socialFor(setupAnswers());
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(warnings.take()).toEqual([]);
     });
 
     it("names the secret's variable after the connection, not after 'custom'", async () => {

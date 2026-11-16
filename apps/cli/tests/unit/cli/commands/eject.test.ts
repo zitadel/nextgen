@@ -9,8 +9,8 @@ import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
-import { MANAGED_MARKER } from "@/lib/paths";
 import { stripAnsi } from "@tests/helpers/run-cli";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -59,7 +59,7 @@ async function makeManagedProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify({ name: "default" }));
   await writeFile(
     join(cwd, "app/login/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function L() {}\n`,
   );
   // Register page lacks the managed marker, so eject must preserve it.
   await writeFile(join(cwd, "app/register/page.tsx"), "export default function R() {}\n");
@@ -83,7 +83,10 @@ async function makeManagedViteProject(): Promise<string> {
   );
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
-  await writeFile(join(cwd, "src/App.vue"), `<!-- ${MANAGED_MARKER} -->\n<template></template>\n`);
+  await writeFile(
+    join(cwd, "src/App.vue"),
+    `<!-- ${ManagedFile.MARKER} -->\n<template></template>\n`,
+  );
   await writeFile(join(cwd, "vite.config.ts"), "export default {};\n");
   return cwd;
 }
@@ -105,8 +108,8 @@ async function makeManagedAngularProject(): Promise<string> {
   await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { demo: {} } }));
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
-  await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
-  await writeFile(join(cwd, "zitadel-ng.cjs"), `${MANAGED_MARKER}\n`);
+  await writeFile(join(cwd, "src/app/app.ts"), `${ManagedFile.MARKER}\nexport class App {}\n`);
+  await writeFile(join(cwd, "zitadel-ng.cjs"), `${ManagedFile.MARKER}\n`);
   await writeFile(
     join(cwd, "src/app/zitadel-project.ts"),
     'export const ZITADEL_PROJECT_ID = "proj-001";\n',
@@ -136,11 +139,11 @@ async function makeOlderNuxtProject(): Promise<string> {
   await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
   await writeFile(
     join(cwd, "app/pages/login.vue"),
-    `<script setup>\n// ${MANAGED_MARKER}\n</script>\n`,
+    `<script setup>\n// ${ManagedFile.MARKER}\n</script>\n`,
   );
   await writeFile(
     join(cwd, "app/plugins/zitadel-components.client.ts"),
-    `// ${MANAGED_MARKER}\nimport "@zitadel/components";\n`,
+    `// ${ManagedFile.MARKER}\nimport "@zitadel/components";\n`,
   );
   await writeFile(
     join(cwd, "app/plugins/auth.server.ts"),

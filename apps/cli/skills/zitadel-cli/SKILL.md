@@ -394,7 +394,11 @@ Each invocation prints one JSON object:
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
-  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  line to pin). Each `data.previews[]` entry is `{ url, expires_at }`, where
+  `expires_at` is the live preview's expiry read after the deploy; a later
+  deploy to the URL renews it (`preview list` reads it again). Every preview
+  expires, so `expires_at: null` means that read failed: the run still answers
+  `ok` with a warning, and the preview and `data.release_env` stand. It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
   outside a preview or development build it is a no-op — even with an explicit
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
@@ -423,6 +427,13 @@ Each invocation prints one JSON object:
   and also stop serving when they expire. Revoke again once none serves it.
   Without origins the CLI can read, the conflict is the plain one: no `hint`, no
   `next_commands`, and `details` holds the server's `status`, `url` and `body`.
+- `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
+  live expiry of a live preview deployment's preview (the earliest, when it still
+  serves several), empty for any other deployment, such as a primary one, a replaced
+  one, or one whose preview is gone. It is also empty when the live view or the
+  previews could not be read, and a warning says so. `--json` items are the API's records,
+  unchanged and without `expires`: read a preview's expiry as JSON with
+  `preview list --json`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.

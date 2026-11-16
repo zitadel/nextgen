@@ -3,7 +3,7 @@ import { credentialVariables, providerOf, selectionName } from "@zitadel/config/
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";
 
@@ -61,7 +61,7 @@ export class PlanChange extends WizardStep<
       await loopbackReach(needs.target.cwd, needs.remote.server),
     );
     if (loopback !== undefined) {
-      reportWarning(loopback);
+      warnings.report(loopback);
     }
     const connection = preview.document;
     const reused = !preview.created;

@@ -1,5 +1,5 @@
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
 

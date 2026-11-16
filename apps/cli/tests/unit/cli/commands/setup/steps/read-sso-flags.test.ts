@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SetupFlags } from "@/cli/commands/setup";
 import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -35,7 +35,7 @@ function flagsMapping(claim: string): { flags: SetupFlags } {
  */
 function aStep(nonInteractive: boolean): ReadSsoFlags {
   return new ReadSsoFlags({
-    ask: asker({ interactive: !nonInteractive, force: false }),
+    ask: Ui.asker({ interactive: !nonInteractive, force: false }),
     dryRun: false,
     nonInteractive,
     suggest: aSuggest({}, "1.2.3"),

@@ -25,8 +25,7 @@ import {
   standardClaimType,
   type VerifiedEntry,
 } from "@/lib/idp";
-import { log } from "@/lib/log";
-import { reportWarning } from "@/lib/warnings";
+import { log, warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { standardClaim } from "@/lib/zitadel";
 
@@ -172,7 +171,7 @@ export class AskClaims extends WizardStep<"answered", Fact<"answered">, Needs> {
     const heard = new Set(needs.claims?.notes);
     for (const note of answered.notes) {
       if (!heard.has(note)) {
-        reportWarning(note);
+        warnings.report(note);
       }
     }
     return {

@@ -1,8 +1,8 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
-import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
+import { Orca } from "@/lib/orca";
 
 /**
  * What the step reads from what is known.
@@ -54,7 +54,7 @@ export class WriteManifest extends WizardStep<"manifest", object, Needs> {
     const { answers, framework, orca, patched, posture, rendererId, scaffoldedFramework } = needs;
     if (framework !== undefined && !this.deps.dryRun) {
       try {
-        await writeScaffoldManifest({
+        await Orca.writeManifest({
           cwd: this.deps.cwd,
           actions: orca.patcherFor(framework.id).artifacts({
             framework,
@@ -66,7 +66,7 @@ export class WriteManifest extends WizardStep<"manifest", object, Needs> {
           posture,
         });
       } catch (error) {
-        reportWarning(
+        warnings.report(
           `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
         );
       }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { PatchApp } from "@/cli/commands/setup/steps/patch-app";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { it } from "@tests/helpers/fixtures";
 import { aQuestionDeps } from "@tests/helpers/setup";
 
@@ -27,6 +27,6 @@ describe("PatchApp undo", () => {
     });
 
     expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("EXISTING=1\n");
-    expect(takeReportedWarnings().join("\n")).toContain("Could not remove zitadel.json");
+    expect(warnings.take().join("\n")).toContain("Could not remove zitadel.json");
   });
 });

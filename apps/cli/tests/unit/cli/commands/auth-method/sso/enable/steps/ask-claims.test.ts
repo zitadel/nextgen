@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AskClaims } from "@/cli/commands/auth-method/sso/enable/steps/ask-claims";
 import { type MappingState, NO_CLAIM_REQUEST } from "@/lib/idp";
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import { displayName } from "@tests/helpers/idp-values";
 import { anAcmeSsoProvider } from "@tests/helpers/connections";
 import { type Answer, answering } from "@tests/helpers/keyboard";
@@ -91,7 +91,7 @@ describe("AskClaims", () => {
     try {
       const result = await asTerminal(() => {
         return new AskClaims({
-          ask: asker({ interactive: true, force: false }),
+          ask: Ui.asker({ interactive: true, force: false }),
           nonInteractive: false,
         }).run(needs);
       });

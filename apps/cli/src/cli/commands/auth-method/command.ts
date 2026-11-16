@@ -2,18 +2,16 @@ import type { Interfaces } from "@oclif/core";
 
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/log";
+import { log, warnings } from "@/lib/ui";
 import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
-import { optionArgs } from "@/lib/public-cli";
 import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
 import {
   AmbiguousSchemaError,
   type BrokenFile,
@@ -30,6 +28,7 @@ import {
   type UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { Cmd } from "@/lib/cmd";
 
 /**
  * The flags the re-run of a refused change sets: the schema every `auth-method`
@@ -534,7 +533,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   protected report(change: Change): void {
     for (const notice of change.notices) {
       if (notice.severity === "warning") {
-        reportWarning(notice.message);
+        warnings.report(notice.message);
       } else {
         log.info(escapeControlCharacters(notice.message));
       }
@@ -812,7 +811,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
         });
       }
       const flags = error.candidates.map((schema) => {
-        return optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
+        return Cmd.optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
       });
       throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
         requested,
