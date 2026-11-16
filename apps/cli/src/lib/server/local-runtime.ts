@@ -2,7 +2,6 @@ import {
   assertLocalStateWritable,
   checkLocalServerHealth,
   CONTAINER_DATA_DIR,
-  DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
   DEFAULT_LOCAL_SERVER_URL,
   defaultLocalServerImageForCliVersion,
@@ -36,8 +35,8 @@ export type {
 /**
  * What a directory records about the local server started in it
  * (`.zitadel/local/runtime.json`): where the record lives, how to read it, and
- * what it says. A record is read-only data; the server's own lifecycle is the
- * only writer.
+ * what it says. A record is read-only data: the server's own lifecycle writes
+ * it, and a test arranges one with {@link LocalRuntime.write}.
  */
 export class LocalRuntime {
   /** The address a local server answers on when nothing names another. */
@@ -45,9 +44,6 @@ export class LocalRuntime {
 
   /** The port a local server asks for first. */
   static readonly DEFAULT_PORT: number = DEFAULT_LOCAL_SERVER_PORT;
-
-  /** The image a local server runs when nothing names another. */
-  static readonly DEFAULT_IMAGE: string = DEFAULT_LOCAL_SERVER_IMAGE;
 
   /** The directory, from a project's root, that holds everything a local server keeps. */
   static readonly DIR: string = LOCAL_RUNTIME_DIR;

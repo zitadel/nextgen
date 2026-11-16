@@ -12,16 +12,22 @@ export type ProjectOwner = { team_id: string; claimed_at: string };
  * project secret, then `claim/complete` with the admin's session cookie.
  */
 export class AdminClaim {
+  private readonly session: AdminSession;
+
   /**
-   * @param input - The project, its secret, and the admin's session on its server.
+   * @param session - The admin's session on the project's server.
+   */
+  constructor(session: AdminSession) {
+    this.session = session;
+  }
+
+  /**
+   * @param project - The project and its secret.
    * @returns The team the project now belongs to.
    */
-  static async attach(input: {
-    projectId: string;
-    projectSecret: string;
-    session: AdminSession;
-  }): Promise<ProjectOwner> {
-    const { projectId, projectSecret, session } = input;
+  async attach(project: { projectId: string; projectSecret: string }): Promise<ProjectOwner> {
+    const { projectId, projectSecret } = project;
+    const { session } = this;
     const { serverUrl, signal } = session;
 
     const { challenge_id } = await createZitadelClient({

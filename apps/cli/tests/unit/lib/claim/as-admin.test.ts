@@ -80,10 +80,9 @@ afterEach(() => {
 });
 
 const claim = () =>
-  AdminClaim.attach({
+  new AdminClaim(new AdminSession(SERVER, admin, signal)).attach({
     projectId: PROJECT,
     projectSecret: "sk_project",
-    session: new AdminSession(SERVER, admin, signal),
   });
 
 describe("claiming a project as the local admin", () => {

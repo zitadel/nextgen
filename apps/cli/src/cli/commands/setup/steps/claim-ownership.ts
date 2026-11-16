@@ -112,10 +112,11 @@ export class ClaimOwnership extends WizardStep<
           isLocal,
         };
       }
-      const owner = await AdminClaim.attach({
+      const owner = await new AdminClaim(
+        new AdminSession(answers.server, admin, this.deps.signal),
+      ).attach({
         projectId: project.id,
         projectSecret: project.project_secret,
-        session: new AdminSession(answers.server, admin, this.deps.signal),
       });
       const secret = await Project.at(this.deps.cwd).secret();
       await secret.with({ team_id: owner.team_id, claimed_at: owner.claimed_at }).write();
