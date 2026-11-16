@@ -1,5 +1,46 @@
 # @zitadel/config
 
+## 0.7.0
+
+### Minor Changes
+
+- [#2943](https://github.com/zitadel/nextgen/pull/2943) [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd) - Flow definitions no longer take a `status`: every flow a release pins is served, and the release alone decides which flows are live.
+  
+  **Breaking:** a flow definition that still sends `status` is refused. Delete the `"status"` line from each file in `.zitadel/flows/` before the next `zitadel deploy`. A `draft` flow is served as soon as a release pins it, including a release deployed before the upgrade, so move a draft out of `.zitadel/flows/` and deploy before upgrading if it should stay off.
+
+- [#2839](https://github.com/zitadel/nextgen/pull/2839) [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce) - `zitadel setup` now writes the sign-up policy, `.zitadel/policies/user.create.json`, beside the password policy. It names the challenge every password or passkey sign-up solves, Zitadel's built-in proof of work, which applies with or without the file. Deploy it like any [policy](https://preview.zitadel.com/docs/guides/deploy#policies); `POST /policies` and `zitadel policy test` take `user.create` too.
+
+### Patch Changes
+
+- [#3067](https://github.com/zitadel/nextgen/pull/3067) [`0c5c523`](https://github.com/zitadel/nextgen/commit/0c5c523d267b61b631f047ec4e29d8c0278ef462) - The branding README that `zitadel branding eject` writes into `.zitadel/branding/` now explains a logo per light and dark theme under `theme`, and that the component's `theme` attribute wins over `theme.mode`. It also says that a login already open keeps the release it started with, and that image URLs may use `http://` on loopback hosts while you develop.
+
+- [#2379](https://github.com/zitadel/nextgen/pull/2379) [`86f90e4`](https://github.com/zitadel/nextgen/commit/86f90e43d0fbc06ba61956c4bc3ae42aa7ea89cd) - `zitadel variable list`, `origin list`, `env list` and `resources` answer an empty result with `No <things> found.`, like every other list. A blank display name, client id or client secret is reported as empty rather than as an instruction to type one; it reaches `--json` only as an error `message`.
+
+- [#3109](https://github.com/zitadel/nextgen/pull/3109) [`80fc7e8`](https://github.com/zitadel/nextgen/commit/80fc7e8855d10e0127875c67bea19754864b4b79) - Every `zitadel` resource command names its resource in the singular, as
+  `zitadel release`, `zitadel deployment` and `zitadel variable` already did:
+  `zitadel user list`, `zitadel policy test`
+  ([CLI reference](https://preview.zitadel.com/docs/reference/cli)). The plural
+  of every noun still runs the same command, so `zitadel users list` keeps
+  working; help, completion and the reference show only the singular.
+  
+  **Breaking:** nothing you type stops running, but what the CLI prints names
+  the singular whichever spelling you typed. With `--json`, the envelope's
+  `command` is `user:list` where it was `users:list`, and the `topic` that
+  `zitadel resources` and a `--dry-run` report is `user`, for `users`, `teams`,
+  `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `policies` and
+  `flow-definitions` alike. `zitadel commands` lists the singular ids only. A
+  script that compares one of those values needs the new name. A plural typed
+  alone, such as `zitadel users`, no longer prints that topic's help: it fails
+  as an unknown command and names `zitadel user --help` as its next command.
+
+- [#3150](https://github.com/zitadel/nextgen/pull/3150) [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0) - Update dependencies to their latest minor and patch releases.
+
+- [#3152](https://github.com/zitadel/nextgen/pull/3152) [`9ffa302`](https://github.com/zitadel/nextgen/commit/9ffa302ac7c5b063fe1abe061ebd0ffba1c72728) - The flows README that `zitadel setup` writes into `.zitadel/flows/` now explains how to let a user who forgot their password back in: set a new one with `zitadel api setUserPassword`, since a flow can't offer a recovery step yet.
+
+- [#2643](https://github.com/zitadel/nextgen/pull/2643) [`9379df0`](https://github.com/zitadel/nextgen/commit/9379df0c077481ac9eecaa24d292239241422355) - The `.zitadel/policies/README.md` that `zitadel setup` writes no longer says a user can change their own password: `history_depth` is checked only then, which no sign-up or API call does yet. It also shows `max_length`'s lower bound as `min_length`, links the NIST guidance, and links the new guide, [Set the password policy](https://preview.zitadel.com/docs/guides/password-policy).
+- Updated dependencies [[`eedebf1`](https://github.com/zitadel/nextgen/commit/eedebf10695859770992487f65bdd73a1acb8ac4), [`92df356`](https://github.com/zitadel/nextgen/commit/92df35690cce6e742689556a1b9cce8f02bf9259), [`abe0207`](https://github.com/zitadel/nextgen/commit/abe02078fe2d7679a0bf76f7121ee74059e076fb), [`b816f9d`](https://github.com/zitadel/nextgen/commit/b816f9d19de143c9765d1fe375469731d7847dc0), [`050f361`](https://github.com/zitadel/nextgen/commit/050f361d28a0e6f900bc00e47a461b0938cd54e1), [`0860713`](https://github.com/zitadel/nextgen/commit/086071351ac81424f2b53e810d1173dd8389cd9e), [`3d6fba7`](https://github.com/zitadel/nextgen/commit/3d6fba7485989700f730319527f494899df6ab1a), [`f666929`](https://github.com/zitadel/nextgen/commit/f66692920e7d324dd74c33b7272de86b6424e4b7), [`6ec4c8b`](https://github.com/zitadel/nextgen/commit/6ec4c8b55bdc3a1a1f599eefa38fbb9708d0e3bd), [`adf0112`](https://github.com/zitadel/nextgen/commit/adf0112b58fab5c5fb6eba233680a74f9a566d32), [`15afc63`](https://github.com/zitadel/nextgen/commit/15afc6395b3f0f07a0578a2235c32c371fdfd5ab), [`b66b18f`](https://github.com/zitadel/nextgen/commit/b66b18f08de82f858fa5e3a8d4f703e4476e51e4), [`06d55b4`](https://github.com/zitadel/nextgen/commit/06d55b49e70b3193da5cc2bb668134772707488e), [`7d1dfa6`](https://github.com/zitadel/nextgen/commit/7d1dfa61b17b31c576eeb114eadd9bcb1662e696), [`8bac5fd`](https://github.com/zitadel/nextgen/commit/8bac5fde36160591dbff98e8d79be4d030484469), [`6b7fd1e`](https://github.com/zitadel/nextgen/commit/6b7fd1e437a28654bfd92207ba3bd731852e8bce)]:
+  - @zitadel/api@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
