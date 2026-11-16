@@ -10,7 +10,7 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import { it } from "@tests/fixtures";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asOneLine, asTerminal } from "@tests/fixtures/terminal";

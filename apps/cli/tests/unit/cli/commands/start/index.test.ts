@@ -6,7 +6,7 @@ import {
   localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 

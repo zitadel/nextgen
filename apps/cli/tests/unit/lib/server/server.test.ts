@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
-import { localRuntimePaths } from "@/lib/local-server/runtime";
+import { localRuntimePaths } from "@/lib/server/local/runtime";
 import { Server } from "@/lib/server";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 

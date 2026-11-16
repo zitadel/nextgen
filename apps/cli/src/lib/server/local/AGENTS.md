@@ -1,8 +1,8 @@
-# Agent Instructions — `apps/cli/src/lib/local-server`
+# Agent Instructions — `apps/cli/src/lib/server/local`
 
 How `zitadel start`, `stop`, `status`, `logs`, `reset`, `console` and `doctor`
 run and find a directory's local server. The package rules in
-[`apps/cli/AGENTS.md`](../../../AGENTS.md) apply here too.
+[`apps/cli/AGENTS.md`](../../../../AGENTS.md) apply here too.
 
 ## The rule everything here serves
 
@@ -48,7 +48,7 @@ admin credential, and the CLI talks only to the server a
 
 ## Tests
 
-Layout and specs: [`tests/AGENTS.md`](../../../tests/AGENTS.md).
+Layout and specs: [`tests/AGENTS.md`](../../../../tests/AGENTS.md).
 
 - Never wait in real time: code that waits takes a `Clock`
   (`internal/clock.ts`), and tests pass `ManualClock` (`tests/helpers/clock.ts`).

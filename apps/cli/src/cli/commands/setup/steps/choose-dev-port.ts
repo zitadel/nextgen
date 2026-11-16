@@ -1,4 +1,4 @@
-import { LocalServer } from "@/lib/local-server/server";
+import { LocalServer } from "@/lib/server/local/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";

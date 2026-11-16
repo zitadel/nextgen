@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
+import { ensureLocalAdmin } from "@/lib/server/local/admin-credential";
 import {
   localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 

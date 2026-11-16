@@ -2,9 +2,9 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { startedServer } from "@/cli/commands/local-server/started";
-import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
+import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server/local/server";
+import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/server/local/server-log";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";

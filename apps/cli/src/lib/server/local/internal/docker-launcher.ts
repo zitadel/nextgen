@@ -9,14 +9,14 @@ import {
   type EnvSummary,
   type ResolvedEnv,
   envSummary,
-} from "@/lib/local-server/env-vars";
+} from "@/lib/server/local/env-vars";
 import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
   type DockerRuntimeMetadata,
-} from "@/lib/local-server/runtime";
-import type { LogSink } from "@/lib/local-server/server-log";
+} from "@/lib/server/local/runtime";
+import type { LogSink } from "@/lib/server/local/server-log";
 import { stopSignal } from "./clock";
 import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 

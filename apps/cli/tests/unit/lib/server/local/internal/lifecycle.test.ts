@@ -16,7 +16,7 @@ import {
   type ServerRecord,
   type ServerStore,
   type StopOutcome,
-} from "@/lib/local-server/internal/lifecycle";
+} from "@/lib/server/local/internal/lifecycle";
 
 type Fake = ServerRecord & { pid: number };
 

@@ -1,7 +1,7 @@
 import { isCancellation, toZitadelError } from "@/lib/errors";
-import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
-import { readPlatformRuntime } from "@/lib/local-server/runtime";
+import { findLocalAdminFor } from "@/lib/server/local/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/server/local/claim-as-admin";
+import { readPlatformRuntime } from "@/lib/server/local/runtime";
 import { Server } from "@/lib/server";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";

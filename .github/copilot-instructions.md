@@ -33,6 +33,6 @@ rules.
 - Journey-gate changes (`e2e/journey/**`, `ci.yml` journey steps):
   [`e2e/journey/AGENTS.md`](../e2e/journey/AGENTS.md) is canonical.
 - Local runtime command changes:
-  [`apps/cli/src/lib/local-server/AGENTS.md`](../apps/cli/src/lib/local-server/AGENTS.md)
+  [`apps/cli/src/lib/server/local/AGENTS.md`](../apps/cli/src/lib/server/local/AGENTS.md)
   is canonical; the zero-config paths agents rely on are in
   [`SKILL.md`](../apps/cli/skills/zitadel-cli/SKILL.md).

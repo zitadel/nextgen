@@ -13,8 +13,8 @@ import { errorMessage, ZitadelError } from "@/lib/errors";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "@/lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
+} from "@/lib/server/local/docker-guidance";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server/local/processes";
 import {
   assertLocalStateWritable,
   checkLocalServerHealth,
@@ -28,8 +28,8 @@ import {
   type RuntimeMetadata,
   readNearestRuntimeMetadata,
   resolveRuntimeBackend,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server/local/server";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";

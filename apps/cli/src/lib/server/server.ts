@@ -3,7 +3,7 @@ import type { Parsed } from "@zitadel/config/idp";
 
 import { ZitadelError, errorMessage } from "@/lib/errors";
 import { isLoopbackHost } from "@/lib/host";
-import { LocalServer } from "@/lib/local-server/server";
+import { LocalServer } from "@/lib/server/local/server";
 import type { FlagVariable } from "@/lib/oclif/types";
 
 /**

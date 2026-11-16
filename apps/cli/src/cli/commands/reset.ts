@@ -2,14 +2,14 @@ import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
 import { startedServer } from "@/cli/commands/local-server/started";
-import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
+import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   localRuntimePaths,
   readRuntimeMetadata,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server/local/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
