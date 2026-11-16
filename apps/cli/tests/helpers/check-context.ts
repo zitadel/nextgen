@@ -1,4 +1,4 @@
-import type { CheckContext } from "@/commands/doctor/checks";
+import type { CheckContext } from "@/cli/commands/doctor/checks";
 import { Consent } from "@/lib/consent";
 import { createOrca } from "@/lib/orca";
 

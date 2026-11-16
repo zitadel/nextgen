@@ -5,12 +5,8 @@ type AcceptInvitationRes interface {
 	acceptInvitationRes()
 }
 
-type AddOriginRes interface {
-	addOriginRes()
-}
-
-type BeginUserPasskeyRegistrationRes interface {
-	beginUserPasskeyRegistrationRes()
+type AddProjectOriginRes interface {
+	addProjectOriginRes()
 }
 
 type BuildReleaseRes interface {
@@ -21,28 +17,28 @@ type CancelInvitationRes interface {
 	cancelInvitationRes()
 }
 
-type CompleteClaimRes interface {
-	completeClaimRes()
+type CompleteProjectClaimRes interface {
+	completeProjectClaimRes()
 }
 
-type CreateApplicationRes interface {
-	createApplicationRes()
+type CompleteUserPasskeyRegistrationRes interface {
+	completeUserPasskeyRegistrationRes()
+}
+
+type CreateAuthAttemptChallengeRes interface {
+	createAuthAttemptChallengeRes()
+}
+
+type CreateAuthAttemptHandoffRes interface {
+	createAuthAttemptHandoffRes()
 }
 
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
 
-type CreateBrandingRes interface {
-	createBrandingRes()
-}
-
 type CreateDeploymentRes interface {
 	createDeploymentRes()
-}
-
-type CreateFlowDefinitionRes interface {
-	createFlowDefinitionRes()
 }
 
 type CreateFlowRes interface {
@@ -53,16 +49,12 @@ type CreateGrantRes interface {
 	createGrantRes()
 }
 
-type CreateHandoffRes interface {
-	createHandoffRes()
-}
-
-type CreateIdpRes interface {
-	createIdpRes()
-}
-
 type CreateInvitationRes interface {
 	createInvitationRes()
+}
+
+type CreateProjectClaimRes interface {
+	createProjectClaimRes()
 }
 
 type CreateProjectRes interface {
@@ -73,16 +65,16 @@ type CreateReleaseRes interface {
 	createReleaseRes()
 }
 
-type CreateSchemaRes interface {
-	createSchemaRes()
-}
-
 type CreateSessionRes interface {
 	createSessionRes()
 }
 
 type CreateTeamRes interface {
 	createTeamRes()
+}
+
+type CreateUserPasskeyRegistrationRes interface {
+	createUserPasskeyRegistrationRes()
 }
 
 type CreateUserRes interface {
@@ -93,16 +85,16 @@ type CreateWebhookRes interface {
 	createWebhookRes()
 }
 
+type DeactivateTeamRes interface {
+	deactivateTeamRes()
+}
+
 type DeleteGrantRes interface {
 	deleteGrantRes()
 }
 
-type DeleteTeamRes interface {
-	deleteTeamRes()
-}
-
-type DeleteUserByIDRes interface {
-	deleteUserByIDRes()
+type DeleteUserRes interface {
+	deleteUserRes()
 }
 
 type DeleteVariableRes interface {
@@ -125,36 +117,20 @@ type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }
 
-type FinishUserPasskeyRegistrationRes interface {
-	finishUserPasskeyRegistrationRes()
-}
-
-type GetApplicationByIdRes interface {
-	getApplicationByIdRes()
+type GetApplicationRes interface {
+	getApplicationRes()
 }
 
 type GetAuthAttemptRes interface {
 	getAuthAttemptRes()
 }
 
-type GetBrandingByIdRes interface {
-	getBrandingByIdRes()
+type GetBrandingRes interface {
+	getBrandingRes()
 }
 
-type GetClaimStatusRes interface {
-	getClaimStatusRes()
-}
-
-type GetClaimWindowRes interface {
-	getClaimWindowRes()
-}
-
-type GetDeploymentByIdRes interface {
-	getDeploymentByIdRes()
-}
-
-type GetDeploymentVariablesRes interface {
-	getDeploymentVariablesRes()
+type GetDeploymentRes interface {
+	getDeploymentRes()
 }
 
 type GetEventRes interface {
@@ -173,12 +149,12 @@ type GetGrantRes interface {
 	getGrantRes()
 }
 
-type GetIdpByIdRes interface {
-	getIdpByIdRes()
+type GetIdpRes interface {
+	getIdpRes()
 }
 
-type GetIdpRevisionByIdRes interface {
-	getIdpRevisionByIdRes()
+type GetIdpRevisionRes interface {
+	getIdpRevisionRes()
 }
 
 type GetInvitationRes interface {
@@ -209,8 +185,8 @@ type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
 }
 
-type GetOAuthSettingsByIdRes interface {
-	getOAuthSettingsByIdRes()
+type GetOAuthSettingsRes interface {
+	getOAuthSettingsRes()
 }
 
 type GetPolicyRes interface {
@@ -221,6 +197,14 @@ type GetPolicyRevisionRes interface {
 	getPolicyRevisionRes()
 }
 
+type GetProjectClaimStatusRes interface {
+	getProjectClaimStatusRes()
+}
+
+type GetProjectClaimWindowRes interface {
+	getProjectClaimWindowRes()
+}
+
 type GetProjectRes interface {
 	getProjectRes()
 }
@@ -229,12 +213,12 @@ type GetReadyRes interface {
 	getReadyRes()
 }
 
-type GetReleaseByIdRes interface {
-	getReleaseByIdRes()
+type GetReleaseRes interface {
+	getReleaseRes()
 }
 
-type GetSchemaByIdRes interface {
-	getSchemaByIdRes()
+type GetSchemaRes interface {
+	getSchemaRes()
 }
 
 type GetSessionRes interface {
@@ -245,36 +229,28 @@ type GetTeamRes interface {
 	getTeamRes()
 }
 
-type GetUserByIDRes interface {
-	getUserByIDRes()
-}
-
 type GetUserPasswordStateRes interface {
 	getUserPasswordStateRes()
+}
+
+type GetUserRes interface {
+	getUserRes()
 }
 
 type GetVariableRes interface {
 	getVariableRes()
 }
 
-type GetVariablesRes interface {
-	getVariablesRes()
-}
-
 type GetWebhookRes interface {
 	getWebhookRes()
 }
 
-type InitClaimRes interface {
-	initClaimRes()
-}
-
-type IssueChallengeRes interface {
-	issueChallengeRes()
-}
-
 type ListBrandingRes interface {
 	listBrandingRes()
+}
+
+type ListDeploymentVariablesRes interface {
+	listDeploymentVariablesRes()
 }
 
 type ListDeploymentsRes interface {
@@ -321,12 +297,12 @@ type ListPolicyRevisionsRes interface {
 	listPolicyRevisionsRes()
 }
 
-type ListPreviewsRes interface {
-	listPreviewsRes()
-}
-
 type ListProjectAdminsRes interface {
 	listProjectAdminsRes()
+}
+
+type ListProjectPreviewsRes interface {
+	listProjectPreviewsRes()
 }
 
 type ListReleasesRes interface {
@@ -349,6 +325,10 @@ type ListUserTeamsRes interface {
 	listUserTeamsRes()
 }
 
+type ListVariablesRes interface {
+	listVariablesRes()
+}
+
 type ListWebhooksRes interface {
 	listWebhooksRes()
 }
@@ -357,20 +337,28 @@ type LookupInvitationRes interface {
 	lookupInvitationRes()
 }
 
-type PatchMyUserRes interface {
-	patchMyUserRes()
+type PublishApplicationRes interface {
+	publishApplicationRes()
 }
 
-type PatchProjectRes interface {
-	patchProjectRes()
+type PublishBrandingRes interface {
+	publishBrandingRes()
 }
 
-type PatchUserByIDRes interface {
-	patchUserByIDRes()
+type PublishFlowDefinitionRes interface {
+	publishFlowDefinitionRes()
+}
+
+type PublishIdpRes interface {
+	publishIdpRes()
 }
 
 type PublishPolicyRes interface {
 	publishPolicyRes()
+}
+
+type PublishSchemaRes interface {
+	publishSchemaRes()
 }
 
 type QueryGrantsRes interface {
@@ -401,12 +389,12 @@ type RejectInvitationRes interface {
 	rejectInvitationRes()
 }
 
-type RemoveOriginRes interface {
-	removeOriginRes()
+type RemoveProjectOriginRes interface {
+	removeProjectOriginRes()
 }
 
-type RemovePreviewRes interface {
-	removePreviewRes()
+type RemoveProjectPreviewRes interface {
+	removeProjectPreviewRes()
 }
 
 type RevokeMySessionRes interface {
@@ -437,22 +425,34 @@ type SetUserPasswordRes interface {
 	setUserPasswordRes()
 }
 
+type SetVariablesRes interface {
+	setVariablesRes()
+}
+
 type SubmitFlowStepRes interface {
 	submitFlowStepRes()
+}
+
+type UpdateMyUserRes interface {
+	updateMyUserRes()
+}
+
+type UpdateProjectRes interface {
+	updateProjectRes()
 }
 
 type UpdateTeamRes interface {
 	updateTeamRes()
 }
 
-type UpdateVariablesRes interface {
-	updateVariablesRes()
+type UpdateUserRes interface {
+	updateUserRes()
 }
 
 type UpdateWebhookRes interface {
 	updateWebhookRes()
 }
 
-type VerifyChallengeProofRes interface {
-	verifyChallengeProofRes()
+type VerifyAuthAttemptChallengeRes interface {
+	verifyAuthAttemptChallengeRes()
 }

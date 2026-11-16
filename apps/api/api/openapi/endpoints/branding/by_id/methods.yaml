@@ -1,10 +1,10 @@
 get:
-  operationId: getBrandingById
+  operationId: getBranding
   x-zitadel-cli: branding get
   summary: Get a branding revision by ID
   description: |
     Returns one branding revision, including its stored configuration. Pass the
-    `id` that `createBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
+    `id` that `publishBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
   tags:
     - Branding
   security:
@@ -27,4 +27,4 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      $ref: getBrandingById-error-response.yaml
+      $ref: getBranding-error-response.yaml

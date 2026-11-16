@@ -1,5 +1,5 @@
 get:
-  operationId: getVariables
+  operationId: listVariables
   x-zitadel-cli: variable list
   summary: Get a project's variables
   description: |
@@ -26,10 +26,10 @@ get:
           schema:
             $ref: variables-by-kind.yaml
     default:
-      $ref: getVariables-error-response.yaml
+      $ref: listVariables-error-response.yaml
 
 patch:
-  operationId: updateVariables
+  operationId: setVariables
   x-zitadel-cli: variable set
   summary: Update a project's variables
   description: |
@@ -89,4 +89,4 @@ patch:
           schema:
             $ref: variables-by-kind.yaml
     default:
-      $ref: updateVariables-error-response.yaml
+      $ref: setVariables-error-response.yaml

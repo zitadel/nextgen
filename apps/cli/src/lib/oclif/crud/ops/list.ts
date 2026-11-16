@@ -11,7 +11,7 @@ import {
   type TypedFilter,
   type TypedSort,
 } from "@/lib/oclif/crud/query";
-import { parseOrThrow } from "@/lib/oclif/crud/shared";
+import { parseOrThrow, pluralOf } from "@/lib/oclif/crud/shared";
 import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
 import { wireOf } from "@/lib/oclif/crud/wire";
 import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
@@ -67,6 +67,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
+    const plural = pluralOf(resource);
     const pagingFlags = {
       limit: Flags.custom<number>({
         parse: reads(LIMIT),
@@ -147,7 +148,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     };
 
     return {
-      description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
+      description: `List ${plural}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
         ...(paged && spec.drains !== true ? [`<%= config.bin %> ${topic} list --all --json`] : []),
@@ -169,7 +170,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
   }
 
   protected override async operate({ flags }: ListInput): Promise<CommandResult> {
-    const { topic, resource, spec, options } = this.definition;
+    const { resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
     const shape = fieldPaths(spec.item);
     // The pages arrive as the server sent them, cursor included, so a token
@@ -246,7 +247,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // page: asking for one with --limit or --page-token is asking for one.
     const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
-    const plural = resource.plural ?? topic;
+    const plural = pluralOf(resource);
     const progress = all ? this.ui.spinner(`Fetching ${plural}`) : undefined;
     const paging = new Paging({
       items: (response) => {

@@ -44,9 +44,9 @@ func (h *Handler) ListWebhooks(ctx context.Context, params api.ListWebhooksParam
 	if err != nil {
 		return nil, err
 	}
-	resp := &api.ListWebhooksResponse{Data: make([]api.Webhook, 0, len(result.Items))}
+	resp := &api.ListWebhooksResponse{Webhooks: make([]api.Webhook, 0, len(result.Items))}
 	for _, entity := range result.Items {
-		resp.Data = append(resp.Data, *toAPIWebhook(entity))
+		resp.Webhooks = append(resp.Webhooks, *toAPIWebhook(entity))
 	}
 	if result.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
@@ -74,7 +74,7 @@ func (h *Handler) GetWebhook(ctx context.Context, params api.GetWebhookParams) (
 	if err := h.requireWebhookAccess(ctx, params.ProjectID, opRead); err != nil {
 		return nil, err
 	}
-	entity, err := h.webhookService.Get(ctx, string(params.ProjectID), string(params.ID))
+	entity, err := h.webhookService.Get(ctx, string(params.ProjectID), string(params.WebhookID))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (h *Handler) UpdateWebhook(ctx context.Context, req *api.UpdateWebhookReque
 	if enabled, ok := req.Enabled.Get(); ok {
 		update.Enabled = &enabled
 	}
-	entity, err := h.webhookService.Update(ctx, string(params.ProjectID), string(params.ID), update)
+	entity, err := h.webhookService.Update(ctx, string(params.ProjectID), string(params.WebhookID), update)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (h *Handler) DeleteWebhook(ctx context.Context, params api.DeleteWebhookPar
 	if err := h.requireWebhookAccess(ctx, params.ProjectID, opDelete); err != nil {
 		return nil, err
 	}
-	if err := h.webhookService.Delete(ctx, string(params.ProjectID), string(params.ID)); err != nil {
+	if err := h.webhookService.Delete(ctx, string(params.ProjectID), string(params.WebhookID)); err != nil {
 		return nil, err
 	}
 	return &api.DeleteWebhookNoContent{}, nil
@@ -116,7 +116,7 @@ func (h *Handler) RotateWebhookSecret(ctx context.Context, params api.RotateWebh
 	if err := h.requireWebhookAccess(ctx, params.ProjectID, opWrite); err != nil {
 		return nil, err
 	}
-	entity, secret, err := h.webhookService.RotateSecret(ctx, string(params.ProjectID), string(params.ID))
+	entity, secret, err := h.webhookService.RotateSecret(ctx, string(params.ProjectID), string(params.WebhookID))
 	if err != nil {
 		return nil, err
 	}

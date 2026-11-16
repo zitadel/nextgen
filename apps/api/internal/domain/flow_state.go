@@ -12,7 +12,7 @@ import "time"
 // that only makes sense at the top level.
 type FlowState struct {
 	// ID is the flow handle minted at Start. The handler verifies it
-	// matches the path (`/flow/{id}/...`) to reject path/cookie mismatches.
+	// matches the path (`/flows/{flow_id}/...`) to reject path/cookie mismatches.
 	ID string
 
 	// ProjectID scopes the flow to a single tenant.
@@ -102,7 +102,7 @@ type FlowState struct {
 // FlowPendingChallenge records the server-issued challenge the next
 // submit must satisfy. The binding (id + method) is threaded through the
 // cookie so the verify step can locate it; Options carries the
-// client-facing ceremony options so a GET /flow re-render can re-emit
+// client-facing ceremony options so a GET /flows re-render can re-emit
 // them without re-issuing.
 type FlowPendingChallenge struct {
 	// ID is the challenge identifier returned by the auth-attempt

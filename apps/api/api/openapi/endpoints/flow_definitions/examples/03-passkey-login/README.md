@@ -34,7 +34,7 @@ flowchart TD
 
 ## Walk-through
 
-1. `POST /flow` with `purpose: login` → engine returns the `signin` step with
+1. `POST /flows` with `purpose: login` → engine returns the `signin` step with
    the `passkey` action.
 2. The user picks `passkey`. The engine calls
    `auth-attempt.IssuePasskeyChallenge`; the step re-renders with the

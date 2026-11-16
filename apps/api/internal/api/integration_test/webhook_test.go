@@ -85,7 +85,7 @@ func TestWebhooks(t *testing.T) {
 	})
 
 	t.Run("get returns it without the secret", func(t *testing.T) {
-		res, err := client.GetWebhook(t.Context(), api.GetWebhookParams{ID: created.ID, ProjectID: projectID})
+		res, err := client.GetWebhook(t.Context(), api.GetWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Webhook{}, res, helpers.MustMarshal(t, res))
 		assert.Equal(t, created.ID, res.(*api.Webhook).ID)
@@ -105,7 +105,7 @@ func TestWebhooks(t *testing.T) {
 	t.Run("update writes the named fields only", func(t *testing.T) {
 		res, err := client.UpdateWebhook(t.Context(), &api.UpdateWebhookRequest{
 			Enabled: api.NewOptBool(false),
-		}, api.UpdateWebhookParams{ID: created.ID, ProjectID: projectID})
+		}, api.UpdateWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Webhook{}, res, helpers.MustMarshal(t, res))
 		updated := res.(*api.Webhook)
@@ -117,7 +117,7 @@ func TestWebhooks(t *testing.T) {
 
 	t.Run("rotate issues a new secret and keeps the previous one for 24 hours", func(t *testing.T) {
 		before := time.Now()
-		res, err := client.RotateWebhookSecret(t.Context(), api.RotateWebhookSecretParams{ID: created.ID, ProjectID: projectID})
+		res, err := client.RotateWebhookSecret(t.Context(), api.RotateWebhookSecretParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.WebhookWithSecret{}, res, helpers.MustMarshal(t, res))
 		rotated := res.(*api.WebhookWithSecret)
@@ -135,16 +135,16 @@ func TestWebhooks(t *testing.T) {
 	})
 
 	t.Run("delete removes it", func(t *testing.T) {
-		res, err := client.DeleteWebhook(t.Context(), api.DeleteWebhookParams{ID: created.ID, ProjectID: projectID})
+		res, err := client.DeleteWebhook(t.Context(), api.DeleteWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteWebhookNoContent{}, res, helpers.MustMarshal(t, res))
 
-		got, err := client.GetWebhook(t.Context(), api.GetWebhookParams{ID: created.ID, ProjectID: projectID})
+		got, err := client.GetWebhook(t.Context(), api.GetWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetWebhookNotFound{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, api.ErrorCode("webhook.not_found"), got.(*api.GetWebhookNotFound).Code)
 
-		again, err := client.DeleteWebhook(t.Context(), api.DeleteWebhookParams{ID: created.ID, ProjectID: projectID})
+		again, err := client.DeleteWebhook(t.Context(), api.DeleteWebhookParams{WebhookID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteWebhookNotFound{}, again, helpers.MustMarshal(t, again))
 	})

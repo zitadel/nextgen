@@ -209,10 +209,10 @@ From the spike in [#1427](https://github.com/zitadel/nextgen/pull/1427) and its 
 
 **RECOMMENDED** — amends [ADR 064 §2](../adrs/064-cli-resource-commands.md) (plural) and settles its §3 (`env`).
 
-- `zitadel <noun> <verb> [id] [flags]`, noun **singular**, like `gh pr create`: `user`, `team`, `session`, `grant`, `idp`, `project`, `schema`, `release`, `deployment`, `origin`, `preview`, `variable`, `env`. Four of the five standard verbs take one object; only `list` reads better plural, and `gh pr list` shows nobody minds. Singular also lets a loop verb and its resource share a word (`preview` / `preview rm`, `deploy` / `deployment list`), and `env` needs no exception.
-- **Three top-level verbs**, because a pipeline runs them: `deploy`, `preview`, `rollback`, the release loop. The shipped top-level commands (`setup`, `apply`, `plan`, `claim`, `doctor`, `start`, `stop`, `status`, `logs`, `eject`, `reset`, `console`) stay.
+- `zitadel <noun> <verb> [id] [flags]`, noun **singular**, like `gh pr create`: `user`, `team`, `session`, `grant`, `idp`, `project`, `schema`, `policy`, `flow-definition`, `event`, `release`, `deployment`, `origin`, `preview`, `variable`, `env`; `branding`, a mass noun, has no other form. Four of the five standard verbs take one object; only `list` reads better plural, and `gh pr list` shows nobody minds. Singular also lets a loop verb and its resource share a word (`preview` / `preview rm`, `deploy` / `deployment list`), and `env` needs no exception.
+- **Two top-level verbs**, because a pipeline runs them: `deploy` and `preview`, the release loop. A rollback is deliberate, not a pipeline step, so it sits under its resource: `deployment rollback`. The shipped top-level commands (`setup`, `apply`, `plan`, `claim`, `doctor`, `start`, `stop`, `status`, `logs`, `eject`, `reset`, `console`) stay.
 - **Verbs:** `list`, `get`, `create`, `update`, `delete` on every resource; `add` / `rm` for membership in a list (`origin add`, `env add`, `preview rm`); `set` for key/value (`variable set`); a state verb where `delete` would lie (`session revoke`, `team deactivate`, `release revoke`).
-- Alpha with no broad adoption: the eleven shipped plural commands are renamed without a deprecation window.
+- The singular is the one documented form. The plural of every noun stays accepted and is never shown: `zitadel users list` runs `zitadel user list`, and help, completion, the reference and every output name the singular. Only a `<noun> <verb>` command answers to its plural; a plural alone runs nothing, so `previews` never deploys a preview.
 
 ---
 

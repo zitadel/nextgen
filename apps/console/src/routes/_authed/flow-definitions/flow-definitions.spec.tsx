@@ -42,7 +42,7 @@ const DEFINITION = {
 
 const SCHEMA = { title: "Minimal", type: "object" };
 
-// `expand=user_schema` embeds the same envelope `GET /schemas/{id}` returns,
+// `expand=user_schema` embeds the same envelope `GET /schemas/{schema_id}` returns,
 // not the bare document — the row reads the name one level in.
 const SCHEMA_EMBED = {
   id: "sch_1",

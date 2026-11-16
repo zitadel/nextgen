@@ -17,9 +17,9 @@ const pipe = (): PassThrough => new PassThrough();
 
 /** Runs `act` and returns how many SIGINTs reached the process meanwhile. */
 const interrupts = (act: () => void): number => {
-  let count = 0;
+  const heard: string[] = [];
   const listener = (): void => {
-    count += 1;
+    heard.push("SIGINT");
   };
   process.on("SIGINT", listener);
   try {
@@ -27,7 +27,7 @@ const interrupts = (act: () => void): number => {
   } finally {
     process.off("SIGINT", listener);
   }
-  return count;
+  return heard.length;
 };
 
 /** How long clack waits between one frame of a spinner and the next. */

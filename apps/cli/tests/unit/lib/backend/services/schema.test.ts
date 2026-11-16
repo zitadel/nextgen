@@ -56,20 +56,20 @@ describe("SchemaService.page", () => {
 
 describe("SchemaService.get", () => {
   it("fetches a revision id directly", async () => {
-    const getSchemaById = vi.fn(async () => ({ id: "sch_1" }));
+    const getSchema = vi.fn(async () => ({ id: "sch_1" }));
 
-    await expect(service({ getSchemaById }).get("sch_1")).resolves.toEqual({ id: "sch_1" });
+    await expect(service({ getSchema }).get("sch_1")).resolves.toEqual({ id: "sch_1" });
     // Scoped like every other call: a schema id is unique within a project and
     // not across them, so a credential seeing more than one would otherwise
     // resolve it ambiguously.
-    expect(getSchemaById).toHaveBeenCalledWith("sch_1", { project_id: "proj_1" });
+    expect(getSchema).toHaveBeenCalledWith("sch_1", { project_id: "proj_1" });
   });
 
   it("resolves an object type to its current revision through the list", async () => {
     const pages = vi.fn(() => pagesOf({ schemas: [{ id: "sch_2" }], next_page_token: null }));
 
     const schema = await service({
-      getSchemaById: async () => {
+      getSchema: async () => {
         throw new NotFoundError("no such schema", { status: 404 });
       },
       listSchemas: { pages },
@@ -87,7 +87,7 @@ describe("SchemaService.get", () => {
   it("refuses a reference that is neither, saying how to see what the project has", async () => {
     await expect(
       service({
-        getSchemaById: async () => {
+        getSchema: async () => {
           throw new NotFoundError("no such schema", { status: 404 });
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
@@ -95,14 +95,14 @@ describe("SchemaService.get", () => {
     ).rejects.toMatchObject({
       name: "NotFoundError",
       message: 'No schema named "typo"',
-      hint: "Run `schemas list` to see the object types this project has.",
+      hint: "Run `schema list` to see the object types this project has.",
     });
   });
 
   it("raises a failure that is not a miss, rather than reading it as an object type", async () => {
     await expect(
       service({
-        getSchemaById: async () => {
+        getSchema: async () => {
           throw new Error("boom");
         },
       }).get("sch_1"),
@@ -115,7 +115,7 @@ describe("SchemaService.get", () => {
   it("raises a revision the server says is gone, rather than reading it as an object type", async () => {
     await expect(
       service({
-        getSchemaById: async () => {
+        getSchema: async () => {
           throw responseFailure(410, "http://localhost:8080/schemas/sch_1", {}, "Gone");
         },
       }).get("sch_1"),
@@ -125,7 +125,7 @@ describe("SchemaService.get", () => {
 
 describe("SchemaService.create", () => {
   it("sends the document as given for the project it is bound to", async () => {
-    const createSchema = vi.fn(async () => ({ id: "sch_1" }));
+    const publishSchema = vi.fn(async () => ({ id: "sch_1" }));
     const input = {
       objectType: "human-user",
       kind: "user-schema" as const,
@@ -133,8 +133,8 @@ describe("SchemaService.create", () => {
       "x-auth-methods": {},
     };
 
-    await service({ createSchema }).create(input);
+    await service({ publishSchema }).create(input);
 
-    expect(createSchema).toHaveBeenCalledWith(input, { project_id: "proj_1" });
+    expect(publishSchema).toHaveBeenCalledWith(input, { project_id: "proj_1" });
   });
 });
