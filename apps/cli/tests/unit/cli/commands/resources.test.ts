@@ -975,6 +975,25 @@ describe("--file -", () => {
     expect(json.hint).toContain("--data");
   });
 
+  it("refuses a secret on the command line before it suggests the run again", async ({
+    dir: cwd,
+    terminal: _terminal,
+  }) => {
+    await makeProject(cwd);
+
+    const res = await run(cwd, [
+      "user",
+      "update",
+      "user_1",
+      "--file",
+      "-",
+      "--set",
+      "attributes.password=hunter2",
+    ]);
+
+    expect(res.stdout + res.stderr).not.toContain("hunter2");
+  });
+
   it.for<[string[], string]>([
     [["user", "create", "--file", "-"], "user create --file '<path>'"],
     [["user", "update", "user_1", "--file", "-"], "user update user_1 --file '<path>'"],

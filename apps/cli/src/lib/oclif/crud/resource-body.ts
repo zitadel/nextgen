@@ -119,10 +119,17 @@ const MISSING_FIELDS_REFUSAL = {
 } as const satisfies Refusal;
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
-  const raw = await readRawBody(flags, source.retry);
-  const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   const fromFlags = bodyFromFlags(source.fields, flags);
   const assignments = (flags.set ?? []) as readonly Assignment[];
+  // The field flags and `--set` are checked before stdin is read: a refusal to
+  // read it suggests the run again with them as typed, a secret included.
+  refuseArgvCredentials(
+    argvParts(flags, undefined, source.fields, fromFlags, assignments),
+    source.document,
+    source.references,
+  );
+  const raw = await readRawBody(flags, source.retry);
+  const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   refuseArgvCredentials(
     argvParts(flags, base, source.fields, fromFlags, assignments),
     source.document,

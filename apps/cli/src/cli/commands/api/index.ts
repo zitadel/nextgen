@@ -150,8 +150,15 @@ export function pathValuesFromWords(
   return ApiCall.to(target).pathValues(argv.slice(named ? 1 : 0), projectId);
 }
 
-/** The flag a refused `--input -` asks to be given a path instead. */
-type InputFlag = { input: Interfaces.OptionFlag<string | undefined> };
+/**
+ * The flags a refused `--input -` changes: `--input` is given a path, and the
+ * `--field` values are left out, since one may hold a secret a suggestion
+ * must never print.
+ */
+type InputFlags = {
+  input: Interfaces.OptionFlag<string | undefined>;
+  field: Interfaces.OptionFlag<string[] | undefined>;
+};
 
 /**
  * `--field` and `--input` laid over the operation's schema, each typed by it.
@@ -330,7 +337,12 @@ export default class Api extends Destructive(EnvironmentCommand) {
     const { server, projectId, client } = await this.reach(operation);
 
     const built = await requestOf(target, flags, projectId, () => {
-      return this.rerun<InputFlag>({ with: { input: "<path>" } });
+      // A chosen operation is not in the arguments the run was given.
+      return this.rerun<InputFlags>({
+        with: { input: "<path>" },
+        without: ["field"],
+        ...(args.operation === undefined ? { arguments: [operation.id] } : {}),
+      });
     });
     // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [
