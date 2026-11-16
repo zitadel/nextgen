@@ -4,7 +4,7 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 
 const SERVERS = [
   ["a remote server", "http://mock.zitadel.test"],

@@ -14,12 +14,13 @@
  * the credentials ({@link CredentialPrompt}), and publishing them to the
  * project through a publisher the caller passes in ({@link CredentialDelivery}).
  *
- * **Dependency rule.** No upward imports (`commands/`, `sync/`), none of
+ * **Dependency rule.** No upward imports (`cli/commands/`, `sync/`), none of
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
  * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions`), `lib/warnings`
- * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
+ * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions` and `warnings.report`) and
+ * `lib/suggestion` (the type of a command a run suggests, which
+ * the running command renders and hands in).
  */
 
 export { callbackUriFor } from "./callback";
@@ -31,8 +32,6 @@ export {
   publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
-  republishCommand,
-  republishCommands,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
@@ -57,7 +56,7 @@ export {
 } from "./custom";
 export { CredentialDelivery, type DeliveryRun } from "./delivery";
 export { askConnectionEndpoints } from "./endpoints";
-export { CredentialPrompt, type PromptRun } from "./prompt";
+export { CLIENT_ID_PLACEHOLDER, CredentialPrompt, type PromptRun } from "./prompt";
 export {
   ProviderChoice,
   type ProviderFlags,

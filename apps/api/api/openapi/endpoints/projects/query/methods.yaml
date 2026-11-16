@@ -1,6 +1,6 @@
 post:
   operationId: queryProjects
-  x-zitadel-cli: projects list
+  x-zitadel-cli: project list
   summary: Query projects
   # ADR 036 widens a credential beyond one project.
   description: |

@@ -74,7 +74,7 @@ bodies: `team create --name`, `grant create --relation` and
 `user create --attributes email=…` read well.
 
 It stops at the first nested object, and the identity provider connection is
-nested throughout. Everything in `CreateIdpBody` sits under `idp`, and the
+nested throughout. Everything in `PublishIdpBody` sits under `idp`, and the
 protocol settings under `idp.oidc`. On the shipped CLI:
 
 | What                                                          | Result                                                                                                                                                                              |
@@ -343,7 +343,7 @@ not only the first.
 
 - **When it may prompt**, on a terminal and without `--non-interactive`, it asks
   for each one through `input`
-  ([`apps/cli/src/lib/input.ts`](../../apps/cli/src/lib/input.ts)) in schema
+  ([`apps/cli/src/lib/ui/asker.ts`](../../apps/cli/src/lib/ui/asker.ts)) in schema
   order. An enum is a select, a boolean a confirm, and a string is text that
   its pattern checks as it is typed. This is the "command-driven with optional
   interaction" model of the draft

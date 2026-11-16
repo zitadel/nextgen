@@ -25,6 +25,11 @@ updates:
   # merges (.changeset/README.md#decision-table).
   - package-ecosystem: npm
     directory: /
+    # The conformance fixtures are generated: a bump to one of their own
+    # ranges fails their drift check (conformance/README.md). exclude-paths
+    # globs are relative to `directory` and hold for version updates only.
+    exclude-paths:
+      - "conformance/fixtures/**"
     schedule:
       interval: monthly
     cooldown:

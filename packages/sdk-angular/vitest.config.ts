@@ -11,6 +11,9 @@ import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
  * the Angular CLI performs in a consumer's build: the published package and
  * `@angular/*` ship declarations (`ɵɵngDeclare*`) that the linker turns into
  * code, because the edge VM disallows compiling them at run time.
+ *
+ * `@babel/core` is pinned exactly to the version `@angular/compiler-cli` pins,
+ * so the linker plugin is typed against the Babel that runs it.
  */
 function angularLinker(): Plugin {
   return {

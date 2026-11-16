@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyAppEnvTemplate, nextAppEnv } from "../../src/app-env";
+import { applyAppEnvTemplate, nextAppEnv, viteAppEnv } from "../../src/app-env";
 import type { InstanceHandle } from "../../src/types";
 
 const handle: InstanceHandle = {
@@ -29,6 +29,15 @@ describe("applyAppEnvTemplate", () => {
       ZITADEL_URL: "http://localhost:8092",
       ZITADEL_PROJECT_ID: "proj_1",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
+      ZITADEL_PROJECT_SECRET: "secret_1",
+    });
+  });
+
+  it("locks the env contract of a Vite app's dev proxy and widgets", () => {
+    expect(applyAppEnvTemplate(viteAppEnv, handle)).toEqual({
+      ZITADEL_URL: "http://localhost:8092",
+      ZITADEL_PROJECT_ID: "proj_1",
+      VITE_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });
   });

@@ -234,8 +234,8 @@ browser-plane preview secret carries.
 |---|---|
 | `POST /invitations?project_id=`: create, or replace with `replaces_invitation_id`; returns the invitation and `link` | project `admin` |
 | `GET /invitations?project_id=[&status=][&type=]`: list | project `admin` |
-| `GET /invitations/{id}?project_id=` | project `admin` |
-| `DELETE /invitations/{id}?project_id=`: cancel | project `admin` |
+| `GET /invitations/{invitation_id}?project_id=` | project `admin` |
+| `DELETE /invitations/{invitation_id}?project_id=`: cancel | project `admin` |
 | `POST /invitations/lookup`, `/accept`, `/reject` with `{token}` | platform-project session; CSRF on writes |
 | `GET /projects/{project_id}/members` | `project.write`, or a session that can read the project |
 

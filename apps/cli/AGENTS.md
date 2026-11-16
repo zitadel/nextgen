@@ -8,13 +8,15 @@
 - `command-reference.json` is the docs site's CLI reference, generated from
   `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
   rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+- `README.md`'s command reference is `oclif readme` output: after adding, renaming or removing a
+  command, run `turbo run readme --filter=@zitadel/cli`; `tests/unit/docs/readme.test.ts` gates it.
 - Running git, and why every call goes through one module:
   [`src/lib/git/AGENTS.md`](src/lib/git/AGENTS.md).
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
-  [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+  [`src/lib/server/local/AGENTS.md`](src/lib/server/local/AGENTS.md).
 - No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
   `// biome-ignore lint/plugin: <reason>` stating the mechanism.
 - `src/lib/orca/patchers` edits and drops code into the customer's project, so no
@@ -23,7 +25,7 @@
 - Scaffold posture: [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)
   (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:
   [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)
-  (`src/lib/scaffold-manifest.ts`).
+  (`src/lib/orca/scaffold-manifest.ts`).
 - Run a framework CLI only at its pin in
   `src/lib/orca/scaffolders/framework-clis/package.json`, never a dist-tag;
   Dependabot bumps it there, and a bump needs a changeset.
@@ -45,6 +47,9 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
+- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/`,
+  `oclif/` and `local-server/` may): hand the command data or a `{ id, … }` suggestion object, or
+  take a function the command supplies. `tests/unit/lib/suggestion/layering.test.ts` fails on it.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
 - Suggest `cd`, `docker`, `git` or `rm` as `shellCommand(program, ...words)`,
@@ -71,7 +76,7 @@
 - Name the CLI one way in anything a person reads — a hint, a warning, a box
   line, a description: the public `npx @zitadel/cli@<version> …` form, from
   `this.suggest`, never bare `zitadel …` and never in
-  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
+  backticks. `tests/unit/lib/suggestion/spelling.test.ts` scans `src/cli/commands` for both,
   and exempts only a `hint:` line (see the rule on quoting a command below).
   - Say it once: when the run's own step already prints the command, the
     prose says what to do and leaves the spelling to the step.
@@ -86,7 +91,7 @@
 - A dry run answers `ok` with `data.dry_run: true` and a headline ending in
   `(dry run)`; it is never `skipped`, which means a person said no.
 - Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
-  it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
+  it with `style` (`src/lib/ui/style.ts`), not `picocolors`; a unit test fails on another import.
 - Read a command top-down: its description, group and flags, then what it
   remembers for a run, then `sourceOf`, then `execute`, then the private
   methods `execute` calls. Nothing it calls is declared above it.
@@ -120,7 +125,18 @@
   - Annotate one only where its `next` would make the type circular;
     `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
-  command.
+  command, with one exception: a command that runs as a wizard.
+  - A wizard command (`setup`, `auth-method sso enable`) keeps one class per step under its own
+    `steps/`, built on `WizardStep` (`src/lib/wizard`), named for what it does
+    (`publish-credentials`, `make-initial-commit`). Beside `index.ts` it may have one `shared.ts`,
+    for the types the steps are wired with and for what two or more steps use; whatever one step
+    uses lives in that step's file.
+  - A step never imports another step or a value from the command's `index.ts`. It takes what it
+    needs through its constructor, which the command's `execute` fills when it builds the wizard,
+    and the command keeps its flags, refusals and telemetry (recorded through the observer given
+    to `.step(...)`) and emits the one result the wizard returns.
+- Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
+  `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
@@ -139,24 +155,32 @@
   colour has its own answer to a question the run already settled.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
-- A domain lib under `src/lib` stays plain functions and parsers, and never
-  imports `lib/oclif`.
-- Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
+- Group `src/lib` by area: a directory whose `index.ts` exports one entry class (plus its
+  types and errors), reached by chaining: `(await PM.detect(cwd)).installDependencies(...)`.
+- Add a method to an area's entry class before a new export; `ui`, `suggestion` and `upgrade`
+  still export several values each.
+- Keep a loose file at the root of `src/lib` to a utility that knows nothing of Zitadel or the
+  CLI; `errors.ts` is the one known exception.
+- A domain lib under `src/lib` never imports `lib/oclif`; `upgrade` builds only on the small
+  utilities `tests/unit/lib/upgrade/layering.test.ts` lists.
+- `src/lib/upgrade` takes each of Zitadel's defaults (`defaults.ts`, `config.ts`) as an option, so a
+  test or another product can swap it; the `upgrade` command does the CLI's part, `doctor --fix` too.
+- Say what a command is doing with `log` (`src/lib/ui/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
   sink decides the look, and `--json` installs one that draws nothing; with no
   sink installed, a line is written plainly. A unit test fails on a
   `consola` import.
-- Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
+- Report a warning through `warnings.report` (`src/lib/ui/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
   fails on any other `log.warn`.
 - Quote a command in a `hint:` as `` `zitadel …` ``; the base command spells it
   out as the `npx @zitadel/cli@<version> …` form and takes the other backticks
-  off (`spellOutCommands`). Only a `hint:` line may do this: a message, a
+  off (`Spelling#spellOut`). Only a `hint:` line may do this: a message, a
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
-  `src/commands`.
+  `src/cli/commands`.
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
-  (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
+  (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
   kind of question and no `kind` string: a unit test fails on a clack import
   elsewhere and on a `kind:` question outside the engine.
@@ -165,7 +189,7 @@
   `static override wizard = true` and gets the chain, the guide beside its
   prompts and the summary box; every other command draws neither chain nor
   box, asks the same clack prompts with no guide, no mark and no indent
-  (`src/lib/flat-output.ts`), a yes or no as a No/Yes list, and ends on its
+  (`src/lib/ui/flat-output.ts`), a yes or no as a No/Yes list, and ends on its
   answer and one dim footer. Nothing else reads a line from the
   terminal: a unit test fails on a `readline` import. Adding a question, a
   warning or a `--force` to a command must not change its shape.
@@ -222,7 +246,7 @@
   (`emitList` builds it), so the token goes with the flags that issued it.
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
-- Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the
+- Every destructive operation takes a `Consent` (`src/lib/consent/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
 - Updates are not guarded, though a merge-patch `null` removes what it names;
   guarding them needs a follow-up of its own, not a `Consent`.
@@ -269,7 +293,7 @@ paused.
 - Mixpanel events for the EU region go through the cloud's
   `/telemetry/mixpanel/*` rewrite in `vercel.json` (`config.test.ts`).
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
-  (`src/lib/user-agent.ts`) and obey the same opt-out.
+  (`Runtime.userAgent()` in `src/lib/runtime`) and obey the same opt-out.
 - The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
   tells users what is sent and how to opt out: change it with any of the above.
 

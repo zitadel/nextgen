@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 import { format } from "node:util";
 
 import { Command, type Config, run } from "@oclif/core";
+import { vi } from "vitest";
 
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
-import { publicCliCommand } from "@/lib/public-cli";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server/local/processes";
 import { cliPackageRoot } from "./oclif-build";
+// The leaf module, not `@/lib/suggestion`: this helper loads in every test's setup, and the area's
+// index would load much of the CLI before a test's own `vi.mock` of a node module can apply.
+import { Spelling } from "@/lib/suggestion/spelling";
 
 export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -37,7 +40,9 @@ export async function runCliForTest(
   const settled: NodeJS.ProcessEnv = { FORCE_COLOR: "", NO_COLOR: "", ...env };
   const overlaid = Object.keys(settled);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, settled);
+  for (const [key, value] of Object.entries(settled)) {
+    vi.stubEnv(key, value);
+  }
 
   const exitCode = await commandSeeing(argv[0], machine)
     .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
@@ -45,12 +50,7 @@ export async function runCliForTest(
     .finally(() => {
       output.restore();
       for (const key of overlaid) {
-        const prior = previous.get(key);
-        if (prior === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = prior;
-        }
+        vi.stubEnv(key, previous.get(key));
       }
     });
 
@@ -155,7 +155,7 @@ async function commandSeeing(
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
   if (name === "doctor") {
-    const { default: Doctor } = await import("@/commands/doctor");
+    const { default: Doctor } = await import("@/cli/commands/doctor");
     return class extends Doctor {
       static override id = "doctor";
 
@@ -165,7 +165,7 @@ async function commandSeeing(
     };
   }
   if (name === "stop") {
-    const { default: Stop } = await import("@/commands/stop");
+    const { default: Stop } = await import("@/cli/commands/stop");
     return class extends Stop {
       static override id = "stop";
 
@@ -202,7 +202,7 @@ export function stripAnsi(text: string): string {
 }
 
 export function expectedPublicCliCommand(args: string): string {
-  return publicCliCommand(args, cliVersion.version);
+  return Spelling.at(cliVersion.version).command(args);
 }
 
 /**

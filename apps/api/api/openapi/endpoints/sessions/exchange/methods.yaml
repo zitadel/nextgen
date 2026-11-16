@@ -5,7 +5,7 @@ post:
     Exchanges a handoff token for a session and a `session_token`.
 
     A handoff token is the short-lived, single-use credential that
-    `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication attempt is
+    `createAuthAttemptHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication attempt is
     complete. This call consumes it. It is the last step of the sign-in sequence:
     create the attempt, issue a challenge, verify the proof, create the handoff,
     exchange it.

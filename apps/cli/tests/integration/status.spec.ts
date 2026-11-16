@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   anApp,
@@ -12,7 +11,6 @@ import {
 import { cliVersion, expectedPublicCliCommand, parseJson } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 /**
  * What the envelope says of Docker, which only a local server run in it asks.

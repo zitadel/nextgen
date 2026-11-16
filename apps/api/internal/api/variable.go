@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParams) (api.GetVariablesRes, error) {
+func (h *Handler) ListVariables(ctx context.Context, params api.ListVariablesParams) (api.ListVariablesRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	return &out, nil
 }
 
-func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRequest, params api.UpdateVariablesParams) (api.UpdateVariablesRes, error) {
+func (h *Handler) SetVariables(ctx context.Context, req api.UpdateVariablesRequest, params api.SetVariablesParams) (api.SetVariablesRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opWrite); err != nil {
 		return nil, err
 	}
