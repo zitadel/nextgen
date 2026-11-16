@@ -191,7 +191,8 @@ func TestAuthorizeLoginPath(t *testing.T) {
 		{name: "with_query", loginPath: "/login?next=/"},
 		{name: "trailing_question_mark", loginPath: "/login?"},
 		{name: "with_fragment", loginPath: "/login#top"},
-		{name: "not_canonical", loginPath: "/login%2"},
+		// The shared check writes a '%' that starts no escape as "%25".
+		{name: "lone_percent", loginPath: "/login%2", wantLocation: "https://app.example.com/login%252?auth_request=authreq_1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -270,6 +271,7 @@ func TestAuthorizeAnswersAProgramWithJSON(t *testing.T) {
 	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 	assert.Contains(t, rec.Body.String(), `"error":"invalid_client"`)
 	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	assert.Contains(t, rec.Header().Values("Vary"), "Accept")
 }
 
 // Once the redirect URI is valid, a refusal goes back to the client with
@@ -286,6 +288,8 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "plain_method", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "plain"}, wantError: "invalid_request"},
 		{name: "no_method", set: map[string]string{"code_challenge": challenge}, wantError: "invalid_request"},
 		{name: "unknown_method", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S512"}, wantError: "invalid_request"},
+		{name: "plain_method_without_challenge", set: map[string]string{"code_challenge_method": "plain"}, wantError: "invalid_request"},
+		{name: "s256_method_without_challenge", set: map[string]string{"code_challenge_method": "S256"}, wantError: "invalid_request"},
 		{name: "challenge_too_short", set: map[string]string{"code_challenge": challenge[:42], "code_challenge_method": "S256"}, wantError: "invalid_request"},
 		{name: "challenge_not_base64url", set: map[string]string{"code_challenge": challenge[:42] + "+", "code_challenge_method": "S256"}, wantError: "invalid_request"},
 		{name: "challenge_nonzero_trailing_bits", set: map[string]string{"code_challenge": challenge[:42] + "N", "code_challenge_method": "S256"}, wantError: "invalid_request"},
@@ -296,6 +300,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "state_too_long", set: map[string]string{"state": strings.Repeat("s", 2049)}, wantError: "invalid_request"},
 		{name: "no_authorization_code_grant", set: map[string]string{"client_id": "no-codes"}, wantError: "unauthorized_client"},
 		{name: "prompt_consent", set: map[string]string{"prompt": "login consent"}, wantError: "unauthorized_client"},
+		{name: "prompt_none", set: map[string]string{"prompt": "none"}, wantError: "interaction_required"},
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
 		{name: "store_unavailable", storeErr: domain.ErrUnavailable().WithParent(errors.New("contention")), wantError: "temporarily_unavailable"},
@@ -339,5 +344,6 @@ func assertErrorPage(t *testing.T, rec *httptest.ResponseRecorder, status int) {
 	assert.Empty(t, rec.Header().Get("Location"))
 	assert.Empty(t, rec.Header().Get("Set-Cookie"))
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
+	assert.Contains(t, rec.Header().Values("Vary"), "Accept")
 	assert.NotContains(t, rec.Body.String(), `"error":`, "the library's JSON is dropped")
 }

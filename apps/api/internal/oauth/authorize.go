@@ -28,8 +28,8 @@ const (
 	// noScope stands in for a missing scope. No client allows it, so the
 	// library drops it.
 	noScope = "urn:zitadel:no-scope"
-	// maxStateBytes bounds the state every request stores. It leaves room for
-	// clients that encrypt their sign-in's properties into state.
+	// maxStateBytes bounds the state every request stores. No spec sets a
+	// limit; this one is chosen, and raising it later breaks no client.
 	maxStateBytes = 2048
 	// temporarilyUnavailable tells the client it may retry (RFC 6749
 	// §4.1.2.1). The library has no constructor for it.
@@ -98,23 +98,16 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	if err != nil {
 		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("invalid login path").WithParent(err), http.StatusBadRequest)
 	}
-	// The server does not serve the standard scopes yet, so they are ignored
-	// (ADR 082 §2). The library keeps them and drops every other scope.
-	// TODO(ADR 082 step 3): keep the scopes the server serves once OpenID
-	// Connect ships.
-	scopes := slices.DeleteFunc(req.Scopes, func(scope string) bool {
-		switch scope {
-		case oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail, oidc.ScopeAddress, oidc.ScopePhone, oidc.ScopeOfflineAccess:
-			return true
-		}
-		return false
-	})
 	request := &domain.AuthRequest{
-		ProjectID:     issuer.ProjectID,
-		ClientID:      c.id,
-		RedirectURI:   req.RedirectURI,
-		State:         req.State,
-		Scopes:        scopes,
+		ProjectID:   issuer.ProjectID,
+		ClientID:    c.id,
+		RedirectURI: req.RedirectURI,
+		State:       req.State,
+		// The server does not serve the standard scopes yet, so they are
+		// ignored (ADR 082 §2), and the library drops every other scope.
+		// TODO(ADR 082 step 3): keep the scopes the server serves once OpenID
+		// Connect ships.
+		Scopes:        []string{},
 		CodeChallenge: req.CodeChallenge,
 		Issuer:        issuer.URL.String(),
 		DeploymentID:  c.settings.DeploymentID,
@@ -160,7 +153,14 @@ func checkAuthRequest(req *oidc.AuthRequest, c *client) error {
 	if slices.Contains(req.Prompt, oidc.PromptConsent) {
 		return oidc.ErrUnauthorizedClient().WithDescription("consent is not supported yet")
 	}
-	if req.CodeChallenge != "" {
+	// Silent sign-in does not exist yet, so a request that forbids a page
+	// cannot be answered without one.
+	// TODO(#2795): store prompt and decide this on POST /flow (ADR 081 §8).
+	if slices.Contains(req.Prompt, oidc.PromptNone) {
+		return oidc.ErrInteractionRequired().WithDescription("silent sign-in is not supported yet")
+	}
+	// A method without a challenge is a client whose PKCE is set up wrong.
+	if req.CodeChallenge != "" || req.CodeChallengeMethod != "" {
 		// The library reads a missing method as plain; this server accepts S256 only.
 		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
 			return oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
@@ -191,8 +191,8 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if u.String() != raw || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return nil, fmt.Errorf("the login path %q has a query or fragment, or is not in canonical form", loginPath)
+	if u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return nil, fmt.Errorf("the login path %q has a query or fragment", loginPath)
 	}
 	return u, nil
 }
@@ -220,9 +220,11 @@ func bindingCookie(issuer Issuer, handle, nonce string) string {
 }
 
 // withErrorPages answers a browser navigation's error with the error page
-// instead of the library's JSON (ADR 076). A program keeps the JSON.
+// instead of the library's JSON (ADR 076). A program keeps the JSON. The
+// Accept header decides, and Vary says so to caches.
 func withErrorPages(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
 		if !errorpage.Wants(r) {
 			next.ServeHTTP(w, r)
 			return
