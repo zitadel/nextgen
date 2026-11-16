@@ -15,7 +15,7 @@ import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Runtime } from "@/lib/runtime";
@@ -167,7 +167,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // given is left to the prompt below.
     const givenServer = this.meta.serverFlag
       ? (
-          await Server.resolve({
+          await ZitadelRuntime.resolve({
             cwd,
             serverFlag: this.meta.serverFlag,
           })
@@ -187,8 +187,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         name: "server",
         message: "What is the URL of your Zitadel server?",
         flag: "--server",
-        initialValue: Server.DEFAULT,
-        parse: Server.parse,
+        initialValue: ZitadelRuntime.DEFAULT,
+        parse: ZitadelRuntime.parse,
         // The rerun keeps every choice this run made, so binding a project
         // (`--project`) stays a bind rather than creating a new project.
         retry: await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),

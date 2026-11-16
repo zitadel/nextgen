@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 
 import { Dotenv } from "./dotenv";
 import { EnvironmentName } from "./environment-name";
@@ -94,8 +94,9 @@ export class Environment {
         source: "--server",
         values: input.serverFlag
           ? {
-              ZITADEL_URL: (await Server.resolve({ cwd: input.cwd, serverFlag: input.serverFlag }))
-                .value,
+              ZITADEL_URL: (
+                await ZitadelRuntime.resolve({ cwd: input.cwd, serverFlag: input.serverFlag })
+              ).value,
             }
           : undefined,
       },
@@ -301,7 +302,7 @@ export class Environment {
           } as const;
         }
         return key === "ZITADEL_URL"
-          ? Server.parse(typed)
+          ? ZitadelRuntime.parse(typed)
           : ({
               ok: true,
               value: typed,
@@ -327,7 +328,7 @@ export class Environment {
    */
   private static originFrom(value: string, source: string): string {
     try {
-      return Server.origin(value);
+      return ZitadelRuntime.origin(value);
     } catch (error) {
       throw new ZitadelError(
         "E_VALIDATION",

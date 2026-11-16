@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { LocalAdmins, LocalRuntime } from "@/lib/server";
+import { LocalRuntime } from "@/lib/server";
 import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -53,7 +53,9 @@ describe("console", () => {
   it("signs in as the admin of a parent directory when run from an app inside it", async ({
     dir: parent,
   }) => {
-    const { admin } = await LocalAdmins.ensure(parent);
+    const { admin } = await LocalRuntime.forFolder(parent, {
+      cliVersion: "0.0.0-test",
+    }).ensureAdmin();
     const app = join(parent, "my-app");
     await mkdir(app);
 
@@ -65,7 +67,7 @@ describe("console", () => {
   });
 
   it("names the sign-in link it would mint on a dry run", async ({ dir: parent }) => {
-    await LocalAdmins.ensure(parent);
+    await LocalRuntime.forFolder(parent, { cliVersion: "0.0.0-test" }).ensureAdmin();
 
     const res = await runCliForTest(["console", "--cwd", parent, "--json", "--dry-run"]);
 
@@ -133,7 +135,7 @@ describe("console", () => {
   it("keeps to the local console when a local server was started, whatever the project names", async ({
     dir,
   }) => {
-    const { admin } = await LocalAdmins.ensure(dir);
+    const { admin } = await LocalRuntime.forFolder(dir, { cliVersion: "0.0.0-test" }).ensureAdmin();
 
     const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
       HOME: dir,

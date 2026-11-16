@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
-import { AdminSession, LocalAdmins, LocalRuntime, LocalServer, Server } from "@/lib/server";
+import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { section, log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
@@ -57,7 +57,7 @@ export default class Console extends BaseCommand {
    * the run has no context of its own yet.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const found = await LocalAdmins.findDir(cwd);
+    const found = await LocalRuntime.findAdminDir(cwd);
     if (found === undefined) {
       // A server that cannot be resolved is the run's error, not a missing local setup.
       const environment = await Environment.resolve({
@@ -76,8 +76,8 @@ export default class Console extends BaseCommand {
   protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
     // With no local server started here, the server `--server` or the project
     // names, when it is not on this machine, has only its own console to open.
-    if (this.named !== undefined && !Server.at(this.named).isLoopback()) {
-      const consoleUrl = Server.at(this.named).consoleUrl();
+    if (this.named !== undefined && !ZitadelRuntime.fromUrl(this.named).isLoopback()) {
+      const consoleUrl = ZitadelRuntime.fromUrl(this.named).consoleUrl();
 
       if (this.dryRun) {
         const title = "Would open the console (dry run)";
@@ -118,9 +118,9 @@ export default class Console extends BaseCommand {
       });
     }
 
-    const found = await LocalAdmins.findDir(this.cwd);
+    const found = await LocalRuntime.findAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await LocalAdmins.read(localDir);
+    const admin = await LocalRuntime.readAdmin(localDir);
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
     }
@@ -146,7 +146,7 @@ export default class Console extends BaseCommand {
       });
     }
 
-    const serverUrl = await LocalServer.resolveUrl(localDir);
+    const serverUrl = await LocalRuntime.resolveUrl(localDir);
     const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
     log.plain(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);

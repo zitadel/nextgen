@@ -12,13 +12,14 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import type { Daemons } from "@tests/fixtures/daemon";
 import { aFakeServerBinary } from "@tests/helpers/local-server";
 import { forcedConsent } from "@tests/helpers/consent";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { it } from "@tests/unit/lib/server/local/occupied-port";
+import type { Serve } from "@tests/fixtures";
 
 // The real credential code, replaceable per test: what it does while it runs
 // is how a test sees that the start lock is held around it.
@@ -39,7 +40,7 @@ const AN_ADMIN: LocalAdmin = {
 const RETRY = aSuggest()({ id: "start" });
 
 const at = (cwd: string) => {
-  return LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
+  return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test" });
 };
 
 /**
@@ -73,7 +74,7 @@ async function directoryRecording(cwd: string, pid: number, command: string): Pr
   );
 }
 
-describe("LocalServer", () => {
+describe("LocalRuntime", () => {
   describe("ensureAdmin", () => {
     it("creates the directory's local admin", async ({ dir }) => {
       const { admin } = await at(dir).ensureAdmin();
@@ -315,24 +316,24 @@ describe("LocalServer", () => {
 
   describe("a free port in place of a taken one", () => {
     it("is the first free one after it", async () => {
-      vi.spyOn(LocalServer, "isPortFree").mockImplementation((port) =>
+      vi.spyOn(LocalRuntime, "isPortFree").mockImplementation((port) =>
         Promise.resolve(port === 3003),
       );
 
-      await expect(LocalServer.nextFreePort(3000)).resolves.toBe(3003);
+      await expect(LocalRuntime.nextFreePort(3000)).resolves.toBe(3003);
     });
 
     it("is none when the next 20 are taken too", async () => {
-      const free = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+      const free = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
 
-      await expect(LocalServer.nextFreePort(3000)).resolves.toBeUndefined();
+      await expect(LocalRuntime.nextFreePort(3000)).resolves.toBeUndefined();
       expect(free).toHaveBeenCalledTimes(20);
     });
 
     it("never looks past the last port", async () => {
-      const free = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+      const free = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
 
-      await expect(LocalServer.nextFreePort(65530)).resolves.toBeUndefined();
+      await expect(LocalRuntime.nextFreePort(65530)).resolves.toBeUndefined();
       expect(free).toHaveBeenLastCalledWith(65535);
     });
   });
@@ -365,7 +366,7 @@ describe("LocalServer", () => {
       await directoryWithARunningServer(cwd, daemon);
       answeringAt(url);
 
-      await expect(LocalServer.resolveUrl(cwd)).resolves.toBe(url);
+      await expect(LocalRuntime.resolveUrl(cwd)).resolves.toBe(url);
     });
 
     it("is the server of the nearest parent directory that started one", async ({
@@ -377,7 +378,7 @@ describe("LocalServer", () => {
       await mkdir(app);
       answeringAt(url);
 
-      await expect(LocalServer.resolveUrl(app)).resolves.toBe(url);
+      await expect(LocalRuntime.resolveUrl(app)).resolves.toBe(url);
     });
 
     it("is not a server that answers at the recorded URL after the recorded one is gone", async ({
@@ -386,7 +387,7 @@ describe("LocalServer", () => {
       await directoryWithAGoneServer(cwd);
       answeringAt(url);
 
-      await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -399,7 +400,7 @@ describe("LocalServer", () => {
       await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
       answeringAt(url);
 
-      await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -408,7 +409,7 @@ describe("LocalServer", () => {
       await directoryWithARunningServer(cwd, daemon);
       answeringAt();
 
-      await expect(LocalServer.resolveUrl(cwd)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(cwd)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -418,7 +419,7 @@ describe("LocalServer", () => {
     }) => {
       answeringAt("http://localhost:8080");
 
-      await expect(LocalServer.resolveUrl(dir)).rejects.toMatchObject({
+      await expect(LocalRuntime.resolveUrl(dir)).rejects.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
         hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
       });
@@ -431,20 +432,20 @@ describe("LocalServer", () => {
       await directoryWithARunningServer(cwd, daemon);
       answeringAt(url);
 
-      await expect(LocalServer.detectUrl(cwd)).resolves.toBe(url);
+      await expect(LocalRuntime.detectUrl(cwd)).resolves.toBe(url);
     });
 
     it("is not found for optional UI when the recorded server is gone", async ({ dir: cwd }) => {
       await directoryWithAGoneServer(cwd);
       answeringAt(url);
 
-      await expect(LocalServer.detectUrl(cwd)).resolves.toBeUndefined();
+      await expect(LocalRuntime.detectUrl(cwd)).resolves.toBeUndefined();
     });
 
     it("is not found for optional UI when the directory started none", async ({ dir }) => {
       answeringAt(url);
 
-      await expect(LocalServer.detectUrl(dir)).resolves.toBeUndefined();
+      await expect(LocalRuntime.detectUrl(dir)).resolves.toBeUndefined();
     });
 
     it("is not found, and not an error, for optional UI when the record cannot be read", async ({
@@ -453,7 +454,7 @@ describe("LocalServer", () => {
       await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
       await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
 
-      await expect(LocalServer.detectUrl(cwd)).resolves.toBeUndefined();
+      await expect(LocalRuntime.detectUrl(cwd)).resolves.toBeUndefined();
     });
   });
 
@@ -499,5 +500,206 @@ describe("LocalServer", () => {
       daemon.adopt(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);
     });
+  });
+});
+
+describe("ZitadelRuntime.resolve", () => {
+  it("falls back to ZitadelRuntime.DEFAULT when no flag is given", async ({ dir }) => {
+    const resolved = await ZitadelRuntime.resolve({ cwd: dir });
+    expect(resolved).toEqual({ value: ZitadelRuntime.DEFAULT, origin: "default" });
+  });
+
+  it("ignores the server in zitadel.json", async ({ dir }) => {
+    await writeFile(
+      join(dir, "zitadel.json"),
+      JSON.stringify({ server: "https://config.example.com" }),
+      "utf8",
+    );
+    const resolved = await ZitadelRuntime.resolve({ cwd: dir });
+    expect(resolved).toEqual({ value: ZitadelRuntime.DEFAULT, origin: "default" });
+  });
+
+  it("uses the --server flag", async ({ dir }) => {
+    const resolved = await ZitadelRuntime.resolve({
+      cwd: dir,
+      serverFlag: "https://flag.example.com",
+    });
+    expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
+  });
+
+  it("normalises a resolved URL down to its origin", async ({ dir }) => {
+    const resolved = await ZitadelRuntime.resolve({
+      cwd: dir,
+      serverFlag: "https://flag.example.com/some/path?q=1",
+    });
+    expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
+  });
+
+  it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
+    await expect(
+      ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
+    await expect(
+      ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" }),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("resolves --server local from healthy local runtime metadata", async ({ dir, serve }) => {
+    const serverUrl = await startHealthServer(serve);
+    await writeLocalRuntime(dir, serverUrl);
+
+    const resolved = await ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" });
+
+    expect(resolved).toEqual({ value: serverUrl, origin: "local" });
+  });
+
+  it("fails --server local when runtime metadata points at an unhealthy server", async ({
+    dir,
+  }) => {
+    await writeLocalRuntime(dir, "http://localhost:9");
+
+    await expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
+      code: "E_LOCAL_SERVER_NOT_RUNNING",
+    });
+  });
+});
+
+async function writeLocalRuntime(dir: string, serverUrl: string): Promise<void> {
+  const paths = localRuntimePaths(dir);
+  await mkdir(paths.runtimeDir, { recursive: true });
+  await writeFile(
+    paths.runtimeFile,
+    JSON.stringify(
+      aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        log_path: paths.logFile,
+        port: Number(new URL(serverUrl).port),
+        server_url: serverUrl,
+        data_dir: paths.dataDir,
+      }),
+    ),
+    "utf8",
+  );
+}
+
+function startHealthServer(serve: Serve): Promise<string> {
+  return serve((req, res) => {
+    if (req.url === "/readyz") {
+      res.writeHead(200).end("ok");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+}
+
+describe("ZitadelRuntime.parse", () => {
+  it("gives the origin of a URL", () => {
+    expect(ZitadelRuntime.parse(" https://api.example.com/some/path ")).toEqual({
+      ok: true,
+      value: "https://api.example.com",
+    });
+  });
+
+  it("reports a URL with no scheme instead of throwing", () => {
+    expect(ZitadelRuntime.parse("api.zitadel.cloud")).toMatchObject({ ok: false });
+  });
+
+  it("reports an empty answer", () => {
+    expect(ZitadelRuntime.parse("  ")).toEqual({
+      ok: false,
+      problem: "The server URL cannot be empty",
+    });
+  });
+});
+
+describe("Server.isLoopback", () => {
+  it.for(["http://localhost:8080", "http://127.0.0.1", "http://[::1]:3000/path"])(
+    "accepts %s",
+    (url) => {
+      expect(ZitadelRuntime.fromUrl(url).isLoopback()).toBe(true);
+    },
+  );
+
+  it.for(["https://example.com", "http://10.0.0.1:8080", "not a url", ""])("rejects %s", (url) => {
+    expect(ZitadelRuntime.fromUrl(url).isLoopback()).toBe(false);
+  });
+});
+
+describe("Server.hostUnlessDefault", () => {
+  it("says nothing for the default server", () => {
+    expect(ZitadelRuntime.fromUrl(ZitadelRuntime.DEFAULT).hostUnlessDefault()).toBeUndefined();
+  });
+
+  it("names the host of any other server", () => {
+    expect(ZitadelRuntime.fromUrl("https://auth.example.com/some/path").hostUnlessDefault()).toBe(
+      "auth.example.com",
+    );
+  });
+
+  it("says nothing for an address that is not a URL", () => {
+    expect(ZitadelRuntime.fromUrl("not a url").hostUnlessDefault()).toBeUndefined();
+  });
+});
+
+describe("Server.isCloud", () => {
+  it.for([ZitadelRuntime.DEFAULT, "https://acme.zitadel.cloud", "https://zitadel.cloud/path"])(
+    "accepts %s",
+    (url) => {
+      expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(true);
+    },
+  );
+
+  it.for(["https://auth.example.com", "http://localhost:8080", "https://evilzitadel.cloud", "x"])(
+    "rejects %s",
+    (url) => {
+      expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(false);
+    },
+  );
+});
+
+describe("Server.consoleUrl", () => {
+  it("is /console/ on the hosted cloud", () => {
+    expect(ZitadelRuntime.fromUrl("https://preview.zitadel.com/api/v1").consoleUrl()).toBe(
+      "https://preview.zitadel.com/console/",
+    );
+  });
+
+  it("is /ui/console/ on any other server", () => {
+    expect(ZitadelRuntime.fromUrl("https://auth.example.com").consoleUrl()).toBe(
+      "https://auth.example.com/ui/console/",
+    );
+  });
+
+  it("refuses an address that is not a URL", () => {
+    expect(() => ZitadelRuntime.fromUrl("not a url").consoleUrl()).toThrow(/Invalid server/);
+  });
+});
+
+describe("Server.kind", () => {
+  it("buckets a server without leaking its address", () => {
+    expect(ZitadelRuntime.fromUrl("https://preview.zitadel.com").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://api.zitadel.cloud").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://acme.zitadel.cloud").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("http://localhost:8080").kind).toBe("local");
+    expect(ZitadelRuntime.fromUrl("http://127.0.0.1:8080").kind).toBe("local");
+    expect(ZitadelRuntime.fromUrl("http://127.0.0.2:8080").kind).toBe("local");
+    expect(ZitadelRuntime.fromUrl("http://[::1]:8080").kind).toBe("local");
+    expect(ZitadelRuntime.fromUrl("mock").kind).toBe("local");
+    expect(ZitadelRuntime.fromUrl("https://auth.internal.acme.com").kind).toBe("self_hosted");
+    expect(ZitadelRuntime.fromUrl("not a url").kind).toBe("unknown");
+  });
+
+  it("does not classify lookalike domains as cloud", () => {
+    expect(ZitadelRuntime.fromUrl("https://foozitadel.cloud").kind).toBe("self_hosted");
+    expect(ZitadelRuntime.fromUrl("https://notzitadel.cloud").kind).toBe("self_hosted");
+    expect(ZitadelRuntime.fromUrl("https://zitadel.cloud").kind).toBe("cloud");
+    expect(ZitadelRuntime.fromUrl("https://notpreview.zitadel.com").kind).toBe("self_hosted");
+    expect(ZitadelRuntime.fromUrl("https://zitadel.com").kind).toBe("self_hosted");
   });
 });

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
@@ -95,7 +95,7 @@ describe("ProjectConfig", () => {
     expect((await configOf({ server: "http://localhost:8080" })).server).toBe(
       "http://localhost:8080",
     );
-    expect((await configOf({})).server).toBe(Server.DEFAULT);
+    expect((await configOf({})).server).toBe(ZitadelRuntime.DEFAULT);
   });
 
   it("answers as an empty configuration when there is none to read", async () => {

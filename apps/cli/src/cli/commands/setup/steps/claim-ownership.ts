@@ -1,6 +1,6 @@
 import { isCancellation, toZitadelError } from "@/lib/errors";
 import { AdminClaim } from "@/lib/claim";
-import { AdminSession, LocalAdmins, LocalRuntime, Server } from "@/lib/server";
+import { AdminSession, LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -88,7 +88,7 @@ export class ClaimOwnership extends WizardStep<
    */
   async run(needs: Needs): Promise<Fact<"ownedByLocalAdmin" | "hostsPlatform" | "isLocal">> {
     const { answers, project } = needs;
-    const isLocal = Server.at(answers.server).kind === "local";
+    const isLocal = ZitadelRuntime.fromUrl(answers.server).kind === "local";
     const hostsPlatform =
       !this.deps.dryRun &&
       isLocal &&
@@ -101,7 +101,7 @@ export class ClaimOwnership extends WizardStep<
       };
     }
     try {
-      const admin = await LocalAdmins.findFor(this.deps.cwd, answers.server);
+      const admin = await LocalRuntime.findAdminFor(this.deps.cwd, answers.server);
       if (!admin) {
         warnings.report(
           `No local admin for ${answers.server} in ${this.deps.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.deps.suggest({ id: "start" })} started this server, run setup from the directory it ran in, or one inside it.`,

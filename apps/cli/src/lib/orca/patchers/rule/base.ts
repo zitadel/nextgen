@@ -6,7 +6,7 @@ import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 import { Origins } from "@/lib/backend";
 import { stableStringify } from "@/lib/json";
 import { MetaSchemas } from "@/lib/meta-schemas";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
@@ -484,11 +484,11 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
   };
 }
 
-/** Normalizes a server URL to its origin, falling back to {@link Server.DEFAULT}. */
+/** Normalizes a server URL to its origin, falling back to {@link ZitadelRuntime.DEFAULT}. */
 function resolveServerOrigin(source: string): string {
   try {
     return new URL(source).origin;
   } catch {
-    return Server.DEFAULT;
+    return ZitadelRuntime.DEFAULT;
   }
 }

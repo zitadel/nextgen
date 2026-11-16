@@ -21,7 +21,7 @@ admin credential, and the CLI talks only to the server a
 
 - Everything outside `src/lib/server` reaches it through `@/lib/server` alone
   (`index.ts` exports classes and their types, never a loose function);
-  `tests/unit/lib/server/layering.test.ts` fails on a deeper import.
+  Biome (`noRestrictedImports` in `biome.json`) fails on a deeper import.
 - Add to the class that owns the concern (`LocalServer` for the lifecycle,
   `LocalRuntime` for a directory's record, `LocalAdmins`, `AdminSession`,
   `ServerLogs`, `DockerGuidance`, `ProjectEnv`) before adding an export.

@@ -1,42 +1,73 @@
 import { join } from "node:path";
 
-import { log } from "@/lib/ui/log";
+import { DEFAULT_SERVER } from "@zitadel/config/server";
+import type { Parsed } from "@zitadel/config/idp";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
-
-import { currentUser } from "@/lib/uidgid";
-import { ensureLocalAdmin, type LocalAdmin } from "./admin-credential";
-import type { ResolvedEnv } from "./env-vars";
-import { assertDockerAvailable, startFailure } from "./internal/failures";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
-import { DockerLauncher, type DockerResult } from "./internal/docker-launcher";
+import { currentUser } from "@/lib/uidgid";
+import { log } from "@/lib/ui/log";
+
+import { isLoopbackHost } from "./host";
+import {
+  ensureLocalAdmin,
+  findLocalAdminDir,
+  findLocalAdminFor,
+  LOCAL_ADMIN_FILE,
+  type LocalAdmin,
+  readLocalAdmin,
+} from "./local/admin-credential";
+import { dockerRuntimeGuidance, dockerUnavailableMessage } from "./local/docker-guidance";
+import { EMPTY_SUMMARY, loadProjectEnv, type ResolvedEnv } from "./local/env-vars";
+import { assertDockerAvailable, startFailure } from "./local/internal/failures";
+import { BinaryLauncher, type StopBinaryRuntimeResult } from "./local/internal/binary-launcher";
+import { DockerLauncher, type DockerResult } from "./local/internal/docker-launcher";
 import {
   Lifecycle,
   PortInUseError,
   type Launcher,
   type LifecycleOptions,
-} from "./internal/lifecycle";
-import { HttpHealth, TcpPorts } from "./internal/probes";
-import { withStartLock } from "./internal/start-lock";
-import { listenersForPort } from "./ports";
-import { RuntimeFileStore } from "./internal/store";
-import type { LocalServers, ManagedRuntimeProcess } from "./processes";
+} from "./local/internal/lifecycle";
+import { HttpHealth, TcpPorts } from "./local/internal/probes";
+import { withStartLock } from "./local/internal/start-lock";
+import { listenersForPort } from "./local/ports";
+import { RuntimeFileStore } from "./local/internal/store";
+import type { LocalServers, ManagedRuntimeProcess } from "./local/processes";
 import {
   type RuntimeBackend,
   type RuntimeMetadata,
+  assertLocalStateWritable,
   checkLocalServerHealth,
+  CONTAINER_DATA_DIR,
+  DEFAULT_LOCAL_SERVER_PORT,
+  DEFAULT_LOCAL_SERVER_URL,
+  defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
+  ensureLocalState,
+  findUpward,
+  LOCAL_RUNTIME_DIR,
+  LOCAL_RUNTIME_FILE,
   localContainerName,
   localRuntimePaths,
   localServerNotRunning,
+  localServerUrl,
+  loopbackReach,
+  PLATFORM_PROJECT_ID,
+  peekRuntimeMetadata,
   readNearestRuntimeMetadata,
+  readPlatformRuntime,
   readRuntimeMetadata,
   removeLocalData,
   removeRuntimeMetadata,
-} from "./runtime";
+  resolveRuntimeBackend,
+  RUNTIME_BACKENDS,
+  runtimeSummary,
+  sameLocalServer,
+  writeRuntimeMetadata,
+} from "./local/runtime";
 import {
+  LOG_LEVELS,
   type LogLevel,
   type LogLine,
   LogLineReader,
@@ -44,7 +75,225 @@ import {
   atLeast,
   lastLines,
   logLines,
-} from "./server-log";
+  logText,
+  renderLogLine,
+} from "./local/server-log";
+
+/** What a runtime is, as telemetry and decisions bucket it. */
+export type RuntimeKind = "cloud" | "local" | "self_hosted" | "unknown";
+
+/**
+ * The resolved target server plus the source it came from. `origin` is
+ * retained (not just the value) so callers can report *why* a server was
+ * chosen.
+ */
+export type ResolvedServer = {
+  value: string;
+  origin: "flag" | "default" | "local";
+};
+
+/**
+ * Inputs to {@link ZitadelRuntime.resolve}. Passed explicitly (cwd) rather than read
+ * from globals so resolution is pure and testable. `serverFlag` comes from the
+ * parsed CLI invocation.
+ */
+export type ResolveServerInput = {
+  cwd: string;
+  serverFlag?: string;
+};
+
+/**
+ * The Zitadel runtime a command addresses: where Zitadel runs, on this machine or elsewhere,, and the one way into everything the
+ * CLI knows about one: the default, the variable that names it, how a typed or
+ * flagged value becomes an origin, and what a URL says about where it points.
+ */
+export abstract class ZitadelRuntime {
+  /**
+   * Server URL used when nothing else resolves (`@zitadel/config/server`, which
+   * the console shares). Also surfaced in hints and the interactive setup
+   * prompt as the suggested value.
+   */
+  static readonly DEFAULT: string = DEFAULT_SERVER;
+
+  /** The runtime's address, as it was given. */
+  readonly address: string;
+
+  /**
+   * @param address - The server's address, as it was given.
+   */
+  protected constructor(address: string) {
+    this.address = address;
+  }
+
+  /**
+   * A server known by its address, as a hint, a flag or a response names it.
+   *
+   * @param address - The server's address.
+   * @returns The server.
+   */
+  static fromUrl(address: string): ZitadelRuntime {
+    return address === "mock" ||
+      (URL.canParse(address) && isLoopbackHost(new URL(address).hostname))
+      ? new LocalRuntime(address, undefined)
+      : new CloudRuntime(address);
+  }
+
+  /**
+   * Resolves which server `setup` should create its project on: the `--server`
+   * flag, else {@link ZitadelRuntime.DEFAULT}. Every other command takes its server
+   * from `ZITADEL_URL` (see `Environment.resolve`), because a project belongs
+   * to the server that created it and the default says nothing about that. A
+   * flag value is validated to a normalised origin; an invalid URL throws a
+   * `ZitadelError` rather than silently falling through.
+   *
+   * @param input - The project directory and the `--server` flag, when given.
+   * @returns The server and where it came from.
+   * @throws {ZitadelError} `E_VALIDATION` when the flag is not an http(s) URL,
+   *   or the local server's own error when `local` is not running.
+   */
+  static async resolve(input: ResolveServerInput): Promise<ResolvedServer> {
+    if (!input.serverFlag) {
+      return { value: ZitadelRuntime.DEFAULT, origin: "default" };
+    }
+    if (input.serverFlag === "local") {
+      return { value: await LocalRuntime.resolveUrl(input.cwd), origin: "local" };
+    }
+    return { value: ZitadelRuntime.origin(input.serverFlag), origin: "flag" };
+  }
+
+  /**
+   * A typed or flagged server as its origin, or the problem with it: the
+   * `parse` an input question takes, so a prompt re-asks instead of throwing
+   * out of it.
+   *
+   * @param value - What was typed.
+   * @returns The origin, or why the value is not a server.
+   */
+  static parse(value: string): Parsed<string> {
+    const typed = value.trim();
+    if (typed === "") {
+      return {
+        ok: false,
+        problem: "The server URL cannot be empty",
+      };
+    }
+    try {
+      return {
+        ok: true,
+        value: ZitadelRuntime.origin(typed),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        problem: errorMessage(error),
+      };
+    }
+  }
+
+  /**
+   * Normalises a server URL to its origin.
+   *
+   * @param value - The server's address.
+   * @returns The origin.
+   * @throws {ZitadelError} `E_VALIDATION` when it is not an http(s) URL.
+   */
+  static origin(value: string): string {
+    if (!URL.canParse(value)) {
+      throw new ZitadelError("E_VALIDATION", `Invalid server "${value}"`, {
+        hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
+      });
+    }
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${value}`, {
+        hint: `Use a URL like ${ZitadelRuntime.DEFAULT}.`,
+      });
+    }
+    return url.origin;
+  }
+
+  /**
+   * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
+   * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
+   *
+   * @returns `true` when it points at this machine.
+   */
+  isLoopback(): boolean {
+    try {
+      return isLoopbackHost(new URL(this.address).hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * What kind of runtime this is, for a decision or an event that must not
+   * carry the address: the hosted cloud, one on this machine, any other
+   * server, or an address that is not a URL.
+   */
+  abstract get kind(): RuntimeKind;
+
+  /**
+   * Whether this is Zitadel's hosted cloud: the default server or a host under
+   * `zitadel.cloud`.
+   *
+   * @returns `true` when the address is a hosted cloud's.
+   */
+  isCloud(): boolean {
+    return this.kind === "cloud";
+  }
+
+  /**
+   * Where this server's console is: `/console/` on the hosted cloud, which
+   * serves it apart from the API, and `/ui/console/` on any other server.
+   *
+   * @returns The console's address, with its trailing slash.
+   * @throws {ZitadelError} `E_VALIDATION` when the address is not an http(s) URL.
+   */
+  consoleUrl(): string {
+    return `${ZitadelRuntime.origin(this.address)}${this.isCloud() ? "/console/" : "/ui/console/"}`;
+  }
+
+  /**
+   * The host of a server, for an ending that says where a run happened, or
+   * `undefined` for the default server, which a reader does not need told, and
+   * for an address that is not a URL.
+   *
+   * @returns The host, or `undefined` when there is nothing to say.
+   */
+  hostUnlessDefault(): string | undefined {
+    try {
+      const { host } = new URL(this.address);
+      return host === new URL(ZitadelRuntime.DEFAULT).host ? undefined : host;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * A runtime that is not on this machine: Zitadel's hosted cloud, or a server a
+ * team runs itself. The CLI only talks to it; it never starts or stops it.
+ */
+export class CloudRuntime extends ZitadelRuntime {
+  /**
+   * @returns `cloud` for Zitadel's hosted cloud (the default server or a host
+   *   under `zitadel.cloud`), `self_hosted` for any other server, `unknown` for
+   *   an address that is not a URL.
+   */
+  get kind(): RuntimeKind {
+    if (!URL.canParse(this.address)) {
+      return "unknown";
+    }
+    const { hostname } = new URL(this.address);
+
+    return hostname === new URL(ZitadelRuntime.DEFAULT).hostname ||
+      hostname === "zitadel.cloud" ||
+      hostname.endsWith(".zitadel.cloud")
+      ? "cloud"
+      : "self_hosted";
+  }
+}
 
 /** What every backend needs to start: what the directory does not already say. */
 type CommonRunConfig = Readonly<{
@@ -63,7 +312,7 @@ export type RunConfig =
   | (CommonRunConfig & Readonly<{ backend: "binary" }>)
   | (CommonRunConfig & Readonly<{ backend: "docker"; image: string }>);
 
-/** How {@link LocalServer.start} is asked to start. */
+/** How {@link LocalRuntime.start} is asked to start. */
 export type StartOptions = Readonly<{
   /** The port to take as asked or refuse, never move; the first free one when absent. */
   port?: number;
@@ -80,7 +329,7 @@ export type StartOptions = Readonly<{
  * `unhealthy`: it is running but does not answer. `running`: both. Whether
  * something answers at the recorded URL is not enough on its own, because
  * another directory's server may have taken the port since; see
- * {@link LocalServer.resolveUrl}.
+ * {@link LocalRuntime.resolveUrl}.
  */
 export type ServerStatus = Readonly<{
   lifecycle: "missing" | "running" | "unhealthy" | "stopped";
@@ -105,7 +354,7 @@ export type StopReport = Readonly<{
 }>;
 
 /**
- * The outcome of {@link LocalServer.stopAll}. `supported: false` where the
+ * The outcome of {@link LocalRuntime.stopAll}. `supported: false` where the
  * process list cannot be read (Windows, or no `ps`), so callers can say so
  * instead of reporting that nothing was running.
  */
@@ -129,7 +378,7 @@ export type SweepResult = Readonly<
  * second directory never silently attaches to another's server on port 8080
  * and signs in with a password that server never imported, so nothing here
  * falls back to a default port, and a recorded URL is never trusted on its own:
- * see {@link LocalServer.resolveUrl}.
+ * see {@link LocalRuntime.resolveUrl}.
  *
  * A directory has at most one server, a process (`binary`) or a container
  * (`docker`), and the record says which. The commands call this class and
@@ -138,16 +387,136 @@ export type SweepResult = Readonly<
  * there. When behaviour is missing, add it here and to a launcher, not to a
  * command, or the commands drift apart again.
  */
-export class LocalServer {
+export class LocalRuntime extends ZitadelRuntime {
   /** The processes listening on a TCP port of this machine, for naming what holds one. */
   static readonly listenersOn = listenersForPort;
 
-  private readonly cwd: string;
-  private readonly cliVersion: string;
+  /** The address a local server answers on when nothing names another. */
+  static readonly DEFAULT_URL: string = DEFAULT_LOCAL_SERVER_URL;
 
-  private constructor(cwd: string, cliVersion: string) {
-    this.cwd = cwd;
-    this.cliVersion = cliVersion;
+  /** The port a local server asks for first. */
+  static readonly DEFAULT_PORT: number = DEFAULT_LOCAL_SERVER_PORT;
+
+  /** The directory, from a project's root, that holds everything a local server keeps. */
+  static readonly DIR: string = LOCAL_RUNTIME_DIR;
+
+  /** The record of the server started in a directory, from the project's root. */
+  static readonly FILE: string = LOCAL_RUNTIME_FILE;
+
+  /** Where a container keeps the data directory it is given. */
+  static readonly CONTAINER_DATA_DIR: string = CONTAINER_DATA_DIR;
+
+  /** The project a local server hosts its own console under. */
+  static readonly PLATFORM_PROJECT_ID: string = PLATFORM_PROJECT_ID;
+
+  /** The runtimes `--runtime` names. */
+  static readonly BACKENDS: typeof RUNTIME_BACKENDS = RUNTIME_BACKENDS;
+
+  /** The record in `cwd`, or `undefined` when none was written there. */
+  static readonly read = readRuntimeMetadata;
+
+  /** The record in `cwd` read without recovering a malformed one. */
+  static readonly peek = peekRuntimeMetadata;
+
+  /** The record in `cwd` or the nearest parent that has one, and where it was found. */
+  static readonly readNearest = readNearestRuntimeMetadata;
+
+  /** The directory, from `cwd` upward, that holds `file`. */
+  static readonly findUpward = findUpward;
+
+  /** Where everything a local server keeps for `cwd` lives. */
+  static readonly paths = localRuntimePaths;
+
+  /** The name of the container a server in `cwd` runs as. */
+  static readonly containerName = localContainerName;
+
+  /** The address a local server on `port` answers on. */
+  static readonly urlOf = localServerUrl;
+
+  /** The image that goes with a CLI release. */
+  static readonly imageFor = defaultLocalServerImageForCliVersion;
+
+  /** The runtime a run asks for, or the one this machine can run. */
+  static readonly resolveBackend = resolveRuntimeBackend;
+
+  /** Creates the directories a local server keeps its state in. */
+  static readonly ensureState = ensureLocalState;
+
+  /** Whether the state directories can be written, and why not. */
+  static readonly assertWritable = assertLocalStateWritable;
+
+  /** What a record reports about itself, for a command's output. */
+  static readonly summary = runtimeSummary;
+
+  /** Whether two addresses name the same local server. */
+  static readonly same = sameLocalServer;
+
+  /** How the server at an address reaches this machine's loopback, judged by the nearest record. */
+  static readonly loopbackReach = loopbackReach;
+
+  /** The platform document a server publishes, or `undefined` when it hosts no platform project. */
+  static readonly readPlatform = readPlatformRuntime;
+
+  /** Writes the record of a directory; the lifecycle does this, and tests arrange one by it. */
+  static readonly write = writeRuntimeMetadata;
+
+  /** Whether the server at an address answers its readiness probe. */
+  static readonly isHealthy = checkLocalServerHealth;
+
+  /** Where the admin's credential is kept, from a project's root. */
+  static readonly ADMIN_FILE: string = LOCAL_ADMIN_FILE;
+
+  /** The directory holding the admin: `cwd`, or the nearest parent a server was started in. */
+  static readonly findAdminDir = findLocalAdminDir;
+
+  /** The nearest admin, from `cwd` upward, of the server at an address. */
+  static readonly findAdminFor = findLocalAdminFor;
+
+  /** The admin in a directory, or `undefined` when none was created. */
+  static readonly readAdmin = readLocalAdmin;
+
+  /** What to do when Docker does not answer, and the run to repeat afterwards. */
+  static readonly dockerGuidance = dockerRuntimeGuidance;
+
+  /** The message for a Docker that cannot be reached. */
+  static readonly dockerUnavailable = dockerUnavailableMessage;
+
+  /** What a start that injected no project variables reports. */
+  static readonly NO_ENV: typeof EMPTY_SUMMARY = EMPTY_SUMMARY;
+
+  /** Reads the project's env files and the defaults a local server needs. */
+  static readonly loadProjectEnv = loadProjectEnv;
+
+  /** The levels a log line can have, from the most verbose. */
+  static readonly LOG_LEVELS: typeof LOG_LEVELS = LOG_LEVELS;
+
+  /** Log lines as one text. */
+  static readonly logText = logText;
+
+  /** One log line as it is drawn, coloured or not. */
+  static readonly renderLogLine = renderLogLine;
+
+  private readonly directory: Readonly<{ cwd: string; cliVersion: string }> | undefined;
+
+  /**
+   * Use {@link LocalRuntime.forFolder} for a directory's server, or
+   * {@link ZitadelRuntime.fromUrl} for an address alone, which can be asked what it
+   * is but not started or stopped.
+   *
+   * @param address - The address the server answers on.
+   * @param directory - The directory it belongs to, and the CLI release that starts it.
+   */
+  constructor(
+    address: string,
+    directory: Readonly<{ cwd: string; cliVersion: string }> | undefined,
+  ) {
+    super(address);
+    this.directory = directory;
+  }
+
+  /** The runtime a local server always is. */
+  get kind(): RuntimeKind {
+    return "local";
   }
 
   /**
@@ -155,9 +524,34 @@ export class LocalServer {
    * running, which the server it launches matches. The commands its failures
    * suggest are rendered by the run that reports them, so they carry the
    * `--cwd` the run was given.
+   *
+   * @param cwd - The directory the server belongs to.
+   * @param options - The CLI release that starts it.
+   * @returns The directory's local runtime.
    */
-  static at(cwd: string, options: { cliVersion: string }): LocalServer {
-    return new LocalServer(cwd, options.cliVersion);
+  static forFolder(cwd: string, options: { cliVersion: string }): LocalRuntime {
+    return new LocalRuntime(LocalRuntime.DEFAULT_URL, { cwd, cliVersion: options.cliVersion });
+  }
+
+  /** The directory this runtime belongs to; an address-only runtime has none. */
+  private get cwd(): string {
+    return this.home().cwd;
+  }
+
+  /** The CLI release that starts this runtime. */
+  private get cliVersion(): string {
+    return this.home().cliVersion;
+  }
+
+  private home(): Readonly<{ cwd: string; cliVersion: string }> {
+    if (this.directory === undefined) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `The local server at ${this.address} belongs to no directory, so it cannot be managed`,
+      );
+    }
+
+    return this.directory;
   }
 
   /**
@@ -206,7 +600,7 @@ export class LocalServer {
     if (!nearest) {
       throw localServerNotRunning();
     }
-    if (await LocalServer.isServing(nearest.runtime)) {
+    if (await LocalRuntime.isServing(nearest.runtime)) {
       return nearest.runtime.server_url;
     }
     throw localServerNotRunning(nearest.runtime.server_url);
@@ -219,7 +613,7 @@ export class LocalServer {
    */
   static async detectUrl(cwd: string): Promise<string | undefined> {
     try {
-      return await LocalServer.resolveUrl(cwd);
+      return await LocalRuntime.resolveUrl(cwd);
     } catch {
       return undefined;
     }
@@ -244,7 +638,7 @@ export class LocalServer {
     for (const next of Array.from({ length: count }, (_, index) => {
       return port + 1 + index;
     })) {
-      if (await LocalServer.isPortFree(next)) {
+      if (await LocalRuntime.isPortFree(next)) {
         return next;
       }
     }

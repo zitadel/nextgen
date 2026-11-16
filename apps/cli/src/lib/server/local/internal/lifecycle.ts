@@ -2,7 +2,7 @@
  * The lifecycle of one directory's server, written against interfaces so it
  * can be tested with no processes, sockets, files or real time.
  *
- * This is the layer below `LocalServer` (the public class) and above the
+ * This is the layer below `LocalRuntime` (the public class) and above the
  * launchers (`BinaryLauncher`, `DockerLauncher`). It decides what to do (reuse
  * the running server, restart it, which port to take, when a start has failed);
  * the launchers know how to run and stop a server; the probes and the store

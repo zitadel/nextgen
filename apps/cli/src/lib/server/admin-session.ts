@@ -1,4 +1,4 @@
-import type { LocalAdmin } from "./local-admins";
+import type { LocalAdmin } from "./local/admin-credential";
 import { adminSessionCookie, consoleSignInUrl, localAdminRequest } from "./local/sign-in";
 
 /**

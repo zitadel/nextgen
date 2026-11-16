@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { LocalRuntime, LocalServer, StartedServer } from "@/lib/server";
+import { LocalRuntime, StartedServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";
@@ -74,7 +74,7 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    const { stopped, outcome } = await LocalServer.at(this.cwd, {
+    const { stopped, outcome } = await LocalRuntime.forFolder(this.cwd, {
       cliVersion: this.cliVersion,
     }).stop();
 
@@ -109,7 +109,7 @@ export default class Stop extends BaseCommand {
       return this.wouldStopAllManagedRuntimes();
     }
 
-    const sweep = await LocalServer.stopAll(this.localServers());
+    const sweep = await LocalRuntime.stopAll(this.localServers());
     if (!sweep.supported) {
       const title = "Managed local runtime process discovery is unavailable";
 

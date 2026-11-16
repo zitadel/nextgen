@@ -19,7 +19,7 @@ function isRecordOf<B extends RuntimeBackend>(
 /**
  * The directory's `.zitadel/local/runtime.json`, seen as the record of one
  * backend. A record the other backend wrote reads as nothing here: that server
- * is not this launcher's to manage, and `LocalServer` handles a backend switch
+ * is not this launcher's to manage, and `LocalRuntime` handles a backend switch
  * explicitly instead of by one backend mistaking the other's record for its own.
  */
 export class RuntimeFileStore<B extends RuntimeBackend> implements ServerStore<RecordOf<B>> {

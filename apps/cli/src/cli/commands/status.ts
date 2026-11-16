@@ -3,7 +3,7 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import { LocalRuntime, LocalServer } from "@/lib/server";
+import { LocalRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Connection,
@@ -53,7 +53,7 @@ export default class Status extends EnvironmentCommand {
   }
 
   protected async execute(): Promise<JsonEnvelope> {
-    const server = await LocalServer.at(this.cwd, {
+    const server = await LocalRuntime.forFolder(this.cwd, {
       cliVersion: this.cliVersion,
     }).status();
     const serverLifecycle = server.lifecycle;

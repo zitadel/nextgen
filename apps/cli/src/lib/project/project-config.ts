@@ -5,7 +5,7 @@ import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExistsStrict } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -114,6 +114,6 @@ export class ProjectConfig {
    * @returns The server's origin.
    */
   get server(): string {
-    return typeof this.data.server === "string" ? this.data.server : Server.DEFAULT;
+    return typeof this.data.server === "string" ? this.data.server : ZitadelRuntime.DEFAULT;
   }
 }

@@ -1,7 +1,7 @@
 import { toZitadelError } from "@/lib/errors";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -69,7 +69,7 @@ type Needs = Fact<"flags">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<SetupServices, "meta" | "suggest" | "useServer">;
+type Deps = Pick<SetupServices, "machine" | "meta" | "suggest" | "useServer">;
 
 /**
  * Checks everything that does not depend on an answer before anything is
@@ -124,7 +124,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await Server.resolve({
+    const server = await ZitadelRuntime.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
@@ -205,6 +205,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
     if (!configured) {
       await refuseOutdatedLocalServer({
         cwd: meta.cwd,
+        machine: this.deps.machine,
         serverUrl: server.value,
         flags,
       });

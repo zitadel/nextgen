@@ -1,13 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  LocalRuntime,
-  LocalServer,
-  ProjectEnv,
-  StartedServer,
-  type RuntimeMetadata,
-} from "@/lib/server";
+import { LocalRuntime, StartedServer, type RuntimeMetadata } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
@@ -137,7 +131,7 @@ export default class Start extends BaseCommand {
     // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
-    const env = await ProjectEnv.load(this.cwd, this.env);
+    const env = await LocalRuntime.loadProjectEnv(this.cwd, this.env);
     // The developer exists on their own server from the first start: the
     // server imports the local admin, and the console signs them in by link.
     // The admin is a user of the platform project, so the two travel together:
@@ -150,7 +144,7 @@ export default class Start extends BaseCommand {
       ...this.env,
       ...env.values,
     };
-    const server = LocalServer.at(this.cwd, {
+    const server = LocalRuntime.forFolder(this.cwd, {
       cliVersion: this.cliVersion,
     });
     const local = platformBootstrapEnabled(serverEnv)
@@ -254,7 +248,7 @@ function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
           }),
       port: metadata.port,
       data_dir: metadata.data_dir,
-      env: metadata.env ?? ProjectEnv.EMPTY,
+      env: metadata.env ?? LocalRuntime.NO_ENV,
     },
     urls: {
       api: metadata.server_url,

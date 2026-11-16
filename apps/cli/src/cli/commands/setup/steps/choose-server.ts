@@ -1,4 +1,4 @@
-import { LocalRuntime, LocalServer, Server } from "@/lib/server";
+import { LocalRuntime, ZitadelRuntime } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
@@ -30,7 +30,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
  */
 type Deps = Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "dryRun" | "machine" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
 >;
 
 /**
@@ -39,7 +39,7 @@ type Deps = Pick<
  * question names the server and not the file that records it.
  *
  * Before asking, it looks for a healthy local Zitadel server the same way the
- * rest of the CLI does (`LocalServer.detectUrl`: the server the runtime
+ * rest of the CLI does (`LocalRuntime.detectUrl`: the server the runtime
  * metadata `zitadel start` wrote to `.zitadel/local/runtime.json` names, when
  * its own process answers a `/readyz` probe). A detected server becomes an
  * option *and* the preselected answer — a user who just ran `zitadel start`
@@ -114,8 +114,8 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
       return answers;
     }
     const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
-    const detected = await LocalServer.detectUrl(ctx.cwd);
-    const outdated = await outdatedLocalServer(ctx.cwd);
+    const detected = await this.deps.machine.detectUrl(ctx.cwd);
+    const outdated = await outdatedLocalServer(ctx.cwd, this.deps.machine);
     probing.clear();
     const usable =
       detected && !(outdated && LocalRuntime.same(outdated.serverUrl, detected))
@@ -126,8 +126,8 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
       message: "Which Zitadel server should your app use?",
       options: [
         {
-          value: Server.DEFAULT,
-          label: `Zitadel Cloud (${new URL(Server.DEFAULT).host})`,
+          value: ZitadelRuntime.DEFAULT,
+          label: `Zitadel Cloud (${new URL(ZitadelRuntime.DEFAULT).host})`,
         },
         usable
           ? {
@@ -153,7 +153,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
           label: "Custom URL (self-hosted)",
         },
       ],
-      initialValue: usable ?? answers.server ?? Server.DEFAULT,
+      initialValue: usable ?? answers.server ?? ZitadelRuntime.DEFAULT,
     });
     return {
       ...answers,
@@ -164,7 +164,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
               message: "What is the URL of your Zitadel server?",
               placeholder: "https://zitadel.internal",
               parse: (value) => {
-                const parsed = Server.parse(value);
+                const parsed = ZitadelRuntime.parse(value);
                 return parsed.ok && outdated && LocalRuntime.same(outdated.serverUrl, parsed.value)
                   ? {
                       ok: false,

@@ -14,7 +14,7 @@ import {
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/ui";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
@@ -471,7 +471,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
     }
     const { values } = this.environment;
     const named = values.ZITADEL_URL?.value;
-    const server = named ?? Server.DEFAULT;
+    const server = named ?? ZitadelRuntime.DEFAULT;
     const projectId = named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value;
     this.ui.ranAgainst(projectId, server);
     return {

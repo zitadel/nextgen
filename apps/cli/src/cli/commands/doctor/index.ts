@@ -4,11 +4,9 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import {
-  DockerGuidance,
   LocalRuntime,
-  LocalServer,
-  Server,
   StartedServer,
+  ZitadelRuntime,
   type LocalServers,
   type ManagedRuntimeProcess,
   type RuntimeBackend,
@@ -522,7 +520,7 @@ export default class Doctor extends Destructive(BaseCommand) {
           return undefined;
         },
       );
-    return server === undefined || Server.at(server).isLoopback() ? undefined : server;
+    return server === undefined || ZitadelRuntime.fromUrl(server).isLoopback() ? undefined : server;
   }
 }
 
@@ -574,7 +572,7 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = DockerGuidance.forRetry(again.rerun);
+    const advice = LocalRuntime.dockerGuidance(again.rerun);
     return {
       hint: advice.hint,
       nextCommands: [advice.check, again.rerun],
@@ -724,7 +722,7 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = DockerGuidance.forRetry(again.rerun);
+    const advice = LocalRuntime.dockerGuidance(again.rerun);
     nextActions.push(...advice.nextActions);
     nextCommands.push(advice.check, again.rerun);
   }
@@ -925,7 +923,7 @@ async function runLocalRuntimeChecks(
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
-        const version = LocalServer.assertBinaryAvailable();
+        const version = LocalRuntime.assertBinaryAvailable();
         return `@zitadel/server ${version} is available`;
       }),
       await check(
@@ -951,11 +949,11 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
-        throw new Error(DockerGuidance.unavailable(error), { cause: error });
+      const result = await LocalRuntime.dockerReachable().catch((error: unknown) => {
+        throw new Error(LocalRuntime.dockerUnavailable(error), { cause: error });
       });
       if (result.status !== 0) {
-        throw new Error(DockerGuidance.unavailable(result.stderr || "docker version failed"));
+        throw new Error(LocalRuntime.dockerUnavailable(result.stderr || "docker version failed"));
       }
       return `Docker engine ${result.stdout.trim() || "available"}`;
     },
@@ -969,7 +967,7 @@ async function runLocalRuntimeChecks(
           `Image ${image} is available`,
           async () => {
             try {
-              const source = await LocalServer.imageAvailable(image);
+              const source = await LocalRuntime.imageAvailable(image);
               return source === "local"
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
@@ -1014,7 +1012,7 @@ async function checkPortAvailability(
   if (runtime?.port === port && (await LocalRuntime.isHealthy(runtime.server_url))) {
     return `${runtime.server_url} is already healthy`;
   }
-  const listeners = await LocalServer.listenersOn(port);
+  const listeners = await LocalRuntime.listenersOn(port);
   if (listeners.length > 0) {
     throw new PortInUseCheckError(port, LocalRuntime.urlOf(port), listeners);
   }
@@ -1024,12 +1022,12 @@ async function checkPortAvailability(
 class PortInUseCheckError extends Error {
   readonly port: number;
   readonly serverUrl: string;
-  readonly listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>;
+  readonly listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>;
 
   constructor(
     port: number,
     serverUrl: string,
-    listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>,
+    listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>,
   ) {
     super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
     this.port = port;
@@ -1117,7 +1115,7 @@ async function checkRuntime(
   });
 }
 
-function formatListeners(listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>): string {
+function formatListeners(listeners: Awaited<ReturnType<typeof LocalRuntime.listenersOn>>): string {
   return listeners
     .map((listener) => {
       return [

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { LocalAdmins, LocalRuntime, LocalServer, StartedServer } from "@/lib/server";
+import { LocalRuntime, StartedServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -64,7 +64,7 @@ export default class Reset extends Destructive(BaseCommand) {
           "",
           "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
-          `Kept: ${join(this.cwd, LocalAdmins.FILE)}, the local admin sign-in, and everything else in your project.`,
+          `Kept: ${join(this.cwd, LocalRuntime.ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
           `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: async () => {
@@ -89,7 +89,7 @@ export default class Reset extends Destructive(BaseCommand) {
           };
         },
         apply: async (consent) => {
-          await LocalServer.at(this.cwd, {
+          await LocalRuntime.forFolder(this.cwd, {
             cliVersion: this.cliVersion,
           }).reset(consent);
           const title = "Local Zitadel server runtime reset";

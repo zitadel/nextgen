@@ -1,6 +1,6 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import type { CommandResult } from "@/lib/oclif";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import type { Summary } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 
@@ -61,7 +61,7 @@ export class ReportAlreadySetUp extends EndStep<"alreadySetUp", CommandResult, N
    * @returns The result.
    */
   async run(needs: Needs): Promise<CommandResult> {
-    const skippedHost = Server.at(needs.preflight.server.value).hostUnlessDefault();
+    const skippedHost = ZitadelRuntime.fromUrl(needs.preflight.server.value).hostUnlessDefault();
     const title = this.deps.dryRun ? `${ALREADY_SET_UP_TITLE} (dry run)` : ALREADY_SET_UP_TITLE;
     const summary: Summary = {
       title,

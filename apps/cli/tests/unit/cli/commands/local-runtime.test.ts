@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { LocalAdmins, LocalRuntime, type RuntimeMetadata } from "@/lib/server";
+import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
 import Reset from "@/cli/commands/reset";
 import {
   aMachineRunning,
@@ -1013,7 +1013,7 @@ describe("local runtime commands", () => {
     const resetting = async (cwd: string, answers: Answer[]) => {
       const paths = LocalRuntime.paths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
-      await writeFile(join(cwd, LocalAdmins.FILE), "{}");
+      await writeFile(join(cwd, LocalRuntime.ADMIN_FILE), "{}");
       await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:8080"));
       const talk = answering(...answers);
       const outcome = await asTerminal(() =>
@@ -1054,7 +1054,7 @@ describe("local runtime commands", () => {
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
-      await expect(stat(join(cwd, LocalAdmins.FILE))).resolves.toBeDefined();
+      await expect(stat(join(cwd, LocalRuntime.ADMIN_FILE))).resolves.toBeDefined();
       await expect(readFile(fake.logPath, "utf8")).resolves.toContain("inspect");
     });
 
@@ -1065,7 +1065,7 @@ describe("local runtime commands", () => {
 
       const message = asOneLine(asked.join("\n"));
       expect(message).toContain(LocalRuntime.paths(cwd).dataDir);
-      expect(message).toContain(join(cwd, LocalAdmins.FILE));
+      expect(message).toContain(join(cwd, LocalRuntime.ADMIN_FILE));
       expect(message).toContain("every organization, user, application and setting");
       expect(message).toContain("cannot be undone");
     });

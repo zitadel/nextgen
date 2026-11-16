@@ -116,6 +116,31 @@
       "plugins": ["./biome-plugins/no-let.grit"]
     },
     {
+      "includes": [
+        "**/apps/cli/src/**",
+        "**/apps/cli/tests/**",
+        "!**/apps/cli/src/lib/server/**",
+        "!**/apps/cli/tests/unit/lib/server/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/lib/server/**"],
+                    "message": "Reach the server package through `@/lib/server`; what is inside it is private to it."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],
       "linter": {
         "rules": {

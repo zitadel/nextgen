@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { LocalRuntime, LocalServer, ServerLogs, StartedServer, type LogLine } from "@/lib/server";
+import { LocalRuntime, StartedServer, type LogLine } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -63,7 +63,7 @@ export default class Logs extends BaseCommand {
     follow: Flags.boolean({ description: "Keep printing lines as the server writes them." }),
     level: Flags.option({
       description: "Show only lines at this level or above.",
-      options: ServerLogs.LEVELS,
+      options: LocalRuntime.LOG_LEVELS,
     })(),
     tail: Flags.custom<number>({
       parse: reads(TAIL),
@@ -95,7 +95,7 @@ export default class Logs extends BaseCommand {
     if (started === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {});
     }
-    const server = LocalServer.at(started.dir, {
+    const server = LocalRuntime.forFolder(started.dir, {
       cliVersion: this.cliVersion,
     });
     if (flags.follow) {
@@ -128,7 +128,7 @@ export default class Logs extends BaseCommand {
       level: flags.level,
     });
     const shown = lines.map((line) => {
-      return ServerLogs.render(line, this.isColored);
+      return LocalRuntime.renderLogLine(line, this.isColored);
     });
     const title = "Local Zitadel server logs";
 
@@ -147,7 +147,7 @@ export default class Logs extends BaseCommand {
                 backend: runtime.backend,
                 container_name: runtime.container_name,
               },
-        logs: ServerLogs.text(lines),
+        logs: LocalRuntime.logText(lines),
       },
       pretty: painted(shown.join("\n")),
       summary: {
@@ -162,7 +162,7 @@ export default class Logs extends BaseCommand {
 function render(lines: readonly LogLine[], color: boolean): string {
   return lines
     .map((line) => {
-      return ServerLogs.render(line, color);
+      return LocalRuntime.renderLogLine(line, color);
     })
     .join("\n");
 }

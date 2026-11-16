@@ -10,7 +10,7 @@ import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { PsLocalServers, Server, type LocalServers } from "@/lib/server";
+import { PsLocalServers, ZitadelRuntime, type LocalServers } from "@/lib/server";
 import { resolveCwd } from "@/lib/paths";
 import {
   Spelling,
@@ -64,6 +64,14 @@ import type {
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
+/** The variable the server is named by when `--server` is not given. */
+const SERVER: FlagVariable = {
+  name: "ZITADEL_API_BASE",
+  flag: "server",
+  description: "The server URL, or `local`, as `--server` takes it.",
+  precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
+};
+
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -83,7 +91,7 @@ const FORCE_COLOR: FlagVariable = {
  * flags (`./reference.ts`).
  */
 export const FLAG_VARIABLES: readonly FlagVariable[] = [
-  Server.VARIABLE,
+  SERVER,
   NO_COLOR,
   FORCE_COLOR,
   DO_NOT_TRACK,
@@ -688,7 +696,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Promise<{ value: string }> {
     return options.resolveServer === false
       ? { value: options.source ?? "" }
-      : await Server.resolve({ cwd, serverFlag });
+      : await ZitadelRuntime.resolve({ cwd, serverFlag });
   }
 
   /**
@@ -906,7 +914,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       return undefined;
     }
 
-    return Server.at(this.meta.source).hostUnlessDefault();
+    return ZitadelRuntime.fromUrl(this.meta.source).hostUnlessDefault();
   }
 
   /**

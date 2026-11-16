@@ -36,7 +36,7 @@ import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
 import { Ui, warnings } from "@/lib/ui";
-import { LocalRuntime, LocalServer, type RuntimeMetadata } from "@/lib/server";
+import { LocalRuntime, SystemMachine, type RuntimeMetadata } from "@/lib/server";
 import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
@@ -85,7 +85,7 @@ const PINNED_DEV_PORT = ["--dev-port", "3000"];
 /**
  * The version of the server this CLI ships.
  */
-const BUNDLED_VERSION = String(LocalServer.bundledVersion());
+const BUNDLED_VERSION = String(LocalRuntime.bundledVersion());
 
 /**
  * A server URL nothing answers on, for a runtime record of a server that is
@@ -3091,7 +3091,7 @@ describe("setup --help", () => {
 
 describe("Setup.run", () => {
   beforeEach(() => {
-    vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
+    vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(true);
   });
 
   describe("with --force", () => {
@@ -3654,7 +3654,12 @@ describe("SettleAnswers", () => {
    * @returns Once the step has said what it has to.
    */
   async function settleOnTakenPort3000(suggest = aSuggest()): Promise<void> {
-    await new SettleAnswers({ dryRun: false, nonInteractive: true, suggest }).run({
+    await new SettleAnswers({
+      dryRun: false,
+      machine: new SystemMachine(),
+      nonInteractive: true,
+      suggest,
+    }).run({
       flags: {} as SetupFlags,
       answers: {
         server: "http://localhost:8080",
@@ -3672,8 +3677,8 @@ describe("SettleAnswers", () => {
 
   describe("when a later port is free", () => {
     it("suggests setup on that port, from the run's directory", async ({ onTestFinished }) => {
-      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
-      const next = vi.spyOn(LocalServer, "nextFreePort").mockResolvedValue(3001);
+      const taken = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
+      const next = vi.spyOn(LocalRuntime, "nextFreePort").mockResolvedValue(3001);
       onTestFinished(() => {
         taken.mockRestore();
         next.mockRestore();
@@ -3691,7 +3696,7 @@ describe("SettleAnswers", () => {
     it("names only the flag, since a placeholder would run as a shell redirection", async ({
       onTestFinished,
     }) => {
-      const taken = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+      const taken = vi.spyOn(LocalRuntime, "isPortFree").mockResolvedValue(false);
       onTestFinished(() => {
         taken.mockRestore();
       });

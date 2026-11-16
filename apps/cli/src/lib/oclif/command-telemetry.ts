@@ -5,7 +5,7 @@ import { country } from "@/lib/telemetry/dimensions/country";
 import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
-import { Server } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import type { GlobalOptions } from "./types";
 
 /**
@@ -135,7 +135,7 @@ export function commandEventProperties(
     invocation_channel: invocationChannel.value(env),
     dry_run: meta.dryRun,
     force: meta.force,
-    server_kind: Server.at(meta.source).kind,
+    server_kind: ZitadelRuntime.fromUrl(meta.source).kind,
   };
 }
 
