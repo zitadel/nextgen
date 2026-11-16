@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 
-import { isSecretFlag, isSecretKey } from "@/lib/secret-key";
+import { isSecretValue } from "@/lib/secret-key";
 
 /** Flags whose value is `name=value` or `path:=json`. */
 const ASSIGNMENTS: ReadonlySet<string> = new Set(["set", "field", "F"]);
@@ -12,36 +12,25 @@ const DOCUMENTS: ReadonlySet<string> = new Set(["data"]);
 const LEAST = 6;
 
 /**
- * The string values anywhere under a credential's key in a parsed document.
+ * The literal secrets in a parsed document: each string under a credential's key.
  *
  * @param value - The document.
- * @param under - Whether an enclosing key already read as a credential's.
+ * @param key - The key the value is under.
  * @returns The values.
  */
-function secretLeaves(value: unknown, under = false): string[] {
+function secretLeaves(value: unknown, key = ""): string[] {
   if (Array.isArray(value)) {
     return value.flatMap((item) => {
-      return secretLeaves(item, under);
+      return secretLeaves(item, key);
     });
   }
   if (typeof value === "object" && value !== null) {
-    return Object.entries(value).flatMap(([key, nested]) => {
-      return secretLeaves(nested, under || isSecretKey(key));
+    return Object.entries(value).flatMap(([name, nested]) => {
+      return secretLeaves(nested, name);
     });
   }
 
-  return under && typeof value === "string" ? [value] : [];
-}
-
-/**
- * Whether a value stands for a secret without being one: a placeholder, a
- * platform variable reference, or a shell variable.
- *
- * @param value - The value.
- * @returns Whether it is a reference.
- */
-function isReference(value: string): boolean {
-  return value.startsWith("<") || value.startsWith("${{") || value.startsWith("$");
+  return typeof value === "string" && isSecretValue(key, value) ? [value] : [];
 }
 
 /**
@@ -66,7 +55,7 @@ export function secretsIn(args: readonly string[]): string[] {
     }
     if (ASSIGNMENTS.has(name)) {
       const assignment = /^([^=:\s]+):?=([\s\S]*)$/.exec(value);
-      if (assignment !== null && isSecretKey(assignment[1] ?? "")) {
+      if (assignment !== null && isSecretValue(assignment[1] ?? "", assignment[2])) {
         found.push(assignment[2] ?? "");
       }
     } else if (DOCUMENTS.has(name)) {
@@ -75,13 +64,13 @@ export function secretsIn(args: readonly string[]): string[] {
       } catch {
         // Not a document: nothing under a key to find.
       }
-    } else if (isSecretFlag(name)) {
+    } else if (isSecretValue(name, value)) {
       found.push(value);
     }
   });
 
   return found.filter((secret) => {
-    return secret.length >= LEAST && !isReference(secret);
+    return secret.length >= LEAST;
   });
 }
 

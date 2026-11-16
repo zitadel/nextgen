@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSecretFlag, isSecretKey } from "@/lib/secret-key";
+import { isBareAddress, isSecretFlag, isSecretKey, isSecretValue } from "@/lib/secret-key";
 
 describe("isSecretKey", () => {
   it.each(["password", "api_key", "userToken", "client_secret", "PRIVATE_KEY", "access-token"])(
@@ -47,5 +47,46 @@ describe("isSecretFlag", () => {
     "display-name",
   ])("does not read --%s as holding one", (name) => {
     expect(isSecretFlag(name)).toBe(false);
+  });
+});
+
+describe("isSecretValue", () => {
+  it.each([
+    ["client_secret", "s3cr3t-canary-7f3a"],
+    ["--password", "hunter2hunter2"],
+    ["api-key", "abc123def456"],
+  ])("takes %s=%s for a secret", (name, value) => {
+    expect(isSecretValue(name, value)).toBe(true);
+  });
+
+  it.each([
+    ["a platform reference", "client_secret", "${{ ACME_SSO_CLIENT_SECRET }}"],
+    ["a placeholder", "client_secret", "<client-secret>"],
+    ["an address", "client_secret", "https://idp.example.com/secret"],
+    ["a number", "password", "12345678"],
+    ["a name that holds no secret", "display_name", "hunter2hunter2"],
+    ["a setting about credentials", "password_hash", "argon2id"],
+    ["a value that is no string", "password", 42],
+  ])("does not take %s", (_what, name, value) => {
+    expect(isSecretValue(name, value)).toBe(false);
+  });
+
+  it("takes an address that carries a credential for a secret", () => {
+    expect(isSecretValue("client_secret", "https://user:pass@idp.example.com")).toBe(true);
+  });
+});
+
+describe("isBareAddress", () => {
+  it.each(["https://idp.example.com/token", "http://localhost:8080"])("is true for %s", (value) => {
+    expect(isBareAddress(value)).toBe(true);
+  });
+
+  it.each([
+    "https://user:pass@idp.example.com",
+    "https://idp.example.com/?access_token=abc",
+    "not a url",
+    42,
+  ])("is false for %s", (value) => {
+    expect(isBareAddress(value)).toBe(false);
   });
 });

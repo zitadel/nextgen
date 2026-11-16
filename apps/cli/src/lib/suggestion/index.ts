@@ -3,7 +3,7 @@ import type { Interfaces } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import type { PackageCommand } from "@/lib/pm";
-import { isSecretFlag, isSecretKey } from "@/lib/secret-key";
+import { isSecretValue } from "@/lib/secret-key";
 import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
@@ -619,28 +619,31 @@ export function withoutCredentials(word: string): string {
   return word.replace(CREDENTIALS, "$1");
 }
 
-/** A key anywhere in a parsed JSON value that reads as a credential's name. */
-function holdsSecretKey(value: unknown): boolean {
+/** Whether a parsed JSON value holds a literal secret under a credential's key. */
+function holdsSecret(value: unknown, key = ""): boolean {
   if (Array.isArray(value)) {
-    return value.some(holdsSecretKey);
+    return value.some((item) => {
+      return holdsSecret(item, key);
+    });
   }
   if (typeof value === "object" && value !== null) {
-    return Object.entries(value).some(([key, nested]) => {
-      return isSecretKey(key) || holdsSecretKey(nested);
+    return Object.entries(value).some(([name, nested]) => {
+      return holdsSecret(nested, name);
     });
   }
 
-  return false;
+  return isSecretValue(key, value);
 }
 
 /** `name=value` or `path:=json`, the shape of `--field` and `--set`. */
 const ASSIGNMENT = /^([^=:\s]+)(:?=)([\s\S]*)$/;
 
 /**
- * `word` as a suggestion may print it, with a placeholder where it could hold a
+ * `word` as a suggestion may print it, with a placeholder where it is a literal
  * secret: the value of a flag or argument named like a credential, the value of
  * a `name=value` assignment whose name reads as one, and a JSON document with
- * a credential's key anywhere in it. A suggestion repeats what the run was
+ * a literal secret under a credential's key. A platform reference
+ * (`${{ NAME }}`), an address, a number and a setting about credentials stay. A suggestion repeats what the run was
  * given, and the run's output goes to terminals and CI logs, so a typed
  * secret must never travel into it.
  *
@@ -649,16 +652,16 @@ const ASSIGNMENT = /^([^=:\s]+)(:?=)([\s\S]*)$/;
  * @returns The word, or a placeholder for it.
  */
 export function withoutSecret(name: string, word: string): string {
-  if (isSecretFlag(name)) {
+  if (isSecretValue(name, word)) {
     return `<${spelled(name)}>`;
   }
   const assignment = ASSIGNMENT.exec(word);
-  if (assignment !== null && isSecretKey(assignment[1] ?? "")) {
+  if (assignment !== null && isSecretValue(assignment[1] ?? "", assignment[3])) {
     return `${assignment[1]}${assignment[2]}<value>`;
   }
   if (/^\s*[[{]/.test(word)) {
     try {
-      if (holdsSecretKey(JSON.parse(word))) {
+      if (holdsSecret(JSON.parse(word))) {
         return "<json>";
       }
     } catch {

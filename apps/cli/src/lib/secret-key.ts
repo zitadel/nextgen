@@ -90,3 +90,50 @@ export function isSecretFlag(name: string): boolean {
     !(words.at(-2) === "page" && words.at(-1) === "token")
   );
 }
+
+/**
+ * Whether a value is an address and nothing more: a URL with a host that
+ * carries no credential of its own — no user info (`https://user:pass@…`) and
+ * no query parameter named like one (`?access_token=…`).
+ *
+ * @param value - The value.
+ * @returns Whether it is a bare address.
+ */
+export const isBareAddress = (value: unknown): boolean => {
+  if (typeof value !== "string" || !URL.canParse(value)) {
+    return false;
+  }
+  const url = new URL(value);
+  return (
+    url.host !== "" &&
+    url.username === "" &&
+    url.password === "" &&
+    ![...url.searchParams.keys()].some(isSecretKey)
+  );
+};
+
+/** How the platform spells a reference to a value it holds elsewhere: `${{ NAME }}`. */
+const REFERENCE = /^\$\{\{\s*\w+\s*\}\}$/;
+
+/**
+ * Whether `value`, typed to `name`, is a secret itself: `name` holds one
+ * ({@link isSecretFlag}) and the value is none of a platform reference
+ * (`${{ NAME }}`, which is how a credential is meant to be given), a
+ * placeholder, a bare address or a number.
+ *
+ * @param name - The flag, argument or key the value was given to.
+ * @param value - The value.
+ * @returns Whether it is a literal secret.
+ */
+export function isSecretValue(name: string, value: unknown): boolean {
+  if (typeof value !== "string" || !isSecretFlag(name)) {
+    return false;
+  }
+  const trimmed = value.trim();
+  return !(
+    REFERENCE.test(trimmed) ||
+    /^<.*>$/s.test(trimmed) ||
+    isBareAddress(trimmed) ||
+    /^\d+$/.test(trimmed)
+  );
+}

@@ -1,6 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { isSecretKey, wordsOf } from "@/lib/secret-key";
+import { isBareAddress, isSecretKey, wordsOf } from "@/lib/secret-key";
 
 import { fieldOf, objectOf, unwrap, type ZodLike } from "./zod";
 
@@ -17,24 +17,6 @@ const ADDRESS_WORDS = new Set(["endpoint", "url", "uri"]);
 /** Whether a name ends in a word that names an address (`token_endpoint`, `jwks_uri`). */
 const isAddressKey = (key: string): boolean => {
   return ADDRESS_WORDS.has(wordsOf(key).at(-1) ?? "");
-};
-
-/**
- * Whether a value is an address and nothing more: a URL with a host that
- * carries no credential of its own — no user info (`https://user:pass@…`) and
- * no query parameter named like one (`?access_token=…`).
- */
-const isBareAddress = (value: unknown): boolean => {
-  if (typeof value !== "string" || !URL.canParse(value)) {
-    return false;
-  }
-  const url = new URL(value);
-  return (
-    url.host !== "" &&
-    url.username === "" &&
-    url.password === "" &&
-    ![...url.searchParams.keys()].some(isSecretKey)
-  );
 };
 
 /** Where a credential can go without passing through the command line. */

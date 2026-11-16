@@ -23,6 +23,13 @@ const run = new RunSuggestions({
   },
 });
 
+/** What `idp create` is given before anything else: its required arguments. */
+const GIVEN_IDP: readonly ParsedToken[] = (
+  declaredOf("idp:create", config.findCommand("idp:create")).requiredArgs ?? []
+).map((): ParsedToken => {
+  return { type: "arg", input: "given_1" };
+});
+
 /** The assignment flags of a command: each takes `name=value` or `path:=json`. */
 const ASSIGNMENT_FLAGS = ["set", "field"];
 
@@ -135,6 +142,59 @@ describe("RunSuggestions#rerun", () => {
     const id = _label.split(" ")[0] ?? "";
 
     expect(printed(id, target, raw)).not.toContain(CANARY);
+  });
+
+  it.each([
+    [
+      "a platform reference given to a secret flag",
+      [{ type: "flag", flag: "oidc-client-secret", input: "${{ ACME_SSO_CLIENT_SECRET }}" }],
+      "ACME_SSO_CLIENT_SECRET",
+    ],
+    [
+      "a platform reference assigned to a credential",
+      [{ type: "flag", flag: "set", input: "oidc.client_secret=${{ ACME_SSO_CLIENT_SECRET }}" }],
+      "ACME_SSO_CLIENT_SECRET",
+    ],
+    [
+      "an endpoint assigned to a name that says token",
+      [{ type: "flag", flag: "set", input: "oidc.token_endpoint=https://idp.example.com/token" }],
+      "https://idp.example.com/token",
+    ],
+    [
+      "a setting about credentials in a document",
+      [{ type: "flag", flag: "data", input: '{"password_hash":{"algorithm":"argon2id"}}' }],
+      "argon2id",
+    ],
+    [
+      "an address in a document under a credential's key",
+      [
+        {
+          type: "flag",
+          flag: "data",
+          input: '{"oidc":{"token_endpoint":"https://idp.example.com/token"}}',
+        },
+      ],
+      "https://idp.example.com/token",
+    ],
+  ] as const)("keeps %s", (_what, raw, kept) => {
+    const target = declaredOf("idp:create", config.findCommand("idp:create"));
+
+    expect(printed("idp:create", target, [...GIVEN_IDP, ...raw])).toContain(kept);
+  });
+
+  it("still replaces a literal secret typed beside what it keeps", () => {
+    const target = declaredOf("idp:create", config.findCommand("idp:create"));
+
+    const shown = printed("idp:create", target, [
+      ...GIVEN_IDP,
+      { type: "flag", flag: "set", input: "oidc.token_endpoint=https://idp.example.com/token" },
+      { type: "flag", flag: "set", input: `oidc.client_secret=${CANARY}` },
+    ]);
+
+    expect([shown.includes("https://idp.example.com/token"), shown.includes(CANARY)]).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("keeps the words of a flag that holds no secret", () => {

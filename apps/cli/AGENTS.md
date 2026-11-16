@@ -181,8 +181,8 @@
   `src/cli/commands`.
 - Put a command that takes `--env-file` in `nextCommands`, never in a string: prose drops the
   selector (`tests/unit/lib/oclif/environment-flags.test.ts`).
-- Never print a secret a run was given: `rerun` swaps a credential-named value for a placeholder
-  (`withoutSecret`, `isSecretFlag` in `src/lib/secret-key.ts`), so name a secret flag as one does.
+- Never print a secret a run was given: `rerun` swaps a literal secret for a placeholder, and keeps
+  a `${{ NAME }}` reference (`withoutSecret`, `isSecretValue` in `src/lib/secret-key.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
