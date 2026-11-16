@@ -103,13 +103,14 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       },
     );
 
-    const items = listed.items;
     const livePreviewOrigins = this.isJson
       ? []
-      : items.flatMap((deployment) => {
+      : listed.items.flatMap((deployment) => {
           return deployment.servesLivePreview ? deployment.origins : [];
         });
     const expiries = await liveExpiries(client, projectId, livePreviewOrigins);
+
+    const items = listed.items;
     const rows = items.map((deployment) => {
       return {
         id: deployment.id,
