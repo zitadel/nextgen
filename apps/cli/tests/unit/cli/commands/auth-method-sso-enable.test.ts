@@ -455,7 +455,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         data: {
           next_commands: expect.arrayContaining([
-            expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
+            expect.stringMatching(/variable set GOOGLE_CLIENT_SECRET --secret .*--cwd /),
           ]),
         },
       });
@@ -1211,6 +1211,20 @@ describe("auth-method sso enable", () => {
             "auth-method sso enable --provider google --client-id '<client-id>' --server https://api.zitadel.cloud",
           ),
         ],
+      });
+    });
+  });
+
+  describe("with a schema and no client id", () => {
+    it("keeps --schema in the retry it suggests", async ({ dir }) => {
+      const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--schema", "employees"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: [expect.stringContaining("--schema employees")],
       });
     });
   });

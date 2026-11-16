@@ -184,6 +184,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             ask: this.ask,
             developmentBuild: Runtime.current().isDevelopment() && !this.nonInteractive,
             suggest: this.suggest,
+            again: this.again,
           }),
         )
         .step(new IntroduceProvider())

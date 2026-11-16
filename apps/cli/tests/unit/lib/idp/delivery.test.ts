@@ -55,7 +55,13 @@ function deliveryFor(connection: Connection, reused = false): CredentialDelivery
   const run: DeliveryRun = {
     connection,
     reused,
-    suggest: aSuggest(),
+    republish: (missing) => {
+      return aSuggest()({
+        id: "variable:set",
+        args: { name: missing.name },
+        flags: { secret: missing.secret },
+      });
+    },
   };
   return new CredentialDelivery(run);
 }

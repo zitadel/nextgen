@@ -587,7 +587,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: opts.suggest,
       });
       log.done(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
