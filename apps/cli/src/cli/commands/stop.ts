@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { startedServer } from "@/lib/server/local/started";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,

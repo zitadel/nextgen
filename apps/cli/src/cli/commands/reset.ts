@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Flags } from "@oclif/core";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { startedServer } from "@/lib/server/local/started";
 import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,

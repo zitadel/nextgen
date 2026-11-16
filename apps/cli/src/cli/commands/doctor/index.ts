@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { startedServer } from "@/lib/server/local/started";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";

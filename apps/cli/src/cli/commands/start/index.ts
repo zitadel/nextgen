@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { startedServer } from "@/lib/server/local/started";
 import { ensureLocalAdmin } from "@/lib/server/local/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/server/local/env-vars";
 import {
