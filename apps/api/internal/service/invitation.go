@@ -27,17 +27,20 @@ type InvitationService struct {
 	keys   KeyService
 	grants *GrantService
 	refs   UserRefResolver
+	// inviterIsAdmin is the authz check accept asks of the creator.
+	inviterIsAdmin InviterCheck
 	// consoleBaseURL never ends in a slash.
 	consoleBaseURL    string
 	platformProjectID string
 }
 
-func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, consoleBaseURL, platformProjectID string) *InvitationService {
+func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, inviterIsAdmin InviterCheck, consoleBaseURL, platformProjectID string) *InvitationService {
 	return &InvitationService{
 		db:                db,
 		keys:              keys,
 		grants:            grants,
 		refs:              refs,
+		inviterIsAdmin:    inviterIsAdmin,
 		consoleBaseURL:    consoleBaseURL,
 		platformProjectID: platformProjectID,
 	}
@@ -348,7 +351,8 @@ func (s *InvitationService) inviterRefs(ctx context.Context, projectID string, i
 }
 
 // InviterCheck reports whether userID still administers projectID, reading
-// through stmts inside the accept's transaction.
+// through stmts inside the accept's transaction. The authz resolver provides
+// it (resolver.ProjectAdminCheck); the service can't import the resolver.
 type InviterCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (bool, error)
 
 // Lookup finds a pending invitation by its link's token for userID.
@@ -357,10 +361,7 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 	defer end(&err)
 
 	stmts := s.db.Statements()
-	if err := requireActiveRedeemer(ctx, stmts, userID); err != nil {
-		return nil, mapInvitationError(err, "failed to look up invitation")
-	}
-	entity, err := pendingInvitationByToken(ctx, stmts, token, time.Now().UTC())
+	entity, err := redeemable(ctx, stmts, token, userID, time.Now().UTC())
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to look up invitation")
 	}
@@ -379,9 +380,10 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 	return found, nil
 }
 
-// Accept redeems a pending invitation for userID: the type's adapter writes
-// the access, then the invitation is marked accepted (ADR 086 §4).
-func (s *InvitationService) Accept(ctx context.Context, token, userID string, inviterIsAdmin InviterCheck) (_ *Invitation, err error) {
+// Accept redeems a pending invitation for userID in one transaction: the
+// guarded status change marks it accepted and locks its row, then the type's
+// adapter writes the access; a failure in either rolls both back (ADR 086).
+func (s *InvitationService) Accept(ctx context.Context, token, userID string) (_ *Invitation, err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Accept")
 	defer end(&err)
 
@@ -393,7 +395,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 		stmts := tx.Statements()
 		// Read per attempt, so a retried transaction rechecks expiry.
 		now := time.Now().UTC()
-		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
+		entity, err := redeemable(ctx, stmts, token, userID, now)
 		if err != nil {
 			return err
 		}
@@ -416,7 +418,7 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 		}
 		// A project secret names no user, so only the project check applies.
 		if entity.CreatedBy != nil {
-			admin, err := inviterIsAdmin(ctx, stmts, entity.ProjectID, *entity.CreatedBy)
+			admin, err := s.inviterIsAdmin(ctx, stmts, entity.ProjectID, *entity.CreatedBy)
 			if err != nil {
 				return err
 			}
@@ -458,7 +460,7 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 		if errors.Is(err, domain.ErrGrantInvalid()) {
 			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
 		}
-		// The session's user is gone or no longer active.
+		// The user was deactivated since the redeem check.
 		if errors.Is(err, domain.ErrGrantPrincipalNotFound()) {
 			return domain.ErrAuthUnauthorized(err)
 		}
@@ -476,11 +478,8 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	var rejected *domain.Invitation
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		if err := requireActiveRedeemer(ctx, stmts, userID); err != nil {
-			return err
-		}
 		now := time.Now().UTC()
-		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
+		entity, err := redeemable(ctx, stmts, token, userID, now)
 		if err != nil {
 			return err
 		}
@@ -500,6 +499,15 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	// The metadata stays for administrators; the link holder doesn't see it.
 	rejected.EncryptedMetadata = nil
 	return &Invitation{Invitation: rejected}, nil
+}
+
+// redeemable is what lookup, accept and decline share: an active user and the
+// pending invitation the token names.
+func redeemable(ctx context.Context, stmts AllStatements, token, userID string, now time.Time) (*domain.Invitation, error) {
+	if err := requireActiveRedeemer(ctx, stmts, userID); err != nil {
+		return nil, err
+	}
+	return pendingInvitationByToken(ctx, stmts, token, now)
 }
 
 // requireActiveRedeemer refuses a session whose user was deactivated or

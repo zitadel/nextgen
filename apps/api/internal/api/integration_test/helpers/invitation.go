@@ -5,6 +5,7 @@ package helpers
 import (
 	"testing"
 
+	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -15,13 +16,15 @@ func (h *Harness) EnsureInvitationService(t testing.TB) *service.InvitationServi
 
 	if h.invitationService.value == nil {
 		db := h.EnsureServiceDB(t)
+		platformID := h.EnsurePlatformProject(t).ID
 		h.invitationService.value = service.NewInvitationService(
 			db,
 			h.EnsureKeyService(t),
 			h.EnsureGrantService(t),
 			service.StatementsUserRefResolver{Pool: db},
+			resolver.ProjectAdminCheck(platformID),
 			ConsoleOrigin+"/ui/console",
-			h.EnsurePlatformProject(t).ID,
+			platformID,
 		)
 	}
 	return h.invitationService.value

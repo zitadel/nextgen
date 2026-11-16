@@ -2,17 +2,14 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
 	"time"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
-	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // WithInvitationService wires the invitation endpoints, like
@@ -227,11 +224,7 @@ func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationToken
 	if err != nil {
 		return nil, err
 	}
-	// A literal, not the method value: gen_openapi_errors follows a func
-	// literal argument.
-	accepted, err := h.invitationService.Accept(ctx, req.Token, userID, func(ctx context.Context, stmts service.AllStatements, projectID, inviterID string) (bool, error) {
-		return h.inviterIsAdmin(ctx, stmts, projectID, inviterID)
-	})
+	accepted, err := h.invitationService.Accept(ctx, req.Token, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,37 +255,6 @@ func (h *Handler) invitationRedeemer(ctx context.Context) (string, error) {
 		return "", invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
 	return self.UserID(), nil
-}
-
-// inviterIsAdmin asks whether the invitation's creator still holds admin on
-// the project, as POST /invitations checked when it was created.
-func (h *Handler) inviterIsAdmin(ctx context.Context, stmts service.AllStatements, projectID, userID string) (bool, error) {
-	home, err := stmts.GetResourceScope(ctx, userID)
-	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return false, nil
-		}
-		return false, err
-	}
-	if home.ResourceKind != domain.ResourceKindUser {
-		return false, nil
-	}
-	req := resolver.Request{
-		PrincipalType: domain.AuthzPrincipalTypeUser,
-		PrincipalID:   userID,
-		ProjectID:     projectID,
-		HomeProjectID: home.ProjectID,
-		ObjectType:    "project",
-		Relation:      projectRelation(opDelete),
-	}
-	if h.platformProjectID != "" && home.ProjectID == h.platformProjectID {
-		req.PlatformProjectID = h.platformProjectID
-	}
-	dec, err := resolver.New().Check(ctx, stmts, req)
-	if err != nil {
-		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
-	}
-	return dec == resolver.DecisionAllow, nil
 }
 
 func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
