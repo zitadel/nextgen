@@ -975,7 +975,7 @@ describe("--file -", () => {
     expect(json.hint).toContain("--data");
   });
 
-  it.for([
+  it.for<[string[], string]>([
     [["user", "create", "--file", "-"], "user create --file '<path>'"],
     [["user", "update", "user_1", "--file", "-"], "user update user_1 --file '<path>'"],
   ])(
@@ -983,10 +983,10 @@ describe("--file -", () => {
     async ([args, command], { dir: cwd, terminal: _terminal }) => {
       await makeProject(cwd);
 
-      const res = await run(cwd, args as string[]);
+      const res = await run(cwd, args);
 
       expect(parseJson(res.stdout)).toMatchObject({
-        next_commands: [expect.stringContaining(command as string)],
+        next_commands: [expect.stringContaining(command)],
       });
     },
   );

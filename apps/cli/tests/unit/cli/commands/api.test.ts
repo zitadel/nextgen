@@ -179,4 +179,16 @@ describe("zitadel api, answering a call at a terminal", () => {
     expect(shown).toContain("Called getLive");
     expect(shown).toContain("serving");
   });
+
+  it("suggests the run again with a path when --input - has nothing piped in", async ({ dir }) => {
+    const cwd = await makeProject(dir, { linked: true });
+
+    const res = await asTerminal(() =>
+      runCliForTest(["api", "getLive", "--input", "-", "--json", "--cwd", cwd, "--no-telemetry"]),
+    );
+
+    expect(JSON.parse(res.stdout)).toMatchObject({
+      next_commands: [expect.stringContaining("api getLive --input '<path>'")],
+    });
+  });
 });

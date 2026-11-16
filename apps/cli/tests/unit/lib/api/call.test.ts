@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 import { Operation } from "@/lib/backend";
 import { ApiCall } from "@/lib/api";
 import { it } from "@tests/fixtures";
-import { rejectionOf } from "@tests/helpers/thrown-value";
+import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 /** What a refusal suggests: the run again. */
 const RETRY = () => Promise.resolve({ id: "setup" } as const);
@@ -184,12 +184,14 @@ describe("ApiCall.request", () => {
   });
 
   it("tells the reader to give a path parameter after the operation, and names no command", () => {
-    expect(() => requestFor("getUser", ["user_id=user_1"], { positionals: ["user_1"] })).toThrow(
-      expect.objectContaining({
-        hint: "Give it after the operation, in the order the path declares them.",
-        nextCommands: undefined,
-      }),
-    );
+    const error = thrownBy(() => {
+      return requestFor("getUser", ["user_id=user_1"], { positionals: ["user_1"] });
+    });
+
+    expect(error).toMatchObject({
+      hint: "Give it after the operation, in the order the path declares them.",
+    });
+    expect(error).not.toHaveProperty("nextCommands", expect.anything());
   });
 
   it("fills a required project_id the caller left out", () => {

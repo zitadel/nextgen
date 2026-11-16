@@ -1000,7 +1000,8 @@ step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead, then `sso enable --provider '<name>'` (replace `<name>`). A non-interactive dry run refuses it the same way, and its
+could be enabled instead, then `sso enable --provider '<name>'` (replace
+`<name>`). A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
 offered by any flow is reported in `warnings` (and in `data.not_offered`

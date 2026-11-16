@@ -163,21 +163,24 @@ function scopedCommandsNamedIn(text: string): number[] {
 
 describe("a command that takes the run's selector", () => {
   it.each([
-    ["a double-quoted string", 'const hint = "Run zitadel deploy first.";'],
-    ["a single-quoted string", "const hint = 'Run zitadel deploy for the \"default\" flow.';"],
-    ["a template", "const hint = `Run zitadel deploy ${where}.`;"],
+    ["a double-quoted string", 'const hint = "Run zitadel deploy first.";', 1],
+    ["a single-quoted string", "const hint = 'Run zitadel deploy for the \"default\" flow.';", 1],
+    ["a template", "const hint = `Run zitadel deploy ${where}.`;", 1],
     [
       "the middle of a multi-line template",
       "const hint = `first\n  Run zitadel deploy --dry-run\n  last`;",
+      1,
     ],
-    ["a nested template", "const hint = `${a ? `b` : `zitadel deploy`}`;"],
+    ["a nested template", "const hint = `${a ? `b` : `zitadel deploy`}`;", 1],
     [
       "a command that declares the environment flags itself",
       'const hint = "Run zitadel doctor --fix.";',
+      1,
     ],
-    ["a string after a lone quote", 'const both = [\'"\', "zitadel deploy"];'],
-  ])("is found in %s", (_form, text) => {
-    expect(scopedCommandsNamedIn(text)).toHaveLength(1);
+    ["a string after a lone quote", 'const both = [\'"\', "zitadel deploy"];', 1],
+    ["a string on a later line", 'const a = 1;\nconst hint = "Run zitadel deploy first.";', 2],
+  ])("is found in %s, on its line", (_form, text, line) => {
+    expect(scopedCommandsNamedIn(text)).toEqual([line]);
   });
 
   it.each([
@@ -192,14 +195,16 @@ describe("a command that takes the run's selector", () => {
 
   it("is named nowhere in the source", async () => {
     const root = join(import.meta.dirname, "../../../../src");
+    const files = await sourcesUnder(root);
     const found = await Promise.all(
-      (await sourcesUnder(root)).map(async (file) => {
+      files.map(async (file) => {
         return scopedCommandsNamedIn(await readFile(join(root, file), "utf8")).map((line) => {
           return `${file}:${line}`;
         });
       }),
     );
 
+    expect(files.length).toBeGreaterThan(0);
     expect(found.flat().sort()).toEqual([]);
   });
 });
