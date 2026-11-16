@@ -9,7 +9,7 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
-  if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
+  if (!isHelp(args) && !oneShot(args)) {
     await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
   }
   // The module compiles in apps/api, but the server runs from the repository
@@ -53,11 +53,17 @@ function isHelp(args) {
   return args.includes("--help") || args.includes("-h") || args[0] === "help";
 }
 
+// The commands that do one thing and exit: they serve no console and take no
+// --migrate.
+function oneShot(args) {
+  return ["migrate", "seed", "completion"].includes(args[0]);
+}
+
 function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (args[0] === "migrate" || args[0] === "completion") {
+  if (oneShot(args)) {
     return args;
   }
   return [...args, "--migrate"];

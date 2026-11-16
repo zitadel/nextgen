@@ -27,7 +27,7 @@ const maxBuildAttempts = 3
 // project: the configuration this server ships (the platform user schema, the
 // default login flows, the recommended password policy and the default sign-up
 // policy) is built into one release and deployed to consoleOrigin, the project's one primary origin. It
-// runs on every start, so an upgrade's defaults go live. A start that changes
+// runs on every seeding, so an upgrade's defaults go live. A seeding that changes
 // nothing deploys nothing, and a server built before the one that made the live
 // deployment leaves it alone.
 func EnsureDeployed(

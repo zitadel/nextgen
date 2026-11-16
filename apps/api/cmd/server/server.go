@@ -71,12 +71,20 @@ import (
 // silent "a key was minted for you" into a startup failure.
 const flagDisableMasterKeyGeneration = "disable-master-key-generation"
 
+// flagSeed turns seeding at start off. It is on by default: a server started
+// by hand has no deploy step that seeded its database.
+const flagSeed = "seed"
+
 func NewCommand() *cobra.Command {
 	var configPath string
 	var userFiles []string
 	var applyMigrations bool
+	seedAtStart := true
 
 	runServer := func(cmd *cobra.Command, _ []string) error {
+		if !seedAtStart && len(userFiles) > 0 {
+			return fmt.Errorf("--user-file is imported by seeding: drop --%s=false, or pass the file to the seed command", flagSeed)
+		}
 		overrides, err := flagOverrides(cmd.Flags())
 		if err != nil {
 			return err
@@ -85,7 +93,7 @@ func NewCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return run(cmd.Context(), cfg, userFiles, applyMigrations)
+		return run(cmd.Context(), cfg, userFiles, phases{migrate: applyMigrations, seed: seedAtStart, serve: true})
 	}
 
 	root := &cobra.Command{
@@ -96,7 +104,7 @@ func NewCommand() *cobra.Command {
 		RunE:          runServer,
 	}
 	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
-	addServerFlags(root, &applyMigrations, &userFiles)
+	addServerFlags(root, &applyMigrations, &seedAtStart, &userFiles)
 
 	serverCmd := &cobra.Command{
 		Use:           "server",
@@ -105,10 +113,11 @@ func NewCommand() *cobra.Command {
 		SilenceErrors: true,
 		RunE:          runServer,
 	}
-	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+	addServerFlags(serverCmd, &applyMigrations, &seedAtStart, &userFiles)
 
 	root.AddCommand(serverCmd)
 	root.AddCommand(newMigrateCommand(&configPath))
+	root.AddCommand(newSeedCommand(&configPath))
 	return root
 }
 
@@ -132,11 +141,27 @@ func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
 	return overrides, nil
 }
 
-func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+func addServerFlags(cmd *cobra.Command, applyMigrations, seedAtStart *bool, userFiles *[]string) {
 	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().BoolVar(seedAtStart, flagSeed, true, "Seed the database before serving; false for a server whose deployment ran the seed command")
 	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
 	cmd.Flags().Bool(flagDisableMasterKeyGeneration, false,
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
+}
+
+// phases are the parts of a start. The server command runs them in one
+// process, migrating only on request. A deployment that migrates and seeds as
+// it deploys runs the migrate and seed commands there and serves alone, so
+// that starting an instance writes nothing.
+type phases struct {
+	// migrate applies the database migrations.
+	migrate bool
+	// seed writes what the configuration asks the database to hold: the
+	// platform project and the release the server ships for it, the bootstrap
+	// users, and the platform operators.
+	seed bool
+	// serve listens for requests; without it the run ends once it has seeded.
+	serve bool
 }
 
 // run is the server's lifetime. Its result is named so that the deferred report
@@ -145,7 +170,7 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 // function-scoped err the defer used to check, so those failures went
 // unreported (#1409); the `x, err :=` returns reused that err, but it held the
 // unwrapped cause rather than the value returned.
-func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
+func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {
 		// Logged before the shutdown funcs run: one of them shuts down the
@@ -181,7 +206,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 	setMemoryLimit()
 
-	pool, err := startDatabase(ctx, cfg, applyMigrations)
+	pool, err := startDatabase(ctx, cfg, do.migrate)
 	if err != nil {
 		return err
 	}
@@ -289,8 +314,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// creates a bare project row for any project id a bootstrap user names, and
 	// a project row that already exists would make this a no-op and leave the
 	// platform project without keys.
-	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	if do.seed {
+		if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+			return fmt.Errorf("failed to bootstrap platform project: %w", err)
+		}
 	}
 
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
@@ -348,22 +375,30 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// there like any other project. Before the user import, which needs the
 	// platform user schema this release stores.
 	if cfg.Platform.BootstrapProject {
-		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
-			return fmt.Errorf("failed to deploy the platform project: %w", err)
+		if do.seed {
+			if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+				return fmt.Errorf("failed to deploy the platform project: %w", err)
+			}
 		}
 		for _, origin := range consoleHosts[1:] {
 			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
 		}
 	}
 
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
+	if do.seed {
+		if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
+			return fmt.Errorf("failed to bootstrap users: %w", err)
+		}
 
-	// After the import, so a bootstrap admin named in platform.operators
-	// exists by the time it is granted (ADR 075 §4).
-	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+		// After the import, so a bootstrap admin named in platform.operators
+		// exists by the time it is granted (ADR 075 §4).
+		if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+			return fmt.Errorf("failed to reconcile platform operators: %w", err)
+		}
+	}
+	if !do.serve {
+		slog.Info("database seeded")
+		return nil
 	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
@@ -437,6 +472,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// otherwise reports the current state for operators.
 	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
+		// The first read of the platform project in a start that does not
+		// seed: say where it comes from, since nothing here creates it.
+		if !do.seed && cfg.Platform.BootstrapProject {
+			return fmt.Errorf("failed to resolve the default project (with --%s=false the seed command creates the platform project, not this start): %w", flagSeed, err)
+		}
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
 	if defaultProject != nil {
@@ -567,17 +607,23 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		close(serverErr)
 	}()
 
+	// Only a rotation has anything to re-wrap: a key wrapped by a master key
+	// that is not configured cannot be unwrapped, so with one master key the
+	// scan over every project's keys finds nothing it could move.
+	//
 	// TODO: on a multi-replica deployment, the migration can happen multiple
 	//       times. This is not a problem since the migration will not remove
 	//       any keys. So nothing breaks. But there is no need to recompute the
 	//       same thing multiple times.
-	go func() {
-		slog.Info("migrate keys to latest master key")
-		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
-			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
-		}
-		slog.Debug("master key migration done")
-	}()
+	if len(masterKey.Keys) > 0 {
+		go func() {
+			slog.Info("migrate keys to latest master key")
+			if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
+				slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
+			}
+			slog.Debug("master key migration done")
+		}()
+	}
 
 	select {
 	case <-ctx.Done():

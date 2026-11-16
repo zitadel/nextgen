@@ -426,3 +426,41 @@ func TestEnsurePreviewDatabaseLeavesItToTheDefaultRoleWithCreateDB(t *testing.T)
 	require.NoError(t, admin.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&found))
 	assert.False(t, found)
 }
+
+// Two builds that deploy to one database seed it one after another.
+func TestSeedUnderLockRunsOneSeedingAtATime(t *testing.T) {
+	ctx := context.Background()
+	dsn, stop, err := testdb.PostgresDSN(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	entered, release := make(chan struct{}), make(chan struct{})
+	first := make(chan error, 1)
+	go func() {
+		first <- seedUnderLock(ctx, dsn, func() error {
+			close(entered)
+			<-release
+			return nil
+		})
+	}()
+	<-entered
+
+	ran := make(chan struct{})
+	second := make(chan error, 1)
+	go func() {
+		second <- seedUnderLock(ctx, dsn, func() error {
+			close(ran)
+			return nil
+		})
+	}()
+	select {
+	case <-ran:
+		t.Fatal("a second seeding ran while the first held the lock")
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	close(release)
+	require.NoError(t, <-first)
+	require.NoError(t, <-second)
+	<-ran
+}
