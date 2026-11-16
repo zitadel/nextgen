@@ -154,11 +154,12 @@ func connectDirect(ctx context.Context, dsn string) (*pgx.Conn, error) {
 	return pgx.ConnectConfig(ctx, config)
 }
 
-// seedLockClass is the first key of the session advisory lock a build holds
-// on a deployment's database while it seeds it: "seed" in hex. Advisory locks
-// are per database, and the two-key form shares no keys with the one-key lock
-// the migrations hold.
-const seedLockClass = 0x73656564
+// seedLockID keys the session advisory lock a build holds on a deployment's
+// database while it seeds it: "zitaseed" in hex. It is a one-key lock, as the
+// migrations' is under a key of its own. The two-key form is the event
+// writers' in this database, who key theirs by project, and whoever reads
+// which events have settled reads those locks.
+const seedLockID = int64(0x7a69746173656564)
 
 // seedLockWait bounds how long a build waits for another build's seeding of
 // the same database, which takes seconds.
@@ -180,7 +181,7 @@ func seedUnderLock(ctx context.Context, dsn string, seed func() error) error {
 		return fmt.Errorf("connect to lock the seeding: %w", err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	if _, err := conn.Exec(lockCtx, "SELECT pg_advisory_lock($1::int, 0)", seedLockClass); err != nil {
+	if _, err := conn.Exec(lockCtx, "SELECT pg_advisory_lock($1)", seedLockID); err != nil {
 		return fmt.Errorf("lock the seeding: %w", err)
 	}
 	return seed()

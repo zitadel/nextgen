@@ -55,9 +55,9 @@ nextgen server --seed=false
 generates one: give it the key the servers are configured with
 ([Encryption keys](#encryption-keys)). A server started with `--seed=false`
 writes nothing by starting and refuses to start on a database nothing seeded.
-It logs a line that starts `platform project:` when what it serves is not what
-a seeding with its configuration leaves, which the next `seed` repairs. Write
-the flag with `=`: `--seed false` is refused.
+It logs an error that starts `platform project:` when the console cannot sign
+anyone in at its public base, which the next `seed` repairs. Write the flag
+with `=`: `--seed false` is refused.
 
 ## OAuth
 

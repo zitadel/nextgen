@@ -105,11 +105,15 @@ func buildRelease(ctx context.Context, releases service.ReleaseService, bundle s
 // no date, such as a development one, always deploys.
 func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
 	primary := primaryDeployment(live)
-	if primary == nil || builtAt.IsZero() {
+	if primary == nil || primary.Metadata.Message == nil || builtAt.IsZero() {
 		return false
 	}
-	deployedBy, ok := deployedByBuild(primary)
-	return ok && deployedBy.After(builtAt)
+	stamp, ok := strings.CutPrefix(*primary.Metadata.Message, platformDeployPrefix)
+	if !ok {
+		return false
+	}
+	deployedBy, err := time.Parse(time.RFC3339, stamp)
+	return err == nil && deployedBy.After(builtAt)
 }
 
 // primaryDeployment is the newest primary deployment among live, what the
@@ -121,21 +125,6 @@ func primaryDeployment(live []*domain.Deployment) *domain.Deployment {
 		}
 	}
 	return nil
-}
-
-// deployedByBuild reads when the server that made a platform deployment was
-// built, from the message EnsureDeployed gives it. ok is false for a
-// deployment someone else made.
-func deployedByBuild(deployment *domain.Deployment) (builtAt time.Time, ok bool) {
-	if deployment.Metadata.Message == nil {
-		return time.Time{}, false
-	}
-	stamp, ok := strings.CutPrefix(*deployment.Metadata.Message, platformDeployPrefix)
-	if !ok {
-		return time.Time{}, false
-	}
-	builtAt, err := time.Parse(time.RFC3339, stamp)
-	return builtAt, err == nil
 }
 
 // ownPrimaryOrigin makes consoleOrigin the platform project's one primary

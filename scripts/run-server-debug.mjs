@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
+import { forwardedArgs, formatCommand, isOneShotServerCommand, run } from "./dev-process.mjs";
 import {
   assertServerBuildPackage,
   gitInfo,
@@ -43,7 +43,7 @@ try {
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    if (!oneShot(args)) {
+    if (!isOneShotServerCommand(args)) {
       await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
     }
     await run("go", buildArgs, { cwd: moduleRoot });
@@ -108,17 +108,11 @@ function isHelp(a) {
   return a.includes("--help") || a.includes("-h") || a[0] === "help";
 }
 
-// The commands that do one thing and exit: they serve no console and take no
-// --migrate.
-function oneShot(args) {
-  return ["migrate", "seed", "completion"].includes(args[0]);
-}
-
 function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (oneShot(args)) {
+  if (isOneShotServerCommand(args)) {
     return args;
   }
   return [...args, "--migrate"];

@@ -418,15 +418,14 @@ project's Vercel Firewall, each counting per address in a fixed window of
   - The step exports no telemetry, whatever backend the environment names:
     its lines are in the build log, as the migration's are.
   - A function that starts on a database no build seeded exits with
-    `failed to resolve the default project`.
+    `the platform project does not exist`.
   - The build owns the platform project's release and primary origin from
     then on: a start repairs nothing, and a change made by hand lasts until
     the next deployment's seeding. Each start reads what the seeding left and
-    logs a line that starts `platform project:` when it differs: an `ERROR`
-    when nothing is deployed to the deployment's public base or the project
-    no longer lists it, which the console cannot sign in through, and a
-    `WARN` when an older build's configuration is live. Redeploy the current
-    deployment to seed again.
+    logs an `ERROR` line that starts `platform project:` when the console
+    cannot sign anyone in: nothing is deployed to the deployment's public
+    base, or the project no longer lists it as a primary origin. Redeploy the
+    current deployment to seed again.
 - **The server's defaults must be expand/contract too.** The platform project
   is deployed from them by the build's `seed` step, before the deployment is
   live, so the previous deployment serves the new defaults until the

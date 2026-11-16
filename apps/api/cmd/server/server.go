@@ -38,7 +38,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
-	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -324,18 +323,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		cfg.Origins.SharedHosts,
 	)
 
-	// Bootstrap runs here rather than straight after the migrations because it
-	// creates the project's keys and so needs the project service, which needs
-	// the key service. It must still precede the user import: that import
-	// creates a bare project row for any project id a bootstrap user names, and
-	// a project row that already exists would make this a no-op and leave the
-	// platform project without keys.
-	if do.seed {
-		if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
-			return fmt.Errorf("failed to bootstrap platform project: %w", err)
-		}
-	}
-
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -386,35 +373,31 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		policyService,
 		builtinBases,
 	)
-	// The console signs operators in to the platform project from the public
-	// base, the first console origin, so that project serves a deployed release
-	// there like any other project. Before the user import, which needs the
-	// platform user schema this release stores.
-	if cfg.Platform.BootstrapProject {
-		if do.seed {
-			if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
-				return fmt.Errorf("failed to deploy the platform project: %w", err)
-			}
-		}
-		for _, origin := range consoleHosts[1:] {
-			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
-		}
-	}
-
+	// Everything above only wires services, and nothing below writes what a
+	// seeding does: the seeding is this one call, for the seed command and for
+	// a server that seeds as it starts.
 	if do.seed {
-		if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-			return fmt.Errorf("failed to bootstrap users: %w", err)
+		seeding := seeder{
+			pool:          serviceDBPool,
+			projects:      projectService,
+			releases:      releaseService,
+			deployments:   deploymentService,
+			hashes:        passwordHasher,
+			builtinBases:  builtinBases,
+			consoleOrigin: consoleHosts[0],
 		}
-
-		// After the import, so a bootstrap admin named in platform.operators
-		// exists by the time it is granted (ADR 075 §4).
-		if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-			return fmt.Errorf("failed to reconcile platform operators: %w", err)
+		if err := seeding.seed(ctx, cfg, userFiles); err != nil {
+			return err
 		}
 	}
 	if !do.serve {
 		slog.Info("database seeded")
 		return nil
+	}
+	if cfg.Platform.BootstrapProject {
+		for _, origin := range consoleHosts[1:] {
+			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
+		}
 	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
@@ -488,10 +471,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	// otherwise reports the current state for operators.
 	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
-		// The first read of the platform project in a start that does not
-		// seed: say where it comes from, since nothing here creates it.
-		if !do.seed && cfg.Platform.BootstrapProject {
-			return fmt.Errorf("failed to resolve the default project (with --%s=false the seed command creates the platform project, not this start): %w", flagSeed, err)
+		// A start that does not seed finds no platform project where none was
+		// seeded: say where it comes from, since nothing here creates it. Any
+		// other failure, an unreachable database among them, is not about
+		// seeding.
+		if !do.seed && cfg.Platform.BootstrapProject && errors.Is(err, domain.ErrProjectNotFound()) {
+			return fmt.Errorf("the platform project does not exist: the seed command creates it, and a server started with --%s=false does not: %w", flagSeed, err)
 		}
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
@@ -628,23 +613,18 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		close(serverErr)
 	}()
 
-	// Only a rotation has anything to re-wrap: a key wrapped by a master key
-	// that is not configured cannot be unwrapped, so with one master key the
-	// scan over every project's keys finds nothing it could move.
+	// Re-wraps what a master key that is being rotated out still wraps. With
+	// one master key configured it has nothing to look for and returns at once.
 	//
 	// TODO: on a multi-replica deployment, the migration can happen multiple
 	//       times. This is not a problem since the migration will not remove
 	//       any keys. So nothing breaks. But there is no need to recompute the
 	//       same thing multiple times.
-	if masterKey.Rotating() {
-		go func() {
-			slog.Info("migrate keys to latest master key")
-			if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
-				slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
-			}
-			slog.Debug("master key migration done")
-		}()
-	}
+	go func() {
+		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
+			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
+		}
+	}()
 
 	select {
 	case <-ctx.Done():
@@ -664,17 +644,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 // seeding with this server's configuration leaves. It reads once and never
 // fails a start: what it finds is for the next seeding to repair.
 func reportPlatformDrift(ctx context.Context, consoleOrigin string, project *domain.Project, deployments *service.DeploymentService) {
-	found, err := platform.CheckSeeded(ctx, build.Date(), consoleOrigin, project, deployments)
+	problem, err := platform.CheckSeeded(ctx, consoleOrigin, project, deployments)
 	if err != nil {
 		slog.Warn("platform project: could not check what its seeding left", slogctx.Err(err))
 		return
 	}
-	for _, drift := range found {
-		level := slog.LevelWarn
-		if drift.Breaking {
-			level = slog.LevelError
-		}
-		slog.Log(ctx, level, "platform project: "+drift.Message+"; the seed command repairs it, which a deployment runs as it deploys")
+	if problem != "" {
+		slog.Error("platform project: " + problem + "; the seed command repairs it, which a deployment runs as it deploys")
 	}
 }
 

@@ -2,14 +2,14 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isOneShotServerCommand, run, runCapture } from "./dev-process.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
-  if (!isHelp(args) && !oneShot(args)) {
+  if (!isHelp(args) && !isOneShotServerCommand(args)) {
     await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
   }
   // The module compiles in apps/api, but the server runs from the repository
@@ -53,17 +53,11 @@ function isHelp(args) {
   return args.includes("--help") || args.includes("-h") || args[0] === "help";
 }
 
-// The commands that do one thing and exit: they serve no console and take no
-// --migrate.
-function oneShot(args) {
-  return ["migrate", "seed", "completion"].includes(args[0]);
-}
-
 function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (oneShot(args)) {
+  if (isOneShotServerCommand(args)) {
     return args;
   }
   return [...args, "--migrate"];

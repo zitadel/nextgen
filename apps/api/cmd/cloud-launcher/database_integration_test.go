@@ -465,9 +465,11 @@ func TestSeedUnderLockRunsOneSeedingAtATime(t *testing.T) {
 	t.Cleanup(func() { _ = conn.Close(context.Background()) })
 	require.Eventually(t, func() bool {
 		var waiting int
+		// A one-key lock shows its key's halves in classid and objid.
 		err := conn.QueryRow(ctx, `SELECT count(*) FROM pg_locks
-			WHERE locktype = 'advisory' AND classid::bigint = $1 AND objid::bigint = 0 AND objsubid = 2 AND NOT granted`,
-			int64(seedLockClass)).Scan(&waiting)
+			WHERE locktype = 'advisory' AND objsubid = 1 AND NOT granted
+				AND (classid::bigint << 32) | objid::bigint = $1`,
+			seedLockID).Scan(&waiting)
 		return err == nil && waiting == 1
 	}, 30*time.Second, 50*time.Millisecond, "the second seeding never waited for the lock")
 	select {

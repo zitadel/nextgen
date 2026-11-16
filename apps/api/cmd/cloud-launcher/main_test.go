@@ -1660,11 +1660,11 @@ func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
 	_, err := prepareMigration(nil)
-	assert.ErrorContains(t, err, `refusing to migrate production from "feature": production deploys from "main"`)
+	assert.ErrorContains(t, err, `refusing to change production from "feature": production deploys from "main"`)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
 	_, err = prepareMigration(nil)
-	assert.ErrorContains(t, err, "refusing to migrate production", "a CLI deploy carries no branch")
+	assert.ErrorContains(t, err, "refusing to change production", "a CLI deploy carries no branch")
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
 	_, err = prepareMigration(nil)

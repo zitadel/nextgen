@@ -115,7 +115,22 @@ func TestRunWithoutSeedingRefusesAnUnseededDatabase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	err = run(ctx, cfg, nil, phases{migrate: true, serve: true})
-	require.ErrorContains(t, err, "the seed command creates the platform project")
+	require.ErrorContains(t, err, "the platform project does not exist: the seed command creates it")
+}
+
+// Only a platform project that is missing is about seeding. A database the
+// start cannot read, here one without its schema, says so and nothing more.
+func TestRunWithoutSeedingBlamesSeedingOnlyForAMissingProject(t *testing.T) {
+	_, configPath := tempServerConfig(t)
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	cfg.Platform.BootstrapProject = true
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	err = run(ctx, cfg, nil, phases{serve: true})
+	require.ErrorContains(t, err, "failed to resolve the default project")
+	assert.NotContains(t, err.Error(), "seed command")
 }
 
 // The import of a --user-file is part of seeding, so a server that does not
