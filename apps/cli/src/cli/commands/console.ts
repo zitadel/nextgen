@@ -77,8 +77,8 @@ export default class Console extends BaseCommand {
    * every event and any refusal names it. The local server a `start` left in this
    * directory or a parent (its runtime metadata sits beside the admin it
    * created) is the one; only without it does `--server`, or else the project's
-   * own server, decide. The environment is read
-   * once, here, from the process: the run has no context of its own yet.
+   * own server, decide. The environment is read once, here, from the process:
+   * the run has no context of its own yet.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await findLocalAdminDir(cwd);
