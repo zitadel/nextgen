@@ -83,6 +83,7 @@ export const test = base.extend<{ clock: TimeControls }>({
         return vi.getTimerCount();
       },
       only: (...names) => {
+        vi.useRealTimers();
         vi.useFakeTimers({ toFake: names });
       },
     });

@@ -30,9 +30,11 @@ export const test = base.extend<{ start: Start; zitadel: Zitadel }, { app: strin
       started.push(running);
       return running;
     });
-    for (const running of started) {
-      running.kill();
-    }
+    await Promise.all(
+      started.map((running) => {
+        return running.kill();
+      }),
+    );
   },
   zitadel: async ({ start }, use) => {
     await use((args, cwd) => runZitadel(args, cwd, start));
