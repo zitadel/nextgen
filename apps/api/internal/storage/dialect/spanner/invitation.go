@@ -224,9 +224,9 @@ func scanInvitation(row *spanner.Row) (*domain.Invitation, error) {
 	scanned.EncryptedMetadata = spannerNullStringPtr(metadata)
 	scanned.CreatedBy = spannerNullStringPtr(createdBy)
 	scanned.CreatedByType = spannerNullStringPtr(createdByType)
-	scanned.AcceptedBy = spannerNullStringPtr(acceptedBy)
+	scanned.RespondedBy = spannerNullStringPtr(acceptedBy)
 	if acceptedAt.Valid {
-		scanned.AcceptedAt = &acceptedAt.Time
+		scanned.RespondedAt = &acceptedAt.Time
 	}
 	return invitation.ToDomain(scanned)
 }
