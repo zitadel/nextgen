@@ -11,6 +11,7 @@ import type { Confirmer } from "@/lib/ui/questions";
  */
 export type Verb =
   | "call"
+  | "cancel"
   | "deactivate"
   | "delete"
   | "deploy"
