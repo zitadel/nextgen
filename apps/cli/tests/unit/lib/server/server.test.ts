@@ -178,3 +178,26 @@ describe("Server.consoleUrl", () => {
     expect(() => Server.at("not a url").consoleUrl()).toThrow(/Invalid server/);
   });
 });
+
+describe("Server.kind", () => {
+  it("buckets a server without leaking its address", () => {
+    expect(Server.at("https://preview.zitadel.com").kind).toBe("cloud");
+    expect(Server.at("https://api.zitadel.cloud").kind).toBe("cloud");
+    expect(Server.at("https://acme.zitadel.cloud").kind).toBe("cloud");
+    expect(Server.at("http://localhost:8080").kind).toBe("local");
+    expect(Server.at("http://127.0.0.1:8080").kind).toBe("local");
+    expect(Server.at("http://127.0.0.2:8080").kind).toBe("local");
+    expect(Server.at("http://[::1]:8080").kind).toBe("local");
+    expect(Server.at("mock").kind).toBe("local");
+    expect(Server.at("https://auth.internal.acme.com").kind).toBe("self_hosted");
+    expect(Server.at("not a url").kind).toBe("unknown");
+  });
+
+  it("does not classify lookalike domains as cloud", () => {
+    expect(Server.at("https://foozitadel.cloud").kind).toBe("self_hosted");
+    expect(Server.at("https://notzitadel.cloud").kind).toBe("self_hosted");
+    expect(Server.at("https://zitadel.cloud").kind).toBe("cloud");
+    expect(Server.at("https://notpreview.zitadel.com").kind).toBe("self_hosted");
+    expect(Server.at("https://zitadel.com").kind).toBe("self_hosted");
+  });
+});

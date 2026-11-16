@@ -1,4 +1,4 @@
-import { serverKind } from "@/lib/oclif/server-kind";
+import { Server } from "@/lib/server";
 import type { ProjectSecretData } from "@/lib/project";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
@@ -236,7 +236,7 @@ export class Claim {
    * @returns The state.
    */
   private static classify(input: ClaimInput): ClaimState {
-    if (serverKind.value(input.server) !== "cloud") {
+    if (Server.at(input.server).kind !== "cloud") {
       return { kind: "not-applicable" };
     }
     if (Claim.isAttached(input.secret)) {

@@ -156,6 +156,27 @@ export class Server {
   }
 
   /**
+   * What kind of server this is, for a decision or an event that must not carry
+   * the address: the hosted cloud, one on this machine (`mock` is the test
+   * double of one), any other server, or an address that is not a URL.
+   *
+   * @returns The kind.
+   */
+  get kind(): "cloud" | "local" | "self_hosted" | "unknown" {
+    if (this.address === "mock") {
+      return "local";
+    }
+    if (!URL.canParse(this.address)) {
+      return "unknown";
+    }
+    if (this.isCloud()) {
+      return "cloud";
+    }
+
+    return this.isLoopback() ? "local" : "self_hosted";
+  }
+
+  /**
    * Whether this is Zitadel's hosted cloud: the default server or a host under
    * `zitadel.cloud`.
    *

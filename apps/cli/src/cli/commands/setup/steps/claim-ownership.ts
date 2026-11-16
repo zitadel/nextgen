@@ -2,7 +2,7 @@ import { isCancellation, toZitadelError } from "@/lib/errors";
 import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
 import { readPlatformRuntime } from "@/lib/local-server/runtime";
-import { serverKind } from "@/lib/oclif/server-kind";
+import { Server } from "@/lib/server";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -90,7 +90,7 @@ export class ClaimOwnership extends WizardStep<
    */
   async run(needs: Needs): Promise<Fact<"ownedByLocalAdmin" | "hostsPlatform" | "isLocal">> {
     const { answers, project } = needs;
-    const isLocal = serverKind.value(answers.server) === "local";
+    const isLocal = Server.at(answers.server).kind === "local";
     const hostsPlatform =
       !this.deps.dryRun &&
       isLocal &&
