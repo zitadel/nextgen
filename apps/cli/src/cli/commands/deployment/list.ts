@@ -103,14 +103,12 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     );
 
     const items = listed.items;
-    const readsExpiries =
-      !this.isJson &&
-      items.some((deployment) => {
-        return deployment.servesLivePreview;
-      });
-    const expiries: ReadonlyMap<string, string> = readsExpiries
-      ? await liveExpiries(client, projectId)
-      : new Map();
+    const livePreviewOrigins = this.isJson
+      ? []
+      : items.flatMap((deployment) => {
+          return deployment.servesLivePreview ? deployment.origins : [];
+        });
+    const expiries = await liveExpiries(client, projectId, livePreviewOrigins);
     const rows = items.map((deployment) => {
       return {
         id: deployment.id,

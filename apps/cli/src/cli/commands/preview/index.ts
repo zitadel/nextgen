@@ -338,7 +338,13 @@ export default class Preview extends PreviewCommand {
           }),
     });
 
-    const expiries = await liveExpiries(client, projectId);
+    const expiries = await liveExpiries(
+      client,
+      projectId,
+      deployment.targets.map((target) => {
+        return target.origin;
+      }),
+    );
     const previews = deployment.targets.map((target) => {
       return {
         url: target.origin,

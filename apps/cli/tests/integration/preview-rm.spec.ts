@@ -40,7 +40,7 @@ describe("preview rm", () => {
           message: expect.stringContaining("is this a Zitadel platform API?"),
           details: {
             status: 404,
-            url: expect.stringMatching(/\/projects\/\S+\/previews\?limit=100$/),
+            url: expect.stringMatching(/\/projects\/\S+\/previews$/),
             body: { raw: "<html>not here</html>" },
           },
         });
@@ -64,7 +64,7 @@ describe("preview rm", () => {
           message: "down",
           details: {
             status: 503,
-            url: expect.stringMatching(/\/projects\/\S+\/previews\?limit=100$/),
+            url: expect.stringMatching(/\/projects\/\S+\/previews$/),
             body: { code: "unavailable", message: "down" },
           },
         });

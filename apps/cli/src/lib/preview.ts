@@ -1,4 +1,4 @@
-import { type LivePreview, PreviewService, type ZitadelClient } from "@/lib/backend";
+import { PreviewService, type ZitadelClient } from "@/lib/backend";
 import { isCancellation, toZitadelError } from "@/lib/errors";
 import { reportWarning } from "@/lib/warnings";
 
@@ -71,26 +71,34 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
 }
 
 /**
- * Each live preview's expiry, by origin. The deployment records none, and it is
- * already live when this reads, so a failed read warns and reports no expiry
- * rather than failing the run.
+ * When each of some preview origins expires, read from the live previews.
+ *
+ * @remarks
+ * A deployment records no expiry of its own, so a caller that shows one reads
+ * it from the previews. The expiry decorates what the caller shows, so a
+ * failed read warns and reports no expiry rather than failing the run. The
+ * caller sees an empty map either way, so it cannot tell a failed read from
+ * an origin whose preview is gone; the warning says which.
+ *
+ * @param client - The client every request goes through.
+ * @param projectId - The project the previews belong to.
+ * @param origins - The preview origins to look for. None are read for an
+ *   empty list.
+ * @returns The expiry of each origin that still has a live preview, by origin.
+ * @throws ZitadelError `E_CANCELLED` when the run was cancelled while reading.
  */
 export async function liveExpiries(
   client: ZitadelClient,
   projectId: string,
+  origins: Iterable<string>,
 ): Promise<ReadonlyMap<string, string>> {
-  const live = await new PreviewService(client, projectId)
-    .list()
-    .catch((error: unknown): readonly LivePreview[] => {
+  return new PreviewService(client, projectId)
+    .expiries(new Set(origins))
+    .catch((error: unknown): ReadonlyMap<string, string> => {
       if (isCancellation(error)) {
         throw error;
       }
       reportWarning(`Could not read when the previews expire: ${toZitadelError(error).message}`);
-      return [];
+      return new Map();
     });
-  return new Map(
-    live.map((preview) => {
-      return [preview.origin, preview.expires_at] as const;
-    }),
-  );
 }
