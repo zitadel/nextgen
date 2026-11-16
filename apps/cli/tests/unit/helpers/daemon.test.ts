@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -10,9 +10,6 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
 const LISTEN = "require('node:net').createServer().listen(Number(process.argv[1]), '127.0.0.1')";
 const STAY = "setInterval(() => undefined, 1000)";
 const SAY_READY = `console.log('ready'); ${STAY}`;
-
-/** The ids of processes earlier tests started, for the tests after them to look for. */
-const left: Record<string, number> = {};
 
 /**
  * Whether anything runs under the id.
@@ -132,41 +129,43 @@ describe("daemon", () => {
   });
 
   describe("when the test ends", () => {
-    it("is given a process that outlives it", async ({ daemon }) => {
+    it("ends the process it spawned", async ({ daemon }) => {
       const started = await daemon.spawn(process.execPath, ["-e", STAY]);
-      left.spawned = started.pid;
+      onTestFinished(() => {
+        expect(runs(started.pid)).toBe(false);
+      });
 
       expect(runs(started.pid)).toBe(true);
     });
 
-    it("has ended the process it spawned", () => {
-      expect(runs(left.spawned ?? 0)).toBe(false);
-    });
-
-    it("is given a process the code under test started", ({ daemon }) => {
+    it("ends the process the code under test started", ({ daemon }) => {
       const child = spawn(process.execPath, ["-e", STAY], { detached: true, stdio: "ignore" });
       child.unref();
-      left.adopted = child.pid ?? 0;
-      daemon.adopt(left.adopted);
+      const { pid } = child;
+      if (pid === undefined) {
+        throw new Error("the process did not start");
+      }
+      daemon.adopt(pid);
+      onTestFinished(() => {
+        expect(runs(pid)).toBe(false);
+      });
 
-      expect(runs(left.adopted)).toBe(true);
+      expect(runs(pid)).toBe(true);
     });
 
-    it("has ended the process it adopted", () => {
-      expect(runs(left.adopted ?? 0)).toBe(false);
-    });
-
-    it("is given a log that names a process", async ({ daemon }) => {
+    it("ends the process a log names", async ({ daemon }) => {
       const child = spawn(process.execPath, ["-e", STAY], { detached: true, stdio: "ignore" });
       child.unref();
-      left.listed = child.pid ?? 0;
-      await writeFile(daemon.pidLog(), `${String(left.listed)}\n`);
+      const { pid } = child;
+      if (pid === undefined) {
+        throw new Error("the process did not start");
+      }
+      await writeFile(daemon.pidLog(), `${String(pid)}\n`);
+      onTestFinished(() => {
+        expect(runs(pid)).toBe(false);
+      });
 
-      expect(runs(left.listed)).toBe(true);
-    });
-
-    it("has ended the process the log named", () => {
-      expect(runs(left.listed ?? 0)).toBe(false);
+      expect(runs(pid)).toBe(true);
     });
   });
 });
