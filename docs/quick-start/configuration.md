@@ -51,8 +51,13 @@ nextgen seed --user-file admin.json
 nextgen server --seed=false
 ```
 
-A server started with `--seed=false` writes nothing by starting, and refuses
-to start on a database nothing seeded.
+`seed` wraps the platform project's keys with the master key and never
+generates one: give it the key the servers are configured with
+([Encryption keys](#encryption-keys)). A server started with `--seed=false`
+writes nothing by starting and refuses to start on a database nothing seeded.
+It logs a line that starts `platform project:` when what it serves is not what
+a seeding with its configuration leaves, which the next `seed` repairs. Write
+the flag with `=`: `--seed false` is refused.
 
 ## OAuth
 

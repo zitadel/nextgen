@@ -104,21 +104,38 @@ func buildRelease(ctx context.Context, releases service.ReleaseService, bundle s
 // on an old deployment's own URL, must not take the console back. A build with
 // no date, such as a development one, always deploys.
 func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
-	for _, deployment := range live {
-		if deployment.OriginKind != domain.DeploymentOriginKindPrimary {
-			continue
-		}
-		if deployment.Metadata.Message == nil || builtAt.IsZero() {
-			return false
-		}
-		stamp, ok := strings.CutPrefix(*deployment.Metadata.Message, platformDeployPrefix)
-		if !ok {
-			return false
-		}
-		deployedBy, err := time.Parse(time.RFC3339, stamp)
-		return err == nil && deployedBy.After(builtAt)
+	primary := primaryDeployment(live)
+	if primary == nil || builtAt.IsZero() {
+		return false
 	}
-	return false
+	deployedBy, ok := deployedByBuild(primary)
+	return ok && deployedBy.After(builtAt)
+}
+
+// primaryDeployment is the newest primary deployment among live, what the
+// console is served; nil when there is none.
+func primaryDeployment(live []*domain.Deployment) *domain.Deployment {
+	for _, deployment := range live {
+		if deployment.OriginKind == domain.DeploymentOriginKindPrimary {
+			return deployment
+		}
+	}
+	return nil
+}
+
+// deployedByBuild reads when the server that made a platform deployment was
+// built, from the message EnsureDeployed gives it. ok is false for a
+// deployment someone else made.
+func deployedByBuild(deployment *domain.Deployment) (builtAt time.Time, ok bool) {
+	if deployment.Metadata.Message == nil {
+		return time.Time{}, false
+	}
+	stamp, ok := strings.CutPrefix(*deployment.Metadata.Message, platformDeployPrefix)
+	if !ok {
+		return time.Time{}, false
+	}
+	builtAt, err := time.Parse(time.RFC3339, stamp)
+	return builtAt, err == nil
 }
 
 // ownPrimaryOrigin makes consoleOrigin the platform project's one primary

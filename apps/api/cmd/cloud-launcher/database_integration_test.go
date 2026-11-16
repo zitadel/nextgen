@@ -443,7 +443,11 @@ func TestSeedUnderLockRunsOneSeedingAtATime(t *testing.T) {
 			return nil
 		})
 	}()
-	<-entered
+	select {
+	case <-entered:
+	case err := <-first:
+		t.Fatalf("the first seeding ended before it ran: %v", err)
+	}
 
 	ran := make(chan struct{})
 	second := make(chan error, 1)
@@ -453,10 +457,25 @@ func TestSeedUnderLockRunsOneSeedingAtATime(t *testing.T) {
 			return nil
 		})
 	}()
+
+	// Not running yet proves nothing by itself: the second seeding has to be
+	// seen waiting for the lock the first one holds.
+	conn, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close(context.Background()) })
+	require.Eventually(t, func() bool {
+		var waiting int
+		err := conn.QueryRow(ctx, `SELECT count(*) FROM pg_locks
+			WHERE locktype = 'advisory' AND classid::bigint = $1 AND objid::bigint = 0 AND objsubid = 2 AND NOT granted`,
+			int64(seedLockClass)).Scan(&waiting)
+		return err == nil && waiting == 1
+	}, 30*time.Second, 50*time.Millisecond, "the second seeding never waited for the lock")
 	select {
 	case <-ran:
 		t.Fatal("a second seeding ran while the first held the lock")
-	case <-time.After(500 * time.Millisecond):
+	case err := <-second:
+		t.Fatalf("the second seeding ended while the first held the lock: %v", err)
+	default:
 	}
 
 	close(release)

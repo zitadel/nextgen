@@ -1261,6 +1261,31 @@ func TestRunSeedSeedsProductionInPlace(t *testing.T) {
 	assert.Equal(t, "https://zitadel.example", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 }
 
+// The seeding runs on a build machine. With an OTLP backend named, the server
+// exports to it; the seeding, like the migration, sends it nothing, and so
+// cannot fail or stall a build on a backend that does not answer.
+func TestRunSeedExportsNoTelemetry(t *testing.T) {
+	stubSeedLock(t)
+	stubExecuteServer(t, nil)
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "zitadel.example")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otlp.example/otlp")
+
+	require.NoError(t, runSeed())
+
+	for _, key := range []string{
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE",
+	} {
+		assert.Empty(t, os.Getenv(key), key)
+	}
+}
+
 // A failed seeding fails the build, so the deployment that serves keeps
 // serving; the files are removed all the same.
 func TestRunSeedFailsTheBuildWhenTheSeedingFails(t *testing.T) {

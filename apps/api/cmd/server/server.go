@@ -109,6 +109,7 @@ func NewCommand() *cobra.Command {
 	serverCmd := &cobra.Command{
 		Use:           "server",
 		Short:         "Run the server",
+		Args:          noArguments,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runServer,
@@ -139,6 +140,16 @@ func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
 	}
 
 	return overrides, nil
+}
+
+// noArguments refuses positional arguments. A subcommand otherwise takes any
+// and ignores them, and a boolean flag reads no value from the next argument:
+// `--seed false` would leave seeding on and drop the "false".
+func noArguments(_ *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unexpected argument %q: this command takes no arguments, and a boolean flag takes its value after \"=\" (--flag=false)", args[0])
 }
 
 func addServerFlags(cmd *cobra.Command, applyMigrations, seedAtStart *bool, userFiles *[]string) {
@@ -183,7 +194,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		// process would exit 0.
 		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
 			slog.Error("shutdown error", slogctx.Err(shutdownErr))
-			err = errors.Join(err, shutdownErr)
+			// What a seeding wrote is committed by now. A telemetry flush or
+			// a pool close that fails afterwards must not report it as failed:
+			// a deployment would fail its build over a database it seeded.
+			if do.serve {
+				err = errors.Join(err, shutdownErr)
+			}
 			return
 		}
 		slog.Info("shut down application")
@@ -479,6 +495,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		}
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
+	// A start that does not seed cannot repair what differs from its
+	// seeding, and nothing else would say so before the next deployment.
+	if !do.seed && cfg.Platform.BootstrapProject {
+		reportPlatformDrift(ctx, consoleHosts[0], defaultProject, deploymentService)
+	}
 	if defaultProject != nil {
 		slog.Info("default project resolved", slog.String("project_id", defaultProject.ID))
 	} else {
@@ -615,7 +636,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 	//       times. This is not a problem since the migration will not remove
 	//       any keys. So nothing breaks. But there is no need to recompute the
 	//       same thing multiple times.
-	if len(masterKey.Keys) > 0 {
+	if masterKey.Rotating() {
 		go func() {
 			slog.Info("migrate keys to latest master key")
 			if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
@@ -636,6 +657,24 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 		return nil
 	case err := <-serverErr:
 		return err
+	}
+}
+
+// reportPlatformDrift logs how the platform project differs from what a
+// seeding with this server's configuration leaves. It reads once and never
+// fails a start: what it finds is for the next seeding to repair.
+func reportPlatformDrift(ctx context.Context, consoleOrigin string, project *domain.Project, deployments *service.DeploymentService) {
+	found, err := platform.CheckSeeded(ctx, build.Date(), consoleOrigin, project, deployments)
+	if err != nil {
+		slog.Warn("platform project: could not check what its seeding left", slogctx.Err(err))
+		return
+	}
+	for _, drift := range found {
+		level := slog.LevelWarn
+		if drift.Breaking {
+			level = slog.LevelError
+		}
+		slog.Log(ctx, level, "platform project: "+drift.Message+"; the seed command repairs it, which a deployment runs as it deploys")
 	}
 }
 

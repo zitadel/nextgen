@@ -164,3 +164,23 @@ func TestEncryptionKey_Crypter(t *testing.T) {
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
 	})
 }
+
+// Only a rotation has a master key beside the one that encrypts, and only then
+// can a key wrapped by another master key be unwrapped and re-wrapped. The
+// server asks this before it scans every key at start.
+func TestMasterKeys_Rotating(t *testing.T) {
+	current := MasterKey{ID: "current", ShouldBeUsedForEncryption: true}
+	previous := MasterKey{ID: "previous"}
+
+	alone, err := NewMasterKeys([]MasterKey{current})
+	require.NoError(t, err)
+	assert.False(t, alone.Rotating())
+
+	for _, keys := range [][]MasterKey{{previous, current}, {current, previous}} {
+		rotating, err := NewMasterKeys(keys)
+		require.NoError(t, err)
+		assert.True(t, rotating.Rotating())
+		assert.Equal(t, "current", rotating.EncryptionKey.ID)
+		assert.NotNil(t, rotating.GetByKeyID("previous"), "the key being rotated out still unwraps")
+	}
+}

@@ -706,8 +706,10 @@ func prepare(command string, extra []string) ([]string, error) {
 	// itself, so the exporters' own endpoint stays unset; an environment
 	// without it exports nothing rather than retry localhost:4318. The batch
 	// durations are the SDK's defaults, named so the cloud's export cadence is
-	// read here rather than inherited.
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+	// read here rather than inherited. Only the server exports: the seeding
+	// runs on a build machine, whose log has every line it prints, and like
+	// the migration it sends the backend nothing under the server's name.
+	if command == commandServer && os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		for key, value := range map[string]string{
 			"NEXTGEN_INSTRUMENTATION_SERVICE_NAME":                   "nextgen-cloud",
 			"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":            "http",
