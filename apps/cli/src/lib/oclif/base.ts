@@ -46,7 +46,6 @@ import {
   FIRST_RUN_NOTICE,
   vercelEventKeys,
 } from "./command-telemetry";
-import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
@@ -151,10 +150,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   static wizard?: boolean;
 
   /**
-   * The group the root help lists this command under (see `lib/oclif/groups`).
+   * The group the root help lists this command under (the CLI's own list, `cli/commands/groups`).
    * Every product command must set it; the root-help test fails otherwise.
    */
-  static group?: CommandGroup;
+  static group?: string;
 
   /** Position within {@link group} on the root help, lowest first. */
   static groupOrder?: number;

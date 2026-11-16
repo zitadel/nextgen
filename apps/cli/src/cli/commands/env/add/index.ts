@@ -8,13 +8,8 @@ import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Environment, type InitialDeployment } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
 import { log, warnings } from "@/lib/ui";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
@@ -132,7 +127,8 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  */
 export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",

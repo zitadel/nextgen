@@ -3,7 +3,8 @@ import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
 import { CANCELLED } from "@/lib/errors";
-import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
@@ -31,7 +32,8 @@ const NAME_PROVIDER_REFUSAL = {
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 1;
 
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",

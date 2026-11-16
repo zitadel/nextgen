@@ -17,13 +17,8 @@ import {
   resolveRuntimeBackend,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -63,8 +58,8 @@ const PORT = {
  */
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
-  static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 1;
 
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
