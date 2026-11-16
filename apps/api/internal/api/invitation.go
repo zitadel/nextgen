@@ -163,13 +163,13 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 	} else {
 		resp.CreatedByType.SetToNull()
 	}
-	if inv.AcceptedBy != nil {
-		resp.RespondedBy.SetTo(*inv.AcceptedBy)
+	if inv.RespondedBy != nil {
+		resp.RespondedBy.SetTo(*inv.RespondedBy)
 	} else {
 		resp.RespondedBy.SetToNull()
 	}
-	if inv.AcceptedAt != nil {
-		resp.RespondedAt.SetTo(*inv.AcceptedAt)
+	if inv.RespondedAt != nil {
+		resp.RespondedAt.SetTo(*inv.RespondedAt)
 	} else {
 		resp.RespondedAt.SetToNull()
 	}

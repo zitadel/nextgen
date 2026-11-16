@@ -23,8 +23,8 @@ type Row struct {
 	CreatedAt         time.Time
 	ExpiresAt         time.Time
 	JourneyID         string
-	AcceptedBy        *string
-	AcceptedAt        *time.Time
+	RespondedBy       *string
+	RespondedAt       *time.Time
 	TokenHash         string
 }
 
@@ -75,17 +75,17 @@ func ToDomain(row Row) (*domain.Invitation, error) {
 		Status:            domain.InvitationStatus(row.Status),
 		CreatedBy:         row.CreatedBy,
 		// Spanner returns UTC while pgx defaults to local; normalize.
-		CreatedAt:  row.CreatedAt.UTC(),
-		ExpiresAt:  row.ExpiresAt.UTC(),
-		JourneyID:  row.JourneyID,
-		AcceptedBy: row.AcceptedBy,
-		TokenHash:  row.TokenHash,
+		CreatedAt:   row.CreatedAt.UTC(),
+		ExpiresAt:   row.ExpiresAt.UTC(),
+		JourneyID:   row.JourneyID,
+		RespondedBy: row.RespondedBy,
+		TokenHash:   row.TokenHash,
 	}
 	if row.CreatedByType != nil {
 		entity.CreatedByType = new(domain.EventActorType(*row.CreatedByType))
 	}
-	if row.AcceptedAt != nil {
-		entity.AcceptedAt = new(row.AcceptedAt.UTC())
+	if row.RespondedAt != nil {
+		entity.RespondedAt = new(row.RespondedAt.UTC())
 	}
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:

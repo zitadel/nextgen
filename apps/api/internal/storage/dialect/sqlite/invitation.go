@@ -184,7 +184,7 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 		&createdNano,
 		&expiresNano,
 		&scanned.JourneyID,
-		&scanned.AcceptedBy,
+		&scanned.RespondedBy,
 		&acceptedAtNano,
 		&scanned.TokenHash,
 	); err != nil {
@@ -194,7 +194,7 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 	scanned.CreatedAt = timeFromUnixNano(createdNano)
 	scanned.ExpiresAt = timeFromUnixNano(expiresNano)
 	if acceptedAtNano.Valid {
-		scanned.AcceptedAt = new(timeFromUnixNano(acceptedAtNano.Int64))
+		scanned.RespondedAt = new(timeFromUnixNano(acceptedAtNano.Int64))
 	}
 	return invitation.ToDomain(scanned)
 }

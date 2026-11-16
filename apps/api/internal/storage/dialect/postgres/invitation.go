@@ -174,8 +174,8 @@ func scanInvitation(row pgx.CollectableRow) (*domain.Invitation, error) {
 		&scanned.CreatedAt,
 		&scanned.ExpiresAt,
 		&scanned.JourneyID,
-		&scanned.AcceptedBy,
-		&scanned.AcceptedAt,
+		&scanned.RespondedBy,
+		&scanned.RespondedAt,
 		&scanned.TokenHash,
 	); err != nil {
 		return nil, err

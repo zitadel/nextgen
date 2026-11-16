@@ -80,8 +80,8 @@ func TestInvitationStatements_Create(t *testing.T) {
 				assert.Equal(t, entity.CreatedAt, got.CreatedAt)
 				assert.Equal(t, expiresAt, got.ExpiresAt)
 				assert.Equal(t, entity.JourneyID, got.JourneyID)
-				assert.Nil(t, got.AcceptedBy)
-				assert.Nil(t, got.AcceptedAt)
+				assert.Nil(t, got.RespondedBy)
+				assert.Nil(t, got.RespondedAt)
 				assert.Equal(t, entity.TokenHash, got.TokenHash)
 			}
 		})
@@ -191,8 +191,8 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusAccepted, new("user_2"), now)
 			require.NoError(t, err)
 			assert.Equal(t, domain.InvitationStatusAccepted, got.Status)
-			assert.Equal(t, "user_2", *got.AcceptedBy)
-			assert.Equal(t, now, *got.AcceptedAt)
+			assert.Equal(t, "user_2", *got.RespondedBy)
+			assert.Equal(t, now, *got.RespondedAt)
 			assert.Nil(t, got.EncryptedMetadata)
 
 			read, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
@@ -208,8 +208,8 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			got, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, domain.InvitationStatusRejected, nil, now)
 			require.NoError(t, err)
 			assert.Equal(t, domain.InvitationStatusRejected, got.Status)
-			assert.Nil(t, got.AcceptedBy)
-			assert.Nil(t, got.AcceptedAt)
+			assert.Nil(t, got.RespondedBy)
+			assert.Nil(t, got.RespondedAt)
 			assert.Nil(t, got.EncryptedMetadata)
 		})
 
