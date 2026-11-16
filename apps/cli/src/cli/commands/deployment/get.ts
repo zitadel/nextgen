@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DeploymentService } from "@/lib/backend";
 import { GetDeploymentParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { readingOptionally } from "@/lib/optional-read";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
@@ -52,7 +53,15 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const shows = !this.isJson && this.isOnScreen;
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
-      shows ? deploymentService.variables(args.deploymentId) : undefined,
+      shows
+        ? readingOptionally(
+            "the variables the deployment froze",
+            () => {
+              return deploymentService.variables(args.deploymentId);
+            },
+            undefined,
+          )
+        : undefined,
     ]);
 
     const listed =
