@@ -6,7 +6,13 @@ import { describe, expect } from "vitest";
 import { it, type Serve } from "@tests/helpers/fixtures";
 
 import { localRuntimePaths } from "@/lib/local-server/runtime";
-import { DEFAULT_SERVER, isLoopbackUrl, parseServer, resolveServer } from "@/lib/server";
+import {
+  DEFAULT_SERVER,
+  hostUnlessDefault,
+  isLoopbackUrl,
+  parseServer,
+  resolveServer,
+} from "@/lib/server";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 describe("resolveServer", () => {
@@ -112,7 +118,7 @@ describe("parseServer", () => {
   });
 
   it("reports an empty answer", () => {
-    expect(parseServer("  ")).toEqual({ ok: false, problem: "Enter the server URL." });
+    expect(parseServer("  ")).toEqual({ ok: false, problem: "The server URL cannot be empty" });
   });
 });
 
@@ -126,5 +132,19 @@ describe("isLoopbackUrl", () => {
 
   it.for(["https://example.com", "http://10.0.0.1:8080", "not a url", ""])("rejects %s", (url) => {
     expect(isLoopbackUrl(url)).toBe(false);
+  });
+});
+
+describe("hostUnlessDefault", () => {
+  it("says nothing for the default server", () => {
+    expect(hostUnlessDefault(DEFAULT_SERVER)).toBeUndefined();
+  });
+
+  it("names the host of any other server", () => {
+    expect(hostUnlessDefault("https://auth.example.com/some/path")).toBe("auth.example.com");
+  });
+
+  it("says nothing for an address that is not a URL", () => {
+    expect(hostUnlessDefault("not a url")).toBeUndefined();
   });
 });

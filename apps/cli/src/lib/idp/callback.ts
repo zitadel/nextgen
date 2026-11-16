@@ -40,5 +40,6 @@ export function idpCallbackPath(slug: string): CallbackPath {
  */
 export function callbackUriFor(issuer: string, slug: string): `${string}${CallbackPath}` {
   const origin = issuer.replace(/\/$/, "");
+
   return `${origin}${idpCallbackPath(slug)}`;
 }

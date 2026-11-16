@@ -24,9 +24,15 @@ export class RepositoryError extends Error {
   headline(): string {
     const lines = this.message
       .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "");
-    const reason = lines.find((line) => line.startsWith("fatal:") || line.startsWith("error:"));
+      .map((line) => {
+        return line.trim();
+      })
+      .filter((line) => {
+        return line !== "";
+      });
+    const reason = lines.find((line) => {
+      return line.startsWith("fatal:") || line.startsWith("error:");
+    });
     if (reason !== undefined) {
       return reason;
     }

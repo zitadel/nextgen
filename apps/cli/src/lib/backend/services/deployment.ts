@@ -5,9 +5,11 @@ import type {
   RollbackDeploymentBody,
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ConflictError } from "@/lib/backend/errors";
+
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
 
@@ -278,7 +280,7 @@ export class DeploymentService extends ApiService {
    * @returns The deployment.
    */
   async get(deploymentId: string): Promise<Deployment> {
-    const record = await this.client.getDeploymentById(deploymentId, {
+    const record = await this.client.getDeployment(deploymentId, {
       project_id: this.projectId,
     });
     return Deployment.of(record);
@@ -291,7 +293,7 @@ export class DeploymentService extends ApiService {
    * @returns The frozen variables. A secret is named, never disclosed.
    */
   async variables(deploymentId: string): Promise<readonly Variable[]> {
-    const frozen = await this.client.getDeploymentVariables(deploymentId, {
+    const frozen = await this.client.listDeploymentVariables(deploymentId, {
       project_id: this.projectId,
     });
     return Variable.fromValues(frozen);

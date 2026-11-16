@@ -238,10 +238,13 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
       const paths = holders.map((file) => {
         return file.path;
       });
-      throw new ConflictError(`${paths.join(" and ")} both hold ${handle}`, {
-        hint: "Remove or fix all but one of them, then run the command again.",
-        details: { handle, paths },
-      });
+      throw new ConflictError(
+        `${new Intl.ListFormat("en", { type: "conjunction" }).format(paths)} both hold ${handle}`,
+        {
+          hint: "Remove or fix all but one of them, then run the command again.",
+          details: { handle, paths },
+        },
+      );
     }
     const holder = holders[0];
     if (holder !== undefined) {

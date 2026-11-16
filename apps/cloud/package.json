@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cloud",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -9,6 +9,7 @@
     "migrate": "cd ../.. && apps/cloud/dist/nextgen-launcher migrate",
     "deploy": "sh deploy.sh",
     "schemas": "node ../../scripts/render-builtin-schemas.mjs",
+    "test": "node --test server/*.test.mjs",
     "dev": "node ../../scripts/run-cloud.mjs"
   },
   "dependencies": {

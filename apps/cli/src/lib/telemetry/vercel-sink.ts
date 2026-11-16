@@ -1,9 +1,10 @@
 import type { Properties } from "mixpanel";
 
+import { userAgent } from "@/lib/user-agent";
+
 import { Outbox } from "./outbox";
 import { type TelemetrySink, trace } from "./sink";
 import { resolveVercelEndpoint, type VercelTarget, vercelEventBody } from "./vercel";
-import { userAgent } from "@/lib/user-agent";
 
 /** What {@link VercelSink.from} needs to make a sink. */
 export type VercelSettings = {
@@ -80,7 +81,9 @@ export class VercelSink implements TelemetrySink {
             return `vercel answered ${response.status}`;
           });
         },
-        () => undefined,
+        () => {
+          return undefined;
+        },
       );
   }
 }

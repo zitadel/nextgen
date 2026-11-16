@@ -46,7 +46,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // app.vue/pages/plugins live under the Nuxt srcDir (`app/`, or the root for a root-layout app); nuxt.config,
       // env, and the dep stay at the project root.
@@ -91,7 +93,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("app.vue"),
       src("pages/index.vue"),
@@ -106,7 +110,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
     // Written only when setup created the app skeleton itself; on a
     // pre-existing app the shell and homepage stay user-owned (see routeOps).
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     // The retired plugins exist only in apps an older setup wrote.
     return [
       src("app.vue"),

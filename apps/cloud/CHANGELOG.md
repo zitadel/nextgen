@@ -1,5 +1,12 @@
 # @zitadel/cloud
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`8f2033e`](https://github.com/zitadel/nextgen/commit/8f2033e8404f2eddbf77fd4438fdb8a5421ca950), [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`4860117`](https://github.com/zitadel/nextgen/commit/486011736d8891f7527ae684b15b6b295fa8ad38), [`d2409a3`](https://github.com/zitadel/nextgen/commit/d2409a323308123f9881b752ffc292d7a475bad6), [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b), [`e741248`](https://github.com/zitadel/nextgen/commit/e741248d1f4447ecda85c05395d209a011946bed)]:
+  - @zitadel/config@0.6.0
+
 ## 0.0.1
 
 ### Patch Changes

@@ -15,6 +15,8 @@ type EvaluatePolicyInput struct {
 	Config    map[string]any
 	// PasswordSet is the request of an [OperationPasswordSet] dry run.
 	PasswordSet *PasswordSetEvaluation
+	// UserCreate is the request of an [OperationUserCreate] dry run.
+	UserCreate *UserCreateEvaluation
 }
 
 // PasswordSetEvaluation is a password set as a dry run states it: the
@@ -25,6 +27,12 @@ type PasswordSetEvaluation struct {
 	// HistoryMatches says whether the candidate matches each of the user's
 	// kept passwords, current first, newest first.
 	HistoryMatches []bool
+}
+
+// UserCreateEvaluation is a sign-up as a dry run states it: the challenge it
+// solved, which a real sign-up proves by solving it.
+type UserCreateEvaluation struct {
+	SolvedChallenge string
 }
 
 // PolicyDecision is what the operation would answer: allowed, or refused
@@ -67,6 +75,12 @@ func (s *PolicyService) Evaluate(ctx context.Context, in EvaluatePolicyInput) (_
 			SelfService: in.PasswordSet.SelfService,
 		})
 		return passwordDecision(err)
+	case OperationUserCreate:
+		if in.UserCreate == nil {
+			return nil, domain.ErrInternal(errors.New("no sign-up to evaluate"))
+		}
+		gate := &UserCreatePolicy{engine: s.engine, resolver: instanceResolver{inst}}
+		return userCreateDecision(gate.CheckSolved(ctx, "", in.UserCreate.SolvedChallenge))
 	default:
 		// The config passed its template, so the operation exists; it only has
 		// no dry run yet. TestPolicyService_EvaluateCoversEveryTemplate fails
@@ -97,6 +111,20 @@ func passwordDecision(err error) (*PolicyDecision, error) {
 		return decision, nil
 	}
 	return nil, domain.ErrInternal(err).WithMessage("failed to evaluate the password policy")
+}
+
+// userCreateDecision turns CheckSolved's answer into a decision. A refused
+// challenge is the decision, with the live sign-up's code; the live error
+// names no rules, so neither does the decision. Anything else is a server
+// fault.
+func userCreateDecision(err error) (*PolicyDecision, error) {
+	if err == nil {
+		return &PolicyDecision{Allowed: true}, nil
+	}
+	if errors.Is(err, domain.ErrFlowProofInvalid()) {
+		return &PolicyDecision{Code: domain.ErrFlowProofInvalid().Code}, nil
+	}
+	return nil, domain.ErrInternal(err).WithMessage("failed to evaluate the user create policy")
 }
 
 // instanceResolver resolves the one instance a dry run evaluates, whatever

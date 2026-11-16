@@ -114,6 +114,14 @@ func TestListEvents_FilterPlans(t *testing.T) {
 			search: "SEARCH events USING INDEX idx_events_project_actor_category (project_id=? AND actor_id=? AND category=?",
 		},
 		{
+			name: "one user in one category",
+			filter: database.And(
+				database.Equal(database.Col(domain.EventFieldUserID), "user_2"),
+				database.Equal(database.Col(domain.EventFieldCategory), "auth"),
+			),
+			search: "SEARCH events USING INDEX idx_events_project_user_category (project_id=? AND user_id=? AND category=?",
+		},
+		{
 			name: "one resource type in one category",
 			filter: database.And(
 				database.Equal(database.Col(domain.EventFieldEntityType), "user"),

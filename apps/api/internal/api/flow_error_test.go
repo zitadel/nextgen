@@ -229,7 +229,7 @@ func TestOgenErrorHandler_logsAnSSOSetupRestartAtWarn(t *testing.T) {
 	err := normalizeFlowError(fmt.Errorf("submit: %w", domain.ErrFlowRestartRequired().WithParent(cause)))
 
 	rec := httptest.NewRecorder()
-	OgenErrorHandler(ctx, rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+	OgenErrorHandler(0)(ctx, rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.NotContains(t, rec.Body.String(), "rev_1")

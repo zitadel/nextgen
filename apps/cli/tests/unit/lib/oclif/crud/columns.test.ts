@@ -27,6 +27,15 @@ describe("chosenColumns", () => {
     );
   });
 
+  it.each([
+    [["emial"], "No such column: emial"],
+    [["emial", "nme"], "No such columns: emial, nme"],
+  ])("words a refusal of %j for one column or several", (chosen, message) => {
+    expect(() => chosenColumns(chosen, ["id"], [{ id: "1", email: "a@b.c", name: "n" }])).toThrow(
+      message,
+    );
+  });
+
   it("accepts any choice when there is no shape and no record to judge by", () => {
     expect(chosenColumns(["anything"], ["id"], [])).toEqual(["anything"]);
   });

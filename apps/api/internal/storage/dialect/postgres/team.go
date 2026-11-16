@@ -65,7 +65,10 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 		}
 		team.Status = domain.TeamStatus(status)
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID)); err != nil {
+			return err
+		}
+		return writeSearchEntry(ctx, tx, domain.TeamSearchEntry(team))
 	})
 }
 
@@ -102,15 +105,20 @@ func (ts teamStatements) GetTeam(ctx context.Context, filter database.Filter[dom
 // Only active teams are updated.
 // Update of a deactivated or a non-existent team returns [database.NoRowFoundError].
 func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) error {
-	return wrapError(ts.client.QueryRow(ctx, updateTeamStmt, team.ProjectID, team.ID, team.Name, domain.TeamStatusActive.String()).
-		Scan(
-			&team.ProjectID,
-			&team.ID,
-			&team.Name,
-			&team.Status,
-			&team.CreatedAt,
-			&team.UpdatedAt,
-		))
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := tx.QueryRow(ctx, updateTeamStmt, team.ProjectID, team.ID, team.Name, domain.TeamStatusActive.String()).
+			Scan(
+				&team.ProjectID,
+				&team.ID,
+				&team.Name,
+				&team.Status,
+				&team.CreatedAt,
+				&team.UpdatedAt,
+			); err != nil {
+			return wrapError(err)
+		}
+		return writeSearchEntry(ctx, tx, domain.TeamSearchEntry(team))
+	})
 }
 
 // ListTeams implements [service.TeamStatements].

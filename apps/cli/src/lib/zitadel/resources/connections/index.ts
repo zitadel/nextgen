@@ -10,9 +10,11 @@ export {
   type ConnectionCredentials,
   type ConnectionPath,
   type ConnectionSetting,
+  type ConnectionSummary,
   type Credential,
   type CredentialVariable,
   type LookupOptions,
   type SsoOptions,
+  type UnmappedProperty,
   type UnusedConnection,
 } from "@/lib/zitadel/resources/connections/types";

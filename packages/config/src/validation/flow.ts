@@ -17,7 +17,7 @@
  *   ill-defined).
  *
  * Scope cuts (server/service-side, not portable): pivot/switch targets
- * must name an active flow definition in the same project (needs the
+ * must name a flow definition in the same project (needs the
  * DB); the user schema itself is assumed meta-schema-valid.
  *
  * Lifecycle: this port is a local-first interim, not a second source of

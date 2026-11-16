@@ -93,7 +93,9 @@ export class LogLineReader {
   read(part: string): LogLine[] {
     const pieces = `${this.partial}${part}`.split("\n");
     this.partial = pieces.pop() ?? "";
-    return pieces.map((piece) => this.line(piece));
+    return pieces.map((piece) => {
+      return this.line(piece);
+    });
   }
 
   /** The last line, when the log does not end with a line break. */
@@ -122,9 +124,9 @@ export function atLeast(lines: readonly LogLine[], level: LogLevel | undefined):
     return [...lines];
   }
   const floor = LOG_LEVELS.indexOf(level);
-  return lines.filter(
-    (line) => line.level !== undefined && LOG_LEVELS.indexOf(line.level) >= floor,
-  );
+  return lines.filter((line) => {
+    return line.level !== undefined && LOG_LEVELS.indexOf(line.level) >= floor;
+  });
 }
 
 /** The last `tail` lines, counting only those at `level` or above when a level is given. */
@@ -138,7 +140,11 @@ export function lastLines(
 
 /** The lines as the log has them, each ending with a line break. */
 export function logText(lines: readonly LogLine[]): string {
-  return lines.map((line) => `${line.text}\n`).join("");
+  return lines
+    .map((line) => {
+      return `${line.text}\n`;
+    })
+    .join("");
 }
 
 const paint = pc.createColors(true);

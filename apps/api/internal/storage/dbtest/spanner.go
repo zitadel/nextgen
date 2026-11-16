@@ -6,14 +6,15 @@ import (
 	"context"
 
 	v2spannerdialect "github.com/zitadel/nextgen/internal/storage/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	"github.com/zitadel/nextgen/internal/storage/dialect/spanner/migration"
 )
 
 // Spanner returns a connected v2 pool for the Spanner integration tests.
-// Bring-up precedence is owned by testdb.SpannerDSN. The returned stop
-// function is always non-nil and safe to defer.
+// Bring-up precedence is owned by testdb.SpannerDSN; where that provisions a
+// database, migration.TestDSN creates it at the newest schema. The returned
+// stop function is always non-nil and safe to defer.
 func Spanner(ctx context.Context) (Pool, func(), error) {
-	dsn, stop, err := testdb.SpannerDSN(ctx)
+	dsn, stop, err := migration.TestDSN(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

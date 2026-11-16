@@ -44,7 +44,7 @@ post:
       the request.
     - `400 dep.variables_missing`: a variable the release references has no
       value for the kind. `details` names the kind and every missing variable.
-      Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
+      Set each one for that kind with `setVariables` (`PATCH /variables`), then deploy again.
     - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
       of the project, or is a loopback URL. Use a URL that matches a pattern.
     - `404 rel.not_found`: the release ID or digest names no release in this
@@ -276,7 +276,8 @@ get:
     A deployment makes a release live on origins. By default the list is the
     history, newest first: every deployment of the project, with every target
     it made the release live on. With `origin`, it is the history of that
-    origin alone.
+    origin alone. With `release_id`, it is every deployment of that release,
+    superseded ones included.
 
     With `live=true`, the list is what is served now, newest first. It holds
     the project's newest primary deployment with every origin it names, an
@@ -285,9 +286,12 @@ get:
     deployment to each live preview URL, narrowed to the URLs it still
     serves. Combined with `origin`, it is the one deployment that origin
     serves, or empty, as it is for an origin the project no longer lists.
+    Combined with `release_id`, it is the deployments of the live view that
+    serve that release: the primary deployment only when it is of that
+    release, and the previews serving it.
 
-    The `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),
-    `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
+    The `id` of an entry is the deployment ID that `getDeployment` (`GET /deployments/{deployment_id}`),
+    `listDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
 
     `expand: ["release"]` embeds the release each deployment made live. It
     requires `release.read` and does not change the ordering or the page
@@ -297,6 +301,7 @@ get:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/origin-filter.yaml
+    - $ref: ../../components/parameters/release-id-filter.yaml
     - name: live
       in: query
       required: false

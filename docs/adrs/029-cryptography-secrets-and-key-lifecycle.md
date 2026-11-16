@@ -52,6 +52,21 @@ The deployment restricts what a project may choose:
 Those same limits are where a compliance profile (see [NIST](#nist)) will narrow
 the choice, so the per-project mechanism does not need to know about it.
 
+The server bounds how much hashing runs at once, per process
+(`password_hasher.concurrency`; each replica or serverless instance has its own
+bound). Each hash or verification takes a share of one memory budget, by
+default half of the container's memory limit: its own estimated memory, floored
+at `memory_budget / max_operations` so cheap algorithms are capped in number
+too, and clamped at the budget so a larger hash runs alone rather than never. A
+hash that gets no share within `max_wait` is refused with
+`429 Too Many Requests` and `Retry-After`; the refusal is never recorded as a
+failed attempt, because it says nothing about the password. A verification is
+charged from the stored hash's own parameters, which the limits above do not
+bound, since stored and imported hashes predate them; they bound what a project
+may configure and what an unreadable stored hash is charged. A startup warning
+names a configuration whose default hasher or limits admit a hash larger than
+the budget.
+
 #### Tokens
 
 (Generated) Tokens should never be stored in the database. If a field is

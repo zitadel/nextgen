@@ -26,11 +26,13 @@ type Handler struct {
 	releaseService        service.ReleaseService
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
+	applicationService    service.ApplicationService
 	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
 	claimService          service.ClaimService
 	grantService          *service.GrantService
+	invitationService     *service.InvitationService
 	variableService       service.VariableService
 	runtime               *service.RuntimeResolver
 	pool                  *service.DB
@@ -64,6 +66,7 @@ func NewHandler(
 	releaseService service.ReleaseService,
 	deploymentService *service.DeploymentService,
 	idpConnectionService service.IDPConnectionService,
+	applicationService service.ApplicationService,
 	eventService *service.EventService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
@@ -86,6 +89,7 @@ func NewHandler(
 		releaseService:        releaseService,
 		deploymentService:     deploymentService,
 		idpConnectionService:  idpConnectionService,
+		applicationService:    applicationService,
 		eventService:          eventService,
 		tokenService:          tokenService,
 		keyService:            keyService,
@@ -115,7 +119,7 @@ func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handle
 }
 
 // WithBuiltinSchemaBases wires the built-in schema namespace the schema
-// routes resolve a path id through, so `GET /schemas/{id}` finds a built-in
+// routes resolve a path id through, so `GET /schemas/{schema_id}` finds a built-in
 // named under another base than the one the project stores it at. Same
 // chainable shape as WithPersonalTeamEnsurer, for the same reason.
 func (h *Handler) WithBuiltinSchemaBases(bases domain.BuiltinSchemaBases) *Handler {

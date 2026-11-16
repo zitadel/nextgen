@@ -3,6 +3,7 @@
 package service_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -111,8 +112,8 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
 				Name:                "Work laptop",
-				CreateUser: func(userID string) []service.UserAction {
-					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "alice@example.com")}
+				CreateUser: func(_ context.Context, userID string) ([]service.UserAction, error) {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "alice@example.com")}, nil
 				},
 			},
 		})
@@ -157,8 +158,8 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(userID string) []service.UserAction {
-					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "taken@example.com")}
+				CreateUser: func(_ context.Context, userID string) ([]service.UserAction, error) {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "taken@example.com")}, nil
 				},
 			},
 		})
@@ -191,8 +192,8 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(userID string) []service.UserAction {
-					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "signup@example.com")}
+				CreateUser: func(_ context.Context, userID string) ([]service.UserAction, error) {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "signup@example.com")}, nil
 				},
 			},
 		})
@@ -233,14 +234,14 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		hasher := cryptomock.NewMockPasswordHasher(ctrl)
-		hasher.EXPECT().Hash(gomock.Any()).Return("hashed:pw", nil)
+		hasher.EXPECT().Hash(gomock.Any(), gomock.Any()).Return("hashed:pw", nil)
 		handler := service.NewFlowCreateUserHandler(
 			service.FixedProjectHasherResolver{Hasher: hasher},
 			noPolicyGate(t),
 			service.NewUserService(pool, pool.Statements(), service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t), service.StatementsUserRefResolver{Pool: pool}, domain.BuiltinSchemaBases{}),
 			pool.Statements(),
 			pool,
-		)
+			stubSignupProtection{})
 
 		attempt, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{ProjectID: projectID})
 		require.NoError(t, err)
@@ -309,8 +310,8 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			ChallengeID: registration.GetID(),
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser: func(userID string) []service.UserAction {
-					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "retry@example.com")}
+				CreateUser: func(_ context.Context, userID string) ([]service.UserAction, error) {
+					return []service.UserAction{newRegistrationCreateUserAction(t, projectID, userID, "retry@example.com")}, nil
 				},
 			},
 		})

@@ -1,5 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
+
 import { fieldOf, objectOf, unwrap, type ZodLike } from "./zod";
 
 /**
@@ -31,12 +32,15 @@ const SECRET_COMPOUNDS = ["apikey", "privatekey", "accesskey", "secretkey"];
 const ADDRESS_WORDS = new Set(["endpoint", "url", "uri"]);
 
 /** A name's words, whether it is spelled in snake_case, kebab-case or camelCase. */
-const wordsOf = (key: string): readonly string[] =>
-  key
+const wordsOf = (key: string): readonly string[] => {
+  return key
     .replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean)
-    .map((word) => word.toLowerCase());
+    .map((word) => {
+      return word.toLowerCase();
+    });
+};
 
 /**
  * Whether a property name reads as a credential, so `client_secret`, `api-key`
@@ -47,13 +51,19 @@ const wordsOf = (key: string): readonly string[] =>
 export const isSecretKey = (key: string): boolean => {
   const words = wordsOf(key);
   return (
-    words.some((word) => SECRET_WORDS.has(word)) ||
-    SECRET_COMPOUNDS.some((compound) => words.join("").includes(compound))
+    words.some((word) => {
+      return SECRET_WORDS.has(word);
+    }) ||
+    SECRET_COMPOUNDS.some((compound) => {
+      return words.join("").includes(compound);
+    })
   );
 };
 
 /** Whether a name ends in a word that names an address (`token_endpoint`, `jwks_uri`). */
-const isAddressKey = (key: string): boolean => ADDRESS_WORDS.has(wordsOf(key).at(-1) ?? "");
+const isAddressKey = (key: string): boolean => {
+  return ADDRESS_WORDS.has(wordsOf(key).at(-1) ?? "");
+};
 
 /**
  * Whether a value is an address and nothing more: a URL with a host that
@@ -122,8 +132,9 @@ export const refuseSecret = (
 };
 
 /** Whether a schema accepts any text at all, so a string under it may be anything. */
-const freeText = (schema: ZodLike | undefined): boolean =>
-  ["string", "any", "unknown", undefined].includes(unwrap(schema)?.def?.type);
+const freeText = (schema: ZodLike | undefined): boolean => {
+  return ["string", "any", "unknown", undefined].includes(unwrap(schema)?.def?.type);
+};
 
 /**
  * Whether the schema types `value` as something no credential can be: one of
@@ -145,7 +156,9 @@ const fixedByTheSchema = (schema: ZodLike | undefined, value: unknown): boolean 
       if (typeof value === "string" && members.some(freeText)) {
         return false;
       }
-      return members.some((member) => fixedByTheSchema(member, value));
+      return members.some((member) => {
+        return fixedByTheSchema(member, value);
+      });
     }
     default:
       return false;
@@ -249,14 +262,18 @@ export const redactCredentials = (
 ): unknown => {
   if (Array.isArray(value)) {
     const element = unwrap(schema)?.def?.element;
-    return value.map((entry) => redactCredentials(entry, context, element, under));
+    return value.map((entry) => {
+      return redactCredentials(entry, context, element, under);
+    });
   }
   if (isObject(value)) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, nested]) => [
-        key,
-        redactCredentials(nested, context, childOf(schema, key), isSecretKey(key) ? key : under),
-      ]),
+      Object.entries(value).map(([key, nested]) => {
+        return [
+          key,
+          redactCredentials(nested, context, childOf(schema, key), isSecretKey(key) ? key : under),
+        ];
+      }),
     );
   }
   return under !== undefined && isCredentialLeaf(value, schema, context, under)

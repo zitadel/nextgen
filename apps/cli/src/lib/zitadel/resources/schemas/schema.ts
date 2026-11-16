@@ -345,14 +345,19 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
    * a provider's claims.
    *
    * @remarks
-   * Only the schema's own `required` lists, through the nested `required` of
-   * each required object. The identifier a password asks for is not among
-   * them: the server does not require it of a sign-up that has none.
+   * The schema's own `required` lists, through the nested `required` of each
+   * required object, and those an `allOf` adds, which hold unconditionally.
+   * The identifier a password asks for is not among them: the server does not
+   * require it of a sign-up that has none.
    *
    * @returns The dotted paths, each once.
    */
   get requiredByServer(): readonly PropertyPath[] {
-    return [...new Set(UserSchema.findRequiredWithin(this.body, undefined))];
+    const parts = Array.isArray(this.body.allOf) ? this.body.allOf.filter(isJsonObject) : [];
+    const composed = parts.flatMap((part) => {
+      return UserSchema.findRequiredWithin(part, undefined);
+    });
+    return [...new Set([...UserSchema.findRequiredWithin(this.body, undefined), ...composed])];
   }
 
   /**

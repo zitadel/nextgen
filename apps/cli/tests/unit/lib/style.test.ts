@@ -10,10 +10,12 @@ import { arrow, command, dim, id, mark, path, strong, url } from "@/lib/style";
 const SRC = join(import.meta.dirname, "../../../src");
 
 /**
- * Who may take `picocolors` directly: the palette itself, and the server log,
- * which is told whether to color by its caller instead of asking the terminal.
+ * Who may take `picocolors` directly: the palette itself, the UI package, which
+ * is the one place the CLI draws, and the server log, which is told whether to
+ * color by its caller instead of asking the terminal.
  */
 const MAY_IMPORT = new Set(["lib/style.ts", "lib/local-server/server-log.ts"]);
+const UI_PACKAGE = "lib/ui/";
 
 describe("the palette", () => {
   it("marks each outcome", () => {
@@ -54,6 +56,8 @@ describe("the palette", () => {
       ),
     );
 
-    expect(direct.flat().filter((file) => !MAY_IMPORT.has(file))).toEqual([]);
+    expect(
+      direct.flat().filter((file) => !MAY_IMPORT.has(file) && !file.startsWith(UI_PACKAGE)),
+    ).toEqual([]);
   });
 });

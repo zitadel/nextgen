@@ -4,8 +4,10 @@ import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
 import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
 import { idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
-import type { CommandResult } from "@/lib/oclif/types";
 import { json, painted } from "@/lib/oclif/rendering";
+import type { CommandResult } from "@/lib/oclif/types";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+
 import {
   type OperationDefinition,
   type OperationInput,
@@ -64,36 +66,52 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
+    const heading = headingOf(resource.heading ?? resource.idField, item);
+    const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
+
     if (!this.isOnScreen) {
-      return { status: "ok", data: item, pretty: json(item) };
+      return {
+        status: "ok",
+        data: item,
+        pretty: json(item),
+        summary: {
+          title,
+          sections: [],
+        },
+      };
     }
     const sections =
       flags.fields === undefined && !this.isJson
-        ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
+        ? ((await spec.sections?.(item, (columns, rows) => {
+            return this.tabulate(columns, rows);
+          })) ?? [])
         : [];
+    const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
+
     return {
       status: "ok",
       data: item,
       pretty: painted(
-        [
-          this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
-          ...sections,
-        ].join("\n\n"),
+        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), record].join(
+          "\n",
+        ),
       ),
+      summary: {
+        title,
+        sections: [],
+        lines: record.split("\n"),
+      },
     };
   }
 }
 
 /** The value that heads the rendering, when the record carries one. */
 const headingOf = (path: string, item: unknown): string | undefined => {
-  const value = path
-    .split(".")
-    .reduce<unknown>(
-      (current, key) =>
-        typeof current === "object" && current !== null
-          ? (current as Record<string, unknown>)[key]
-          : undefined,
-      item,
-    );
+  const value = path.split(".").reduce<unknown>((current, key) => {
+    return typeof current === "object" && current !== null
+      ? (current as Record<string, unknown>)[key]
+      : undefined;
+  }, item);
+
   return typeof value === "string" ? value : undefined;
 };

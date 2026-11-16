@@ -20,13 +20,15 @@ export type NavIcon = ComponentType<{
  * the selected project's screens, `account` what sits above every project
  * (Projects, and Settings; the sidebar lists the project's among them,
  * `accountListItems`), `settings` the pages Settings opens (the person's
- * profile, what an add-on adds beside it).
+ * profile, what an add-on adds beside it): the root settings, the platform
+ * project's. `project-settings` is the pages the selected project's own
+ * Settings opens (General, Admins, D40), which differ from the root's.
  *
- * `logs` is the list Logs opens, in place of the project's (D30). No route
+ * `events` is the list Events opens, in place of the project's (D30). No route
  * belongs to it: its rows are the views and filters of one screen, which the
- * events feature draws (`LogViewRows`, `LogFilters`).
+ * events feature draws (`EventViewPicker`, `EventFilters`).
  */
-export type NavView = "portal" | "account" | "settings" | "logs";
+export type NavView = "portal" | "account" | "settings" | "project-settings" | "events";
 
 export interface NavMeta {
   /** Sidebar label. */

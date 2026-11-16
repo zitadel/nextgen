@@ -46,11 +46,15 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
     }
 
     const present = new Set(
-      Array.from({ length: routes.length }, (_unused, index) => routes[index]?.path).filter(
-        (path): path is string => typeof path === "string",
-      ),
+      Array.from({ length: routes.length }, (_unused, index) => {
+        return routes[index]?.path;
+      }).filter((path): path is string => {
+        return typeof path === "string";
+      }),
     );
-    const missing = AUTH_ROUTE_PATHS.filter((path) => !present.has(path));
+    const missing = AUTH_ROUTE_PATHS.filter((path) => {
+      return !present.has(path);
+    });
     for (const path of missing) {
       routes.push(builders.raw(`{ path: ${JSON.stringify(path)}, children: [] }`));
     }

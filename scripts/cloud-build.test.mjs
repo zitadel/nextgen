@@ -37,6 +37,7 @@ function fixture() {
     "vercel.json",
     "apps/cloud/build-launcher.sh",
     "apps/cloud/deploy.sh",
+    "apps/cloud/install-go.sh",
     "apps/api/internal/build/info.go",
   ]) {
     write(root, file, readFileSync(join(repo, file)));
@@ -126,7 +127,7 @@ function run(root, overrides = {}) {
   const [goos, goarch] = target.trim().split("\n");
   const command = JSON.parse(readFileSync(join(root, "vercel.json"))).services.server.buildCommand;
   return execFileSync("sh", ["-c", command], {
-    cwd: join(root, "apps/api"),
+    cwd: join(root, "apps/cloud"),
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
     env: {
@@ -139,7 +140,6 @@ function run(root, overrides = {}) {
       VERCEL: "1",
       VERCEL_GIT_COMMIT_REF: "feature",
       VERCEL_GIT_COMMIT_SHA: "first",
-      VERCEL_OUTPUT_FILE: join(root, "function"),
       GOOS: goos,
       GOARCH: goarch,
       GOFLAGS: "-x",
@@ -152,7 +152,9 @@ function run(root, overrides = {}) {
   });
 }
 function metadata(root) {
-  return execFileSync(join(root, "function"), [], { encoding: "utf8" }).trim().split("\n");
+  return execFileSync(join(root, "apps/cloud/dist/nextgen-launcher"), [], { encoding: "utf8" })
+    .trim()
+    .split("\n");
 }
 
 test("restored Go caches skip compilation, refresh metadata and still migrate and deploy", async () => {

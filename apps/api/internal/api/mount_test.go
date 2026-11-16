@@ -48,7 +48,7 @@ func newMountedAPI(t *testing.T) mountedAPI {
 	spans := tracetest.NewInMemoryExporter()
 	metrics := sdkmetric.NewManualReader()
 	servers, err := NewServers(probeHandler{}, NewSecurityHandler(nil),
-		api.WithErrorHandler(OgenErrorHandler),
+		api.WithErrorHandler(OgenErrorHandler(0)),
 		api.WithNotFound(OgenNotFound(nil)),
 		api.WithMethodNotAllowed(OgenMethodNotAllowed),
 		api.WithTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans))),

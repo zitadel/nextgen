@@ -295,14 +295,14 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 // servedOrigins returns the origins still serving the release, each with the
 // deployment that serves it.
 func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
-	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
+	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.ListOptions(projectID, nil, &releaseID, 0))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
 	}
 	var served []domain.ReleaseInUseOrigin
 	for _, live := range result.Items {
 		for _, origin := range live.Origins() {
-			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID})
+			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID, Kind: live.OriginKind})
 		}
 	}
 	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })

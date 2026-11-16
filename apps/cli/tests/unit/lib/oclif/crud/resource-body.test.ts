@@ -1,5 +1,6 @@
 import { CreateTeamBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { describeBody } from "@/lib/oclif/crud";
 import { documentSchemaOf } from "@/lib/oclif/crud/fields";
@@ -8,7 +9,7 @@ import { resourceBody } from "@/lib/oclif/crud/resource-body";
 const resolve = (flags: Record<string, unknown>) => {
   return resourceBody(
     {
-      topic: "teams",
+      topic: "team",
       verb: "create",
       root: undefined,
       schema: CreateTeamBody,
@@ -40,13 +41,46 @@ describe("resourceBody", () => {
   it("words the refusal for what it lacks, naming the fields in the error's details", async () => {
     await expect(resolve({ data: "{}" })).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: "teams create is missing required field: --name",
+      message: "team create is missing required field: --name",
       hint: expect.stringContaining("Pass --name, or include it in --data / --file."),
       details: {
         missing: ["name"],
       },
     });
   });
+
+  it.each([
+    [
+      "one",
+      z.object({ name: z.string() }),
+      "team create is missing required field: --name",
+      "Pass --name, or include it in --data / --file.",
+    ],
+    [
+      "several",
+      z.object({ name: z.string(), slug: z.string() }),
+      "team create is missing required fields: --name, --slug",
+      "Pass --name and --slug, or include them in --data / --file.",
+    ],
+  ])(
+    "words a refusal for %s missing field in the singular or plural",
+    async (_count, schema, message, hint) => {
+      await expect(
+        resourceBody(
+          {
+            topic: "team",
+            verb: "create",
+            root: undefined,
+            schema,
+            document: documentSchemaOf(schema, undefined),
+            fields: describeBody(schema),
+            references: undefined,
+          },
+          { data: "{}" },
+        ),
+      ).rejects.toMatchObject({ message, hint: expect.stringContaining(hint) });
+    },
+  );
 
   it("refuses a body that does not fit the API schema", async () => {
     await expect(resolve({ data: '{"name":42}' })).rejects.toMatchObject({

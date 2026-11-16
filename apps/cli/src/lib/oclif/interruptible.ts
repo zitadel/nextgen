@@ -15,7 +15,7 @@ const GRACE_MS = 1_000;
  *
  * Node exits on SIGINT only while nothing listens for it, and a spinner does
  * listen — clack's stops its animation and returns — so a request stalled
- * behind one used to outlive the keypress. A command that listens for itself
+ * behind one outlives the keypress. A command that listens for itself
  * avoids that: its first Ctrl-C aborts {@link signal} with an `E_CANCELLED`
  * reason, so every request bound to it rejects and the command unwinds through
  * its normal error path.

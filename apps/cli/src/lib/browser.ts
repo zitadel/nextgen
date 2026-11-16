@@ -95,6 +95,8 @@ async function launch(url: string, app?: string): Promise<void> {
   const child = await open(url, app ? { app: { name: app } } : {});
   // A spawn error surfaces asynchronously; swallow it so an opener that
   // vanishes cannot crash the CLI with an unhandled 'error' event.
-  child.on("error", () => undefined);
+  child.on("error", () => {
+    return undefined;
+  });
   child.unref();
 }

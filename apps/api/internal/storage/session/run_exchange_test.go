@@ -137,8 +137,10 @@ func completedAttempt(projectID string, sessionID *string) *domain.AuthAttempt {
 
 func TestRunExchange_newSession(t *testing.T) {
 	t.Parallel()
+	attempt := completedAttempt("proj", nil)
+	attempt.FlowID = "flow-1"
 	store := &fakeExchangeStore{
-		attempt: completedAttempt("proj", nil),
+		attempt: attempt,
 		attemptChecks: []session.StoredCheck{
 			{ID: "c1", Type: domain.AuthCheckTypePassword, LastVerifiedAt: time.Now(), OnAttempt: true},
 		},
@@ -147,6 +149,8 @@ func TestRunExchange_newSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "sess-new", got.ID)
+	// The attempt is deleted, so the session is all that still names its flow.
+	assert.Equal(t, "flow-1", got.FlowID)
 	assert.Equal(t, "tok-rotated", got.TokenID)
 	assert.Equal(t, "attempt-1", store.deletedAttempt)
 	assert.Equal(t, "sess-new", store.appliedOn)

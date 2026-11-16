@@ -6,9 +6,10 @@ import (
 	"net/url"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
-const idpCallbackProxyPrefix = "/__nextgen"
+const idpCallbackProxyPrefix = httputil.ProxyPrefix
 const idpCallbackUpstreamPrefix = "/idp"
 
 const IDPCallbackUpstreamPattern = idpCallbackUpstreamPrefix + "/{" + idpCallbackSlugWildcard + "}/callback"

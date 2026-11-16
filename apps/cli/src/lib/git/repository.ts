@@ -125,14 +125,20 @@ export class Repository {
     const real = await realpath(dir);
     const gitDir = join(real, ".git");
     const hadOne = await lstat(gitDir).then(
-      () => true,
-      () => false,
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
     );
     try {
       await new Git(real).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
-        await rm(gitDir, { recursive: true, force: true }).catch(() => undefined);
+        await rm(gitDir, { recursive: true, force: true }).catch(() => {
+          return undefined;
+        });
       }
       throw error;
     }

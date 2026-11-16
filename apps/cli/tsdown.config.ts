@@ -9,7 +9,7 @@ import { bundleSkills } from "./src/lib/skills/bundle.ts";
  * exports the `COMMANDS` table (hand-written commands plus the ones built
  * from the resource registry) and oclif loads `dist/index.mjs` at runtime.
  * The root help class is built alongside it for `oclif.helpClass`, and the
- * `--version` notice for `oclif.hooks`.
+ * unknown-command and `--version` hooks for `oclif.hooks`.
  * `@oclif/*` (core + plugins) stays external — resolved from node_modules at
  * runtime, never bundled — which is what lets the plugin system work.
  * Every public agent skill in the repository lands in `dist/skills/`, which
@@ -27,7 +27,8 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     "lib/oclif/help": "src/lib/oclif/help.ts",
-    "hooks/version-notice": "src/hooks/version-notice.ts",
+    "hooks/command-not-found": "src/cli/hooks/command-not-found.ts",
+    "hooks/version-notice": "src/cli/hooks/version-notice.ts",
   },
   outDir: "dist",
   tsconfig: "tsconfig.app.json",

@@ -16,7 +16,7 @@ const (
 
 // ReleasePointerKind is the kind of resource a release pointer pins. The wire
 // value is flow_definition rather than flow: the API serves runtime flows at
-// /flow and their definitions at /flow_definitions, and a release pins the
+// /flows and their definitions at /flow_definitions, and a release pins the
 // latter (ADR 035, amended 2026-09-02).
 //
 //go:generate go tool enumer -type ReleasePointerKind -transform snake -trimprefix ReleasePointerKind -sql
@@ -67,10 +67,12 @@ func ErrReleaseRevisionUnpinnable(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
-// ReleaseInUseOrigin is one origin whose newest deployment pins the release.
+// ReleaseInUseOrigin is one origin whose newest deployment pins the release,
+// and whether that deployment serves it as a primary origin or a preview.
 type ReleaseInUseOrigin struct {
-	Origin       string `json:"origin"`
-	DeploymentID string `json:"deployment_id"`
+	Origin       string               `json:"origin"`
+	DeploymentID string               `json:"deployment_id"`
+	Kind         DeploymentOriginKind `json:"kind"`
 }
 
 // ReleaseInUseDetails names every origin that still serves the release.

@@ -30,12 +30,12 @@ describe("reportWarning", () => {
     expect(takeReportedWarnings()).toEqual(["schema \u001b[2Jwiped has no identifier"]);
   });
 
-  // A direct consola.warn is silenced by --json, so the warning never reaches
+  // A direct log.warn is silenced by --json, so the warning never reaches
   // an agent. reportWarning is the one place allowed to call it.
-  it("is the only caller of consola.warn", async () => {
+  it("is the only caller of log.warn", async () => {
     const callers: string[] = [];
     for (const file of await sourceFiles(SRC)) {
-      if (/consola\.warn\(/.test(await readFile(file, "utf8"))) {
+      if (/\blog\.warn\(/.test(await readFile(file, "utf8"))) {
         // Compared with forward slashes, so the test also passes on Windows.
         callers.push(relative(SRC, file).split(sep).join("/"));
       }

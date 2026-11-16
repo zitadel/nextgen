@@ -1,6 +1,7 @@
 import type { Command, Interfaces } from "@oclif/core";
 
 import { EXIT_CODES, type ZitadelErrorCode } from "@/lib/errors";
+
 import { BaseCommand, FLAG_VARIABLES } from "./base";
 import { COMMAND_GROUPS, type CommandGroup, compareInGroup } from "./groups";
 import type { FlagVariable } from "./types";
@@ -96,29 +97,43 @@ export function cliReference(
   bin: string,
 ): CliReference {
   const entries = Object.entries(commands)
-    .map(([id, command]) => ({ id, command: command as ReferencedCommand }))
-    .filter(({ command }) => !command.hidden)
-    .map(({ id, command }) => ({ id, command, group: groupOf(id, command) }))
-    .sort(
-      (a, b) =>
+    .map(([id, command]) => {
+      return { id, command: command as ReferencedCommand };
+    })
+    .filter(({ command }) => {
+      return !command.hidden;
+    })
+    .map(({ id, command }) => {
+      return { id, command, group: groupOf(id, command) };
+    })
+    .sort((a, b) => {
+      return (
         COMMAND_GROUPS.indexOf(a.group) - COMMAND_GROUPS.indexOf(b.group) ||
         compareInGroup(
           { id: a.id, groupOrder: a.command.groupOrder },
           { id: b.id, groupOrder: b.command.groupOrder },
-        ),
-    );
+        )
+      );
+    });
 
   const flagOrder = Object.keys(BaseCommand.baseFlags);
 
   return {
     bin,
     groups: [...COMMAND_GROUPS],
-    globalFlags: [JSON_FLAG, ...flagReferences(BaseCommand.baseFlags, (text) => text)],
-    env: [...FLAG_VARIABLES].sort((a, b) => flagOrder.indexOf(a.flag) - flagOrder.indexOf(b.flag)),
+    globalFlags: [
+      JSON_FLAG,
+      ...flagReferences(BaseCommand.baseFlags, (text) => {
+        return text;
+      }),
+    ],
+    env: [...FLAG_VARIABLES].sort((a, b) => {
+      return flagOrder.indexOf(a.flag) - flagOrder.indexOf(b.flag);
+    }),
     exitCodes: { ...EXIT_CODES },
-    commands: entries.map(({ id, command, group }) =>
-      commandReference(id.replaceAll(":", " "), command, group, bin),
-    ),
+    commands: entries.map(({ id, command, group }) => {
+      return commandReference(id.replaceAll(":", " "), command, group, bin);
+    }),
   };
 }
 
@@ -140,22 +155,33 @@ function commandReference(
   // all of them.
   const base: Interfaces.FlagInput = command.baseFlags ?? {};
   const globalFlags = Object.entries(BaseCommand.baseFlags);
-  if (!command.enableJsonFlag || globalFlags.some(([name, flag]) => base[name] !== flag)) {
+  if (
+    !command.enableJsonFlag ||
+    globalFlags.some(([name, flag]) => {
+      return base[name] !== flag;
+    })
+  ) {
     throw new Error(`${id} does not take BaseCommand's flags and --json, the global flags.`);
   }
   // Its own flags, then those its family adds to the base flags, such as the
   // `--schema` of every `auth-method` command.
   const own: Interfaces.FlagInput = command.flags ?? {};
-  const family = Object.entries(base).filter(
-    ([name]) => !(name in own) && !(name in BaseCommand.baseFlags),
-  );
-  const render = (text: string) => renderTemplates(text, id, bin);
+  const family = Object.entries(base).filter(([name]) => {
+    return !(name in own) && !(name in BaseCommand.baseFlags);
+  });
+  const render = (text: string) => {
+    return renderTemplates(text, id, bin);
+  };
   const description = [command.summary, command.description]
-    .filter((text): text is string => typeof text === "string" && text.trim() !== "")
+    .filter((text): text is string => {
+      return typeof text === "string" && text.trim() !== "";
+    })
     .map(render)
     .join("\n\n");
   if (description === "") throw new Error(`${id} has neither a summary nor a description.`);
-  const aliases = (command.aliases ?? []).map((alias) => alias.replaceAll(":", " "));
+  const aliases = (command.aliases ?? []).map((alias) => {
+    return alias.replaceAll(":", " ");
+  });
 
   return {
     id,
@@ -164,16 +190,22 @@ function commandReference(
     ...(aliases.length > 0 && { aliases }),
     ...(command.state !== undefined && { state: command.state }),
     args: Object.entries(command.args ?? {})
-      .filter(([, arg]) => !arg.hidden)
-      .map(([name, arg]) => ({
-        name,
-        ...(arg.description !== undefined && { description: render(arg.description) }),
-        ...(arg.required === true && { required: true as const }),
-        ...(arg.options !== undefined && { options: arg.options.map(String) }),
-      })),
+      .filter(([, arg]) => {
+        return !arg.hidden;
+      })
+      .map(([name, arg]) => {
+        return {
+          name,
+          ...(arg.description !== undefined && { description: render(arg.description) }),
+          ...(arg.required === true && { required: true as const }),
+          ...(arg.options !== undefined && { options: arg.options.map(String) }),
+        };
+      }),
     ...(command.strict === false && { variadic: true as const }),
     flags: flagReferences({ ...own, ...Object.fromEntries(family) }, render),
-    examples: (command.examples ?? []).map((example) => exampleReference(example, render, id, bin)),
+    examples: (command.examples ?? []).map((example) => {
+      return exampleReference(example, render, id, bin);
+    }),
   };
 }
 
@@ -182,8 +214,12 @@ function flagReferences(
   render: (text: string) => string,
 ): FlagReference[] {
   return Object.entries(input)
-    .filter(([, flag]) => !flag.hidden)
-    .map(([name, flag]) => flagReference(name, flag, render));
+    .filter(([, flag]) => {
+      return !flag.hidden;
+    })
+    .map(([name, flag]) => {
+      return flagReference(name, flag, render);
+    });
 }
 
 function flagReference(

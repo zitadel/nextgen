@@ -4,9 +4,9 @@ import { baseTest, sourceConditions } from "@zitadel/vitest-config";
 import { aliases } from "./tests/helpers/aliases";
 
 /**
- * `cli:check-advisories`: asks the npm advisory database about the package
+ * `@zitadel/cli#check-advisories`: asks the npm advisory database about the package
  * versions the scaffolders pin. It needs the network, so it is not part of
- * `cli:test`; `.github/workflows/scaffold-advisories.yml` runs it nightly and
+ * `@zitadel/cli#test`; `.github/workflows/scaffold-advisories.yml` runs it nightly and
  * on changes to the scaffolders.
  */
 export default defineConfig({

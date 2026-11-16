@@ -99,14 +99,19 @@ export class BrokenFilesError extends ConfigError {
         return entry.path;
       }),
     );
-    const files = paths.size === 1 ? "file is" : "files are";
     const lines = problems.map((entry) => {
       return `  - ${entry.path}: ${entry.problem}`;
     });
-    super([`${paths.size} configuration ${files} not valid:`, ...lines].join("\n"), {
-      hint: "Fix the files named above, then run the command again; nothing was changed.",
-      details: { problems },
-    });
+    super(
+      [
+        `${paths.size} configuration ${new Intl.PluralRules("en").select(paths.size) === "one" ? "file is" : "files are"} not valid:`,
+        ...lines,
+      ].join("\n"),
+      {
+        hint: "Fix the files named above, then run the command again; nothing was changed.",
+        details: { problems },
+      },
+    );
     this.problems = problems;
   }
 }

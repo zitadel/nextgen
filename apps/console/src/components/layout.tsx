@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * The one page wrapper every console screen renders in, so every screen starts
- * the same distance under the top bar. Its geometry, and `inset="panel"` for
- * the configuration-panel screens, are in `docs/styling.md` ("Page wrapper").
+ * the same distance under the top bar. Its geometry is in `docs/styling.md`
+ * ("Page wrapper").
  *
  * Do not write Tailwind's built-in centring utility name (the "c" word) anywhere
  * in scanned source, even in a comment: its extractor would emit that utility,
@@ -14,11 +14,10 @@ import { cn } from "@/lib/utils";
  */
 export function Page({
   children,
-  inset = "default",
   fill = false,
+  besideSheet = false,
 }: {
   children: ReactNode;
-  inset?: "default" | "panel";
   /**
    * On a desktop, exactly the height under the 56px top bar, as a column, so a
    * child with `flex-1 min-h-0` takes what is left instead of guessing it from
@@ -26,14 +25,23 @@ export function Page({
    * and the page scrolls, so a short window keeps its minimum heights.
    */
   fill?: boolean;
+  /**
+   * A sheet that is not modal stands open at the right (Events' event
+   * drawer): from `xl`, where the two fit side by side, the page ends a
+   * gutter before it, so none of the screen sits under the sheet. Narrower,
+   * the sheet covers the page's right.
+   */
+  besideSheet?: boolean;
 }) {
   return (
-    <div className={cn(PAGE, inset === "panel" && "sm:px-6", fill && PAGE_FILL)}>{children}</div>
+    <div className={cn(PAGE, fill && PAGE_FILL, besideSheet && PAGE_BESIDE_SHEET)}>{children}</div>
   );
 }
 
 const PAGE = "px-4 pt-4 pb-8 lg:pt-5";
 const PAGE_FILL = "lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col";
+/** The sheets' 520px (`sm:max-w-130`) and the page's 16px gutter. */
+const PAGE_BESIDE_SHEET = "xl:pr-134";
 
 /** The fixed column every settings screen renders in, centred in the main area. */
 export function SettingsColumn({ children }: { children: ReactNode }) {

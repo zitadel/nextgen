@@ -6,7 +6,7 @@ applyTo: "packages/design-tokens/figma-export/**,packages/design-tokens/src/gene
 
 Both of these directories are machine-written. `figma-export/**` is pushed by
 the Figma sync plugin to branch `design-tokens/figma-sync`;
-`src/generated/**` is produced from it by `:sync-export` and `:generate`.
+`src/generated/**` is produced from it by the package's `sync:export` and `generate` tasks.
 Do not ask an author to hand-edit either — the next sync overwrites the file.
 Corrections to a token's name, value, or description belong in the Figma
 library. See [`packages/design-tokens/AGENTS.md`](../../packages/design-tokens/AGENTS.md).

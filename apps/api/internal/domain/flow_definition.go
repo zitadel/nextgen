@@ -12,16 +12,6 @@ const (
 	FlowDefinitionPrefix ResourcePrefix = "flowdef"
 )
 
-//go:generate go tool enumer -type FlowDefinitionStatus -transform snake -trimprefix FlowDefinitionStatus -sql
-type FlowDefinitionStatus uint8
-
-const (
-	FlowDefinitionStatusDraft FlowDefinitionStatus = iota
-	FlowDefinitionStatusActive
-	FlowDefinitionStatusDeprecated
-	FlowDefinitionStatusArchived
-)
-
 //go:generate go tool enumer -type FlowDefinitionPurpose -transform snake -trimprefix FlowDefinitionPurpose -sql
 type FlowDefinitionPurpose uint8
 
@@ -124,7 +114,6 @@ type FlowDefinition struct {
 	ID            string
 	Name          string
 	SchemaVersion string
-	Status        FlowDefinitionStatus
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	// UserSchema is the objectType of the user schema this flow operates on.
@@ -145,14 +134,12 @@ func NewFlowDefinition(
 	purposes map[FlowDefinitionPurpose]string,
 	audience FlowDefinitionAudience,
 	steps []FlowDefinitionStep,
-	status FlowDefinitionStatus,
 ) (_ *FlowDefinition, err error) {
 	return &FlowDefinition{
 		ProjectID:     projectID,
 		ID:            flowDefID,
 		Name:          name,
 		SchemaVersion: schemaVersion,
-		Status:        status,
 		UserSchema:    userSchema,
 		Purposes:      purposes,
 		Audience:      audience,
@@ -170,7 +157,6 @@ func (d *FlowDefinition) Equal(other *FlowDefinition) bool {
 		return d == other
 	}
 	return d.Name == other.Name &&
-		d.Status == other.Status &&
 		d.UserSchema == other.UserSchema &&
 		maps.Equal(d.Purposes, other.Purposes) &&
 		slices.Equal(d.Audience.AppIDs, other.Audience.AppIDs) &&
@@ -399,7 +385,6 @@ const (
 	FlowDefinitionFieldID
 	FlowDefinitionFieldName
 	FlowDefinitionFieldSchemaVersion
-	FlowDefinitionFieldStatus
 	FlowDefinitionFieldCreatedAt
 	FlowDefinitionFieldUpdatedAt
 	FlowDefinitionFieldUserSchema

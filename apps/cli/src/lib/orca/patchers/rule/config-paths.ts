@@ -23,5 +23,7 @@ const COMMONJS_EXTENSIONS = ["cts", "cjs"] as const;
  * clear unsupported-format error.
  */
 export function configCandidates(basename: string): string[] {
-  return [...CONFIG_EXTENSIONS, ...COMMONJS_EXTENSIONS].map((ext) => `${basename}.${ext}`);
+  return [...CONFIG_EXTENSIONS, ...COMMONJS_EXTENSIONS].map((ext) => {
+    return `${basename}.${ext}`;
+  });
 }

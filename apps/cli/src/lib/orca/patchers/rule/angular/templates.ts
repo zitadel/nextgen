@@ -1,3 +1,8 @@
+import { posix } from "node:path";
+
+import { ZitadelError } from "@/lib/errors";
+import type { GitignoreRule } from "@/lib/gitignore";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { MANAGED_MARKER } from "@/lib/paths";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import type { WiringVerdict } from "@/lib/orca/patchers/rule/file-writer/types";
@@ -19,10 +24,39 @@ import {
 } from "@/lib/orca/patchers/rule/session-cookie";
 import { lfText, withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
 
+/** The managed launcher the app's serve, build and test scripts run through. */
+export const LAUNCHER_PATH = "zitadel-ng.cjs";
+
+/**
+ * The module the launcher writes the app's project id into, beside the root
+ * component that imports it. It holds a per-project value, so it is
+ * git-ignored, like the env files.
+ */
+export const PROJECT_ID_MODULE_PATH = "src/app/zitadel-project.ts";
+
+/** The `.gitignore` rule that keeps {@link PROJECT_ID_MODULE_PATH} out of the repository. */
+export const PROJECT_ID_MODULE_GITIGNORE: GitignoreRule = {
+  path: PROJECT_ID_MODULE_PATH,
+  ignored: true,
+  entry: `/${PROJECT_ID_MODULE_PATH}`,
+};
+
+/** How `src/app/app.ts` imports {@link PROJECT_ID_MODULE_PATH}. */
+const PROJECT_ID_IMPORT = `./${posix.basename(PROJECT_ID_MODULE_PATH, ".ts")}`;
+
+/**
+ * The text of {@link PROJECT_ID_MODULE_PATH} for `projectId`, as setup writes
+ * it and as the launcher does, which builds the same text at run time.
+ */
+export function projectIdModule(projectId: string): string {
+  return `// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\nexport const ZITADEL_PROJECT_ID = ${JSON.stringify(projectId)};\n`;
+}
+
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
- * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
+ * project id (public, not secret) comes from {@link PROJECT_ID_MODULE_PATH},
+ * which the launcher writes, so the file names no project; the dev proxy in `proxy.conf.cjs`
  * attaches the project service-key secret as the bearer server-side only to
  * `POST /sessions/exchange` (read from `.env.local`), and no secret reaches
  * the browser.
@@ -58,6 +92,8 @@ export function appComponentTemplate(ctx: PatchContext): string {
   return `${MANAGED_MARKER}
 import { Component, OnInit } from "@angular/core";
 import {${importNames}} from "@zitadel/sdk-angular";
+// ${LAUNCHER_PATH} writes this module from ZITADEL_PROJECT_ID: npm run dev, build and test run it.
+import { ZITADEL_PROJECT_ID } from "${PROJECT_ID_IMPORT}";
 
 @Component({
   selector: "app-root",
@@ -67,7 +103,7 @@ import {${importNames}} from "@zitadel/sdk-angular";
 })
 export class App implements OnInit {
   protected readonly project = configureZitadel({
-    projectId: ${JSON.stringify(ctx.project.id)},
+    projectId: ZITADEL_PROJECT_ID,
     proxyPath: "${PROXY_PATH}",
   });
   protected readonly path = window.location.pathname;${localesProperty}
@@ -79,6 +115,143 @@ export class App implements OnInit {
   }
 }
 `;
+}
+
+/**
+ * The managed launcher `zitadel-ng.cjs`, which the app's serve, build and test
+ * scripts run instead of `ng`. Angular's CLI reads no environment into client
+ * code, so this file takes `ZITADEL_PROJECT_ID` from the environment, else from
+ * `.env.local` (which `zitadel setup` writes), parsed with Node's
+ * `util.parseEnv` for that one variable, so the rest of the file, the project
+ * secret included, stays out of the Angular CLI's environment. It writes the
+ * id into {@link PROJECT_ID_MODULE_PATH} when that file does not already hold
+ * it, so a running watcher is not woken, and runs the Angular CLI in this
+ * process with the arguments it was given. Both paths are the app's, from
+ * `__dirname`, wherever it is run from. Only reading `.env.local` needs
+ * Node.js 20.12 or newer; an id from the environment needs nothing more. It
+ * reads each file once and never checks a path before it uses it, which a
+ * file-system-race scan (CodeQL's `js/file-system-race`) reports in the app.
+ */
+export function launcherTemplate(): string {
+  return `${MANAGED_MARKER}
+// Writes the project id into ${PROJECT_ID_MODULE_PATH}, which .gitignore
+// excludes, then runs the Angular CLI with the arguments it was given. The id
+// comes from the environment, else from .env.local, which zitadel setup writes.
+const { readFileSync, writeFileSync } = require("node:fs");
+const { join } = require("node:path");
+const util = require("node:util");
+
+// The text of file, or undefined when there is none to read: one read, so
+// nothing can change the file between a check and its use.
+function read(file) {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function fromEnvLocal() {
+  const text = read(join(__dirname, ".env.local"));
+  if (text === undefined) return undefined;
+  if (typeof util.parseEnv !== "function") {
+    throw new Error("Reading .env.local needs Node.js 20.12 or newer; or set ZITADEL_PROJECT_ID in the environment.");
+  }
+  return util.parseEnv(text).ZITADEL_PROJECT_ID;
+}
+
+const projectId = process.env.ZITADEL_PROJECT_ID || fromEnvLocal();
+if (!projectId) {
+  throw new Error("ZITADEL_PROJECT_ID is not set: add it to .env.local (zitadel setup writes it) or to the environment.");
+}
+const path = join(__dirname, "${PROJECT_ID_MODULE_PATH}");
+const contents = \`// Written by ${LAUNCHER_PATH} from ZITADEL_PROJECT_ID. Not committed.\\nexport const ZITADEL_PROJECT_ID = \${JSON.stringify(projectId)};\\n\`;
+if (read(path) !== contents) {
+  writeFileSync(path, contents);
+}
+require("@angular/cli/bin/ng.js");
+`;
+}
+
+/** Writes {@link PROJECT_ID_MODULE_PATH} for `projectId` when it is absent; the launcher keeps it current. */
+export function projectIdModuleEdit(projectId: string): (source: string | undefined) => string {
+  return (source) => {
+    return source ?? projectIdModule(projectId);
+  };
+}
+
+/** `source`, a `package.json`, and its scripts; throws when there is none to edit. */
+function packageJson(source: string | undefined): {
+  source: string;
+  scripts: Record<string, unknown>;
+} {
+  if (source === undefined) {
+    throw new ZitadelError("E_VALIDATION", "package.json is required to add the dev script", {
+      hint: "Run setup from a project that has a package.json.",
+    });
+  }
+  const pkg = parseJsonObject(source, "package.json");
+  return { source, scripts: isObject(pkg.scripts) ? pkg.scripts : {} };
+}
+
+/**
+ * `pkg` with its scripts replaced by `scripts`, or its source itself when they
+ * are the same: the edit op then skips the file instead of reformatting the
+ * developer's `package.json`, which is theirs. Only the scripts value is
+ * spliced; every byte outside it stays.
+ */
+function withScripts(
+  pkg: ReturnType<typeof packageJson>,
+  scripts: Record<string, unknown>,
+): string {
+  return JSON.stringify(scripts) === JSON.stringify(pkg.scripts)
+    ? pkg.source
+    : setTopLevelJsonKey(pkg.source, "package.json", "scripts", scripts);
+}
+
+/**
+ * A script setup moves onto the launcher: `ng serve …`, `ng build …` or
+ * `ng test …` with no shell operators, where replacing `ng` with
+ * `node zitadel-ng.cjs` changes nothing the Angular CLI receives.
+ */
+const PLAIN_NG = /^ng (?:serve|build|test)(?: [^&|;<>`$()\n]*)?$/;
+
+/**
+ * Runs the app's plain serve, build and test scripts through the launcher, so
+ * the module it imports holds the project id: each `ng serve …`, `ng build …`
+ * or `ng test …` without shell operators. The launcher passes the arguments
+ * on unchanged, so a script moved in an app that does not import the module
+ * runs as before. A script in another form stays on `ng`: it works while the
+ * module exists, and fails to compile at the import on a clean checkout.
+ */
+export function launcherScriptsEdit(source: string | undefined): string {
+  const pkg = packageJson(source);
+  return withScripts(
+    pkg,
+    Object.fromEntries(
+      Object.entries(pkg.scripts).map(([name, command]) => {
+        return [
+          name,
+          typeof command === "string" && PLAIN_NG.test(command)
+            ? `node ${LAUNCHER_PATH} ${command.slice("ng ".length)}`
+            : command,
+        ];
+      }),
+    ),
+  );
+}
+
+/**
+ * Adds a `dev` script that serves through the launcher when the project
+ * defines none. `ng new` ships only a `start` script, but the CLI tells every
+ * framework to run `npm run dev` (and `ng serve` reads the proxy + port from
+ * `angular.json`). An existing `dev` script is left as it is.
+ */
+export function devScriptEdit(source: string | undefined): string {
+  const pkg = packageJson(source);
+  return pkg.scripts.dev === undefined
+    ? withScripts(pkg, { ...pkg.scripts, dev: `node ${LAUNCHER_PATH} serve` })
+    : pkg.source;
 }
 
 /**
@@ -217,7 +390,9 @@ const V2_EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
 
 /** The exchange-only bearer hook `text` carries, of either version, or `undefined`. */
 function bearerIn(text: string): string | undefined {
-  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => text.includes(bearer));
+  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => {
+    return text.includes(bearer);
+  });
 }
 
 /** The session-cookie hooks' functions, after the bearer hook (ADR 073, ADR 083). */
@@ -402,11 +577,11 @@ export function proxyConfApiPrefixEdit(): (source: string | undefined) => string
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    return withLfLineEnds(source, (text) =>
-      text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
+    return withLfLineEnds(source, (text) => {
+      return text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
         ? text.replace(V2_EXCHANGE_ONLY_BEARER, EXCHANGE_ONLY_BEARER)
-        : text,
-    );
+        : text;
+    });
   };
 }
 

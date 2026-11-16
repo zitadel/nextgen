@@ -48,7 +48,7 @@ sequenceDiagram
     participant S as FlowService
     participant SM as StateMachine
 
-    Note over C,SM: POST /flow — no cookie yet
+    Note over C,SM: POST /flows — no cookie yet
     C->>H: CreateFlow
     H->>S: Resolve, then Start
     S->>SM: Start
@@ -57,7 +57,7 @@ sequenceDiagram
     H->>K: sealState(_zflow)
     H-->>C: 201 + Set-Cookie
 
-    Note over C,SM: GET /flow/{id}
+    Note over C,SM: GET /flows/{flow_id}
     C->>H: GetFlowStep (_zflow cookie)
     H->>K: openState(_zflow)
     K-->>H: *FlowState
@@ -67,7 +67,7 @@ sequenceDiagram
     S-->>H: FlowStepResult
     H-->>C: 200 + buildFlowResponse
 
-    Note over C,SM: POST /flow/{id}/submit
+    Note over C,SM: POST /flows/{flow_id}/submit
     C->>H: SubmitFlowStep (_zflow cookie + body)
     H->>K: openState(_zflow)
     K-->>H: *FlowState
@@ -90,7 +90,7 @@ The use-case surface the HTTP handler depends on. Four methods:
 
 | Method | Responsibility |
 |---|---|
-| `Resolve` | Pick the active `FlowDefinition` to run. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
+| `Resolve` | Pick the `FlowDefinition` to run from the revisions the release pins. `Name` → direct lookup; otherwise audience-based (`Hint` plumbed through but not yet honored). |
 | `Start` | Mint a fresh `FlowState`, ask the state machine to bootstrap it, mint and attach `flow_*` and `sess_*` ids. |
 | `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
 | `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |
@@ -240,7 +240,7 @@ ceremony rides the same attempt + checks machinery (ADR 056).
 
 Postgres, Spanner, and SQLite implementations live under
 `internal/storage/dialect/{postgres,spanner,sqlite}/flow_definition.go` and back
-`FlowService.Resolve` (list active definitions) and `FlowService.Submit` /
+`FlowService.Resolve` (list pinned definitions) and `FlowService.Submit` /
 `GetStep` (re-fetch by id) via `FlowDefinitionService`. Migrations ship
 `flow_definitions` SQL per dialect.
 

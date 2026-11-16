@@ -5,6 +5,7 @@ import (
 )
 
 type statements struct {
+	signupProtectionStatements
 	projectStatements
 	originStatements
 	flowDefinitionStatements
@@ -12,6 +13,7 @@ type statements struct {
 	jsonSchemaStatements
 	releaseStatements
 	idpConnectionStatements
+	applicationStatements
 	policyStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -30,7 +32,9 @@ type statements struct {
 	variableStatements
 	variableSetStatements
 	claimStatements
+	invitationStatements
 	resourceScopeStatements
+	searchEntryStatements
 	authzAssignmentStatements
 	authzMembershipEdgeStatements
 	authzCatalogStatements
@@ -48,6 +52,7 @@ func (s statements) IsStatements() {}
 func newStatements(db queryExecutor) statements {
 	db = traced(db)
 	return statements{
+		signupProtectionStatements:    newSignupProtectionStatements(db),
 		projectStatements:             newProjectStatements(db),
 		originStatements:              newOriginStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
@@ -55,6 +60,7 @@ func newStatements(db queryExecutor) statements {
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
 		releaseStatements:             newReleaseStatements(db),
 		idpConnectionStatements:       newIDPConnectionStatements(db),
+		applicationStatements:         newApplicationStatements(db),
 		policyStatements:              newPolicyStatements(db),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(db),
 		deploymentStatements:          newDeploymentStatements(db),
@@ -73,7 +79,9 @@ func newStatements(db queryExecutor) statements {
 		variableStatements:            newVariableStatements(db),
 		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
+		invitationStatements:          newInvitationStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
+		searchEntryStatements:         newSearchEntryStatements(db),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(db),
 		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(db),
 		authzCatalogStatements:        newAuthzCatalogStatements(db),

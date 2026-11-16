@@ -1,21 +1,26 @@
-import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
-import { prose } from "@/lib/oclif/rendering";
+import { aConfigAt } from "@tests/helpers/suggestions";
+import { prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
+import { offTerminal } from "@tests/helpers/terminal";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {
   public static override readonly id = "warnings-test";
   public readonly printed: string[] = [];
+  public readonly aside: string[] = [];
 
   public override jsonEnabled(): boolean {
     return false;
   }
   public override log(message?: string): void {
     this.printed.push(message ?? "");
+  }
+  public override logToStderr(message?: string): void {
+    this.aside.push(message ?? "");
   }
 
   protected async execute(): Promise<never> {
@@ -44,14 +49,20 @@ class WarningCommand extends BaseCommand {
 
 function makeCommand(): WarningCommand {
   takeReportedWarnings();
-  return new WarningCommand([], { version: "0.0.0-test" } as unknown as Config);
+  return new WarningCommand([], aConfigAt("0.0.0-test"));
 }
 
 describe("BaseCommand warnings", () => {
   it("prints a result's warnings after its own terminal text", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("Done") });
+    await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: {},
+      warnings: ["careful"],
+      pretty: prose("Done"),
+    });
 
     expect(cmd.printed).toEqual(["Done\nWarning: careful"]);
   });
@@ -59,7 +70,13 @@ describe("BaseCommand warnings", () => {
   it("prints the warnings alone when the terminal text is empty", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("") });
+    await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: {},
+      warnings: ["careful"],
+      pretty: prose(""),
+    });
 
     expect(cmd.printed).toEqual(["Warning: careful"]);
   });
@@ -68,6 +85,7 @@ describe("BaseCommand warnings", () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       warnings: ["schema \u001b[2Jwiped has no identifier"],
@@ -78,11 +96,34 @@ describe("BaseCommand warnings", () => {
     expect(cmd.printed).toEqual(["Deployed\nWarning: schema \\x1b[2Jwiped has no identifier"]);
   });
 
+  it("keeps a warning and the footer off the stdout a script reads", async () => {
+    const cmd = makeCommand();
+
+    await offTerminal(() => {
+      return cmd.finish({
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: {},
+        warnings: ["careful"],
+        pretty: rows("row"),
+        footer: "See also",
+      });
+    });
+
+    expect(cmd.printed).toEqual(["row"]);
+    expect(cmd.aside).toEqual(["Warning: careful", "\nSee also"]);
+  });
+
   it("carries a reported warning into the envelope", async () => {
     const cmd = makeCommand();
     reportWarning("reported early");
 
-    const envelope = await cmd.finish({ status: "ok", data: {}, warnings: ["from result"] });
+    const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: {},
+      warnings: ["from result"],
+    });
 
     expect(envelope).toMatchObject({ warnings: ["reported early", "from result"] });
   });
@@ -91,7 +132,12 @@ describe("BaseCommand warnings", () => {
     const cmd = makeCommand();
     reportWarning("reported early");
 
-    await cmd.finish({ status: "ok", data: {}, pretty: prose("Done") });
+    await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: {},
+      pretty: prose("Done"),
+    });
 
     expect(cmd.printed).toEqual(["Done"]);
   });
@@ -100,7 +146,11 @@ describe("BaseCommand warnings", () => {
     const cmd = makeCommand();
     reportWarning("reported early");
 
-    const envelope = await cmd.finish({ status: "skipped", reason: "dry-run" });
+    const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "skipped",
+      reason: "dry-run",
+    });
 
     expect(envelope).toMatchObject({ status: "skipped", warnings: ["reported early"] });
   });
@@ -108,7 +158,11 @@ describe("BaseCommand warnings", () => {
   it("leaves a skipped envelope without warnings when none were reported", async () => {
     const cmd = makeCommand();
 
-    const envelope = await cmd.finish({ status: "skipped", reason: "dry-run" });
+    const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
+      status: "skipped",
+      reason: "dry-run",
+    });
 
     expect(envelope).not.toHaveProperty("warnings");
   });

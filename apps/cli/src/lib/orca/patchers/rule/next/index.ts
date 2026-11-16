@@ -110,9 +110,9 @@ export class NextPatcher extends AbstractRulePatcher {
     // (see nextCodeOps).
     return [
       join(view.framework.appDir, "page.tsx"),
-      ...routeTitles(getRenderer(view.rendererId)).map((route) =>
-        join(view.framework.appDir, `${route.segment}/layout.tsx`),
-      ),
+      ...routeTitles(getRenderer(view.rendererId)).map((route) => {
+        return join(view.framework.appDir, `${route.segment}/layout.tsx`);
+      }),
     ];
   }
 
@@ -218,7 +218,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       ? {
           kind: "edit",
           path: join(appDir, "page.tsx"),
-          edit: () => homePageTemplate(),
+          edit: () => {
+            return homePageTemplate();
+          },
           // Replaces create-next-app's default homepage wholesale; the
           // missing-only repair path must not replay it over user content.
           overwrites: true,
@@ -240,13 +242,13 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     // Fresh apps only: create-next-app's root layout titles every page
     // "Create Next App", while an existing app has titles of its own and may
     // have a layout beside a route already.
-    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map(
-      (route): FileOp => ({
+    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map((route): FileOp => {
+      return {
         kind: "write",
         path: join(appDir, `${route.segment}/layout.tsx`),
         contents: routeLayoutTemplate(route.title),
-      }),
-    ),
+      };
+    }),
     {
       kind: "write",
       path: join(appDir, `../${boundary.filename}`),
@@ -273,7 +275,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
     devScriptPortOp(ctx.issuer),
-  ].filter((op): op is FileOp => op !== undefined);
+  ].filter((op): op is FileOp => {
+    return op !== undefined;
+  });
 }
 
 /**
@@ -362,7 +366,7 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
       `${existing} aside and rerun setup, then merge it into ${target}.`;
   return new ZitadelError(
     "E_CONFLICT",
-    `Next.js 16 won't start with both ${existing} and the ${target} setup writes`,
+    `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
     { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
   );
 }

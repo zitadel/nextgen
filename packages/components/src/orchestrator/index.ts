@@ -46,6 +46,7 @@ export { createSanitiser } from "./sanitiser.js";
 export const defaultTemplate: string = defaultTemplateSource;
 export const layoutChromeCss: string = layoutChromeCssSource;
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
+export { solveSignupPow } from "./signup-pow.js";
 export {
   validateBranding,
   type BrandingValidationContext,

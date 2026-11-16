@@ -45,7 +45,7 @@ const ACCENT_TAB = "data-[state=active]:bg-accent";
  * button of its own.
  *
  * `cliHint={false}` is the full-size viewer around a record rather than
- * configuration (an event on the Logs screen): nothing deploys it, so it has
+ * configuration (an event on the Events screen): nothing deploys it, so it has
  * no hint either.
  */
 export function DocumentViewer({

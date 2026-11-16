@@ -2,8 +2,13 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { User } from "lucide-react";
 import { useState } from "react";
 import { DeleteUserDialog } from "@/features/users/components/delete-user-dialog";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import {
+  DETAIL_BODY,
+  DETAIL_CARD,
+  DETAIL_STACK,
+  DetailHeader,
+  DetailSection,
+} from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +20,7 @@ import { UserAuthentication } from "@/features/users/components/user-authenticat
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
 import {
+  hasNoSignInMethod,
   userAttributes,
   userIdentity,
   userIdentitySecondary,
@@ -29,7 +35,7 @@ import { UserProfileCard } from "@/features/users/components/user-profile-card";
  * markup. Rather than render labels with nothing behind them, each is left out
  * and recorded here:
  *
- *   - **Last login** in the header card: no such field anywhere on the user
+ *   - **Last sign-in** on the identity line: no such field anywhere on the user
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
  * The design's "Project permissions" block is not pending — it has been removed
@@ -66,27 +72,24 @@ function UserDetail() {
 
   return (
     <Page>
-      {/* `User`, the sidebar's glyph for Users, as each detail title carries its
-          section's. */}
+      {/* `User`, the sidebar's glyph for Users, as a resource's title tile. */}
       <DetailHeader
         icon={User}
         title={name}
         status={metadata.status && <StatusBadge status={metadata.status} />}
-        subtitle={secondary}
-        meta={
-          <>
-            <MetaValue label="User ID" value={userId} copyable />
-            {metadata.createdAt && (
-              <>
-                <MetaRule />
-                <MetaValue label="Created" value={formatDate(metadata.createdAt)} />
-              </>
-            )}
-          </>
-        }
+        meta={[
+          // The identifier under a display name, as the design's email; a user
+          // titled by the identifier has nothing to repeat here.
+          { label: "Identifier", value: secondary, labelHidden: true },
+          { label: "User ID", value: userId, copyable: true },
+          {
+            label: "Created",
+            value: metadata.createdAt ? formatDate(metadata.createdAt) : undefined,
+          },
+        ]}
       />
 
-      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} gap-6`}>
+      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
@@ -98,7 +101,7 @@ function UserDetail() {
           value="overview"
           forceMount
           hidden={tab !== "overview"}
-          className="flex flex-col gap-6"
+          className={DETAIL_STACK}
         >
           <UserProfileCard
             // The route reuses this for the next user: a save's error stays with its own.
@@ -140,7 +143,13 @@ function UserDetail() {
         </TabsContent>
 
         <TabsContent value="authentication">
-          <DetailSection title="Authentication">
+          <DetailSection
+            title="Authentication"
+            description={
+              hasNoSignInMethod({ passwordSetAt, passkeys, identityLinks }) &&
+              "This user cannot sign in because no sign-in method is configured."
+            }
+          >
             <UserAuthentication
               passwordSetAt={passwordSetAt}
               passkeys={passkeys}

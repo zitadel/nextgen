@@ -10,7 +10,6 @@ import {
   type SchemaReference,
   schemaReference,
   type StepName,
-  stepName,
 } from "@/lib/zitadel/names";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
@@ -32,8 +31,6 @@ import {
   PASSKEY_ACTION_KINDS,
   PASSWORD_FIELD,
   type PasskeyActionKind,
-  PROVIDER_OUTCOMES,
-  type ProviderOutcome,
   REGISTER_SSO_STEP,
   SSO_CONFLICT_STEP,
 } from "@/lib/zitadel/resources/flows/types";
@@ -88,18 +85,6 @@ export class Flow extends ConfigDocument<FlowValue> {
   static isPasskeyActionKind(kind: string): kind is PasskeyActionKind {
     return PASSKEY_ACTION_KINDS.some((known) => {
       return known === kind;
-    });
-  }
-
-  /**
-   * Whether an outcome is one a provider sign-in ends in.
-   *
-   * @param outcome - The outcome, as a transition names it.
-   * @returns Whether it is one of {@link PROVIDER_OUTCOMES}.
-   */
-  static isProviderOutcome(outcome: string): outcome is ProviderOutcome {
-    return PROVIDER_OUTCOMES.some((known) => {
-      return known === outcome;
     });
   }
 
@@ -218,11 +203,10 @@ export class Flow extends ConfigDocument<FlowValue> {
   /**
    * Whether the flow can sign anyone in.
    *
-   * @returns True when it is `active`, the only status that is served, and has
-   *   a `login` entry.
+   * @returns True when it has a `login` entry.
    */
   get servesLogin(): boolean {
-    return this.value.status === "active" && this.value.purposes.login !== undefined;
+    return this.value.purposes.login !== undefined;
   }
 
   /**
@@ -257,17 +241,6 @@ export class Flow extends ConfigDocument<FlowValue> {
       return false;
     }
     return PLATFORM_SCHEMA_ID.test(reference) || SCHEMA_URL.test(reference);
-  }
-
-  /**
-   * The steps the flow starts at, one per purpose.
-   *
-   * @returns The entry step names, in the order the purposes are written.
-   */
-  get entrySteps(): readonly StepName[] {
-    return Object.values(this.value.purposes).map((entry) => {
-      return stepName(entry);
-    });
   }
 
   /**

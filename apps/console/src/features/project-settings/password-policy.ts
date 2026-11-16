@@ -5,7 +5,10 @@ import type { ListPolicies200PoliciesItem } from "@zitadel/api/generated/model";
  * the `auth.factor.password.set` revision the release on the primary origins
  * pins, every setting optional and unenforced when left out.
  */
-export type PasswordPolicyConfig = ListPolicies200PoliciesItem["config"];
+export type PasswordPolicyConfig = Extract<
+  ListPolicies200PoliciesItem,
+  { operation: "auth.factor.password.set" }
+>["config"];
 
 /** What the password policy enforces, as the project page states it. */
 export interface PasswordRequirements {

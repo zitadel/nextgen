@@ -20,17 +20,19 @@ import (
 // checks and writes, not about hashing.
 type plainHasher struct{}
 
-func (plainHasher) Hash(password string) (string, error) { return "plain$" + password, nil }
+func (plainHasher) Hash(_ context.Context, password string) (string, error) {
+	return "plain$" + password, nil
+}
 
-func (plainHasher) VerifyHash(encoded, password string) error {
+func (plainHasher) VerifyHash(_ context.Context, encoded, password string) error {
 	if encoded == "plain$"+password {
 		return nil
 	}
 	return crypto.ErrHashMismatch
 }
 
-func (h plainHasher) VerifyAndRehash(encoded, password string) (string, error) {
-	return "", h.VerifyHash(encoded, password)
+func (h plainHasher) VerifyAndRehash(ctx context.Context, encoded, password string) (string, error) {
+	return "", h.VerifyHash(ctx, encoded, password)
 }
 
 // Two self-service changes to the same new password are both checked against

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // tsc reads sdk-core's source (the `@zitadel/source` condition); this edge
+    // puts it in the task's hash.
+    "typecheck": {
+      "dependsOn": ["@zitadel/sdk-core#build"]
+    }
+  }
+}

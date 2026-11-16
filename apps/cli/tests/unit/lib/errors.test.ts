@@ -6,12 +6,12 @@ import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
+  failureText,
   isCancellation,
   isErrno,
   toZitadelError,
 } from "@/lib/errors";
 import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
-import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -38,7 +38,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
+      nextCommands: [{ id: "doctor" }, { id: "setup" }],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -46,7 +46,7 @@ describe("ZitadelError", () => {
     expect(err.message).toBe("boom");
     expect(err.code).toBe("E_CONFLICT");
     expect(err.hint).toBe("try again");
-    expect(err.nextCommands).toEqual(["zitadel doctor", "zitadel init"]);
+    expect(err.nextCommands).toEqual([{ id: "doctor" }, { id: "setup" }]);
     expect(err.details).toEqual({ field: "x" });
   });
 
@@ -593,5 +593,63 @@ describe("isCancellation", () => {
     expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
     expect(isCancellation(new Error("Cancelled."))).toBe(false);
     expect(isCancellation(undefined)).toBe(false);
+  });
+});
+
+// Every failure the CLI reports is one grammar: `Error: <sentence> (E_CODE)`,
+// said once, with the sentence the envelope's `message` carries.
+describe("a failure as a person is shown it", () => {
+  describe("an ordinary message", () => {
+    it.each([
+      ["variable not found"],
+      ["release: still served by an origin"],
+      ["npm install failed"],
+      ["http://localhost:9/users/query got no response"],
+      ["usr_1 was not found on the project"],
+      [".zitadel/state.json could not be read"],
+      ["--client-id was given an empty value"],
+      ["POST http://localhost:9/users/query got no response"],
+    ])("leaves %j exactly as it was thrown", (message) => {
+      expect(failureText(message).sentence).toBe(message);
+    });
+  });
+
+  describe("oclif's own rendering of a refused command line", () => {
+    const refused =
+      "The following error occurred:\n  Missing required flag kind\nSee more help with --help";
+
+    it("states the reason as the one sentence, without oclif's heading", () => {
+      expect(failureText(refused).sentence).toBe("Missing required flag kind");
+    });
+
+    it("says the command line was refused, so --help can be offered under Next:", () => {
+      expect(failureText(refused).misuse).toBe(true);
+    });
+
+    it("drops oclif's own help footer, which nothing else writes", () => {
+      expect(failureText(refused).sentence).not.toContain("--help");
+    });
+
+    it("joins the reasons when the command line was wrong in more than one way", () => {
+      const both =
+        "The following errors occurred:\n  Missing required flag kind\n  Missing required flag pattern\nSee more help with --help";
+
+      expect(failureText(both).sentence).toBe(
+        "Missing required flag kind; Missing required flag pattern",
+      );
+    });
+
+    it("names what a heading introduces on the heading's own line", () => {
+      const missing = "Missing 1 required arg:\nurl  the origin to add\nSee more help with --help";
+
+      expect(failureText(missing).sentence).toBe("Missing 1 required arg: url");
+    });
+
+    it("leaves an ordinary failure's own lines alone", () => {
+      expect(failureText("Bad port\nUse 1 to 65535.")).toEqual({
+        sentence: "Bad port\nUse 1 to 65535.",
+        misuse: false,
+      });
+    });
   });
 });

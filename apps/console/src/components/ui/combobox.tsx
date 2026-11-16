@@ -1,6 +1,6 @@
 import { Check, ChevronDown, X } from "lucide-react";
 import type * as React from "react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -9,9 +9,11 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemText,
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /**
@@ -47,12 +49,16 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-input/50 opacity-50 dark:bg-inpu
 const TRIGGER_INVALID =
   "border-destructive ring-destructive/20 dark:ring-destructive/40 aria-invalid:ring-[3px]";
 
-const LIST = "w-(--radix-popover-trigger-width) rounded-md border-foreground/10 p-0";
+/** The list's popover without its width, for a menu drawn like it (`ResourceFilter`). */
+export const COMBOBOX_SURFACE = "rounded-md border-foreground/10 p-0";
+const LIST = `w-(--radix-popover-trigger-width) ${COMBOBOX_SURFACE}`;
 
 // One-line is 32px; two-line stacks a 14px label over a 12px description and
 // measures 48px.
 const ITEM_SIMPLE = "h-8 gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
+/** A row of any height, for a menu drawn like this list. */
+export const COMBOBOX_ROW = ITEM_CUSTOM;
 // cmdk marks an item active as soon as the list mounts, but every state of
 // the design's menu item renders transparent — a resting list must not paint a
 // filled row, so the fill is suppressed until the operator points or arrows.
@@ -188,12 +194,20 @@ export interface ComboboxOption {
   description?: string;
   /** Optional leading glyph for the row. */
   icon?: ReactNode;
+  /**
+   * Draws the label as a tinted chip, with the description beside it on one
+   * line: for a row that is no value itself but stands for a set of the rows
+   * under it, so it is not read as one more of them.
+   */
+  chip?: "destructive" | "warning" | "secondary";
 }
 
 /** A run of rows under a caption, as the design's menu label draws it. */
 export interface ComboboxGroup {
   heading?: string;
   options: ComboboxOption[];
+  /** A hairline under the group, setting it apart from the groups that follow. */
+  ruled?: boolean;
 }
 
 /**
@@ -314,48 +328,53 @@ export function ComboboxContent({
             <CommandEmpty>{emptyLabel}</CommandEmpty>
           )}
           {sections.map((group, index) => (
-            <CommandGroup key={group.heading ?? index} heading={group.heading} className={GROUP}>
-              {group.options.map((option) => {
-                const isSelected = selected.includes(option.value);
-                return (
-                  <CommandItem
-                    key={option.value}
-                    // The value is cmdk's name for the row, so it must be unique:
-                    // two schemas or projects may share a label. Search matches
-                    // the label and the description, so typing a property name
-                    // finds the schemas that collect it.
-                    value={option.value}
-                    keywords={
-                      option.description ? [option.label, option.description] : [option.label]
-                    }
-                    className={cn(
-                      option.description ? ITEM_CUSTOM : ITEM_SIMPLE,
-                      !navigating && ITEM_RESTING,
-                      isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
-                    )}
-                    onSelect={() => {
-                      onSelect(option.value);
-                      if (closeOnSelect) onClose();
-                    }}
-                  >
-                    {option.icon}
-                    {option.description ? (
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate font-medium">{option.label}</span>
-                        <span className="truncate text-xs leading-4 text-muted-foreground">
-                          {option.description}
+            <Fragment key={group.heading ?? index}>
+              <CommandGroup heading={group.heading} className={GROUP}>
+                {group.options.map((option) => {
+                  const isSelected = selected.includes(option.value);
+                  return (
+                    <CommandItem
+                      key={option.value}
+                      // The value is cmdk's name for the row, so it must be unique:
+                      // two schemas or projects may share a label. Search matches
+                      // the label and the description, so typing a property name
+                      // finds the schemas that collect it.
+                      value={option.value}
+                      keywords={
+                        option.description ? [option.label, option.description] : [option.label]
+                      }
+                      className={cn(
+                        option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
+                        !navigating && ITEM_RESTING,
+                        isSelected && indicator === "fill" && "bg-accent text-accent-foreground",
+                      )}
+                      onSelect={() => {
+                        onSelect(option.value);
+                        if (closeOnSelect) onClose();
+                      }}
+                    >
+                      {option.icon}
+                      {option.chip ? (
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <Badge variant={option.chip}>{option.label}</Badge>
+                          {option.description && (
+                            <span className="truncate text-xs text-muted-foreground">
+                              {option.description}
+                            </span>
+                          )}
                         </span>
-                      </span>
-                    ) : (
-                      <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                    )}
-                    {isSelected && indicator === "check" && (
-                      <Check className="absolute right-2 size-4" aria-hidden />
-                    )}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
+                      ) : (
+                        <CommandItemText label={option.label} description={option.description} />
+                      )}
+                      {isSelected && indicator === "check" && (
+                        <Check className="absolute right-2 size-4" aria-hidden />
+                      )}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+              {group.ruled && <CommandSeparator className="bg-foreground/10" />}
+            </Fragment>
           ))}
           {footer && (
             <>

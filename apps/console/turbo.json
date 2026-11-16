@@ -37,17 +37,12 @@
       "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
     },
-    // The release UI build consumes the package release output and runs after
-    // the public packages' release builds (tools/release/turbo.json). It
-    // bundles the dist of sdk-react and components; sdk-react's release build
-    // reaches components'.
-    "build-release": {
-      "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
-      "env": ["CONSOLE_BASE_PATH", "CONSOLE_ADDON", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
-      "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
-    },
     "test": {
       "dependsOn": ["build"]
+    },
+    // The build's directory, outside the package; its committed .gitkeep stays.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../api/internal/staticui/console/dist", ".vitest", "test-output"]
     },
     // The dev servers and the preview are not cached, and the console's own
     // CONSOLE_* variables pass through to them: strict mode would hide them,
@@ -61,10 +56,10 @@
     },
     // Real-data dev loop: boots a seeded ephemeral instance through the built
     // CLI, then the dev server against it. scripts/dev-real.mts builds the
-    // server itself, because in moon's project graph that dependency would
-    // cycle (the server embeds the console); turbo has no project graph, so
-    // here the server build is an explicit dependency too. Native Go commands
-    // run when selected; Go's own cache keeps a repeated build incremental.
+    // server itself, and the server build is an explicit dependency here
+    // too: turbo's edges join tasks, not packages, so it does not cycle
+    // although the server embeds the console. Native Go commands run when
+    // selected; Go's own cache keeps a repeated build incremental.
     "dev:real": {
       "cache": false,
       "persistent": true,

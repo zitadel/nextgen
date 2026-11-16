@@ -10,7 +10,6 @@ allOf:
     properties:
       link:
         type: string
-        format: uri
         description: |
           The browser URL to share. It carries the redeem token in the fragment.
           Only this create or replace response returns it.

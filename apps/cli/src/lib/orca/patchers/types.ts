@@ -56,7 +56,20 @@ export type PatchContext = PatchView &
      * that existed before the record, so legacy restores stay full-page.
      */
     posture?: ScaffoldPosture;
+    /**
+     * `ZITADEL_URL` as `.env.development.local` holds it, which `doctor`
+     * reads so a repair never moves an app onto a server the file names
+     * (`AbstractRulePatcher.developmentServerUrl`). Setup leaves it out.
+     */
+    developmentServerUrl?: string;
   }>;
+
+/**
+ * `ZITADEL_URL` as a Vite app's development env files give it once setup's
+ * base ops ran: the value `file` holds when `held`, or the one the ops are
+ * about to write there. `value` may be empty.
+ */
+export type DevelopmentServerUrl = Readonly<{ value: string; file: string; held: boolean }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
 export type PatchExecOptions = Readonly<{
@@ -121,8 +134,9 @@ export type PatchResult = Readonly<{
  * - `envBackups` — env files renamed to a timestamped backup rather than deleted.
  * - `dependencies` — package-manager dependencies the integration added.
  *   `eject` does NOT modify `package.json` (the lockfile and other deps might
- *   conflict), but surfaces an `npm uninstall <name>` line in `next_commands`
- *   so the user can finish the revert manually.
+ *   conflict), but suggests removing each in `next_commands`, with the project's own
+ *   package manager (`pnpm remove <name>`), so the user can finish the revert
+ *   manually.
  * - `configEdits` — user config files the integration merged into via an `edit`
  *   op (e.g. `vite.config.ts`, `angular.json`, `nuxt.config.ts`). `eject` cannot
  *   reverse an in-place merge, so it surfaces these as manual cleanup steps

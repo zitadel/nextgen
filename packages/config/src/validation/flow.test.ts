@@ -32,7 +32,6 @@ type TestStep = {
 
 type TestFlow = {
   name: string;
-  status: string;
   user_schema: string;
   purposes: Record<string, string>;
   steps: Array<Partial<TestStep> & { name: string }>;
@@ -836,7 +835,6 @@ describe("schema-dependent rules", () => {
     // but no step on its path collects an identifier-challenge field.
     const def = {
       name: "register-only",
-      status: "active",
       user_schema: "sch_x",
       purposes: { register: "register-password" },
       steps: [
@@ -902,7 +900,6 @@ describe("warn/password-without-identifier", () => {
     // still cannot resolve which user to challenge.
     const def = {
       name: "login",
-      status: "active",
       user_schema: "sch_x",
       purposes: { login: "quick", register: "register" },
       steps: [
@@ -940,7 +937,6 @@ describe("warn/password-without-identifier", () => {
   it("does not warn for a password step reached only through a user_already_exists collision", () => {
     const def = {
       name: "login",
-      status: "active",
       user_schema: "sch_x",
       purposes: { login: "start" },
       steps: [

@@ -101,6 +101,7 @@ export {
   startFlow,
   submitStep,
   getCurrentStep,
+  solveSignupPow,
   publishedSides,
   resolveLogoUrl,
   type Branding,

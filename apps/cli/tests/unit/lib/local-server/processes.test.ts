@@ -73,6 +73,23 @@ describe("discoverManagedRuntimeProcesses", () => {
     });
   });
 
+  it("reports a process's command without the environment it ran with", async () => {
+    whenPs((args) => {
+      if (args[0] === "axo") {
+        return " 678 1 /usr/local/bin/nextgen --serve\n";
+      }
+      return args[0] === "eww"
+        ? "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen --serve npm_config__authToken=s3cret"
+        : "/usr/local/bin/nextgen --serve";
+    });
+
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery.processes.map((processInfo) => processInfo.command)).toEqual([
+      "/usr/local/bin/nextgen --serve",
+    ]);
+  });
+
   it("reports unsupported discovery instead of throwing", async () => {
     const enoent: NodeJS.ErrnoException = Object.assign(new Error("spawn ps ENOENT"), {
       code: "ENOENT",

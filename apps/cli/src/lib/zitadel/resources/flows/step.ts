@@ -1,4 +1,4 @@
-import { type PropertyPath, type StepName, stepName } from "@/lib/zitadel/names";
+import { type StepName, stepName } from "@/lib/zitadel/names";
 import {
   COLLISION_OUTCOME,
   type RouteValue,
@@ -131,19 +131,6 @@ export class Step {
    */
   get collisionCarriesAction(): boolean {
     return Step.crossFlowAction(this.routesByOutcome[COLLISION_OUTCOME]) !== undefined;
-  }
-
-  /**
-   * Whether the step asks for a property, or for something inside it, or for
-   * the object it sits in.
-   *
-   * @param path - The property's dotted path.
-   * @returns Whether a field covers it.
-   */
-  asksFor(path: PropertyPath): boolean {
-    return this.fields.some((field) => {
-      return field === path || field.startsWith(`${path}.`) || path.startsWith(`${field}.`);
-    });
   }
 
   /**

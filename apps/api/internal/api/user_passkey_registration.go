@@ -9,10 +9,10 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// BeginUserPasskeyRegistration starts a management-plane enrollment ceremony.
+// CreateUserPasskeyRegistration starts a management-plane enrollment ceremony.
 // The between-steps state rides an internal auth attempt (ADR 056) the
 // service orchestrates; it can never be read, handed off, or exchanged.
-func (h *Handler) BeginUserPasskeyRegistration(ctx context.Context, req *api.BeginUserPasskeyRegistrationRequest, params api.BeginUserPasskeyRegistrationParams) (api.BeginUserPasskeyRegistrationRes, error) {
+func (h *Handler) CreateUserPasskeyRegistration(ctx context.Context, req *api.BeginUserPasskeyRegistrationRequest, params api.CreateUserPasskeyRegistrationParams) (api.CreateUserPasskeyRegistrationRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
 	if err != nil {
 		return nil, err
@@ -40,9 +40,9 @@ func (h *Handler) BeginUserPasskeyRegistration(ctx context.Context, req *api.Beg
 	}, nil
 }
 
-// FinishUserPasskeyRegistration verifies the attestation and persists the new
+// CompleteUserPasskeyRegistration verifies the attestation and persists the new
 // credential; the service consumes the ceremony atomically.
-func (h *Handler) FinishUserPasskeyRegistration(ctx context.Context, req *api.FinishUserPasskeyRegistrationRequest, params api.FinishUserPasskeyRegistrationParams) (api.FinishUserPasskeyRegistrationRes, error) {
+func (h *Handler) CompleteUserPasskeyRegistration(ctx context.Context, req *api.FinishUserPasskeyRegistrationRequest, params api.CompleteUserPasskeyRegistrationParams) (api.CompleteUserPasskeyRegistrationRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
 	if err != nil {
 		return nil, err

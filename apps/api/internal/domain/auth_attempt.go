@@ -101,6 +101,10 @@ type AuthAttempt struct {
 	// attempt ops; empty when create did not resolve a deployment.
 	DeploymentID string
 	ReleaseID    string
+
+	// FlowID is the login flow that created the attempt, so the handoff
+	// exchange can stamp it on the events it writes; empty outside a flow.
+	FlowID string
 }
 
 const AuthAttemptTTL = 15 * time.Minute
@@ -219,6 +223,16 @@ func (a *AuthAttempt) hasVerifiedCredential() bool {
 // IsHandedOff returns true if a handoff token has been generated.
 func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
+}
+
+// ResolvedUserID is the user the attempt has identified, from its verified
+// user factor; empty until an identifier resolved to one.
+func (a *AuthAttempt) ResolvedUserID() string {
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if !ok {
+		return ""
+	}
+	return userCheck.UserID
 }
 
 // FactorByClass returns a verified factor whose type competes in typ's class

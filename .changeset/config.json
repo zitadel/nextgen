@@ -45,6 +45,8 @@
     "@zitadel/api-mock",
     "@zitadel/cloud-console",
     "@zitadel/cloud-functions",
+    "@zitadel/conformance",
+    "@zitadel/conformance-*",
     "@zitadel/console",
     "@zitadel/e2e",
     "@zitadel/demo-next",

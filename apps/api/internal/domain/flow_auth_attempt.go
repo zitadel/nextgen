@@ -54,6 +54,7 @@ type FlowAuthAttemptService interface {
 // default when pinned.
 type FlowCreateAttemptInput struct {
 	ProjectID      string
+	FlowID         string
 	SessionID      *string
 	RequiredChecks []AuthCheckType
 }
@@ -62,12 +63,15 @@ type FlowCreateAttemptInput struct {
 // (AttributeName, e.g. "email") and the user-entered value the
 // auth-attempt service resolves to a user. UserSchemaURL is the schema the
 // flow is bound to: the lookup matches only users of its revisions.
+// Register is set when the flow is signing someone up: the lookup then asks
+// whether the identifier is free, and no match is not a failed sign-in.
 type FlowSubmitIdentifierInput struct {
 	ProjectID     string
 	AttemptID     string
 	AttributeName string
 	Value         string
 	UserSchemaURL string
+	Register      bool
 }
 
 type FlowSubmitPasswordInput struct {
@@ -133,7 +137,9 @@ type FlowPasskeyRegistrationChallengeOutput struct {
 // FlowSubmitPasskeyRegistrationInput carries the attestation plus the
 // ChallengeID returned by IssuePasskeyRegistrationChallenge. UserSchemaURL
 // and UserAttributes feed the user creation that runs inside the verify
-// transaction when the ceremony is provisional.
+// transaction when the ceremony is provisional. That creation is a sign-up:
+// it first spends the proof submitted under [SignupGate] in GateProofs,
+// bound to the flow in State.
 type FlowSubmitPasskeyRegistrationInput struct {
 	ProjectID      string
 	AttemptID      string
@@ -142,6 +148,8 @@ type FlowSubmitPasskeyRegistrationInput struct {
 	Attestation    []byte
 	UserSchemaURL  string
 	UserAttributes map[string]any
+	State          *FlowState
+	GateProofs     map[string]string
 }
 
 type FlowHandoffInput struct {

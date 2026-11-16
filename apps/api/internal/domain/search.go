@@ -2,8 +2,10 @@ package domain
 
 import (
 	"cmp"
+	"net/url"
 	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -78,6 +80,20 @@ func IsSearchID(prefix ResourcePrefix, query string) bool {
 		}
 	}
 	return true
+}
+
+// IsSearchSchemaID reports whether query has the shape of a schema's id: one
+// the server minted (see [IsSearchID]), or the absolute URI a schema document
+// names as its `$id`. Other text is not worth a read by id.
+func IsSearchSchemaID(query string) bool {
+	if IsSearchID(PrefixJSONSchema, query) {
+		return true
+	}
+	if strings.ContainsFunc(query, unicode.IsSpace) {
+		return false
+	}
+	uri, err := url.Parse(query)
+	return err == nil && uri.Scheme != "" && (uri.Host != "" || uri.Opaque != "")
 }
 
 // RankSearchText is the best match of query among values, ignoring case.

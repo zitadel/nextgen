@@ -22,6 +22,9 @@ var defaultLoginFlowDefinition []byte
 //go:embed default-password-policy.json
 var defaultPasswordPolicy []byte
 
+//go:embed default-user-create-policy.json
+var defaultUserCreatePolicy []byte
+
 //go:embed README-schemas.md
 var schemasReadme []byte
 
@@ -42,6 +45,15 @@ func DefaultLoginFlowDefinition() []byte {
 // the one `setup` writes when given no minimum, and the platform project's.
 func DefaultPasswordPolicy() []byte {
 	return append([]byte(nil), defaultPasswordPolicy...)
+}
+
+// DefaultUserCreatePolicy returns a copy of the free sign-up protection every
+// project starts with: the guard's own built-in challenge, written down as a
+// policy (ADR 088 §5). `setup` writes it and the platform project deploys
+// it; a server test keeps it equal to the guard, so deleting it loosens
+// nothing.
+func DefaultUserCreatePolicy() []byte {
+	return append([]byte(nil), defaultUserCreatePolicy...)
 }
 
 // SchemasReadme returns the README content the CLI copies to

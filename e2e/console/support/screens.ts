@@ -20,7 +20,7 @@ export async function expectNoErrorBoundary(page: Page): Promise<void> {
  * it with its name field and submit button.
  */
 export async function openAddTeam(page: Page) {
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add team", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add team" });
   await expect(drawer).toBeVisible();
   return {

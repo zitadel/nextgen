@@ -51,6 +51,20 @@ func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID, _ 
 	return slices.Contains(s.granted, projectID), nil
 }
 
+func (s stubAuthzStmts) CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error) {
+	results := make([]domain.AuthzCheckResult, len(projectIDs))
+	for i, projectID := range projectIDs {
+		p := params
+		p.ProjectID = projectID
+		allowed, foothold, err := s.CheckAuthz(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = domain.AuthzCheckResult{Allowed: allowed, Foothold: foothold}
+	}
+	return results, nil
+}
+
 func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
 	foothold, err := s.HasAuthzProjectFoothold(ctx, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	if err != nil {

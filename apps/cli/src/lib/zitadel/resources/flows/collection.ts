@@ -1,15 +1,12 @@
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { NotFoundError } from "@/lib/zitadel/errors";
-import { type PropertyPath, propertyName, propertyPath, type StepName } from "@/lib/zitadel/names";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import { Flow } from "@/lib/zitadel/resources/flows/flow";
-import type { Step } from "@/lib/zitadel/resources/flows/step";
-import type { Offer, PinnedOffer, SignUpGap, Visit } from "@/lib/zitadel/resources/flows/types";
+import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import type { Offer, PinnedOffer } from "@/lib/zitadel/resources/flows/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
-import { walk } from "@/lib/zitadel/utils/graph";
 
 /**
  * The login flows under `.zitadel/flows/`, the user schema each runs against,
@@ -53,32 +50,6 @@ export class Flows extends PinnedCollection<Flow> {
         return [];
       }
       return [{ ...offer, schema }];
-    });
-  }
-
-  /**
-   * Every way someone signing up with a provider reaches a step that creates
-   * their user without having been asked for a required property the
-   * provider does not map.
-   *
-   * @remarks
-   * Walks each flow from its entry steps, one required property at a time. A
-   * step that asks for the property ends that path; a provider outcome
-   * carries the provider that was chosen on to the next step. The engine
-   * keeps every answer given on the way, so a property asked for on an
-   * earlier step counts.
-   *
-   * @returns The gaps.
-   */
-  get signUpGaps(): readonly SignUpGap[] {
-    return this.all.flatMap((flow) => {
-      const schema = this.findSchemaOf(flow);
-      if (schema === undefined) {
-        return [];
-      }
-      return schema.requiredByServer.flatMap((path) => {
-        return this.findGaps(flow, schema, propertyPath(path));
-      });
     });
   }
 
@@ -186,81 +157,5 @@ export class Flows extends PinnedCollection<Flow> {
     }, this.config.with(edited));
     assertFlowsIntact({ before: this.config, after, original: schema, edited });
     return flows;
-  }
-
-  /**
-   * Find the sign-up gaps for one required property of one flow.
-   *
-   * @remarks
-   * A breadth-first walk from the entry steps, which visits each step once
-   * for each provider that can be chosen on the way to it. A step that asks
-   * for the property ends the paths that leave it by submitting, but not the
-   * ones that leave it by a provider outcome, which skip the form.
-   *
-   * @param flow - The flow.
-   * @param schema - The schema it runs against.
-   * @param path - The required property's dotted path.
-   * @returns The gaps.
-   */
-  private findGaps(flow: Flow, schema: UserSchema, path: PropertyPath): readonly SignUpGap[] {
-    const stepNamed = (name: StepName | undefined): Step | undefined => {
-      if (name === undefined) {
-        return undefined;
-      }
-      return flow.findStep(name);
-    };
-    const start = flow.entrySteps.flatMap((name): readonly Visit[] => {
-      const step = stepNamed(name);
-      if (step === undefined) {
-        return [];
-      }
-      return [{ step, provider: undefined }];
-    });
-    const visits = walk(
-      start,
-      (from) => {
-        const asked = from.step.asksFor(path);
-        return from.step.transitions.flatMap((transition): readonly Visit[] => {
-          // A cross-flow transition leaves the flow, so the engine does not
-          // carry a sign-up across it.
-          if (transition.kind !== "step") {
-            return [];
-          }
-          const next = stepNamed(transition.target);
-          if (next === undefined) {
-            return [];
-          }
-          // A provider button skips the form, so the step's own answers
-          // count only for the transitions taken after they are submitted.
-          if (Flow.isProviderOutcome(transition.outcome)) {
-            return from.step.providers.map((provider) => {
-              return { step: next, provider };
-            });
-          }
-          if (asked) {
-            return [];
-          }
-          return [{ step: next, provider: from.provider }];
-        });
-      },
-      (visit) => {
-        return JSON.stringify([visit.step.name, visit.provider ?? ""]);
-      },
-    );
-    const top = propertyName(path.split(".")[0] ?? path);
-    return visits.flatMap((visit): readonly SignUpGap[] => {
-      if (
-        visit.provider === undefined ||
-        !visit.step.createsUserFromSso ||
-        visit.step.asksFor(path)
-      ) {
-        return [];
-      }
-      const connection = this.config.connections.find(visit.provider);
-      if (connection === undefined || !connection.createsUsers || connection.maps(top)) {
-        return [];
-      }
-      return [{ flow, schema, step: visit.step, connection, path }];
-    });
   }
 }

@@ -11,7 +11,9 @@ import { execa } from "execa";
 import pWaitFor from "p-wait-for";
 
 import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
-import { shellCommand } from "@/lib/suggestion";
+import { addCommandFor } from "@/lib/package-manager";
+import { CLI_PACKAGE_NAME } from "@/lib/public-cli";
+import { suggestedCommandOf } from "@/lib/suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
 import type { LogSink } from "@/lib/local-server/server-log";
@@ -28,6 +30,13 @@ const LOG_POLL_MS = 1_000;
 const MIGRATE_FLAG = "--migrate";
 /** What the server binary is called, whatever launched it. */
 const SERVER_PROGRAM = "nextgen";
+
+/**
+ * The reinstall both failures suggest. It is npm whatever the project uses,
+ * since the hints that go with it say npm installs @zitadel/server and its
+ * platform package.
+ */
+const REINSTALL = suggestedCommandOf(addCommandFor("npm", [`${CLI_PACKAGE_NAME}@latest`]));
 
 const require = createRequire(import.meta.url);
 
@@ -95,7 +104,9 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     serverUrl: string;
   }): Promise<Launched<BinaryRuntimeMetadata>> {
     const { spec } = this;
-    const command = BinaryLauncher.available(() => BinaryLauncher.command());
+    const command = BinaryLauncher.available(() => {
+      return BinaryLauncher.command();
+    });
     const env = spec.env ?? EMPTY_ENV;
     await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
     const log = await open(spec.logPath, "a", 0o600);
@@ -240,7 +251,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
+        nextCommands: [REINSTALL],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -342,17 +353,17 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 
   /**
    * Hands `sink` the log file as it is, then each part appended to it, until
-   * `signal` aborts, by default when the CLI is interrupted. The file is
+   * the run's `signal` aborts or the CLI is asked to stop. The file is
    * polled by size: it is appended to by another process, and there is no
    * event to wait on that works on every platform.
    */
   static async followLogs(
     logPath: string,
     sink: LogSink,
-    options: { clock?: Clock; signal?: AbortSignal } = {},
+    options: { clock?: Clock; signal: AbortSignal },
   ): Promise<void> {
     const clock = options.clock ?? realClock;
-    const stop = options.signal ? { signal: options.signal, dispose: () => {} } : stopSignal();
+    const stop = stopSignal(options.signal);
     try {
       const log = new AppendedLog(logPath);
       sink.existing(await log.next());
@@ -420,14 +431,20 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   }
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-  // such as pnpm and moon export), and the server's long path is cut before its name.
-  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => undefined);
+  // such as pnpm export), and the server's long path is cut before its name.
+  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
+    return undefined;
+  });
   if (listing === undefined) {
     return true;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
     const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    const named = match !== null && programs.some((program) => (match[3] ?? "").includes(program));
+    const named =
+      match !== null &&
+      programs.some((program) => {
+        return (match[3] ?? "").includes(program);
+      });
     const ours =
       match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
     return named && ours ? [Number(match[1])] : [];
@@ -444,7 +461,9 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => undefined);
+  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => {
+    return undefined;
+  });
   if (command === undefined) {
     return true;
   }
@@ -481,13 +500,15 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
       );
     });
     // Anything it reports from here on, such as a failed signal, is not the start's to raise.
-    child.on("error", () => undefined);
+    child.on("error", () => {
+      return undefined;
+    });
     child.unref();
     return pid;
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
+      nextCommands: [REINSTALL],
       details: { command, message: errorMessage(error) },
     });
   }
@@ -567,10 +588,17 @@ function signalRuntime(
  * process's child, so there is no exit event to wait on.
  */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const gone = () => !BinaryLauncher.isRunning(pid);
+  const gone = () => {
+    return !BinaryLauncher.isRunning(pid);
+  };
   await pWaitFor(gone, {
     interval: 200,
-    timeout: { milliseconds: timeoutMs, fallback: () => undefined },
+    timeout: {
+      milliseconds: timeoutMs,
+      fallback: () => {
+        return undefined;
+      },
+    },
   });
   return gone();
 }

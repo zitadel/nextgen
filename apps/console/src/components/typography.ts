@@ -1,7 +1,10 @@
 /** A screen's title: the 24/24 display face. */
 export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
 
-/** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
+/**
+ * The row a list, settings or System screen's title sits in (`docs/styling.md`,
+ * "Page wrapper"). A detail screen's `DetailHeader` has its own 24px title row.
+ */
 export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
 
 /**
@@ -12,6 +15,12 @@ export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
  * screen uses it.
  */
 export const SECTION_HEADING = "text-foreground font-serif text-base leading-5";
+
+/**
+ * A heading inside a card body, under its `SECTION_HEADING`: the 14/20
+ * display face (Figma text style `zitadel/subsection-heading`).
+ */
+export const SUBSECTION_HEADING = "text-foreground font-serif text-sm leading-5";
 
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";

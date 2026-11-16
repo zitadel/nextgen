@@ -13,6 +13,7 @@ import {
   DETAIL_CARD,
   DETAIL_TITLE,
   DetailRow,
+  DetailRows,
   FormError,
   PAGE_TITLE_ROW,
   PANEL_BODY_CELL,
@@ -110,31 +111,33 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
         description={`The plan and usage for ${period(team.period)}.`}
       >
         <SettingsCard>
-          <DetailRow label="Plan" align="center">
-            <span className="flex items-center gap-2 text-sm">
-              {team.plan.name}
-              <Badge variant="secondary">
-                {money(team.plan.base_amount, team.plan.currency)} / month
-              </Badge>
-            </span>
-          </DetailRow>
-          {team.usage.map((line) => (
-            <DetailRow key={line.metric} label={line.label} align="center" divider>
-              <span className="text-sm">
-                {line.used.toLocaleString()}
-                {line.included === undefined
-                  ? ""
-                  : ` of ${line.included.toLocaleString()} included`}
+          <DetailRows>
+            <DetailRow label="Plan" align="center">
+              <span className="flex items-center gap-2 text-sm">
+                {team.plan.name}
+                <Badge variant="secondary">
+                  {money(team.plan.base_amount, team.plan.currency)} / month
+                </Badge>
               </span>
             </DetailRow>
-          ))}
-          <DetailRow label="Payment method" align="center" divider>
-            <span className="text-sm">
-              {team.payment_method
-                ? `${team.payment_method.brand} ending in ${team.payment_method.last4}`
-                : "None yet"}
-            </span>
-          </DetailRow>
+            {team.usage.map((line) => (
+              <DetailRow key={line.metric} label={line.label} align="center">
+                <span className="text-sm">
+                  {line.used.toLocaleString()}
+                  {line.included === undefined
+                    ? ""
+                    : ` of ${line.included.toLocaleString()} included`}
+                </span>
+              </DetailRow>
+            ))}
+            <DetailRow label="Payment method" align="center">
+              <span className="text-sm">
+                {team.payment_method
+                  ? `${team.payment_method.brand} ending in ${team.payment_method.last4}`
+                  : "None yet"}
+              </span>
+            </DetailRow>
+          </DetailRows>
           <div className="flex flex-col gap-2 py-4">
             <FormError message={error} />
             <div className="flex justify-end gap-2">

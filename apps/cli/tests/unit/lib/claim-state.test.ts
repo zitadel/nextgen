@@ -8,10 +8,10 @@ import {
   claimWindowDeadline,
   isAttached,
 } from "@/lib/claim-state";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /** A run that named no environment, so its suggestions carry no selector. */
-const NO_SELECTOR = environmentSelectorSuffix({});
+const SUGGEST = aSuggest();
 
 const ATTACHED = { claimed_at: "2026-08-01T10:00:00.000Z", team_id: "team-001" };
 const DETACHED = {};
@@ -105,25 +105,21 @@ describe("claim copy", () => {
   // after the window. "lost", deliberately not "deleted"/"removed": the copy
   // warns about the outcome without promising a mechanism.
   it("names the window and the data-loss stake", () => {
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("within 14 days of creation");
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("its data may be lost");
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).not.toMatch(/delete|removed|expire/i);
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("npx @zitadel/cli@0.1.0 claim");
+    expect(claimAction(SUGGEST, undefined)).toContain("within 14 days of creation");
+    expect(claimAction(SUGGEST, undefined)).toContain("its data may be lost");
+    expect(claimAction(SUGGEST, undefined)).not.toMatch(/delete|removed|expire/i);
+    expect(claimAction(SUGGEST, undefined)).toContain("npx @zitadel/cli@0.1.0 claim");
   });
 
   it("names the concrete deadline when the creation time is known", () => {
-    const withDeadline = claimAction(
-      "0.1.0",
-      claimWindowDeadline("2026-09-04T10:00:00.000Z"),
-      NO_SELECTOR,
-    );
-    expect(withDeadline).toContain("Claim your Project before ");
+    const withDeadline = claimAction(SUGGEST, claimWindowDeadline("2026-09-04T10:00:00.000Z"));
+    expect(withDeadline).toContain("Claim your project before ");
     expect(withDeadline).toContain("2026");
     expect(withDeadline).not.toContain("within 14 days of creation");
   });
 
   it("boxes the same nudge with the command pulled out of the prose", () => {
-    const box = claimBoxAction("0.1.0", undefined, NO_SELECTOR);
+    const box = claimBoxAction(SUGGEST, undefined);
     expect(box.command).toBe("npx @zitadel/cli@0.1.0 claim");
     expect(box.text).toContain("temporary and its data may be lost");
     expect(box.text).not.toContain("npx");
@@ -134,20 +130,28 @@ describe("claim copy", () => {
   // quoting the claim command as the safe authoritative check alongside the
   // fresh-setup pointer.
   it("frames a closed window as reconciliation, not a verdict", () => {
-    const closed = claimWindowClosedAction("0.1.0", NO_SELECTOR);
+    const closed = claimWindowClosedAction(SUGGEST);
     expect(closed).toContain("claim window has closed");
     expect(closed).toContain("npx @zitadel/cli@0.1.0 claim");
     expect(closed).toContain("no longer be claimed");
-    expect(closed).toContain("npx @zitadel/cli@0.1.0 setup");
+    expect(closed).toContain(
+      "npx @zitadel/cli@0.1.0 setup --cwd '<new-directory>' in a fresh directory",
+    );
     expect(closed).not.toMatch(/delete|removed|expire/i);
+  });
+
+  it("points the fresh setup at a new directory, not the one the run was given", () => {
+    expect(claimWindowClosedAction(aSuggest({ cwd: "app" }))).toContain(
+      "setup --cwd '<new-directory>' in a fresh directory",
+    );
   });
 
   // `unclaimed` is banned from the public docs by the vocabulary gate; keeping
   // it out of the strings themselves is what makes that gate easy to keep.
   it("stays on the vocabulary the claim command established", () => {
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).not.toMatch(/\bunclaimed\b/i);
-    expect(claimBoxAction("0.1.0", undefined, NO_SELECTOR).text).not.toMatch(/\bunclaimed\b/i);
-    expect(claimWindowClosedAction("0.1.0", NO_SELECTOR)).not.toMatch(/\bunclaimed\b/i);
+    expect(claimAction(SUGGEST, undefined)).not.toMatch(/\bunclaimed\b/i);
+    expect(claimBoxAction(SUGGEST, undefined).text).not.toMatch(/\bunclaimed\b/i);
+    expect(claimWindowClosedAction(SUGGEST)).not.toMatch(/\bunclaimed\b/i);
   });
 });
 

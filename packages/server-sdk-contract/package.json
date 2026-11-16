@@ -1,0 +1,24 @@
+{
+  "name": "@zitadel/server-sdk-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The test cases every server SDK runs through its own adapter: the middleware contract and the edge-runtime block. Workspace tooling only; nothing is published.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./edge": "./src/edge.ts",
+    "./middleware": "./src/middleware.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@zitadel/sdk-core": "workspace:*",
+    "vitest": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

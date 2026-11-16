@@ -18,7 +18,7 @@ properties:
   metadata:
     description: |
       Who the administrator said the link is for. Null after accept or decline.
-      Cancel and replace of a pending invitation delete the row.
+      Cancel and replace delete the row.
     oneOf:
       - $ref: invitation-metadata.yaml
       - type: 'null'

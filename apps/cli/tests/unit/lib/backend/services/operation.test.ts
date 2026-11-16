@@ -107,7 +107,13 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal, await forcedConsent()),
+      send(
+        SERVER,
+        "s",
+        requestFor("deactivateTeam", [], ["team_1"]),
+        signal,
+        await forcedConsent(),
+      ),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
@@ -116,8 +122,8 @@ describe("OperationService.call", () => {
 
   it("refuses a destructive operation without consent", async () => {
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal),
-    ).rejects.toThrow("deleteTeam is destructive: reach it through allowDestructive");
+      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
+    ).rejects.toThrow("deactivateTeam is destructive: reach it through allowDestructive");
   });
 
   it("sends nothing for a destructive operation without consent", async ({ server }) => {
@@ -129,7 +135,7 @@ describe("OperationService.call", () => {
       }),
     );
 
-    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal).catch(
+    await send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal).catch(
       () => undefined,
     );
 
@@ -144,7 +150,7 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"]), signal),
+      send(SERVER, "s", requestFor("setVariables", ["FOO:=null", "project_id=proj_1"]), signal),
     ).resolves.toMatchObject({ status: 200 });
   });
 
@@ -417,7 +423,7 @@ describe("Operation.all, over the whole table", () => {
 
 describe("Operation.named", () => {
   it("finds an operation by its id, in any case", () => {
-    expect(Operation.named("getuserbyid").operation.id).toBe("GetUserByID");
+    expect(Operation.named("getuser").operation.id).toBe("getUser");
   });
 
   it("suggests the operation a typo meant", () => {
@@ -461,11 +467,11 @@ describe("Operation.named", () => {
   });
 
   it("takes GET among a path's methods without -X", () => {
-    expect(Operation.named("/users/user_1").operation.id).toBe("GetUserByID");
+    expect(Operation.named("/users/user_1").operation.id).toBe("getUser");
   });
 
   it("takes the method -X names", () => {
-    expect(Operation.named("/users/user_1", "DELETE").operation.id).toBe("DeleteUserByID");
+    expect(Operation.named("/users/user_1", "DELETE").operation.id).toBe("deleteUser");
   });
 
   it("asks for -X where a path has several methods and no GET", () => {
@@ -505,7 +511,7 @@ describe("Operation.uncallable", () => {
 
 describe("Operation.pathParameters", () => {
   it("lists the parameters in the order the path has them", () => {
-    expect(operationById("finishUserPasskeyRegistration").pathParameters).toEqual([
+    expect(operationById("completeUserPasskeyRegistration").pathParameters).toEqual([
       "user_id",
       "registration_id",
     ]);
@@ -516,8 +522,8 @@ describe("Operation.all", () => {
   it("finds an operation by a word of its id, path, summary or tag, in any case", () => {
     expect(Operation.all({ filter: "PASSKEY" }).map((operation) => operation.id)).toEqual([
       "listUserPasskeys",
-      "beginUserPasskeyRegistration",
-      "finishUserPasskeyRegistration",
+      "createUserPasskeyRegistration",
+      "completeUserPasskeyRegistration",
       "listMyPasskeys",
     ]);
   });

@@ -1,9 +1,6 @@
-import { Fragment } from "react";
-
 import { DeploymentStatusBadge } from "./deployment-status-badge";
-import { DetailRow, DetailSection } from "@/components/detail-page";
+import { DETAIL_VALUE_EMPTY, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
 import { OriginLink } from "@/components/origin-link";
-import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/date";
 import { type Deployment, KIND_LABEL } from "@/features/deployments/deployment";
 
@@ -18,16 +15,13 @@ export function ReleaseDeployments({ deployments }: { deployments: Deployment[] 
   return (
     <DetailSection title="Deployment of this release">
       {deployments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">This release has not been deployed.</p>
+        <p className={DETAIL_VALUE_EMPTY}>This release has not been deployed.</p>
       ) : (
-        <div className="flex flex-col gap-4">
-          {deployments.map((deployment, index) => (
-            <Fragment key={deployment.id}>
-              {index > 0 && <Separator />}
-              <DeploymentRow deployment={deployment} />
-            </Fragment>
+        <DetailRows>
+          {deployments.map((deployment) => (
+            <DeploymentRow key={deployment.id} deployment={deployment} />
           ))}
-        </div>
+        </DetailRows>
       )}
     </DetailSection>
   );
@@ -36,6 +30,7 @@ export function ReleaseDeployments({ deployments }: { deployments: Deployment[] 
 function DeploymentRow({ deployment }: { deployment: Deployment }) {
   return (
     <DetailRow
+      align="control"
       label={
         <>
           <span>{KIND_LABEL[deployment.kind]}</span>
@@ -58,7 +53,8 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
       </ul>
       <time
         dateTime={deployment.deployed_at}
-        className="shrink-0 text-sm leading-5 font-medium whitespace-nowrap text-muted-foreground"
+        // A 24px line, the origin link's, so the date sits level with it.
+        className="shrink-0 text-sm leading-6 font-medium whitespace-nowrap text-muted-foreground"
       >
         {formatDateTime(deployment.deployed_at)}
       </time>

@@ -20,8 +20,8 @@ export async function pathExists(path: string): Promise<boolean> {
  * Reads a UTF-8 text file, treating a file that does not exist as "no text"
  * rather than as an error.
  *
- * It replaces the hand-written `try { await readFile(...) } catch` that every
- * optional-file read used to carry to recognise `ENOENT`. Only a missing file
+ * It spares every optional-file read a hand-written
+ * `try { await readFile(...) } catch` to recognise `ENOENT`. Only a missing file
  * gives `undefined`. A file that exists but cannot be read, such as one without
  * read permission or a directory, still throws, so it is not mistaken for an
  * absent one.
@@ -100,7 +100,9 @@ export async function pathExistsStrict(path: string): Promise<boolean> {
  * missing instead of aborting the rest.
  */
 export function readIfReadable(path: string): Promise<string | undefined> {
-  return readIfExists(path).catch(() => undefined);
+  return readIfExists(path).catch(() => {
+    return undefined;
+  });
 }
 
 /**
@@ -119,7 +121,11 @@ export function readIfReadable(path: string): Promise<string | undefined> {
  */
 export async function isFile(path: string): Promise<boolean> {
   return stat(path).then(
-    (info) => info.isFile(),
-    () => false,
+    (info) => {
+      return info.isFile();
+    },
+    () => {
+      return false;
+    },
   );
 }

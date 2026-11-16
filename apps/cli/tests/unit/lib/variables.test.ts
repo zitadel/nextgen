@@ -48,7 +48,7 @@ describe("parseVariableValue", () => {
   it.each(["True", "1", "yes", ""])("refuses %j as a boolean", (raw) => {
     expect(parseVariableValue(raw, "boolean")).toMatchObject({
       ok: false,
-      problem: expect.stringMatching(/Expected true or false.*`true` or `false`/),
+      problem: expect.stringMatching(/Expected true or false.*is exactly true or false/),
     });
   });
 });

@@ -1,4 +1,5 @@
 import { ZitadelError } from "@/lib/errors";
+
 import { jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { BodyField } from "./fields";
 import type { Json } from "./types";
@@ -24,13 +25,18 @@ export type Assignment = Readonly<{
   raw: string;
 }>;
 
-const usage = (flag: string): string =>
-  `Use ${flag} path=value, or ${flag} path:=json for a JSON value (e.g. ${flag} oidc.pkce_enabled=false).`;
+const usage = (flag: string): string => {
+  return `Use ${flag} path=value, or ${flag} path:=json for a JSON value (e.g. ${flag} oidc.pkce_enabled=false).`;
+};
 
 /** The fields worth naming to a caller whose path does not exist. */
 const knownPaths = (fields: readonly BodyField[], first: string): readonly string[] => {
-  const all = fields.map((field) => (field.kind === "record" ? `${field.name}.<key>` : field.name));
-  const near = all.filter((path) => path === first || path.startsWith(`${first}.`));
+  const all = fields.map((field) => {
+    return field.kind === "record" ? `${field.name}.<key>` : field.name;
+  });
+  const near = all.filter((path) => {
+    return path === first || path.startsWith(`${first}.`);
+  });
   return near.length > 0 ? near : all;
 };
 
@@ -46,7 +52,9 @@ const plainValue = (
   const shape =
     type === "array" ? "a list" : type === "object" || type === "record" ? "an object" : undefined;
   if (shape) {
-    const flag = fields.find((field) => field.name === name)?.flag;
+    const flag = fields.find((field) => {
+      return field.name === name;
+    })?.flag;
     throw new ZitadelError("E_VALIDATION", `${label} ${name} names ${shape}, which takes JSON`, {
       hint: `Set it whole with ${label} '${name}:=<json>'${flag ? `, or give --${flag} once per value` : ""}.`,
     });
@@ -75,7 +83,11 @@ export const readAssignment = (
   const name = raw.slice(0, at);
   const text = raw.slice(at + (isJson ? 2 : 1));
   const path = name.split(".");
-  if (path.some((segment) => segment === "")) {
+  if (
+    path.some((segment) => {
+      return segment === "";
+    })
+  ) {
     throw new ZitadelError("E_VALIDATION", `Invalid ${label} path "${name}"`, {
       hint: usage(label),
     });
@@ -104,11 +116,15 @@ export const readAssignments = (
   entries: unknown,
   document: ZodLike | undefined,
   fields: readonly BodyField[],
-): readonly Assignment[] =>
-  (Array.isArray(entries) ? entries : entries === undefined ? [] : [entries]).map((entry) =>
-    readAssignment(String(entry), document, fields),
+): readonly Assignment[] => {
+  return (Array.isArray(entries) ? entries : entries === undefined ? [] : [entries]).map(
+    (entry) => {
+      return readAssignment(String(entry), document, fields);
+    },
   );
+};
 
 /** An assignment as the fragment of a document it describes. */
-export const fragmentOf = (assignment: Assignment): Json =>
-  setAt({}, assignment.path, assignment.value);
+export const fragmentOf = (assignment: Assignment): Json => {
+  return setAt({}, assignment.path, assignment.value);
+};

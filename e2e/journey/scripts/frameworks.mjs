@@ -16,15 +16,76 @@ export const frameworkIds = [
 /**
  * Frameworks whose scaffolds and journey definitions are kept, and which can still
  * be run by hand (`--framework sveltekit`), but which the CI fresh-app matrix
- * intentionally skips: their `create-*@latest` scaffolders pull an upstream
- * release the day it ships (SolidStart 2, Qwik 2 already broke the journey once),
- * and a red lane for a reason outside a PR would flake the whole team. Take an id
- * off this list once its scaffold is pinned and has been stable.
+ * intentionally skips. Past their pins, `create-solid` takes its template from
+ * GitHub's head and the TanStack CLI asks npmjs for some packages' `latest`,
+ * so their journeys could go red, and stay cached green, for a reason outside
+ * the repo. SvelteKit and Qwik Router run pinned, self-contained framework
+ * CLIs: take an id off this list once its journey has been stable by hand.
  */
 export const ciExcludedFrameworkIds = ["sveltekit", "tanstack-start", "solid-start", "qwik-router"];
 
 /** The frameworks the CI fresh-app matrix runs. */
 export const ciFrameworkIds = frameworkIds.filter((id) => !ciExcludedFrameworkIds.includes(id));
+
+/**
+ * The runner's `--ci` set (fresh-app matrix, passkey preset, pre-existing app,
+ * testkit, remote https). Each journey of it, `<variant>/<framework>`, is a
+ * turbo task of its own (`journey:<id>` in e2e/package.json and
+ * e2e/turbo.json); frameworks.test.mjs fails when the two disagree.
+ */
+export function ciJourneyVariants({ matrix = "full" } = {}) {
+  return [
+    {
+      id: "fresh-app",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: matrix === "single" ? ["next"] : [...ciFrameworkIds],
+    },
+    {
+      id: "passkey",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: ["next"],
+    },
+    {
+      id: "preexisting",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: true,
+      remote: false,
+      frameworkIds: ["next", "nuxt"],
+    },
+    {
+      id: "testkit",
+      suite: "testkit",
+      preset: "",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: ["next"],
+    },
+    // The scaffolded dev proxy against an https server that answers only to
+    // its own name, as the hosted cloud does. React stands for the shared
+    // Vite proxy; passkey-first because the passkey ceremony depends most on
+    // the server seeing the app's origin.
+    {
+      id: "remote",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      remote: true,
+      frameworkIds: ["react"],
+    },
+  ];
+}
+
+/** Every journey of the `--ci` set, as `<variant>/<framework>`. */
+export const ciJourneyIds = ciJourneyVariants().flatMap((variant) =>
+  variant.frameworkIds.map((id) => `${variant.id}/${id}`),
+);
 
 const viteDevArgs = (port) => ["run", "dev", "--", "--host", "localhost", "--port", String(port)];
 

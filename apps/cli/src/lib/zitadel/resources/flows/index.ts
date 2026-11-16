@@ -10,6 +10,5 @@ export {
   type IncomingTransition,
   type MethodUse,
   type Offer,
-  type SignUpGap,
   type Transition,
 } from "@/lib/zitadel/resources/flows/types";

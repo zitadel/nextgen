@@ -31,6 +31,10 @@ VALUES (@p1, @p2, @p3, @p4)`
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM users`
 
+	// userSearchIndexArm opens one range of a user search across projects,
+	// which carries the project and property its rows answer for.
+	userSearchIndexArm = `(SELECT project_id, key, user_id, search_text FROM user_attributes WHERE search_text IS NOT NULL AND project_id = `
+
 	// userSearchQuery and userSearchJoin frame the one range of
 	// idx_user_attributes_search a search arm reads; see the postgres peer.
 	// The index is NULL_FILTERED, which Spanner only reads for a query that
@@ -361,6 +365,56 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		Items:      headers,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// SearchUserIndex implements [service.UserStatements]: one UNION ALL of one
+// range of idx_user_attributes_search per arm, each with its own ORDER BY and
+// LIMIT, so each is one range of the index read to the limit, and nothing else
+// is read. The index is NULL_FILTERED, hence the IS NOT NULL.
+func (us userStatements) SearchUserIndex(ctx context.Context, ranges []domain.UserSearchRange, prefix string, limit int) ([]domain.UserSearchRange, error) {
+	if err := authz.RequireUnfilteredBatch(ctx); err != nil {
+		return nil, err
+	}
+	if len(ranges) == 0 {
+		return ranges, nil
+	}
+	lower, upper, bounded := v2user.SearchBounds(prefix)
+	var compiler statementCompiler
+	for i, r := range ranges {
+		if i > 0 {
+			compiler.WriteString(" UNION ALL ")
+		}
+		compiler.WriteString(userSearchIndexArm)
+		compiler.WriteArg(r.ProjectID)
+		compiler.WriteString(" AND key = ")
+		compiler.WriteArg(string(r.Key))
+		compiler.WriteString(" AND search_text >= ")
+		compiler.WriteArg(lower)
+		if bounded {
+			compiler.WriteString(" AND search_text < ")
+			compiler.WriteArg(upper)
+		}
+		compiler.WriteString(" ORDER BY search_text, user_id")
+		compileLimit(&compiler, uint32(limit))
+		compiler.WriteString(")")
+	}
+	arms := v2user.SearchIndexArms(ranges)
+	err := us.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		return iter.Do(func(row *spanner.Row) error {
+			var projectID, key string
+			var hit domain.UserSearchHit
+			if err := row.Columns(&projectID, &key, &hit.UserID, &hit.MatchedText); err != nil {
+				return err
+			}
+			arm := arms[v2user.SearchIndexArm{ProjectID: projectID, Key: domain.AttributeKey(key)}]
+			ranges[arm].Hits = append(ranges[arm].Hits, hit)
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v2user.MarkSearchIndexFull(ranges, limit), nil
 }
 
 // searchUsers runs a search read (see [service.UserSearch]): one statement

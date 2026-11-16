@@ -341,46 +341,12 @@ describe("Connections.enable", () => {
   });
 
   describe("with a connection of the developer's own", () => {
-    it("summarises the claim mapping it was written with", () => {
+    it("leaves the claim mapping out of its notices", () => {
       const config = aConfig(CUSTOMERS_PROJECT);
 
       const change = config.connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
 
-      expect(change.notices).toEqual([
-        {
-          severity: "info",
-          message: [
-            `Claim mappings in ${ACME_SSO_FILE}. Each line is an attribute of your user schema, then the claim Acme SSO must return for it:`,
-            "  email ← email",
-            "Verification, which a mapping alone does not give:",
-            "  email is treated as verified only when Acme SSO says so in the email_verified claim.",
-            "Edit the mappings in that file if your provider returns other claims.",
-          ].join("\n"),
-        },
-      ]);
-    });
-
-    it("says nothing is treated as verified when the connection verifies nothing", () => {
-      const config = aConfig(CUSTOMERS_PROJECT);
-      const acme = Connection.create(
-        aFile(
-          "connections",
-          "acme-sso.json",
-          anAcmeSsoConnection({ claim_mapping: { email: "mail" } }),
-        ),
-      );
-
-      const change = config.connections.enable(CUSTOMERS_SCHEMA, acme);
-
-      expect(change.notices).toContainEqual({
-        severity: "info",
-        message: [
-          `Claim mappings in ${ACME_SSO_FILE}. Each line is an attribute of your user schema, then the claim Acme SSO must return for it:`,
-          "  email ← mail",
-          "Nothing is treated as verified.",
-          "Edit the mappings in that file if your provider returns other claims.",
-        ].join("\n"),
-      });
+      expect(change.notices).toEqual([]);
     });
   });
 
@@ -444,6 +410,160 @@ describe("Connections.enable", () => {
         }),
       );
     });
+  });
+});
+
+describe("Connections.summarize", () => {
+  const enabledChange = () => {
+    return aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
+  };
+
+  it("lists each property the connection fills and its claim", () => {
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.mappings).toEqual([{ property: "email", claim: "email" }]);
+  });
+
+  it("lists what verifies each property", () => {
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.verifications).toEqual([{ property: "email", claim: "email_verified" }]);
+  });
+
+  it("lists the scopes it asks for", () => {
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.scopes).toEqual(["openid", "profile", "email"]);
+  });
+
+  it("names the schemas that sign in through it", () => {
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.usedBy).toEqual(["customers"]);
+  });
+
+  it("names a property no claim fills, and whether the schema requires it", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        companyName: { type: "string" },
+        nickname: { type: "string" },
+      },
+      required: ["companyName"],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([
+      { property: "companyName", required: true },
+      { property: "nickname", required: false },
+    ]);
+  });
+
+  it("names no schema for a connection none lists", () => {
+    expect(aConfig(CUSTOMERS_PROJECT).connections.summarize(ACME_SSO).usedBy).toEqual([]);
+  });
+
+  it("marks an object required when only its members are required", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        address: {
+          type: "object",
+          properties: { street: { type: "string" } },
+          required: ["street"],
+        },
+      },
+      required: ["address"],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "address", required: true }]);
+  });
+
+  it("marks a property required when an allOf requires it", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        companyName: { type: "string" },
+      },
+      allOf: [{ required: ["companyName"] }],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "companyName", required: true }]);
+  });
+
+  it("does not mark the identifier a password signs in with as required", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: { email: { type: "string" }, username: { type: "string" } },
+      "x-identifier": "username",
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "username", required: false }]);
+  });
+
+  it("names no schema that lists the connection with SSO switched off", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      "x-auth-methods": {
+        password: { enabled: true },
+        sso: { enabled: false, providers: ["acme-sso"] },
+      },
+    });
+    const config = aConfig({ schemas: { "customers.json": body } });
+
+    expect(config.connections.summarize(ACME_SSO).usedBy).toEqual([]);
+  });
+
+  it("says a connection that creates users does", () => {
+    const change = enabledChange();
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.createsUsers).toBe(true);
+  });
+
+  it("says a connection whose creation is disabled creates none", () => {
+    const quiet = Connection.create(
+      aFile(
+        "connections",
+        "acme-sso.json",
+        anAcmeSsoConnection({ provisioning: { creation: "disabled" } }),
+      ),
+    );
+
+    const change = aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, quiet);
+
+    expect(change.after.connections.summarize(change.document).createsUsers).toBe(false);
   });
 });
 

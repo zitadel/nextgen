@@ -609,29 +609,6 @@ export const SSO_RULES: readonly Rule[] = [
   }),
 
   defineRule({
-    id: "sso/collection-misses-required",
-    severity: "error",
-    each: (config) => {
-      return config.flows.signUpGaps;
-    },
-    file: (gap) => {
-      return gap.flow.path;
-    },
-    steps: {
-      step: (gap) => {
-        return gap.step.name;
-      },
-      cause: (gap) => {
-        return JSON.stringify([gap.connection.path, gap.path]);
-      },
-    },
-    says: (gap, where) => {
-      const slug = gap.connection.slug ?? gap.connection.path;
-      return `${where}: on_success create_user_with_sso can create a user without ${quote(gap.path)}, which ${gap.schema.path} requires (or signs people in by): someone signing up with ${quote(slug)} gets here without being asked for it, and ${gap.connection.path} does not map it. Ask for it on a step on the way, or map it in ${gap.connection.path}.`;
-    },
-  }),
-
-  defineRule({
     id: "sso/unmapped-verification-key",
     severity: "error",
     each: (config) => {

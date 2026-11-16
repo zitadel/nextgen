@@ -6,7 +6,9 @@ description: |
   names this revision.
 oneOf:
   - $ref: password-set-policy.yaml
+  - $ref: user-create-policy.yaml
 discriminator:
   propertyName: operation
   mapping:
     auth.factor.password.set: password-set-policy.yaml
+    user.create: user-create-policy.yaml

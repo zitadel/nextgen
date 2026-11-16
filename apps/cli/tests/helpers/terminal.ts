@@ -1,3 +1,4 @@
+import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach } from "vitest";
 
 /**
@@ -108,3 +109,20 @@ export const RENDERINGS = [
   // the coloured one twice.
   ["without colour", { NO_COLOR: "1" }],
 ] as const satisfies ReadonlyArray<readonly [string, NodeJS.ProcessEnv]>;
+
+/**
+ * Everything a run said, as one line: the box's border taken off and every
+ * fold rejoined.
+ *
+ * An ending is laid out for a terminal 80 columns wide, so where a sentence
+ * folds depends on what happens to be in it, and a step's command sits on a
+ * line of its own under the sentence that introduces it. A test that reads
+ * what a command said reads it here, rather than pinning where the layout
+ * broke it.
+ */
+export const asOneLine = (shown: string): string =>
+  stripAnsi(shown)
+    .replace(/[│╭╮╰╯─]/g, " ")
+    .replace(/\s+/g, " ")
+    .replaceAll(" \\ ", " ")
+    .trim();

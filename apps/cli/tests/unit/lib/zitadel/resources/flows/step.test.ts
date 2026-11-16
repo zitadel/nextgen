@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Flow } from "@/lib/zitadel";
-import { propertyPath, stepName } from "@/lib/zitadel/names";
+import { stepName } from "@/lib/zitadel/names";
 import { Step } from "@/lib/zitadel/resources/flows/step";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { aFile } from "@tests/helpers/config";
@@ -266,35 +266,5 @@ describe("Step.collisionCarriesAction", () => {
     const step = stepOf(routing({ submit: { target: "password", action: "switch" } }));
 
     expect(step.collisionCarriesAction).toBe(false);
-  });
-});
-
-describe("Step.asksFor", () => {
-  it.each([
-    { named: "the field itself", field: "email", path: "email" },
-    { named: "a property inside a field", field: "address", path: "address.street" },
-    { named: "the object a field sits in", field: "address.street", path: "address" },
-  ])("is true for $named", ({ field, path }) => {
-    const step = stepOf({ name: "identifier", fields: [field] });
-
-    expect(step.asksFor(propertyPath(path))).toBe(true);
-  });
-
-  it("is false for a property no field covers", () => {
-    const step = stepOf(EMAIL_AND_PASSWORD);
-
-    expect(step.asksFor(propertyPath("phone"))).toBe(false);
-  });
-
-  it("is false for a property that only shares a prefix with a field", () => {
-    const step = stepOf({ name: "identifier", fields: ["email"] });
-
-    expect(step.asksFor(propertyPath("emailAddress"))).toBe(false);
-  });
-
-  it("is false for a step that asks for nothing", () => {
-    const step = stepOf({ name: "identifier" });
-
-    expect(step.asksFor(propertyPath("email"))).toBe(false);
   });
 });

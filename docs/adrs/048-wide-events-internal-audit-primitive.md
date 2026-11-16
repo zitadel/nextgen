@@ -31,6 +31,11 @@
 > read from an index too. See
 > [the amendment](#amendment-2026-11-10-the-resource-type-and-api-requests-by-operation-and-status).
 >
+> **Amendment (2026-11-11):** `events` gains a `user_id` column, the user an
+> event concerns whoever acted, and an index for it, and `GET /events`
+> filters on it. See
+> [the amendment](#amendment-2026-11-11-the-user-an-event-concerns).
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -156,7 +161,7 @@ Events are **not** registered in `resource_scope_index`. That table stays a
 small map for durable globally-addressable resources
 ([ADR 033](033-internal-permission-management.md),
 [url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
-rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
+rows do not belong there. `GET /events/{event_id}` is **project-scoped** (see ADR 049).
 
 Per-sink export delivery is tracked with per-(sink, project) watermark cursors;
 see [ADR 049 §3](049-events-api-retention-export.md).
@@ -196,6 +201,7 @@ tenancy. Primary correlation columns are **server-authoritative** (see §4).
 | **Device** | `fingerprint` | All events from a device |
 | **App** | `client_id` | All events from an application or AI agent |
 | **User** | `actor_id` | All events by a user |
+| **Account** | `user_id` | All events that concern a user, whoever acted (amendment of 2026-11-11) |
 
 Admin and forensic queries use these scopes directly:
 
@@ -633,7 +639,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 ## Amendment (2026-11-10): indexes for the reads the console makes
 
 §1 kept one secondary index, `(project_id, created_at, id)`, and deferred the
-rest until a query path was measured. The console's Logs screen is that path:
+rest until a query path was measured. The console's Events screen is that path:
 it opens on a project's audit events, every category but `request`, narrows
 them by type, actor or resource, and follows one request, session or login
 flow from an event. The one index serves none of those. A filtered
@@ -785,7 +791,7 @@ met the batch's own rows and logged it as dropped.
 
 ## Amendment (2026-11-10): the resource type, and API requests by operation and status
 
-The console's Logs screen also narrows its list to one type of resource, and
+The console's Events screen also narrows its list to one type of resource, and
 the API requests to one operation or to the failed ones. The first amendment
 left the resource type matched over a budget, and a request's operation and
 status were only in its payload, which no index holds.
@@ -864,3 +870,67 @@ calls, with Postgres logging each statement's plan:
 resource type one. On the measured data, after the burst (1,000,161 events,
 400,067 of them requests), the three indexes were 99 MB (resource type),
 38 MB (operation) and 61 MB (status class) beside the 224 MB table.
+
+## Amendment (2026-11-11): the user an event concerns
+
+An event named the user it concerns wherever its type happened to: the
+resource for a change to the user, the payload for a credential or an identity
+link, the actor for the token a sign-in minted, and nowhere for a sign-in
+check, a deleted session or a revoked token. No filter of `GET /events` reads
+a payload, so what happened to one user's account, a rejected password
+included, was not one read.
+
+**Column.** `user_id` is the user an event is about, whoever acted: the user
+a session, a token, a sign-in check or a credential belongs to, and the user
+a change or a grant was made to. The emitter sets it (`EmitSpec.UserID`). The
+[catalog](../design/api/events-catalog.md#the-user-an-event-concerns) lists
+the types that do, and `TestUserEventsSetUserID` holds every emitter to that
+list. Every other event leaves it NULL, and so does an event of a listed type
+that concerns no user: an anonymous session, a check before the identifier
+resolved, a grant to a team or a key. The actor is unchanged: `actor_id`
+answers what a principal did, `user_id` what happened to an account.
+
+**Index.**
+
+| Index | Serves |
+| --- | --- |
+| `(project_id, user_id, category, created_at, id)` | what happened to one user, in one category |
+
+- The category comes before the time for the reason the actor's does: a
+  user's sign-ins are a range apart from the changes made to the user.
+- On Postgres and SQLite it leaves out the rows that name no user; on Spanner
+  it indexes every row and keeps the time descending, as in the first
+  amendment.
+
+**How a list is read.** `planEventRead` puts the user after the resource and
+before the actor: it reads, by category, when no request, login flow, session
+or resource does, and is matched beside one. An actor beside it is matched.
+
+**No backfill.** The events stored before the migration keep no `user_id`,
+and the API reference says they are not matched. They age out within the
+retention period, as in the amendment before.
+
+**Measured** through the API on Postgres 18 with 600,048 events in one
+project: 300,000 sign-in checks of one user, 300,000 API requests newer than
+those, which concern no user, and, older than all of them, 12 changes to that
+user, 12 of its sessions, 12 of its checks made by an administrator and 12
+failed checks of another user. 11 filters (the user alone, in one and in two
+categories, another user, an unknown one, and the user beside an actor, a
+resource, a type and a session), each in both orders, 412 calls and 1,336
+statements on `events`, with Postgres logging each statement's plan:
+
+- Every statement a page read ran on the index its range names, read at most
+  26 rows for a page of 25, and sorted nothing; no residual filter, no
+  sequential scan. Every statement a budget read stopped at 1,000 rows.
+- Each list that ended returned exactly the events one unbounded read under
+  the whole filter finds, in order. The others, stopped after 40 calls,
+  matched it as far as they were read.
+- An actor beside the user is matched over the user's range: newest first,
+  with the actor's 12 events behind the user's 300,000, 40 calls read 40,000
+  rows and had returned none yet.
+
+Spanner was not measured: no local Spanner shows a plan.
+
+**Cost.** One more index entry for an event that names a user. On the
+measured data the index was 54 MB beside the 160 MB table, with 300,055 of
+600,074 events naming a user.

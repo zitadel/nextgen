@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Boxes, LayoutGrid } from "lucide-react";
 
-import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_STACK, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { loadProjectOverview } from "@/features/overview/api";
 import { ProductionCard } from "@/features/overview/components/production-card";
@@ -16,7 +15,7 @@ import { formatDate } from "@/lib/date";
  * Projects stands above every project (D35). As Vercel's project Overview, it
  * says what the project is and what it is doing, and hands each part over to
  * the screen it summarizes: what the primary origins serve now (Deployments)
- * and the newest audit events (Logs).
+ * and the newest audit events (Events).
  *
  * It holds no figures. An earlier overview design was stat cards (totals and
  * their trends), and nothing can compute them: the API's lists return pages,
@@ -47,17 +46,13 @@ function OverviewScreen() {
         title={project.name}
         // The site the project signs people into, as Projects names it (D21).
         subtitle={primaryHost(project.origins)}
-        meta={
-          <>
-            <MetaValue label="Project ID" value={project.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(project.created_at)} />
-          </>
-        }
+        meta={[
+          { label: "Project ID", value: project.id, copyable: true },
+          { label: "Created", value: formatDate(project.created_at) },
+        ]}
       />
 
-      {/* The page owns the 16px between its cards, as Settings does. */}
-      <div className={`${DETAIL_BODY} flex flex-col gap-4`}>
+      <div className={`${DETAIL_BODY} ${DETAIL_STACK}`}>
         <ProductionCard live={live} />
         <RecentActivityCard activity={activity} />
       </div>

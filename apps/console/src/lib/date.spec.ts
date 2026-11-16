@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, formatRecent, formatTimestamp } from "./date";
+import { formatDate, formatDateTime, formatEventDay, formatRecent } from "./date";
 
 describe("formatRecent", () => {
   const now = new Date("2026-10-15T12:00:00Z");
@@ -25,26 +25,24 @@ describe("formatRecent", () => {
   });
 });
 
-describe("formatTimestamp", () => {
-  it("tells apart two moments of one minute, which the date and time alone do not", () => {
-    const first = "2026-11-10T08:15:42Z";
-    const second = "2026-11-10T08:15:43Z";
-    expect(formatDateTime(first)).toBe(formatDateTime(second));
-    expect(formatTimestamp(first)).not.toBe(formatTimestamp(second));
-    // The viewer's own date and time, with the seconds added to it.
-    expect(formatTimestamp(first)).toBe(
-      new Date(first).toLocaleString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-    );
+describe("formatEventDay", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+  const yearless = (value: string) =>
+    new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  it("leaves the year out of a day within eleven months, last year's included", () => {
+    expect(formatEventDay("2026-10-06T14:00:00Z", now)).toBe(yearless("2026-10-06T14:00:00Z"));
+    expect(formatEventDay("2025-12-28T14:00:00Z", now)).toBe(yearless("2025-12-28T14:00:00Z"));
+    expect(formatEventDay("2026-10-06T14:00:00Z", now)).not.toContain("2026");
+  });
+
+  it("writes the year of a day further off, which the month alone would misplace", () => {
+    const old = "2025-10-20T14:00:00Z";
+    expect(formatEventDay(old, now)).toBe(formatDate(old));
+    expect(formatEventDay(old, now)).toContain("2025");
   });
 
   it("shows what arrived when it cannot be parsed", () => {
-    expect(formatTimestamp("not a date")).toBe("not a date");
+    expect(formatEventDay("not a date", now)).toBe("not a date");
   });
 });

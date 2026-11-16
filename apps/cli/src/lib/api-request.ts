@@ -1,6 +1,9 @@
+import { Cmd } from "@/lib/cmd";
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
+import type { ApiRequest, Operation, Target } from "./backend";
+import * as schemas from "./backend/schemas";
 import { ZitadelError } from "./errors";
 import { parseJsonObject } from "./json";
 import { fragmentOf, readAssignment } from "./oclif/crud/assign";
@@ -8,8 +11,6 @@ import { mergeDocuments, typedValue } from "./oclif/crud/document";
 import { describeBody } from "./oclif/crud/fields";
 import type { Schema } from "./oclif/crud/types";
 import { nodeAt, unwrap, type ZodLike } from "./oclif/crud/zod";
-import * as schemas from "./backend/schemas";
-import type { ApiRequest, Operation, Target } from "./backend";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
@@ -59,7 +60,7 @@ export const pathValuesOf = (
   if (positionals.length > names.length) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${target.operation.id} takes ${names.length} path parameter${names.length === 1 ? "" : "s"} (${names.join(", ")}), but got ${positionals.length}`,
+      `${target.operation.id} takes ${names.length} ${new Intl.PluralRules("en").select(names.length) === "one" ? "path parameter" : "path parameters"} (${names.join(", ")}), but got ${positionals.length}`,
       { hint: `Give them in the path's order: ${target.operation.path}.` },
     );
   }
@@ -73,7 +74,12 @@ export const pathValuesOf = (
   if (values.project_id === undefined && names.includes("project_id") && projectId) {
     values.project_id = projectId;
   }
-  return { values, missing: names.filter((name) => values[name] === undefined) };
+  return {
+    values,
+    missing: names.filter((name) => {
+      return values[name] === undefined;
+    }),
+  };
 };
 
 /** What a request is built from. Its path parameters are filled in by {@link withPathValues}. */
@@ -97,7 +103,11 @@ const headOf = (raw: string): string => {
 /** A query parameter's value as the URL carries it: a list repeats the name. */
 const queryValues = (name: string, value: unknown): readonly string[] => {
   const values = Array.isArray(value) ? value : [value];
-  if (values.some((item) => item === null || typeof item === "object")) {
+  if (
+    values.some((item) => {
+      return item === null || typeof item === "object";
+    })
+  ) {
     throw new ZitadelError(
       "E_VALIDATION",
       `${FIELD} ${name} is a query parameter, which takes a value or a list of values`,
@@ -153,7 +163,9 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
   const bodySchema = schemaOf(operation, "Body");
   for (const raw of fields) {
     const head = headOf(raw);
-    const parameter = operation.parameters.find((candidate) => candidate.name === head);
+    const parameter = operation.parameters.find((candidate) => {
+      return candidate.name === head;
+    });
     if (parameter?.in === "query") {
       if (!/^[^.]+:?=/.test(raw)) {
         throw new ZitadelError(
@@ -178,14 +190,20 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
           ? `${head} is a path parameter of ${operation.id}; give it as an argument`
           : `${head} is a ${parameter.in} parameter, which the CLI does not send`,
         parameter.in === "path"
-          ? { hint: `For example: zitadel api ${operation.id} <${head}>` }
+          ? {
+              hint: `For example: zitadel api ${Cmd.quote(operation.id)} ${Cmd.quote(`<${head}>`)}`,
+            }
           : {},
       );
     }
     if (operation.body === null) {
       const names = operation.parameters
-        .filter((candidate) => candidate.in === "query")
-        .map((candidate) => candidate.name);
+        .filter((candidate) => {
+          return candidate.in === "query";
+        })
+        .map((candidate) => {
+          return candidate.name;
+        });
       throw new ZitadelError(
         "E_VALIDATION",
         `${operation.id} takes no body, and ${head} is none of its query parameters`,
@@ -202,13 +220,15 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
     fragments.push(fragmentOf(assignment));
   }
   const body = fragments.reduce<unknown>(
-    (merged, fragment) => mergeDocuments(merged ?? {}, fragment),
+    (merged, fragment) => {
+      return mergeDocuments(merged ?? {}, fragment);
+    },
     input ?? (operation.body === "required" ? {} : undefined),
   );
 
-  const projectParameter = operation.parameters.find(
-    (candidate) => candidate.in === "query" && candidate.name === "project_id",
-  );
+  const projectParameter = operation.parameters.find((candidate) => {
+    return candidate.in === "query" && candidate.name === "project_id";
+  });
   if (projectParameter?.required && !query.has("project_id") && projectId) {
     query.set("project_id", [projectId]);
   }
@@ -216,7 +236,11 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
   return {
     operation,
     path: operation.path,
-    query: [...query].flatMap(([name, values]) => values.map((value) => [name, value] as const)),
+    query: [...query].flatMap(([name, values]) => {
+      return values.map((value) => {
+        return [name, value] as const;
+      });
+    }),
     ...(body === undefined ? {} : { body }),
   };
 };
@@ -225,21 +249,26 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
 export const withPathValues = (
   request: ApiRequest,
   pathValues: Readonly<Record<string, string>>,
-): ApiRequest => ({
-  ...request,
-  path: request.path.replace(/\{([^}]+)\}/g, (_, name: string) =>
-    encodeURIComponent(pathValues[name] ?? ""),
-  ),
-});
+): ApiRequest => {
+  return {
+    ...request,
+    path: request.path.replace(/\{([^}]+)\}/g, (_, name: string) => {
+      return encodeURIComponent(pathValues[name] ?? "");
+    }),
+  };
+};
 
 /**
  * The body's fields, for an error that names the ones a path could have
  * meant. Without their flags: those belong to the resource commands.
  */
-const bodyFields = (schema: ZodLike | undefined) =>
-  schema === undefined
+const bodyFields = (schema: ZodLike | undefined) => {
+  return schema === undefined
     ? []
-    : describeBody(schema as Schema).map(({ flag: _flag, ...field }) => field);
+    : describeBody(schema as Schema).map(({ flag: _flag, ...field }) => {
+        return field;
+      });
+};
 
 /**
  * The `--input` document: a file, or stdin with `-`. Reading a terminal to its

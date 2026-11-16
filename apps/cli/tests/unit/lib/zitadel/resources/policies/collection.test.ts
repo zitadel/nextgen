@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, Policy, SignupPolicy } from "@/lib/zitadel";
 import { aConfig, aPasswordPolicy, PASSWORD_POLICY } from "@tests/helpers/config";
 import {
   aPolicyTest,
@@ -37,6 +37,32 @@ describe("Policies.password", () => {
     const config = aConfig({ policies: { "other.json": aPasswordPolicy({}) } });
 
     const policy = config.policies.password;
+
+    expect(policy).toBeUndefined();
+  });
+});
+
+describe("Policies.signup", () => {
+  it("is the policy at the sign-up policy's file", () => {
+    const config = aConfig({
+      policies: {
+        [Policy.fileName(SignupPolicy.OPERATION)]: {
+          operation: SignupPolicy.OPERATION,
+          config: { challenge: "zitadel_pow" },
+        },
+      },
+    });
+
+    const policy = config.policies.signup;
+
+    expect(policy?.path).toBe(SignupPolicy.PATH);
+    expect(policy?.config).toEqual({ challenge: "zitadel_pow" });
+  });
+
+  it("is undefined when the project has none", () => {
+    const config = aConfig({ policies: { [PASSWORD_POLICY_FILE]: aPasswordPolicy({}) } });
+
+    const policy = config.policies.signup;
 
     expect(policy).toBeUndefined();
   });

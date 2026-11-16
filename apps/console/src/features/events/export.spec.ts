@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { downloadEvents } from "./export";
-import type { LogEvent } from "./model";
+import type { ProjectEvent } from "./model";
 
 const EVENT = {
   id: "evt_1",
@@ -12,7 +12,7 @@ const EVENT = {
   created_at: "2026-11-10T08:15:43Z",
   client_id: "",
   payload: {},
-} as LogEvent;
+} as ProjectEvent;
 
 describe("downloadEvents", () => {
   afterEach(() => {

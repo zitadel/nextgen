@@ -1,10 +1,10 @@
 post:
-  operationId: finishUserPasskeyRegistration
+  operationId: completeUserPasskeyRegistration
   summary: Finish a passkey registration
   description: |
     Verifies the attestation against the registration ceremony and stores
     the new passkey for the user. `registration_id` is the one that
-    `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+    `createUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
     returned when it started the ceremony. The attestation is
     the browser's answer from `navigator.credentials.create()`.
 
@@ -56,6 +56,18 @@ post:
         application/json:
           schema:
             $ref: ../../../../../../components/error-details.yaml
+    '429':
+      description: |
+        The server is hashing or checking as many passwords as it allows right
+        now and could not take on another within its wait. Nothing was changed;
+        retry after the number of seconds in the `Retry-After` header.
+      headers:
+        Retry-After:
+          $ref: ../../../../../../components/headers/retry-after.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/schemas/too-many-requests.yaml
     '500':
       description: Something went wrong on the server. This was not your fault.
       content:
@@ -63,4 +75,4 @@ post:
           schema:
             $ref: ../../../../../../components/error-details.yaml
     default:
-      $ref: finishUserPasskeyRegistration-error-response.yaml
+      $ref: completeUserPasskeyRegistration-error-response.yaml

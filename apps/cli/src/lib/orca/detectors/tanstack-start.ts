@@ -23,7 +23,9 @@ export class TanStackStartDetector implements Detector {
   readonly versionFloor = "1.168.10";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (!pkg || !hasDependency(pkg, "react") || !hasDependency(pkg, "@tanstack/react-start")) {
       return null;
     }

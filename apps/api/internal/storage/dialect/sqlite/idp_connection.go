@@ -80,7 +80,10 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		}
 		entity.CreatedAt, entity.UpdatedAt = timeFromUnixNano(now), timeFromUnixNano(now)
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID)); err != nil {
+			return err
+		}
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
 	})
 }
 
@@ -92,23 +95,25 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	if err != nil {
 		return err
 	}
-	// One insert, so no transaction. The connection row is not read here, so
-	// CreatedAt stays as the caller had it.
-	// Stamped at the insert, inside a transaction BEGIN IMMEDIATE already
-	// serialized, so revision order follows transaction order.
+	// The connection row is not read here, so CreatedAt stays as the caller
+	// had it. Stamped at the insert, inside a transaction BEGIN IMMEDIATE
+	// already serialized, so revision order follows transaction order.
 	now := nowUnixNano()
-	if _, err := s.client.Exec(ctx, createIDPConnectionRevisionStmt,
-		entity.ProjectID,
-		revisionID,
-		entity.ID,
-		string(entity.Document),
-		now,
-	); err != nil {
-		return idpconnection.ReviseNotFound(wrapError(err))
-	}
-	entity.RevisionID = revisionID
-	entity.UpdatedAt = timeFromUnixNano(now)
-	return nil
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, createIDPConnectionRevisionStmt,
+			entity.ProjectID,
+			revisionID,
+			entity.ID,
+			string(entity.Document),
+			now,
+		); err != nil {
+			return idpconnection.ReviseNotFound(wrapError(err))
+		}
+		entity.RevisionID = revisionID
+		entity.UpdatedAt = timeFromUnixNano(now)
+		// The revision's display name is what search shows from now on.
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
+	})
 }
 
 // LockIDPConnection implements [service.IDPConnectionStatements].

@@ -1,13 +1,9 @@
-import { spinner } from "@clack/prompts";
-import { z } from "zod";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
+
 import { Paging } from "@/lib/backend/transport";
-
-import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
-
-import type { CommandResult } from "@/lib/oclif/types";
-import { plainFlag } from "@/lib/oclif/tabulatable";
-import { wireOf } from "@/lib/oclif/crud/wire";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
 import {
   type ParsedFilter,
   parseFilter,
@@ -15,11 +11,13 @@ import {
   type TypedFilter,
   type TypedSort,
 } from "@/lib/oclif/crud/query";
-import { parseOrThrow } from "@/lib/oclif/crud/shared";
-import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
-import { Cmd } from "@/lib/cmd";
-import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import { parseOrThrow, pluralOf } from "@/lib/oclif/crud/shared";
 import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
+import { wireOf } from "@/lib/oclif/crud/wire";
+import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { plainFlag } from "@/lib/oclif/tabulatable";
+import type { CommandResult } from "@/lib/oclif/types";
+
 import {
   type OperationDefinition,
   type OperationInput,
@@ -49,7 +47,7 @@ const LIMIT_MIN = 1;
 const LIMIT_MAX = 100;
 
 /** What a page size the server would refuse is refused for. */
-const LIMIT: Refused<number> = {
+const LIMIT = {
   schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
   refusal: {
     message: "{value} is not a valid page size",
@@ -59,7 +57,7 @@ const LIMIT: Refused<number> = {
     min: LIMIT_MIN,
     max: LIMIT_MAX,
   },
-};
+} as const satisfies Refused<number>;
 
 export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
@@ -69,6 +67,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
+    const plural = pluralOf(resource);
     const pagingFlags = {
       limit: Flags.custom<number>({
         parse: reads(LIMIT),
@@ -124,10 +123,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
               filters,
               operations: options.operations,
               description: `Filter as field=operation:value (operation defaults to equals). Fields: ${filters
-                .map(
-                  (field) =>
-                    `${field.field} (${field.operations.join("|")}${field.values ? `; values ${field.values.join("|")}` : ""}${field.combine === "or" ? "; repeats widen" : ""})`,
-                )
+                .map((field) => {
+                  return `${field.field} (${field.operations.join("|")}${field.values ? `; values ${field.values.join("|")}` : ""}${field.combine === "or" ? "; repeats widen" : ""})`;
+                })
                 .join(", ")}.`,
             }),
           }
@@ -148,8 +146,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
           }
         : {}),
     };
+
     return {
-      description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
+      description: `List ${plural}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
         ...(paged && spec.drains !== true ? [`<%= config.bin %> ${topic} list --all --json`] : []),
@@ -171,7 +170,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
   }
 
   protected override async operate({ flags }: ListInput): Promise<CommandResult> {
-    const { topic, resource, spec, options } = this.definition;
+    const { resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
     const shape = fieldPaths(spec.item);
     // The pages arrive as the server sent them, cursor included, so a token
@@ -183,22 +182,26 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
-    const pageFields = (token?: string): Json =>
-      paged
+    const pageFields = (token?: string): Json => {
+      return paged
         ? {
             ...(flags.limit !== undefined && { [wire.limit]: flags.limit }),
             ...(token && { [wire.pageToken]: token }),
           }
         : {};
+    };
 
     const given = flags.filter ?? [];
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.
-    const defaults = (spec.filters ?? []).flatMap((field) =>
-      field.default !== undefined && !given.some((one) => one.field.field === field.field)
+    const defaults = (spec.filters ?? []).flatMap((field) => {
+      return field.default !== undefined &&
+        !given.some((one) => {
+          return one.field.field === field.field;
+        })
         ? [{ field, operation: "equals", value: field.default }]
-        : [],
-    );
+        : [];
+    });
     const parsed = [...given, ...defaults];
     const sorting = flags.sort && {
       field: flags.sort.field,
@@ -208,8 +211,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // Transport is the only thing that differs: a structured query endpoint
     // takes a validated body, a GET list takes flat parameters. The caller
     // typed the same thing either way.
-    const request = (token?: string): Promise<unknown> =>
-      spec.body
+    const request = (token?: string): Promise<unknown> => {
+      return spec.body
         ? spec.call(
             ctx,
             parseOrThrow(
@@ -217,14 +220,20 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
               wire.query({
                 paging: pageFields(token),
                 sorting,
-                filters: parsed.map(({ field, operation, value }) => ({
-                  field: field.field,
-                  operation,
-                  value,
-                })),
+                filters: parsed.map(({ field, operation, value }) => {
+                  return {
+                    field: field.field,
+                    operation,
+                    value,
+                  };
+                }),
               }),
               "Invalid list query",
-              `Filter fields: ${(spec.filters ?? []).map((f) => f.field).join(", ")}. Sort fields: ${(spec.sorts ?? []).join(", ")}.`,
+              `Filter fields: ${(spec.filters ?? [])
+                .map((one) => {
+                  return one.field;
+                })
+                .join(", ")}. Sort fields: ${(spec.sorts ?? []).join(", ")}.`,
             ),
           )
         : spec.call(ctx, {
@@ -232,16 +241,14 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
             ...queryParams(parsed),
             ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
+    };
 
     // A resource that drains by default does so only when the caller named no
     // page: asking for one with --limit or --page-token is asking for one.
     const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
-    // `--all` is one request per page, so a wide drain would otherwise sit
-    // silent. The spinner is terminal-only: no animation reaches a pipe, and
-    // `--json` has already silenced everything.
-    const progress = all && this.isTTY && !this.isJson ? spinner() : undefined;
-    progress?.start(`Fetching ${topic}`);
+    const plural = pluralOf(resource);
+    const progress = all ? this.ui.spinner(`Fetching ${plural}`) : undefined;
     const paging = new Paging({
       items: (response) => {
         return spec.items(response);
@@ -253,28 +260,27 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const walk = paging.walk(async (token, number) => {
       // The walk begins at the page --page-token names, if any.
       const page = await request(token ?? flags.pageToken);
-      progress?.message(`Fetching ${topic} — page ${number}`);
+      progress?.message(`Fetching ${plural} — page ${number}`);
+
       return page;
     });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
     const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
-      progress?.stop(`Fetching ${topic} failed`);
+      progress?.clear();
       throw error;
     });
-    const { items } = collected;
-    const next = collected.next;
-    progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
+    const { items, next } = collected;
+    progress?.stop(
+      `Fetched ${items.length} ${new Intl.PluralRules("en").select(items.length) === "one" ? resource.singular : plural}`,
+    );
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = next ? `No ${topic} on this page.` : `No ${topic} found.`;
     const footer: string[] = [];
     const page = {
       token: next,
-      command: `${topic} list`,
-      flags: repeatedFlags(flags),
       cursorKey: wire.nextPageToken,
     };
     const extra = {};
@@ -286,8 +292,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
         rows,
         items,
         singular: resource.singular,
-        plural: topic,
-        empty,
+        plural,
+        empty: next ? `No ${plural} on this page` : `No ${plural} found`,
         footer,
         page,
         extra,
@@ -297,28 +303,17 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
 }
 
 /**
- * The flags a follow-up page has to carry: a cursor is only valid with the
- * sorting and filters that produced it, and the page size is part of what the
- * caller asked for. Values are re-emitted exactly as they were typed.
- */
-const repeatedFlags = (flags: ListFlags): readonly string[] => {
-  const limit = flags.limit === undefined ? [] : [`--limit ${flags.limit}`];
-  const sort = flags.sort ? [Cmd.option("--sort", flags.sort.raw)] : [];
-  const filters = (flags.filter ?? []).map((filter) => Cmd.option("--filter", filter.raw));
-  return [...limit, ...sort, ...filters];
-};
-
-/**
  * Parsed filters as the flat query parameters a GET list expects. A field
  * names the parameter each of its operations travels as, and a field whose
  * repeats widen collects its values into an array rather than overwriting.
  */
-const queryParams = (parsed: readonly ParsedFilter[]): Json =>
-  parsed.reduce<Record<string, unknown>>((params, { field, operation, value }) => {
+const queryParams = (parsed: readonly ParsedFilter[]): Json => {
+  return parsed.reduce<Record<string, unknown>>((params, { field, operation, value }) => {
     const key = field.params?.[operation] ?? field.field;
     const existing = params[key];
     if (field.combine !== "or") {
       params[key] = value;
+
       return params;
     }
     params[key] = Array.isArray(existing)
@@ -326,5 +321,7 @@ const queryParams = (parsed: readonly ParsedFilter[]): Json =>
       : existing === undefined
         ? [value]
         : [existing, value];
+
     return params;
   }, {});
+};

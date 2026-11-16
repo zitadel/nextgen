@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join, isAbsolute, relative, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 import { isObject } from "./json";
 import type { EjectActions } from "./orca/patchers/types";
@@ -83,20 +83,32 @@ export async function writeScaffoldManifest(options: {
   posture?: ScaffoldPosture;
 }): Promise<void> {
   const { cwd, actions, written, scaffoldedFramework, devPort, posture } = options;
-  const touched = new Set(written.map((path) => relativePosix(cwd, path)));
+  const touched = new Set(
+    written.map((path) => {
+      return relativePosix(cwd, path);
+    }),
+  );
   const marked = actions.markedFiles
-    .map((path) => ({ path, key: relativePosix(cwd, path) }))
-    .filter(({ key }) => touched.has(key));
+    .map((path) => {
+      return { path, key: relativePosix(cwd, path) };
+    })
+    .filter(({ key }) => {
+      return touched.has(key);
+    });
   const read = await Promise.all(
-    marked.map(async ({ path, key }) => ({
-      path,
-      key,
-      contents: await readFile(join(cwd, key), "utf8").catch(() => undefined),
-    })),
+    marked.map(async ({ path, key }) => {
+      return {
+        path,
+        key,
+        contents: await readFile(join(cwd, key), "utf8").catch(() => {
+          return undefined;
+        }),
+      };
+    }),
   );
   const files: ScaffoldManifest["files"] = Object.fromEntries(
-    read.flatMap(({ path, key, contents }) =>
-      contents === undefined
+    read.flatMap(({ path, key, contents }) => {
+      return contents === undefined
         ? []
         : [
             [
@@ -106,8 +118,8 @@ export async function writeScaffoldManifest(options: {
                 class: actions.fileClasses?.[path] ?? "presentation",
               },
             ],
-          ],
-    ),
+          ];
+    }),
   );
   await updateScaffold(cwd, {
     files,

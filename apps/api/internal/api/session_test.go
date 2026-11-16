@@ -114,7 +114,7 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 							Return(nil)
 					}
 				}
-				srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler(0)))
 				require.NoError(t, err)
 
 				req := httptest.NewRequest(op.method, op.path+tc.query, nil)
@@ -197,7 +197,7 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 						ListAuthorized(gomock.Any(), service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_other", UserID: "user_1", Limit: 20}).
 						Return(&service.ListProjectsResponse{}, nil)
 				}
-				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler(0)))
 				require.NoError(t, err)
 
 				req := httptest.NewRequest(op.method, op.path+tc.query, strings.NewReader(op.body))

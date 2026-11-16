@@ -2,23 +2,19 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { Command } from "@oclif/core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-  spinner: vi.fn(),
-}));
-
-import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
-
-import { asTerminal } from "@tests/helpers/terminal";
+import { answering, atTerminal } from "@tests/helpers/keyboard";
+import { DrawnSpinner } from "@/lib/ui/spinner";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { printing } from "@tests/helpers/run-cli";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
 import {
-  bindOperation,
+  bindOperation as bindOperationOnly,
   definitionOf,
   CreateOperation,
   type CreateSpec,
@@ -35,6 +31,43 @@ import {
   UpdateOperation,
   type UpdateSpec,
 } from "@/lib/oclif/crud";
+
+/**
+ * The generated command each operation stands in for. A run suggests commands
+ * by id and renders them from what the loaded CLI declares for that id, so a
+ * bound operation takes the id of a real command with the same verb.
+ */
+const STAND_IN = new Map<unknown, string>([
+  [ListOperation, "team:list"],
+  [GetOperation, "team:get"],
+  [CreateOperation, "team:create"],
+  [UpdateOperation, "team:update"],
+]);
+
+/**
+ * Runs `command` against the CLI's own package, whose config knows the commands
+ * a run suggests: a command run on its own would load the config of whatever
+ * started the test runner.
+ */
+function inCli<Bound extends typeof Command>(command: Bound, id: string): Bound {
+  return Object.assign(command, {
+    id,
+    run: (argv: string[]) => {
+      return Reflect.apply(Command.run, command, [argv, cliPackageRoot]);
+    },
+  });
+}
+
+/** {@link bindOperationOnly}, named as the command it stands in for. */
+const bindOperation: typeof bindOperationOnly = (operation, definition) => {
+  return inCli(
+    bindOperationOnly(operation, definition),
+    STAND_IN.get(operation) ?? "team:deactivate",
+  );
+};
+
+/** How long clack waits between one frame of a spinner and the next. */
+const FRAME = 100;
 
 type Ctx = { token: string };
 
@@ -72,7 +105,7 @@ const options = {
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
-  topic: "teams",
+  topic: "team",
   resource,
   spec,
   options,
@@ -94,7 +127,7 @@ describe("operation statics", () => {
     ]);
     expect(statics.args).toEqual({});
     expect(statics.examples[2]).toBe(
-      "<%= config.bin %> teams list --filter name=equals:<value> --sort created_at:desc",
+      "<%= config.bin %> team list --filter name=equals:<value> --sort created_at:desc",
     );
   });
 
@@ -124,7 +157,7 @@ describe("operation statics", () => {
     const filter = statics.flags.filter as { description?: string };
     expect(filter.description).toContain("category (equals; values a|b; repeats widen)");
     expect(statics.examples[2]).toBe(
-      "<%= config.bin %> teams list --filter category=equals:<value>",
+      "<%= config.bin %> team list --filter category=equals:<value>",
     );
   });
 
@@ -171,25 +204,25 @@ describe("operation statics", () => {
 
   it("leads the create and update examples with the required fields", () => {
     expect(CreateOperation.describe(definition(create)).examples[0]).toBe(
-      "<%= config.bin %> teams create --name <name> --json",
+      "<%= config.bin %> team create --name <name> --json",
     );
     expect(UpdateOperation.describe(definition(update)).examples[0]).toBe(
-      "<%= config.bin %> teams update <id> --name <name> --json",
+      "<%= config.bin %> team update <id> --name <name> --json",
     );
   });
 
   it("names the --file example as one shell word for a multi-word resource", () => {
     const idps = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
       ...definition(spec),
-      topic: "idps",
+      topic: "idp",
       resource: { ...resource, singular: "identity provider connection" },
     });
 
     expect(CreateOperation.describe(idps(create)).examples).toContain(
-      "<%= config.bin %> idps create --file ./identity-provider-connection.json",
+      "<%= config.bin %> idp create --file ./identity-provider-connection.json",
     );
     expect(UpdateOperation.describe(idps(update)).examples).toContain(
-      "<%= config.bin %> idps update <id> --file ./identity-provider-connection.json",
+      "<%= config.bin %> idp update <id> --file ./identity-provider-connection.json",
     );
   });
 
@@ -203,7 +236,7 @@ describe("operation statics", () => {
 
     const examples = CreateOperation.describe(definition(nested)).examples;
 
-    expect(examples[0]).toBe("<%= config.bin %> teams create --data '{...}' --json");
+    expect(examples[0]).toBe("<%= config.bin %> team create --data '{...}' --json");
     expect(examples.join(" ")).not.toContain("--name <name>");
   });
 
@@ -215,7 +248,7 @@ describe("operation statics", () => {
     };
 
     expect(CreateOperation.describe(definition(declared)).examples[0]).toBe(
-      "<%= config.bin %> teams create --name platform --json",
+      "<%= config.bin %> team create --name platform --json",
     );
   });
 
@@ -240,7 +273,7 @@ describe("operation statics", () => {
     // the command is `delete` everywhere, and the outcome is in the result.
     const statics = DeleteOperation.describe(definition(remove));
     expect(statics.description).toBe("Delete a team by id.");
-    expect(statics.examples).toEqual(["<%= config.bin %> teams delete <id> --force --json"]);
+    expect(statics.examples).toEqual(["<%= config.bin %> team delete <id> --force --json"]);
   });
 });
 
@@ -262,7 +295,7 @@ describe("bindOperation", () => {
     const a = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
     const b = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
       ...definition(get),
-      topic: "users",
+      topic: "user",
     });
     expect(a).not.toBe(b);
     expect(a.examples).not.toEqual(b.examples);
@@ -356,14 +389,52 @@ describe("list filters", () => {
     const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
 
     await expect(printed(command, ["--filter", "state=less_than:5"])).rejects.toThrow(
-      'Filter field "state" does not support the less_than operation',
+      /Filter field "state" does not support the less_than\s+operation/,
     );
+  });
+});
+
+describe("list nouns", () => {
+  const nothingListed = async (plural: string | undefined): Promise<string> => {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+      body: z.object({}).passthrough(),
+      filters: [],
+      call: async () => ({ rows: [] }),
+      items: (page) => page.rows,
+      next: () => undefined,
+    };
+    const named: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "idp",
+      resource: {
+        singular: "identity provider",
+        ...(plural === undefined ? {} : { plural }),
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
+      spec,
+      options: { connect: async () => ({ token: "t" }), operations: ["equals"] },
+    };
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, named);
+    const { stdout } = await printing(() =>
+      asTerminal(() => (command as unknown as { run(argv: string[]): Promise<unknown> }).run([])),
+    );
+    return stdout;
+  };
+
+  it("says the descriptor's plural when nothing is found", async () => {
+    expect(await nothingListed("identity providers")).toContain("No identity providers found");
+  });
+
+  it("says the singular's regular plural when the descriptor names none", async () => {
+    expect(await nothingListed(undefined)).toContain("No identity providers found");
   });
 });
 
 describe("write results", () => {
   it("carries data and no next command when the server answers without a body", async () => {
-    // `grants create` by identifier answers 202 with no body.
+    // `grant create` by identifier answers 202 with no body.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
@@ -377,11 +448,29 @@ describe("write results", () => {
     ]);
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
-    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {
+      title: "Command completed",
+    });
+  });
+
+  it("draws what it wrote as one line when the id has a line break in it", async () => {
+    const odd: CreateSpec<Ctx> = { schema, call: async () => ({ id: "a\nb", name: "a" }) };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(odd),
+    );
+
+    const { stdout } = await printing(() =>
+      asTerminal(() =>
+        (command as unknown as { run(a: string[]): Promise<unknown> }).run(["--name", "a"]),
+      ),
+    );
+
+    expect(stdout).toContain("Created team a\\x0ab");
   });
 
   it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
-    // `grants create` by identifier answers 202 with no body, so there is no
+    // `grant create` by identifier answers 202 with no body, so there is no
     // record to print and the generic rendering is the honest one.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
@@ -392,8 +481,36 @@ describe("write results", () => {
     const { stdout } = await printed(command, ["--name", "a"]);
 
     expect(stdout.join("\n")).not.toBe("{}");
-    expect(stdout.join("\n")).toContain("Zitadel command completed.");
+    expect(stdout.join("\n")).toContain("Command completed");
   });
+
+  it.each([
+    ["create", CreateOperation, []],
+    ["update", UpdateOperation, ["team_1"]],
+  ] as const)(
+    "draws the %s summary on a terminal and the record when piped",
+    async (verb, Operation, ids) => {
+      const written: CreateSpec<Ctx> & UpdateSpec<Ctx> = {
+        schema,
+        call: async () => ({ id: "team_1", name: "a" }),
+      };
+      const command = bindOperation(
+        Operation as OperationClass<Ctx, CreateSpec<Ctx>>,
+        definition(written),
+      );
+      const argv = [...ids, "--name", "a"];
+
+      const onScreen = await printing(() =>
+        asTerminal(() => (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv)),
+      );
+      const piped = await printing(() =>
+        offTerminal(() => (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv)),
+      );
+
+      expect(onScreen.stdout).toContain(`${verb === "create" ? "Created" : "Updated"} team team_1`);
+      expect(piped.stdout).toContain('"id": "team_1"');
+    },
+  );
 
   it("asks the server on a dry run of an update that can check, and never writes", async () => {
     const call = vi.fn(async () => ({ id: "team_1" }));
@@ -422,6 +539,37 @@ describe("write results", () => {
         result: { id: "team_1", name: "a" },
       },
     });
+  });
+
+  it("offers the same write without --dry-run as the next command, keeping what was typed", async () => {
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition({ schema, call: async () => ({ id: "team_1" }) }),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "team_1",
+      "--name",
+      "a",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      data: { next_commands: [expect.stringMatching(/ team update team_1 --name a$/)] },
+    });
+  });
+
+  it("names the resource a dry run would write as the prompt does, not the topic", async () => {
+    const command = bindOperation(CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>, {
+      ...definition(create),
+      topic: "idp",
+      resource: { ...resource, singular: "identity provider" },
+    });
+
+    const { stdout } = await printed(command, ["--name", "a", "--dry-run"]);
+
+    expect(stdout.join("\n")).toContain("Would create identity provider (dry run)");
   });
 
   it("lets a server's refusal of a dry run fail the command", async () => {
@@ -479,7 +627,7 @@ describe("write results", () => {
     };
     const envelope = await runnable.run(["team_1", "--name", "a", "--json"]);
 
-    expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
+    expect(envelope.data.next_commands[0]).toContain("team get team_1 --json");
   });
 });
 
@@ -532,7 +680,18 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain"]);
 
-    expect(stderr.join("\n")).toContain("teams list --page-token p2 --json");
+    expect(stderr.join("\n")).toContain("team list --plain --page-token p2");
+  });
+
+  it("carries --fields into the next page it suggests", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stderr } = await printed(command, ["--plain", "--fields", "name"]);
+
+    expect(stderr.join("\n")).toContain("team list --plain --fields name --page-token p2");
   });
 
   it("leaves a created resource's JSON body as the only thing on stdout", async () => {
@@ -548,6 +707,10 @@ describe("output a script reads", () => {
 });
 
 describe("list paging", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks for the page --page-token names first", async () => {
     const sent: unknown[] = [];
     const command = bindOperation(
@@ -568,36 +731,92 @@ describe("list paging", () => {
   });
 
   it("reports each page of a drain once it has it", async () => {
-    const events: string[] = [];
-    vi.mocked(spinner).mockReturnValueOnce({
-      start: vi.fn(),
-      stop: vi.fn(),
-      clear: vi.fn(),
-      message: (text?: string) => {
-        events.push(`say ${text}`);
-      },
-    } as unknown as ReturnType<typeof spinner>);
+    vi.useFakeTimers();
+    const screen = atTerminal();
+    const seen: string[] = [];
     const command = bindOperation(
       ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
       definition({
         ...list,
         body: z.object({}).passthrough(),
         call: async (_ctx, body) => {
+          vi.advanceTimersByTime(FRAME);
           const token = (body as { page_token?: string }).page_token;
-          events.push(`ask ${token ?? "first"}`);
-          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+          seen.push(`${token ?? "first"} asked after ${screen.plain().includes("page 1")}`);
+          if (token === undefined) {
+            return { teams: [], next_page_token: "p2" };
+          }
+          return token === "p2" ? { teams: [], next_page_token: "p3" } : { teams: [] };
         },
       }),
     );
 
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
-    expect(events).toEqual([
-      "ask first",
-      "say Fetching teams — page 1",
-      "ask p2",
-      "say Fetching teams — page 2",
-    ]);
+    expect(seen).toEqual(["first asked after false", "p2 asked after true", "p3 asked after true"]);
+    expect(screen.plain()).toContain("Fetching teams — page 2");
+  });
+
+  it("names the descriptor's plural in the drain's spinner, not the topic", async () => {
+    vi.useFakeTimers();
+    const screen = atTerminal();
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
+      ...definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          vi.advanceTimersByTime(FRAME);
+          const token = (body as { page_token?: string }).page_token;
+          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+        },
+      }),
+      topic: "idp",
+      resource: { ...resource, singular: "identity provider", plural: "identity providers" },
+    });
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(screen.plain()).toContain("Fetching identity providers — page 1");
+  });
+
+  it.each([
+    [1, "Fetched 1 team"],
+    [2, "Fetched 2 teams"],
+  ])("stops the drain's spinner on how many it found: %i", async (found, text) => {
+    const person = answering();
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async () => {
+          return { teams: Array.from({ length: found }, (_, index) => ({ id: `t_${index}` })) };
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(person.plain()).toContain(text);
+  });
+
+  it("clears the drain's spinner when a page throws", async () => {
+    const person = answering();
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async () => {
+          throw new Error("the page failed");
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"])).catch(() => undefined);
+
+    expect(DrawnSpinner.active.size).toBe(0);
+    expect(person.plain()).not.toContain("Fetched");
   });
 });
 
@@ -708,16 +927,8 @@ describe("get sections", () => {
 
   /** What a run prints on a terminal. */
   const printed = async (argv: string[]): Promise<string> => {
-    const written: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
-    await asTerminal(() => getting.run(argv));
-    return written.join("");
+    const { stdout } = await printing(() => asTerminal(() => getting.run(argv)));
+    return stdout;
   };
 
   it("shows a spec's sections under the fields", async () => {
@@ -727,43 +938,49 @@ describe("get sections", () => {
   it("leaves them out when --fields picks the view", async () => {
     expect(await printed(["team_1", "--fields", "name"])).not.toContain("members");
   });
+
+  it("draws a heading with a line break in it as one line", async () => {
+    const odd = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+      ...definition<GetSpec<Ctx>>({ call: async () => ({ id: "a\nb", name: "core" }) }),
+    }) as unknown as { run(argv: string[]): Promise<unknown> };
+
+    const { stdout } = await printing(() => asTerminal(() => odd.run(["x"])));
+
+    expect(stdout).toContain("Read a\\x0ab");
+  });
 });
 
 describe("delete confirmation", () => {
+  const DELETING = {
+    delete: "user:delete",
+    revoke: "session:revoke",
+    deactivate: "team:deactivate",
+  } as const;
   const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
     Object.assign(
-      bindOperation(
-        DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-        definition<DeleteSpec<Ctx>>({ verb, call }),
+      inCli(
+        bindOperationOnly(
+          DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+          definition<DeleteSpec<Ctx>>({ verb, call }),
+        ),
+        DELETING[verb],
       ),
-      { id: `teams:${verb}` },
+      // Drawn, so a question is clack's prompt, which is the one these tests answer.
+      { wizard: true },
     ) as unknown as { run(argv: string[]): Promise<unknown> };
 
   /** What a failing command prints, which is how an agent or a person reads the failure. */
   const printedByFailing = async (
     run: () => Promise<unknown>,
   ): Promise<{ stdout: string; stderr: string }> => {
-    const written: string[] = [];
-    const errors: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      errors.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
-    await run().catch(() => undefined);
-    return { stdout: written.join(""), stderr: errors.join("") };
+    const { stdout, stderr } = await printing(() => run().catch(() => undefined));
+    return { stdout, stderr };
   };
 
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+  beforeEach(() => {
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
   });
 
   it.each(["delete", "revoke", "deactivate"] as const)(
@@ -776,7 +993,9 @@ describe("delete confirmation", () => {
       expect(failure).toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
-        next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
+        next_commands: [
+          expect.stringContaining(`${DELETING[verb].replace(":", " ")} team_1 --force`),
+        ],
       });
     },
   );
@@ -795,7 +1014,7 @@ describe("delete confirmation", () => {
   it.each(["delete", "revoke", "deactivate"] as const)(
     "sends no %s when the answer is no",
     async (verb) => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
       const call = vi.fn(async () => undefined);
 
       await asTerminal(() => deleting(verb, call).run(["team_1"]));
@@ -804,16 +1023,55 @@ describe("delete confirmation", () => {
     },
   );
 
-  it("asks the question with the verb, the resource and the id", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+  it("keeps the id exact in the question a --json refusal carries", async () => {
+    const failure = JSON.parse(
+      (await printedByFailing(() => deleting("delete").run(["team\u001bx", "--json"]))).stdout,
+    );
+
+    expect(failure.details.question).toBe(
+      "Delete team team\u001bx in project proj_env on api.zitadel.example?",
+    );
+  });
+
+  it("asks the question with the verb, the resource, the id and the place", async () => {
+    const talk = answering(true);
 
     await asTerminal(() => deleting("revoke").run(["team_1"]));
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
+    expect(talk.asked()).toEqual([
+      "Revoke team team_1 in project proj_env on api.zitadel.example?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    vi.stubEnv("ZITADEL_URL", "http://localhost:8112");
+    const talk = answering(true);
+
+    await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(talk.asked()).toEqual(["Delete team team_1 in project proj_env on localhost:8112?"]);
+  });
+
+  it("spells out a control character in the id it asks about", async () => {
+    const talk = answering(true);
+
+    await asTerminal(() => deleting("delete").run(["team\u001b]0;x\u0007"]));
+
+    expect(talk.asked()).toEqual([
+      "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
+    ]);
+  });
+
+  it("closes on what it deleted as one line when the id has a line break in it", async () => {
+    const talk = answering(true);
+
+    await asTerminal(() => deleting("delete").run(["a\nb"]));
+
+    expect(talk.plain()).toContain("Deleted team a\\x0ab");
   });
 
   it("is skipped when the answer is no", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+    answering(false);
 
     const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
 
@@ -824,11 +1082,10 @@ describe("delete confirmation", () => {
   });
 
   it("fails instead of skipping on Ctrl-C", async () => {
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+    const talk = answering();
 
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(talk.plain()).toContain("Cancelled");
   });
 });

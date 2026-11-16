@@ -2,12 +2,11 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // `meta-schemas/` is gitignored build input, copied from the directory the
-    // server embeds. The package scripts run the copy themselves, so this
-    // task exists for cache invalidation: it names the upstream files as
-    // inputs, and every task that reads the copy depends on it. The script
-    // holds the `generated-sources` lock: the server's generation rewrites
-    // what it copies.
+    // `meta-schemas/` is gitignored build input, copied from the server's
+    // committed meta-schemas, the directory it embeds. The package scripts
+    // run the copy themselves, so this task exists for cache invalidation: it
+    // names the upstream files as inputs, and every task that reads the copy
+    // depends on it.
     // Its inputs leave out what the shared build shape leaves out: every
     // task that reads the copy depends on this one, so a docs or test edit
     // here would otherwise re-run them all.
@@ -15,7 +14,6 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -40,9 +38,6 @@
     },
     "build": {
       "dependsOn": ["@zitadel/api#build", "sync-schemas"]
-    },
-    "build-release": {
-      "dependsOn": ["@zitadel/api#build-release"]
     },
     // Files the tests read outside the package: the IdP design docs' Markdown
     // and example schemas, and every file their relative links name, which

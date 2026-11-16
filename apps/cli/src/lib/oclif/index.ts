@@ -4,19 +4,19 @@
  * oclif and the Zitadel envelope contract (ADR 004) is in one place.
  */
 export { type Admitted, BaseCommand, type MetaOptions } from "./base";
-export type { Refusal } from "./refusal";
+export { CREDENTIALS, type CredentialKind } from "./credentials";
 export {
   EnvironmentCommand,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "./environment-command";
-export { CREDENTIALS, type CredentialKind } from "./credentials";
-export { CommandGroups, type CommandGroup } from "./groups";
 export { nonBlankArg, nonBlankString } from "./flags";
+export { type CommandGroup, CommandGroups } from "./groups";
+export type { Refusal } from "./refusal";
 export type {
   CommandResult,
-  ConnectOptions,
   Connection,
+  ConnectOptions,
   EnvelopeMeta,
   ErrorEnvelope,
   GlobalOptions,

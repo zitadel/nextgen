@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     // Resolves workspace packages from source via the `@zitadel/source`
-    // condition; these build deps (through api:build) keep the generated api
+    // condition; these build deps (through @zitadel/api#build) keep the generated api
     // client present.
     "typecheck": {
       "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build"]

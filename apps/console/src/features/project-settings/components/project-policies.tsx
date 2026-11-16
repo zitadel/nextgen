@@ -38,7 +38,7 @@ export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) 
       role="region"
       aria-labelledby="project-policies"
     >
-      <DetailRow divider label="Password policy">
+      <DetailRow label="Password policy">
         {rules ? (
           <dl className="flex min-w-0 flex-col gap-1.5 text-sm leading-5 text-muted-foreground">
             <div className="flex items-center gap-1.5">

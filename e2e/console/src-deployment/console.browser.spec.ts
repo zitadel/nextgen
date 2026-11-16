@@ -8,7 +8,7 @@ import { recordPolicyViolations } from "../support/policy";
  * asset loads from /console/); the guard sends it to the sign-in screen; the
  * login widget asking for an email proves the server behind it, because the
  * widget takes its project from /console/runtime.json and starts its flow
- * with POST /flow on the same origin.
+ * with POST /flows on the same origin.
  */
 test("a deep link lands on the sign-in screen, whose widget asks for an email", async ({
   page,

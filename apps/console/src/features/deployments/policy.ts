@@ -3,17 +3,23 @@ import type { GetPolicyRevision200 } from "@zitadel/api/generated/model";
 /**
  * Display helpers for operation policies (ADR 066).
  *
- * A policy is typed by the operation it guards; the password policy is the
- * only one the catalog lists today. The release detail shows a pinned policy
- * revision as a short summary of its settings above its document, so the
- * helpers here turn the typed config into those rows and that document.
+ * A policy is typed by the operation it guards. The release detail shows a
+ * pinned policy revision as a short summary of its settings above its
+ * document, so the helpers here turn the typed config into those rows and
+ * that document.
  */
 
 /** One revision of a policy, as `GET /policies/revisions/{revision_id}` reads it. */
 type PolicyRevision = GetPolicyRevision200;
 
 /** The settings of the password policy; every one optional, and off when left out. */
-type PasswordPolicyConfig = PolicyRevision["config"];
+type PasswordPolicyConfig = Extract<
+  PolicyRevision,
+  { operation: "auth.factor.password.set" }
+>["config"];
+
+/** The settings of the sign-up policy; left out, the server's own challenge applies. */
+type UserCreatePolicyConfig = Extract<PolicyRevision, { operation: "user.create" }>["config"];
 
 /** One row of a policy's settings summary. */
 export interface PolicySetting {
@@ -21,29 +27,48 @@ export interface PolicySetting {
   value: string;
 }
 
-interface PolicyDisplay {
-  name: string;
-  settings: (config: PasswordPolicyConfig) => PolicySetting[];
-}
-
 /**
- * How each operation's policy reads. An operation the console does not know
- * yet, from a server whose catalog has grown, is named by the operation as
+ * Each operation's policy name. An operation the console does not know yet,
+ * from a server whose catalog has grown, is named by the operation as
  * written, which is the file name the operator edits, and shows its document
  * alone.
  */
-const POLICIES: Partial<Record<string, PolicyDisplay>> = {
-  "auth.factor.password.set": { name: "Password policy", settings: passwordPolicySettings },
+const POLICY_NAMES: Partial<Record<string, string>> = {
+  "auth.factor.password.set": "Password policy",
+  "user.create": "Sign-up policy",
 };
 
 /** The policy's name, by the operation it guards. */
 export function policyDisplayName(operation: string): string {
-  return POLICIES[operation]?.name ?? operation;
+  return POLICY_NAMES[operation] ?? operation;
 }
 
 /** The settings rows for a revision, by its operation. */
 export function policySettings(revision: PolicyRevision): PolicySetting[] {
-  return POLICIES[revision.operation]?.settings(revision.config) ?? [];
+  switch (revision.operation) {
+    case "auth.factor.password.set":
+      return passwordPolicySettings(revision.config);
+    case "user.create":
+      return userCreatePolicySettings(revision.config);
+    default:
+      return [];
+  }
+}
+
+/** What each challenge a sign-up policy can name is called. */
+const CHALLENGES: Record<NonNullable<UserCreatePolicyConfig["challenge"]>, string> = {
+  zitadel_pow: "Built-in proof of work",
+};
+
+/**
+ * The sign-up policy's settings as rows: the challenge it names. Left out, it
+ * gets no row, as a password rule left out does; the server's own challenge
+ * applies then.
+ */
+export function userCreatePolicySettings(config: UserCreatePolicyConfig): PolicySetting[] {
+  return config.challenge === undefined
+    ? []
+    : [{ label: "Challenge", value: CHALLENGES[config.challenge] }];
 }
 
 /**

@@ -42,6 +42,11 @@ export type PolicyTestFileName<Operation extends string> =
 export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set" satisfies PolicyOperation;
 
 /**
+ * The operation the sign-up policy guards, which names its file.
+ */
+export const USER_CREATE_POLICY_OPERATION = "user.create" satisfies PolicyOperation;
+
+/**
  * What a policy holds once the policy contract took its body.
  */
 export type PolicyValue = ContractValue<typeof policyConfigSchema>;

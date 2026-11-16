@@ -1,15 +1,20 @@
-import { eventsCsv, type LogEvent } from "./model";
+import { copyText } from "@/lib/clipboard";
 
-/** The loaded events on the clipboard, as JSON: an array of what the API returned. */
-export async function copyEvents(events: readonly LogEvent[]): Promise<void> {
-  await navigator.clipboard.writeText(JSON.stringify(events, null, 2));
+import { eventsCsv, type ProjectEvent } from "./model";
+
+/**
+ * The loaded events on the clipboard, as JSON: an array of what the API
+ * returned. `false` when the clipboard refused them.
+ */
+export function copyEvents(events: readonly ProjectEvent[]): Promise<boolean> {
+  return copyText(JSON.stringify(events, null, 2));
 }
 
 /**
  * The loaded events saved as a file: JSON, the events as the API returned
  * them, or CSV ({@link eventsCsv}). Named after the moment it was saved.
  */
-export function downloadEvents(events: readonly LogEvent[], format: "json" | "csv"): void {
+export function downloadEvents(events: readonly ProjectEvent[], format: "json" | "csv"): void {
   const body = format === "json" ? JSON.stringify(events, null, 2) : eventsCsv(events);
   const type = format === "json" ? "application/json" : "text/csv";
   const url = URL.createObjectURL(new Blob([body], { type }));

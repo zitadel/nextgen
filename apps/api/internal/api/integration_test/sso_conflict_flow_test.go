@@ -27,7 +27,6 @@ import (
 // sso_user_not_found routes, which a bound attempt never reaches.
 const ssoConflictFlowDefinition = `{
 	"name": "sso-conflict-login",
-	"status": "active",
 	"user_schema": %q,
 	"purposes": {"login": "identifier", "register": "register"},
 	"steps": [
@@ -102,7 +101,7 @@ func newSSOConflictFixture(t *testing.T) *ssoResolutionFixture {
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	var def api.FlowDefinition
 	require.NoError(t, def.UnmarshalJSON(fmt.Appendf(nil, ssoConflictFlowDefinition, defaultSchemaURL())))
-	resp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	resp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: def,
 	})
@@ -117,6 +116,9 @@ func newSSOConflictFixture(t *testing.T) *ssoResolutionFixture {
 func (f *ssoResolutionFixture) submitAction(t *testing.T, flow ssoFlow, action string, fields map[string]string) api.SubmitFlowStepRes {
 	t.Helper()
 	req := &api.FlowSubmitRequest{Action: action}
+	if action == "submit" && fields["x-auth-methods#password"] != "" {
+		req.GateProofs = currentSignupProofs(t, f.client, flow.id, flow.zflow)
+	}
 	if fields != nil {
 		raw := api.FlowSubmitRequestFields{}
 		for name, value := range fields {
@@ -124,7 +126,7 @@ func (f *ssoResolutionFixture) submitAction(t *testing.T, flow ssoFlow, action s
 		}
 		req.Fields = api.NewOptFlowSubmitRequestFields(raw)
 	}
-	resp, err := f.client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	resp, err := f.client.SubmitFlowStep(t.Context(), req, api.SubmitFlowStepParams{FlowID: flow.id, Zflow: flow.zflow})
 	require.NoError(t, err)
 	return resp
 }
@@ -137,10 +139,10 @@ func advance(t *testing.T, flow *ssoFlow, resp any) api.FlowResponse {
 	switch r := resp.(type) {
 	case *api.FlowResponseHeaders:
 		got = r
-	case *api.SubmitFlowStepOK:
-		got = (*api.FlowResponseHeaders)(r)
-	case *api.SubmitFlowStepBadRequest:
-		got = (*api.FlowResponseHeaders)(r)
+	case *api.SubmitFlowStepBadRequestHeaders:
+		step, ok := r.Response.GetFlowResponse()
+		require.True(t, ok, "a refusal, not a step: %s", helpers.MustMarshal(t, resp))
+		got = &api.FlowResponseHeaders{CacheControl: r.CacheControl, SetCookie: r.SetCookie, Response: step}
 	default:
 		require.Failf(t, "not a step response", "%s", helpers.MustMarshal(t, resp))
 	}
@@ -220,8 +222,8 @@ func TestSSOConflictBackAfterSignInAsksToSignIn(t *testing.T) {
 	require.Equal(t, "sso-conflict", back.Step.Name)
 
 	resp := f.submitAction(t, flow, "submit", map[string]string{"x-auth-methods#password": "correct-horse-battery-staple"})
-	require.IsType(t, &api.SubmitFlowStepBadRequest{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepBadRequest).Response
+	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := badRequestStep(t, resp)
 	assert.Equal(t, "sso-conflict", got.Step.Name)
 	assert.Equal(t, "error.sign_in_first", got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)

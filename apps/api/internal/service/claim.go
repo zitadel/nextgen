@@ -304,6 +304,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 			ProjectID:  asgn.ProjectID,
 			EntityType: "authz_assignment",
 			EntityID:   asgn.ID,
+			UserID:     asgn.PrincipalUserID(),
 			ActorID:    &userID,
 			ActorType:  &actorType,
 			Payload: domain.AuthzGrantedPayload{

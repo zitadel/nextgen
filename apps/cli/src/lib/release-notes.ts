@@ -29,10 +29,14 @@ export async function breakingChanges(from: string, to: string): Promise<Breakin
       .flatMap((release) => {
         const version = semver.valid(String(release.tag_name));
         return version !== null && semver.gt(version, from) && semver.lte(version, to)
-          ? breakingNotes(String(release.body ?? "")).map((note) => ({ version, note }))
+          ? breakingNotes(String(release.body ?? "")).map((note) => {
+              return { version, note };
+            })
           : [];
       })
-      .sort((a, b) => semver.compare(a.version, b.version));
+      .sort((a, b) => {
+        return semver.compare(a.version, b.version);
+      });
   } catch {
     return [];
   }

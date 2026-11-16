@@ -1,5 +1,23 @@
 # @zitadel/components
 
+## 0.6.0
+
+### Minor Changes
+
+- [#2687](https://github.com/zitadel/nextgen/pull/2687) [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b) - User attributes must now match their schema's `format`. Creating a user, patching one and signing up all refuse a value like `not-an-email` for a `format: email` property, with `attributes_invalid` naming the attribute, so `zitadel users create` and `users update` do too. This covers the standard JSON Schema formats, such as `email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`, stays a label.
+  
+  **Breaking:** values stored before this change get no exception. A patch to a user holding a value that fails its `format` is refused until the same request corrects it, and a stored identifier that fails its `format` no longer signs in or starts recovery. Correct such values through `PATCH /users/{id}` or `zitadel users update`.
+  
+  In a login flow, a blank optional field with a format counts as unset, and a `date-time` field gets a date and time input.
+  
+  A `--user-file` document that creates a user with a bad value now stops the server from starting.
+
+### Patch Changes
+
+- [#2899](https://github.com/zitadel/nextgen/pull/2899) [`bcd9413`](https://github.com/zitadel/nextgen/commit/bcd9413e7f1065cde76afb4149fddadd3e843cb6) - `<zitadel-login>` keeps field names that collide with DOM property names, such as `name` or `title`, so a schema field named `name` no longer breaks registration. `createSanitiser()` no longer strips `id` or `name` values that match `document` or form properties, so do not insert its output into the main document.
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`8f2033e`](https://github.com/zitadel/nextgen/commit/8f2033e8404f2eddbf77fd4438fdb8a5421ca950), [`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`4860117`](https://github.com/zitadel/nextgen/commit/486011736d8891f7527ae684b15b6b295fa8ad38), [`d2409a3`](https://github.com/zitadel/nextgen/commit/d2409a323308123f9881b752ffc292d7a475bad6), [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b), [`e741248`](https://github.com/zitadel/nextgen/commit/e741248d1f4447ecda85c05395d209a011946bed)]:
+  - @zitadel/config@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

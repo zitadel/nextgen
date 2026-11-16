@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
 import type { PackageJson } from "type-fest";
 
 import { readIfExists } from "./fs";

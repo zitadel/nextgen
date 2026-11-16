@@ -1,9 +1,10 @@
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { isErrno, ZitadelError } from "@/lib/errors";
 import { pathExists, readDirIfExists } from "@/lib/fs";
 import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
+
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
@@ -12,8 +13,8 @@ import type { Patcher } from "./patchers/types";
 import { scaffolders } from "./scaffolders";
 import type { Scaffolder } from "./scaffolders/types";
 
-export type { Detector, FrameworkFacts } from "./detectors/types";
 export { issuerFromPort } from "./detectors/port";
+export type { Detector, FrameworkFacts } from "./detectors/types";
 
 /** One framework the CLI can scaffold from scratch, surfaced to the picker. */
 export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
@@ -89,7 +90,9 @@ export class Orca {
    */
   async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
     const candidates = requested
-      ? this.detectors.filter((detector) => detector.framework === requested)
+      ? this.detectors.filter((detector) => {
+          return detector.framework === requested;
+        })
       : this.detectors;
     if (requested && candidates.length === 0) {
       throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", `Unsupported framework "${requested}"`, {
@@ -200,21 +203,34 @@ export class Orca {
     // one, move the existing entries aside, scaffold, then restore anything the
     // scaffold did not create itself.
     const stash = await stashScaffoldDir(cwd, target.entries);
-    const undo = () =>
-      created === undefined
+    const undo = () => {
+      return created === undefined
         ? undoScaffold(cwd, before, stash)
         : rm(created, { recursive: true, force: true });
+    };
     // Starting from a resolved promise puts the scaffolder lookup, which throws
     // for an unknown framework, under the same undo as the scaffold itself.
     const facts = await Promise.resolve()
-      .then(() => this.scaffolderFor(framework).scaffold(cwd, framework))
-      .then(() => restoreBesideScaffold(cwd, stash))
-      .then(() => this.detect(cwd, framework))
+      .then(() => {
+        return this.scaffolderFor(framework).scaffold(cwd, framework);
+      })
+      .then(() => {
+        return restoreBesideScaffold(cwd, stash);
+      })
+      .then(() => {
+        return this.detect(cwd, framework);
+      })
       .catch(async (error: unknown) => {
         await undo();
         throw error;
       });
-    return { facts, undo, keep: () => dropStash(stash) };
+    return {
+      facts,
+      undo,
+      keep: () => {
+        return dropStash(stash);
+      },
+    };
   }
 
   /**
@@ -222,11 +238,15 @@ export class Orca {
    * available list) when none matches.
    */
   scaffolderFor(framework: string): Scaffolder {
-    const scaffolder = this.scaffolders.find((candidate) => candidate.canScaffold(framework));
+    const scaffolder = this.scaffolders.find((candidate) => {
+      return candidate.canScaffold(framework);
+    });
     if (!scaffolder) {
       throw new ZitadelError("E_VALIDATION", `No scaffolder supports "${framework}"`, {
         hint: `Available frameworks: ${this.availableFrameworks()
-          .map((f) => f.id)
+          .map((f) => {
+            return f.id;
+          })
           .join(", ")}.`,
       });
     }
@@ -238,7 +258,9 @@ export class Orca {
    * matches (e.g. a framework that can be scaffolded but not yet integrated).
    */
   patcherFor(framework: string): Patcher {
-    const patcher = this.patchers.find((candidate) => candidate.canPatch(framework));
+    const patcher = this.patchers.find((candidate) => {
+      return candidate.canPatch(framework);
+    });
     if (!patcher) {
       throw new ZitadelError("E_VALIDATION", `No patcher supports "${framework}"`, {
         hint: "Zitadel integration currently supports Next.js.",
@@ -249,24 +271,34 @@ export class Orca {
 
   /** The frameworks that can be scaffolded, derived from the scaffolder registry. */
   availableFrameworks(): ReadonlyArray<FrameworkChoice> {
-    return this.scaffolders.map((scaffolder) => ({
-      id: scaffolder.supportedFrameworks[0] ?? scaffolder.displayName,
-      displayName: scaffolder.displayName,
-    }));
+    return this.scaffolders.map((scaffolder) => {
+      return {
+        id: scaffolder.supportedFrameworks[0] ?? scaffolder.displayName,
+        displayName: scaffolder.displayName,
+      };
+    });
   }
 
   private frameworkIds(): ReadonlyArray<string> {
-    return this.detectors.map((detector) => detector.framework);
+    return this.detectors.map((detector) => {
+      return detector.framework;
+    });
   }
 
   /** A framework's name as people write it ("Next.js" for `next`), or its id when it has none. */
   displayName(id: string): string {
-    return this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    return (
+      this.availableFrameworks().find((framework) => {
+        return framework.id === id;
+      })?.displayName ?? id
+    );
   }
 
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
   private frameworkMismatch(requested: string, detected: string): ZitadelError {
-    const name = (id: string) => this.displayName(id);
+    const name = (id: string) => {
+      return this.displayName(id);
+    };
     return new ZitadelError(
       "E_CONFLICT",
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
@@ -322,7 +354,9 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
  */
 export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
   return stat(cwd).then(
-    (stats) => stats.isDirectory(),
+    (stats) => {
+      return stats.isDirectory();
+    },
     (error: unknown) => {
       if (isErrno(error, "ENOENT")) {
         return true;
@@ -345,11 +379,15 @@ async function isLocalRuntimeEntry(cwd: string, name: string): Promise<boolean> 
   try {
     if (name === dirname(LOCAL_RUNTIME_DIR)) {
       const inside = await readdir(join(cwd, name));
-      return inside.every((entry) => entry === basename(LOCAL_RUNTIME_DIR));
+      return inside.every((entry) => {
+        return entry === basename(LOCAL_RUNTIME_DIR);
+      });
     }
     if (name === ".gitignore") {
       const lines = (await readFile(join(cwd, name), "utf8")).split(/\r?\n/);
-      return lines.every((line) => ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim()));
+      return lines.every((line) => {
+        return ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim());
+      });
     }
   } catch {
     // Not a directory, or not a readable file: not what `start` wrote.
@@ -472,8 +510,14 @@ async function dropStash(stash: ScaffoldStash | undefined): Promise<void> {
 /** Append any lines from the stashed `.gitignore` that the scaffold's own one lacks. */
 async function mergeGitignore(stashed: string, dest: string): Promise<void> {
   const [from, into] = await Promise.all([readFile(stashed, "utf8"), readFile(dest, "utf8")]);
-  const present = new Set(into.split("\n").map((line) => line.trim()));
-  const missing = from.split("\n").filter((line) => line.trim() && !present.has(line.trim()));
+  const present = new Set(
+    into.split("\n").map((line) => {
+      return line.trim();
+    }),
+  );
+  const missing = from.split("\n").filter((line) => {
+    return line.trim() && !present.has(line.trim());
+  });
   if (missing.length === 0) {
     return;
   }

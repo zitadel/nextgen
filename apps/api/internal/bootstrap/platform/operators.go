@@ -135,6 +135,7 @@ func emitOperatorEvent(ctx context.Context, stmts service.AllStatements, typ dom
 		ProjectID:  a.ProjectID,
 		EntityType: "authz_assignment",
 		EntityID:   a.ID,
+		UserID:     a.PrincipalUserID(),
 		Payload:    payload,
 		ActorType:  &system,
 	})

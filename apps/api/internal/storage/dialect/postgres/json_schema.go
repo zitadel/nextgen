@@ -40,25 +40,69 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		}
 		schema.Kind = parsedKind
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL)); err != nil {
+			return err
+		}
+		// The new revision is the newest of its object type, so search answers
+		// with it.
+		if entry, ok := domain.SchemaSearchEntry(schema); ok {
+			return writeSearchEntry(ctx, tx, entry)
+		}
+		return nil
 	})
 }
 
-const deleteByIDJSONSchemaStmt = `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1 AND url = $2`
+const deleteByIDJSONSchemaStmt = `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1 AND url = $2 RETURNING project_id, url, object_type, kind, created_at, payload`
+
+// newestJSONSchemaByObjectTypeStmt is one descent of
+// idx_json_schemas_object_type_revision.
+const newestJSONSchemaByObjectTypeStmt = jsonSchemaQuery + ` WHERE project_id = $1 AND object_type = $2 ORDER BY created_at DESC LIMIT 1`
 
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		tag, err := tx.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
+		rows, err := tx.Query(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
 		if err != nil {
 			return wrapError(err)
 		}
-		if tag.RowsAffected() == 0 {
+		deleted, err := pgx.CollectRows(rows, jsonSchemaScanner(false))
+		if err != nil {
+			return wrapError(err)
+		}
+		if len(deleted) == 0 {
 			return nil
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID)
+		if err := rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID); err != nil {
+			return err
+		}
+		return js.replaceSearchEntry(ctx, tx, deleted[0])
 	})
+}
+
+// replaceSearchEntry points the search entry of a deleted schema's object type
+// at the newest revision left, or removes it when none is.
+func (js jsonSchemaStatements) replaceSearchEntry(ctx context.Context, tx queryExecutor, deleted *domain.JSONSchema) error {
+	entry, ok := domain.SchemaSearchEntry(deleted)
+	if !ok {
+		return nil
+	}
+	if deleted.ObjectType != nil {
+		rows, err := tx.Query(ctx, newestJSONSchemaByObjectTypeStmt, deleted.ProjectID, *deleted.ObjectType)
+		if err != nil {
+			return wrapError(err)
+		}
+		newest, err := pgx.CollectRows(rows, jsonSchemaScanner(false))
+		if err != nil {
+			return wrapError(err)
+		}
+		if len(newest) > 0 {
+			if next, ok := domain.SchemaSearchEntry(newest[0]); ok {
+				return writeSearchEntry(ctx, tx, next)
+			}
+		}
+	}
+	return deleteSearchEntry(ctx, tx, entry.ProjectID, entry.Kind, entry.Key)
 }
 
 const jsonSchemaQuery = "SELECT project_id, url, object_type, kind, created_at, payload FROM zitadel_nextgen.json_schemas"

@@ -2,10 +2,9 @@ import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
 import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
-
-import { consola } from "consola";
 import { Agent, type Dispatcher } from "undici";
 
+import { log } from "@/lib/log";
 import { userAgent } from "@/lib/user-agent";
 import type { JsonObject } from "@/lib/zitadel";
 
@@ -160,7 +159,7 @@ export async function brandingAssetWarnings(
   brandings: readonly JsonObject[],
 ): Promise<readonly string[]> {
   if (process.env.ZITADEL_SKIP_ASSET_PROBE) {
-    consola.debug("Branding asset probe skipped (ZITADEL_SKIP_ASSET_PROBE is set)");
+    log.debug("Branding asset probe skipped (ZITADEL_SKIP_ASSET_PROBE is set)");
     return [];
   }
 
@@ -226,7 +225,7 @@ export async function probeAsset(
   const target = current ?? new URL(url);
   try {
     if (!isSafeProbeUrl(target)) {
-      consola.debug(`asset probe ${url} skipped unsafe/private target: ${target.href}`);
+      log.debug(`asset probe ${url} skipped unsafe/private target: ${target.href}`);
       return { kind: "inconclusive" };
     }
 
@@ -268,10 +267,10 @@ export async function probeAsset(
     return { kind: "content-type", contentType };
   } catch (error) {
     if (isUnsafeProbeTargetError(error, 0)) {
-      consola.debug(`asset probe ${url} skipped unsafe/private target`);
+      log.debug(`asset probe ${url} skipped unsafe/private target`);
       return { kind: "inconclusive" };
     }
-    consola.debug(`asset probe ${url} failed:`, error);
+    log.debug(`asset probe ${url} failed:`, error);
     return { kind: "unreachable", detail: describeProbeError(error, timeoutMs) };
   }
 }

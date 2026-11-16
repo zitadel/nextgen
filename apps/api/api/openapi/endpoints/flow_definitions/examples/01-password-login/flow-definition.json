@@ -3,7 +3,6 @@
   "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
   "flow_definition": {
     "name": "password-login",
-    "status": "active",
     "user_schema": "human-user",
     "purposes": {
       "login": "identifier"

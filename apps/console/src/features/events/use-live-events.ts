@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { describeError } from "@/lib/api-error";
 
 import { listNewerEvents } from "./api";
-import type { LogEvent, LogsSearch } from "./model";
+import type { ProjectEvent, EventsSearch } from "./model";
 
 /** How often Live asks for newer events. */
-export const LIVE_INTERVAL_MS = 3000;
+const LIVE_INTERVAL_MS = 3000;
 
 /**
  * Whether Live was left on. A new filter reads the list again under a new
@@ -46,10 +46,10 @@ export function useLiveEvents({
   enabled = true,
 }: {
   projectId: string;
-  search: LogsSearch;
+  search: EventsSearch;
   loaded: unknown;
   /** The newest event the list holds, where Live starts reading. */
-  newest: LogEvent | undefined;
+  newest: ProjectEvent | undefined;
   /** Whether the list can have newer events at all: a range that has ended cannot. */
   enabled?: boolean;
 }) {
@@ -59,7 +59,7 @@ export function useLiveEvents({
       wanted = typeof next === "function" ? next(current) : next;
       return wanted;
     });
-  const [events, setEvents] = useState<LogEvent[]>([]);
+  const [events, setEvents] = useState<ProjectEvent[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   // When Live last finished a read: what the screen says it is up to date with.
   const [checkedAt, setCheckedAt] = useState<Date | undefined>(undefined);

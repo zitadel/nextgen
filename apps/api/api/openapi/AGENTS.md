@@ -9,10 +9,13 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
 - Never hand-edit the ogen output, the server stubs in
   `apps/api/internal/api/generated/` and the public client in
   `packages/go/api/*_gen.go`, or orval's `packages/api/src/generated/`. Change
-  the spec, then run `moon run server:generate`; CI checks the committed output
-  with `server:check-generate`.
-- Lint the spec with `moon run server:openapi` (Redocly with the repo's
-  [`redocly.yaml`](../../../../redocly.yaml)).
+  the spec, then run `turbo run generate --filter=@zitadel/server`; CI checks
+  the committed output with `@zitadel/server#check-generate`.
+- Lint the spec with `turbo run lint --filter=@zitadel/server`: the server's
+  static checks include Redocly with the repo's
+  [`redocly.yaml`](../../../../redocly.yaml).
+- Pin a known Redocly finding in `.redocly.lint-ignore.yaml` with its reason;
+  `scripts/lint-openapi.mjs` fails on an entry that suppresses nothing.
 
 ## Wire casing: snake_case
 
@@ -23,16 +26,28 @@ silently at runtime: an unknown property is dropped, not rejected.
   `rule/wire-parameter-no-camel-case` in `redocly.yaml` gate it, with
   documented carve-outs (JSON Schema keywords, `x-` extensions, RFC
   vocabularies, header and cookie names).
-- `moon run workspace:check-openapi-rules` runs fixture tests
+- `pnpm run check-openapi-rules` runs fixture tests
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
+
+## Operation IDs and path parameters
+
+An `operationId` is public: `zitadel api <operationId>`, the Go and TS client
+method names, the API reference page URLs.
+
+- Name an operation `<verb><Resource>` in camelCase, with a verb the spec
+  already uses and no `By…` suffix; `rule/operation-id-verb-camel-case` gates it.
+- Name a path parameter after its resource (`{schema_id}`), never `{id}`;
+  `rule/path-parameter-not-id` gates it.
+- Give a `{…_id}` path parameter a schema with a `pattern`, a $ref to its
+  resource's ID schema; `rule/path-id-parameter-pattern` gates it.
 
 ## Patterns say what a valid value looks like
 
 - Give every `pattern` in the OpenAPI spec an `x-zitadel-pattern-message` beside it: the sentence
   that follows the field's name when a value fails it (`must be a user ID:
   user_ followed by letters, digits, _ or -`). orval's zod output carries no
-  message of its own, so `moon run api:generate` adds this one
+  message of its own, so `turbo run generate --filter=@zitadel/api` adds this one
   (`packages/api/scripts/pattern-messages.ts`).
 - A message belongs to the pattern's text, so fields that share a regex share
   its wording. Generation fails when a pattern has no message, or when the same
@@ -70,6 +85,22 @@ structured `filter` / `sorting` bodies
 the reference implementation; the how-to is in
 [`readme.md`](readme.md#api-design-conventions).
 
+A list is the `GET` on a collection or the `POST` on its `/query`; a collection
+is a path an ID follows (`/users` in `/users/{user_id}`), one that is queried,
+or one a `list…` operation reads. `check-openapi-rules` checks these on the
+bundle in [`openapi-list-conventions.test.mjs`](../../../../scripts/openapi-list-conventions.test.mjs).
+
+- Return `{ <resource>: [...], next_page_token }` from a list and nothing else,
+  the array named after the collection's segment; `list-response-shape` gates it.
+- Page a list by `page_token` and a `limit` of 1 to 100, default 20 (the shared
+  `limit` schema); `list-pagination` gates it.
+- Sort a query by its own `<resource>-sort-field` enum, not its filter's enum;
+  `query-sort-field` gates it.
+- Name a collection's segment as a plural snake_case noun (`/flow_definitions`);
+  `collection-plural` gates it.
+- Name a departure in that test's `KNOWN_VIOLATIONS` (to fix) or `EXEMPT` (by
+  design), with its reason; an entry that finds nothing fails the test.
+
 ## Identifiers on the wire
 
 Resource IDs are prefixed opaque strings (`user_01H…`, `proj_01H…`,
@@ -78,12 +109,15 @@ Resource IDs are prefixed opaque strings (`user_01H…`, `proj_01H…`,
 prefixed form in `example:` fields, never the retired dictionary slug
 (`river-8421`).
 
+- Name a resource's own ID `id`. A session, auth attempt, challenge and passkey
+  registration use `session_id`, `attempt_id`, `challenge_id`, `registration_id`.
+
 ## CLI commands — `x-zitadel-cli`
 
 An operation the `zitadel` CLI runs names its command in `x-zitadel-cli`, on
-the line after its `operationId` (`x-zitadel-cli: users create`); the API
+the line after its `operationId` (`x-zitadel-cli: user create`); the API
 reference shows it beside the samples. The CLI's
-[`api-coverage` test](../../../../apps/cli/tests/unit/commands/api-coverage.test.ts)
+[`api-coverage` test](../../../../apps/cli/tests/unit/cli/commands/api-coverage.test.ts)
 fails until every command names exactly one operation it calls, and on a name
 no command answers to.
 
@@ -94,7 +128,7 @@ no command answers to.
 - A `PATCH` is not marked, though a merge-patch `null` removes what it names:
   updates are not guarded yet, and need a follow-up of their own.
 - The CLI's client only exposes a destructive operation behind a confirmation
-  ([consent](../../apps/cli/src/lib/consent.ts)).
+  ([consent](../../../cli/src/lib/consent.ts)).
 
 ## Descriptions — the first sentence stands alone
 

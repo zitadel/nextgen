@@ -53,13 +53,14 @@ export const Route = createFileRoute("/_authed/branding/")({
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    // Newest first, so the head of the list is what visitors see today. The
-    // list carries ids only, so the configuration itself is a second call. A
-    // project that has never published branding has no revision, and the
-    // panel then shows the maintained defaults.
+    // Newest first, so the head of the list is what visitors see today, and
+    // one row is all the screen reads. The list carries ids only, so the
+    // configuration itself is a second call. A project that has never
+    // published branding has no revision, and the panel then shows the
+    // maintained defaults.
     const projectId = requireProjectScope(deps.project);
     const [revisions, flows] = await Promise.all([
-      api.listBranding({ project_id: projectId }),
+      api.listBranding({ project_id: projectId, limit: 1 }),
       // One row per flow rather than per revision (#1246), as the Login
       // flows directory asks for it. The preview starts a flow by name, so a
       // second revision of one is an ambiguous row rather than another choice.
@@ -77,9 +78,9 @@ export const Route = createFileRoute("/_authed/branding/")({
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
       successStep: successStepName(entry.flow_definition.steps),
     }));
-    const latest = revisions[0];
+    const latest = revisions.branding[0];
     if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
-    const found = await api.getBrandingById(latest.id);
+    const found = await api.getBranding(latest.id);
     return { revision: found.branding as BrandingRevision, flows: previewFlows };
   },
   component: BrandingScreen,
@@ -198,10 +199,12 @@ function BrandingScreen() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* One name in both states: `aria-pressed` says which is on. */}
             <Button
               variant="outline"
               size="icon"
-              aria-label={narrow ? "Show at desktop width" : "Show at phone width"}
+              aria-label="Phone width"
+              title="Phone width"
               aria-pressed={narrow}
               onClick={() => setNarrow((value) => !value)}
             >
@@ -230,9 +233,11 @@ function BrandingScreen() {
                     <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
                       <entry.icon aria-hidden />
                       {entry.label}
-                      {/* What a visitor gets, and why a side is not offered. */}
+                      {/* What a visitor gets, and why a side is not offered. Muted
+                          text fails contrast on the highlighted row's accent, so
+                          the hint takes the row's colour there. */}
                       {(id === "revision" || id === unpublished) && (
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground in-data-highlighted:text-accent-foreground">
                           {id === "revision" ? revisionSide(revision) : "Not published"}
                         </span>
                       )}
@@ -260,7 +265,17 @@ function BrandingScreen() {
             // Centred by auto margins, not the stage's alignment: a step
             // taller than the stage (an error banner) then starts at its top
             // and scrolls, instead of spilling above where it cannot.
-            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+            // Phone width is the card on a 375px screen, less the login page's
+            // padding either side (`--zl-spacing-6` below 48rem). The card
+            // stops at its own 384px maximum, so a phone frame must be
+            // narrower than that to show any change.
+            <div
+              className={
+                narrow
+                  ? "m-auto w-[calc(375px-2*var(--zl-spacing-6))] max-w-full"
+                  : "m-auto w-full max-w-lg"
+              }
+            >
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
@@ -274,7 +289,7 @@ function BrandingScreen() {
           )}
         </PreviewStage>
 
-        <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
+        <Card className="min-h-0 overflow-hidden p-0 shadow-xs outline-foreground/10">
           <SettingsPanel revision={revision} />
         </Card>
       </div>

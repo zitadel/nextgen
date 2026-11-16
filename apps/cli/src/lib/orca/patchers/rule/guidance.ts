@@ -155,7 +155,7 @@ ${deploy}
 
 /** The command that moves the app to another dev port, `<port>` left to fill in. */
 function movePortCommand(ctx: PatchContext): string {
-  return publicCliCommand("setup --dev-port <port>", ctx.cliVersion);
+  return publicCliCommand("setup --dev-port '<port>'", ctx.cliVersion);
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */

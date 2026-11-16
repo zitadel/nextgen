@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { Config } from "@oclif/core";
 import { expect } from "vitest";
+
+import {
+  declaredOf,
+  type LooseNext,
+  type Scope,
+  type Suggest,
+  type SuggestWords,
+  suggesterFor,
+  suggestionWords,
+} from "@/lib/suggestion";
 
 import { cliPackageRoot } from "./oclif-build";
 
@@ -26,6 +37,9 @@ const REFERENCE = JSON.parse(
 
 /** The CLI as a suggestion runs it: `npx @zitadel/cli@<version>` or `zitadel`. */
 const RUNNER = /^(?:@zitadel\/cli(?:@\S+)?|zitadel)$/;
+
+/** The words that ask for help rather than run a command. */
+const HELP: ReadonlySet<string> = new Set(["--help", "-h"]);
 
 /** One shell word: unquoted characters, escapes and quoted runs, up to the next blank. */
 const SHELL_WORD = /(?:[^\s'"\\]|\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*")+/g;
@@ -126,6 +140,16 @@ function problemWith(command: string): string | undefined {
     (word, at) => at > runner && ["|", "&&", "||", ";", "<", ">", "2>&1"].includes(word),
   );
   const rest = words.slice(runner + 1, end === -1 ? undefined : end);
+  // Help is oclif's own flag, on the CLI and on every command, so no command lists it.
+  if (rest.length > 0 && HELP.has(rest.at(-1) as string)) {
+    const named = rest.slice(0, -1);
+    return named.length === 0 ||
+      REFERENCE.commands.some(({ id }) => {
+        return id === named.join(" ");
+      })
+      ? undefined
+      : `names no command: ${named.slice(0, 2).join(" ")}`;
+  }
   const reference = REFERENCE.commands
     .filter(({ id }) => id.split(" ").every((part, at) => rest[at] === part))
     .sort((a, b) => b.id.split(" ").length - a.id.split(" ").length)[0];
@@ -176,4 +200,52 @@ export function assertRunnableSuggestions(
       `${where}: a refusal for want of --force names no way to pass it`,
     ).toBe(true);
   }
+}
+
+/** The release the commands a test renders are written for, unless it says otherwise. */
+export const SUGGEST_CLI_VERSION = "0.1.0";
+
+const config = await Config.load(cliPackageRoot);
+
+/**
+ * A {@link Suggest} as a run renders its suggestions, against the commands the
+ * CLI really declares: what a command suggests in a test is what it suggests
+ * for a person.
+ *
+ * @param scope - What the run puts back on each command: its directory and environment.
+ * @param cliVersion - The release the commands are written for.
+ * @returns The renderer.
+ */
+export function aSuggest(scope: Scope = {}, cliVersion: string = SUGGEST_CLI_VERSION): Suggest {
+  return suggesterFor(config, scope, cliVersion);
+}
+
+/**
+ * A {@link SuggestWords} as a run renders its suggestions: the words after the
+ * CLI, unquoted, for a result that reports argument lists too.
+ *
+ * @param scope - What the run puts back on each command: its directory and environment.
+ * @returns The renderer.
+ */
+export function aSuggestWords(scope: Scope = {}): SuggestWords {
+  return (next: LooseNext) => {
+    return suggestionWords(next.id, next, declaredOf(next.id, config.findCommand(next.id)), scope);
+  };
+}
+
+/**
+ * A config for a command built in a test: the release it reports is fixed, so
+ * what it renders reads the same on every build, and it finds the CLI's real
+ * commands, which its suggestions are rendered against.
+ *
+ * @param version - The release the run reports.
+ * @returns The config.
+ */
+export function aConfigAt(version: string): Config {
+  return {
+    version,
+    findCommand: (id: string) => {
+      return config.findCommand(id);
+    },
+  } as unknown as Config;
 }

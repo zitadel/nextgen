@@ -1,4 +1,5 @@
 import type { Property } from "@/lib/telemetry/property";
+
 import { envEnabled } from "./env-flag";
 
 /** Coarse CI provider name, or `undefined` when not running in CI. */
@@ -13,7 +14,9 @@ class CiProvider implements Property<NodeJS.ProcessEnv, string | undefined> {
   ] as const satisfies ReadonlyArray<readonly [string, string]>;
 
   public value(env: NodeJS.ProcessEnv): string | undefined {
-    const named = CiProvider.providers.find(([marker]) => envEnabled(env[marker]));
+    const named = CiProvider.providers.find(([marker]) => {
+      return envEnabled(env[marker]);
+    });
     if (named) {
       return named[1];
     }

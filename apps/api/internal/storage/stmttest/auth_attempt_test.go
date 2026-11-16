@@ -128,3 +128,23 @@ func TestAuthAttemptStatements_RuntimeSealRoundTrip(t *testing.T) {
 		assert.Equal(t, "rel_seal1", got.ReleaseID)
 	})
 }
+
+// An attempt keeps the flow that created it, which the handoff exchange
+// stamps on its events; one created outside a flow keeps none.
+func TestAuthAttemptStatements_FlowIDRoundTrip(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		inFlow := &domain.AuthAttempt{ProjectID: projectID, FlowID: "flow_roundtrip1"}
+		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), inFlow))
+		direct := &domain.AuthAttempt{ProjectID: projectID}
+		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), direct))
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, inFlow.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "flow_roundtrip1", got.FlowID)
+
+		got, err = d.stmts.GetAuthAttemptByID(t.Context(), projectID, direct.ID)
+		require.NoError(t, err)
+		assert.Empty(t, got.FlowID)
+	})
+}

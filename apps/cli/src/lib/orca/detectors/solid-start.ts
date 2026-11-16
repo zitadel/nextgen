@@ -22,7 +22,9 @@ export class SolidStartDetector implements Detector {
   readonly versionFloor = "2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (!pkg || !hasDependency(pkg, "solid-js") || !hasDependency(pkg, "@solidjs/start")) {
       return null;
     }

@@ -47,7 +47,7 @@ function summary(id: string, overrides: Record<string, unknown> = {}) {
 }
 
 const SCHEMA = { title: "Customer", objectType: "human-user", type: "object" };
-const FLOW = { name: "default-login", status: "active", user_schema: "human-user", steps: [] };
+const FLOW = { name: "default-login", user_schema: "human-user", steps: [] };
 const BRANDING = { theme: { primary: "#ff0000" } };
 
 /** `GET /releases/{id}`: the summary plus the pinned set. */
@@ -122,20 +122,16 @@ describe("release detail", () => {
 
     expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
     // Nothing has been deployed, so no origin serves the release.
-    expect(screen.getByText("inactive")).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Release ID" })).toBeInTheDocument();
 
-    // All semantic h2 headings in visual order: release content, pinned groups,
-    // deployment, and metadata. Each pointer is named by its document.
-    const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups).toEqual([
-      "Release content",
-      "User schemas",
-      "Login flows",
-      "Branding",
-      "Deployment of this release",
-      "Metadata",
-    ]);
+    // One h2 per card, in visual order, and the pinned groups as h3s inside
+    // the release content card. Each pointer is named by its document.
+    const cards = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(cards).toEqual(["Release content", "Deployment of this release", "Metadata"]);
+    const groups = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(groups).toEqual(["User schemas", "Login flows", "Branding"]);
+    expect(screen.getAllByRole("heading", { level: 4 })).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^Customer sch_1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Default login flow_1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Default br_1$/ })).toBeInTheDocument();
@@ -271,7 +267,7 @@ describe("release detail", () => {
 
     await screen.findByRole("heading", { name: "rel_1" });
     expect(screen.getByText("Revoked")).toBeInTheDocument();
-    expect(screen.queryByText("inactive")).not.toBeInTheDocument();
+    expect(screen.queryByText("Inactive")).not.toBeInTheDocument();
   });
 
   it("lists where the release went, marking what is still served", async () => {
@@ -282,10 +278,7 @@ describe("release detail", () => {
       targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
-    // The history also holds another release's deployment, which the card
-    // leaves out.
-    const other = deployment("dep_9", { release_id: "rel_2" });
-    serveDeployments([preview, deployment("dep_1", { status: "inactive" }), other]);
+    serveDeployments([preview, deployment("dep_1", { status: "inactive" })]);
     await renderAt("/releases/rel_1");
 
     const card = (await screen.findByText("Deployment of this release")).closest(
@@ -294,17 +287,17 @@ describe("release detail", () => {
     const rows = within(card).getAllByRole("list");
     expect(rows).toHaveLength(2);
     // The header says the release is live too: the preview still serves it.
-    expect(screen.getAllByText("live")).toHaveLength(2);
+    expect(screen.getAllByText("Live")).toHaveLength(2);
 
     // Newest first: the preview, still served.
     expect(within(card).getByText("Preview")).toBeInTheDocument();
-    expect(within(card).getByText("live")).toBeInTheDocument();
+    expect(within(card).getByText("Live")).toBeInTheDocument();
     expect(
       within(card).getByRole("link", { name: "https://acme-k3x9v2.vercel.app" }),
     ).toHaveAttribute("href", "https://acme-k3x9v2.vercel.app");
     // Then the primary deployment, superseded, with each origin it named.
     expect(within(card).getByText("Primary")).toBeInTheDocument();
-    expect(within(card).getByText("inactive")).toBeInTheDocument();
+    expect(within(card).getByText("Inactive")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://app.acme.com" })).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://www.acme.com" })).toBeInTheDocument();
     expect(within(card).getByText(formatDateTime(DEPLOYED_AT))).toBeInTheDocument();
@@ -318,19 +311,24 @@ describe("release detail", () => {
     expect(await screen.findByText("This release has not been deployed.")).toBeInTheDocument();
   });
 
-  it("reads every page of the history for the release's own deployments", async () => {
+  it("asks for the release's own deployments, page after page", async () => {
     server.use(http.get(`${RELEASES_URL}/rel_1`, () => HttpResponse.json(release())));
     servePointers();
-    // The release's second deployment sits on the second page of the
-    // project's history, behind one of another release.
+    const asked: (string | null)[] = [];
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        return new URL(request.url).searchParams.get("page_token") === "next"
-          ? HttpResponse.json({ deployments: [deployment("dep_2")] })
-          : HttpResponse.json({
-              deployments: [deployment("dep_9", { release_id: "rel_2" })],
-              next_page_token: "next",
-            });
+        const params = new URL(request.url).searchParams;
+        asked.push(params.get("release_id"));
+        return params.get("page_token") === "next"
+          ? HttpResponse.json({
+              deployments: [
+                deployment("dep_1", {
+                  status: "inactive",
+                  targets: [{ origin: "https://old.acme.com" }],
+                }),
+              ],
+            })
+          : HttpResponse.json({ deployments: [deployment("dep_2")], next_page_token: "next" });
       }),
     );
     await renderAt("/releases/rel_1");
@@ -338,8 +336,10 @@ describe("release detail", () => {
     const card = (await screen.findByText("Deployment of this release")).closest(
       "[data-slot=card]",
     ) as HTMLElement;
-    expect(within(card).getAllByRole("list")).toHaveLength(1);
-    expect(within(card).getByRole("link", { name: "https://app.acme.com" })).toBeInTheDocument();
+    expect(within(card).getAllByRole("list")).toHaveLength(2);
+    // The second page's deployment is on the card too.
+    expect(within(card).getByRole("link", { name: "https://old.acme.com" })).toBeInTheDocument();
+    expect(asked).toEqual(["rel_1", "rel_1"]);
   });
 
   it("names the selected project on every read", async () => {

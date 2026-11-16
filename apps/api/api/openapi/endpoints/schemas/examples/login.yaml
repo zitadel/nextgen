@@ -9,7 +9,6 @@
 # switch vs pivot transitions, and a terminal step.
 
 name: standard-login
-status: active
 user_schema: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
 
 purposes:

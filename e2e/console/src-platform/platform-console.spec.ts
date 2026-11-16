@@ -62,7 +62,7 @@ test("a platform operator reaches every management screen without an error", asy
   // not the platform project the operator signed in to. Only here do the two
   // differ, so the request body is what says which one it ran in.
   const flowStart = page.waitForRequest(
-    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flow"),
+    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flows"),
   );
   await page.goto("/ui/console/branding");
   expect((await flowStart).postDataJSON()).toMatchObject({
@@ -70,11 +70,36 @@ test("a platform operator reaches every management screen without an error", asy
   });
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
+  // The platform project the console signs in to is the root, not a project
+  // to choose (D42): the server marks it, Projects never lists it, and this
+  // operator, who holds no grant on it, finds none of its screens in the
+  // root's sidebar.
+  const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {
+    console_project_id?: string;
+    platform_project_id?: string;
+  };
+  expect(runtime.platform_project_id).toBeTruthy();
+  expect(runtime.platform_project_id).toBe(runtime.console_project_id);
+
   // The granted customer project: listed on Projects, where a row opens the
-  // project (selects it, lands on its Overview, D35); its own page is Settings.
+  // project (selects it, lands on its Overview, D35); its Settings open on
+  // their first page, General (D40).
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
+  // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
+  await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
+  // Its screens are not this operator's: the server answers the platform
+  // project's read with a refusal, so a URL that selects it goes on in their
+  // own project instead, and the root's sidebar lists none of its screens.
+  // The embedded console has no add-on either, so Projects is the root's
+  // only row.
+  await page.goto(`/ui/console/users?project=${runtime.platform_project_id}`);
+  await expect(page).toHaveURL(new RegExp(`/users\\?project=${zitadel.handle.projectId}$`));
+  await page.goto("/ui/console/projects");
+  await expect(projectLink).toBeVisible();
+  const root = page.getByRole("navigation", { name: "Account" });
+  await expect(root.getByRole("link")).toHaveText(["Projects"]);
   await projectLink.click();
   await expect(page).toHaveURL(new RegExp(`/console/?\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
@@ -83,7 +108,9 @@ test("a platform operator reaches every management screen without an error", asy
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Settings" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
+  );
   await expectNoErrorBoundary(page);
 
   const field = page.getByLabel("Project name");
@@ -113,7 +140,7 @@ test("a platform operator adds their name from the account menu", async ({ page,
   // The person heading the menu opens their profile.
   await page.getByRole("menuitem", { name: operator.email }).click();
 
-  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page).toHaveURL(/\/account(\?|$)/);
   await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
   const name = page.getByLabel("Name", { exact: true });
   await name.fill("Ada Lovelace");
