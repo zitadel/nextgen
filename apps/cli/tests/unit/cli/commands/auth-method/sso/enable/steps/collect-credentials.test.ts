@@ -77,7 +77,15 @@ function depsFor(overrides: Partial<Deps> = {}): Deps {
   return {
     ask: asking("shh\n"),
     developmentBuild: false,
-    suggest: aSuggest({}, "1.0.0"),
+    again: async () => {
+      return aSuggest(
+        {},
+        "1.0.0",
+      )({
+        id: "auth-method:sso:enable",
+        flags: { provider: "google", clientId: "<client-id>" },
+      });
+    },
     ...overrides,
   };
 }
@@ -140,24 +148,6 @@ describe("CollectCredentials for a new connection", () => {
 
     await expect(asked).rejects.toMatchObject({
       nextCommands: [expect.stringContaining("auth-method sso enable --provider google")],
-    });
-  });
-
-  it("repeats the claims the run was given in the command it suggests", async () => {
-    const asked = new CollectCredentials(depsFor()).run(
-      needsFor({
-        claimRequest: {
-          ...NO_CLAIM_REQUEST,
-          entries: [{ attribute: "companyName", claim: "organization", type: undefined }],
-          scopes: ["organization"],
-        },
-      }),
-    );
-
-    await expect(asked).rejects.toMatchObject({
-      nextCommands: [
-        expect.stringContaining("--claim companyName=organization --claim-scope organization"),
-      ],
     });
   });
 

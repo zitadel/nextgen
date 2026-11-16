@@ -281,9 +281,9 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       }).kind === "detached" ||
         (isLocal && (this.deps.dryRun || hostsPlatform)))
         ? {
-            actions: [Claim.nudge(this.deps.suggest, deadline)],
-            boxActions: [Claim.boxNudge(this.deps.suggest, deadline)],
-            commands: [Claim.command(this.deps.suggest)],
+            actions: [Claim.nudge(this.deps.suggest({ id: "claim" }), deadline)],
+            boxActions: [Claim.boxNudge(this.deps.suggest({ id: "claim" }), deadline)],
+            commands: [this.deps.suggest({ id: "claim" })],
           }
         : {
             actions: [],

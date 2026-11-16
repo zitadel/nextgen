@@ -15,12 +15,12 @@ import {
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 import { isCancellation, ZitadelError } from "@/lib/errors";
-import type { Suggest } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
 import { headSha, worktreeIsDirty } from "./git";
 import {
+  type Lockout,
   type PipelineMode,
   type RunEnvironment,
   runSteps,
@@ -71,12 +71,6 @@ export type PrepareRequest = {
    */
   readonly json: boolean;
   readonly color: boolean;
-
-  /**
-   * A command against the project this run addresses, for a step's error to
-   * suggest its fix.
-   */
-  readonly suggest: Suggest;
 };
 
 /**
@@ -109,7 +103,7 @@ export type PreparedRelease = {
    * Existing users the release would leave unable to sign in, which the
    * command must not deploy without consent.
    */
-  readonly lockouts: readonly string[];
+  readonly lockouts: readonly Lockout[];
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
 };
@@ -302,7 +296,6 @@ export class Publisher {
       deployedUnknown: known.deployedUnknown,
       store,
       bundle: built.bundle,
-      suggest: request.suggest,
       // The steps hand on what they learned, so a later one can stand on what
       // an earlier one found rather than reading it again.
       learned: {},

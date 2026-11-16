@@ -14,6 +14,7 @@ import {
   abbreviate,
   deployMessage,
   MESSAGE_MAX_LENGTH,
+  type Lockout,
   messageTooLong,
   Publisher,
 } from "@/lib/publish";
@@ -220,7 +221,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       compare: true,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
@@ -376,12 +376,16 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
    *   be asked and `--force` was not given.
    */
-  private async confirmLockouts(lockouts: readonly string[]): Promise<boolean> {
+  private async confirmLockouts(lockouts: readonly Lockout[]): Promise<boolean> {
     if (lockouts.length === 0) {
       return true;
     }
     for (const lockout of lockouts) {
-      warnings.report(lockout);
+      warnings.report(
+        lockout.fix === undefined
+          ? lockout.message
+          : `${lockout.message}: ${this.suggest(lockout.fix)}`,
+      );
     }
     const { projectId, server } = await this.connect();
     const question = `Deploy to project ${projectId} on ${server.replace(/^https?:\/\//, "")} even though the users above will not be able to sign in?`;

@@ -10,7 +10,6 @@ import {
 } from "@zitadel/config/idp";
 
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { claimFlagTexts } from "@/lib/idp";
 import { type FillIn, pipedFrom, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -28,7 +27,7 @@ type Needs = Fact<"flags" | "selection" | "claimRequest" | "preview" | "names">;
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
+type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "again">;
 
 /**
  * Asks for the client id and secret of the application registered with the
@@ -124,7 +123,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
       flag: "--client-id",
       parse: parseClientId,
       given: needs.flags.clientId,
-      retry: this.retryFor(needs, CLIENT_ID_PLACEHOLDER, false),
+      retry: await this.retryFor(needs, CLIENT_ID_PLACEHOLDER, false),
     });
     const secretVariable = needs.names.clientSecret;
     const secret = await this.deps.ask.secret({
@@ -132,7 +131,7 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
       message: `What is the client secret of your ${provider.displayName} OAuth app? Copy it from the same place. We store it in your project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
-      retry: this.retryFor(needs, clientId, true),
+      retry: await this.retryFor(needs, clientId, true),
     });
 
     return {
@@ -149,29 +148,25 @@ export class CollectCredentials extends WizardStep<"credentials", Fact<"given">,
    * catalog provider: a custom connection needs its settings repeated too.
    *
    * @remarks
-   * The claims the run was given are repeated, because a rerun that dropped
-   * them would create the connection with the defaults.
+   * The run again keeps everything it was given, the claim flags included,
+   * because a rerun that dropped them would create the connection with the
+   * defaults.
    *
    * @param needs - What the step reads.
    * @param clientId - The client id, or a placeholder for it.
    * @param piped - Whether the command reads the secret from `$CLIENT_SECRET` on stdin.
    * @returns The command, or `undefined` for a custom provider.
    */
-  private retryFor(
+  private async retryFor(
     needs: Needs,
     clientId: ClientId | FillIn,
     piped: boolean,
-  ): SuggestedCommand | undefined {
+  ): Promise<SuggestedCommand | undefined> {
     if (needs.selection.kind !== "catalog") {
       return undefined;
     }
-    const command = this.deps.suggest({
-      id: "auth-method:sso:enable",
-      flags: {
-        provider: selectionName(needs.selection),
-        clientId,
-        ...claimFlagTexts(needs.claimRequest),
-      },
+    const command = await this.deps.again("auth-method:sso:enable", {
+      with: { provider: selectionName(needs.selection), clientId },
     });
 
     return piped ? pipedFrom("CLIENT_SECRET", command) : command;

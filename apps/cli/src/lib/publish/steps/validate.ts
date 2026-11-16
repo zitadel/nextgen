@@ -35,8 +35,8 @@ export const validateStep: Step = {
     });
     // The local findings are refused before the server is asked anything, so
     // a server that cannot be reached never hides them.
-    refuseErrors(ctx, issues);
-    refuseErrors(ctx, await unresolvedSchemas(ctx));
+    refuseErrors(issues);
+    refuseErrors(await unresolvedSchemas(ctx));
     await validateConnections(ctx);
     const branding = ctx.bundle.branding;
     const brandings = branding === undefined ? [] : [branding];
@@ -89,11 +89,10 @@ function reported(finding: Issue | ServerFinding): ReportedFinding {
  * Stop the deploy on every error, named in one `E_VALIDATION`, before anything
  * is sent.
  *
- * @param ctx - The step's context, for the commands a hint suggests.
  * @param findings - Every finding.
  * @throws {@link ZitadelError} `E_VALIDATION` when any finding is an error.
  */
-function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFinding)[]): void {
+function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
     return !("severity" in finding) || finding.severity === "error";
   });
@@ -112,7 +111,7 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
     return UserSchema.refusesKey(finding);
   });
   const fix = literalSecret
-    ? `Publish a secret with ${ctx.suggest({ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } })} and reference it as "\${{ NAME }}".`
+    ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
     : "Fix the files named above and rerun; no changes were made.";
   const hint = refusedKey
     ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
@@ -122,6 +121,11 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
     `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
     {
       hint,
+      ...(literalSecret
+        ? {
+            nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
+          }
+        : {}),
       details: {
         issues: errors.map(reported),
       },

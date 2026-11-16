@@ -1,5 +1,4 @@
 import type { Questions } from "@/lib/ui";
-import type { Suggest } from "@/lib/suggestion";
 import type { ZitadelClient } from "@/lib/backend";
 
 import type { ENVIRONMENT_KEYS } from "./keys";
@@ -58,6 +57,5 @@ export type InitialReleaseInput = {
   json: boolean;
   color: boolean;
   message: string;
-  suggest: Suggest;
   narrate: (notices: readonly string[]) => void;
 };

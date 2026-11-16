@@ -1060,8 +1060,9 @@ error: a file that does not parse or fails its contract, a flow the server's
 flow rules refuse, a connection that disagrees with a schema or flow, and a
 variable the environment lacks (`environment/missing-variable`, one issue per
 file that references it). The hint says to fix the files and re-run, and for a
-literal `client_secret` (`connection/literal-secret`) to publish it with
-`variable set NAME --secret` and reference it as `"${{ NAME }}"`. Warnings in
+literal `client_secret` (`connection/literal-secret`) to publish it and
+reference it as `"${{ NAME }}"`; the runnable `variable set NAME --secret`
+is in `next_commands`, not in the hint. Warnings in
 `warnings` start with the file's path. The server still applies its own
 release rules when the build is submitted, such as handles being unique, so a
 passing dry run does not promise the release is accepted.
