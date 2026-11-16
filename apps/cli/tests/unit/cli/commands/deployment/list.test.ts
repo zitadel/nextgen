@@ -160,6 +160,29 @@ describe("deployment list", () => {
       );
     };
 
+    /** Makes the mock refuse the live view and answer the history as it does. */
+    const refusingLiveView = () => {
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
+          const live = new URL(request.url).searchParams.get("live") === "true";
+          return live
+            ? HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 })
+            : undefined;
+        }),
+      );
+    };
+
+    /** Records every read of the deployments and lets the mock answer it. */
+    const watchingDeployments = (): string[] => {
+      const asked: string[] = [];
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
+          asked.push(request.url);
+        }),
+      );
+      return asked;
+    };
+
     /** Makes the mock list a live preview for each origin, expiring as given. */
     const previewsExpiring = (expiries: Readonly<Record<string, string>>) => {
       server.use(
@@ -235,6 +258,51 @@ describe("deployment list", () => {
       expect(result).toPrintPlainRow(
         ...previewRow("dep_1", "rel_1", "2026-02-08T00:00:00Z", `${kept}, ${lost}`),
       );
+    });
+
+    it("still lists the deployments when the live view cannot be read", async () => {
+      const { cwd, row } = await aLivePreview();
+      refusingLiveView();
+
+      const result = await plain(cwd);
+
+      expect(result).toPrintPlainRow(...row(""));
+    });
+
+    it("warns when the live view cannot be read", async () => {
+      const { cwd } = await aLivePreview();
+      refusingLiveView();
+
+      const result = await plain(cwd);
+
+      expect(result.stderr).toContain("Could not read when the previews expire");
+    });
+
+    it("reads the live view beside the history", async () => {
+      const { cwd } = await aLivePreview();
+      const asked = watchingDeployments();
+
+      await plain(cwd);
+
+      expect(asked).toHaveLength(2);
+    });
+
+    it("reads no live view beside --live, which already is one", async () => {
+      const { cwd } = await aLivePreview();
+      const asked = watchingDeployments();
+
+      await runCliForTest([
+        "deployment",
+        "list",
+        "--live",
+        "--plain",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+
+      expect(asked).toHaveLength(1);
     });
 
     it.each([

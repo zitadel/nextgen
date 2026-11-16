@@ -71,20 +71,40 @@ export function detectPreviewUrls(env: NodeJS.ProcessEnv): DetectedPreviews {
 }
 
 /**
- * When each of some preview origins expires, read from the live previews.
+ * A read that decorates a listing with when previews expire, which warns and
+ * answers `none` when it fails instead of failing the listing.
  *
  * @remarks
  * A deployment records no expiry of its own, so a caller that shows one reads
  * it from the previews. The expiry decorates what the caller shows, so a
- * failed read warns and reports no expiry rather than failing the run. The
- * caller sees an empty map either way, so it cannot tell a failed read from
- * an origin whose preview is gone; the warning says which.
+ * failed read reports no expiry rather than failing the run. The caller sees
+ * `none` either way, so it cannot tell a failed read from an origin whose
+ * preview is gone; the warning says which.
+ *
+ * @param read - The read that finds out, which may fail.
+ * @param none - What to answer when it fails.
+ * @returns What `read` answers, or `none` after a warning when it fails.
+ * @throws ZitadelError `E_CANCELLED` when the run was cancelled while reading.
+ */
+export async function readingExpiries<T>(read: () => Promise<T>, none: T): Promise<T> {
+  return read().catch((error: unknown): T => {
+    if (isCancellation(error)) {
+      throw error;
+    }
+    reportWarning(`Could not read when the previews expire: ${toZitadelError(error).message}`);
+    return none;
+  });
+}
+
+/**
+ * When each of some preview origins expires, read from the live previews.
  *
  * @param client - The client every request goes through.
  * @param projectId - The project the previews belong to.
  * @param origins - The preview origins to look for. None are read for an
  *   empty list.
- * @returns The expiry of each origin that still has a live preview, by origin.
+ * @returns The expiry of each origin that still has a live preview, by origin;
+ *   empty when the previews cannot be read, as {@link readingExpiries} says.
  * @throws ZitadelError `E_CANCELLED` when the run was cancelled while reading.
  */
 export async function liveExpiries(
@@ -92,13 +112,7 @@ export async function liveExpiries(
   projectId: string,
   origins: Iterable<string>,
 ): Promise<ReadonlyMap<string, string>> {
-  return new PreviewService(client, projectId)
-    .expiries(new Set(origins))
-    .catch((error: unknown): ReadonlyMap<string, string> => {
-      if (isCancellation(error)) {
-        throw error;
-      }
-      reportWarning(`Could not read when the previews expire: ${toZitadelError(error).message}`);
-      return new Map();
-    });
+  return readingExpiries(() => {
+    return new PreviewService(client, projectId).expiries(new Set(origins));
+  }, new Map<string, string>());
 }

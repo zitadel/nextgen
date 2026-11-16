@@ -10,7 +10,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { liveExpiries } from "@/lib/preview";
+import { liveExpiries, readingExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
@@ -54,7 +54,7 @@ const COLUMNS = [
  * `expires` is the live expiry of the preview a live preview deployment made
  * on the origins it still serves, the earliest when it serves several, and
  * empty for any other deployment. It is also empty, with a warning, when the
- * previews cannot be read.
+ * live view or the previews cannot be read.
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
@@ -106,7 +106,9 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
 
     const serving = this.isJson
       ? new Map<string, Deployment>()
-      : await deploymentService.servingLivePreviews(listed.items, flags.live === true);
+      : await readingExpiries(() => {
+          return deploymentService.servingLivePreviews(listed.items, flags.live === true);
+        }, new Map<string, Deployment>());
     const expiries = await liveExpiries(
       client,
       projectId,
