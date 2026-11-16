@@ -7,7 +7,7 @@ import {
   CredentialPrompt,
   loopbackIssuerWarning,
 } from "@/lib/idp";
-import { loopbackReach } from "@/lib/server/local/runtime";
+import { LocalRuntime } from "@/lib/server";
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -80,7 +80,7 @@ export class PlanChange extends WizardStep<
     );
     const loopback = loopbackIssuerWarning(
       needs.selection,
-      await loopbackReach(needs.target.cwd, needs.remote.server),
+      await LocalRuntime.loopbackReach(needs.target.cwd, needs.remote.server),
     );
     if (loopback !== undefined) {
       warnings.report(loopback);

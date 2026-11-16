@@ -22,7 +22,6 @@ const GENERIC = [
   "lib/cmd",
   "lib/consent",
   "lib/errors",
-  "lib/host",
   "lib/json",
   "lib/names",
   "lib/paths",

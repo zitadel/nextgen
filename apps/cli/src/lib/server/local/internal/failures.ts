@@ -1,6 +1,6 @@
 import { ZitadelError, toZitadelError } from "@/lib/errors";
 import { distinct, type SuggestedCommand } from "@/lib/suggestion";
-import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
+import { listenersForPort, type TcpListener } from "@/lib/server/local/ports";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,

@@ -4,17 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
-import {
-  CONTAINER_DATA_DIR,
-  LOCAL_RUNTIME_FILE,
-  defaultLocalServerImageForCliVersion,
-  localContainerName,
-  localRuntimePaths,
-  readRuntimeMetadata,
-  writeRuntimeMetadata,
-  type RuntimeMetadata,
-} from "@/lib/server/local/runtime";
+import { LocalAdmins, LocalRuntime, type RuntimeMetadata } from "@/lib/server";
 import Reset from "@/cli/commands/reset";
 import {
   aMachineRunning,
@@ -216,7 +206,7 @@ describe("local runtime commands", () => {
   }) => {
     const fake = await fakeDocker(other, daemon);
     const serverUrl = await serve(health(false));
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+    await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
     const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
       PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
@@ -397,9 +387,9 @@ describe("local runtime commands", () => {
     });
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");
-    const runtimeFile = await readFile(join(cwd, LOCAL_RUNTIME_FILE), "utf8");
+    const runtimeFile = await readFile(join(cwd, LocalRuntime.FILE), "utf8");
     expect(runtimeFile).not.toContain("canary");
-    expect((await readRuntimeMetadata(cwd))?.env).toEqual(envelope.data.runtime.env);
+    expect((await LocalRuntime.read(cwd))?.env).toEqual(envelope.data.runtime.env);
 
     const status = await runCliForTest(["status", "--cwd", cwd, "--json"]);
     expect(status.exitCode).toBe(0);
@@ -435,11 +425,11 @@ describe("local runtime commands", () => {
     const serverUrl = await serve(health());
     const port = Number(new URL(serverUrl).port);
     const recorded = { injected: ["NEXTGEN_GOOGLE_SECRET"] };
-    await writeRuntimeMetadata(cwd, {
+    await LocalRuntime.write(cwd, {
       ...runtimeFor(cwd, serverUrl),
       image,
       env: recorded,
-    } as Parameters<typeof writeRuntimeMetadata>[1]);
+    } as Parameters<typeof LocalRuntime.write>[1]);
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -453,7 +443,7 @@ describe("local runtime commands", () => {
     expect(parseJson(result.stdout)).toMatchObject({
       data: { title: "Local Zitadel server is already running", runtime: { env: recorded } },
     });
-    expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
+    expect((await LocalRuntime.read(cwd))?.env).toEqual(recorded);
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
   });
@@ -487,7 +477,7 @@ describe("local runtime commands", () => {
       "Restarting the local Zitadel server on 1.0.0-alpha.2: it ran 1.0.0-alpha.1.",
     );
     expect(newer.stdout).not.toContain("already running");
-    const runtime = await readRuntimeMetadata(cwd);
+    const runtime = await LocalRuntime.read(cwd);
     expect(runtime).toMatchObject({ backend: "binary", server_version: "1.0.0-alpha.2" });
     const newerPid = runtime?.backend === "binary" ? runtime.pid : 0;
     daemon.adopt(newerPid);
@@ -526,7 +516,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.runtime).toMatchObject({
       backend: "binary",
-      log_path: localRuntimePaths(cwd).logFile,
+      log_path: LocalRuntime.paths(cwd).logFile,
       server_package: "@zitadel/server",
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
@@ -540,12 +530,12 @@ describe("local runtime commands", () => {
     ]);
     expect(envelope.data.next_actions).toContainEqual(expect.stringContaining(" logs --follow"));
 
-    const runtime = await readRuntimeMetadata(cwd);
+    const runtime = await LocalRuntime.read(cwd);
     expect(runtime).toMatchObject({
       backend: "binary",
       port,
       server_url: serverUrl,
-      data_dir: localRuntimePaths(cwd).dataDir,
+      data_dir: LocalRuntime.paths(cwd).dataDir,
     });
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
 
@@ -586,7 +576,7 @@ describe("local runtime commands", () => {
     expect(result.stdout).not.toContain("handoff");
     expect(result.stdout).not.toContain(expectedPublicCliCommand("console"));
     expect(result.stderr).not.toContain("console sign-in link");
-    const runtime = await readRuntimeMetadata(cwd);
+    const runtime = await LocalRuntime.read(cwd);
     if (runtime?.backend === "binary") {
       daemon.adopt(runtime.pid);
     }
@@ -656,7 +646,7 @@ describe("local runtime commands", () => {
       await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
       await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
       // And the server is started without the bootstrap user document.
-      const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
+      const commandLine = (await LocalRuntime.read(cwd)) as { command?: string } | undefined;
       expect(commandLine?.command ?? "").not.toContain("--user-file");
     },
   );
@@ -715,15 +705,19 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
-    const runtime = await readRuntimeMetadata(cwd);
+    const runtime = await LocalRuntime.read(cwd);
     expect(runtime?.server_url).toBe(serverUrl);
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
 
     const dockerCalls = await readDockerCalls(fake.logPath);
     const runCall = dockerCalls.find((args) => args[0] === "run");
     expect(runCall).toBeDefined();
-    expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
-    expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
+    expect(runCall?.join(" ")).toContain(
+      `${LocalRuntime.paths(cwd).dataDir}:${LocalRuntime.CONTAINER_DATA_DIR}`,
+    );
+    expect(runCall?.join(" ")).toContain(
+      `NEXTGEN_SERVER_DATA_DIR=${LocalRuntime.CONTAINER_DATA_DIR}`,
+    );
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
     expect(runImage(runCall)).toBe(await expectedDefaultImage());
   });
@@ -839,8 +833,8 @@ describe("local runtime commands", () => {
     });
     const fakeBinary = await fakeServerBinary(other);
     const serverUrl = `http://localhost:${String(port)}`;
-    const containerName = localContainerName(cwd);
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+    const containerName = LocalRuntime.containerName(cwd);
+    await LocalRuntime.write(cwd, runtimeFor(cwd, serverUrl));
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "binary", "--port", String(port)],
@@ -992,10 +986,10 @@ describe("local runtime commands", () => {
     daemon,
   }) => {
     const fake = await fakeDocker(other, daemon);
-    const paths = localRuntimePaths(cwd);
+    const paths = LocalRuntime.paths(cwd);
     await mkdir(paths.dataDir, { recursive: true });
     await writeFile(join(paths.dataDir, "sample"), "data");
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
+    await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:8080"));
 
     const result = await runCliForTest(["reset", "--cwd", cwd, "--json", "--force"], {
       PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
@@ -1010,17 +1004,17 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.next_commands).toBeUndefined();
     await expect(stat(paths.dataDir)).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(readRuntimeMetadata(cwd)).resolves.toBeUndefined();
+    await expect(LocalRuntime.read(cwd)).resolves.toBeUndefined();
   });
 
   describe("reset asked on a terminal", () => {
     // The built CLI bundles its own prompts, so it can only be answered by
     // running the command from source.
     const resetting = async (cwd: string, answers: Answer[]) => {
-      const paths = localRuntimePaths(cwd);
+      const paths = LocalRuntime.paths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
-      await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
-      await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
+      await writeFile(join(cwd, LocalAdmins.FILE), "{}");
+      await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:8080"));
       const talk = answering(...answers);
       const outcome = await asTerminal(() =>
         Reset.run(["--cwd", cwd], cliPackageRoot).then(
@@ -1060,7 +1054,7 @@ describe("local runtime commands", () => {
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
-      await expect(stat(join(cwd, LOCAL_ADMIN_FILE))).resolves.toBeDefined();
+      await expect(stat(join(cwd, LocalAdmins.FILE))).resolves.toBeDefined();
       await expect(readFile(fake.logPath, "utf8")).resolves.toContain("inspect");
     });
 
@@ -1070,8 +1064,8 @@ describe("local runtime commands", () => {
       const { cwd, asked } = await resetting(dir, [false]);
 
       const message = asOneLine(asked.join("\n"));
-      expect(message).toContain(localRuntimePaths(cwd).dataDir);
-      expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
+      expect(message).toContain(LocalRuntime.paths(cwd).dataDir);
+      expect(message).toContain(join(cwd, LocalAdmins.FILE));
       expect(message).toContain("every organization, user, application and setting");
       expect(message).toContain("cannot be undone");
     });
@@ -1356,12 +1350,12 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return {
     schema_version: 1,
     backend: "docker",
-    container_name: localContainerName(cwd),
+    container_name: LocalRuntime.containerName(cwd),
     container_id: "container-test-id",
     image: "ghcr.io/zitadel/nextgen:test",
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
@@ -1371,7 +1365,7 @@ async function expectedDefaultImage(): Promise<string> {
   const pkg = JSON.parse(
     await readFile(new URL("../../../../package.json", import.meta.url), "utf8"),
   ) as { version: string };
-  return defaultLocalServerImageForCliVersion(pkg.version);
+  return LocalRuntime.imageFor(pkg.version);
 }
 
 async function childEnv(serverUrl: string, name: string): Promise<string | undefined> {

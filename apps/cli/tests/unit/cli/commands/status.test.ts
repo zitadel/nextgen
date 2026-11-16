@@ -5,12 +5,7 @@ import { http, HttpResponse } from "msw";
 import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
-import {
-  localContainerName,
-  localRuntimePaths,
-  writeRuntimeMetadata,
-  type RuntimeMetadata,
-} from "@/lib/server/local/runtime";
+import { LocalRuntime, type RuntimeMetadata } from "@/lib/server";
 import { it } from "@tests/fixtures";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
@@ -324,7 +319,7 @@ describe("status command", () => {
     other: binDir,
   }) => {
     await makeProject(cwd);
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
 
     // The docker-backend fixture makes status spawn `docker inspect`; a fake
     // on PATH keeps the test hermetic — with a wedged Docker daemon the real
@@ -351,7 +346,7 @@ describe("status command", () => {
     };
     expect(json.status).toBe("ok");
     expect(json.data.server.runtime.configured).toBe(true);
-    expect(json.data.server.runtime.data_dir).toBe(localRuntimePaths(cwd).dataDir);
+    expect(json.data.server.runtime.data_dir).toBe(LocalRuntime.paths(cwd).dataDir);
   });
 
   it("falls back to the secret project_id when config.project is absent", async ({ dir: cwd }) => {
@@ -563,7 +558,7 @@ describe("status command", () => {
 
   it("says in text where a stopped local server last ran", async ({ dir: cwd, other: binDir }) => {
     await configuredProject(cwd);
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
     await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
     await chmod(join(binDir, "docker"), 0o755);
 
@@ -582,7 +577,7 @@ describe("status command", () => {
     other: noDocker,
   }) => {
     await configuredProject(cwd);
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    await LocalRuntime.write(cwd, runtimeFor(cwd, "http://localhost:9"));
 
     const res = await runCliForTest(
       ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
@@ -611,12 +606,12 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return {
     schema_version: 1,
     backend: "docker",
-    container_name: localContainerName(cwd),
+    container_name: LocalRuntime.containerName(cwd),
     container_id: "container-test-id",
     image: "ghcr.io/zitadel/nextgen:test",
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };

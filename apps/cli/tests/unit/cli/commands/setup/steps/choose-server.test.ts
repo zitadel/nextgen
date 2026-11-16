@@ -22,9 +22,8 @@ import { ChooseServer } from "@/cli/commands/setup/steps/choose-server";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { writeRuntimeMetadata } from "@/lib/server/local/runtime";
+import { LocalRuntime, LocalServer } from "@/lib/server";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
 import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -122,7 +121,7 @@ function setupAnswers(overrides: Partial<SetupAnswers> = {}): SetupAnswers {
  * @param serverVersion - The server version it runs.
  */
 async function startedLocally(dir: string, serverVersion: string): Promise<void> {
-  await writeRuntimeMetadata(
+  await LocalRuntime.write(
     dir,
     aBinaryRecord({ port: 8080, server_url: LOCAL, server_version: serverVersion }),
   );

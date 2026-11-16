@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-import { isLoopbackHost } from "@/lib/host";
+import { isLoopbackHost } from "@/lib/server/host";
 
 export type TcpListener = Readonly<{
   address: string;

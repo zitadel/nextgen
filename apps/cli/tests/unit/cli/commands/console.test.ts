@@ -3,12 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { ensureLocalAdmin } from "@/lib/server/local/admin-credential";
-import {
-  localContainerName,
-  localRuntimePaths,
-  writeRuntimeMetadata,
-} from "@/lib/server/local/runtime";
+import { LocalAdmins, LocalRuntime } from "@/lib/server";
 import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -33,15 +28,15 @@ describe("console", () => {
   });
 
   it("names the server the directory recorded even where it refuses", async ({ dir: cwd }) => {
-    await writeRuntimeMetadata(cwd, {
+    await LocalRuntime.write(cwd, {
       schema_version: 1,
       backend: "docker",
-      container_name: localContainerName(cwd),
+      container_name: LocalRuntime.containerName(cwd),
       container_id: "container-test-id",
       image: "ghcr.io/zitadel/nextgen:test",
       port: 3000,
       server_url: "http://localhost:3000",
-      data_dir: localRuntimePaths(cwd).dataDir,
+      data_dir: LocalRuntime.paths(cwd).dataDir,
       created_at: "2026-06-09T00:00:00.000Z",
       cli_version: "0.0.0-test",
     });
@@ -58,7 +53,7 @@ describe("console", () => {
   it("signs in as the admin of a parent directory when run from an app inside it", async ({
     dir: parent,
   }) => {
-    const { admin } = await ensureLocalAdmin(parent);
+    const { admin } = await LocalAdmins.ensure(parent);
     const app = join(parent, "my-app");
     await mkdir(app);
 
@@ -70,7 +65,7 @@ describe("console", () => {
   });
 
   it("names the sign-in link it would mint on a dry run", async ({ dir: parent }) => {
-    await ensureLocalAdmin(parent);
+    await LocalAdmins.ensure(parent);
 
     const res = await runCliForTest(["console", "--cwd", parent, "--json", "--dry-run"]);
 
@@ -138,7 +133,7 @@ describe("console", () => {
   it("keeps to the local console when a local server was started, whatever the project names", async ({
     dir,
   }) => {
-    const { admin } = await ensureLocalAdmin(dir);
+    const { admin } = await LocalAdmins.ensure(dir);
 
     const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
       HOME: dir,

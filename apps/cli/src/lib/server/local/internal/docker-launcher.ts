@@ -17,7 +17,7 @@ import {
   type DockerRuntimeMetadata,
 } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
-import { stopSignal } from "./clock";
+import { stopSignal } from "./stop-signal";
 import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 
 export type DockerResult = {

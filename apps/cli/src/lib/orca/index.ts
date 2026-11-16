@@ -4,7 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExists, readDirIfExists } from "@/lib/fs";
-import { LOCAL_RUNTIME_DIR } from "@/lib/server/local/runtime";
+import { LocalRuntime } from "@/lib/server";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -427,16 +427,16 @@ export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
  */
 async function isLocalRuntimeEntry(cwd: string, name: string): Promise<boolean> {
   try {
-    if (name === dirname(LOCAL_RUNTIME_DIR)) {
+    if (name === dirname(LocalRuntime.DIR)) {
       const inside = await readdir(join(cwd, name));
       return inside.every((entry) => {
-        return entry === basename(LOCAL_RUNTIME_DIR);
+        return entry === basename(LocalRuntime.DIR);
       });
     }
     if (name === ".gitignore") {
       const lines = (await readFile(join(cwd, name), "utf8")).split(/\r?\n/);
       return lines.every((line) => {
-        return ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim());
+        return ["", `${LocalRuntime.DIR}/`].includes(line.trim());
       });
     }
   } catch {

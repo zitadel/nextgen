@@ -47,9 +47,9 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { LocalServer, type ResolvedServer } from "@/lib/server";
-import { readNearestRuntimeMetadata, sameLocalServer } from "@/lib/server/local/runtime";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { LocalRuntime, LocalServer, type ResolvedServer } from "@/lib/server";
+
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -1559,7 +1559,7 @@ export type OutdatedLocalServer = Readonly<{
  *   release or says nothing about its version.
  */
 export async function outdatedLocalServer(cwd: string): Promise<OutdatedLocalServer | undefined> {
-  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => {
+  const nearest = await LocalRuntime.readNearest(cwd).catch(() => {
     return undefined;
   });
   const runtime = nearest?.runtime;
@@ -1605,7 +1605,7 @@ export async function refuseOutdatedLocalServer(
 ): Promise<void> {
   const { cwd, serverUrl, flags } = input;
   const outdated = await outdatedLocalServer(cwd);
-  if (!outdated || !sameLocalServer(outdated.serverUrl, serverUrl)) {
+  if (!outdated || !LocalRuntime.same(outdated.serverUrl, serverUrl)) {
     return;
   }
   throw refusalError(

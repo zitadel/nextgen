@@ -20,6 +20,7 @@ import {
 } from "./internal/lifecycle";
 import { HttpHealth, TcpPorts } from "./internal/probes";
 import { withStartLock } from "./internal/start-lock";
+import { listenersForPort } from "./ports";
 import { RuntimeFileStore } from "./internal/store";
 import type { LocalServers, ManagedRuntimeProcess } from "./processes";
 import {
@@ -138,6 +139,9 @@ export type SweepResult = Readonly<
  * command, or the commands drift apart again.
  */
 export class LocalServer {
+  /** The processes listening on a TCP port of this machine, for naming what holds one. */
+  static readonly listenersOn = listenersForPort;
+
   private readonly cwd: string;
   private readonly cliVersion: string;
 

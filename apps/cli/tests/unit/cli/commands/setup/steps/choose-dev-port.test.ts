@@ -17,7 +17,7 @@ import { ChooseDevPort } from "@/cli/commands/setup/steps/choose-dev-port";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { Ui } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { aPromptDeps } from "@tests/helpers/setup";
 

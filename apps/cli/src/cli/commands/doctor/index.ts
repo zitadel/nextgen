@@ -3,33 +3,22 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/lib/server/local/started";
+import {
+  DockerGuidance,
+  LocalRuntime,
+  LocalServer,
+  StartedServer,
+  type LocalServers,
+  type ManagedRuntimeProcess,
+  type RuntimeBackend,
+  type RuntimeMetadata,
+} from "@/lib/server";
 import { createZitadelClient } from "@/lib/backend";
 import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import {
-  dockerRuntimeGuidance,
-  dockerUnavailableMessage,
-} from "@/lib/server/local/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server/local/processes";
-import {
-  assertLocalStateWritable,
-  checkLocalServerHealth,
-  DEFAULT_LOCAL_SERVER_PORT,
-  defaultLocalServerImageForCliVersion,
-  findUpward,
-  LOCAL_RUNTIME_FILE,
-  localServerUrl,
-  RUNTIME_BACKENDS,
-  type RuntimeBackend,
-  type RuntimeMetadata,
-  readNearestRuntimeMetadata,
-  resolveRuntimeBackend,
-} from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
@@ -45,7 +34,6 @@ import {
   stepsOf,
 } from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
-import { listenersForPort } from "@/lib/prober/ports";
 import { Server } from "@/lib/server";
 import {
   Guidance,
@@ -145,7 +133,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       }),
       runtime: Flags.option({
         description: "Local runtime backend.",
-        options: RUNTIME_BACKENDS,
+        options: LocalRuntime.BACKENDS,
       })(),
       // Doctor's local-runtime checks are about the machine, but with `--env` /
       // `--env-file` it also verifies the environment a command would connect to:
@@ -165,13 +153,13 @@ export default class Doctor extends Destructive(BaseCommand) {
    * context is built, so the run's first event names the same server as its
    * last, and `execute` reads what was found rather than asking again.
    */
-  private readonly started = startedServer(readNearestRuntimeMetadata);
+  private readonly started = new StartedServer(LocalRuntime.readNearest);
 
   private readonly checking = new Map<string, Promise<Checking>>();
 
   protected override async sourceOf(flags: Asked, cwd: string): Promise<string> {
     const { port, hostedServer } = await this.checks(flags, cwd);
-    return hostedServer ?? localServerUrl(port);
+    return hostedServer ?? LocalRuntime.urlOf(port);
   }
 
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
@@ -180,16 +168,14 @@ export default class Doctor extends Destructive(BaseCommand) {
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
       nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;
-    const runtimeBackend = resolveRuntimeBackend({
+    const runtimeBackend = LocalRuntime.resolveBackend({
       runtime: flags.runtime,
       image: flags.image,
       envImage: this.env.ZITADEL_LOCAL_IMAGE,
       existingRuntime,
     });
     const image =
-      flags.image ??
-      this.env.ZITADEL_LOCAL_IMAGE ??
-      defaultLocalServerImageForCliVersion(this.cliVersion);
+      flags.image ?? this.env.ZITADEL_LOCAL_IMAGE ?? LocalRuntime.imageFor(this.cliVersion);
     const runtimeChecks =
       hostedServer === undefined
         ? await runLocalRuntimeChecks(
@@ -497,7 +483,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       });
       return {
         cwd,
-        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+        port: flags.port ?? hint?.runtime.port ?? LocalRuntime.DEFAULT_PORT,
         hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
       };
     })();
@@ -521,7 +507,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       return undefined;
     }
     if (
-      (await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
+      (await LocalRuntime.findUpward(cwd, LocalRuntime.FILE)) !== undefined ||
       !(await Project.at(cwd).hasConfig())
     ) {
       return undefined;
@@ -588,7 +574,7 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance(again.rerun);
+    const advice = DockerGuidance.forRetry(again.rerun);
     return {
       hint: advice.hint,
       nextCommands: [advice.check, again.rerun],
@@ -610,7 +596,7 @@ export function failureAdvice(
   }
 
   if (failedNames.has("port")) {
-    const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
+    const fallbackPort = port === LocalRuntime.DEFAULT_PORT ? port + 1 : LocalRuntime.DEFAULT_PORT;
     const stopCommand = suggest({ id: "stop", flags: { all: true } });
     const retryCommand = again.rerun;
     const alternatePortCommand = suggest({ id: "doctor", flags: { port: fallbackPort } });
@@ -738,7 +724,7 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance(again.rerun);
+    const advice = DockerGuidance.forRetry(again.rerun);
     nextActions.push(...advice.nextActions);
     nextCommands.push(advice.check, again.rerun);
   }
@@ -946,7 +932,7 @@ async function runLocalRuntimeChecks(
         "state-dir",
         "Local state directory is writable",
         async () => {
-          const probe = await assertLocalStateWritable(runtimeDir);
+          const probe = await LocalRuntime.assertWritable(runtimeDir);
           return probe.checkedPath === probe.targetPath
             ? `${probe.targetPath} is writable`
             : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -966,10 +952,10 @@ async function runLocalRuntimeChecks(
     "Docker is reachable",
     async () => {
       const result = await LocalServer.dockerReachable().catch((error: unknown) => {
-        throw new Error(dockerUnavailableMessage(error), { cause: error });
+        throw new Error(DockerGuidance.unavailable(error), { cause: error });
       });
       if (result.status !== 0) {
-        throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
+        throw new Error(DockerGuidance.unavailable(result.stderr || "docker version failed"));
       }
       return `Docker engine ${result.stdout.trim() || "available"}`;
     },
@@ -1006,7 +992,7 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const probe = await assertLocalStateWritable(runtimeDir);
+        const probe = await LocalRuntime.assertWritable(runtimeDir);
         return probe.checkedPath === probe.targetPath
           ? `${probe.targetPath} is writable`
           : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -1025,12 +1011,12 @@ async function checkPortAvailability(
   runtime: RuntimeMetadata | undefined,
   port: number,
 ): Promise<string> {
-  if (runtime?.port === port && (await checkLocalServerHealth(runtime.server_url))) {
+  if (runtime?.port === port && (await LocalRuntime.isHealthy(runtime.server_url))) {
     return `${runtime.server_url} is already healthy`;
   }
-  const listeners = await listenersForPort(port);
+  const listeners = await LocalServer.listenersOn(port);
   if (listeners.length > 0) {
-    throw new PortInUseCheckError(port, localServerUrl(port), listeners);
+    throw new PortInUseCheckError(port, LocalRuntime.urlOf(port), listeners);
   }
   return `Port ${String(port)} is available`;
 }
@@ -1038,12 +1024,12 @@ async function checkPortAvailability(
 class PortInUseCheckError extends Error {
   readonly port: number;
   readonly serverUrl: string;
-  readonly listeners: Awaited<ReturnType<typeof listenersForPort>>;
+  readonly listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>;
 
   constructor(
     port: number,
     serverUrl: string,
-    listeners: Awaited<ReturnType<typeof listenersForPort>>,
+    listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>,
   ) {
     super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
     this.port = port;
@@ -1122,7 +1108,7 @@ async function checkRuntime(
         `Existing local runtime uses ${runtime.backend}; run start --runtime ${runtimeBackend} to switch backends.`,
       );
     }
-    if (!(await checkLocalServerHealth(runtime.server_url))) {
+    if (!(await LocalRuntime.isHealthy(runtime.server_url))) {
       throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
     return inheritedFrom === undefined
@@ -1131,7 +1117,7 @@ async function checkRuntime(
   });
 }
 
-function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>): string {
+function formatListeners(listeners: Awaited<ReturnType<typeof LocalServer.listenersOn>>): string {
   return listeners
     .map((listener) => {
       return [

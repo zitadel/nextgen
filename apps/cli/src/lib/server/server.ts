@@ -2,7 +2,7 @@ import { DEFAULT_SERVER } from "@zitadel/config/server";
 import type { Parsed } from "@zitadel/config/idp";
 
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { isLoopbackHost } from "@/lib/host";
+import { isLoopbackHost } from "@/lib/server/host";
 import { LocalServer } from "@/lib/server/local/server";
 import type { FlagVariable } from "@/lib/oclif/types";
 

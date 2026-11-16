@@ -19,8 +19,15 @@ admin credential, and the CLI talks only to the server a
 
 ## Where things live
 
-- Commands may import any top-level module here; `internal/` is private to
-  `server.ts` (`LocalServer`).
+- Everything outside `src/lib/server` reaches it through `@/lib/server` alone
+  (`index.ts` exports classes and their types, never a loose function);
+  `tests/unit/lib/server/layering.test.ts` fails on a deeper import.
+- Add to the class that owns the concern (`LocalServer` for the lifecycle,
+  `LocalRuntime` for a directory's record, `LocalAdmins`, `AdminSession`,
+  `ServerLogs`, `DockerGuidance`, `ProjectEnv`) before adding an export.
+- Claiming a project is not a server concern: it lives in `lib/claim` and asks
+  the server for an `AdminSession`.
+- `internal/` is private to `server.ts` (`LocalServer`).
 - A command that needs more from a running server gets it from a new
   `LocalServer` method (and a launcher method), not code of its own.
 - `internal/lifecycle.ts` decides against interfaces (reuse, restart, port,
@@ -51,7 +58,7 @@ admin credential, and the CLI talks only to the server a
 Layout and specs: [`tests/AGENTS.md`](../../../../tests/AGENTS.md).
 
 - Never wait in real time: code that waits takes a `Clock`
-  (`internal/clock.ts`), and tests pass `ManualClock` (`tests/helpers/clock.ts`).
+  (`lib/clock.ts`), and tests pass `ManualClock` (`tests/helpers/clock.ts`).
 - Get a deterministic outcome by construction (the `orphaned` shape in
   `tests/helpers/local-server.ts`), never by sleeping.
 - Make no test depend on whether Docker is installed: fake Docker, or take

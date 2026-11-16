@@ -3,8 +3,8 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import type { LocalAdmin } from "@/lib/server/local/admin-credential";
-import { claimProjectAsAdmin } from "@/lib/server/local/claim-as-admin";
+import { AdminSession, type LocalAdmin } from "@/lib/server";
+import { AdminClaim } from "@/lib/claim";
 
 const signal = new AbortController().signal;
 
@@ -80,12 +80,10 @@ afterEach(() => {
 });
 
 const claim = () =>
-  claimProjectAsAdmin({
-    serverUrl: SERVER,
+  AdminClaim.attach({
     projectId: PROJECT,
     projectSecret: "sk_project",
-    admin,
-    signal,
+    session: new AdminSession(SERVER, admin, signal),
   });
 
 describe("claiming a project as the local admin", () => {

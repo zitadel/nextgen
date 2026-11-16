@@ -11,7 +11,7 @@
  * change stop being able to cover it.
  */
 import { DEFAULT_LOCAL_SERVER_PORT } from "@/lib/server/local/runtime";
-import { type Clock, realClock } from "./clock";
+import { type Clock, SystemClock } from "@/lib/clock";
 
 /**
  * What the lifecycle needs to know about a running server, whatever started it.
@@ -272,7 +272,7 @@ export class Lifecycle<R extends ServerRecord> {
 
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
   private async answers(serverUrl: string): Promise<boolean> {
-    const clock = this.options.clock ?? realClock;
+    const clock = this.options.clock ?? new SystemClock();
     for (const attempt of Array.from({ length: HEALTH_ATTEMPTS }, (_, index) => {
       return index + 1;
     })) {
@@ -471,7 +471,7 @@ export class Lifecycle<R extends ServerRecord> {
   private async waitUntilReady(record: Launched<R>): Promise<void> {
     const timeout = this.options.startTimeoutMs ?? 90_000;
     const interval = this.options.pollIntervalMs ?? 1000;
-    const clock = this.options.clock ?? realClock;
+    const clock = this.options.clock ?? new SystemClock();
     const started = clock.now();
     while (clock.now() - started < timeout) {
       if (!(await this.deps.launcher.isLaunchedAlive(record))) {

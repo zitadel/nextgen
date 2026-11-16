@@ -1,8 +1,7 @@
-import { LocalServer } from "@/lib/server";
 import { Server } from "@/lib/server";
-import { sameLocalServer } from "@/lib/server/local/runtime";
 import { WizardStep } from "@/lib/wizard";
 
+import { LocalRuntime, LocalServer } from "@/lib/server";
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 import { outdatedLocalServer, promptContext } from "@/cli/commands/setup/shared";
 
@@ -120,7 +119,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
     const outdated = await outdatedLocalServer(ctx.cwd);
     probing.clear();
     const usable =
-      detected && !(outdated && sameLocalServer(outdated.serverUrl, detected))
+      detected && !(outdated && LocalRuntime.same(outdated.serverUrl, detected))
         ? detected
         : undefined;
     const choice = await ctx.ask.select({
@@ -167,7 +166,7 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
               placeholder: "https://zitadel.internal",
               parse: (value) => {
                 const parsed = Server.parse(value);
-                return parsed.ok && outdated && sameLocalServer(outdated.serverUrl, parsed.value)
+                return parsed.ok && outdated && LocalRuntime.same(outdated.serverUrl, parsed.value)
                   ? {
                       ok: false,
                       problem: `That local server runs ${outdated.running}, but this CLI ships ${outdated.expected}. Restart it first, or enter another URL`,

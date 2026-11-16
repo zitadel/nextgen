@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
-import { type Clock, realClock } from "./clock";
+import { type Clock, SystemClock } from "@/lib/clock";
 
 type LockOptions = Readonly<{
   /** How long to wait for another start to finish. */
@@ -163,7 +163,7 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
 }
 
 async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {
-  const clock = options.clock ?? realClock;
+  const clock = options.clock ?? new SystemClock();
   const deadline = clock.now() + (options.timeoutMs ?? 120_000);
   const pollMs = options.pollMs ?? 200;
   for (;;) {

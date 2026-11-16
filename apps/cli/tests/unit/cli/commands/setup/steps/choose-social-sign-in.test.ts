@@ -20,7 +20,7 @@ import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import type { PromptContext } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
 import { Ui, warnings } from "@/lib/ui";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";

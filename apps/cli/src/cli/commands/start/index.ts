@@ -1,21 +1,13 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/lib/server/local/started";
-import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/server/local/env-vars";
 import {
-  DEFAULT_LOCAL_SERVER_PORT,
-  defaultLocalServerImageForCliVersion,
-  ensureLocalState,
-  localContainerName,
-  localServerUrl,
-  PLATFORM_PROJECT_ID,
-  peekRuntimeMetadata,
-  RUNTIME_BACKENDS,
+  LocalRuntime,
+  LocalServer,
+  ProjectEnv,
+  StartedServer,
   type RuntimeMetadata,
-  resolveRuntimeBackend,
-} from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
+} from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
@@ -70,7 +62,7 @@ export default class Start extends BaseCommand {
     }),
     runtime: Flags.option({
       description: "Local runtime backend.",
-      options: RUNTIME_BACKENDS,
+      options: LocalRuntime.BACKENDS,
     })(),
   };
 
@@ -78,10 +70,10 @@ export default class Start extends BaseCommand {
     resolveServer: false,
   };
 
-  private readonly recorded = startedServer(peekRuntimeMetadata);
+  private readonly recorded = new StartedServer(LocalRuntime.peek);
 
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    return localServerUrl(await this.portOf(flags, cwd));
+    return LocalRuntime.urlOf(await this.portOf(flags, cwd));
   }
 
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
@@ -89,17 +81,15 @@ export default class Start extends BaseCommand {
       throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
     }
     const port = await this.portOf(flags);
-    const serverUrl = localServerUrl(port);
-    const runtimeBackend = resolveRuntimeBackend({
+    const serverUrl = LocalRuntime.urlOf(port);
+    const runtimeBackend = LocalRuntime.resolveBackend({
       image: flags.image,
       runtime: flags.runtime,
       envImage: this.env.ZITADEL_LOCAL_IMAGE,
     });
     this.recordTelemetry({ runtime: runtimeBackend });
     const image =
-      flags.image ??
-      this.env.ZITADEL_LOCAL_IMAGE ??
-      defaultLocalServerImageForCliVersion(this.cliVersion);
+      flags.image ?? this.env.ZITADEL_LOCAL_IMAGE ?? LocalRuntime.imageFor(this.cliVersion);
     if (this.dryRun) {
       const title = "Would start the local Zitadel server (dry run)";
       const imaged: Fact[] = runtimeBackend === "docker" ? [["Image", image]] : [];
@@ -113,7 +103,7 @@ export default class Start extends BaseCommand {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
               ? {
-                  container_name: localContainerName(this.cwd),
+                  container_name: LocalRuntime.containerName(this.cwd),
                   image,
                 }
               : {}),
@@ -143,11 +133,11 @@ export default class Start extends BaseCommand {
       });
     }
 
-    await ensureLocalState(this.cwd);
+    await LocalRuntime.ensureState(this.cwd);
     // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
-    const env = await loadProjectEnv(this.cwd, this.env);
+    const env = await ProjectEnv.load(this.cwd, this.env);
     // The developer exists on their own server from the first start: the
     // server imports the local admin, and the console signs them in by link.
     // The admin is a user of the platform project, so the two travel together:
@@ -223,7 +213,7 @@ export default class Start extends BaseCommand {
     const asked = typeof flags.port === "number" ? flags.port : undefined;
     // A record whose port is no port is no record: `readRuntimeMetadata`
     // drops it, so the default stands and nothing here reads it again.
-    return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    return asked ?? (await this.recorded.of(cwd))?.port ?? LocalRuntime.DEFAULT_PORT;
   }
 }
 
@@ -240,7 +230,7 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
   // one — it refuses that combination at startup (cmd/server/config.go) — so the
   // pin wins and there is no local admin, rather than a start that cannot boot.
   const pinned = env.NEXTGEN_PLATFORM_PROJECT_ID;
-  return !pinned || pinned === PLATFORM_PROJECT_ID;
+  return !pinned || pinned === LocalRuntime.PLATFORM_PROJECT_ID;
 }
 
 function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
@@ -264,7 +254,7 @@ function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
           }),
       port: metadata.port,
       data_dir: metadata.data_dir,
-      env: metadata.env ?? EMPTY_SUMMARY,
+      env: metadata.env ?? ProjectEnv.EMPTY,
     },
     urls: {
       api: metadata.server_url,

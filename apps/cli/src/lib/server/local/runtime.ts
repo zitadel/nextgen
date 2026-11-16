@@ -11,7 +11,7 @@ import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
-import { isLoopbackHost } from "@/lib/host";
+import { isLoopbackHost } from "@/lib/server/host";
 import { Runtime } from "@/lib/runtime";
 import { CliPackage } from "@/lib/upgrade";
 

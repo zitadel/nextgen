@@ -3,12 +3,7 @@ import pTimeout from "p-timeout";
 import { UserService } from "@/lib/backend";
 import { Claim, type ClaimState } from "@/lib/claim";
 import { isCancellation } from "@/lib/errors";
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  readRuntimeMetadata,
-  runtimeSummary,
-} from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
+import { LocalRuntime, LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Connection,
@@ -48,12 +43,12 @@ export default class Status extends EnvironmentCommand {
     if (flags.server !== "local") {
       return super.toMeta(flags, options);
     }
-    const runtime = await readRuntimeMetadata(
+    const runtime = await LocalRuntime.read(
       resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
     );
     return super.toMeta(flags, {
       resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
+      source: runtime?.server_url ?? LocalRuntime.DEFAULT_URL,
     });
   }
 
@@ -107,7 +102,7 @@ export default class Status extends EnvironmentCommand {
         title,
         server: {
           lifecycle: serverLifecycle,
-          runtime: runtimeSummary(server.runtime),
+          runtime: LocalRuntime.summary(server.runtime),
           docker: server.docker,
           process: server.process,
           health: {

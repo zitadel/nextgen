@@ -9,7 +9,7 @@ import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
-import { writeRuntimeMetadata } from "@/lib/server/local/runtime";
+import { LocalRuntime } from "@/lib/server";
 
 const config = {
   version: "0.0.0-test",
@@ -96,7 +96,7 @@ describe("--follow off a terminal", () => {
     await mkdir(join(dir, ".zitadel/local/data"), { recursive: true });
     const logPath = join(dir, "server.log");
     await writeFile(logPath, "level=INFO msg=first\nlevel=INFO msg=last\n");
-    await writeRuntimeMetadata(
+    await LocalRuntime.write(
       dir,
       aBinaryRecord({
         pid: 2_147_483_000,

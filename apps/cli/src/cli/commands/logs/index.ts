@@ -1,10 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/lib/server/local/started";
-import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
-import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/server/local/server-log";
+import { LocalRuntime, LocalServer, ServerLogs, StartedServer, type LogLine } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -66,7 +63,7 @@ export default class Logs extends BaseCommand {
     follow: Flags.boolean({ description: "Keep printing lines as the server writes them." }),
     level: Flags.option({
       description: "Show only lines at this level or above.",
-      options: LOG_LEVELS,
+      options: ServerLogs.LEVELS,
     })(),
     tail: Flags.custom<number>({
       parse: reads(TAIL),
@@ -80,12 +77,12 @@ export default class Logs extends BaseCommand {
     resolveServer: false,
   };
 
-  private readonly started = startedServer(readNearestRuntimeMetadata);
+  private readonly started = new StartedServer(LocalRuntime.readNearest);
 
   protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
     // The default where nothing was started here, because a run still reports
     // the server it is about: an empty one would name no server at all.
-    return (await this.started.of(cwd))?.runtime.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+    return (await this.started.of(cwd))?.runtime.server_url ?? LocalRuntime.DEFAULT_URL;
   }
 
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
@@ -131,7 +128,7 @@ export default class Logs extends BaseCommand {
       level: flags.level,
     });
     const shown = lines.map((line) => {
-      return renderLogLine(line, this.isColored);
+      return ServerLogs.render(line, this.isColored);
     });
     const title = "Local Zitadel server logs";
 
@@ -150,7 +147,7 @@ export default class Logs extends BaseCommand {
                 backend: runtime.backend,
                 container_name: runtime.container_name,
               },
-        logs: logText(lines),
+        logs: ServerLogs.text(lines),
       },
       pretty: painted(shown.join("\n")),
       summary: {
@@ -165,7 +162,7 @@ export default class Logs extends BaseCommand {
 function render(lines: readonly LogLine[], color: boolean): string {
   return lines
     .map((line) => {
-      return renderLogLine(line, color);
+      return ServerLogs.render(line, color);
     })
     .join("\n");
 }

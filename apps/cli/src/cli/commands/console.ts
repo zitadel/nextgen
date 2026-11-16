@@ -2,11 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
-import { findLocalAdminDir, readLocalAdmin } from "@/lib/server/local/admin-credential";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
-import { consoleSignInUrl } from "@/lib/server/local/sign-in";
-import { Server } from "@/lib/server";
+import { AdminSession, LocalAdmins, LocalRuntime, LocalServer, Server } from "@/lib/server";
 import { section, log } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
@@ -61,7 +57,7 @@ export default class Console extends BaseCommand {
    * the run has no context of its own yet.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const found = await findLocalAdminDir(cwd);
+    const found = await LocalAdmins.findDir(cwd);
     if (found === undefined) {
       // A server that cannot be resolved is the run's error, not a missing local setup.
       const environment = await Environment.resolve({
@@ -73,9 +69,7 @@ export default class Console extends BaseCommand {
     }
 
     return (
-      this.named ??
-      (await readRuntimeMetadata(found ?? cwd))?.server_url ??
-      DEFAULT_LOCAL_SERVER_URL
+      this.named ?? (await LocalRuntime.read(found ?? cwd))?.server_url ?? LocalRuntime.DEFAULT_URL
     );
   }
 
@@ -124,9 +118,9 @@ export default class Console extends BaseCommand {
       });
     }
 
-    const found = await findLocalAdminDir(this.cwd);
+    const found = await LocalAdmins.findDir(this.cwd);
     const localDir = found ?? this.cwd;
-    const admin = await readLocalAdmin(localDir);
+    const admin = await LocalAdmins.read(localDir);
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
     }
@@ -153,7 +147,7 @@ export default class Console extends BaseCommand {
     }
 
     const serverUrl = await LocalServer.resolveUrl(localDir);
-    const signInUrl = await consoleSignInUrl(serverUrl, admin, this.signal);
+    const signInUrl = await new AdminSession(serverUrl, admin, this.signal).consoleUrl();
 
     log.plain(`Signed in to the local console as ${escapeControlCharacters(admin.email)}:`);
     log.plain(escapeControlCharacters(signInUrl));

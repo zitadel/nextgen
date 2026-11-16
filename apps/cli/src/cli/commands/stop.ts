@@ -1,12 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { startedServer } from "@/lib/server/local/started";
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  localContainerName,
-  readRuntimeMetadata,
-} from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
+import { LocalRuntime, LocalServer, StartedServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";
@@ -29,10 +23,10 @@ export default class Stop extends BaseCommand {
     resolveServer: false,
   };
 
-  private readonly started = startedServer(readRuntimeMetadata);
+  private readonly started = new StartedServer(LocalRuntime.read);
 
   protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
-    return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+    return (await this.started.of(cwd))?.server_url ?? LocalRuntime.DEFAULT_URL;
   }
 
   protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
@@ -45,7 +39,7 @@ export default class Stop extends BaseCommand {
     const runtime = await this.started.of(this.cwd);
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
+      runtime?.backend === "docker" ? runtime.container_name : LocalRuntime.containerName(this.cwd);
     const owner: Fact =
       runtime?.backend === "binary"
         ? ["Process", String(runtime.pid)]

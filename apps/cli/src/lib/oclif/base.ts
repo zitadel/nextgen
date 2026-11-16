@@ -10,9 +10,8 @@ import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { type LocalServers, PsLocalServers } from "@/lib/server/local/processes";
+import { PsLocalServers, Server, type LocalServers } from "@/lib/server";
 import { resolveCwd } from "@/lib/paths";
-import { Server } from "@/lib/server";
 import {
   Spelling,
   commandOf,

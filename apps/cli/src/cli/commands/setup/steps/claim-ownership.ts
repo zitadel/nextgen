@@ -1,8 +1,6 @@
 import { isCancellation, toZitadelError } from "@/lib/errors";
-import { findLocalAdminFor } from "@/lib/server/local/admin-credential";
-import { claimProjectAsAdmin } from "@/lib/server/local/claim-as-admin";
-import { readPlatformRuntime } from "@/lib/server/local/runtime";
-import { Server } from "@/lib/server";
+import { AdminClaim } from "@/lib/claim";
+import { AdminSession, LocalAdmins, LocalRuntime, Server } from "@/lib/server";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -94,7 +92,7 @@ export class ClaimOwnership extends WizardStep<
     const hostsPlatform =
       !this.deps.dryRun &&
       isLocal &&
-      Boolean(await readPlatformRuntime(answers.server, PLATFORM_RUNTIME_TIMEOUT_MS));
+      Boolean(await LocalRuntime.readPlatform(answers.server, PLATFORM_RUNTIME_TIMEOUT_MS));
     if (!hostsPlatform) {
       return {
         ownedByLocalAdmin: undefined,
@@ -103,7 +101,7 @@ export class ClaimOwnership extends WizardStep<
       };
     }
     try {
-      const admin = await findLocalAdminFor(this.deps.cwd, answers.server);
+      const admin = await LocalAdmins.findFor(this.deps.cwd, answers.server);
       if (!admin) {
         warnings.report(
           `No local admin for ${answers.server} in ${this.deps.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.deps.suggest({ id: "start" })} started this server, run setup from the directory it ran in, or one inside it.`,
@@ -114,12 +112,10 @@ export class ClaimOwnership extends WizardStep<
           isLocal,
         };
       }
-      const owner = await claimProjectAsAdmin({
-        serverUrl: answers.server,
+      const owner = await AdminClaim.attach({
         projectId: project.id,
         projectSecret: project.project_secret,
-        admin,
-        signal: this.deps.signal,
+        session: new AdminSession(answers.server, admin, this.deps.signal),
       });
       const secret = await Project.at(this.deps.cwd).secret();
       await secret.with({ team_id: owner.team_id, claimed_at: owner.claimed_at }).write();

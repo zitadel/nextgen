@@ -4,7 +4,7 @@ import { format } from "node:util";
 import { Command, type Config, run } from "@oclif/core";
 import { vi } from "vitest";
 
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server/local/processes";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server";
 import { cliPackageRoot } from "./oclif-build";
 // The leaf module, not `@/lib/suggestion`: this helper loads in every test's setup, and the area's
 // index would load much of the CLI before a test's own `vi.mock` of a node module can apply.

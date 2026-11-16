@@ -17,7 +17,8 @@ import { suggestedCommandOf } from "@/lib/suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
-import { type Clock, realClock, stopSignal } from "./clock";
+import { type Clock, SystemClock } from "@/lib/clock";
+import { stopSignal } from "./stop-signal";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 import { CliPackage } from "@/lib/upgrade";
 
@@ -363,7 +364,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     sink: LogSink,
     options: { clock?: Clock; signal: AbortSignal },
   ): Promise<void> {
-    const clock = options.clock ?? realClock;
+    const clock = options.clock ?? new SystemClock();
     const stop = stopSignal(options.signal);
     try {
       const log = new AppendedLog(logPath);

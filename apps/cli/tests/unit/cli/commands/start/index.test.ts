@@ -2,11 +2,7 @@ import type { Config } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import Start from "@/cli/commands/start";
-import {
-  localContainerName,
-  localRuntimePaths,
-  writeRuntimeMetadata,
-} from "@/lib/server/local/runtime";
+import { LocalRuntime } from "@/lib/server";
 import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 
@@ -35,15 +31,15 @@ class Reading extends Start {
  * @returns Once the directory remembers it.
  */
 async function aDirectoryRemembering(cwd: string, port: number): Promise<void> {
-  await writeRuntimeMetadata(cwd, {
+  await LocalRuntime.write(cwd, {
     schema_version: 1,
     backend: "docker",
-    container_name: localContainerName(cwd),
+    container_name: LocalRuntime.containerName(cwd),
     container_id: "container-test-id",
     image: "ghcr.io/zitadel/nextgen:test",
     port,
     server_url: `http://localhost:${port}`,
-    data_dir: localRuntimePaths(cwd).dataDir,
+    data_dir: LocalRuntime.paths(cwd).dataDir,
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   });
