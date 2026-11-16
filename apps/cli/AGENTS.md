@@ -179,8 +179,9 @@
   warning or a box line names its command with `suggest`, because the scan
   above rejects backticks and a bare `zitadel …` anywhere else in
   `src/cli/commands`.
-- Put a command that takes `--env-file` in `nextCommands`, never in a string: prose drops the
-  selector (`tests/unit/lib/oclif/environment-flags.test.ts`).
+- Put a command that takes `--env-file` in `nextCommands`; a `hint:` may name it for a person to
+  read, but a message or a box line never may: prose drops the selector
+  (`tests/unit/lib/oclif/environment-flags.test.ts`).
 - Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
   (`src/lib/ui/questions.ts`, engine in `src/lib/ui/asker.ts`) — never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per

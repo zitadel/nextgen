@@ -141,11 +141,30 @@ const isProse = (node: ts.Node): node is Prose => {
 };
 
 /**
+ * Whether `node` is written as a hint: the value of a `hint:` property, or the
+ * body of a function named for one, such as `disableHint`.
+ */
+const inHint = (node: ts.Node): boolean => {
+  const parent = node.parent as ts.Node | undefined;
+  if (parent === undefined) {
+    return false;
+  }
+  if (ts.isPropertyAssignment(parent) && parent.name.getText() === "hint") {
+    return true;
+  }
+  if (ts.isFunctionDeclaration(parent) && /Hint$/.test(parent.name?.text ?? "")) {
+    return true;
+  }
+  return inHint(parent);
+};
+
+/**
  * The lines of `text` whose strings write out `zitadel <command>` for a command
  * that takes the run's selector. Prose cannot carry it: `Spelling#spellOut`
- * only rewrites the program's name, so such a command in a hint or a message
- * would run against the default project. Comments are no strings, so they are
- * free to name one.
+ * only rewrites the program's name, so such a command in a message would run
+ * against the default project. A `hint:` may name one for a person to read,
+ * since the failure lists the same command, selector and all, under
+ * `nextCommands`. Comments are no strings, so they are free to name one.
  *
  * @param text - A source file.
  * @returns The 1-based line each offending string starts on.
@@ -153,6 +172,9 @@ const isProse = (node: ts.Node): node is Prose => {
 function scopedCommandsNamedIn(text: string): number[] {
   const source = parsedSource("source.ts", text);
   return nodesOf(source, isProse)
+    .filter((node) => {
+      return !inHint(node);
+    })
     .filter((node) => {
       return [...node.text.matchAll(/\bzitadel ([a-z][a-z-]*(?: [a-z][a-z-]*)*)/g)].some(
         (match) => {
@@ -188,6 +210,9 @@ describe("a command that takes the run's selector", () => {
 
   it.each([
     ["a comment", "// Run zitadel deploy first.\nconst a = 1;"],
+    ["a hint", 'throw fail({ hint: "Run `zitadel deploy` first.", next });'],
+    ["a function that makes a hint", 'function disableHint() { return "Run zitadel deploy"; }'],
+    ["a hint written as a template", "const e = { hint: `Run zitadel deploy ${where}.` };"],
     ["a doc comment", "/** See `zitadel deploy --dry-run`. */\nconst a = 1;"],
     ["a command that takes no selector", 'const hint = "Run zitadel start first.";'],
     ["a longer command that takes none", 'const hint = "List them with zitadel api ls.";'],

@@ -1063,17 +1063,15 @@ describe("auth-method sso disable", () => {
         });
       });
 
-      it("suggests no dry run, which would check the files and not the refused change", async ({
-        dir,
-      }) => {
+      it("suggests a dry run of deploy, which reports those flow errors", async ({ dir }) => {
         await writeProject(dir, broken);
 
         const result = await runCliForTest(
           authMethodJson(dir, "sso", "disable", "--provider", "google"),
         );
 
-        expect(parseJson(result.stdout)).not.toMatchObject({
-          next_commands: expect.arrayContaining([expect.stringContaining("deploy")]),
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: expect.arrayContaining([expect.stringContaining("deploy --dry-run")]),
         });
       });
 
