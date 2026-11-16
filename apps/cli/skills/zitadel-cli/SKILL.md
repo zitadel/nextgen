@@ -428,8 +428,8 @@ Each invocation prints one JSON object:
   Without origins the CLI can read, the conflict is the plain one: no `hint`, no
   `next_commands`, and `details` holds the server's `status`, `url` and `body`.
 - `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
-  live expiry of a live preview deployment's preview (the earliest, when it made
-  several), empty for any other deployment, such as a primary one, a replaced
+  live expiry of a live preview deployment's preview (the earliest, when it still
+  serves several), empty for any other deployment, such as a primary one, a replaced
   one, or one whose preview is gone. It is also empty when the previews could
   not be read, and a warning says so. `--json` items are the API's records,
   unchanged and without `expires`: read a preview's expiry as JSON with
