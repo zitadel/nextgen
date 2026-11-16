@@ -3,9 +3,9 @@ import { z } from "zod";
 
 import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
-  CommandGroups,
   type CommandResult,
   CREDENTIALS,
   type JsonEnvelope,
@@ -234,7 +234,7 @@ export async function refusePrimaryOrigins(
 export default class Preview extends PreviewCommand {
   static override description =
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
   static override groupOrder = 2;
 
   static override examples = [

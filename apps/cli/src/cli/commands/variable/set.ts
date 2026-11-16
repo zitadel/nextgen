@@ -3,7 +3,8 @@ import { Args, Flags } from "@oclif/core";
 import { previewVerdict } from "@/cli/commands/preview";
 import { type Variable, VariableService, VariableWrite } from "@/lib/backend";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -51,7 +52,8 @@ const VALUE_TYPE_REFUSAL = {
  */
 export default class VariableSet extends Tabulatable(Promptable(EnvironmentCommand)) {
   static override description = "Set one variable on the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com",

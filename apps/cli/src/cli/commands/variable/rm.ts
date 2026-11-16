@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
@@ -17,7 +18,8 @@ import { variableNameArg } from "./name";
  */
 export default class VariableRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID",

@@ -30,13 +30,8 @@ import {
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -130,8 +125,8 @@ type Checking = Readonly<{
  */
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 1;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 3;
 
   static override flags = relatedFlags(
     {

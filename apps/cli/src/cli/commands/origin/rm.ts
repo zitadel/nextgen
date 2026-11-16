@@ -2,13 +2,8 @@ import { Flags } from "@oclif/core";
 
 import { OriginService } from "@/lib/backend";
 import { errorMessage } from "@/lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
@@ -23,7 +18,8 @@ import { warnings } from "@/lib/ui";
  */
 export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",

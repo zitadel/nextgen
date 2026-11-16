@@ -16,7 +16,8 @@ import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { Runtime } from "@/lib/runtime";
 import { errorMessage } from "@/lib/errors";
 import { customExample, ENABLE_FLAG_NAMES } from "@/lib/idp";
-import { type Admitted, CommandGroups, type CommandResult, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, CommandResult, JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { accepts, parses } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -62,7 +63,8 @@ const PROVIDER_IS_NAMED_REFUSAL = {
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
-  static override group = CommandGroups.authentication;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 1;
 
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",

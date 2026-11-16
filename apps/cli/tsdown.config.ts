@@ -26,7 +26,7 @@ export default defineConfig({
   },
   entry: {
     index: "src/index.ts",
-    "lib/oclif/help": "src/lib/oclif/help.ts",
+    "cli/help": "src/cli/help.ts",
     "hooks/command-not-found": "src/cli/hooks/command-not-found.ts",
     "hooks/version-notice": "src/cli/hooks/version-notice.ts",
   },

@@ -6,13 +6,8 @@ import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type CommandResult,
-  type JsonEnvelope,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type CommandResult, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { createOrca, Orca } from "@/lib/orca";
 import { LAUNCHER_PATH } from "@/lib/orca/patchers/rule/angular/templates";
@@ -367,8 +362,8 @@ function ejected(
  */
 export default class Eject extends Destructive(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 5;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 7;
 
   static override aliases = ["uninstall"];
   static override flags = {

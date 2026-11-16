@@ -6,7 +6,8 @@ import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-serve
 import { LocalServer } from "@/lib/local-server/server";
 import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { section, log } from "@/lib/ui";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -26,8 +27,8 @@ const NO_LOCAL_ADMIN_REFUSAL = {
 export default class Console extends BaseCommand {
   static override description =
     "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 1;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

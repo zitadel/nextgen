@@ -5,7 +5,8 @@ import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { GetDeploymentParams, GetReleaseParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PublishedConfiguration } from "@/lib/publish";
@@ -203,8 +204,8 @@ type PullOutcome =
 export default class Pull extends EnvironmentCommand {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
-  static override group = CommandGroups.configuration;
-  static override groupOrder = 2;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> pull",
