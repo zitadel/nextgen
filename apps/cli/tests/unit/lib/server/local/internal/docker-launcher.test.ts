@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import { execa } from "execa";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DockerLauncher } from "@/lib/local-server/internal/docker-launcher";
-import { CONTAINER_DATA_DIR } from "@/lib/local-server/runtime";
-import type { LogSink } from "@/lib/local-server/server-log";
+import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
+import { CONTAINER_DATA_DIR } from "@/lib/server/local/runtime";
+import type { LogSink } from "@/lib/server/local/server-log";
 
 vi.mock("execa", () => ({ execa: vi.fn() }));
 
@@ -24,7 +24,7 @@ describe("DockerLauncher", () => {
   // serving. CI has no Docker, so this parity check is the gate.
   it("ships an image whose data dir default matches the mount the CLI provides", async () => {
     const dockerfile = await readFile(
-      new URL("../../../../../../../Dockerfile", import.meta.url),
+      new URL("../../../../../../../../Dockerfile", import.meta.url),
       "utf8",
     );
 

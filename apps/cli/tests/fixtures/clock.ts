@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import type { Clock } from "@/lib/local-server/internal/clock";
+import type { Clock } from "@/lib/server/local/internal/clock";
 import { test as base } from "./terminal";
 
 /**

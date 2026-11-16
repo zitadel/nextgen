@@ -5,8 +5,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { AppendedLog, BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
-import { launched } from "@/lib/local-server/internal/lifecycle";
+import { AppendedLog, BinaryLauncher } from "@/lib/server/local/internal/binary-launcher";
+import { launched } from "@/lib/server/local/internal/lifecycle";
 import { ManualClock } from "@tests/fixtures/clock";
 import type { Daemons } from "@tests/fixtures/daemon";
 import { it } from "@tests/fixtures";

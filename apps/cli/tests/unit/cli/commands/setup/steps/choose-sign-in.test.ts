@@ -4,7 +4,7 @@ vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
 
-vi.mock("@/lib/local-server/server", async (importOriginal) => {
+vi.mock("@/lib/server/local/server", async (importOriginal) => {
   return {
     ...(await importOriginal<object>()),
     LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
@@ -17,7 +17,7 @@ import { ChooseSignIn } from "@/cli/commands/setup/steps/choose-sign-in";
 import type { SetupFlags } from "@/cli/commands/setup";
 import type { SetupAnswers } from "@/cli/commands/setup/shared";
 import { ZitadelError } from "@/lib/errors";
-import { LocalServer } from "@/lib/local-server/server";
+import { LocalServer } from "@/lib/server/local/server";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { aQuestionDeps } from "@tests/helpers/setup";
 

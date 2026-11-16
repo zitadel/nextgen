@@ -318,6 +318,7 @@ describe("claim", () => {
             project_id: expect.stringMatching(/^proj-[0-9a-f]{12}$/),
             team_id: expect.stringMatching(/^team-[0-9a-f]{12}$/),
             claimed_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/),
+            console_url: `${MOCK_SERVER_URL}/ui/console/`,
           },
         });
         expect(data.team_id).toMatch(/^team-/);
@@ -445,6 +446,16 @@ describe("claim", () => {
         const result = await shown(() => app.run(["claim", "--no-open"]));
 
         expect(result).toSayOnce("This project already belongs to a team");
+      }, 30000);
+
+      it("prints the console link of a project already claimed", async () => {
+        const app = await aSetUpApp();
+        platform.completesTheNextClaim();
+        await app.run(WAITING_FOR_A_BROWSER);
+
+        const result = await shown(() => app.run(["claim", "--no-open"]));
+
+        expect(result).toPrintRow("Console", `${MOCK_SERVER_URL}/ui/console/`);
       }, 30000);
 
       it("prints the link to open and the command that waits for it", async () => {

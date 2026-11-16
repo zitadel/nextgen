@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
+import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
 import {
   CONTAINER_DATA_DIR,
   LOCAL_RUNTIME_FILE,
@@ -14,7 +14,7 @@ import {
   readRuntimeMetadata,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import Reset from "@/cli/commands/reset";
 import {
   aMachineRunning,

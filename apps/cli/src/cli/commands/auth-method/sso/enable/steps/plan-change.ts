@@ -2,7 +2,7 @@ import { credentialVariables, providerOf, selectionName } from "@zitadel/config/
 
 import type { Fact } from "@/cli/commands/auth-method/sso/enable/shared";
 import { callbackUriFor, loopbackIssuerWarning } from "@/lib/idp";
-import { loopbackReach } from "@/lib/local-server/runtime";
+import { loopbackReach } from "@/lib/server/local/runtime";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";

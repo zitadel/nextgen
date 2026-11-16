@@ -512,12 +512,12 @@
     {
       "id": "console",
       "group": "Local server",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
+      "description": "Open the console of the server the project uses.\n\nWhere a local server was started, the console opens signed in as the local admin the start command created: run this in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.",
       "args": [],
       "flags": [
         {
           "name": "no-open",
-          "description": "Print the sign-in link instead of opening a browser.",
+          "description": "Print the link instead of opening a browser.",
           "type": "boolean"
         }
       ],

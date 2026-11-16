@@ -40,8 +40,8 @@ import {
   localRuntimePaths,
   type RuntimeMetadata,
   writeRuntimeMetadata,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server/local/server";
 import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";

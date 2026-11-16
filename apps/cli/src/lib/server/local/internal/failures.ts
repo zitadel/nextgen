@@ -4,8 +4,8 @@ import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "@/lib/local-server/docker-guidance";
-import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "@/lib/local-server/runtime";
+} from "@/lib/server/local/docker-guidance";
+import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "@/lib/server/local/runtime";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,
