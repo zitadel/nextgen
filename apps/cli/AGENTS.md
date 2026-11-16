@@ -16,7 +16,7 @@
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
-  [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+  [`src/lib/server/local/AGENTS.md`](src/lib/server/local/AGENTS.md).
 - No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
   `// biome-ignore lint/plugin: <reason>` stating the mechanism.
 - `src/lib/orca/patchers` edits and drops code into the customer's project, so no

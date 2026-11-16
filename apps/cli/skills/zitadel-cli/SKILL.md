@@ -805,6 +805,8 @@ release this CLI ships; one an earlier release started is restarted, and its
 data stays. `setup --server local` refuses a binary-runtime server another
 release started with `E_CONFLICT` before it creates anything: that server's API
 is its own release's. Its `next_commands` run `start`, then `setup` again.
+Setup's interactive server question lists such a server as unavailable, and
+asks again when its URL is typed as a custom one.
 
 In an existing app, `--framework` has to name the framework setup detects
 there; another one stops setup with `E_CONFLICT` instead of offering
@@ -1158,8 +1160,14 @@ waits for the person to finish, returns `data.dashboard_url`, and records the
 owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
 names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
 new `--no-wait` link. A project that already has a team is `skipped` with
-`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
-and no `next_commands`, since a new link cannot reopen it.
+`reason: "already-claimed"` and carries `data.console_url`, the link to the
+project's console; one past its 14 days fails with `E_VALIDATION` and no
+`next_commands`, since a new link cannot reopen it.
+
+To get a person to the console of a project on a hosted or self-hosted server,
+run `console --no-open --json`: with no local server started in the directory it
+returns `data.console_url` instead of a local sign-in link, and the person signs
+in there themselves.
 
 ## Reference files
 

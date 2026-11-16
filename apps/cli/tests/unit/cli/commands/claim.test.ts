@@ -17,7 +17,7 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "@/lib/local-server/runtime";
+} from "@/lib/server/local/runtime";
 import Claim from "@/cli/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";

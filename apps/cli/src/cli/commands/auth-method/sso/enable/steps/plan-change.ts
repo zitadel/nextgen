@@ -7,7 +7,7 @@ import {
   CredentialPrompt,
   loopbackIssuerWarning,
 } from "@/lib/idp";
-import { loopbackReach } from "@/lib/local-server/runtime";
+import { loopbackReach } from "@/lib/server/local/runtime";
 import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";

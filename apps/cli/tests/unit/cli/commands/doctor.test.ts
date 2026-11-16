@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { type Serve, test } from "@tests/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
-import type { LocalServers } from "@/lib/local-server/processes";
+import type { LocalServers } from "@/lib/server/local/processes";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { advisoryForWarnings, type DoctorAgain } from "@/cli/commands/doctor/index";
 import type { Suggest } from "@/lib/suggestion";

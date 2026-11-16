@@ -4,7 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExists, readDirIfExists } from "@/lib/fs";
-import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
+import { LOCAL_RUNTIME_DIR } from "@/lib/server/local/runtime";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";

@@ -37,7 +37,7 @@ Local server
   stop             Stop the local Zitadel server
   status           Summarize the local Zitadel server and project state
   logs             Show local Zitadel server logs
-  console          Open the local console, signed in as the local admin
+  console          Open the console of the server the project uses
   reset            Delete the local Zitadel server runtime and data
   eject            Remove managed files and local Zitadel state
 

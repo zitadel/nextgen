@@ -1,9 +1,8 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
-import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
-import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
+import { startedServer } from "@/lib/server/local/started";
+import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/server/local/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   defaultLocalServerImageForCliVersion,
@@ -15,8 +14,8 @@ import {
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
   resolveRuntimeBackend,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
@@ -161,13 +160,14 @@ export default class Start extends BaseCommand {
       ...this.env,
       ...env.values,
     };
+    const server = LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
+    });
     const local = platformBootstrapEnabled(serverEnv)
-      ? await ensureLocalAdmin(this.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
+      ? await server.ensureAdmin(serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
       : undefined;
 
-    const { runtime, alreadyRunning } = await LocalServer.at(this.cwd, {
-      cliVersion: this.cliVersion,
-    }).start(
+    const { runtime, alreadyRunning } = await server.start(
       runtimeBackend === "docker"
         ? {
             backend: "docker",
