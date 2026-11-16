@@ -22,26 +22,6 @@ const NO_LOCAL_ADMIN_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The server this run is about when no local server was started: the one
- * `--server` names, else the project's own (`ZITADEL_URL`, from the
- * environment or the project's `.env` files). A server that cannot be resolved
- * is the run's error, not a missing local setup.
- *
- * @param cwd - The directory the run addresses.
- * @param serverFlag - The `--server` the run was given, if any.
- * @returns The server's address, or `undefined` when none is named.
- */
-async function projectServerOf(cwd: string, serverFlag: unknown): Promise<string | undefined> {
-  const environment = await Environment.resolve({
-    cwd,
-    env: process.env,
-    serverFlag: typeof serverFlag === "string" ? serverFlag : undefined,
-  });
-
-  return environment.values.ZITADEL_URL?.value;
-}
-
-/**
  * `zitadel console` — open the console of the server the project uses. Where a
  * local server was started that is the local console, signed in as the local
  * admin `zitadel start` created; every run mints a fresh one-time link, so the
@@ -83,7 +63,13 @@ export default class Console extends BaseCommand {
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await findLocalAdminDir(cwd);
     if (found === undefined) {
-      this.named = await projectServerOf(cwd, flags.server);
+      // A server that cannot be resolved is the run's error, not a missing local setup.
+      const environment = await Environment.resolve({
+        cwd,
+        env: process.env,
+        serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      });
+      this.named = environment.values.ZITADEL_URL?.value;
     }
 
     return (
@@ -97,7 +83,45 @@ export default class Console extends BaseCommand {
     // With no local server started here, the server `--server` or the project
     // names, when it is not on this machine, has only its own console to open.
     if (this.named !== undefined && !Server.at(this.named).isLoopback()) {
-      return this.openRemote(Server.at(this.named).consoleUrl(), flags.noOpen);
+      const consoleUrl = Server.at(this.named).consoleUrl();
+
+      if (this.dryRun) {
+        const title = "Would open the console (dry run)";
+
+        return this.emit({
+          status: "ok",
+          data: {
+            title,
+            dry_run: true,
+            console_url: consoleUrl,
+          },
+          summary: {
+            title,
+            sections: [section(undefined, ["Console", escapeControlCharacters(consoleUrl)])],
+          },
+          next: { commands: [await this.realRun()] },
+        });
+      }
+
+      log.plain("The console of this project's server:");
+      log.plain(escapeControlCharacters(consoleUrl));
+      const skipLaunch = flags.noOpen || this.nonInteractive;
+      const opened = skipLaunch ? false : (await openInBrowser(consoleUrl)).opened;
+
+      const title = "Console";
+
+      return this.emit({
+        status: "ok",
+        data: {
+          title,
+          console_url: consoleUrl,
+          browser_opened: opened,
+        },
+        summary: {
+          title,
+          sections: [],
+        },
+      });
     }
 
     const found = await findLocalAdminDir(this.cwd);
@@ -154,55 +178,6 @@ export default class Console extends BaseCommand {
         actions: [
           `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
         ],
-      },
-    });
-  }
-
-  /**
-   * Opens the console of a server that is not on this machine. There is no
-   * local admin to sign in as, so the page is the server's own and the
-   * developer signs in there; a dry run opens nothing, as it would not for a
-   * local server.
-   *
-   * @param consoleUrl - The server's console.
-   * @param noOpen - Whether `--no-open` asked to print the link only.
-   * @returns The result, naming the link and whether a browser was opened.
-   */
-  private async openRemote(consoleUrl: string, noOpen: boolean): Promise<JsonEnvelope> {
-    if (this.dryRun) {
-      const title = "Would open the console (dry run)";
-
-      return this.emit({
-        status: "ok",
-        data: {
-          title,
-          dry_run: true,
-          console_url: consoleUrl,
-        },
-        summary: {
-          title,
-          sections: [section(undefined, ["Console", escapeControlCharacters(consoleUrl)])],
-        },
-        next: { commands: [await this.realRun()] },
-      });
-    }
-
-    log.plain(`The console of this project's server:`);
-    log.plain(escapeControlCharacters(consoleUrl));
-    const opened = noOpen || this.nonInteractive ? false : (await openInBrowser(consoleUrl)).opened;
-
-    const title = "Console";
-
-    return this.emit({
-      status: "ok",
-      data: {
-        title,
-        console_url: consoleUrl,
-        browser_opened: opened,
-      },
-      summary: {
-        title,
-        sections: [],
       },
     });
   }
