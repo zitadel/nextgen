@@ -6,8 +6,8 @@ import { describe, expect } from "vitest";
 
 import OriginRm from "@/cli/commands/origin/rm";
 import { answering } from "@tests/helpers/keyboard";
-import { it } from "@tests/helpers/fixtures";
-import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { it } from "@tests/fixtures";
+import { asTerminal as asPerson } from "@tests/fixtures/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { runCommand } from "@tests/helpers/run-cli";

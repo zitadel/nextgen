@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** The name of the env file each test writes in its directory. */
 const ENV_FILE = ".env.test.local";

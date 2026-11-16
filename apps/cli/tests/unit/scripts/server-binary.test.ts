@@ -11,7 +11,7 @@ import {
   serverBinaryPath,
   supportedPlatforms,
 } from "@zitadel/server/binary";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("@zitadel/server binary resolver", () => {
   it("lists exactly the platform packages the server package depends on", async () => {

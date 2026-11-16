@@ -9,7 +9,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;

@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 type ServerWrapperModule = {
   ensureExecutable: (binaryPath: string, platform?: string) => void;

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";

@@ -4,7 +4,7 @@ import { LOGGED_LINES } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 

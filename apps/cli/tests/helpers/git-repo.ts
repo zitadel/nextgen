@@ -8,7 +8,7 @@ import { vi } from "vitest";
 
 import { RepositoryError } from "@/lib/git/errors";
 import { Git, GitResult } from "@/lib/git/git";
-import { scratchDir } from "./scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 const exec = promisify(execFile);
 

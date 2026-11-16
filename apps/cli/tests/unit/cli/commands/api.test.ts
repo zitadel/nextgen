@@ -5,12 +5,12 @@ import { Config } from "@oclif/core";
 import Api, { readOperation } from "@/cli/commands/api/index";
 
 import { ZitadelError } from "@/lib/errors";
-import { atScreenRecording as it } from "@tests/helpers/fixtures";
+import { atScreenRecording as it } from "@tests/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by

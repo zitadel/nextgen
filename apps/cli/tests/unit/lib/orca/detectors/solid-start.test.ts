@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { SolidStartDetector } from "@/lib/orca/detectors/solid-start";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * Writes a `package.json` declaring the given dependencies.

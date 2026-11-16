@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { PM, type PMName } from "@/lib/pm";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * Makes a directory a project: it gets a `package.json` that names no package manager.

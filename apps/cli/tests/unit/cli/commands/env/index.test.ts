@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 const SERVER = "https://api.zitadel.cloud";
 

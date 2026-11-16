@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { VueDetector } from "@/lib/orca/detectors/vue";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 async function project(cwd: string, deps: Record<string, string>): Promise<string> {

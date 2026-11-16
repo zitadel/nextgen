@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import PreviewRm from "@/cli/commands/preview/rm";
 import { answering } from "@tests/helpers/keyboard";
-import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { asTerminal as asPerson } from "@tests/fixtures/terminal";
 import {
   aProjectDirectory,
   PLATFORM_URL,

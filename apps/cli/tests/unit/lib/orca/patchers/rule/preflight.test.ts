@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
 import { NextPatcher } from "@/lib/orca/patchers/rule/next";
 import { QwikPatcher } from "@/lib/orca/patchers/rule/qwik";

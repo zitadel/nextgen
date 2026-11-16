@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 
 import { loadOrCreateIdentity, telemetryConfigDir } from "@/lib/telemetry/identity";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const { homedir } = vi.hoisted(() => {
   return { homedir: vi.fn<() => string>() };

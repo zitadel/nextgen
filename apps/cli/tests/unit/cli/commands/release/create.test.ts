@@ -1,11 +1,11 @@
 import { describe, expect } from "vitest";
 
 import ReleaseCreate from "@/cli/commands/release/create";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { makeProject } from "@tests/helpers/local-project";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 

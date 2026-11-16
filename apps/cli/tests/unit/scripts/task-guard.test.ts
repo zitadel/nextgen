@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 type Options = { mutex: string | null; retries: number; command: string[] };
 type Result = { code?: number; signal?: string };

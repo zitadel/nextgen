@@ -7,9 +7,9 @@ import { afterEach, describe, expect, vi } from "vitest";
 
 import { AppendedLog, BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
 import { launched } from "@/lib/local-server/internal/lifecycle";
-import { ManualClock } from "@tests/helpers/clock";
-import type { Daemons } from "@tests/helpers/daemon";
-import { it } from "@tests/helpers/fixtures";
+import { ManualClock } from "@tests/fixtures/clock";
+import type { Daemons } from "@tests/fixtures/daemon";
+import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 const resolver = vi.hoisted(() => ({ missing: false }));

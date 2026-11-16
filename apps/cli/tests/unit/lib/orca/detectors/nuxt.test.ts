@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { NuxtDetector } from "@/lib/orca/detectors/nuxt";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * Writes a Nuxt (or Vue-only) `package.json` and the named folders.

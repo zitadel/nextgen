@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("node:timers/promises under the shared setup", () => {
   it("resolves with the given value once fake timers advance past the delay", async ({ clock }) => {

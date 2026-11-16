@@ -5,7 +5,7 @@ import { describe, expect, vi } from "vitest";
 
 import { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
 import type { NodeEngines } from "@/lib/orca/scaffolders/node-engines";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { SUPPORTED_NODE } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));

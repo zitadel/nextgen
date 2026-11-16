@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { ReactDetector } from "@/lib/orca/detectors/react";
 import { ZitadelError } from "@/lib/errors";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

@@ -18,7 +18,7 @@ import {
   stagedFiles,
   write,
 } from "@tests/helpers/git-repo";
-import { removeTree } from "@tests/helpers/scratch";
+import { removeTree } from "@tests/fixtures/scratch";
 
 const exec = promisify(execFile);
 

@@ -20,7 +20,7 @@ import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import {
   CreateUserBody,

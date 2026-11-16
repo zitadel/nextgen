@@ -11,9 +11,9 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "@/lib/local-server/runtime";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
 
 // The platform is unreachable unless a test says otherwise — a network error,

@@ -4,7 +4,7 @@ import { basename } from "node:path";
 
 import { describe, expect, onTestFinished } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const LISTEN = "require('node:net').createServer().listen(Number(process.argv[1]), '127.0.0.1')";

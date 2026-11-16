@@ -11,7 +11,7 @@ import {
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import type { Daemons } from "@tests/helpers/daemon";
+import type { Daemons } from "@tests/fixtures/daemon";
 import { aFakeServerBinary } from "@tests/helpers/local-server";
 import { forcedConsent } from "@tests/helpers/consent";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";

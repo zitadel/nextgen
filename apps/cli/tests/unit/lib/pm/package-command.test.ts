@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { PM, type PMName } from "@/lib/pm";
-import { scratchDir } from "@tests/helpers/scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 async function tempProject(): Promise<string> {

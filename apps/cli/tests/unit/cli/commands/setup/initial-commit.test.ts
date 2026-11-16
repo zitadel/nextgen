@@ -10,8 +10,8 @@ import {
   MakeInitialCommit,
 } from "@/cli/commands/setup/steps/make-initial-commit";
 import { inspectWorktree } from "@/cli/commands/setup/shared";
-import { it } from "@tests/helpers/fixtures";
-import { recordLog } from "@tests/helpers/log";
+import { it } from "@tests/fixtures";
+import { recordLog } from "@tests/fixtures/log";
 import { Ui, warnings } from "@/lib/ui";
 import {
   commitAll,

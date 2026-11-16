@@ -14,10 +14,10 @@ import { ZitadelError } from "@/lib/errors";
 
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
-import { recordLog } from "@tests/helpers/log";
+import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import {
   defaultSchema,
   makeProject,
@@ -26,7 +26,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

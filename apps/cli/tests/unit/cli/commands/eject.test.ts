@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import Eject from "@/cli/commands/eject";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
 import { ManagedFile } from "@/lib/orca/managed-file";
 

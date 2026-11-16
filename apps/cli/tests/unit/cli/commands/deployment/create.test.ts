@@ -1,11 +1,11 @@
 import { describe, expect } from "vitest";
 
 import DeploymentCreate from "@/cli/commands/deployment/create";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";

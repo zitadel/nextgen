@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
 import { ZitadelError } from "@/lib/errors";
 import {

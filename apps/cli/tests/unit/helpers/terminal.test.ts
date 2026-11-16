@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const found = {
   platform: process.platform,

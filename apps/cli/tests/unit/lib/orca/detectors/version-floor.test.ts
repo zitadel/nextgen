@@ -7,7 +7,7 @@ import { describe, expect } from "vitest";
 import { ZitadelError } from "@/lib/errors";
 import { detectors } from "@/lib/orca/detectors";
 import { enforceVersionFloor } from "@/lib/orca/detectors/version-floor";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** Versions around a detector's floor, derived from the floor it declares. */
 function around(floor: string) {

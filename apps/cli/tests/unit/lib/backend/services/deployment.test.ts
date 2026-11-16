@@ -2,7 +2,7 @@ import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/m
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";

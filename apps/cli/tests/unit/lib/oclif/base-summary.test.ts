@@ -10,9 +10,9 @@ import type { SuggestedCommand } from "@/lib/suggestion";
 import { COLUMN_MARK } from "@/lib/ui/layout";
 import { painted, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { printing } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /** A command that ends on a summary, so its box is what the assertions read. */
 class SummarisingCommand extends BaseCommand {

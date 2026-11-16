@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import config from "../../../vitest.config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { PORT_WORKERS } from "@tests/helpers/ports";
 import { ownerIsAlive, staleFakeServers } from "@tests/helpers/stale-servers";
 

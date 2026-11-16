@@ -6,7 +6,7 @@ import { afterEach, describe, expect, vi } from "vitest";
 import { Orca } from "@/lib/orca";
 import type { Detector } from "@/lib/orca";
 import type { Scaffolder } from "@/lib/orca/scaffolders/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 // Real file system calls, with `rename` replaceable per test: the stash moves
 // each entry aside by renaming it.

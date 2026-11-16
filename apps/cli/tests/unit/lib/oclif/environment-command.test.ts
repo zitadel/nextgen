@@ -5,14 +5,14 @@ import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import { CREDENTIALS } from "@/lib/oclif/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/lib/oclif/environment-command";
 import type { ConnectOptions } from "@/lib/oclif/types";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 

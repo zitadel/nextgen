@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { Spelling } from "@/lib/suggestion";
 
 const platform = usePlatformMock();

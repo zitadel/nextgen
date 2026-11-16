@@ -1,6 +1,6 @@
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const realSetTimeout = globalThis.setTimeout;
 

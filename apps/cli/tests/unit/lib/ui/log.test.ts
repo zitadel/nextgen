@@ -1,8 +1,8 @@
 import { describe, expect, onTestFinished } from "vitest";
 
 import { log } from "@/lib/ui/log";
-import { it } from "@tests/helpers/fixtures";
-import { recordLog } from "@tests/helpers/log";
+import { it } from "@tests/fixtures";
+import { recordLog } from "@tests/fixtures/log";
 
 describe("log", () => {
   it("writes a line plainly when no command has installed a sink, so code outside a command is heard", ({

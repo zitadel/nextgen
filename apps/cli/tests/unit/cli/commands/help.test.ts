@@ -5,7 +5,7 @@ import { Plugin } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { COMMAND_GROUPS } from "@/lib/oclif/groups";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import {
   expectedPublicCliCommand,

@@ -2,7 +2,7 @@ import { Command, type Config } from "@oclif/core";
 import { describe, expect, onTestFinished, vi } from "vitest";
 
 import { Interruptible } from "@/lib/oclif/interruptible";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** A command that only exposes what the mixin gives it. */
 class Probe extends Interruptible(Command) {

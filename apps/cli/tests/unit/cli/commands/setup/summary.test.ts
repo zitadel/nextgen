@@ -13,7 +13,7 @@ import { ShowResult } from "@/cli/commands/setup/steps/show-result";
 import type { CommandResult } from "@/lib/oclif";
 import { type Section, Ui, style } from "@/lib/ui";
 import type { ScaffoldedProvider } from "@/lib/zitadel";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
 import { stripAnsi } from "@tests/helpers/run-cli";
 import { aSuggest } from "@tests/helpers/suggestions";

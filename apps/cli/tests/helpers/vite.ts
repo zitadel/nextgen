@@ -12,7 +12,7 @@ import {
   resolveConfig,
 } from "vite";
 
-import { scratchDir } from "./scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The dev server of a generated app, running in this process. */
 export interface DevApp {

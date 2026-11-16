@@ -11,7 +11,7 @@ import {
   readIfExists,
   readIfReadable,
 } from "@/lib/fs";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("pathExists", () => {
   it("is true for a file and a directory, false for a missing path", async ({ dir }) => {

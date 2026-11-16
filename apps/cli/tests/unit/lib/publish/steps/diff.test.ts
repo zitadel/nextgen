@@ -4,7 +4,7 @@ import type { StepContext, StepResult } from "@/lib/publish/pipeline";
 import { diffStep } from "@/lib/publish/steps/diff";
 import { DiskStore } from "@/lib/zitadel";
 import { aConfig } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
 import { aDeployment, PROJECT_ID, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";

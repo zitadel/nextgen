@@ -24,7 +24,7 @@ import { Orca, createOrca } from "@/lib/orca";
 import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
 import { aUserSchema } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { git, ignoredByGit, isolateGit, write } from "@tests/helpers/git-repo";
 import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
 import { readJson } from "@tests/helpers/local-project";

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { pathExists } from "@/lib/fs";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { TestKit } from "@/lib/test-kit";
 

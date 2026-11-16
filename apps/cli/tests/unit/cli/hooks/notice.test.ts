@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect } from "vitest";
 
 import { updateNotice } from "@/cli/hooks/notice";
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";

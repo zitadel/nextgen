@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 

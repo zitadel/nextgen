@@ -9,7 +9,7 @@ import {
   type RootMount,
   viteEntry,
 } from "@/lib/orca/patchers/rule/root-component";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** A React root, as the React patcher writes and mounts it. */
 const REACT_ROOT: RootMount = {

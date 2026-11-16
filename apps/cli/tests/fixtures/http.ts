@@ -3,7 +3,7 @@ import { createServer, type RequestListener, type Server } from "node:http";
 import { setupServer } from "msw/node";
 import { test as base } from "vitest";
 
-import { nextPort } from "./ports";
+import { nextPort } from "../helpers/ports";
 
 /** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
 export type Serve = (handler: RequestListener, host?: string) => Promise<string>;
@@ -57,7 +57,7 @@ class Servers {
 /**
  * `test` with the fixtures that put an HTTP server in front of the code under test. Vitest has no
  * way to merge two extended tests, so each helper file extends the one before it and
- * `fixtures.ts` presents the last as the CLI's one `it`.
+ * `index.ts` presents the last as the CLI's one `it`.
  *
  * - `server` is an MSW server listening for the test, one that fails a request nothing handled.
  *   Each test adds its own handlers with `server.use(...)`.

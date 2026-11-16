@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { readRawBody } from "@/lib/oclif/crud/body";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 describe("readRawBody", () => {
   it("parses --data", async () => {

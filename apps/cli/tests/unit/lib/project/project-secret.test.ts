@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const VALID_SECRET = {
   project_id: "proj-001",

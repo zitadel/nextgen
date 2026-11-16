@@ -3,7 +3,7 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { ReleaseNotes } from "@/lib/upgrade";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 

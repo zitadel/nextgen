@@ -9,7 +9,7 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 describe("console", () => {

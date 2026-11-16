@@ -13,7 +13,7 @@ import { scaffolders } from "@/lib/orca/scaffolders";
 import { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
 import type { NodeEngines } from "@/lib/orca/scaffolders/node-engines";
 import type { Scaffolder } from "@/lib/orca/scaffolders/types";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
 

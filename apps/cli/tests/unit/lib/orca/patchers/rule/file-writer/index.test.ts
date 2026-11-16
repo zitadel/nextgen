@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { ZitadelError } from "@/lib/errors";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";

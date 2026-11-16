@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const platform = usePlatformMock();
 

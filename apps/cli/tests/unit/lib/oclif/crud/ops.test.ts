@@ -5,12 +5,12 @@ import { Command } from "@oclif/core";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { z } from "zod";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { answering } from "@tests/helpers/keyboard";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { printing } from "@tests/helpers/run-cli";
-import { asTerminal, offTerminal } from "@tests/helpers/terminal";
+import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
 import {

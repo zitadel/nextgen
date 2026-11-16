@@ -11,7 +11,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
-import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { asTerminal as asPerson } from "@tests/fixtures/terminal";
 import { parseJson, runCliForTest, runCommand } from "@tests/helpers/run-cli";
 
 usePlatformServer();

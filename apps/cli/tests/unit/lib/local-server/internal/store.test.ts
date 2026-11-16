@@ -2,7 +2,7 @@ import { describe, expect } from "vitest";
 
 import { RuntimeFileStore } from "@/lib/local-server/internal/store";
 import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 
 describe("RuntimeFileStore", () => {

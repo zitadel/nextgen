@@ -8,11 +8,11 @@ import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 import BrandingEject from "@/cli/commands/branding/eject";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { BRANDING_DESIGN_INFO } from "@/lib/zitadel";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 /**
  * Makes a directory a Zitadel project.

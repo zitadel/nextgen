@@ -11,7 +11,7 @@ import { Server } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
-import { scratchDir } from "@tests/helpers/scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = Server.DEFAULT;

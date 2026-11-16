@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 import { UpgradePlan } from "@/lib/upgrade/plan";
 import { Release } from "@/lib/upgrade/release";

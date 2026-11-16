@@ -1,7 +1,7 @@
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { http, HttpResponse } from "msw";
 import { describe, expect } from "vitest";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import {
   aProjectWithTwoDeploys,
   aReleaseServedOn,

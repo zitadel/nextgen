@@ -22,11 +22,11 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import type { Daemons } from "@tests/helpers/daemon";
+import type { Daemons } from "@tests/fixtures/daemon";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 
 /**
  * The three ways a local server is told not to bootstrap the platform project:

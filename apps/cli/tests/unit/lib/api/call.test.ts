@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 
 import { Operation } from "@/lib/backend";
 import { ApiCall } from "@/lib/api";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 

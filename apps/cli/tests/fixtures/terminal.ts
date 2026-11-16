@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import { atTerminal, type Terminal } from "./keyboard";
+import { atTerminal, type Terminal } from "../helpers/keyboard";
 import { test as base } from "./log";
 
 /**

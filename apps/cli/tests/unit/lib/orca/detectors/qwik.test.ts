@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { QwikDetector } from "@/lib/orca/detectors/qwik";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * Writes a `package.json` with the given dependencies into a directory.

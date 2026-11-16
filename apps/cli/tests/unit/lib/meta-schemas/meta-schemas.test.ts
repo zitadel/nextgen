@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * The CLI version whose meta-schemas the tests write.

@@ -10,7 +10,7 @@ import {
   loadEnvFiles,
   loadProjectEnv,
 } from "@/lib/local-server/env-vars";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /**
  * Writes env files into a project directory.

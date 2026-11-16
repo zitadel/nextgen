@@ -4,7 +4,7 @@ import { stripVTControlCharacters as plain } from "node:util";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { atTerminal } from "@tests/helpers/keyboard";
 
 /** What clack writes as a spinner starts, and as it ends. */

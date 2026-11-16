@@ -9,8 +9,8 @@ import {
   UNWRITTEN_LOCK_MS,
   withStartLock,
 } from "@/lib/local-server/internal/start-lock";
-import { ManualClock } from "@tests/helpers/clock";
-import { it } from "@tests/helpers/fixtures";
+import { ManualClock } from "@tests/fixtures/clock";
+import { it } from "@tests/fixtures";
 
 /**
  * Where a start lock lives under a directory.

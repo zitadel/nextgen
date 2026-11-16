@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { SvelteKitDetector } from "@/lib/orca/detectors/sveltekit";
 
 /**

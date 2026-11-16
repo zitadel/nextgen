@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.example";

@@ -5,7 +5,7 @@ import semver from "semver";
 import { describe, expect } from "vitest";
 
 import { detectors } from "@/lib/orca/detectors";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 /** What a detector needs besides the package it floors before it recognises a project. */
 const COMPANION_DEPENDENCIES: Record<string, Record<string, string>> = {

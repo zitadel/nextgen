@@ -11,8 +11,8 @@ vi.mock("@oclif/table", async (importOriginal) => {
 
 import { makeTable } from "@oclif/table";
 
-import { it } from "@tests/helpers/fixtures";
-import { asTerminal, offTerminal, type TerminalFixture } from "@tests/helpers/terminal";
+import { it } from "@tests/fixtures";
+import { asTerminal, offTerminal, type TerminalFixture } from "@tests/fixtures/terminal";
 import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);

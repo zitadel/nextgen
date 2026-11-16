@@ -1,7 +1,7 @@
 import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { scratchDir } from "./scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /**
  * Stands in for `create-next-app`: writes a minimal Next.js App Router app into

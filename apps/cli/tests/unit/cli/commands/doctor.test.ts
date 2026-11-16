@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { type Serve, test } from "@tests/helpers/fixtures";
+import { type Serve, test } from "@tests/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
 import type { LocalServers } from "@/lib/local-server/processes";
@@ -18,7 +18,7 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
 import { Spelling } from "@/lib/suggestion";
 import { ManagedFile } from "@/lib/orca/managed-file";

@@ -15,7 +15,7 @@ import {
   aUserSchema,
   type DocumentsByName,
 } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import { parseFlag } from "@tests/helpers/inputs";
 import {
@@ -30,7 +30,7 @@ import {
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

@@ -7,7 +7,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import EnvAdd from "@/cli/commands/env/add";
 import {
@@ -17,7 +17,7 @@ import {
   stripAnsi,
 } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const personAnswering = (...answers: Answer[]) => answering(...answers);

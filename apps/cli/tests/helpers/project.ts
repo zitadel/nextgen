@@ -17,7 +17,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
-import { scratchDir } from "./scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** How long a run gets to unwind after an interrupt before the test gives up on it. */
 const INTERRUPT_GRACE_MS = 10_000;
@@ -34,7 +34,7 @@ export type InterruptedRun = Readonly<{
 }>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
-import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/fixtures/terminal";
 import { BARE_VITE_CONFIG, withFixedAddress } from "./vite-config";
 import { assertRunnableSuggestions } from "./suggestions";
 

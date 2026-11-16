@@ -46,8 +46,8 @@ import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
 import { aPatchContext } from "@tests/helpers/patch-context";
-import { recordLog } from "@tests/helpers/log";
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { recordLog } from "@tests/fixtures/log";
+import { it, type Serve } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { parseFlag } from "@tests/helpers/inputs";
 import { usePlatformServer } from "@tests/helpers/platform-project";
@@ -62,7 +62,7 @@ import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
 import { aSuggest } from "@tests/helpers/suggestions";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 /** The CLI's commands, which a run reads to render what it suggests. */

@@ -1,7 +1,7 @@
 import { Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { BaseCommand } from "@/lib/oclif/base";

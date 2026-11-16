@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
-import { scratchDir } from "@tests/helpers/scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 describe("Project.lockDown", () => {
   it("warns instead of throwing when the mode cannot be applied", async () => {

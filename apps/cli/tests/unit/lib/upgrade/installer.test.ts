@@ -9,7 +9,7 @@ import { InstallError } from "@/lib/upgrade/errors";
 import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
 import { UpgradePlan } from "@/lib/upgrade/plan";
 import { Release } from "@/lib/upgrade/release";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

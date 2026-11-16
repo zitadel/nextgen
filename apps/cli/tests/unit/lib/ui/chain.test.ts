@@ -7,8 +7,8 @@ import { DrawnSpinner } from "@/lib/ui/spinner";
 import { GUIDE, MARK } from "@/lib/ui/marks";
 import { it } from "@tests/unit/lib/ui/at-terminal";
 import { answering, type Person, type Terminal } from "@tests/helpers/keyboard";
-import type { TimeControls } from "@tests/helpers/clock";
-import { asTerminal } from "@tests/helpers/terminal";
+import type { TimeControls } from "@tests/fixtures/clock";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
 const normally = () => new Chain({ interactive: true, force: false }, "plain");

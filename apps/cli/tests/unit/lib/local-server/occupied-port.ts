@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:net";
 
-import { test } from "@tests/helpers/fixtures";
+import { test } from "@tests/fixtures";
 
 /**
  * Holds a TCP listener on a port the OS picks, for a test of what the CLI does when a port is

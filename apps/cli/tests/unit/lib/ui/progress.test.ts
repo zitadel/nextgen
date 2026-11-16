@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { Chain } from "@/lib/ui/chain";
 import { Progress } from "@/lib/ui/progress";
-import { atScreenRecording } from "@tests/helpers/fixtures";
+import { atScreenRecording } from "@tests/fixtures";
 import type { Terminal } from "@tests/helpers/keyboard";
 
 /** The chain progress draws into, as a person watching a wizard or a normal command sees it. */

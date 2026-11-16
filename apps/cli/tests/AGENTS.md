@@ -44,7 +44,7 @@ reclassified until it is one.
   runner, which keeps that knowledge in its own spec.
 - A spec's own `rendered for a terminal` group runs whatever the fixture gives
   it, which is a pipe unless the test wraps the run in `asTerminal` or
-  `onTerminalReadingAFile` (`helpers/terminal.ts`, whose `RENDERINGS` table is
+  `onTerminalReadingAFile` (`fixtures/terminal.ts`, whose `RENDERINGS` table is
   the colour/no-colour pair). Do not read the group's name as proof a terminal
   was involved.
 - The binary's own behaviour (unknown command, server resolution) is
@@ -205,7 +205,7 @@ it stays here deliberately rather than by oversight.
   callback (`it("…", async ({ dir, server }) => { … })`) and never creates or
   removes the thing itself: no `mkdtemp`, no `rm` in an `afterEach`, no
   `try`/`finally` cleanup, no module-level array a hook empties, no `let` a hook
-  assigns. Import `it` from `@tests/helpers/fixtures`, never from `vitest`, in
+  assigns. Import `it` from `@tests/fixtures`, never from `vitest`, in
   a test that uses one.
   - `dir` is a fresh temp directory, `other` a second one; both are removed when
     the test ends, permissions a test took away included. A git repository is
@@ -236,14 +236,14 @@ it stays here deliberately rather than by oversight.
   - `occupiedPort(host?)` (`tests/unit/lib/local-server/occupied-port.ts`) holds
     a TCP listener on a port the OS picks and returns the port, for a test of
     what the CLI does on a port that is taken.
-- A fixture lives in the helper file named for what it provides (`http.ts`,
+- A fixture lives in `tests/fixtures/`, in the file named for what it provides (`http.ts`,
   `log.ts`, `terminal.ts`, `clock.ts`, `daemon.ts`), defined with
   `test.extend`. Vitest cannot merge extended tests, so each extends the one
-  before it and `fixtures.ts` adds `dir` and `other` and exports the CLI's one
+  before it and `fixtures/index.ts` adds `dir` and `other` and exports the CLI's one
   `it`. A fixture only one test file uses stays in that file; when a second file
   in the folder needs it, it goes in a file in that folder. A helper that makes a
   directory, server or process for a test registers its removal with
-  `onTestFinished` itself (`scratchDir` in `helpers/scratch.ts`), so its caller
+  `onTestFinished` itself (`scratchDir` in `fixtures/scratch.ts`), so its caller
   has nothing to clean up.
 - Catch a refusal with `thrownBy` or `rejectionOf` (`helpers/thrown-value.ts`),
   then assert its class with `toBeInstanceOf`, then the fields that matter with

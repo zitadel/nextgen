@@ -5,10 +5,10 @@ import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import DeploymentGet from "@/cli/commands/deployment/get";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseArg } from "@tests/helpers/inputs";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 

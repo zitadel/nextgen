@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { Server } from "@/lib/server";
 import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
-import { scratchDir } from "@tests/helpers/scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
   return scratchDir("zitadel-shared-test-");

@@ -21,7 +21,7 @@ import {
 import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
 import type { PatchContext, PatchExecOptions } from "@/lib/orca/patchers/types";
 import { ManagedFile } from "@/lib/orca/managed-file";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";

@@ -1,5 +1,5 @@
-import { test } from "@tests/helpers/fixtures";
-import type { TerminalFixture } from "@tests/helpers/terminal";
+import { test } from "@tests/fixtures";
+import type { TerminalFixture } from "@tests/fixtures/terminal";
 
 /**
  * `it` with the terminal the run is at in every test: stdout and stdin are patched as the

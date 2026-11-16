@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-import { recording } from "@tests/helpers/fixtures";
+import { recording } from "@tests/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 const homedir = vi.hoisted(() => vi.fn<() => string>());

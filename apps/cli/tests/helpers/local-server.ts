@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { onTestFinished } from "vitest";
 
-import { scratchDir } from "./scratch";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /**
  * How the stand-in for the server binary is built. `plain` is the server

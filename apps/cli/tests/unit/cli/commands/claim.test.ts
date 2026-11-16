@@ -11,7 +11,7 @@ import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
 import {
   localRuntimePaths,
@@ -22,7 +22,7 @@ import Claim from "@/cli/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
 import { answering } from "@tests/helpers/keyboard";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
