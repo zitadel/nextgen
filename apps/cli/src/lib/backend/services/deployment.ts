@@ -102,6 +102,9 @@ export type LiveOnResult = Readonly<
 /** What making a release live takes: the release, the targets and the optional guard. */
 export type DeploymentInput = Readonly<CreateDeploymentBody>;
 
+/** The most deployments the API returns in one page, so a search takes the fewest requests. */
+const PAGE_SIZE = 100;
+
 /** What narrows a list of deployments. */
 export type DeploymentQuery = Readonly<
   Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
@@ -325,8 +328,9 @@ export class DeploymentService extends ApiService {
    * @param isLiveView - Whether the page is itself the live view, whose targets
    *   are already the ones served, so nothing more is read.
    * @returns The page's live preview deployments as the live view lists them,
-   *   by id. One the live view no longer lists is absent. Nothing is read when
-   *   the page has none.
+   *   by id. One the live view no longer lists is absent, and it makes the read
+   *   go through every page of the live view. Nothing is read when the page
+   *   has none.
    */
   async servingLivePreviews(
     deployments: readonly Deployment[],
@@ -344,16 +348,35 @@ export class DeploymentService extends ApiService {
     if (wanted.size === 0) {
       return new Map();
     }
-    const view = isLiveView ? deployments : await this.list({ live: true });
-    return new Map(
-      view
-        .filter((deployment) => {
-          return wanted.has(deployment.id);
-        })
-        .map((deployment) => {
-          return [deployment.id, deployment] as const;
-        }),
-    );
+    if (isLiveView) {
+      return new Map(
+        deployments
+          .filter((deployment) => {
+            return wanted.has(deployment.id);
+          })
+          .map((deployment) => {
+            return [deployment.id, deployment] as const;
+          }),
+      );
+    }
+    const found = new Map<string, Deployment>();
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const pages = this.client.listDeployments.pages({
+      project_id: this.projectId,
+      live: true,
+      limit: PAGE_SIZE,
+    });
+    for await (const page of pages) {
+      for (const record of paging.items(page)) {
+        if (wanted.has(record.id)) {
+          found.set(record.id, Deployment.of(record));
+        }
+      }
+      if (found.size === wanted.size) {
+        break;
+      }
+    }
+    return found;
   }
 
   /**
