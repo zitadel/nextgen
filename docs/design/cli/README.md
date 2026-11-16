@@ -125,7 +125,7 @@ Getting started
   claim            Claim this project to make it permanent
 
 Local development
-  console          Open the local console, signed in as the local admin
+  console          Open the console of the server the project uses
   logs             Show local Zitadel server logs
   stop             Stop the local Zitadel server
   reset            Delete the local Zitadel server runtime and data
