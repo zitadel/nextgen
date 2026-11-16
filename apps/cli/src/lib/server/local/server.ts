@@ -6,6 +6,7 @@ import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
 
 import { currentUser } from "@/lib/uidgid";
+import { ensureLocalAdmin, type LocalAdmin } from "./admin-credential";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import type { SuggestedCommand } from "@/lib/suggestion";
@@ -292,6 +293,28 @@ export class LocalServer {
   }
 
   /**
+   * Creates the directory's local admin on first use and writes the bootstrap
+   * user document a start hands the server ({@link ensureLocalAdmin}).
+   *
+   * It holds the directory's start lock while it does: a second start in the
+   * directory would otherwise read the credential while the first is still
+   * writing it, and report a file that is fine a moment later as malformed.
+   *
+   * @param builtinSchemaBase - The server's `schema.builtin_public_base`, when the environment overrides it.
+   * @returns The credential, and the document's path for `--user-file`.
+   */
+  ensureAdmin(builtinSchemaBase?: string): Promise<{ admin: LocalAdmin; userFile: string }> {
+    return withStartLock(this.startLockFile(), () => {
+      return ensureLocalAdmin(this.cwd, builtinSchemaBase);
+    });
+  }
+
+  /** The file that makes a start the only one in the directory. */
+  private startLockFile(): string {
+    return join(localRuntimePaths(this.cwd).runtimeDir, "start.lock");
+  }
+
+  /**
    * Starts the directory's server, or finds it already running.
    *
    * A running server is kept only if it is what was asked for: the server
@@ -316,7 +339,7 @@ export class LocalServer {
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     // One start at a time per directory: two at once would pick the same port
     // and run two servers over one data directory. The second finds the first's.
-    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () => {
+    return withStartLock(this.startLockFile(), () => {
       return this.startLocked(config, options);
     });
   }

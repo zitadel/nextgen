@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { execa } from "execa";
 
 import { errorMessage } from "@/lib/errors";
+import { isFile } from "@/lib/fs";
 
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
@@ -49,7 +50,9 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
-  const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
+  // `ww`: without it `ps` cuts each command at `COLUMNS`, and a long install path loses the
+  // `bin/nextgen` that marks a server before the full command is ever read.
+  const listed = await runPs(["axww", "-o", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
     .then(parsePsRows)
     .then(
       (rows) => {
@@ -75,11 +78,11 @@ export async function discoverManagedRuntimeProcesses(opts?: {
       };
     }),
   );
-  const processes = hydrated
-    .map(toManagedRuntimeProcess)
-    .filter((candidate): candidate is ManagedRuntimeProcess => {
+  const processes = (await Promise.all(hydrated.map(toManagedRuntimeProcess))).filter(
+    (candidate): candidate is ManagedRuntimeProcess => {
       return candidate !== undefined;
-    });
+    },
+  );
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
@@ -125,9 +128,12 @@ function parsePsRows(stdout: string): ReadonlyArray<ProcessRow> {
   return rows;
 }
 
-function toManagedRuntimeProcess(row: ProcessRow): ManagedRuntimeProcess | undefined {
+async function toManagedRuntimeProcess(
+  row: ProcessRow,
+): Promise<ManagedRuntimeProcess | undefined> {
   const dataDir = extractDataDir(row.command);
-  const wrapper = isServerWrapper(row.command);
+  // Judged by the arguments alone: the environment's values can hold spaces, and would be read as words.
+  const wrapper = await isServerWrapper(row.shown ?? row.command);
   const binary = isServerBinary(row.command);
   if (!wrapper && !binary) {
     return undefined;
@@ -146,15 +152,93 @@ function toManagedRuntimeProcess(row: ProcessRow): ManagedRuntimeProcess | undef
 
 function isRuntimeCandidate(command: string): boolean {
   return (
-    isServerWrapper(command) ||
+    command.includes(WRAPPER_SCRIPT) ||
     isServerBinary(command) ||
     command.includes("NEXTGEN_SERVER_DATA_DIR=") ||
     basename(command.split(/\s+/)[0] ?? "") === "nextgen"
   );
 }
 
-function isServerWrapper(command: string): boolean {
-  return command.includes("zitadel-server.js");
+/** The script `@zitadel/server` starts its server through. */
+const WRAPPER_SCRIPT = "zitadel-server.js";
+
+/** The JavaScript runtimes the wrapper script runs under. */
+const SCRIPT_RUNTIMES = new Set(["node", "nodejs", "bun", "deno"]);
+
+/** Runtime options whose value is the next word, which is then not the script. */
+const OPTIONS_WITH_A_VALUE = new Set([
+  "-r",
+  "--require",
+  "--import",
+  "--loader",
+  "--experimental-loader",
+  "-C",
+  "--conditions",
+  "--env-file",
+  "--watch-path",
+]);
+
+/**
+ * Whether `command` runs `@zitadel/server`'s wrapper script: a JavaScript
+ * runtime whose script is `zitadel-server.js`. Naming the file is not enough,
+ * since `stop --all` signals every match: `tail -f …/zitadel-server.js`, an
+ * editor holding it open or a tool node runs on it is not a server.
+ *
+ * `ps` joins a command's arguments with spaces, so a path that has a space in
+ * it reads as several words. Where a path starts and the script's name comes
+ * words later, the files on disk say which words are one path
+ * ({@link isOnePath}).
+ */
+async function isServerWrapper(command: string): Promise<boolean> {
+  if (!command.includes(WRAPPER_SCRIPT)) {
+    return false;
+  }
+  const words = commandTokens(command);
+  const runtime = words.findIndex((word) => {
+    return SCRIPT_RUNTIMES.has(basename(word));
+  });
+  if (runtime < 0 || !(await isOnePath(words, runtime))) {
+    return false;
+  }
+  const given = words.slice(runtime + 1);
+  const first = given.findIndex((word, index) => {
+    return (
+      !word.startsWith("-") &&
+      !(index === 0 && word === "run") &&
+      !OPTIONS_WITH_A_VALUE.has(given[index - 1] ?? "")
+    );
+  });
+  const rest = first < 0 ? [] : given.slice(first);
+  const script = rest.findIndex((word) => {
+    return basename(word) === WRAPPER_SCRIPT;
+  });
+  return script >= 0 && isOnePath(rest, script);
+}
+
+/**
+ * Whether the words up to and including the one at `end` are a single path,
+ * and not a path followed by further arguments.
+ *
+ * One word is one path. More are one path only when no shorter run of them is
+ * a file and all of them together are: `/Users/Jane Doe/app/zitadel-server.js`
+ * is, and `/usr/bin/prettier zitadel-server.js` is not. Only an absolute path
+ * can be looked up, so a relative one with a space in it is not recognised.
+ */
+async function isOnePath(words: readonly string[], end: number): Promise<boolean> {
+  if (end === 0) {
+    return true;
+  }
+  if (!words[0]?.startsWith("/")) {
+    return false;
+  }
+  for (const length of Array.from({ length: end + 1 }, (_, index) => {
+    return index + 1;
+  })) {
+    if (await isFile(words.slice(0, length).join(" "))) {
+      return length === end + 1;
+    }
+  }
+  return false;
 }
 
 function isServerBinary(command: string): boolean {

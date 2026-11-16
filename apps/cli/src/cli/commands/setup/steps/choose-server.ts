@@ -1,8 +1,10 @@
 import { LocalServer } from "@/lib/server";
 import { Server } from "@/lib/server";
+import { sameLocalServer } from "@/lib/server/local/runtime";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
+import { outdatedLocalServer } from "@/cli/commands/setup/shared";
 
 /**
  * The value the choice select returns when the person picks "Custom URL".
@@ -13,6 +15,12 @@ const CUSTOM = "__custom__";
  * The value of the disabled local option, which can never be picked.
  */
 const LOCAL_NOT_RUNNING = "__local_not_running__";
+
+/**
+ * The value of the disabled option for a local server another CLI release
+ * started, which can never be picked.
+ */
+const LOCAL_OUTDATED = "__local_outdated__";
 
 /**
  * What the step reads from what is known.
@@ -37,8 +45,11 @@ type Deps = Pick<SetupServices, "ask" | "cwd" | "dryRun" | "nonInteractive" | "s
  * almost certainly wants it, and `start`'s own next-step hint says
  * `setup --server local`. Without one, the local option is still listed,
  * disabled, saying how to get it, so the choice is visible before it is
- * available. Picking a server writes its URL directly to `answers.server`;
- * picking "Custom URL" still asks for a validated URL.
+ * available. A detected server another CLI release started is listed the same
+ * way, saying to restart it: its API is that release's, and setup would stop
+ * halfway against it. Picking a server writes its URL directly to
+ * `answers.server`; picking "Custom URL" still asks for a URL, validated and
+ * normalised to its origin the way `--server` is.
  */
 export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
   /**
@@ -72,6 +83,10 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
    * clears instead of leaving a line behind, because the options it decides already say what it
    * found, and it draws no guide line of its own, which clearing would leave behind.
    *
+   * A local server another CLI release started is not offered, and its URL typed as a custom one
+   * is asked for again: the question keeps the wizard going where a refusal would end it after
+   * the questions before this one were answered.
+   *
    * @param needs - The flags, the app and the answers so far.
    * @returns The answers, with the server settled.
    */
@@ -84,7 +99,12 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
     }
     const probing = this.deps.ui.spinner("Checking for a local Zitadel server", { guide: false });
     const detected = await LocalServer.detectUrl(this.deps.cwd);
+    const outdated = await outdatedLocalServer(this.deps.cwd);
     probing.clear();
+    const usable =
+      detected && !(outdated && sameLocalServer(outdated.serverUrl, detected))
+        ? detected
+        : undefined;
     const choice = await this.deps.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
@@ -93,24 +113,31 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
           value: Server.DEFAULT,
           label: `Zitadel Cloud (${new URL(Server.DEFAULT).host})`,
         },
-        detected
+        usable
           ? {
-              value: detected,
-              label: `Local server (${detected})`,
+              value: usable,
+              label: `Local server (${usable})`,
               hint: "already running on this machine",
             }
-          : {
-              value: LOCAL_NOT_RUNNING,
-              label: "Local server",
-              hint: "not running — start it first",
-              disabled: true,
-            },
+          : detected && outdated
+            ? {
+                value: LOCAL_OUTDATED,
+                label: `Local server (${detected})`,
+                hint: `runs ${outdated.running}, this CLI ships ${outdated.expected} — restart it first`,
+                disabled: true,
+              }
+            : {
+                value: LOCAL_NOT_RUNNING,
+                label: "Local server",
+                hint: "not running — start it first",
+                disabled: true,
+              },
         {
           value: CUSTOM,
           label: "Custom URL (self-hosted)",
         },
       ],
-      initialValue: detected ?? answers.server ?? Server.DEFAULT,
+      initialValue: usable ?? answers.server ?? Server.DEFAULT,
     });
     return {
       answers: {
@@ -122,15 +149,13 @@ export class ChooseServer extends WizardStep<"server", Fact<"answers">, Needs> {
                 message: "What is the URL of your Zitadel server?",
                 placeholder: "https://zitadel.internal",
                 parse: (value) => {
-                  return URL.canParse(value)
+                  const parsed = Server.parse(value);
+                  return parsed.ok && outdated && sameLocalServer(outdated.serverUrl, parsed.value)
                     ? {
-                        ok: true,
-                        value,
-                      }
-                    : {
                         ok: false,
-                        problem: "Must be a valid URL",
-                      };
+                        problem: `That local server runs ${outdated.running}, but this CLI ships ${outdated.expected}. Restart it first, or enter another URL`,
+                      }
+                    : parsed;
                 },
               })
             : choice,

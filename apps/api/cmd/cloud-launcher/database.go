@@ -131,7 +131,17 @@ var listDatabases = listPreviewDatabases
 
 // connectPreviewCluster opens one connection through a preview's base URL.
 func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, error) {
-	config, err := pgx.ParseConfig(baseDSN)
+	conn, err := connectDirect(ctx, baseDSN)
+	if err != nil {
+		return nil, fmt.Errorf("connect to the preview cluster: %w", err)
+	}
+	return conn, nil
+}
+
+// connectDirect opens one connection through a direct URL
+// (CLOUD_MIGRATOR_DATABASE_URL, or a database beside the one it names).
+func connectDirect(ctx context.Context, dsn string) (*pgx.Conn, error) {
+	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
 	}
@@ -141,11 +151,40 @@ func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, erro
 			delete(config.RuntimeParams, key)
 		}
 	}
-	conn, err := pgx.ConnectConfig(ctx, config)
+	return pgx.ConnectConfig(ctx, config)
+}
+
+// seedLockID keys the session advisory lock a build holds on a deployment's
+// database while it seeds it: "zitaseed" in hex. It is a one-key lock, as the
+// migrations' is under a key of its own. The two-key form is the event
+// writers' in this database, who key theirs by project, and whoever reads
+// which events have settled reads those locks.
+const seedLockID = int64(0x7a69746173656564)
+
+// seedLockWait bounds how long a build waits for another build's seeding of
+// the same database, which takes seconds.
+const seedLockWait = 5 * time.Minute
+
+// withSeedLock is seedUnderLock; tests replace it.
+var withSeedLock = seedUnderLock
+
+// seedUnderLock runs seed while it holds the seeding lock of the database dsn
+// names, so builds that deploy to one database seed it one after another. The
+// lock is a session's, so it needs the direct URL, as the migrations' own
+// does; seed itself may reach the database any way it likes. Closing the
+// connection releases the lock, whatever became of seed.
+func seedUnderLock(ctx context.Context, dsn string, seed func() error) error {
+	lockCtx, cancel := context.WithTimeout(ctx, seedLockWait)
+	defer cancel()
+	conn, err := connectDirect(lockCtx, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("connect to the preview cluster: %w", err)
+		return fmt.Errorf("connect to lock the seeding: %w", err)
 	}
-	return conn, nil
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if _, err := conn.Exec(lockCtx, "SELECT pg_advisory_lock($1)", seedLockID); err != nil {
+		return fmt.Errorf("lock the seeding: %w", err)
+	}
+	return seed()
 }
 
 // previewLockClass is the first key of the session advisory lock held on a
