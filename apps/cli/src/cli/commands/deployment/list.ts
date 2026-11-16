@@ -52,7 +52,8 @@ const COLUMNS = [
  *
  * `kind` says whether a deployment served primary origins or previews.
  * `expires` is the live expiry of the preview a live preview deployment made,
- * the earliest when it made several, and empty for any other deployment.
+ * the earliest when it made several, and empty for any other deployment. It is
+ * also empty, with a warning, when the previews cannot be read.
  */
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";

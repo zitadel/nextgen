@@ -406,7 +406,8 @@ Each invocation prints one JSON object:
 - `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
   live expiry of a live preview deployment's preview (the earliest, when it made
   several), empty for any other deployment, such as a primary one, a replaced
-  one, or one whose preview is gone. `--json` items are the API's records,
+  one, or one whose preview is gone. It is also empty when the previews could
+  not be read, and a warning says so. `--json` items are the API's records,
   unchanged and without `expires`.
 - `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
   they use a GitHub pull request's title, Vercel's commit message, or a clean
