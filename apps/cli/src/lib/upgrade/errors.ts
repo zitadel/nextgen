@@ -1,4 +1,4 @@
-import type { PackageCommand } from "@/lib/package-manager";
+import type { PackageCommand } from "@/lib/pm";
 
 /**
  * The newest release could not be looked up. Its message is generic on purpose:

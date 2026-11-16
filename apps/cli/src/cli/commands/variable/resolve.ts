@@ -15,7 +15,7 @@ import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { WHAT_CHANGED } from "@/lib/suggestion";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
 
 /**
  * The deployment `variable resolve` reads. The schema is the API spec's own, so
@@ -182,7 +182,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     });
 
     const rows = items.map((item) => {
-      return variableCell(item);
+      return VariableView.of(item).cell();
     });
     const columns = COLUMNS;
     const empty = `${deploymentId} froze no variables${where}`;

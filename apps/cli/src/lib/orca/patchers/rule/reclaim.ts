@@ -1,8 +1,8 @@
 import { join } from "node:path";
 
 import { pathExists } from "@/lib/fs";
-import { readPackageJson } from "@/lib/npm";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { PM } from "@/lib/pm";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
 /**
@@ -28,7 +28,7 @@ export function reclaimableOps(plan: ScaffoldPlan): FileOp[] {
           op.kind === "append-gitignore" ||
           op.kind === "add-dep" ||
           op.kind === "edit" ||
-          (op.kind === "write" && op.contents.includes(MANAGED_MARKER))
+          (op.kind === "write" && op.contents.includes(ManagedFile.MARKER))
         );
       })
       // A repair only adds what is missing: setup may replace its own stale
@@ -96,7 +96,7 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  const pkg = await readPackageJson(cwd).catch(() => {
+  const pkg = await PM.manifest(cwd).catch(() => {
     return undefined;
   });
   return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;

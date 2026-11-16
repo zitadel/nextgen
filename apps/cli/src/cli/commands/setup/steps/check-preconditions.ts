@@ -5,8 +5,7 @@ import { readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
-import { hasZitadelConfig, hasZitadelSecret } from "@/lib/project";
-import { resolveServer } from "@/lib/server";
+import { Server } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -17,6 +16,7 @@ import {
   setupRetryFlags,
   ssoRecovery,
 } from "@/cli/commands/setup/shared";
+import { Project } from "@/lib/project";
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
@@ -145,7 +145,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await resolveServer({
+    const server = await Server.resolve({
       cwd: meta.cwd,
       serverFlag: meta.serverFlag,
     }).catch((error: unknown) => {
@@ -182,8 +182,8 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         cwd: meta.cwd,
       });
     }
-    const configured = await hasZitadelConfig(meta.cwd);
-    if (!configured && (await hasZitadelSecret(meta.cwd))) {
+    const configured = await Project.at(meta.cwd).hasConfig();
+    if (!configured && (await Project.at(meta.cwd).hasSecret())) {
       throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
     }
     if (!configured && flags.git !== false) {

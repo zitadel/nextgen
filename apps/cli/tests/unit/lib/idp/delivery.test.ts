@@ -6,7 +6,7 @@ import {
   type PublishedCredentials,
   type SecretPublisher,
 } from "@/lib/idp";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { Connection } from "@/lib/zitadel";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { anAcmeSsoConnection } from "@tests/helpers/connections";
@@ -61,7 +61,7 @@ function deliveryFor(connection: Connection, reused = false): CredentialDelivery
 }
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 describe("CredentialDelivery.names", () => {
@@ -134,7 +134,7 @@ describe("CredentialDelivery.publish", () => {
     });
 
     expect(published.secret).toEqual({ name: secretVariable("acme-sso"), published: "failed" });
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining("ACME_SSO_CLIENT_ID could not be published"),
       expect.stringContaining("ACME_SSO_CLIENT_SECRET could not be published"),
     ]);
@@ -159,7 +159,7 @@ describe("CredentialDelivery.publish", () => {
 
     expect(published.clientId).toBeUndefined();
     expect(publisher.mock.calls.map((call) => call[0])).toEqual([secretVariable("google")]);
-    expect(takeReportedWarnings()).toEqual([
+    expect(warnings.take()).toEqual([
       expect.stringContaining(".zitadel/idps/google.json holds its client id directly"),
     ]);
   });
@@ -170,7 +170,7 @@ describe("CredentialDelivery.publish", () => {
       async () => {},
     );
 
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(warnings.take()).toEqual([]);
   });
 });
 

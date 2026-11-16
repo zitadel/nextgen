@@ -6,7 +6,7 @@ import {
   signInOf,
 } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -63,7 +63,7 @@ export class KeepChanges extends WizardStep<"keep", Fact<"allFilesWritten" | "si
     try {
       await newApp?.keep();
     } catch (error) {
-      reportWarning(
+      warnings.report(
         `Could not delete what the new app replaced, kept beside ${this.deps.cwd}: ${toZitadelError(error).message}`,
       );
     }

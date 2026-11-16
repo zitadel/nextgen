@@ -1,7 +1,8 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { ZitadelError, isErrno } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { type Clock, realClock } from "./clock";
 
 type LockOptions = Readonly<{

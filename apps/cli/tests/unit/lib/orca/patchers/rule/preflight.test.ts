@@ -13,6 +13,7 @@ import { SolidPatcher } from "@/lib/orca/patchers/rule/solid";
 import { SveltePatcher } from "@/lib/orca/patchers/rule/svelte";
 import { VuePatcher } from "@/lib/orca/patchers/rule/vue";
 import type { PatchContext, Patcher } from "@/lib/orca/patchers/types";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * The file-writer stops only on a file at exactly a path setup writes. These
@@ -57,6 +58,7 @@ function ctxFor(id: string, appDir: string, versionMajor?: number): PatchContext
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };
 }
 

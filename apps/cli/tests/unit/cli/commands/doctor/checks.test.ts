@@ -19,11 +19,9 @@ import {
   SecretPermissionsCheck,
 } from "@/cli/commands/doctor/checks";
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { type ProjectMetaSchema, projectMetaSchemas } from "@/lib/meta-schemas";
-import { createOrca } from "@/lib/orca";
+import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
+import { Orca, createOrca } from "@/lib/orca";
 import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { hashScaffoldFile } from "@/lib/scaffold-manifest";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
 import { aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -33,6 +31,7 @@ import { readJson } from "@tests/helpers/local-project";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 import { viteConfig, withFixedAddress, withoutBlankLines } from "@tests/helpers/vite-config";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 /**
  * The project the config and the secret name.
@@ -132,12 +131,12 @@ const TRAILING = "0.1.0-alpha.17";
 /**
  * A Next managed boundary file as setup wrote it.
  */
-const MANAGED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
+const MANAGED_MIDDLEWARE = `${ManagedFile.MARKER}\nexport function middleware() {}\n`;
 
 /**
  * A Next managed boundary file the developer edited.
  */
-const EDITED_MIDDLEWARE = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+const EDITED_MIDDLEWARE = `${ManagedFile.MARKER}\nexport function middleware() { /* custom */ }\n`;
 
 /**
  * A Next 16 app's `package.json`, which has the SDK.
@@ -249,11 +248,11 @@ async function aNextProject(dir: string): Promise<void> {
     ".gitignore": [SECRET_FILE, ".env*", "!.env.example"].join("\n"),
     ".env.example": ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
     [SCHEMA_FILE]: JSON.stringify(aUserSchema()),
-    [LOGIN_PAGE]: `${MANAGED_MARKER}\nexport default function L() {}\n`,
-    [REGISTER_PAGE]: `${MANAGED_MARKER}\nexport default function R() {}\n`,
-    "app/profile/page.tsx": `${MANAGED_MARKER}\nexport default function P() {}\n`,
+    [LOGIN_PAGE]: `${ManagedFile.MARKER}\nexport default function L() {}\n`,
+    [REGISTER_PAGE]: `${ManagedFile.MARKER}\nexport default function R() {}\n`,
+    "app/profile/page.tsx": `${ManagedFile.MARKER}\nexport default function P() {}\n`,
     [MIDDLEWARE]: MANAGED_MIDDLEWARE,
-    "custom-elements.d.ts": `${MANAGED_MARKER}\nexport {};\n`,
+    "custom-elements.d.ts": `${ManagedFile.MARKER}\nexport {};\n`,
   });
   await writeSecret(dir, SECRET);
 }
@@ -323,8 +322,8 @@ async function anAngularProject(dir: string): Promise<void> {
       "];",
       "",
     ].join("\n"),
-    "src/app/app.ts": `${MANAGED_MARKER}\nexport class App {}\n`,
-    "src/app/app.html": `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`,
+    "src/app/app.ts": `${ManagedFile.MARKER}\nexport class App {}\n`,
+    "src/app/app.html": `<!-- ${ManagedFile.MARKER} -->\n<main></main>\n`,
     [ANGULAR_PROXY]: proxyConfTemplate(),
   });
   await writeSecret(dir, SECRET);
@@ -370,7 +369,7 @@ async function aReactProject(
     }),
     ...SETUP_ENV_FILES,
     [VITE_CONFIG]: config,
-    "src/App.tsx": `${MANAGED_MARKER}\nexport default function App() {}\n`,
+    "src/App.tsx": `${ManagedFile.MARKER}\nexport default function App() {}\n`,
     ...files,
   });
   await writeSecret(dir, SECRET);
@@ -384,8 +383,8 @@ async function aReactProject(
  * @param dir - The directory to fill.
  */
 async function anOlderNuxtProject(dir: string): Promise<void> {
-  const contents = `// ${MANAGED_MARKER}\n`;
-  const hash = hashScaffoldFile(contents);
+  const contents = `// ${ManagedFile.MARKER}\n`;
+  const hash = Orca.scaffoldHash(contents);
   const pages = ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"];
   await write(dir, {
     "package.json": JSON.stringify({
@@ -432,7 +431,7 @@ async function writeTheMetaSchemas(dir: string, cliVersion = CHECK_CLI_VERSION):
   await write(
     dir,
     Object.fromEntries(
-      projectMetaSchemas(cliVersion).map((file) => {
+      MetaSchemas.of(cliVersion).files.map((file) => {
         return [file.path, file.contents];
       }),
     ),
@@ -447,7 +446,7 @@ async function writeTheMetaSchemas(dir: string, cliVersion = CHECK_CLI_VERSION):
  * @throws When this CLI ships none there.
  */
 function thisCliMetaSchema(path: string): ProjectMetaSchema {
-  const file = projectMetaSchemas(CHECK_CLI_VERSION).find((meta) => {
+  const file = MetaSchemas.of(CHECK_CLI_VERSION).files.find((meta) => {
     return meta.path === path;
   });
   if (file === undefined) {
@@ -1502,7 +1501,7 @@ describe("ManagedFilesCheck", () => {
       await aNextProject(dir);
       await writeScaffold(dir, {
         files: {
-          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+          [MIDDLEWARE]: { hash: Orca.scaffoldHash(MANAGED_MIDDLEWARE), class: "infrastructure" },
         },
       });
       await rm(join(dir, "custom-elements.d.ts"));
@@ -1833,7 +1832,7 @@ describe("ManagedFilesCheck", () => {
       await write(dir, { "package.json": JSON.stringify(NEXT_16_PACKAGE) });
       await writeScaffold(dir, {
         files: {
-          [MIDDLEWARE]: { hash: hashScaffoldFile(MANAGED_MIDDLEWARE), class: "infrastructure" },
+          [MIDDLEWARE]: { hash: Orca.scaffoldHash(MANAGED_MIDDLEWARE), class: "infrastructure" },
         },
       });
     };
@@ -1895,7 +1894,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, PROXY)).toContain(ManagedFile.MARKER);
       });
 
       it("drops middleware.ts from the manifest", async ({ dir }) => {
@@ -1936,7 +1935,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, LOGIN_PAGE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, LOGIN_PAGE)).toContain(ManagedFile.MARKER);
       });
 
       it("creates no proxy.ts, which Next refuses beside middleware.ts", async ({ dir }) => {
@@ -1985,7 +1984,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, PROXY)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, PROXY)).toContain(ManagedFile.MARKER);
       });
 
       it("drops middleware.ts from the manifest", async ({ dir }) => {
@@ -2050,7 +2049,7 @@ describe("ManagedFilesCheck", () => {
         await anUnresolvedConflict(dir);
         await new ManagedFilesCheck().fix(aCheckContext(dir));
         await rm(join(dir, MIDDLEWARE));
-        await write(dir, { [PROXY]: `${MANAGED_MARKER}\nexport function proxy() {}\n` });
+        await write(dir, { [PROXY]: `${ManagedFile.MARKER}\nexport function proxy() {}\n` });
       };
 
       it("creates no proxy.ts", async ({ dir }) => {
@@ -2105,12 +2104,12 @@ describe("ManagedFilesCheck", () => {
 
       await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
     });
 
     it("leaves an edited page untouched without a manifest", async ({ dir }) => {
       await aNextProject(dir);
-      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
+      const editedLogin = `${ManagedFile.MARKER}\nexport default function L() { return "custom"; }\n`;
       await write(dir, { [LOGIN_PAGE]: editedLogin });
       await rm(join(dir, MIDDLEWARE));
 
@@ -2160,7 +2159,7 @@ describe("ManagedFilesCheck", () => {
 
       await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-      expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+      expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
     });
 
     describe("with missing infrastructure the manifest records", () => {
@@ -2183,7 +2182,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
       });
 
       it("refreshes its recorded hash", async ({ dir }) => {
@@ -2193,7 +2192,7 @@ describe("ManagedFilesCheck", () => {
 
         expect(await readJson(dir, STATE_FILE)).toHaveProperty(
           ["scaffold", "files", MIDDLEWARE, "hash"],
-          hashScaffoldFile(await textOf(dir, MIDDLEWARE)),
+          Orca.scaffoldHash(await textOf(dir, MIDDLEWARE)),
         );
       });
 
@@ -2243,7 +2242,7 @@ describe("ManagedFilesCheck", () => {
     });
 
     describe("with edited and adopted pages the manifest records", () => {
-      const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
+      const editedLogin = `${ManagedFile.MARKER}\nexport default function L() { return "edited"; }\n`;
       const adoptedRegister = "export default function Own() {}\n";
 
       /**
@@ -2281,7 +2280,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, MIDDLEWARE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, MIDDLEWARE)).toContain(ManagedFile.MARKER);
       });
     });
 
@@ -2552,7 +2551,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, HOME_PAGE)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, HOME_PAGE)).toContain(ManagedFile.MARKER);
       });
 
       it("leaves the check passing", async ({ dir }) => {
@@ -2568,7 +2567,7 @@ describe("ManagedFilesCheck", () => {
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, LOGIN_LAYOUT)).toContain(MANAGED_MARKER);
+        expect(await textOf(dir, LOGIN_LAYOUT)).toContain(ManagedFile.MARKER);
       });
 
       it("records the route layouts in the manifest", async ({ dir }) => {
@@ -2798,6 +2797,28 @@ describe("loadPatchContext", () => {
       scaffoldedFramework: true,
       issuer: ISSUER,
     });
+  });
+
+  it("plans with no server when zitadel.json records none, as it always has", async ({ dir }) => {
+    await aNextProject(dir);
+    await write(dir, {
+      "zitadel.json": JSON.stringify({ project: PROJECT_ID, framework: { id: "next" } }),
+    });
+
+    const context = await loadPatchContext(dir, createOrca(), CHECK_CLI_VERSION);
+
+    expect(context.server).toBe("");
+  });
+
+  it.for([
+    ["1.2.0", "1.2.0"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", async ([cliVersion, expected], { dir }) => {
+    await aNextProject(dir);
+
+    const context = await loadPatchContext(dir, createOrca(), cliVersion ?? "");
+
+    expect(context.sdkVersion).toBe(expected);
   });
 
   it("takes the issuer from the project's files, never the shell's environment", async ({

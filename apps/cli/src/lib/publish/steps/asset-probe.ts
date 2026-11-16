@@ -4,8 +4,8 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
-import { log } from "@/lib/log";
-import { userAgent } from "@/lib/user-agent";
+import { log } from "@/lib/ui/log";
+import { Runtime } from "@/lib/runtime";
 import type { JsonObject } from "@/lib/zitadel";
 
 /**
@@ -419,7 +419,7 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
   // The global fetch takes undici's dispatcher, which its own type leaves out.
   const init: RequestInit & { readonly dispatcher: Dispatcher } = {
     method: "HEAD",
-    headers: { "user-agent": userAgent() },
+    headers: { "user-agent": Runtime.current().userAgent() },
     redirect: "manual",
     signal,
     dispatcher,

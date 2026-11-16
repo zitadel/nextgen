@@ -14,21 +14,19 @@ import {
   type JsonEnvelope,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { createOrca } from "@/lib/orca";
+import { createOrca, Orca } from "@/lib/orca";
 import { LAUNCHER_PATH } from "@/lib/orca/patchers/rule/angular/templates";
 import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { detectPackageManager, type PackageManager, removeCommandFor } from "@/lib/package-manager";
+import { PM } from "@/lib/pm";
 import {
   type SuggestedCommand,
   shellCommand,
   shellSteps,
   suggestedCommandOf,
 } from "@/lib/suggestion";
-import { ejectedBackup } from "@/lib/secret-paths";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { Project } from "@/lib/project";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -52,12 +50,10 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     return fallback;
   }
   try {
-    const config = await readZitadelConfig(cwd).catch(() => {
-      return {} as Record<string, unknown>;
-    });
+    const config = await Project.at(cwd).configOrEmpty();
     return orca.patcherFor(framework.id).artifacts({
       framework,
-      rendererId: readRendererId(config),
+      rendererId: config.rendererId,
     });
   } catch {
     return fallback;
@@ -78,7 +74,7 @@ function assembleNextCommands(
   // so a command run from the shell's would miss them or touch another project.
   dir: string | undefined,
   // The project's own: another one would write a lockfile of its own.
-  packageManager: PackageManager,
+  packageManager: PM,
 ): ReadonlyArray<SuggestedCommand> {
   const inDir = (command: SuggestedCommand) => {
     return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
@@ -94,7 +90,7 @@ function assembleNextCommands(
     commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
   }
   for (const dep of dependencies) {
-    commands.push(inDir(suggestedCommandOf(removeCommandFor(packageManager, [dep]))));
+    commands.push(inDir(suggestedCommandOf(packageManager.remove([dep]))));
   }
   return commands;
 }
@@ -106,7 +102,7 @@ type Ejection = {
   preserved: string[];
   backedUp: string[];
   /** The project's own package manager, which removes the SDK packages it added. */
-  packageManager: PackageManager;
+  packageManager: PM;
 };
 
 /**
@@ -120,10 +116,7 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
   }
   // The package manager is read before anything is removed, so nothing the
   // ejection deletes can change it.
-  const [actions, packageManager] = await Promise.all([
-    resolveEjectActions(cwd),
-    detectPackageManager(cwd),
-  ]);
+  const [actions, packageManager] = await Promise.all([resolveEjectActions(cwd), PM.detect(cwd)]);
   const removed: string[] = [];
   const preserved: string[] = [];
   const backedUp: string[] = [];
@@ -136,7 +129,7 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     const contents = await readFile(abs, "utf8").catch(() => {
       return "";
     });
-    if (!contents.includes(MANAGED_MARKER)) {
+    if (!Orca.isManaged(contents)) {
       preserved.push(rel);
       continue;
     }
@@ -163,11 +156,11 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
       continue;
     }
     if (dryRun) {
-      backedUp.push(`${rel} -> ${ejectedBackup(rel, "<timestamp>")}`);
+      backedUp.push(`${rel} -> ${Project.ejectedBackup(rel, "<timestamp>")}`);
       continue;
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backup = ejectedBackup(abs, stamp);
+    const backup = Project.ejectedBackup(abs, stamp);
     await rename(abs, backup);
     backedUp.push(`${rel} -> ${backup.slice(cwd.length + 1)}`);
   }

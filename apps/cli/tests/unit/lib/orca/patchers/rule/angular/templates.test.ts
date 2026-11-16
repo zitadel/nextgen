@@ -20,6 +20,7 @@ import type { PatchContext } from "@/lib/orca/patchers/types";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
+import { CliPackage } from "@/lib/upgrade";
 
 const run = promisify(execFile);
 
@@ -37,6 +38,7 @@ function ctx(projectId = "proj-1"): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
   };
 }
 

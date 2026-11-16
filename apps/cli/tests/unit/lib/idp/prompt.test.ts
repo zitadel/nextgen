@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
-import { asker } from "@/lib/input";
+import { Ui } from "@/lib/ui";
 import type { Questions } from "@/lib/ui";
 import { CredentialPrompt, type PromptRun } from "@/lib/idp";
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -26,7 +26,7 @@ function asking(piped: string | undefined): Questions {
     piped === undefined
       ? Object.assign(Readable.from([]), { isTTY: true })
       : Readable.from([piped]);
-  return asker({ interactive: false, force: false, stdin });
+  return Ui.asker({ interactive: false, force: false, stdin });
 }
 
 /**

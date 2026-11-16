@@ -11,7 +11,7 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PublishedConfiguration } from "@/lib/publish";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import {
   type Change,
   DiskStore,
@@ -469,7 +469,7 @@ export function fileList(paths: readonly string[], dryRun: boolean): string[] {
  * caller sees it too.
  */
 function reportSkipped(resource: PinnedResource): void {
-  reportWarning(
+  warnings.report(
     `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
   );
 }

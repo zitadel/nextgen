@@ -10,6 +10,7 @@ import { parseEnv } from "node:util";
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
+import { Project } from "@/lib/project";
 
 vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
@@ -17,11 +18,6 @@ vi.mock("@clack/prompts", async () => {
 
 vi.mock("@/cli/commands/setup/shared", async (importOriginal) => {
   return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
-});
-
-vi.mock("@/lib/scaffold-manifest", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/scaffold-manifest")>();
-  return { ...actual, writeScaffoldManifest: vi.fn(actual.writeScaffoldManifest) };
 });
 
 import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
@@ -40,18 +36,14 @@ import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
-import { asker } from "@/lib/input";
+import { Ui, warnings } from "@/lib/ui";
 import {
   localRuntimePaths,
   type RuntimeMetadata,
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { createOrca } from "@/lib/orca";
-import { readZitadelSecret } from "@/lib/project";
-import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
-import { Ui } from "@/lib/ui";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { Orca, createOrca } from "@/lib/orca";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
 import { aPatchContext } from "@tests/helpers/patch-context";
@@ -254,7 +246,7 @@ const CANCELLED = Symbol("cancelled");
  * @param question - The question.
  * @returns The answer.
  */
-const ask = asker({ interactive: true, force: false });
+const ask = Ui.asker({ interactive: true, force: false });
 
 /**
  * A Vite React app.
@@ -830,13 +822,13 @@ async function readJsonAt(cwd: string, path: string): Promise<unknown> {
  * @returns The client and the project's id.
  */
 async function aClientOf(cwd: string) {
-  const secret = await readZitadelSecret(cwd);
+  const secret = await Project.at(cwd).secret();
   const client = createZitadelClient({
     signal: new AbortController().signal,
     baseUrl: CLOUD,
-    token: secret.project_secret,
+    token: secret.data.project_secret,
   });
-  return { client, projectId: secret.project_id };
+  return { client, projectId: secret.data.project_id };
 }
 
 /**
@@ -1917,7 +1909,7 @@ describe("setup", () => {
 
         await runCliForTest(against(cwd, LOCAL_SERVER, ...SCRIPTED_NEXT));
 
-        expect(await readZitadelSecret(cwd)).toMatchObject({ team_id: "team_localadmin" });
+        expect((await Project.at(cwd).secret()).data).toMatchObject({ team_id: "team_localadmin" });
       });
 
       it.for([
@@ -1986,7 +1978,7 @@ describe("setup", () => {
 
         await runCliForTest(against(dir, LOCAL_SERVER, ...SCRIPTED_NEXT));
 
-        expect(await readZitadelSecret(dir)).not.toHaveProperty("team_id");
+        expect((await Project.at(dir).secret()).data).not.toHaveProperty("team_id");
       });
 
       it("ends its suggestions with claim", async ({ dir }) => {
@@ -3188,7 +3180,7 @@ describe("Setup.run", () => {
     it("says in the chain that a step it could not finish gave up", async ({ dir }) => {
       await aNextApp(dir);
       answeringEveryQuestion();
-      vi.mocked(writeScaffoldManifest).mockRejectedValueOnce(new Error("disk full"));
+      vi.spyOn(Orca, "writeManifest").mockRejectedValueOnce(new Error("disk full"));
 
       await asTerminal(() => {
         return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
@@ -3361,7 +3353,7 @@ async function readingCredentialFiles(dir: string) {
 
 describe("PatchApp", () => {
   beforeEach(() => {
-    takeReportedWarnings();
+    warnings.take();
   });
 
   describe("reading the credential files", () => {
@@ -3433,9 +3425,7 @@ describe("PatchApp", () => {
 
         await step.undo(out);
 
-        expect(takeReportedWarnings()).toEqual([
-          expect.stringContaining("Could not restore .env.local"),
-        ]);
+        expect(warnings.take()).toEqual([expect.stringContaining("Could not restore .env.local")]);
       });
     });
   });
@@ -3683,7 +3673,7 @@ describe("SettleAnswers", () => {
   }
 
   beforeEach(() => {
-    takeReportedWarnings();
+    warnings.take();
   });
 
   describe("when a later port is free", () => {
@@ -3697,7 +3687,7 @@ describe("SettleAnswers", () => {
 
       await settleOnTakenPort3000(aSuggest({ cwd: "app" }, "1.2.3"));
 
-      expect(takeReportedWarnings().join("\n")).toContain(
+      expect(warnings.take().join("\n")).toContain(
         "npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app",
       );
     });
@@ -3714,7 +3704,7 @@ describe("SettleAnswers", () => {
 
       await settleOnTakenPort3000();
 
-      expect(takeReportedWarnings()).toEqual([
+      expect(warnings.take()).toEqual([
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
       ]);
     });
@@ -3779,7 +3769,7 @@ describe("ClaimOwnership", () => {
           created_at: "2026-04-21T14:03:11.000Z",
         },
       });
-      takeReportedWarnings();
+      warnings.take();
 
       expect(owned.hostsPlatform).toBe(hosts);
     },

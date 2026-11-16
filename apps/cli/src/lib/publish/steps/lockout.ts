@@ -3,7 +3,7 @@ import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -216,7 +216,7 @@ export const lockoutStep: Step = {
     try {
       const found = await findLockouts(ctx);
       for (const note of found.notes) {
-        reportWarning(note);
+        warnings.report(note);
       }
       if (found.lockouts.length === 0) {
         return undefined;
@@ -228,7 +228,7 @@ export const lockoutStep: Step = {
         throw error;
       }
       // Never a failed deploy, but never a silent pass either.
-      reportWarning(
+      warnings.report(
         "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
       );
     }

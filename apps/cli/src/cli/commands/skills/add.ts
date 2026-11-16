@@ -1,6 +1,6 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
-import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
+import { Skills } from "@/lib/skills";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -27,10 +27,10 @@ export default class SkillsAdd extends BaseCommand {
   };
 
   protected async execute(): Promise<JsonEnvelope> {
-    const skills = await bundledSkills(this.config.root);
-    const dirs = await skillDirs(this.cwd);
+    const skills = await Skills.bundled(this.config.root);
+    const dirs = await Skills.dirs(this.cwd);
     if (!this.dryRun) {
-      await addSkills({
+      await Skills.add({
         packageRoot: this.config.root,
         projectDir: this.cwd,
         skills,
@@ -43,7 +43,7 @@ export default class SkillsAdd extends BaseCommand {
       title,
       this.dryRun ? "Would add them to:" : "Added them to:",
       ...dirs.map((dir) => {
-        return `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`;
+        return `  ${dir}${dir === Skills.CLAUDE_DIR ? "  (Claude Code)" : ""}`;
       }),
       "Run this again after updating the CLI to keep them in step with it.",
     ];

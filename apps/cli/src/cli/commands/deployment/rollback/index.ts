@@ -17,7 +17,7 @@ import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 
 const NOTHING_DEPLOYED_REFUSAL = {
   message: "There is no deployment to roll back",
@@ -168,12 +168,12 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         preview: () => {
           const title = `Would roll back to ${escapeControlCharacters(target.id)} (dry run)`;
           if (dropped.length > 0) {
-            reportWarning(
+            warnings.report(
               `Rolling back to ${target.id} restores origins that leave out ${dropped.join(", ")}: they would refuse sign-in until the next deploy.`,
             );
           }
           if (restored.length > 0) {
-            reportWarning(
+            warnings.report(
               `Rolling back to ${target.id} includes ${restored.join(", ")}: they would serve its release again.`,
             );
           }
@@ -227,7 +227,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               if (isCancellation(error)) {
                 throw error;
               }
-              reportWarning(
+              warnings.report(
                 `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
               );
               return undefined;
@@ -239,12 +239,12 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               ? undefined
               : await this.tabulate(["kind", "handle", "revision_id"], pointers);
           if (dropped.length > 0) {
-            reportWarning(
+            warnings.report(
               `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
             );
           }
           if (restored.length > 0) {
-            reportWarning(
+            warnings.report(
               `Rolled back to origins that include ${restored.join(", ")}: they serve ${deployment.release_id} again.`,
             );
           }
@@ -310,7 +310,7 @@ async function originChanges(
     if (isCancellation(error)) {
       throw error;
     }
-    reportWarning(
+    warnings.report(
       `Could not check which origins rolling back to ${deploymentId} changes: ${toZitadelError(error).message}`,
     );
     return undefined;

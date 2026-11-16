@@ -46,9 +46,8 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import type { FrameworkChoice, FrameworkFacts, Orca, UndoableScaffold } from "@/lib/orca";
 import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
-import { isLocalRuntimePath } from "@/lib/secret-paths";
 import type { ResolvedServer } from "@/lib/server";
-import { path as stylePath } from "@/lib/style";
+import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { tryCatch } from "@/lib/try-catch";
@@ -74,7 +73,8 @@ import type { InitialCommitOutcome } from "./steps/make-initial-commit";
 import type { SetupInstallOutcome } from "./steps/install-dependencies";
 import { z } from "zod";
 import { type Refused, whole } from "@/lib/oclif/flags";
-import { isDevelopmentBuild } from "@/lib/build-channel";
+import { Runtime } from "@/lib/runtime";
+import { Project } from "@/lib/project";
 
 /**
  * The name of the README setup writes into each configuration directory.
@@ -1127,9 +1127,9 @@ export function describeWrittenFile(relPath: string, dryRun: boolean): string | 
   const verb = dryRun ? "Would write" : "Wrote";
   const subject = SENTENCE_BY_PATH[relPath];
   if (subject) {
-    return `${verb} ${subject} (${stylePath(escapeControlCharacters(relPath))})`;
+    return `${verb} ${subject} (${style.path(escapeControlCharacters(relPath))})`;
   }
-  return `${verb} ${stylePath(escapeControlCharacters(relPath))}`;
+  return `${verb} ${style.path(escapeControlCharacters(relPath))}`;
 }
 
 /**
@@ -1211,7 +1211,7 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
       return !(
         file.path === ".gitignore" ||
         file.path.endsWith("/.gitignore") ||
-        isLocalRuntimePath(file.path)
+        Project.isLocalRuntime(file.path)
       );
     });
     if (dirty.length === 0) {
@@ -1497,6 +1497,6 @@ export function promptContext(
     useCaseFromFlag: flags.useCase !== undefined,
     ssoFromFlag: flags.sso !== undefined,
     passwordMinLengthFromFlag: flags.passwordMinLength !== undefined,
-    developmentBuild: isDevelopmentBuild(),
+    developmentBuild: Runtime.current().isDevelopment(),
   };
 }

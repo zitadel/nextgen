@@ -47,7 +47,7 @@ import {
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { Scope } from "@/lib/suggestion";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { Wizard } from "@/lib/wizard";
 import { PAGE_LAYOUT_HINT, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 
@@ -643,7 +643,7 @@ export default class Setup extends Destructive(BaseCommand) {
           { flags },
           {
             onUndoError: (key, error) => {
-              reportWarning(`Could not take back the ${key} step: ${errorMessage(error)}`);
+              warnings.report(`Could not take back the ${key} step: ${errorMessage(error)}`);
             },
           },
         ),

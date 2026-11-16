@@ -11,7 +11,7 @@ import type {
   ProviderChoice,
   PublishedCredentials,
 } from "@/lib/idp";
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";

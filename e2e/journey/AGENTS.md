@@ -33,7 +33,7 @@ the repo root.
 - The testkit suite (`turbo run journey --filter=@zitadel/e2e -- --suite testkit`) runs
   `zitadel tests add` in one fresh Next app, which installs `@zitadel/testing`
   from the journey registry, and runs the suite it wrote with `npm run test:e2e`.
-  The starter suite lives only in the CLI (`apps/cli/src/lib/test-kit.ts`);
+  The starter suite lives only in the CLI (`apps/cli/src/lib/test-kit/test-kit.ts`);
   a framework joins `tests add` once this lane runs it. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.

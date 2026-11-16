@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { pathExists } from "@/lib/fs";
-import { PLAYWRIGHT_CONFIG, SIGN_IN_SPEC, SIGNED_IN_SPEC } from "@/lib/test-kit";
 import { test } from "@tests/helpers/fixtures";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { TestKit } from "@/lib/test-kit";
 
 /** What a run answers, as far as these tests read it. */
 type Answer = Readonly<{
@@ -108,10 +108,12 @@ describe("tests add", () => {
         name: "a test of the developer's own where the suite's goes",
         arrange: async (dir: string) => {
           await aProject(dir);
-          await anOwnTestAt(dir, SIGNED_IN_SPEC);
+          await anOwnTestAt(dir, TestKit.SIGNED_IN_SPEC);
         },
         code: "E_CONFLICT",
-        message: expect.stringMatching(new RegExp(`^Refusing to overwrite .*/${SIGNED_IN_SPEC}$`)),
+        message: expect.stringMatching(
+          new RegExp(`^Refusing to overwrite .*/${TestKit.SIGNED_IN_SPEC}$`),
+        ),
       },
     ])("refuses $name", async ({ arrange, code, message }, { dir }) => {
       await arrange(dir);
@@ -131,11 +133,11 @@ describe("tests add", () => {
 
     test("writes nothing before a file that conflicts", async ({ dir }) => {
       await aProject(dir);
-      await anOwnTestAt(dir, SIGNED_IN_SPEC);
+      await anOwnTestAt(dir, TestKit.SIGNED_IN_SPEC);
 
       await testsAdd(dir);
 
-      expect(await pathExists(join(dir, PLAYWRIGHT_CONFIG))).toBe(false);
+      expect(await pathExists(join(dir, TestKit.CONFIG))).toBe(false);
     });
   });
 
@@ -195,11 +197,13 @@ describe("tests add", () => {
   describe("with --force", () => {
     test("replaces a test of the developer's own", async ({ dir }) => {
       await aProject(dir);
-      await anOwnTestAt(dir, SIGN_IN_SPEC);
+      await anOwnTestAt(dir, TestKit.SIGN_IN_SPEC);
 
       await testsAdd(dir, "--force");
 
-      expect(await readFile(join(dir, SIGN_IN_SPEC), "utf8")).toContain("loginWithPassword");
+      expect(await readFile(join(dir, TestKit.SIGN_IN_SPEC), "utf8")).toContain(
+        "loginWithPassword",
+      );
     });
   });
 
@@ -209,7 +213,7 @@ describe("tests add", () => {
 
       await testsAdd(dir, "--dry-run");
 
-      expect(await pathExists(join(dir, PLAYWRIGHT_CONFIG))).toBe(false);
+      expect(await pathExists(join(dir, TestKit.CONFIG))).toBe(false);
     });
   });
 });

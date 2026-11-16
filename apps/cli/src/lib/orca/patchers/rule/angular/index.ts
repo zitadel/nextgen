@@ -2,7 +2,6 @@ import { join } from "node:path";
 
 import { readIfReadable } from "@/lib/fs";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
-import { sdkVersionForCli } from "@/lib/public-cli";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type {
@@ -243,7 +242,7 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }

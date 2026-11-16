@@ -1,4 +1,3 @@
-import { sdkVersionForCli } from "@/lib/public-cli";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { DevelopmentServerUrl, PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
@@ -85,7 +84,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }

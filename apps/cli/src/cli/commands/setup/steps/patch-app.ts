@@ -7,9 +7,10 @@ import {
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
-import { errorMessage, isErrno } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -185,7 +186,7 @@ export class PatchApp extends WizardStep<
         try {
           await rm(join(this.deps.cwd, marker), { force: true });
         } catch (error) {
-          reportWarning(
+          warnings.report(
             `Could not remove ${marker} after the failed setup (${errorMessage(error)}); a rerun may refuse to start until it is removed.`,
           );
         }
@@ -198,7 +199,7 @@ export class PatchApp extends WizardStep<
             await writeFile(join(this.deps.cwd, file), content);
           }
         } catch (error) {
-          reportWarning(
+          warnings.report(
             `Could not restore ${file} after the failed setup (${errorMessage(error)}); it may still name the abandoned project.`,
           );
         }
