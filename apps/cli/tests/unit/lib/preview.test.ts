@@ -57,9 +57,16 @@ describe("detectPreviewUrls", () => {
 });
 
 /** A walk whose first read fails with `error`. */
-async function* failingWith(error: Error): AsyncGenerator<never> {
-  yield* [];
-  throw error;
+function failingWith(error: Error): AsyncIterable<never> {
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        next: () => {
+          return Promise.reject(error);
+        },
+      };
+    },
+  };
 }
 
 describe("liveExpiries", () => {
