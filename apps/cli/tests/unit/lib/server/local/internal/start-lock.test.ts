@@ -1,4 +1,4 @@
-import { readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
@@ -11,6 +11,9 @@ import {
 } from "@/lib/server/local/internal/start-lock";
 import { ManualClock } from "@tests/fixtures/clock";
 import { it } from "@tests/fixtures";
+
+/** The pid of a start that is no longer running. */
+const DEAD_OWNER = 2147483000;
 
 /**
  * Where a start lock lives under a directory.
@@ -115,14 +118,55 @@ describe("clearStale", () => {
     await expect(readFile(lock, "utf8")).resolves.toBe("2147483000");
   });
 
-  it("clears the way of a start that died while clearing", async ({ dir }) => {
-    const lock = lockPath(dir);
-    await tryLock(lock);
-    await writeFile(`${lock}.clearing`, "2147483000");
+  describe("when a start died while clearing", () => {
+    /**
+     * A lock a dead start left, with the guard of another start that died
+     * while clearing it.
+     *
+     * @param dir - The directory the lock is made under.
+     * @returns The lock file's path.
+     */
+    async function aLockSomeoneDiedClearing(dir: string): Promise<string> {
+      const lock = lockPath(dir);
+      await tryLock(lock);
+      await writeFile(lock, String(DEAD_OWNER));
+      await writeFile(`${lock}.clearing`, String(DEAD_OWNER));
+      return lock;
+    }
 
-    await clearStale(lock, 2147483000);
+    it("still removes the lock", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
 
-    await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
+      await clearStale(lock, DEAD_OWNER);
+
+      await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("leaves the dead start's guard, so no start that saw it can remove a live one", async ({
+      dir,
+    }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
+
+      await clearStale(lock, DEAD_OWNER);
+
+      await expect(readFile(`${lock}.clearing`, "utf8")).resolves.toBe(String(DEAD_OWNER));
+    });
+
+    it("leaves nothing of its own behind", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
+
+      await clearStale(lock, DEAD_OWNER);
+
+      await expect(readdir(join(dir, "local"))).resolves.toEqual(["start.lock.clearing"]);
+    });
+
+    it("does nothing while the start that took over from it is clearing", async ({ dir }) => {
+      const lock = await aLockSomeoneDiedClearing(dir);
+      await writeFile(`${lock}.clearing.2`, String(process.pid));
+
+      await expect(clearStale(lock, DEAD_OWNER)).resolves.toBe(false);
+      await expect(readFile(lock, "utf8")).resolves.toBe(String(DEAD_OWNER));
+    });
   });
 });
 

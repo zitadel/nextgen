@@ -1,8 +1,4 @@
-import semver from "semver";
-
 import { toZitadelError } from "@/lib/errors";
-import { readNearestRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { Server } from "@/lib/server";
@@ -11,6 +7,7 @@ import { WizardStep } from "@/lib/wizard";
 import {
   type Fact,
   inspectWorktree,
+  refuseOutdatedLocalServer,
   retryOptionsFromFlags,
   type SetupServices,
   setupRetryFlags,
@@ -61,19 +58,6 @@ const WORKTREE_DIRTY_REFUSAL = {
   details: {
     modified: "{modified}",
     untracked: "{untracked}",
-  },
-} as const satisfies Refusal;
-
-/** How a local server another CLI release started is refused. */
-const SERVER_VERSION_REFUSAL = {
-  code: "E_CONFLICT",
-  message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
-  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
-  next: ["{start}", "{setup}"],
-  details: {
-    server_url: "{serverUrl}",
-    server_version: "{running}",
-    cli_server_version: "{expected}",
   },
 } as const satisfies Refusal;
 
@@ -129,14 +113,9 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
    * A repository setup must not commit in is refused. One snapshot answers all three questions:
    * git is asked once, not once per refusal.
    *
-   * A local server another CLI release started is refused. `start` restarts such a server, but one
-   * left running stays that release's until `start` runs again, and its API is that release's:
-   * setup would create the project, then fail deploying the default schema and flow, and `--force`
-   * would not help. Only a binary runtime records the version it runs, and only release versions
-   * are compared: an override records `override`, which says nothing about its API. An unreadable
-   * `runtime.json` is doctor's to report, not setup's. The version check compares against the
-   * server this run is about. The start command names the server's own directory, so the typed
-   * `--cwd` is not added to it.
+   * A local server another CLI release started is refused when `--server` names it
+   * ({@link refuseOutdatedLocalServer}). Without `--server` the run is about the cloud until the
+   * wizard asks, and its question does not offer such a server.
    *
    * @param needs - The flags.
    * @returns What was settled about the run.
@@ -223,47 +202,12 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
         });
       }
     }
-    const nearest = configured
-      ? undefined
-      : await readNearestRuntimeMetadata(meta.cwd).catch(() => {
-          return undefined;
-        });
-    const runtime = nearest?.runtime;
-    const expected = LocalServer.bundledVersion();
-    if (
-      nearest &&
-      runtime?.backend === "binary" &&
-      runtime.server_url === server.value &&
-      expected !== undefined &&
-      semver.valid(expected) &&
-      semver.valid(runtime.server_version) &&
-      runtime.server_version !== expected
-    ) {
-      throw refusalError(
-        SERVER_VERSION_REFUSAL,
-        {
-          running: runtime.server_version,
-          expected,
-          serverUrl: runtime.server_url,
-          where:
-            nearest.dir === meta.cwd
-              ? ""
-              : `Run start in ${nearest.dir}, where the server was started. `,
-        },
-        {
-          start:
-            nearest.dir === meta.cwd
-              ? { id: "start" }
-              : {
-                  id: "start",
-                  flags: { cwd: nearest.dir },
-                },
-          setup: {
-            id: "setup",
-            flags: setupRetryFlags(retryOptionsFromFlags(flags)),
-          },
-        },
-      );
+    if (!configured) {
+      await refuseOutdatedLocalServer({
+        cwd: meta.cwd,
+        serverUrl: server.value,
+        flags,
+      });
     }
     this.deps.useServer(server.value);
     return {

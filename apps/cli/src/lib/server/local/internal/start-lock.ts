@@ -99,25 +99,16 @@ async function isUnwritten(lockFile: string): Promise<boolean> {
  * Removes the lock of a dead owner. Two starts that both saw the same dead owner
  * must not both remove it: the first would then take the lock, and the second,
  * removing it a moment later, would remove the first's live one. So removal
- * itself is exclusive (a second file, created the same way), and the owner is
- * read again once it is held: if the lock has a different owner by then, it is
- * not the stale one and stays. `false` when another start is clearing it.
+ * itself is exclusive (a guard, see {@link takeGuard}), and the owner is read
+ * again once it is held: if the lock has a different owner by then, it is not
+ * the stale one and stays. `false` when another start is clearing it.
  */
 export async function clearStale(
   lockFile: string,
   staleOwner: number | undefined,
 ): Promise<boolean> {
-  const guardFile = `${lockFile}.clearing`;
-  try {
-    await createOwned(guardFile);
-  } catch (error) {
-    if (!isErrno(error, "EEXIST")) {
-      throw error;
-    }
-    const clearing = await readOwner(guardFile);
-    if (clearing === undefined ? await isUnwritten(guardFile) : !isAlive(clearing)) {
-      await rm(guardFile, { force: true });
-    }
+  const release = await takeGuard(`${lockFile}.clearing`);
+  if (!release) {
     return false;
   }
   try {
@@ -125,9 +116,50 @@ export async function clearStale(
       await rm(lockFile, { force: true });
     }
   } finally {
-    await rm(guardFile, { force: true });
+    await release();
   }
   return true;
+}
+
+/** How many starts may have died while clearing one lock before the next stops trying to clear it. */
+const GUARD_GENERATIONS = 32;
+
+/**
+ * Takes the guard that makes clearing a lock exclusive, or `undefined` while a
+ * live start has it.
+ *
+ * The guard is a file created exclusively, like the lock. A start that died
+ * while holding it leaves it behind, and that file is never removed: a file
+ * can only be removed by its path, so a start that saw the dead owner a moment
+ * ago could remove the live guard another start has made there since, and two
+ * starts would clear at once. A dead guard is passed over instead, for the
+ * next file in line. A file is only reached past dead ones, and dead ones stay,
+ * so one live start holds the guard at a time. Only the holder removes its own
+ * file. Each start that dies while clearing costs one small file.
+ */
+async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | undefined> {
+  for (const file of [
+    guardFile,
+    ...Array.from({ length: GUARD_GENERATIONS - 1 }, (_, index) => {
+      return `${guardFile}.${index + 2}`;
+    }),
+  ]) {
+    try {
+      await createOwned(file);
+      return async () => {
+        await rm(file, { force: true });
+      };
+    } catch (error) {
+      if (!isErrno(error, "EEXIST")) {
+        throw error;
+      }
+    }
+    const holder = await readOwner(file);
+    if (holder === undefined ? !(await isUnwritten(file)) : isAlive(holder)) {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {

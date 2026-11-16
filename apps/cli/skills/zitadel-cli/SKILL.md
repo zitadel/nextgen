@@ -805,6 +805,8 @@ release this CLI ships; one an earlier release started is restarted, and its
 data stays. `setup --server local` refuses a binary-runtime server another
 release started with `E_CONFLICT` before it creates anything: that server's API
 is its own release's. Its `next_commands` run `start`, then `setup` again.
+Setup's interactive server question lists such a server as unavailable, and
+asks again when its URL is typed as a custom one.
 
 In an existing app, `--framework` has to name the framework setup detects
 there; another one stops setup with `E_CONFLICT` instead of offering
