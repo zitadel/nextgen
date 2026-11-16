@@ -17,6 +17,21 @@ function released(server: SetupServer, releases: Array<{ tag_name: string; body:
   server.use(http.get(RELEASES, () => HttpResponse.json(releases)));
 }
 
+/**
+ * Starts counting the requests the server matched to a handler, so a test whose answer is empty
+ * can tell a handler that was reached from one that never was.
+ *
+ * @param server - The msw server of the test.
+ * @returns The urls of the requests matched so far.
+ */
+function matched(server: SetupServer): string[] {
+  const urls: string[] = [];
+  server.events.on("request:match", ({ request }) => {
+    urls.push(request.url);
+  });
+  return urls;
+}
+
 describe("ReleaseNotes.breakingBetween", () => {
   it("returns the notes of the releases in between, oldest first", async ({ server }) => {
     released(server, [
@@ -85,15 +100,19 @@ describe("ReleaseNotes.breakingBetween", () => {
   });
 
   it("skips a tag that is not a version", async ({ server }) => {
+    const urls = matched(server);
     released(server, [{ tag_name: "nightly", body: "**Breaking:** a" }]);
 
     await expect(new ReleaseNotes().breakingBetween("1.0.0", "2.0.0")).resolves.toEqual([]);
+    expect(urls).toHaveLength(1);
   });
 
   it("answers nothing when GitHub refuses", async ({ server }) => {
+    const urls = matched(server);
     server.use(http.get(RELEASES, () => new HttpResponse(null, { status: 403 })));
 
     await expect(new ReleaseNotes().breakingBetween("1.0.0", "2.0.0")).resolves.toEqual([]);
+    expect(urls).toHaveLength(1);
   });
 
   it("answers nothing when GitHub is out of reach", async ({ server }) => {
