@@ -1,4 +1,4 @@
-import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
+import type { VerifyAuthAttemptChallengeBody } from "@zitadel/api/generated/model";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
@@ -8,7 +8,7 @@ import { BackendError } from "@/lib/backend/errors";
 export type AttemptFactor = "identifier" | "password";
 
 /** What answers a challenge: the identifier or the password. */
-export type AttemptProof = Readonly<VerifyChallengeProofBody>;
+export type AttemptProof = Readonly<VerifyAuthAttemptChallengeBody>;
 
 /**
  * What proving a factor came to. `rejected` carries the error the server
@@ -80,7 +80,7 @@ export class AuthAttemptService extends ApiService {
     factor: AttemptFactor,
     proof: AttemptProof,
   ): Promise<AttemptProofResult> {
-    const challenge = await this.client.issueChallenge(
+    const challenge = await this.client.createAuthAttemptChallenge(
       attemptId,
       {
         method: factor,
@@ -88,7 +88,7 @@ export class AuthAttemptService extends ApiService {
       this.request(),
     );
     try {
-      await this.client.verifyChallengeProof(
+      await this.client.verifyAuthAttemptChallenge(
         attemptId,
         challenge.challenge_id,
         proof,
@@ -115,7 +115,7 @@ export class AuthAttemptService extends ApiService {
    * @returns The handoff token, which becomes a console link or a session.
    */
   async handoff(attemptId: string): Promise<string> {
-    const handoff = await this.client.createHandoff(attemptId, this.request());
+    const handoff = await this.client.createAuthAttemptHandoff(attemptId, this.request());
     return handoff.handoff_token;
   }
 

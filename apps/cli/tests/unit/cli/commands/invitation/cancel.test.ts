@@ -5,12 +5,12 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect } from "vitest";
 
 import InvitationCancel from "@/cli/commands/invitation/cancel";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { parseArg } from "@tests/helpers/inputs";
 import { answering } from "@tests/helpers/keyboard";
 import { aProjectDirectory } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest, runCommand } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const INVITATION = "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J";

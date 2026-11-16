@@ -1,11 +1,11 @@
 post:
-  operationId: beginUserPasskeyRegistration
+  operationId: createUserPasskeyRegistration
   summary: Begin a passkey registration
   description: |
     Starts a WebAuthn registration ceremony for the user and returns the
     creation options for `navigator.credentials.create()`. A passkey is
     registered in two steps: this one returns options for the browser, and
-    `finishUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
+    `completeUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
 
     Complete the ceremony with
     `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five
@@ -62,4 +62,4 @@ post:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      $ref: beginUserPasskeyRegistration-error-response.yaml
+      $ref: createUserPasskeyRegistration-error-response.yaml

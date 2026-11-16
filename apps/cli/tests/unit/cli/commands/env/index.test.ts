@@ -1,24 +1,15 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
+import { it } from "@tests/fixtures";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 
 const SERVER = "https://api.zitadel.cloud";
-const dirs: string[] = [];
 
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function aProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-env-"));
-  dirs.push(cwd);
+async function aProject(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -33,8 +24,8 @@ async function aProject(): Promise<string> {
   return cwd;
 }
 
-const shown = async (): Promise<string> => {
-  const cwd = await aProject();
+const shown = async (dir: string): Promise<string> => {
+  const cwd = await aProject(dir);
   const res = await asTerminal(() =>
     runCliForTest(["env", "--cwd", cwd, "--server", SERVER, "--no-telemetry"]),
   );
@@ -43,22 +34,22 @@ const shown = async (): Promise<string> => {
 };
 
 describe("zitadel env", () => {
-  it("ends on a footer, as every other command does", async () => {
-    const out = await shown();
+  it("ends on a footer, as every other command does", async ({ dir }) => {
+    const out = await shown(dir);
 
     // It opens no connection — reporting what resolves is its whole job — so
     // it was the one command whose answer had nothing under it.
     expect(out).toContain("Using the development environment");
   });
 
-  it("names the project and server it resolved in that footer", async () => {
-    const out = await shown();
+  it("names the project and server it resolved in that footer", async ({ dir }) => {
+    const out = await shown(dir);
 
     expect(out).toContain("· project proj_test on api.zitadel.cloud");
   });
 
-  it("does not head its answer with a row that reads as a table", async () => {
-    const out = await shown();
+  it("does not head its answer with a row that reads as a table", async ({ dir }) => {
+    const out = await shown(dir);
 
     // Two spaces made the headline look like a column row, so it was read as
     // part of the table under it and never became the closing sentence.

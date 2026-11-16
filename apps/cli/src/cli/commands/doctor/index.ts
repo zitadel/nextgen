@@ -3,19 +3,18 @@ import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
+import { startedServer } from "@/lib/server/local/started";
 import { createZitadelClient } from "@/lib/backend";
-import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
-import { isRefusal } from "@/lib/consent";
-import { resolveEnvironment } from "@/lib/environment";
+import { Consent } from "@/lib/consent";
+import { Environment } from "@/lib/environment";
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { serverLogAction } from "@/lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "@/lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
+} from "@/lib/server/local/docker-guidance";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/server/local/processes";
 import {
   assertLocalStateWritable,
   checkLocalServerHealth,
@@ -29,16 +28,11 @@ import {
   type RuntimeMetadata,
   readNearestRuntimeMetadata,
   resolveRuntimeBackend,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import { log } from "@/lib/log";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server";
+import { log, warnings as invocationWarnings } from "@/lib/ui";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
@@ -52,25 +46,19 @@ import {
 } from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
 import { listenersForPort } from "@/lib/prober/ports";
+import { Server } from "@/lib/server";
 import {
-  hasZitadelConfig,
-  hasZitadelSecret,
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-} from "@/lib/project";
-import { isLoopbackUrl } from "@/lib/server";
-import {
-  type Suggest,
-  type SuggestedCommand,
+  Guidance,
   shellCommand,
+  type Suggest,
   type SuggestWords,
+  type SuggestedCommand,
 } from "@/lib/suggestion";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
 
 import { type CheckContext, type CheckOutcome, checkCliVersion, SANITY_CHECKS } from "./checks";
 import { doctorReport, renderDoctorReport, withCategories } from "./report";
+import { Project } from "@/lib/project";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -138,8 +126,8 @@ type Checking = Readonly<{
  */
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.diagnostics;
-  static override groupOrder = 1;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 3;
 
   static override flags = relatedFlags(
     {
@@ -215,7 +203,7 @@ export default class Doctor extends Destructive(BaseCommand) {
             parentRuntimeDir,
           )
         : [];
-    const hasConfig = await hasZitadelConfig(this.cwd);
+    const hasConfig = await Project.at(this.cwd).hasConfig();
     const ctx: CheckContext = {
       cwd: this.cwd,
       orca: createOrca(),
@@ -249,8 +237,8 @@ export default class Doctor extends Destructive(BaseCommand) {
           if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
             throw error;
           }
-          if (isRefusal(error) && error instanceof ZitadelError) {
-            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+          if (Consent.isRefusal(error) && error instanceof ZitadelError) {
+            invocationWarnings.report(`${error.message}. ${error.hint ?? ""}`.trim());
             continue;
           }
           log.debug(`doctor --fix: ${check.name} repair failed`, error);
@@ -297,15 +285,22 @@ export default class Doctor extends Destructive(BaseCommand) {
     // A `zitadel.json` that does not parse is the config check's to report,
     // not a reason for doctor itself to fail before it reports anything.
     const projectServer = hasConfig
-      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => {
-          return flags.server;
-        })
+      ? await Project.at(this.cwd)
+          .config()
+          .then(
+            (config) => {
+              return config.server;
+            },
+            () => {
+              return flags.server;
+            },
+          )
       : flags.server;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
       projectId !== undefined &&
-      (await resolveEnvironment({
+      (await Environment.resolve({
         cwd: this.cwd,
         env: this.env,
       }).then(
@@ -354,7 +349,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       })?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.suggest)] : []),
+      ...(serving ? [new Guidance(this.suggest).serverLog()] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -527,14 +522,21 @@ export default class Doctor extends Destructive(BaseCommand) {
     }
     if (
       (await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
-      !(await hasZitadelConfig(cwd))
+      !(await Project.at(cwd).hasConfig())
     ) {
       return undefined;
     }
-    const server = await readZitadelConfig(cwd).then(readProjectServer, () => {
-      return undefined;
-    });
-    return server === undefined || isLoopbackUrl(server) ? undefined : server;
+    const server = await Project.at(cwd)
+      .config()
+      .then(
+        (config) => {
+          return config.server;
+        },
+        () => {
+          return undefined;
+        },
+      );
+    return server === undefined || Server.at(server).isLoopback() ? undefined : server;
   }
 }
 
@@ -759,9 +761,12 @@ export function advisoryForWarnings(
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? claimWindowClosedAction(local)
-          : claimAction(local, undefined),
-        claimCommand(local),
+          ? Claim.windowClosedNudge(
+              local({ id: "claim" }),
+              local({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } }),
+            )
+          : Claim.nudge(local({ id: "claim" }), undefined),
+        local({ id: "claim" }),
       );
     }
   }
@@ -861,7 +866,7 @@ async function runEnvironmentChecks(input: {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  const resolved = await resolveEnvironment({
+  const resolved = await Environment.resolve({
     cwd: input.cwd,
     env: input.env,
     envName: input.envName,
@@ -902,7 +907,7 @@ async function runEnvironmentChecks(input: {
         );
       }
       const project = await createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: server,
         token,
         signal: input.signal,
@@ -1230,15 +1235,17 @@ function imageUnavailableMessage(image: string, error: unknown, suggest: Suggest
 
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */
 async function secretProjectId(cwd: string): Promise<string | undefined> {
-  return (await hasZitadelSecret(cwd))
-    ? readZitadelSecret(cwd).then(
-        (secret) => {
-          return secret.project_id;
-        },
-        () => {
-          return undefined;
-        },
-      )
+  return (await Project.at(cwd).hasSecret())
+    ? Project.at(cwd)
+        .secret()
+        .then(
+          (secret) => {
+            return secret.data.project_id;
+          },
+          () => {
+            return undefined;
+          },
+        )
     : undefined;
 }
 
@@ -1255,7 +1262,7 @@ async function namesProject(
   // process environment is left out, so only the file answers. The file must
   // carry the credential too: for one it lacks, a pinned claim would take
   // whatever secret the shell exports and send it along for this project.
-  return resolveEnvironment({
+  return Environment.resolve({
     cwd: dirname(path),
     env: {},
     envFile: path,

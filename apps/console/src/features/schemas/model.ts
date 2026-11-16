@@ -4,7 +4,7 @@ import { titleCase } from "@/lib/text";
 /**
  * A user schema as the console reads it.
  *
- * `GET /schemas/{id}` returns a JSON Schema document whose shape is
+ * `GET /schemas/{schema_id}` returns a JSON Schema document whose shape is
  * customer-authored (`additionalProperties: true` all the way down), so the
  * console treats it as an open record and reads only the keys it understands —
  * the same defensive posture `features/users/model.ts` takes for users themselves.
@@ -152,26 +152,10 @@ export function schemaDisplayName(schema: UserSchema, id: string): string {
 }
 
 /**
- * The property names a schema defines, joined for the picker's second line
- * (`email · givenName · familyName`). Deliberately the raw keys rather than
- * humanised labels: the point of the line is to show which attributes the
- * schema will ask for, and the keys are what the API actually stores.
- *
- * Ordered through {@link schemaFields} so the summary lists the properties in
- * the same sequence the form renders them — and so it does not inherit the
- * response's randomised key order.
- */
-export function schemaFieldSummary(schema: UserSchema): string {
-  return schemaFields(schema)
-    .map((entry) => entry.key)
-    .join(" · ");
-}
-
-/**
  * Build the form controls for a schema.
  *
  * **Field order is not decided here, and deliberately encodes no intent.**
- * `GET /schemas/{id}` serialises `properties` from a Go map, so the response's key
+ * `GET /schemas/{schema_id}` serialises `properties` from a Go map, so the response's key
  * order is randomised — identical requests return different orderings, which makes
  * the form shuffle between openings. Sorting by key is the minimum needed to stop
  * that: it is stable and it claims nothing about how the fields should read (it
@@ -186,6 +170,23 @@ export function schemaFieldSummary(schema: UserSchema): string {
  */
 export function schemaFields(schema: UserSchema): SchemaField[] {
   return objectFields(schema, [], field(schema, "x-identifier"));
+}
+
+/**
+ * Every property name a schema collects, nested ones too, each as its key and
+ * its dotted path (`email`, `contact.email`): what a schema search matches.
+ */
+export function schemaPropertyNames(schema: UserSchema): string[] {
+  const names = new Set<string>();
+  const walk = (fields: SchemaField[]) => {
+    for (const entry of fields) {
+      names.add(entry.key).add(entry.attributePath);
+      if (entry.kind === "object") walk(entry.fields);
+      if (entry.kind === "array") walk([entry.item]);
+    }
+  };
+  walk(schemaFields(schema));
+  return [...names];
 }
 
 function objectFields(node: UserSchema, path: string[], identifier?: string): SchemaField[] {
@@ -379,7 +380,7 @@ function optionalNumber<K extends string>(name: K, value: unknown): { [P in K]?:
  * The schema screens read the document instead of writing to it, and the design's
  * field table renders an object as a row you drill into, so this lists them flat.
  *
- * Sorted by key for the same reason `schemaFields` is: `GET /schemas/{id}`
+ * Sorted by key for the same reason `schemaFields` is: `GET /schemas/{schema_id}`
  * serialises `properties` from a Go map, so the response order is randomised
  * and an unsorted table reshuffles between loads.
  */
@@ -464,7 +465,7 @@ export interface SchemaAuthMethod {
  * `x-auth-methods` says which methods a user type supports; the order they are
  * offered in is the flow's, from the order of a step's actions. So the sort
  * here claims nothing — it exists for the same reason {@link schemaFields}
- * sorts: `GET /schemas/{id}` serialises from a Go map, so the response's key
+ * sorts: `GET /schemas/{schema_id}` serialises from a Go map, so the response's key
  * order is randomised and an unsorted list reshuffles between loads.
  *
  * Every declared method is returned, not just the two the backend supports

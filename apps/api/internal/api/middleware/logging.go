@@ -6,10 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
-	slogotel "github.com/veqryn/slog-context/otel"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -51,17 +47,9 @@ func WithLogging(next http.Handler) http.Handler {
 				status = http.StatusOK
 			}
 			operationID, _ := GetOperationIDContext(ctx)
-			// The server span ended before this runs, and the trace extractor
-			// reads only a recording span, so the IDs come from the holder. They
-			// are prepended so they sit at the root of the line, as on every
-			// other line. The span context on ctx is what the OTLP handler reads.
-			if sc := GetServerSpanContext(ctx); sc.IsSampled() {
-				ctx = trace.ContextWithSpanContext(ctx, sc)
-				ctx = slogctx.Prepend(ctx,
-					slog.String(slogotel.DefaultKeyTraceID, sc.TraceID().String()),
-					slog.String(slogotel.DefaultKeySpanID, sc.SpanID().String()),
-				)
-			}
+			// The line carries the IDs of the request's server span, as every
+			// line of the request does: WithServerSpan runs outside this, so the
+			// span is on ctx and still open.
 			logger.InfoContext(ctx, "request served",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
@@ -78,7 +66,7 @@ func WithLogging(next http.Handler) http.Handler {
 // ---------------------- LOGGING RESPONSE WRITER -----------------------------
 
 // loggingResponseWriter records the status and the number of body bytes
-// written, for the request line.
+// written, for the request line and the server span.
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int

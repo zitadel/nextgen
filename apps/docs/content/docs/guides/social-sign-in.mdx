@@ -131,7 +131,7 @@ with Google" button.
 1. Open your app's sign-in page and choose "Continue with Google".
 2. Sign in at the provider. The provider sends you back to the callback URI, and
    your app shows you signed in.
-3. Check that the user exists with `npx @zitadel/cli@latest users list`.
+3. Check that the user exists with `npx @zitadel/cli@latest user list`.
 
 If the button is missing, check that you ran `deploy`, not only
 `deploy --dry-run`, and reload. If the sign-in fails, keep
@@ -220,8 +220,8 @@ This example fills a new property `staffNumber` from a claim the provider calls
 
 4. Sign in through the provider with an account that has not signed in to
    your app before. The first sign-in registers the user from the claims. Find
-   its ID with `npx @zitadel/cli@latest users list`, then
-   `npx @zitadel/cli@latest users get <user_id> --json` prints the user, with
+   its ID with `npx @zitadel/cli@latest user list`, then
+   `npx @zitadel/cli@latest user get <user_id> --json` prints the user, with
    `staffNumber` under `data.attributes`.
 
    A property the provider did not return is left out. To let the person type

@@ -16,8 +16,8 @@ when reproducibility matters.
 
 - Node from the supported range in `package.json#engines` (currently ≥ 24)
 - Docker only when using the optional Docker runtime backend
-- An app in one of the eight supported frameworks, or an empty directory
-  where setup can scaffold one
+- An app in one of the supported frameworks, or an empty directory where
+  setup can scaffold one
 
 ## Quickstart
 
@@ -52,13 +52,12 @@ attaches the new project to the local admin's team, so the project is owned
 from the start and `zitadel claim` reports it as already owned. If you opted
 out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, there is no local admin
 and the project has no owning team; that server cannot claim projects.
-Setup writes `.env.local` and `.zitadel/`, and installs
+Setup writes `.env.local`, `.env.development.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
-them yourself. The project's default user schema and login flow are provisioned
-from versioned local defaults; setup writes editable copies into
+them yourself. The project's default user schema and login flow come from
+versioned local defaults; setup writes editable copies into
 `.zitadel/schemas/default-human-user.json` and
-`.zitadel/flows/default-login.json`, uploads them through the schema and flow
-APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
+`.zitadel/flows/default-login.json`, and its first deploy publishes them.
 Open the dev server URL printed by your framework, register a user, log out,
 log back in, and end on the signed-in profile page. That user is an end user
 of your app. The management console is a separate sign-in: run
@@ -80,8 +79,8 @@ passkey can sign in with either credential.
 
 Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
 `.zitadel/flows/*.json`, or `.zitadel/branding/` (a `branding.json` descriptor
-plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
-`zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
+plus a `login.liquid` LiquidJS template), then run `zitadel deploy`
+(`--dry-run` previews it). Server-provisioned defaults remain a fallback for non-CLI
 project creation, but CLI-created projects are authored from local files first.
 Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|minimal`); setup never does;
@@ -115,7 +114,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel pull`: rebuild `.zitadel/` from the revisions a released snapshot
   pins — the inverse of deploy — for `latest`, a release id, or a deployment id
 - `zitadel branding eject`: scaffold an editable login template from a design
-- `zitadel schemas list`: list the project's user schemas
+- `zitadel schema list`: list the project's user schemas
 - `zitadel variable set|get|list|rm`: manage the project's variables and secrets
   (`--preview` for a preview override); `zitadel variable resolve` shows what a
   deployment froze, the live one by default
@@ -159,18 +158,18 @@ which ships in this package.
 * [`zitadel env`](#zitadel-env)
 * [`zitadel env add NAME`](#zitadel-env-add-name)
 * [`zitadel env list`](#zitadel-env-list)
-* [`zitadel events get ID`](#zitadel-events-get-id)
-* [`zitadel events list`](#zitadel-events-list)
-* [`zitadel flow-definitions get FLOW`](#zitadel-flow-definitions-get-flow)
-* [`zitadel flow-definitions list`](#zitadel-flow-definitions-list)
-* [`zitadel grants create`](#zitadel-grants-create)
-* [`zitadel grants delete ID`](#zitadel-grants-delete-id)
-* [`zitadel grants get ID`](#zitadel-grants-get-id)
-* [`zitadel grants list`](#zitadel-grants-list)
+* [`zitadel event get ID`](#zitadel-event-get-id)
+* [`zitadel event list`](#zitadel-event-list)
+* [`zitadel flow-definition get FLOW`](#zitadel-flow-definition-get-flow)
+* [`zitadel flow-definition list`](#zitadel-flow-definition-list)
+* [`zitadel grant create`](#zitadel-grant-create)
+* [`zitadel grant delete ID`](#zitadel-grant-delete-id)
+* [`zitadel grant get ID`](#zitadel-grant-get-id)
+* [`zitadel grant list`](#zitadel-grant-list)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
-* [`zitadel idps create`](#zitadel-idps-create)
-* [`zitadel idps get ID`](#zitadel-idps-get-id)
-* [`zitadel idps list`](#zitadel-idps-list)
+* [`zitadel idp create`](#zitadel-idp-create)
+* [`zitadel idp get ID`](#zitadel-idp-get-id)
+* [`zitadel idp list`](#zitadel-idp-list)
 * [`zitadel invitation cancel [INVITATION_ID]`](#zitadel-invitation-cancel-invitation_id)
 * [`zitadel invitation create`](#zitadel-invitation-create)
 * [`zitadel invitation get INVITATION_ID`](#zitadel-invitation-get-invitation_id)
@@ -179,15 +178,15 @@ which ships in this package.
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
-* [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
-* [`zitadel policies list`](#zitadel-policies-list)
-* [`zitadel policies test [OPERATION]`](#zitadel-policies-test-operation)
+* [`zitadel policy get POLICY`](#zitadel-policy-get-policy)
+* [`zitadel policy list`](#zitadel-policy-list)
+* [`zitadel policy test [OPERATION]`](#zitadel-policy-test-operation)
 * [`zitadel preview`](#zitadel-preview)
 * [`zitadel preview list`](#zitadel-preview-list)
 * [`zitadel preview rm URL`](#zitadel-preview-rm-url)
-* [`zitadel projects get ID`](#zitadel-projects-get-id)
-* [`zitadel projects list`](#zitadel-projects-list)
-* [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel project get ID`](#zitadel-project-get-id)
+* [`zitadel project list`](#zitadel-project-list)
+* [`zitadel project update ID`](#zitadel-project-update-id)
 * [`zitadel pull [TARGET]`](#zitadel-pull-target)
 * [`zitadel release create`](#zitadel-release-create)
 * [`zitadel release get ID`](#zitadel-release-get-id)
@@ -195,30 +194,30 @@ which ships in this package.
 * [`zitadel release revoke RELEASE_ID`](#zitadel-release-revoke-release_id)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
-* [`zitadel schemas get SCHEMA`](#zitadel-schemas-get-schema)
-* [`zitadel schemas list`](#zitadel-schemas-list)
+* [`zitadel schema get SCHEMA`](#zitadel-schema-get-schema)
+* [`zitadel schema list`](#zitadel-schema-list)
 * [`zitadel search`](#zitadel-search)
-* [`zitadel sessions get ID`](#zitadel-sessions-get-id)
-* [`zitadel sessions list`](#zitadel-sessions-list)
-* [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
+* [`zitadel session get ID`](#zitadel-session-get-id)
+* [`zitadel session list`](#zitadel-session-list)
+* [`zitadel session revoke ID`](#zitadel-session-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel skills add`](#zitadel-skills-add)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
-* [`zitadel teams create`](#zitadel-teams-create)
-* [`zitadel teams deactivate ID`](#zitadel-teams-deactivate-id)
-* [`zitadel teams get ID`](#zitadel-teams-get-id)
-* [`zitadel teams list`](#zitadel-teams-list)
-* [`zitadel teams update ID`](#zitadel-teams-update-id)
+* [`zitadel team create`](#zitadel-team-create)
+* [`zitadel team deactivate ID`](#zitadel-team-deactivate-id)
+* [`zitadel team get ID`](#zitadel-team-get-id)
+* [`zitadel team list`](#zitadel-team-list)
+* [`zitadel team update ID`](#zitadel-team-update-id)
 * [`zitadel tests add`](#zitadel-tests-add)
 * [`zitadel uninstall`](#zitadel-uninstall)
 * [`zitadel upgrade`](#zitadel-upgrade)
-* [`zitadel users create`](#zitadel-users-create)
-* [`zitadel users delete ID`](#zitadel-users-delete-id)
-* [`zitadel users get ID`](#zitadel-users-get-id)
-* [`zitadel users list`](#zitadel-users-list)
-* [`zitadel users update ID`](#zitadel-users-update-id)
+* [`zitadel user create`](#zitadel-user-create)
+* [`zitadel user delete ID`](#zitadel-user-delete-id)
+* [`zitadel user get ID`](#zitadel-user-get-id)
+* [`zitadel user list`](#zitadel-user-list)
+* [`zitadel user update ID`](#zitadel-user-update-id)
 * [`zitadel variable get NAME`](#zitadel-variable-get-name)
 * [`zitadel variable list`](#zitadel-variable-list)
 * [`zitadel variable resolve [DEPLOYMENT_ID]`](#zitadel-variable-resolve-deployment_id)
@@ -274,7 +273,7 @@ DESCRIPTION
 EXAMPLES
   $ zitadel api queryUsers -F limit=5
 
-  $ zitadel api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+  $ zitadel api getUser user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
 
   $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
 
@@ -625,38 +624,44 @@ EXAMPLES
 
 ## `zitadel branding list`
 
-List branding.
+List branding revisions.
 
 ```
 USAGE
   $ zitadel branding list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>] [--plain]
+    [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--plain]
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
-                          platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
-                          from the current directory, not from --cwd. Cannot be combined with --env.
-      --fields=<value>    Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
-                          resource's own columns; `--json` is unaffected.
-      --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                            platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
+                            resource's own columns; `--json` is unaffected.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List branding.
+  List branding revisions.
 
 EXAMPLES
   $ zitadel branding list --json
+
+  $ zitadel branding list --all --json
 ```
 
 ## `zitadel claim`
@@ -736,7 +741,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin.
+Open the console of the server the project uses.
 
 ```
 USAGE
@@ -751,17 +756,18 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --no-open          Print the sign-in link instead of opening a browser.
+      --no-open          Print the link instead of opening a browser.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin.
+  Open the console of the server the project uses.
 
-  The local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local
-  admin is read from the nearest .zitadel/local/ on the way up.
+  Where a local server was started, the console opens signed in as the local admin the start command created: run this
+  in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the
+  way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.
 
 EXAMPLES
   $ zitadel console
@@ -1152,13 +1158,13 @@ EXAMPLES
   $ zitadel env list --plain
 ```
 
-## `zitadel events get ID`
+## `zitadel event get ID`
 
 Get one event by id.
 
 ```
 USAGE
-  $ zitadel events get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel event get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -1187,18 +1193,18 @@ DESCRIPTION
   Get one event by id.
 
 EXAMPLES
-  $ zitadel events get <id>
+  $ zitadel event get <id>
 
-  $ zitadel events get <id> --json
+  $ zitadel event get <id> --json
 ```
 
-## `zitadel events list`
+## `zitadel event list`
 
 List events.
 
 ```
 USAGE
-  $ zitadel events list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel event list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -1268,20 +1274,20 @@ DESCRIPTION
   List events.
 
 EXAMPLES
-  $ zitadel events list --json
+  $ zitadel event list --json
 
-  $ zitadel events list --all --json
+  $ zitadel event list --all --json
 
-  $ zitadel events list --filter category=equals:<value> --sort occurred_at:desc
+  $ zitadel event list --filter category=equals:<value> --sort occurred_at:desc
 ```
 
-## `zitadel flow-definitions get FLOW`
+## `zitadel flow-definition get FLOW`
 
 Get one flow definition by flow name (newest revision) or revision id.
 
 ```
 USAGE
-  $ zitadel flow-definitions get FLOW [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel flow-definition get FLOW [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -1310,18 +1316,18 @@ DESCRIPTION
   Get one flow definition by flow name (newest revision) or revision id.
 
 EXAMPLES
-  $ zitadel flow-definitions get <flow>
+  $ zitadel flow-definition get <flow>
 
-  $ zitadel flow-definitions get <flow> --json
+  $ zitadel flow-definition get <flow> --json
 ```
 
-## `zitadel flow-definitions list`
+## `zitadel flow-definition list`
 
-List flow-definitions.
+List flow definitions.
 
 ```
 USAGE
-  $ zitadel flow-definitions list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel flow-definition list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--plain]
 
@@ -1351,23 +1357,23 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List flow-definitions.
+  List flow definitions.
 
 EXAMPLES
-  $ zitadel flow-definitions list --json
+  $ zitadel flow-definition list --json
 
-  $ zitadel flow-definitions list --all --json
+  $ zitadel flow-definition list --all --json
 
-  $ zitadel flow-definitions list --filter name=equals:<value>
+  $ zitadel flow-definition list --filter name=equals:<value>
 ```
 
-## `zitadel grants create`
+## `zitadel grant create`
 
 Create a grant.
 
 ```
 USAGE
-  $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel grant create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--relation viewer|editor|admin] [--expires-at <value>]
     [--user-user-id <value>] [--user-identifier <value>] [--team-team-id <value>] [--team-name <value>] [--data <value>
     | --file <value>] [--set <value>...]
@@ -1416,20 +1422,20 @@ DESCRIPTION
   Create a grant.
 
 EXAMPLES
-  $ zitadel grants create --relation viewer --user-identifier alice@acme.com --json
+  $ zitadel grant create --relation viewer --user-identifier alice@acme.com --json
 
-  $ zitadel grants create --data '{...}' --json
+  $ zitadel grant create --data '{...}' --json
 
-  $ zitadel grants create --file ./grant.json
+  $ zitadel grant create --file ./grant.json
 ```
 
-## `zitadel grants delete ID`
+## `zitadel grant delete ID`
 
 Delete a grant by id.
 
 ```
 USAGE
-  $ zitadel grants delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel grant delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
@@ -1457,16 +1463,16 @@ DESCRIPTION
   Delete a grant by id.
 
 EXAMPLES
-  $ zitadel grants delete <id> --force --json
+  $ zitadel grant delete <id> --force --json
 ```
 
-## `zitadel grants get ID`
+## `zitadel grant get ID`
 
 Get one grant by id.
 
 ```
 USAGE
-  $ zitadel grants get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel grant get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -1495,18 +1501,18 @@ DESCRIPTION
   Get one grant by id.
 
 EXAMPLES
-  $ zitadel grants get <id>
+  $ zitadel grant get <id>
 
-  $ zitadel grants get <id> --json
+  $ zitadel grant get <id> --json
 ```
 
-## `zitadel grants list`
+## `zitadel grant list`
 
 List grants.
 
 ```
 USAGE
-  $ zitadel grants list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel grant list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -1578,11 +1584,11 @@ DESCRIPTION
   List grants.
 
 EXAMPLES
-  $ zitadel grants list --json
+  $ zitadel grant list --json
 
-  $ zitadel grants list --all --json
+  $ zitadel grant list --all --json
 
-  $ zitadel grants list --filter created_at=equals:<value> --sort created_at:desc
+  $ zitadel grant list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
 ## `zitadel help [COMMAND]`
@@ -1605,13 +1611,13 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
 
-## `zitadel idps create`
+## `zitadel idp create`
 
 Create an identity provider connection.
 
 ```
 USAGE
-  $ zitadel idps create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel idp create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--slug <value>] [--protocol oidc] [--template <value>]
     [--display-name <value>] [--subject-claim <value>] [--claim-mapping <value>...] [--verified-claims <value>...]
     [--provisioning-creation disabled|auto] [--oidc-issuer <value>] [--oidc-jwks-uri <value>] [--oidc-id-token-mapping]
@@ -1689,20 +1695,20 @@ DESCRIPTION
   Create an identity provider connection.
 
 EXAMPLES
-  $ zitadel idps create --slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --json
+  $ zitadel idp create --slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --json
 
-  $ zitadel idps create --data '{...}' --json
+  $ zitadel idp create --data '{...}' --json
 
-  $ zitadel idps create --file ./identity-provider-connection.json
+  $ zitadel idp create --file ./identity-provider-connection.json
 ```
 
-## `zitadel idps get ID`
+## `zitadel idp get ID`
 
 Get one identity provider connection by id.
 
 ```
 USAGE
-  $ zitadel idps get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel idp get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -1731,18 +1737,18 @@ DESCRIPTION
   Get one identity provider connection by id.
 
 EXAMPLES
-  $ zitadel idps get <id>
+  $ zitadel idp get <id>
 
-  $ zitadel idps get <id> --json
+  $ zitadel idp get <id> --json
 ```
 
-## `zitadel idps list`
+## `zitadel idp list`
 
-List idps.
+List identity provider connections.
 
 ```
 USAGE
-  $ zitadel idps list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel idp list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -1775,14 +1781,14 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List idps.
+  List identity provider connections.
 
 EXAMPLES
-  $ zitadel idps list --json
+  $ zitadel idp list --json
 
-  $ zitadel idps list --all --json
+  $ zitadel idp list --all --json
 
-  $ zitadel idps list --filter slug=equals:<value> --sort slug:desc
+  $ zitadel idp list --filter slug=equals:<value> --sort slug:desc
 ```
 
 ## `zitadel invitation cancel [INVITATION_ID]`
@@ -2106,13 +2112,13 @@ EXAMPLES
   $ zitadel origin rm https://app.acme.com --force
 ```
 
-## `zitadel policies get POLICY`
+## `zitadel policy get POLICY`
 
 Get one policy by policy id or operation.
 
 ```
 USAGE
-  $ zitadel policies get POLICY [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel policy get POLICY [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -2141,18 +2147,18 @@ DESCRIPTION
   Get one policy by policy id or operation.
 
 EXAMPLES
-  $ zitadel policies get <policy>
+  $ zitadel policy get <policy>
 
-  $ zitadel policies get <policy> --json
+  $ zitadel policy get <policy> --json
 ```
 
-## `zitadel policies list`
+## `zitadel policy list`
 
 List policies.
 
 ```
 USAGE
-  $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel policy list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--plain]
 
@@ -2184,20 +2190,20 @@ DESCRIPTION
   List policies.
 
 EXAMPLES
-  $ zitadel policies list --json
+  $ zitadel policy list --json
 
-  $ zitadel policies list --all --json
+  $ zitadel policy list --all --json
 
-  $ zitadel policies list --filter operation=equals:<value>
+  $ zitadel policy list --filter operation=equals:<value>
 ```
 
-## `zitadel policies test [OPERATION]`
+## `zitadel policy test [OPERATION]`
 
 Run the test cases in .zitadel/policies/ against the policies.
 
 ```
 USAGE
-  $ zitadel policies test [OPERATION] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel policy test [OPERATION] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--release <value>]
 
 ARGUMENTS
@@ -2233,13 +2239,13 @@ DESCRIPTION
   leaves the live policies as they are.
 
 EXAMPLES
-  $ zitadel policies test
+  $ zitadel policy test
 
-  $ zitadel policies test auth.factor.password.set
+  $ zitadel policy test auth.factor.password.set
 
-  $ zitadel policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7
+  $ zitadel policy test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7
 
-  $ zitadel policies test --json
+  $ zitadel policy test --json
 ```
 
 ## `zitadel preview`
@@ -2367,13 +2373,13 @@ EXAMPLES
   $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app --force
 ```
 
-## `zitadel projects get ID`
+## `zitadel project get ID`
 
 Get one project by id.
 
 ```
 USAGE
-  $ zitadel projects get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel project get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -2402,18 +2408,18 @@ DESCRIPTION
   Get one project by id.
 
 EXAMPLES
-  $ zitadel projects get <id>
+  $ zitadel project get <id>
 
-  $ zitadel projects get <id> --json
+  $ zitadel project get <id> --json
 ```
 
-## `zitadel projects list`
+## `zitadel project list`
 
 List projects.
 
 ```
 USAGE
-  $ zitadel projects list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel project list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -2448,20 +2454,20 @@ DESCRIPTION
   List projects.
 
 EXAMPLES
-  $ zitadel projects list --json
+  $ zitadel project list --json
 
-  $ zitadel projects list --all --json
+  $ zitadel project list --all --json
 
-  $ zitadel projects list --filter created_at=equals:<value> --sort created_at:desc
+  $ zitadel project list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
-## `zitadel projects update ID`
+## `zitadel project update ID`
 
 Update a project by id.
 
 ```
 USAGE
-  $ zitadel projects update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel project update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--password-hash-algorithm
     argon2i|argon2id|bcrypt|scrypt|pbkdf2|sha2] [--password-hash-params-time <value>] [--password-hash-params-memory
     <value>] [--password-hash-params-threads <value>] [--password-hash-params-cost <value>]
@@ -2513,9 +2519,9 @@ DESCRIPTION
   Update a project by id.
 
 EXAMPLES
-  $ zitadel projects update <id> --data '{...}' --json
+  $ zitadel project update <id> --data '{...}' --json
 
-  $ zitadel projects update <id> --file ./project.json
+  $ zitadel project update <id> --file ./project.json
 ```
 
 ## `zitadel pull [TARGET]`
@@ -2639,7 +2645,7 @@ EXAMPLES
 
 ## `zitadel release list`
 
-List release.
+List releases.
 
 ```
 USAGE
@@ -2671,7 +2677,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List release.
+  List releases.
 
 EXAMPLES
   $ zitadel release list --json
@@ -2782,13 +2788,13 @@ EXAMPLES
   $ zitadel resources --json | jq -r '.data.items[] | "\(.topic): \(.verbs | join(", "))"'
 ```
 
-## `zitadel schemas get SCHEMA`
+## `zitadel schema get SCHEMA`
 
 Get one schema by object type (current revision) or revision id.
 
 ```
 USAGE
-  $ zitadel schemas get SCHEMA [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel schema get SCHEMA [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -2817,18 +2823,18 @@ DESCRIPTION
   Get one schema by object type (current revision) or revision id.
 
 EXAMPLES
-  $ zitadel schemas get <schema>
+  $ zitadel schema get <schema>
 
-  $ zitadel schemas get <schema> --json
+  $ zitadel schema get <schema> --json
 ```
 
-## `zitadel schemas list`
+## `zitadel schema list`
 
 List schemas.
 
 ```
 USAGE
-  $ zitadel schemas list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel schema list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--plain]
 
@@ -2861,11 +2867,11 @@ DESCRIPTION
   List schemas.
 
 EXAMPLES
-  $ zitadel schemas list --json
+  $ zitadel schema list --json
 
-  $ zitadel schemas list --all --json
+  $ zitadel schema list --all --json
 
-  $ zitadel schemas list --filter object_type=equals:<value>
+  $ zitadel schema list --filter object_type=equals:<value>
 ```
 
 ## `zitadel search`
@@ -2884,13 +2890,13 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-search](https://github.com/oclif/plugin-search/blob/v1.2.50/src/commands/search.ts)_
 
-## `zitadel sessions get ID`
+## `zitadel session get ID`
 
 Get one session by id.
 
 ```
 USAGE
-  $ zitadel sessions get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel session get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -2919,18 +2925,18 @@ DESCRIPTION
   Get one session by id.
 
 EXAMPLES
-  $ zitadel sessions get <id>
+  $ zitadel session get <id>
 
-  $ zitadel sessions get <id> --json
+  $ zitadel session get <id> --json
 ```
 
-## `zitadel sessions list`
+## `zitadel session list`
 
 List sessions.
 
 ```
 USAGE
-  $ zitadel sessions list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel session list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -3001,20 +3007,20 @@ DESCRIPTION
   List sessions.
 
 EXAMPLES
-  $ zitadel sessions list --json
+  $ zitadel session list --json
 
-  $ zitadel sessions list --all --json
+  $ zitadel session list --all --json
 
-  $ zitadel sessions list --filter created_at=equals:<value> --sort created_at:desc
+  $ zitadel session list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
-## `zitadel sessions revoke ID`
+## `zitadel session revoke ID`
 
 Revoke a session by id.
 
 ```
 USAGE
-  $ zitadel sessions revoke ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel session revoke ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
@@ -3042,7 +3048,7 @@ DESCRIPTION
   Revoke a session by id.
 
 EXAMPLES
-  $ zitadel sessions revoke <id> --force --json
+  $ zitadel session revoke <id> --force --json
 ```
 
 ## `zitadel setup`
@@ -3238,13 +3244,13 @@ DESCRIPTION
   Stop the local Zitadel server.
 ```
 
-## `zitadel teams create`
+## `zitadel team create`
 
 Create a team.
 
 ```
 USAGE
-  $ zitadel teams create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel team create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...]
 
@@ -3279,20 +3285,20 @@ DESCRIPTION
   Create a team.
 
 EXAMPLES
-  $ zitadel teams create --name <name> --json
+  $ zitadel team create --name <name> --json
 
-  $ zitadel teams create --data '{...}' --json
+  $ zitadel team create --data '{...}' --json
 
-  $ zitadel teams create --file ./team.json
+  $ zitadel team create --file ./team.json
 ```
 
-## `zitadel teams deactivate ID`
+## `zitadel team deactivate ID`
 
 Deactivate a team by id.
 
 ```
 USAGE
-  $ zitadel teams deactivate ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel team deactivate ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
@@ -3320,16 +3326,16 @@ DESCRIPTION
   Deactivate a team by id.
 
 EXAMPLES
-  $ zitadel teams deactivate <id> --force --json
+  $ zitadel team deactivate <id> --force --json
 ```
 
-## `zitadel teams get ID`
+## `zitadel team get ID`
 
 Get one team by id.
 
 ```
 USAGE
-  $ zitadel teams get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel team get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -3358,18 +3364,18 @@ DESCRIPTION
   Get one team by id.
 
 EXAMPLES
-  $ zitadel teams get <id>
+  $ zitadel team get <id>
 
-  $ zitadel teams get <id> --json
+  $ zitadel team get <id> --json
 ```
 
-## `zitadel teams list`
+## `zitadel team list`
 
 List teams.
 
 ```
 USAGE
-  $ zitadel teams list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel team list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -3406,20 +3412,20 @@ DESCRIPTION
   List teams.
 
 EXAMPLES
-  $ zitadel teams list --json
+  $ zitadel team list --json
 
-  $ zitadel teams list --all --json
+  $ zitadel team list --all --json
 
-  $ zitadel teams list --filter created_at=equals:<value> --sort created_at:desc
+  $ zitadel team list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
-## `zitadel teams update ID`
+## `zitadel team update ID`
 
 Update a team by id.
 
 ```
 USAGE
-  $ zitadel teams update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel team update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--data <value> | --file <value>] [--set
     <value>...]
 
@@ -3457,9 +3463,9 @@ DESCRIPTION
   Update a team by id.
 
 EXAMPLES
-  $ zitadel teams update <id> --data '{...}' --json
+  $ zitadel team update <id> --data '{...}' --json
 
-  $ zitadel teams update <id> --file ./team.json
+  $ zitadel team update <id> --file ./team.json
 ```
 
 ## `zitadel tests add`
@@ -3565,13 +3571,13 @@ EXAMPLES
   $ zitadel upgrade --dry-run
 ```
 
-## `zitadel users create`
+## `zitadel user create`
 
 Create a user.
 
 ```
 USAGE
-  $ zitadel users create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel user create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
     --file <value>] [--set <value>...]
 
@@ -3593,7 +3599,7 @@ REQUIRED FIELD FLAGS
   --attributes=<value>...  (required) Repeatable attributes entry: key=value for a string, key:=value for JSON. The
                            user's schema-defined content.
   --schema=<value>         (required) The ID of the schema that defines the content of `attributes`: the `id` that
-                           `createSchema` (`POST /schemas`)…
+                           `publishSchema` (`POST…
 
 RAW BODY FLAGS
   --data=<value>    Whole body as a JSON object. Field flags and --set apply over it.
@@ -3609,20 +3615,20 @@ DESCRIPTION
   Create a user.
 
 EXAMPLES
-  $ zitadel users create --schema <schema> --attributes <key>=<value> --json
+  $ zitadel user create --schema <schema> --attributes <key>=<value> --json
 
-  $ zitadel users create --data '{...}' --json
+  $ zitadel user create --data '{...}' --json
 
-  $ zitadel users create --file ./user.json
+  $ zitadel user create --file ./user.json
 ```
 
-## `zitadel users delete ID`
+## `zitadel user delete ID`
 
 Delete a user by id.
 
 ```
 USAGE
-  $ zitadel users delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel user delete ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
@@ -3650,16 +3656,16 @@ DESCRIPTION
   Delete a user by id.
 
 EXAMPLES
-  $ zitadel users delete <id> --force --json
+  $ zitadel user delete <id> --force --json
 ```
 
-## `zitadel users get ID`
+## `zitadel user get ID`
 
 Get one user by id.
 
 ```
 USAGE
-  $ zitadel users get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel user get ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--fields <value>]
 
 ARGUMENTS
@@ -3688,18 +3694,18 @@ DESCRIPTION
   Get one user by id.
 
 EXAMPLES
-  $ zitadel users get <id>
+  $ zitadel user get <id>
 
-  $ zitadel users get <id> --json
+  $ zitadel user get <id> --json
 ```
 
-## `zitadel users list`
+## `zitadel user list`
 
 List users.
 
 ```
 USAGE
-  $ zitadel users list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel user list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
     [--filter <value>...] [--sort <value>] [--plain]
 
@@ -3774,20 +3780,20 @@ DESCRIPTION
   List users.
 
 EXAMPLES
-  $ zitadel users list --json
+  $ zitadel user list --json
 
-  $ zitadel users list --all --json
+  $ zitadel user list --all --json
 
-  $ zitadel users list --filter created_at=equals:<value> --sort created_at:desc
+  $ zitadel user list --filter created_at=equals:<value> --sort created_at:desc
 ```
 
-## `zitadel users update ID`
+## `zitadel user update ID`
 
 Update a user by id.
 
 ```
 USAGE
-  $ zitadel users update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+  $ zitadel user update ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
     [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
     --file <value>] [--set <value>...]
 
@@ -3811,7 +3817,7 @@ FLAGS
 OPTIONAL FIELD FLAGS
   --attributes=<value>...  Repeatable attributes entry: key=value for a string, key:=value for JSON. The changed
                            attributes only.
-  --schema=<value>         The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST
+  --schema=<value>         The ID of the schema the user follows after this patch: the `id` that `publishSchema` (`POST
                            /schemas`)…
 
 RAW BODY FLAGS
@@ -3828,9 +3834,9 @@ DESCRIPTION
   Update a user by id.
 
 EXAMPLES
-  $ zitadel users update <id> --data '{...}' --json
+  $ zitadel user update <id> --data '{...}' --json
 
-  $ zitadel users update <id> --file ./user.json
+  $ zitadel user update <id> --file ./user.json
 ```
 
 ## `zitadel variable get NAME`

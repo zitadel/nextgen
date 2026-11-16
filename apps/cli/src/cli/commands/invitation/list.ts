@@ -7,13 +7,8 @@ import {
   type InvitationStatus,
   type InvitationType,
 } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { relatedFlags } from "@/lib/suggestion/relations";
@@ -27,7 +22,7 @@ const STATUSES = ListInvitationsQueryParams.shape.status.unwrap().element.option
 
 /**
  * What `list` shows without `--status`: every status but accepted, as the
- * console does. Whoever accepted is a member now, which `grants list` shows.
+ * console does. Whoever accepted is a member now, which `grant list` shows.
  */
 const OPEN_STATUSES: readonly InvitationStatus[] = ["pending", "expired", "rejected"];
 
@@ -58,8 +53,8 @@ const LIMIT = {
  */
 export default class InvitationList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's invitations, newest first.";
-  static override group = CommandGroups.projectAdministration;
-  static override groupOrder = 2;
+  static override group = CommandGroups.usersAndAccess;
+  static override groupOrder = 6;
   static override examples = [
     "<%= config.bin %> invitation list",
     "<%= config.bin %> invitation list --status pending",

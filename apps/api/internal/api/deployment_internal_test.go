@@ -183,7 +183,7 @@ func TestListPreviewsRefusesAPartialGrant(t *testing.T) {
 		PrincipalID:   "user_alice",
 	})
 
-	_, err := h.ListPreviews(member, api.ListPreviewsParams{ProjectID: "proj_a"})
+	_, err := h.ListProjectPreviews(member, api.ListProjectPreviewsParams{ProjectID: "proj_a"})
 	assertDomainCode(t, err, domain.ErrDeploymentPermissionDenied().Code)
 }
 

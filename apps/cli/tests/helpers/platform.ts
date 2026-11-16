@@ -122,6 +122,9 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
+
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
    * does, while a deployment and the project still answer. A command that reads
@@ -186,6 +189,14 @@ export interface PlatformMock {
   revokesAHostileReleaseId(): string;
 
   /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
+
+  /**
    * Answers a user query with a page cursor holding a terminal escape
    * sequence, which the footer and the next-page command both name.
    *
@@ -231,8 +242,10 @@ export interface PlatformMock {
    * @param invitationId - The invitation to accept.
    */
   acceptsInvitation(invitationId: string): void;
+
   /**
-   * Declines the invitation, as the person it was for following its link would.
+   * Declines the invitation, as the person it was for following its link and
+   * declining would.
    *
    * @param invitationId - The invitation to decline.
    */
@@ -572,6 +585,23 @@ export function usePlatformMock(): PlatformMock {
       return id;
     },
 
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
+    },
+
     pagesWithAHostileCursor() {
       const cursor = "cur-\u001b[2Jwiped";
       server.use(
@@ -672,6 +702,14 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.get("*/variables", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
     },

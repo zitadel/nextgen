@@ -766,8 +766,8 @@ func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		newMasterKey := newMasterKey(t, "new-master-key", true)
-		svc, statements := newMigrationKeyService(t, newMasterKey)
+		svc, statements := newMigrationKeyService(t,
+			newMasterKey(t, "old-master-key", false), newMasterKey(t, "new-master-key", true))
 
 		// Wrapped by a project KEK crypter, so its kid is not a master key.
 		kekCrypter := op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "some-kek-id")
@@ -778,6 +778,20 @@ func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 			Return(listResult(key), nil)
 
 		// ACT + ASSERT: no UpdateKey call expected.
+		require.NoError(t, svc.MigrateToLatestMasterKey(t.Context()))
+	})
+
+	// A key wrapped by a master key that is not configured cannot be
+	// unwrapped, so with one master key nothing could be re-wrapped: the
+	// service does not page through every project's keys to find that out.
+	t.Run("does not look with one master key", func(t *testing.T) {
+		t.Parallel()
+
+		// ARRANGE: no ListEncryptionKeys call is expected, and the mock
+		// controller fails the test if one happens.
+		svc, _ := newMigrationKeyService(t, newMasterKey(t, "only-master-key", true))
+
+		// ACT + ASSERT
 		require.NoError(t, svc.MigrateToLatestMasterKey(t.Context()))
 	})
 
@@ -830,7 +844,8 @@ func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		svc, statements := newMigrationKeyService(t, newMasterKey(t, "new-master-key", true))
+		svc, statements := newMigrationKeyService(t,
+			newMasterKey(t, "old-master-key", false), newMasterKey(t, "new-master-key", true))
 		sentinel := errors.New("connection refused")
 
 		statements.EXPECT().

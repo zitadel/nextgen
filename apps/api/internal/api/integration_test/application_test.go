@@ -14,7 +14,7 @@ import (
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
-func TestCreateApplication(t *testing.T) {
+func TestPublishApplication(t *testing.T) {
 	t.Parallel()
 	f := newApplicationFixture(t)
 
@@ -74,8 +74,8 @@ func TestCreateApplication(t *testing.T) {
 		before := f.get(t, created.ID).(*api.ApplicationResponse)
 
 		resp := f.put(t, shopApplication(webClient("web", "")))
-		require.IsType(t, &api.CreateApplicationBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationFieldImmutable(nil).Code), resp.(*api.CreateApplicationBadRequest).Code)
+		require.IsType(t, &api.PublishApplicationBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationFieldImmutable(nil).Code), resp.(*api.PublishApplicationBadRequest).Code)
 
 		after := f.get(t, created.ID).(*api.ApplicationResponse)
 		assert.Equal(t, before.RevisionID, after.RevisionID)
@@ -83,8 +83,8 @@ func TestCreateApplication(t *testing.T) {
 
 	t.Run("a client_id another application holds is client_id_taken", func(t *testing.T) {
 		resp := f.put(t, api.Application{Slug: "blog", Name: "Blog", Clients: []api.ApplicationClient{webClient("web", "shop-admin")}})
-		require.IsType(t, &api.CreateApplicationConflict{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationClientIDTaken().Code), resp.(*api.CreateApplicationConflict).Code)
+		require.IsType(t, &api.PublishApplicationConflict{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationClientIDTaken().Code), resp.(*api.PublishApplicationConflict).Code)
 	})
 
 	t.Run("an unknown id is app.not_found", func(t *testing.T) {
@@ -95,8 +95,8 @@ func TestCreateApplication(t *testing.T) {
 		noRedirect := webClient("web", "")
 		noRedirect.RedirectUris = nil
 		resp := f.put(t, api.Application{Slug: "cli", Name: "CLI", Clients: []api.ApplicationClient{noRedirect}})
-		require.IsType(t, &api.CreateApplicationBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationInvalid(nil, nil).Code), resp.(*api.CreateApplicationBadRequest).Code)
+		require.IsType(t, &api.PublishApplicationBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationInvalid(nil, nil).Code), resp.(*api.PublishApplicationBadRequest).Code)
 	})
 }
 
@@ -124,8 +124,8 @@ func TestApplicationAccess(t *testing.T) {
 		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
 
 		denied := viewer.put(t, shopApplication(webClient("web", "")))
-		require.IsType(t, &api.CreateApplicationForbidden{}, denied, helpers.MustMarshal(t, denied))
-		assert.Equal(t, api.ErrorCode(domain.ErrApplicationPermissionDenied().Code), denied.(*api.CreateApplicationForbidden).Code)
+		require.IsType(t, &api.PublishApplicationForbidden{}, denied, helpers.MustMarshal(t, denied))
+		assert.Equal(t, api.ErrorCode(domain.ErrApplicationPermissionDenied().Code), denied.(*api.PublishApplicationForbidden).Code)
 	})
 
 	t.Run("unauthenticated calls are rejected", func(t *testing.T) {
@@ -156,9 +156,9 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 	return applicationFixture{project: project, client: client}
 }
 
-func (f applicationFixture) put(t *testing.T, app api.Application) api.CreateApplicationRes {
+func (f applicationFixture) put(t *testing.T, app api.Application) api.PublishApplicationRes {
 	t.Helper()
-	resp, err := f.client.CreateApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, api.CreateApplicationParams{ProjectID: api.ProjectID(f.project.ID)})
+	resp, err := f.client.PublishApplication(t.Context(), &api.CreateApplicationRequest{Application: app}, api.PublishApplicationParams{ProjectID: api.ProjectID(f.project.ID)})
 	require.NoError(t, err)
 	return resp
 }
@@ -166,20 +166,20 @@ func (f applicationFixture) put(t *testing.T, app api.Application) api.CreateApp
 func (f applicationFixture) create(t *testing.T, app api.Application) api.CreateApplicationResponse {
 	t.Helper()
 	resp := f.put(t, app)
-	require.IsType(t, &api.CreateApplicationCreated{}, resp, helpers.MustMarshal(t, resp))
-	return api.CreateApplicationResponse(*resp.(*api.CreateApplicationCreated))
+	require.IsType(t, &api.PublishApplicationCreated{}, resp, helpers.MustMarshal(t, resp))
+	return api.CreateApplicationResponse(*resp.(*api.PublishApplicationCreated))
 }
 
 func (f applicationFixture) revise(t *testing.T, app api.Application) api.CreateApplicationResponse {
 	t.Helper()
 	resp := f.put(t, app)
-	require.IsType(t, &api.CreateApplicationOK{}, resp, helpers.MustMarshal(t, resp))
-	return api.CreateApplicationResponse(*resp.(*api.CreateApplicationOK))
+	require.IsType(t, &api.PublishApplicationOK{}, resp, helpers.MustMarshal(t, resp))
+	return api.CreateApplicationResponse(*resp.(*api.PublishApplicationOK))
 }
 
-func (f applicationFixture) get(t *testing.T, id string) api.GetApplicationByIdRes {
+func (f applicationFixture) get(t *testing.T, id string) api.GetApplicationRes {
 	t.Helper()
-	resp, err := f.client.GetApplicationById(t.Context(), api.GetApplicationByIdParams{ProjectID: api.ProjectID(f.project.ID), ID: id})
+	resp, err := f.client.GetApplication(t.Context(), api.GetApplicationParams{ProjectID: api.ProjectID(f.project.ID), ApplicationID: id})
 	require.NoError(t, err)
 	return resp
 }

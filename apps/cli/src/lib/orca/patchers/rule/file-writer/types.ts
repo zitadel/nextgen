@@ -1,4 +1,5 @@
 import type { PatchedFile } from "@/lib/orca/patchers/types";
+import type { GitignoreRule } from "@/lib/project";
 
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers
@@ -51,7 +52,7 @@ export type FileOp =
       readonly path: string;
       readonly patch: Readonly<Record<string, unknown>>;
     }
-  | { readonly kind: "append-gitignore"; readonly entries: ReadonlyArray<string> }
+  | { readonly kind: "append-gitignore"; readonly rules: ReadonlyArray<GitignoreRule> }
   | {
       readonly kind: "add-dep";
       readonly name: string;
@@ -88,7 +89,7 @@ export type FileOp =
        * check verifies via the transform's idempotency: when running the
        * transform against the current file changes it, the wiring is absent.
        * `infrastructure` wirings (dev proxy merges, route registrations) fail
-       * the check when detached; `convenience` (the Angular `dev` script)
+       * the check when detached; `convenience` (the Angular proxy's session-cookie hooks)
        * only warns. Unlabelled edits (guidance sections, the overwriting
        * home page) are not probed.
        */

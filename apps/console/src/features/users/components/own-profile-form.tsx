@@ -55,7 +55,7 @@ export function ProfileForm({
       // a `format` and reads as a value rather than its absence.
       patch[entry.key] = value === "" ? null : attributeValue(entry, value);
     }
-    await api.patchMyUser({ attributes: patch }, consoleSessionProject());
+    await api.updateMyUser({ attributes: patch }, consoleSessionProject());
     // The account menu renders the session's `display`; drop the cached
     // session (only it: the CSRF token and the other cached reads still hold)
     // so a changed name shows without waiting out the cache.

@@ -77,7 +77,11 @@ func projectContent(t *testing.T, ctx context.Context, projectID string) domain.
 	})
 	require.NoError(t, err)
 	require.Empty(t, connections.NextPageToken)
-	brandings, err := harness.EnsureBrandingService(t).List(ctx, projectID)
+	// The newest revision is the one a deploy pins.
+	brandings, err := harness.EnsureBrandingService(t).List(ctx, service.ListBrandingInput{
+		ProjectID: projectID,
+		Limit:     1,
+	})
 	require.NoError(t, err)
 	policies, err := harness.EnsurePolicyService(t).List(ctx, service.ListPoliciesInput{
 		ProjectID: projectID,
@@ -86,8 +90,8 @@ func projectContent(t *testing.T, ctx context.Context, projectID string) domain.
 	require.NoError(t, err)
 	require.Empty(t, policies.NextPageToken)
 	var branding *domain.Branding
-	if len(brandings) > 0 {
-		branding = brandings[0]
+	if len(brandings.Items) > 0 {
+		branding = brandings.Items[0]
 	}
 	return domain.ReleaseContent{
 		Schemas:         schemas.Items,

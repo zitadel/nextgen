@@ -33,9 +33,9 @@ func TestVariables(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	projectID := api.ProjectID(project.ID)
-	update := func(t *testing.T, kind api.OptVariableKind, body api.UpdateVariablesRequest) api.UpdateVariablesRes {
+	update := func(t *testing.T, kind api.OptVariableKind, body api.UpdateVariablesRequest) api.SetVariablesRes {
 		t.Helper()
-		res, err := client.UpdateVariables(t.Context(), body, api.UpdateVariablesParams{
+		res, err := client.SetVariables(t.Context(), body, api.SetVariablesParams{
 			ProjectID: projectID,
 			Kind:      kind,
 		})
@@ -46,7 +46,7 @@ func TestVariables(t *testing.T) {
 	// each with its value per kind.
 	getByKind := func(t *testing.T, kind api.OptVariableKind) api.VariablesByKind {
 		t.Helper()
-		res, err := client.GetVariables(t.Context(), api.GetVariablesParams{
+		res, err := client.ListVariables(t.Context(), api.ListVariablesParams{
 			ProjectID: projectID,
 			Kind:      kind,
 		})
@@ -443,7 +443,7 @@ func TestVariables(t *testing.T) {
 			assert.Equal(t, domain.ErrVariablePermissionDenied().Code, code)
 		}
 
-		list, err := previewClient.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: projectID, Kind: preview})
+		list, err := previewClient.ListVariables(t.Context(), api.ListVariablesParams{ProjectID: projectID, Kind: preview})
 		require.NoError(t, err)
 		refused(t, list)
 
@@ -453,9 +453,9 @@ func TestVariables(t *testing.T) {
 		require.NoError(t, err)
 		refused(t, one)
 
-		written, err := previewClient.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+		written, err := previewClient.SetVariables(t.Context(), api.UpdateVariablesRequest{
 			"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
-		}, api.UpdateVariablesParams{ProjectID: projectID, Kind: preview})
+		}, api.SetVariablesParams{ProjectID: projectID, Kind: preview})
 		require.NoError(t, err)
 		refused(t, written)
 		assert.NotContains(t, getByKind(t, api.OptVariableKind{}), "NEVER_LANDS")

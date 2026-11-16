@@ -1,11 +1,11 @@
 import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { isErrno } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import { readIfExists } from "@/lib/fs";
-import { enforceMode } from "@/lib/fs-safe";
 import type { Change, DirChange, FileChange } from "./operation";
 import type { Outcome } from "./report";
+import { SecretFile } from "@/lib/project/secret-file";
 
 /**
  * How a run is executed.
@@ -172,7 +172,7 @@ export class Workspace {
       });
     }
     if (!this.dryRun && mode) {
-      await enforceMode(path, mode);
+      await SecretFile.enforceMode(path, mode);
     }
 
     return {
@@ -190,7 +190,7 @@ export class Workspace {
     const reported = isUnchanged ? undefined : dependency;
 
     if (isHealing && !this.dryRun) {
-      await enforceMode(path, mode);
+      await SecretFile.enforceMode(path, mode);
     }
     if (!isUnchanged && !this.dryRun) {
       await this.store(change);
@@ -218,7 +218,7 @@ export class Workspace {
       mode,
     });
     if (mode !== undefined) {
-      await enforceMode(target, mode);
+      await SecretFile.enforceMode(target, mode);
     }
     if (atomic) {
       await rename(target, path);

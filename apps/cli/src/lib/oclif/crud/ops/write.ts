@@ -228,7 +228,7 @@ abstract class WriteOperation<
       });
     }
 
-    // Some writes answer without a body (`grants create` by identifier answers
+    // Some writes answer without a body (`grant create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
     const summary: Summary =

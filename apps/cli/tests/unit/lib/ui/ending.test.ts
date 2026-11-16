@@ -2,7 +2,7 @@ import { stripVTControlCharacters as stripAnsi } from "node:util";
 import pc from "picocolors";
 import { describe, expect, it } from "vitest";
 
-import { command, dim, strong } from "@/lib/style";
+import { style } from "@/lib/ui";
 import { Ending } from "@/lib/ui/ending";
 import { section, type Summary } from "@/lib/ui/summary";
 import { Where } from "@/lib/ui/where";
@@ -130,7 +130,9 @@ describe("the next steps of a normal command", () => {
       next: [{ text: "Open the app." }, { text: "Next:", command: START }],
     }).renderStandalone();
 
-    expect(shown.split("\n").filter((line) => line.includes("Next:"))).toEqual([strong("Next:")]);
+    expect(shown.split("\n").filter((line) => line.includes("Next:"))).toEqual([
+      style.strong("Next:"),
+    ]);
   });
 
   it("put a sentence before the commands, indented under the heading", () => {
@@ -142,7 +144,7 @@ describe("the next steps of a normal command", () => {
   it("draw each command the way every other command is drawn, dim $ and bold cyan", () => {
     const shown = normally({ next: [{ text: "Next:", command: START }] }).renderStandalone();
 
-    expect(shown).toContain(`  ${dim("$")} ${command(START)}`);
+    expect(shown).toContain(`  ${style.dim("$")} ${style.command(START)}`);
   });
 
   it("leave a blank line between the answer and the heading", () => {

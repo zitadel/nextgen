@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
-import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { asTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 
 const UNKNOWN = "inv_missing";
 

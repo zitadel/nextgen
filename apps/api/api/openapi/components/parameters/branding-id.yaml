@@ -1,8 +1,8 @@
-name: id
+name: branding_id
 in: path
 required: true
 description: |
-  The branding revision ID: the `id` that `createBranding` (`POST /branding`) returns or
+  The branding revision ID: the `id` that `publishBranding` (`POST /branding`) returns or
   `listBranding` (`GET /branding`) lists.
 schema:
   type: string

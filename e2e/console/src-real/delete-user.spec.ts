@@ -31,7 +31,7 @@ async function openList(
 /** Opens the delete dialog from the row menu of `name`. */
 async function openDeleteDialog(page: Page, name: string) {
   await page.getByRole("button", { name: `Actions for ${name}` }).click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete user", exact: true }).click();
   const dialog = page.getByRole("alertdialog", { name: `Delete ${name}?` });
   await expect(dialog).toBeVisible();
   return dialog;

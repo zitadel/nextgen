@@ -13,4 +13,4 @@ Deleting a user who is the last active member of a project's owning team now fai
 - Admin grants stay freely revocable, and suspending or deactivating a user is still allowed.
 - A project whose owning team already has no active member is left alone.
 
-[Delete a user in the API reference](https://preview.zitadel.com/docs/reference/api/users/DeleteUserByID)
+[Delete a user in the API reference](https://preview.zitadel.com/docs/reference/api/users/deleteUser)

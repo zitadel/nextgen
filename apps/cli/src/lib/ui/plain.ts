@@ -1,4 +1,4 @@
-import type { LogLevel } from "@/lib/log";
+import type { LogLevel } from "./log";
 
 /**
  * One line of narration as a normal command, or code with nobody to draw it,
