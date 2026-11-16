@@ -208,7 +208,7 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
       kind: "broken",
       file: edit.edited.path,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
-      hint: "Fix those errors first, then run the command again.",
+      hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
       issues: unchecked,
     });
   }
@@ -260,7 +260,7 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
   return [
     `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
     ...deletions,
-    "A dry run of deploy checks the edited flow; then run the command again.",
+    "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
   ].join(" ");
 }
 

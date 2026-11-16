@@ -598,11 +598,6 @@ export class BrokenFlowsError extends ConfigError {
   override readonly name: string = "BrokenFlowsError";
 
   /**
-   * What the report is of: a change that breaks a flow, or a method still in use.
-   */
-  readonly kind: BrokenFlows["kind"];
-
-  /**
    * Make the failure for these issues.
    *
    * @param input - The schema, the heading and hint, the issues, and the steps
@@ -633,7 +628,6 @@ export class BrokenFlowsError extends ConfigError {
       hint: input.hint,
       details: BrokenFlowsError.detailsOf(input, issues),
     });
-    this.kind = input.kind;
   }
 
   /**

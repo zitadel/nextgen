@@ -505,7 +505,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
             "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
-            "A dry run of deploy checks the edited flow; then run the command again.",
+            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
         });
       });
 
@@ -596,7 +596,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
             "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
-            "A dry run of deploy checks the edited flow; then run the command again.",
+            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
         });
       });
     });

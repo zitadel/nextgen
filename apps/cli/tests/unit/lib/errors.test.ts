@@ -136,13 +136,9 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    [
-      "a method still in use",
-      { kind: "method-in-use", uses: [] },
-      [{ id: "deploy", flags: { dryRun: true } }],
-    ],
-    ["a change that breaks a flow", { kind: "broken" }, undefined],
-  ] as const)("gives %s its follow-up", (_name, report, next) => {
+    ["a method still in use", { kind: "method-in-use", uses: [] }],
+    ["a change that breaks a flow", { kind: "broken" }],
+  ] as const)("gives %s a dry run of deploy as its follow-up", (_name, report) => {
     const result = toZitadelError(
       new BrokenFlowsError({
         ...report,
@@ -153,7 +149,7 @@ describe("toZitadelError", () => {
       }),
     );
 
-    expect(result.nextCommands).toEqual(next);
+    expect(result.nextCommands).toEqual([{ id: "deploy", flags: { dryRun: true } }]);
   });
 
   it("leaves out the hint and details a ConfigError has none of", () => {

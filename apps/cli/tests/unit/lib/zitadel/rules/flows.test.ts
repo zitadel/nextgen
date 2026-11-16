@@ -307,7 +307,7 @@ describe("assertFlowsIntact", () => {
       message: expect.stringContaining(
         "A login flow has errors, so it cannot be checked against the changed schema:",
       ),
-      hint: "Fix those errors first, then run the command again.",
+      hint: expect.stringContaining("zitadel deploy --dry-run"),
     });
   });
 
