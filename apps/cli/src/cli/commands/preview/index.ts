@@ -1,14 +1,8 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  ForbiddenError,
-  type LivePreview,
-  OriginService,
-  PreviewService,
-  type ZitadelClient,
-} from "@/lib/backend";
-import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -21,7 +15,7 @@ import {
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
-import { PreviewUrls } from "@/lib/preview";
+import { PreviewExpiries, PreviewUrls } from "@/lib/preview";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -218,31 +212,6 @@ export async function refusePrimaryOrigins(
 }
 
 /**
- * Each live preview's expiry, by origin. The deployment records none, and it is
- * already live when this reads, so a failed read warns and reports no expiry
- * rather than failing the run.
- */
-export async function liveExpiries(
-  client: ZitadelClient,
-  projectId: string,
-): Promise<ReadonlyMap<string, string>> {
-  const live = await new PreviewService(client, projectId)
-    .list()
-    .catch((error: unknown): readonly LivePreview[] => {
-      if (isCancellation(error)) {
-        throw error;
-      }
-      warnings.report(`Could not read when the previews expire: ${toZitadelError(error).message}`);
-      return [];
-    });
-  return new Map(
-    live.map((preview) => {
-      return [preview.origin, preview.expires_at] as const;
-    }),
-  );
-}
-
-/**
  * `zitadel preview` — publish `.zitadel/` to a pull-request build's preview URLs.
  *
  * It is `deploy`'s counterpart for a preview environment: it assembles the same
@@ -388,7 +357,11 @@ export default class Preview extends PreviewCommand {
           }),
     });
 
-    const expiries = await liveExpiries(client, projectId);
+    const expiries = await PreviewExpiries.of(client, projectId).live(
+      deployment.targets.map((target) => {
+        return target.origin;
+      }),
+    );
     const previews = deployment.targets.map((target) => {
       return {
         url: target.origin,
