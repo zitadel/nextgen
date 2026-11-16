@@ -267,8 +267,8 @@ npx @zitadel/cli@latest api ls --json        # every API operation, its paramete
 ```
 
 `--help` groups the commands by what you are doing: getting started, local
-development, users and teams, authentication, configuration and releases, and
-diagnostics and utilities. A family such as `user` is one row, and
+server, users and access, sign-in, project settings, releases, API and events,
+and the CLI itself. A family such as `user` is one row, and
 `zitadel user --help` lists its verbs. Read the groups from `--help` rather than
 from memory, since they change as the CLI gains commands.
 

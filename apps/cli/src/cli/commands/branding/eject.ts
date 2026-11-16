@@ -16,7 +16,8 @@ import { ZitadelError } from "@/lib/errors";
 import { isErrno } from "@/lib/errno";
 import { pathExists } from "@/lib/fs";
 import { MetaSchemas } from "@/lib/meta-schemas";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { filled, reads } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
@@ -114,7 +115,8 @@ function isRetiredDesign(value: string): boolean {
 export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 4;
 
   static override flags = {
     force: Flags.boolean({

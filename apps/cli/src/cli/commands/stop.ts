@@ -7,7 +7,8 @@ import {
   readRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";
 
 /**
@@ -15,8 +16,8 @@ import { type Fact, section } from "@/lib/ui";
  */
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 3;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 2;
 
   static override flags = {
     all: Flags.boolean({
