@@ -65,9 +65,9 @@ The flow engine orchestrates **which step renders when** (UI layer). The underly
 Web/frontend client                    Any other client (mobile, backend, CLI)
 ─────────────────────                  ─────────────────────────────────────────
 
-POST /flow                          POST /auth_attempts
+POST /flows                         POST /auth_attempts
   → get capabilities + template          → drive primitives directly
-POST /flow/{flow_id}/submit         POST /auth_attempts/{attempt_id}/challenges
+POST /flows/{flow_id}/submit        POST /auth_attempts/{attempt_id}/challenges
   → server advances state machine        + /challenges/{challenge_id}/verify
   → internally invokes auth_attempt      → submit factor proofs
     Go service layer (no HTTP)           → server verifies the declared proof

@@ -2,7 +2,7 @@ import type { AddProjectOriginBody } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";

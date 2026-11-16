@@ -545,7 +545,7 @@ An environment either runs the previous release or the new one, never a mixture.
 The [Releases](#releases) table above writes the flow kind as `flow`. The wire
 enum on `POST /releases` spells it **`flow_definition`** instead.
 
-`flow` is ambiguous in the API it ships into: `/flow` is the runtime flow
+`flow` is ambiguous in the API it ships into: `/flows` is the runtime flow
 orchestration resource (tag *Flows*), while the revisions a release pins come
 from `/flow_definitions` (tag *Flow Definitions*), carry `flowdef_` ids, and are
 gated by `flow_definition.read` / `flow_definition.write`. A pointer reading

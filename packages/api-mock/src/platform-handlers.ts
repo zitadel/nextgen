@@ -1208,7 +1208,7 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
  * store the way the server allocates revisions from a bundle: a schema or flow
  * whose content matches the project's newest revision of the same handle reuses
  * it, anything else allocates a new one. This is what makes a deployed schema or
- * flow observable through `schemas list` / `flow-definitions list`. Branding has
+ * flow observable through `schema list` / `flow-definition list`. Branding has
  * no store here, so it keeps a synthesised revision id.
  */
 function materializeBundle(
@@ -1854,11 +1854,7 @@ function deploymentResponse(
     id: deployment.id,
     project_id: deployment.projectId,
     release_id: deployment.releaseId,
-    targets: targets.map((target) =>
-      target.expiresAt === null
-        ? { origin: target.origin }
-        : { origin: target.origin, expires_at: target.expiresAt },
-    ),
+    targets: targets.map((target) => ({ origin: target.origin })),
     kind: deploymentKind(deployment),
     status,
     deployed_at: deployment.deployedAt,
@@ -2489,7 +2485,11 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const origin = record.origin;
+      const releaseId = query.data.release_id;
       const live = liveRaw === "true";
+      const ofRelease = (deployment: DeploymentRecord): boolean => {
+        return releaseId === undefined || deployment.releaseId === releaseId;
+      };
 
       const deployments = projectDeployments(query.data.project_id);
       const served = servedOrigins(query.data.project_id, deployments);
@@ -2500,13 +2500,16 @@ export function setupPlatformHandlers() {
         if (origin !== undefined) {
           asked = servedOn(query.data.project_id, origin, served);
         }
-        items = liveGroups(served, asked).map((group) => {
+        const groups = liveGroups(served, asked).filter((group) => {
+          return ofRelease(group.deployment);
+        });
+        items = groups.map((group) => {
           return deploymentResponse(group.deployment, serving, group.targets, {
             release: expandRelease,
           });
         });
       } else {
-        let named = deployments;
+        let named = deployments.filter(ofRelease);
         if (origin !== undefined) {
           named = named.filter((deployment) => {
             return deployment.targets.some((target) => {
@@ -3263,7 +3266,7 @@ export function setupPlatformHandlers() {
     // --- operation policies ---------------------------------------------------
     // `setup` publishes the password policy here, a release build publishes
     // `.zitadel/policies/*.json` through the same revision helper, and
-    // `policies list|get` read them back. They mirror the server's answers: an
+    // `policy list|get` read them back. They mirror the server's answers: an
     // unknown setting is malformed (`req.invalid` there), and a minimum above
     // the maximum fails the template's config rule (`pol.invalid`).
 

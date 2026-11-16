@@ -9,7 +9,7 @@ import { resourceBody } from "@/lib/oclif/crud/resource-body";
 const resolve = (flags: Record<string, unknown>) => {
   return resourceBody(
     {
-      topic: "teams",
+      topic: "team",
       verb: "create",
       root: undefined,
       schema: CreateTeamBody,
@@ -41,7 +41,7 @@ describe("resourceBody", () => {
   it("words the refusal for what it lacks, naming the fields in the error's details", async () => {
     await expect(resolve({ data: "{}" })).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: "teams create is missing required field: --name",
+      message: "team create is missing required field: --name",
       hint: expect.stringContaining("Pass --name, or include it in --data / --file."),
       details: {
         missing: ["name"],
@@ -53,13 +53,13 @@ describe("resourceBody", () => {
     [
       "one",
       z.object({ name: z.string() }),
-      "teams create is missing required field: --name",
+      "team create is missing required field: --name",
       "Pass --name, or include it in --data / --file.",
     ],
     [
       "several",
       z.object({ name: z.string(), slug: z.string() }),
-      "teams create is missing required fields: --name, --slug",
+      "team create is missing required fields: --name, --slug",
       "Pass --name and --slug, or include them in --data / --file.",
     ],
   ])(
@@ -68,7 +68,7 @@ describe("resourceBody", () => {
       await expect(
         resourceBody(
           {
-            topic: "teams",
+            topic: "team",
             verb: "create",
             root: undefined,
             schema,

@@ -23,7 +23,7 @@ export class Policies extends Collection<Policy> {
   readonly kinds = ["policy", "policy-test"] as const;
 
   /**
-   * The policies' test files, which `zitadel policies test` runs and a
+   * The policies' test files, which `zitadel policy test` runs and a
    * release never carries.
    */
   readonly tests: readonly PolicyTest[];

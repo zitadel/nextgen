@@ -18,7 +18,7 @@ import (
 )
 
 // TestPasswordLoginFlow exercises the example 01 (password-login) JSON
-// definition end-to-end over the real /flow REST API: start flow → submit
+// definition end-to-end over the real /flows REST API: start flow → submit
 // identifier step → submit password step → assert handoff token.
 //
 // The passkey flows have HTTP e2e coverage (passkey_flow_test.go,

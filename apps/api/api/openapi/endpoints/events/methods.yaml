@@ -1,6 +1,6 @@
 get:
   operationId: listEvents
-  x-zitadel-cli: events list
+  x-zitadel-cli: event list
   summary: List events
   # Pages are keyset-paginated on (created_at, id) (ADR 027 / ADR 049). The
   # event types are catalogued in docs/design/api/events-catalog.md.

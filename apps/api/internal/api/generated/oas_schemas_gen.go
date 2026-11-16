@@ -25659,8 +25659,6 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 // Ref: #
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
-	// Preview URLs only: the expiry this deployment set. A later deployment to the URL records its own.
-	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
 // GetOrigin returns the value of Origin.
@@ -25668,19 +25666,9 @@ func (s *DeploymentTarget) GetOrigin() Origin {
 	return s.Origin
 }
 
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *DeploymentTarget) GetExpiresAt() OptDateTime {
-	return s.ExpiresAt
-}
-
 // SetOrigin sets the value of Origin.
 func (s *DeploymentTarget) SetOrigin(val Origin) {
 	s.Origin = val
-}
-
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
-	s.ExpiresAt = val
 }
 
 // Where the release goes live: `primary`, every primary origin of the project, or a list of preview
@@ -29900,7 +29888,7 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // Administrators create flow definitions, either as `.zitadel/flows/` files that `zitadel deploy`
 // publishes or through the API, and they are stored in the project/team configuration hierarchy. The
 // server selects the matching definition from the purpose and audience when a flow starts with
-// `createFlow` (`POST /flow`).
+// `createFlow` (`POST /flows`).
 // Ref: #
 type FlowDefinition struct {
 	// Editor affordance: path or URL of this file's JSON meta-schema, so an editor validates and
@@ -32827,7 +32815,7 @@ type FlowSubmitRequest struct {
 	// ID of the selected SSO provider (from `sso_providers[].id`). Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
 	// The page hosting the login component, where the flow resumes after an external sign-in: the callback
-	// sends the browser here unchanged, and the page loads `GET /flow/{flow_id}` to render the next step.
+	// sends the browser here unchanged, and the page loads `GET /flows/{flow_id}` to render the next step.
 	// The client puts the flow ID in it; the login component reads `?flow=<id>` on the reload. Required
 	// when `action` is "sso". An absolute URL; the server parses it and keeps a fragment, so a hash-routed
 	// page returns to its route. Its origin must equal the request origin; any other origin is rejected
@@ -92135,7 +92123,7 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 // identify its kind: a schema's is its `$id`, which may be any URL.
 //
 // `flow_definition` rather than `flow`: a release pins the definitions served at `/flow_definitions`,
-// not the runtime flows at `/flow`.
+// not the runtime flows at `/flows`.
 // Ref: #
 type ReleasePointerKind string
 

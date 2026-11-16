@@ -115,7 +115,7 @@ prefixed form in `example:` fields, never the retired dictionary slug
 ## CLI commands — `x-zitadel-cli`
 
 An operation the `zitadel` CLI runs names its command in `x-zitadel-cli`, on
-the line after its `operationId` (`x-zitadel-cli: users create`); the API
+the line after its `operationId` (`x-zitadel-cli: user create`); the API
 reference shows it beside the samples. The CLI's
 [`api-coverage` test](../../../../apps/cli/tests/unit/cli/commands/api-coverage.test.ts)
 fails until every command names exactly one operation it calls, and on a name
@@ -128,7 +128,7 @@ no command answers to.
 - A `PATCH` is not marked, though a merge-patch `null` removes what it names:
   updates are not guarded yet, and need a follow-up of their own.
 - The CLI's client only exposes a destructive operation behind a confirmation
-  ([consent](../../../cli/src/lib/consent.ts)).
+  ([consent](../../../cli/src/lib/consent/consent.ts)).
 
 ## Descriptions — the first sentence stands alone
 

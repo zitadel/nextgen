@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson, stripAnsi } from "./run-cli";
-import { asOneLine } from "./terminal";
+import { asOneLine } from "@tests/fixtures/terminal";
 
 /**
  * Whether a run said `text`, wherever the layout happened to break it.

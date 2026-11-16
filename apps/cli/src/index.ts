@@ -9,7 +9,7 @@ import AuthMethodPasswordEnable from "./cli/commands/auth-method/password/enable
 import AuthMethodSsoDisable from "./cli/commands/auth-method/sso/disable";
 import AuthMethodSsoEnable from "./cli/commands/auth-method/sso/enable";
 import BrandingEject from "./cli/commands/branding/eject";
-import PoliciesTest from "./cli/commands/policies/test";
+import PolicyTest from "./cli/commands/policy/test";
 import Claim from "./cli/commands/claim";
 import Console from "./cli/commands/console";
 import Deploy from "./cli/commands/deploy";
@@ -47,13 +47,14 @@ import VariableList from "./cli/commands/variable/list";
 import VariableResolve from "./cli/commands/variable/resolve";
 import VariableRm from "./cli/commands/variable/rm";
 import VariableSet from "./cli/commands/variable/set";
+import { answeringToPlurals } from "./lib/oclif/plural-aliases";
 
 /**
  * The hand-written commands of the explicit oclif command table
  * (`oclif.commands.strategy: "explicit"` in `package.json`). Keys are command
  * ids with `:` as the topic separator; oclif renders them with the configured
- * space separator (`users list`). The resource commands (`users`, `teams`,
- * `sessions`, …) come from the registry in `cli/commands/resources.ts`, so a new
+ * space separator (`user list`). The resource commands (`user`, `team`,
+ * `session`, …) come from the registry in `cli/commands/resources.ts`, so a new
  * backend resource is one registry entry.
  */
 export const WORKFLOW_COMMANDS = {
@@ -91,7 +92,7 @@ export const WORKFLOW_COMMANDS = {
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
-  "policies:test": PoliciesTest,
+  "policy:test": PolicyTest,
   "preview:list": PreviewList,
   "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
@@ -106,13 +107,28 @@ export const WORKFLOW_COMMANDS = {
 } as const satisfies Record<string, typeof Command>;
 
 /**
- * Every command the CLI runs: the hand-written ones, then the generated
- * resource commands.
+ * The nouns whose commands answer to no plural, and why. Every other
+ * `<noun> <verb>` command also runs as `<plural> <verb>`, which nothing lists.
  */
-export const COMMANDS: Record<string, typeof Command> = {
-  ...WORKFLOW_COMMANDS,
-  ...RESOURCE_COMMANDS,
+export const NO_PLURAL: Readonly<Record<string, string>> = {
+  api: "names the API, which is one thing, and calls an operation of it",
+  branding: "a mass noun: a project has branding, not brandings",
+  skills: "named in the plural already",
+  tests: "named in the plural already",
 };
+
+/**
+ * Every command the CLI runs: the hand-written ones, then the generated
+ * resource commands. A command names its noun in the singular
+ * (`zitadel user list`), and answers to the plural as well.
+ */
+export const COMMANDS: Record<string, typeof Command> = answeringToPlurals(
+  {
+    ...WORKFLOW_COMMANDS,
+    ...RESOURCE_COMMANDS,
+  },
+  new Set(Object.keys(NO_PLURAL)),
+);
 
 declare module "@/lib/suggestion" {
   /**

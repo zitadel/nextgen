@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
+import { forwardedArgs, formatCommand, isOneShotServerCommand, run } from "./dev-process.mjs";
 import {
   assertServerBuildPackage,
   gitInfo,
@@ -43,7 +43,7 @@ try {
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    if (args[0] !== "migrate" && args[0] !== "completion") {
+    if (!isOneShotServerCommand(args)) {
       await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
     }
     await run("go", buildArgs, { cwd: moduleRoot });
@@ -112,7 +112,7 @@ function withServerMigrateArgs(args) {
   if (isHelp(args) || args.includes("--migrate")) {
     return args;
   }
-  if (args[0] === "migrate" || args[0] === "completion") {
+  if (isOneShotServerCommand(args)) {
     return args;
   }
   return [...args, "--migrate"];

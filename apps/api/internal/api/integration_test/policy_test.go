@@ -420,7 +420,7 @@ func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
 		t.Helper()
 		body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
 		require.NoError(t, err)
-		resp, raw := postFlow(t, "/flow", body, origin, nil)
+		resp, raw := postFlow(t, "/flows", body, origin, nil)
 		require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
 		var opened api.FlowResponse
 		require.NoError(t, opened.UnmarshalJSON(raw), string(raw))

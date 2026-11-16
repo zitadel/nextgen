@@ -154,7 +154,7 @@ const policyTestExpectSchema = z
 const [passwordSetEvaluateBody, userCreateEvaluateBody] = EvaluatePolicyBody.options;
 
 /**
- * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
+ * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policy
  * test` evaluates (`POST /policies/evaluate`), each with the operation's
  * input, the facts it would look up where it has any, and the decision it
  * expects, one branch per operation. `input` and `facts` come from the

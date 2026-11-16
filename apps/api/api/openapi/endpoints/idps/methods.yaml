@@ -1,6 +1,6 @@
 post:
   operationId: publishIdp
-  x-zitadel-cli: idps create
+  x-zitadel-cli: idp create
   summary: Create or revise an identity provider
   description: |
     Creates or revises an identity provider, an external sign-in such as

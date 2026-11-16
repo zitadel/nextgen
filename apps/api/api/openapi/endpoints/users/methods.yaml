@@ -1,6 +1,6 @@
 post:
   operationId: createUser
-  x-zitadel-cli: users create
+  x-zitadel-cli: user create
   summary: Create a user
   description: |
     Creates a user whose attributes satisfy the user schema named in the request.

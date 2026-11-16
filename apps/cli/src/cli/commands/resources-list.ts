@@ -1,4 +1,5 @@
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { describeRegistry } from "@/lib/oclif/crud";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
@@ -20,7 +21,8 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
-  static override group = CommandGroups.diagnostics;
+  static override group = CommandGroups.apiAndEvents;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> resources",

@@ -102,7 +102,7 @@ the previous purpose.
 
 ## Context
 
-Today every action submitted to `POST /flow/{flow_id}/submit` runs the same pipeline —
+Today every action submitted to `POST /flows/{flow_id}/submit` runs the same pipeline —
 validate fields, dispatch to auth-attempts, run `on_success`. There is no way to
 declare an action as navigation-only.
 

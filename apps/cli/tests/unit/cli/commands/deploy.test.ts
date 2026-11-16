@@ -17,11 +17,10 @@ import {
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 describe("deploy", () => {
-  const { server, dirs } = usePlatformServer();
+  const { server } = usePlatformServer();
 
   it("guards the deploy with the primary that is live, past the first page", async () => {
     const project = await aProjectWithTwoDeploys("zitadel-deploy-");
-    dirs.push(project.cwd);
     await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
     await writeFile(
       join(project.cwd, DEFAULT_SCHEMA_CONFIG_PATH),
@@ -56,7 +55,6 @@ describe("deploy", () => {
 
   it("reports the primary that raced in on a conflict, past the first page", async () => {
     const project = await aProjectWithTwoDeploys("zitadel-deploy-");
-    dirs.push(project.cwd);
     await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
     await writeFile(
       join(project.cwd, DEFAULT_SCHEMA_CONFIG_PATH),

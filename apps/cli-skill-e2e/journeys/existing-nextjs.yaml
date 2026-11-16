@@ -37,25 +37,25 @@ stages:
       also: /about,/todos/1
     assert:
       - name: a project exists on the instance
-        get: projects list
+        get: project list
         path: items
         op: count-gte
         value: 1
       - name: deployed schema collects a first name
-        get: schemas get human-user
+        get: schema get human-user
         path: [schema.properties.givenName, schema.properties.firstName]
         op: exists
       - name: deployed schema collects a last name
-        get: schemas get human-user
+        get: schema get human-user
         path: [schema.properties.familyName, schema.properties.lastName]
         op: exists
       - name: password sign-in is enabled
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.x-auth-methods.password.enabled
         op: eq
         value: true
       - name: passkeys are NOT enabled (the developer said no)
-        get: schemas get human-user
+        get: schema get human-user
         path: schema.x-auth-methods.passkey.enabled
         op: neq
         value: true

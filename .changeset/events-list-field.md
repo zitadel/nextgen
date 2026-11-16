@@ -9,6 +9,6 @@ resource: the page is `{ events: […], next_page_token }`
 
 **Breaking:** the events of a page were under `data`. Read them from `events`
 instead. In `@zitadel/api` the item type is `ListEvents200EventsItem`, and in
-the Go client the field is `ListEventsResponse.Events`. `zitadel events list`
+the Go client the field is `ListEventsResponse.Events`. `zitadel event list`
 and the console read the new field, so use a CLI of this version or later
 against a server that has it.

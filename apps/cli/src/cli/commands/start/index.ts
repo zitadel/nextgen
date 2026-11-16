@@ -1,10 +1,9 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { startedServer } from "@/cli/commands/local-server/started";
-import { serverLogAction } from "@/lib/journey-guidance";
-import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
-import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
+import { startedServer } from "@/lib/server/local/started";
+import { ensureLocalAdmin } from "@/lib/server/local/admin-credential";
+import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/server/local/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   defaultLocalServerImageForCliVersion,
@@ -16,19 +15,14 @@ import {
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
   resolveRuntimeBackend,
-} from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+} from "@/lib/server/local/runtime";
+import { LocalServer } from "@/lib/server";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import { Guidance, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import { type Fact, section } from "@/lib/ui";
 
 /**
@@ -64,8 +58,8 @@ const PORT = {
  */
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
-  static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 1;
 
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
@@ -284,7 +278,7 @@ function readyNext(suggest: Suggest): NextSteps<SuggestedCommand> {
     actions: [
       "Create an app with authentication. Run setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-      serverLogAction(suggest),
+      new Guidance(suggest).serverLog(),
     ],
     commands: [suggest({ id: "setup", flags: { server: "local" } })],
   };

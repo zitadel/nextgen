@@ -20,7 +20,7 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
  * There is one method per kind of question — `text`, `secret`, `select`,
  * `multiselect`, `yesNo` — so a command states only the question and the
  * answer's type follows from it. See {@link Questions} for what each one
- * returns, and `lib/input.ts` for the order the answer is looked for in and
+ * returns, and `lib/ui/asker.ts` for the order the answer is looked for in and
  * what is thrown when there is none. It cannot ask a destructive `confirm`: a
  * destructive command extends `Destructive` instead.
  */

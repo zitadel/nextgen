@@ -204,12 +204,12 @@ paths:
     $ref: endpoints/users/me/schema/methods.yaml
   /users/me/teams:
     $ref: endpoints/users/me/teams/methods.yaml
-  /flow:
-    $ref: endpoints/flow/methods.yaml
-  /flow/{flow_id}:
-    $ref: endpoints/flow/session/methods.yaml
-  /flow/{flow_id}/submit:
-    $ref: endpoints/flow/submit/methods.yaml
+  /flows:
+    $ref: endpoints/flows/methods.yaml
+  /flows/{flow_id}:
+    $ref: endpoints/flows/session/methods.yaml
+  /flows/{flow_id}/submit:
+    $ref: endpoints/flows/submit/methods.yaml
   /auth_attempts:
     $ref: endpoints/auth_attempts/methods.yaml
   /auth_attempts/{attempt_id}:

@@ -34,20 +34,20 @@ const ACME_CONNECTION_FLAGS = [
 ];
 
 const DESTRUCTIVE = [
-  ["users", "delete", "user_1", "Cannot delete user user_1", "Delete user user_1"],
-  ["teams", "deactivate", "team_1", "Cannot deactivate team team_1", "Deactivate team team_1"],
-  ["sessions", "revoke", "sess_1", "Cannot revoke session sess_1", "Revoke session sess_1"],
+  ["user", "delete", "user_1", "Cannot delete user user_1", "Delete user user_1"],
+  ["team", "deactivate", "team_1", "Cannot deactivate team team_1", "Deactivate team team_1"],
+  ["session", "revoke", "sess_1", "Cannot revoke session sess_1", "Revoke session sess_1"],
 ];
 
 const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] = [
   {
-    args: ["users", "get", "rel_01M6KPFXAE68N6G2X1HN5XD29R"],
-    list: "users list",
+    args: ["user", "get", "rel_01M6KPFXAE68N6G2X1HN5XD29R"],
+    list: "user list",
     message: "Invalid id: must be a user ID: user_ followed by letters, digits, _ or -",
   },
   {
-    args: ["sessions", "get", "user_01KX5N7C9D2E7F0N9WD3P2E4YM6"],
-    list: "sessions list",
+    args: ["session", "get", "user_01KX5N7C9D2E7F0N9WD3P2E4YM6"],
+    list: "session list",
     message: "Invalid id: must be a session ID: sess_ followed by letters, digits, _ or -",
   },
   {
@@ -138,13 +138,13 @@ describe("resources", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.run(["idps", "list", "--json"]);
+        const result = await app.run(["idp", "list", "--json"]);
 
         expect(result).toFailWith("E_NETWORK");
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "idps:list",
+          command: "idp:list",
           source: MOCK_SERVER_URL,
           code: "E_NETWORK",
           message: expect.stringMatching(
@@ -166,7 +166,7 @@ describe("resources", () => {
         const app = await aSetUpApp();
         const waiting = platform.hangs();
 
-        const result = app.run(["idps", "list", "--json"]);
+        const result = app.run(["idp", "list", "--json"]);
         await waiting;
         pressCtrlC();
 
@@ -174,7 +174,7 @@ describe("resources", () => {
         expect(app.envelopeOf(await result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "idps:list",
+          command: "idp:list",
           source: MOCK_SERVER_URL,
           code: "E_CANCELLED",
           message: "Cancelled",
@@ -222,7 +222,7 @@ describe("resources", () => {
 
         const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
         expect(data.items.map((row) => row.topic)).toEqual(
-          expect.arrayContaining(["users", "teams", "sessions", "idps", "schemas"]),
+          expect.arrayContaining(["user", "team", "session", "idp", "schema"]),
         );
       });
 
@@ -285,9 +285,9 @@ describe("resources", () => {
         const result = await app.run(["resources", "--json"]);
 
         const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
-        expect(data.items.filter((row) => row.topic === "policies")).toEqual([
+        expect(data.items.filter((row) => row.topic === "policy")).toEqual([
           {
-            topic: "policies",
+            topic: "policy",
             singular: "policy",
             id_field: "id",
             id_arg: "policy",
@@ -346,7 +346,7 @@ describe("resources", () => {
             const app = await aSetUpApp();
 
             const result = await app.runWithoutServer([
-              "teams",
+              "team",
               "deactivate",
               "team_1",
               "--server",
@@ -373,7 +373,7 @@ describe("resources", () => {
       it("registers a connection made from its nested fields", async () => {
         const app = await aSetUpApp();
 
-        await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+        await app.run(["idp", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
 
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
       });
@@ -381,11 +381,11 @@ describe("resources", () => {
       it("answers a created connection with the secret as the reference it was given", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+        const result = await app.run(["idp", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
 
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "idps:create",
+          command: "idp:create",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -411,7 +411,7 @@ describe("resources", () => {
             },
             next_commands: [
               expectedPublicCliCommand(
-                `idps get ${(await app.registeredIdps())[0]?.id} --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `idp get ${(await app.registeredIdps())[0]?.id} --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -422,7 +422,7 @@ describe("resources", () => {
       it("never prints the project secret", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+        const result = await app.run(["idp", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
 
         const { ZITADEL_PROJECT_SECRET } = await app.developmentValues();
         expect(result.stdout + result.stderr).not.toContain(ZITADEL_PROJECT_SECRET);
@@ -433,11 +433,11 @@ describe("resources", () => {
         await app.writePasswordPolicy({ min_length: 12 });
         expect(await app.publish()).toSucceed();
 
-        const result = await app.run(["policies", "get", PASSWORD_POLICY, "--json"]);
+        const result = await app.run(["policy", "get", PASSWORD_POLICY, "--json"]);
 
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:get",
+          command: "policy:get",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -460,11 +460,11 @@ describe("resources", () => {
         const app = await aSetUpApp();
         const cursor = platform.pagesWithAHostileCursor();
 
-        const result = await app.run(["users", "list", "--json"]);
+        const result = await app.run(["user", "list", "--json"]);
 
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "users:list",
+          command: "user:list",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -474,7 +474,7 @@ describe("resources", () => {
             next_page_token: cursor,
             next_commands: [
               expectedPublicCliCommand(
-                `users list --page-token $'cur-\\x1b[2Jwiped' --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `user list --page-token $'cur-\\x1b[2Jwiped' --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -486,11 +486,11 @@ describe("resources", () => {
         const app = await aSetUpApp();
         platform.pagesWithAHostileCursor();
 
-        const result = await app.run(["users", "list", "--limit", "1", "--fields", "id", "--json"]);
+        const result = await app.run(["user", "list", "--limit", "1", "--fields", "id", "--json"]);
 
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "users:list",
+          command: "user:list",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -500,7 +500,7 @@ describe("resources", () => {
             next_page_token: "cur-\u001b[2Jwiped",
             next_commands: [
               expectedPublicCliCommand(
-                `users list --limit 1 --fields id --page-token $'cur-\\x1b[2Jwiped' --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `user list --limit 1 --fields id --page-token $'cur-\\x1b[2Jwiped' --json --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -515,7 +515,7 @@ describe("resources", () => {
         const app = await aSetUpApp();
         platform.pagesWithAHostileCursor();
 
-        const result = await app.run(["users", "list"]);
+        const result = await app.run(["user", "list"]);
 
         expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
         expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
@@ -525,9 +525,9 @@ describe("resources", () => {
         const app = await aSetUpApp();
         platform.pagesWithAHostileCursor();
 
-        const result = await app.run(["users", "list"]);
+        const result = await app.run(["user", "list"]);
 
-        expect(result).toSayOnce("users list --page-token");
+        expect(result).toSayOnce("user list --page-token");
       });
     });
 
@@ -560,7 +560,7 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--plain"]);
 
-        expect(result).toPrintPlainRow("users", /.+/, /.*/);
+        expect(result).toPrintPlainRow("user", /.+/, /.*/);
       });
 
       it("prints a topic with nothing to filter by with an empty last cell", async () => {

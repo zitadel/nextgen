@@ -228,10 +228,12 @@ sessions; factor changes flow through `auth_attempts`. Detail in
 The UI-orchestration layer that runs on top of auth_attempts. Detail in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ```http
-POST /flow                      # start a flow run
-GET  /flow/{flow_id}                 # read the current step
-POST /flow/{flow_id}/submit          # submit the current step
+POST /flows                      # start a flow run
+GET  /flows/{flow_id}                 # read the current step
+POST /flows/{flow_id}/submit          # submit the current step
 ```
+
+Until 1.0.0 the three also answer, deprecated, at `/flow`, the collection's name before it became plural ([ADR 077 §4](../../adrs/077-api-path-prefix.md#4-the-root-keeps-answering-through-0x)).
 
 Flow definition management:
 

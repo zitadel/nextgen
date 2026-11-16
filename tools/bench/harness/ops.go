@@ -50,7 +50,7 @@ type LoginResult struct {
 	SessionID    string `json:"session_id"`
 }
 
-// Login drives POST /flow → submit identifier → submit password through the
+// Login drives POST /flows → submit identifier → submit password through the
 // typed client and returns the handoff token. The sealed `_zflow` cookie is
 // an explicit parameter of the generated client, so the journey carries it
 // from one response's Set-Cookie into the next request itself. Every failure

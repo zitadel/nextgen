@@ -1,6 +1,6 @@
 get:
   operationId: getProject
-  x-zitadel-cli: projects get
+  x-zitadel-cli: project get
   summary: Get a project by ID
   description: |
     Returns a project's current state: its name, origins, password hashing
@@ -47,7 +47,7 @@ get:
 
 patch:
   operationId: updateProject
-  x-zitadel-cli: projects update
+  x-zitadel-cli: project update
   summary: Update a project
   description: |
     Updates a project's name or password hashing method.

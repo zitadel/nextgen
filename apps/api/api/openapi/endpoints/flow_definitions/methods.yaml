@@ -68,7 +68,7 @@ post:
 
 get:
   operationId: listFlowDefinitions
-  x-zitadel-cli: flow-definitions list
+  x-zitadel-cli: flow-definition list
   summary: List flow definitions
   description: |
     Lists the project's flow definitions with their configurations, newest by

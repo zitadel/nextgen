@@ -221,7 +221,7 @@ refuses, never count: an attack must not grow the project's usage.
 
 ## Open questions
 
-1. The send operation's name, and whether starting a flow (`POST /flow`) is
+1. The send operation's name, and whether starting a flow (`POST /flows`) is
    an operation with its own policy.
 2. Whether lists can sit inline in a policy, or only in `protection.json`.
 3. Platform attestation (App Attest, Play Integrity) as the bot signal for

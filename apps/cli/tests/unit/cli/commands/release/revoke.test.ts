@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import ReleaseRevoke from "@/cli/commands/release/revoke";
 import { answering } from "@tests/helpers/keyboard";
@@ -10,12 +11,24 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
-import { asTerminal as asPerson } from "@tests/helpers/terminal";
-import { runCliForTest, runCommand } from "@tests/helpers/run-cli";
+import { asTerminal as asPerson } from "@tests/fixtures/terminal";
+import { parseJson, runCliForTest, runCommand } from "@tests/helpers/run-cli";
 
-const { dirs } = usePlatformServer();
+usePlatformServer();
 
 const RELEASE = "rel_01KX3RG8A7F0N9WD3P2E4YM5C1";
+
+/**
+ * The part of a refused `release revoke --json` that names what serves the
+ * release: the hint, and every serving origin in the details.
+ */
+const InUseRefusal = z.looseObject({
+  hint: z.string(),
+  details: z.looseObject({
+    release_id: z.string(),
+    origins: z.array(z.looseObject({ origin: z.string() })),
+  }),
+});
 
 describe("release_id", () => {
   it("takes a release id, trimmed", async () => {
@@ -46,7 +59,6 @@ describe("release revoke asked on a terminal", () => {
       id: "proj_test",
       secret: "ps",
     });
-    dirs.push(cwd);
     const talk = answering(false);
     await asPerson(() =>
       runCommand(ReleaseRevoke, "release:revoke", [RELEASE, "--cwd", cwd, "--server", serverUrl]),
@@ -79,10 +91,7 @@ describe("release revoke refused for a release an origin serves", () => {
    * @returns The project's directory, its release and which deployment serves it where.
    */
   async function aServedRelease(served: { primary: boolean; preview: boolean }) {
-    const project = await aReleaseServedOn("zitadel-release-revoke-served-", served);
-    dirs.push(project.cwd);
-
-    return project;
+    return aReleaseServedOn("zitadel-release-revoke-served-", served);
   }
 
   /**
@@ -127,6 +136,49 @@ describe("release revoke refused for a release an origin serves", () => {
     const result = await runCliForTest(revokeArgumentsOf(project));
 
     expect(result).toHintAt(`${origin} (${kind}, ${project.deploymentOn(kind)})`);
+  });
+
+  it("names the first three serving origins, counts the rest and lists every one in the details", async () => {
+    const project = await aReleaseServedOn(
+      "zitadel-release-revoke-served-many-",
+      { primary: true, preview: false },
+      { primaries: ["https://b.acme.com", "https://c.acme.com", "https://d.acme.com"] },
+    );
+
+    const result = await runCliForTest(revokeArgumentsOf(project));
+
+    const { hint, details } = InUseRefusal.parse(parseJson(result.stdout));
+    expect(details.release_id).toBe(project.releaseId);
+    expect(details.origins).toHaveLength(4);
+    for (const { origin } of details.origins.slice(0, 3)) {
+      expect(hint).toContain(origin);
+    }
+    expect(hint).not.toContain(details.origins[3]?.origin);
+    expect(hint).toContain("; and 1 more");
+  });
+
+  it("suggests removing only the first three of the previews that serve it", async () => {
+    const project = await aReleaseServedOn(
+      "zitadel-release-revoke-served-previews-",
+      { primary: false, preview: true },
+      {
+        previews: [
+          "https://y-acme.vercel.app",
+          "https://z-acme.vercel.app",
+          "https://w-acme.vercel.app",
+        ],
+      },
+    );
+
+    const result = await runCliForTest(revokeArgumentsOf(project));
+
+    const { details } = InUseRefusal.parse(parseJson(result.stdout));
+    expect(details.origins).toHaveLength(4);
+    expect(result).toSuggestOnly(
+      ...details.origins.slice(0, 3).map(({ origin }) => {
+        return `preview rm ${origin} --server ${PLATFORM_URL} --cwd ${project.cwd}`;
+      }),
+    );
   });
 
   it.each([

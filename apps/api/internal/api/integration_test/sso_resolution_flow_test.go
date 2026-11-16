@@ -24,7 +24,7 @@ import (
 
 // These tests park the provider's result on the attempt through the same
 // statements the callback route uses, then drive the resolution through
-// GET /flow/{flow_id}. The route itself is covered in sso_callback_flow_test.go.
+// GET /flows/{flow_id}. The route itself is covered in sso_callback_flow_test.go.
 
 // ssoResolutionFixture is a project with the sso login flow definition, one
 // connection, and a team users can be created in.

@@ -2,18 +2,13 @@ import { Flags } from "@oclif/core";
 
 import { OriginService } from "@/lib/backend";
 import { errorMessage } from "@/lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankArg,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -23,7 +18,8 @@ import { reportWarning } from "@/lib/warnings";
  */
 export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",
@@ -84,7 +80,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
             case "emptied": {
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and an unquoted `<url>` placeholder is a shell redirection, so the placeholder is quoted.
-              reportWarning(
+              warnings.report(
                 `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${this.suggest({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}.`,
               );
               return {
@@ -100,7 +96,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               };
             }
             case "unverified": {
-              reportWarning(
+              warnings.report(
                 `${removal.pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(removal.cause)}`,
               );
               return {

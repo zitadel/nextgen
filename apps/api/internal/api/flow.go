@@ -390,7 +390,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 		// Path=/ ensures that each Set-Cookie replaces the previous one in
 		// the browser's cookie jar rather than accumulating — without an
 		// explicit path the browser derives the path from the request URI,
-		// which differs across /flow and /flow/{flow_id}/submit endpoints.
+		// which differs across /flows and /flows/{flow_id}/submit endpoints.
 		Path: "/",
 	}
 	if clear {

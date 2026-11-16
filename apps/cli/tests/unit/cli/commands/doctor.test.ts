@@ -1,19 +1,15 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { type Serve, test } from "@tests/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
-import type { LocalServers } from "@/lib/local-server/processes";
-import { projectMetaSchemas } from "@/lib/meta-schemas";
-import { publicCliCommand } from "@/lib/public-cli";
-import { MANAGED_MARKER } from "@/lib/paths";
+import type { LocalServers } from "@/lib/server/local/processes";
+import { MetaSchemas } from "@/lib/meta-schemas";
 import { advisoryForWarnings, type DoctorAgain } from "@/cli/commands/doctor/index";
 import type { Suggest } from "@/lib/suggestion";
-import { nextPort } from "@tests/helpers/ports";
 import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
 import {
   aMachineRunning,
@@ -22,12 +18,12 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminal } from "@tests/fixtures/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
+import { Spelling } from "@/lib/suggestion";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
-
-const tempDirs: string[] = [];
 
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
@@ -36,37 +32,6 @@ const VALID_USER_SCHEMA = {
   "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
-
-async function doctor(cwd: string, extra: string[] = []) {
-  const fake = await fakeDocker();
-  const port = nextPort();
-  return runCliForTest(
-    [
-      "doctor",
-      "--cwd",
-      cwd,
-      "--json",
-      "--port",
-      String(port),
-      "--server",
-      "https://api.zitadel.cloud",
-      ...extra,
-    ],
-    {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    },
-  );
-}
-
-/** `doctor` as setup's next steps run it: no flag about the local runtime. */
-async function doctorWithoutPort(cwd: string) {
-  const fake = await fakeDocker();
-  return runCliForTest(
-    ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
-    { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
-  );
-}
 
 /** The checks that look at the machine's local runtime rather than the project. */
 const LOCAL_RUNTIME_CHECKS = new Set([
@@ -127,13 +92,14 @@ async function recordStartedServer(serve: Serve, dir: string): Promise<number> {
  * user schema, a Zitadel SDK dependency, the editor meta-schemas this CLI
  * writes, and an owning team recorded by `zitadel claim` (without it the
  * claim check warns, which is its own test below).
+ *
+ * @param cwd - The empty directory to build the project in.
+ * @returns The project's directory, which is `cwd`.
  */
-async function makeHealthyProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
-  tempDirs.push(cwd);
+async function makeHealthyProject(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
-  for (const file of projectMetaSchemas(cliVersion.version)) {
+  for (const file of MetaSchemas.of(cliVersion.version).files) {
     await writeFile(join(cwd, file.path), file.contents);
   }
   await mkdir(join(cwd, "app/login"), { recursive: true });
@@ -181,21 +147,21 @@ async function makeHealthyProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(
     join(cwd, "app/login/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function L() {}\n`,
   );
   await writeFile(
     join(cwd, "app/register/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function R() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function R() {}\n`,
   );
   await writeFile(
     join(cwd, "app/profile/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function P() {}\n`,
   );
   await writeFile(
     join(cwd, "middleware.ts"),
-    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+    `${ManagedFile.MARKER}\nexport function middleware() {}\n`,
   );
-  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${ManagedFile.MARKER}\nexport {};\n`);
   return cwd;
 }
 
@@ -222,18 +188,69 @@ async function writeDetachedSecret(
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
+/** The stand-in `docker` and `ps` a doctor run finds first on its `PATH`. */
+interface FakeDocker {
+  /** The directory holding the stand-ins. */
+  readonly binDir: string;
+  /** The file the stand-in `docker` appends each call's arguments to. */
+  readonly logPath: string;
+}
+
+/** A doctor run against a directory, with `extra` flags after the ones every run has. */
+type Doctor = (cwd: string, extra?: string[]) => Promise<Awaited<ReturnType<typeof runCliForTest>>>;
+
+/** A doctor run against a directory, given no flag about the local runtime. */
+type DoctorWithoutPort = (cwd: string) => Promise<Awaited<ReturnType<typeof runCliForTest>>>;
+
+/**
+ * `it` with a stand-in `docker` and the two ways the tests run `doctor` against it.
+ *
+ * - `docker` is written into the `other` directory, so it is removed with the test.
+ * - `doctor` is the run with `--json`, a port from `port`, and `--server https://api.zitadel.cloud`.
+ * - `doctorWithoutPort` is the run as setup's next steps make it: no flag about the local runtime.
+ */
+const it = test.extend<{
+  docker: FakeDocker;
+  doctor: Doctor;
+  doctorWithoutPort: DoctorWithoutPort;
+}>({
+  async docker({ other }, use) {
+    await use(await fakeDocker(other));
+  },
+  async doctor({ docker, port }, use) {
+    await use((cwd, extra = []) => {
+      return runCliForTest(
+        [
+          "doctor",
+          "--cwd",
+          cwd,
+          "--json",
+          "--port",
+          String(port),
+          "--server",
+          "https://api.zitadel.cloud",
+          ...extra,
+        ],
+        {
+          PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+          DOCKER_LOG: docker.logPath,
+        },
+      );
+    });
+  },
+  async doctorWithoutPort({ docker }, use) {
+    await use((cwd) => {
+      return runCliForTest(
+        ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+        { PATH: `${docker.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: docker.logPath },
+      );
+    });
+  },
 });
 
 describe("doctor command", () => {
-  it("passes every check for a well-formed managed project", async () => {
-    const cwd = await makeHealthyProject();
+  it("passes every check for a well-formed managed project", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(0);
@@ -259,8 +276,11 @@ describe("doctor command", () => {
   // The nudge has to stay advisory: doctor throws E_VALIDATION on any `fail`,
   // so failing here would break every scripted `zitadel doctor` run against a
   // project nobody has attached to a team yet.
-  it("warns (but passes) when the project is not attached to a team, and points at claim", async () => {
-    const cwd = await makeHealthyProject();
+  it("warns (but passes) when the project is not attached to a team, and points at claim", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
 
     const res = await doctor(cwd);
@@ -284,10 +304,11 @@ describe("doctor command", () => {
 
   it("suggests the claim on the project's own server, not the one doctor was pointed at", async ({
     port,
+    dir,
+    docker,
   }) => {
-    const cwd = await makeHealthyProject();
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
-    const fake = await fakeDocker();
 
     const res = await runCliForTest(
       [
@@ -300,7 +321,7 @@ describe("doctor command", () => {
         "--server",
         "https://self.example",
       ],
-      { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+      { PATH: `${docker.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: docker.logPath },
     );
 
     const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
@@ -309,8 +330,11 @@ describe("doctor command", () => {
     );
   });
 
-  it("does not pin the claim to a file that names the project but not its secret", async () => {
-    const cwd = await makeHealthyProject();
+  it("does not pin the claim to a file that names the project but not its secret", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
 
@@ -322,8 +346,11 @@ describe("doctor command", () => {
     );
   });
 
-  it("reports an unparseable zitadel.json as a failed config check rather than failing itself", async () => {
-    const cwd = await makeHealthyProject();
+  it("reports an unparseable zitadel.json as a failed config check rather than failing itself", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeFile(join(cwd, "zitadel.json"), "{");
 
     const res = await doctor(cwd);
@@ -334,8 +361,11 @@ describe("doctor command", () => {
     expect(json.details?.checks?.find((check) => check.name === "config")?.status).toBe("fail");
   });
 
-  it("suggests no claim when .env.development.local names another project", async () => {
-    const cwd = await makeHealthyProject();
+  it("suggests no claim when .env.development.local names another project", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=someone-else\n");
 
@@ -345,8 +375,8 @@ describe("doctor command", () => {
     expect((data.next_commands ?? []).some((command) => command.includes(" claim"))).toBe(false);
   });
 
-  it("pins the claim it suggests to setup's file when there is one", async () => {
-    const cwd = await makeHealthyProject();
+  it("pins the claim it suggests to setup's file when there is one", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(
       join(cwd, ".env.development.local"),
@@ -368,8 +398,8 @@ describe("doctor command", () => {
   // the warning explains both outcomes, and the claim command stays
   // suggested because the local record can be stale (claimed from another
   // machine reads detached) and running claim answers authoritatively.
-  it("switches to reconciliation wording once the window has closed", async () => {
-    const cwd = await makeHealthyProject();
+  it("switches to reconciliation wording once the window has closed", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
 
     const res = await doctor(cwd);
@@ -388,14 +418,17 @@ describe("doctor command", () => {
     );
   });
 
-  it("says each next step once when its output is read by a pipe", async () => {
-    const cwd = await makeHealthyProject();
+  it("says each next step once when its output is read by a pipe", async ({
+    dir,
+    docker,
+    port,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
-    const fake = await fakeDocker();
 
-    const res = await runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
+    const res = await runCliForTest(["doctor", "--cwd", cwd, "--port", String(port)], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
     });
 
     const claim = expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`);
@@ -403,15 +436,18 @@ describe("doctor command", () => {
     expect(stripAnsi(res.stdout)).not.toContain("Next:");
   });
 
-  it("says a next step that no row shows once, in what a pipe reads", async () => {
-    const cwd = await makeHealthyProject();
-    const fake = await fakeDocker();
+  it("says a next step that no row shows once, in what a pipe reads", async ({
+    dir,
+    docker,
+    port,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
 
     const res = await runCliForTest(
-      ["doctor", "--cwd", cwd, "--port", String(nextPort())],
+      ["doctor", "--cwd", cwd, "--port", String(port)],
       {
-        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-        DOCKER_LOG: fake.logPath,
+        PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: docker.logPath,
       },
       undefined,
       aMachineRunning({
@@ -427,8 +463,8 @@ describe("doctor command", () => {
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
-  it("leaves the claim warning (and the secret) alone under --fix", async () => {
-    const cwd = await makeHealthyProject();
+  it("leaves the claim warning (and the secret) alone under --fix", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
 
@@ -443,8 +479,8 @@ describe("doctor command", () => {
   // A local project's claim depends on server state this offline check
   // cannot see (platform.bootstrap_project), so the nudge must not follow
   // `zitadel setup --server local` around; setup probes the server instead.
-  it("passes the claim check without a nudge for a local project", async () => {
-    const cwd = await makeHealthyProject();
+  it("passes the claim check without a nudge for a local project", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
@@ -469,8 +505,11 @@ describe("doctor command", () => {
   // the repair must be a structured next_command — the agent contract prefers
   // that field over prose — using the project's package manager with an
   // exact-save flag so the repair cannot float the pin.
-  it("warns on a trailing SDK pin and emits the exact-pin repair in next_commands", async () => {
-    const cwd = await makeHealthyProject();
+  it("warns on a trailing SDK pin and emits the exact-pin repair in next_commands", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({
@@ -495,8 +534,11 @@ describe("doctor command", () => {
     );
   });
 
-  it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async () => {
-    const cwd = await makeHealthyProject();
+  it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await rm(join(cwd, ".zitadel/schemas/user.json"));
 
     const res = await doctor(cwd);
@@ -513,8 +555,8 @@ describe("doctor command", () => {
     expect(schemaCheck?.message).toContain("No schema files found");
   });
 
-  it("fails the dependency check when no @zitadel package is present", async () => {
-    const cwd = await makeHealthyProject();
+  it("fails the dependency check when no @zitadel package is present", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
@@ -535,20 +577,18 @@ describe("doctor command", () => {
   });
 
   it("reports actionable recovery commands when the local runtime port is occupied", async ({
+    dir: cwd,
     serve,
+    docker,
   }) => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-port-"));
-    tempDirs.push(cwd);
     const occupiedUrl = await startHealthServer(serve);
     const occupiedPort = Number(new URL(occupiedUrl).port);
-
-    const fake = await fakeDocker();
     // The port probe shells out to `lsof` and degrades to "no listeners" on
     // ANY failure by contract (ports.ts), so asserting through the real
     // system lsof makes this test environment-dependent — the listener
     // silently vanished on CI runners. Fake lsof on the PATH the test
     // already owns so the occupied port is always visible.
-    const lsofPath = join(fake.binDir, "lsof");
+    const lsofPath = join(docker.binDir, "lsof");
     await writeFile(
       lsofPath,
       `#!/usr/bin/env node
@@ -568,8 +608,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         "https://api.zitadel.cloud",
       ],
       {
-        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-        DOCKER_LOG: fake.logPath,
+        PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: docker.logPath,
         LSOF_FIXTURE_PORT: String(occupiedPort),
       },
     );
@@ -595,24 +635,24 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   // local runtime says nothing about it, and a port another app holds must not
   // fail it.
   describe("for a project set up against a hosted server", () => {
-    it("checks no local runtime", async () => {
-      const cwd = await makeHealthyProject();
+    it("checks no local runtime", async ({ dir, doctorWithoutPort }) => {
+      const cwd = await makeHealthyProject(dir);
 
       const res = await doctorWithoutPort(cwd);
 
       expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
     });
 
-    it("reports no local port", async () => {
-      const cwd = await makeHealthyProject();
+    it("reports no local port", async ({ dir, doctorWithoutPort }) => {
+      const cwd = await makeHealthyProject(dir);
 
       const res = await doctorWithoutPort(cwd);
 
       expect((parseJson(res.stdout) as { data: { port?: number } }).data.port).toBeUndefined();
     });
 
-    it("reports the project's server as its source", async () => {
-      const cwd = await makeHealthyProject();
+    it("reports the project's server as its source", async ({ dir, doctorWithoutPort }) => {
+      const cwd = await makeHealthyProject(dir);
       await setProjectServer(cwd, "https://hosted.example.com");
 
       const res = await doctorWithoutPort(cwd);
@@ -622,16 +662,20 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       );
     });
 
-    it("checks the local runtime a flag asks about", async () => {
-      const cwd = await makeHealthyProject();
+    it("checks the local runtime a flag asks about", async ({ dir, doctor }) => {
+      const cwd = await makeHealthyProject(dir);
 
       const res = await doctor(cwd);
 
       expect(checkNamesOf(res.stdout)).toContain("port");
     });
 
-    it("checks a local server started in its directory", async ({ serve }) => {
-      const cwd = await makeHealthyProject();
+    it("checks a local server started in its directory", async ({
+      serve,
+      dir,
+      doctorWithoutPort,
+    }) => {
+      const cwd = await makeHealthyProject(dir);
       await recordStartedServer(serve, cwd);
 
       const res = await doctorWithoutPort(cwd);
@@ -640,8 +684,12 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     });
   });
 
-  it("checks the local runtime of a project set up against a local server", async ({ port }) => {
-    const cwd = await makeHealthyProject();
+  it("checks the local runtime of a project set up against a local server", async ({
+    port,
+    dir,
+    doctorWithoutPort,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await setProjectServer(cwd, `http://localhost:${String(port)}`);
 
     const res = await doctorWithoutPort(cwd);
@@ -649,11 +697,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(checkNamesOf(res.stdout)).toContain("port");
   });
 
-  it("checks the local runtime before setup", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-empty-"));
-    tempDirs.push(cwd);
-
-    const res = await doctorWithoutPort(cwd);
+  it("checks the local runtime before setup", async ({ dir, doctorWithoutPort }) => {
+    const res = await doctorWithoutPort(dir);
 
     expect(checkNamesOf(res.stdout)).toContain("port");
   });
@@ -661,25 +706,26 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   // `zitadel start` tells developers to run setup in the directory it ran in,
   // or one inside it; doctor must check that server, not the default port.
   describe("in an app inside the directory a local server was started in", () => {
-    async function appUnderStartedServer(serve: Serve): Promise<{ app: string; port: number }> {
-      const parent = await mkdtemp(join(tmpdir(), "zitadel-doctor-parent-"));
-      tempDirs.push(parent);
+    async function appUnderStartedServer(
+      serve: Serve,
+      parent: string,
+    ): Promise<{ app: string; port: number }> {
       const port = await recordStartedServer(serve, parent);
       const app = join(parent, "app");
       await mkdir(app);
       return { app, port };
     }
 
-    it("checks that server's port", async ({ serve }) => {
-      const { app, port } = await appUnderStartedServer(serve);
+    it("checks that server's port", async ({ dir, serve, doctorWithoutPort }) => {
+      const { app, port } = await appUnderStartedServer(serve, dir);
 
       const res = await doctorWithoutPort(app);
 
       expect((parseJson(res.stdout) as { data: { port: number } }).data.port).toBe(port);
     });
 
-    it("reports that server healthy", async ({ serve }) => {
-      const { app } = await appUnderStartedServer(serve);
+    it("reports that server healthy", async ({ dir, serve, doctorWithoutPort }) => {
+      const { app } = await appUnderStartedServer(serve, dir);
 
       const res = await doctorWithoutPort(app);
 
@@ -690,8 +736,12 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       });
     });
 
-    it("names the parent folder the healthy server was started in", async ({ serve }) => {
-      const { app } = await appUnderStartedServer(serve);
+    it("names the parent folder the healthy server was started in", async ({
+      dir,
+      serve,
+      doctorWithoutPort,
+    }) => {
+      const { app } = await appUnderStartedServer(serve, dir);
 
       const res = await doctorWithoutPort(app);
 
@@ -701,8 +751,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       );
     });
 
-    it("points at that server's log", async ({ serve }) => {
-      const { app } = await appUnderStartedServer(serve);
+    it("points at that server's log", async ({ dir, serve, doctorWithoutPort }) => {
+      const { app } = await appUnderStartedServer(serve, dir);
 
       const res = await doctorWithoutPort(app);
 
@@ -711,16 +761,16 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     });
   });
 
-  it("points at no server log where no server was started", async () => {
-    const cwd = await makeHealthyProject();
+  it("points at no server log where no server was started", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
 
     const res = await doctor(cwd);
 
     expect(res.stdout).not.toContain("logs --follow");
   });
 
-  it("fails the project-match check when secret and config disagree", async () => {
-    const cwd = await makeHealthyProject();
+  it("fails the project-match check when secret and config disagree", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await writeFile(
       join(cwd, ".zitadel/secret"),
       JSON.stringify({
@@ -742,8 +792,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(match?.status).toBe("fail");
   });
 
-  it("re-locks loose secret permissions via --fix and then passes", async () => {
-    const cwd = await makeHealthyProject();
+  it("re-locks loose secret permissions via --fix and then passes", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await chmod(join(cwd, ".zitadel/secret"), 0o644);
 
     const res = await doctor(cwd, ["--fix"]);
@@ -758,8 +808,11 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(perms?.status).toBe("pass");
   });
 
-  it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async () => {
-    const cwd = await makeHealthyProject();
+  it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     // project-match has no auto-repair: a secret/config project_id mismatch
     // stays failed through --fix, so doctor must report E_VALIDATION rather
     // than crash.
@@ -790,8 +843,11 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     );
   });
 
-  it("fails when a scaffolded infrastructure file is missing and --fix restores it", async () => {
-    const cwd = await makeHealthyProject();
+  it("fails when a scaffolded infrastructure file is missing and --fix restores it", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     await rm(join(cwd, "middleware.ts"));
 
     const broken = await doctor(cwd);
@@ -818,11 +874,11 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
       "pass",
     );
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(ManagedFile.MARKER);
   });
 
-  it("warns on a missing scaffolded page and --fix restores it", async () => {
-    const cwd = await makeHealthyProject();
+  it("warns on a missing scaffolded page and --fix restores it", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
     await rm(join(cwd, "app/login/page.tsx"));
 
     const warned = await doctor(cwd);
@@ -842,11 +898,14 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
       "pass",
     );
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(ManagedFile.MARKER);
   });
 
-  it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
-    const cwd = await makeHealthyProject();
+  it("re-applies a missing Zitadel dependency via --fix and then passes", async ({
+    dir,
+    doctor,
+  }) => {
+    const cwd = await makeHealthyProject(dir);
     // Drop the SDK dependency; repair re-adds it via its `add-dep` op.
     await writeFile(
       join(cwd, "package.json"),
@@ -868,14 +927,13 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
 
   // It never opens a connection, so nothing else records where it ran; the
   // project comes from `.zitadel/secret` and the server from `zitadel.json`.
-  it("names the project it checked, not only the server", async () => {
-    const cwd = await makeHealthyProject();
-    const fake = await fakeDocker();
+  it("names the project it checked, not only the server", async ({ dir, docker, port }) => {
+    const cwd = await makeHealthyProject(dir);
 
     const res = await asTerminal(() =>
-      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
-        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-        DOCKER_LOG: fake.logPath,
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(port)], {
+        PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: docker.logPath,
       }),
     );
 
@@ -885,8 +943,8 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
 
-  it("titles its --json answer with the title a terminal shows", async () => {
-    const cwd = await makeHealthyProject();
+  it("titles its --json answer with the title a terminal shows", async ({ dir, doctor }) => {
+    const cwd = await makeHealthyProject(dir);
 
     const res = await doctor(cwd);
 
@@ -897,14 +955,13 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     });
   });
 
-  it("says its verdict on a terminal once, in its title", async () => {
-    const cwd = await makeHealthyProject();
-    const fake = await fakeDocker();
+  it("says its verdict on a terminal once, in its title", async ({ dir, docker, port }) => {
+    const cwd = await makeHealthyProject(dir);
 
     const res = await asTerminal(() =>
-      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
-        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-        DOCKER_LOG: fake.logPath,
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(port)], {
+        PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: docker.logPath,
       }),
     );
 
@@ -912,9 +969,13 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   });
 });
 
-async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
-  tempDirs.push(binDir);
+/**
+ * Writes a `docker` that records its arguments and succeeds, and a `ps` that finds nothing.
+ *
+ * @param binDir - The empty directory to write them to.
+ * @returns Where they are and where the `docker` records its calls.
+ */
+async function fakeDocker(binDir: string): Promise<FakeDocker> {
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
   const psPath = join(binDir, "ps");
@@ -959,17 +1020,16 @@ describe("doctor's managed runtime process check", () => {
   };
 
   /** A `ps` that fails, so a doctor that reads the host's processes cannot find them supported. */
-  async function failingPs(): Promise<string> {
-    const binDir = await mkdtemp(join(tmpdir(), "zitadel-failing-ps-"));
-    tempDirs.push(binDir);
+  async function failingPs(parent: string): Promise<string> {
+    const binDir = join(parent, "failing-ps");
+    await mkdir(binDir);
     await writeFile(join(binDir, "ps"), "#!/usr/bin/env node\nprocess.exit(1);\n");
     await chmod(join(binDir, "ps"), 0o755);
     return binDir;
   }
 
-  async function doctorOn(servers: LocalServers) {
-    const cwd = await makeHealthyProject();
-    const fake = await fakeDocker();
+  async function doctorOn(servers: LocalServers, dir: string, docker: FakeDocker, port: number) {
+    const cwd = await makeHealthyProject(dir);
     const res = await runCliForTest(
       [
         "doctor",
@@ -977,13 +1037,13 @@ describe("doctor's managed runtime process check", () => {
         cwd,
         "--json",
         "--port",
-        String(nextPort()),
+        String(port),
         "--server",
         "https://api.zitadel.cloud",
       ],
       {
-        PATH: `${await failingPs()}:${fake.binDir}:${process.env.PATH ?? ""}`,
-        DOCKER_LOG: fake.logPath,
+        PATH: `${await failingPs(docker.binDir)}:${docker.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: docker.logPath,
       },
       undefined,
       servers,
@@ -991,8 +1051,8 @@ describe("doctor's managed runtime process check", () => {
     return parseJson(res.stdout);
   }
 
-  it("reports the servers of the machine it is given", async () => {
-    const json = await doctorOn(aMachineRunning(HOST_WIDE_SERVER));
+  it("reports the servers of the machine it is given", async ({ dir, docker, port }) => {
+    const json = await doctorOn(aMachineRunning(HOST_WIDE_SERVER), dir, docker, port);
 
     expect(json).toMatchObject({
       data: {
@@ -1011,8 +1071,12 @@ describe("doctor's managed runtime process check", () => {
     });
   });
 
-  it("reports none for a machine running none, whatever the host runs", async () => {
-    const json = await doctorOn(aMachineRunning());
+  it("reports none for a machine running none, whatever the host runs", async ({
+    dir,
+    docker,
+    port,
+  }) => {
+    const json = await doctorOn(aMachineRunning(), dir, docker, port);
 
     expect(json).toMatchObject({
       data: {
@@ -1180,9 +1244,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       );
 
       expect(advice.nextCommands).toEqual([
-        publicCliCommand(`start --cwd ${quoted}`, "1.0.0"),
-        publicCliCommand("start", "1.0.0"),
-        publicCliCommand(`reset --force --cwd ${quoted}`, "1.0.0"),
+        Spelling.at("1.0.0").command(`start --cwd ${quoted}`),
+        Spelling.at("1.0.0").command("start"),
+        Spelling.at("1.0.0").command(`reset --force --cwd ${quoted}`),
       ]);
       expect(advice.suggestedArgs).toEqual([
         ["start", "--cwd", dir],
@@ -1204,9 +1268,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
     );
 
     expect(advice.nextCommands).toEqual([
-      publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
-      publicCliCommand("start", "1.0.0"),
-      publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+      Spelling.at("1.0.0").command("start --cwd /home/dev/app"),
+      Spelling.at("1.0.0").command("start"),
+      Spelling.at("1.0.0").command("reset --force --cwd /home/dev/app"),
     ]);
   });
 
@@ -1260,8 +1324,8 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
 
     expect(advice.hint).not.toContain("parent folder");
     expect(advice.nextCommands).toEqual([
-      publicCliCommand("start", "1.0.0"),
-      publicCliCommand("reset --force", "1.0.0"),
+      Spelling.at("1.0.0").command("start"),
+      Spelling.at("1.0.0").command("reset --force"),
     ]);
   });
 });

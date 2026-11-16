@@ -1,6 +1,6 @@
 import semver from "semver";
 
-import { readPackageJsonIfExists } from "@/lib/npm";
+import { PM } from "@/lib/pm";
 
 /**
  * One dependency of a project: its package name and the specifier its
@@ -93,7 +93,7 @@ export class Dependencies {
    * @throws A `SyntaxError` when the `package.json` is not valid JSON.
    */
   static async read(cwd: string, scope: string): Promise<Dependencies | undefined> {
-    const pkg = await readPackageJsonIfExists(cwd);
+    const pkg = await PM.manifestIfExists(cwd);
     if (pkg === undefined) {
       return undefined;
     }
