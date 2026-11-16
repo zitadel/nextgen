@@ -32,13 +32,18 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 	if err := ensureManagedID(&request.ID, domain.PrefixAuthRequest); err != nil {
 		return err
 	}
+	// A nil slice is written as NULL, which the column refuses.
+	scopes := request.Scopes
+	if scopes == nil {
+		scopes = []string{}
+	}
 	stmt := buildStatement(createAuthRequestStmt,
 		request.ProjectID,
 		request.ID,
 		request.ClientID,
 		request.RedirectURI,
 		request.State,
-		request.Scopes,
+		scopes,
 		request.CodeChallenge,
 		request.Issuer,
 		request.DeploymentID,

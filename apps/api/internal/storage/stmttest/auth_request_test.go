@@ -47,6 +47,19 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 					BindingHash:  domain.HashSecret("nonce"),
 				},
 			},
+			{
+				// Unset scopes are stored and read back empty on every dialect.
+				name: "nil_scopes",
+				request: domain.AuthRequest{
+					ClientID:     "client_1",
+					RedirectURI:  "https://app.example.com/callback",
+					State:        "xyz",
+					Issuer:       "https://app.example.com/oauth/proj_1",
+					DeploymentID: "dep_1",
+					ReleaseID:    "rel_1",
+					BindingHash:  domain.HashSecret("nonce"),
+				},
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -60,6 +73,9 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 
 				got, err := d.stmts.GetAuthRequest(t.Context(), request.ProjectID, request.ID)
 				require.NoError(t, err)
+				if request.Scopes == nil {
+					request.Scopes = []string{}
+				}
 				assert.Equal(t, &request, got)
 			})
 		}
