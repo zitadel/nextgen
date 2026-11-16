@@ -32,7 +32,13 @@ describe("PublishCredentials", () => {
           body: anAcmeSsoConnection(),
         }),
         reused: false,
-        suggest: aSuggest(),
+        republish: (missing) => {
+          return aSuggest()({
+            id: "variable:set",
+            args: { name: missing.name },
+            flags: { secret: missing.secret },
+          });
+        },
       }),
       given: { endpoints: undefined, clientId: clientId("abc"), secret: clientSecret("shh") },
     });

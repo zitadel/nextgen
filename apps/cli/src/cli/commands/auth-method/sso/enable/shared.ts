@@ -14,7 +14,7 @@ import type {
 import { log } from "@/lib/ui";
 import type { Admitted, CommandResult } from "@/lib/oclif";
 import type { Connection as RemoteConnection } from "@/lib/oclif/types";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import type { Again, Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions } from "@/lib/ui";
 import type { Change, Connection, DocumentChange, SsoOptions } from "@/lib/zitadel";
@@ -243,6 +243,11 @@ export type EnableServices = Readonly<{
    * Builds the commands the run suggests.
    */
   suggest: Suggest;
+
+  /**
+   * This run again, with what changes, keeping everything it was given.
+   */
+  again: Again;
 
   /**
    * The arguments a suggested command is run with.

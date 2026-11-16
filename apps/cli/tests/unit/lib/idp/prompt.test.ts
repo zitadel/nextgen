@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Ui } from "@/lib/ui";
 import type { Questions } from "@/lib/ui";
 import { CredentialPrompt, type PromptRun } from "@/lib/idp";
+import { pipedFrom } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { ZitadelError } from "@/lib/errors";
 import {
@@ -42,7 +43,17 @@ function promptFor(overrides: Partial<PromptRun> = {}): CredentialPrompt {
     secretVariable: secretVariable("google"),
     ask: asking("shh\n"),
     developmentBuild: false,
-    suggest: aSuggest({}, "1.0.0"),
+    retry: async (clientId, piped) => {
+      const command = aSuggest(
+        {},
+        "1.0.0",
+      )({
+        id: "auth-method:sso:enable",
+        flags: { provider: "google", clientId },
+      });
+
+      return piped ? pipedFrom("CLIENT_SECRET", command) : command;
+    },
     ...overrides,
   });
 }
@@ -65,7 +76,7 @@ describe("CredentialPrompt.ask for a new connection", () => {
     await expect(asked).rejects.toMatchObject({ message: expect.stringContaining("client id") });
   });
 
-  it("suggests the command that supplies the missing client id", async () => {
+  it("offers the retry the command supplied when the client id is missing", async () => {
     const asked = promptFor().ask(undefined);
 
     await expect(asked).rejects.toMatchObject({
@@ -81,8 +92,13 @@ describe("CredentialPrompt.ask for a new connection", () => {
     });
   });
 
-  it("suggests no command for a custom connection, whose settings it cannot repeat", async () => {
-    const asked = promptFor({ selection: acmeSelection }).ask(undefined);
+  it("offers no retry when the command supplied none", async () => {
+    const asked = promptFor({
+      selection: acmeSelection,
+      retry: async () => {
+        return undefined;
+      },
+    }).ask(undefined);
 
     await expect(asked).rejects.toMatchObject({ nextCommands: undefined });
   });

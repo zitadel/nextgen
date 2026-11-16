@@ -8,6 +8,7 @@ import {
   loopbackIssuerWarning,
 } from "@/lib/idp";
 import { loopbackReach } from "@/lib/server/local/runtime";
+import { pipedFrom } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Connection } from "@/lib/zitadel";
@@ -22,7 +23,7 @@ type Needs = Fact<
 /**
  * What the step is given by the command.
  */
-type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest">;
+type Deps = Pick<EnableServices, "ask" | "developmentBuild" | "suggest" | "again">;
 
 /**
  * Works out the whole change before anything is asked or written, so every
@@ -89,7 +90,13 @@ export class PlanChange extends WizardStep<
     const delivery = new CredentialDelivery({
       connection,
       reused,
-      suggest: this.deps.suggest,
+      republish: (missing) => {
+        return this.deps.suggest({
+          id: "variable:set",
+          args: { name: missing.name },
+          flags: { secret: missing.secret },
+        });
+      },
     });
     const callbackUri = callbackUriFor(needs.issuer, connection.slug);
     const deployedCallbackUris = [
@@ -111,7 +118,18 @@ export class PlanChange extends WizardStep<
         secretVariable: delivery.names.clientSecret,
         ask: this.deps.ask,
         developmentBuild: this.deps.developmentBuild,
-        suggest: this.deps.suggest,
+        retry: async (clientId, piped) => {
+          // A custom connection's settings are not a retry an agent can be
+          // handed whole, so it is not offered one.
+          if (needs.selection.kind !== "catalog") {
+            return undefined;
+          }
+          const command = await this.deps.again("auth-method:sso:enable", {
+            with: { provider: selectionName(needs.selection), clientId },
+          });
+
+          return piped ? pipedFrom("CLIENT_SECRET", command) : command;
+        },
       }),
       summary: {
         projectId: needs.remote.projectId,

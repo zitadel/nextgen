@@ -761,9 +761,12 @@ export function advisoryForWarnings(
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? Claim.windowClosedNudge(local)
-          : Claim.nudge(local, undefined),
-        Claim.command(local),
+          ? Claim.windowClosedNudge(
+              local({ id: "claim" }),
+              local({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } }),
+            )
+          : Claim.nudge(local({ id: "claim" }), undefined),
+        local({ id: "claim" }),
       );
     }
   }

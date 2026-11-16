@@ -1,6 +1,6 @@
 import { Server } from "@/lib/server";
 import type { ProjectSecretData } from "@/lib/project";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
 
 /**
@@ -108,41 +108,31 @@ export class Claim {
   }
 
   /**
-   * The command for `next_commands`.
-   *
-   * @param suggest - Renders a suggestion for the run that reports it.
-   * @returns The `claim` command.
-   */
-  static command(suggest: Suggest): SuggestedCommand {
-    return suggest({ id: "claim" });
-  }
-
-  /**
    * The one claim nudge for `next_actions`, shared by `setup` and `status`
    * (doctor mirrors it with plain `zitadel` command names), quoting the
-   * command in prose. The command is rendered by `suggest`, so it carries the
-   * run's own scope and targets the project this run is about rather than
+   * command in prose. The running command renders the command, so it carries
+   * the run's own scope and targets the project this run is about rather than
    * whatever the next shell's environment resolves to.
    *
-   * @param suggest - Renders a suggestion for the run that reports it.
+   * @param claim - The `claim` command, rendered by the run that reports it.
    * @param deadline - When the claim window closes, if it is known.
    * @returns The nudge.
    */
-  static nudge(suggest: Suggest, deadline: Date | undefined): string {
-    return `${Claim.sentence(deadline)} Run ${Claim.command(suggest)}.`;
+  static nudge(claim: SuggestedCommand, deadline: Date | undefined): string {
+    return `${Claim.sentence(deadline)} Run ${claim}.`;
   }
 
   /**
    * The same nudge for the human box, with the command on its own styled line.
    *
-   * @param suggest - Renders a suggestion for the run that reports it.
+   * @param claim - The `claim` command, rendered by the run that reports it.
    * @param deadline - When the claim window closes, if it is known.
    * @returns The box action.
    */
-  static boxNudge(suggest: Suggest, deadline: Date | undefined): BoxAction {
+  static boxNudge(claim: SuggestedCommand, deadline: Date | undefined): BoxAction {
     return {
       text: Claim.sentence(deadline),
-      command: Claim.command(suggest),
+      command: claim,
     };
   }
 
@@ -156,15 +146,16 @@ export class Claim {
    * the window, so an attached project answers with a clean already-claimed
    * skip, and only a genuinely unattached one gets the final refusal.
    *
-   * @param suggest - Renders a suggestion for the run that reports it.
+   * @param claim - The `claim` command, rendered by the run that reports it.
+   * @param setup - The `setup` command aimed at {@link Claim.FRESH_DIRECTORY}.
    * @returns The nudge.
    */
-  static windowClosedNudge(suggest: Suggest): string {
+  static windowClosedNudge(claim: SuggestedCommand, setup: SuggestedCommand): string {
     return (
       `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
-      `closed. Run ${Claim.command(suggest)} to reconcile: a project ` +
+      `closed. Run ${claim} to reconcile: a project ` +
       "claimed from another machine confirms its team, and one never claimed can no " +
-      `longer be claimed. ${suggest({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } })} in a fresh directory ` +
+      `longer be claimed. ${setup} in a fresh directory ` +
       "gets you a new project you can claim."
     );
   }
