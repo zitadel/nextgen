@@ -1,5 +1,21 @@
 # @zitadel/sdk-solid-start
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`c52126e`](https://github.com/zitadel/nextgen/commit/c52126ed0bad6656dc97d582628479075a476bb1), [`b665fe5`](https://github.com/zitadel/nextgen/commit/b665fe5229180cbc604b6e57085b73236160df94), [`81df24d`](https://github.com/zitadel/nextgen/commit/81df24d34accdf7a135d2930103a7812899b3401), [`d4e7203`](https://github.com/zitadel/nextgen/commit/d4e720361e3428eb0454aafff9c0d37e89ad2824)]:
+  - @zitadel/api@0.6.0
+  - @zitadel/sdk-core@0.6.0
+
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c), [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0), [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b), [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6), [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99), [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede)]:
+  - @zitadel/api@0.5.0
+  - @zitadel/sdk-core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

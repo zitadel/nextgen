@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
@@ -106,6 +108,133 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
 				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "equals", Value: nil}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "identifier cannot be sorted by",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "identifier", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "less_than", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "not_contains on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "not_contains", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// No index serves a substring match, so it is not offered.
+			name: "contains on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "contains", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "starts_with on a field other than identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "id", Operation: "starts_with", Value: "user_"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// A search comes back in the order of the search index.
+			name: "sorting with an identifier filter is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: "alex"}},
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "desc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "a second identifier filter is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters: []service.Filter{
+					{Field: "identifier", Operation: "starts_with", Value: "alex"},
+					{Field: "identifier", Operation: "starts_with", Value: "ben"},
+				},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "an identifier value longer than the search text is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: strings.Repeat("a", domain.SearchTextMaxRunes+1)}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "equals on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "equals", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "not_equals on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "not_equals", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "NUL byte in an identifier value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: "a\x00b"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "NUL byte in an id value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "id", Operation: "contains", Value: "a\x00b"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "invalid UTF-8 in a filter value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "id", Operation: "equals", Value: "a\xffb"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string identifier value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// As a prefix it would select every user with an identifier.
+			name: "empty identifier value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: ""}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
@@ -598,6 +727,129 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 	return service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
 }
 
+// An identifier lives under a different property per schema, and each revision's
+// own designation governs its users, so the search has one arm per property,
+// counted only for the users on the schemas that designate it.
+func TestUserService_ListUsers_IdentifierFilter(t *testing.T) {
+	t.Parallel()
+
+	schemaCol := database.Col(domain.UserFieldSchemaURL)
+	schema := func(url, identifier string) *domain.JSONSchema {
+		return &domain.JSONSchema{URL: url, Schema: []byte(`{"x-identifier":"` + identifier + `"}`)}
+	}
+
+	t.Run("starts_with searches each designated property in the order of the search index", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		// A caller allowed part of the project still needs every schema's
+		// designation, but only the users its grants cover: the schema read
+		// is unrestricted and the users read keeps the caller's filter.
+		callerFilter := service.AuthzListFilter{ResourceKind: domain.ResourceKindUser}
+		stmts.EXPECT().ListJSONSchemas(gomock.Cond(func(ctx context.Context) bool {
+			return service.AuthzListUnrestricted(ctx)
+		}), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{
+				schema("https://example.test/a-v1", "email"),
+				schema("https://example.test/a-v2", "email"),
+				schema("https://example.test/b", "username"),
+				{URL: "https://example.test/undesignated", Schema: []byte(`{}`)},
+			}}, nil).AnyTimes()
+		svcPool := service.NewPool(pool)
+		svc := service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+
+		var (
+			got     *database.ListOptions[domain.UserField]
+			gotOpts service.UserQueryOptions
+		)
+		stmts.EXPECT().
+			ListUsers(gomock.Cond(func(ctx context.Context) bool {
+				filter, ok := service.AuthzListFilterFromContext(ctx)
+				return ok && filter.ResourceKind == callerFilter.ResourceKind
+			}), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], queryOpts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got, gotOpts = opts, queryOpts
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(service.WithAuthzListFilter(t.Context(), callerFilter), service.ListUsersInput{
+			ProjectID: "proj_1",
+			Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: "Alex@Example.com"}},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, database.And[domain.UserField](database.Equal(database.Col(domain.UserFieldProjectID), "proj_1")), got.Filter)
+		assert.Equal(t, v2user.SearchOrder(), got.Pagination.OrderBy)
+		// The term is folded as the stored text is, so the two compare alike.
+		assert.Equal(t, &service.UserSearch{
+			ProjectID: "proj_1",
+			Prefix:    "alex@example.com",
+			Arms: []service.UserSearchArm{
+				{Key: "email", Users: database.Or(database.Equal(schemaCol, "https://example.test/a-v1"), database.Equal(schemaCol, "https://example.test/a-v2"))},
+				{Key: "username", Users: database.Or[domain.UserField](database.Equal(schemaCol, "https://example.test/b"))},
+			},
+		}, gotOpts.Search)
+	})
+
+	// The read still runs, carrying the page token storage validates.
+	t.Run("no designating schema searches no property through the read", func(t *testing.T) {
+		t.Parallel()
+
+		svc, stmts := newMockedUserService(t)
+		var (
+			got     *database.ListOptions[domain.UserField]
+			gotOpts service.UserQueryOptions
+		)
+		stmts.EXPECT().
+			ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], queryOpts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got, gotOpts = opts, queryOpts
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
+			ProjectID: "proj_1",
+			PageToken: "token",
+			Filters:   []service.Filter{{Field: "identifier", Operation: "starts_with", Value: "alex"}},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, &service.UserSearch{ProjectID: "proj_1", Prefix: "alex", Arms: []service.UserSearchArm{}}, gotOpts.Search)
+		assert.Equal(t, []byte("token"), got.Pagination.Cursor)
+	})
+
+	// With no designation, what else the request asks for is still validated,
+	// wherever the identifier filter stands.
+	invalid := []struct {
+		name  string
+		input service.ListUsersInput
+	}{
+		{"unknown filter after", service.ListUsersInput{Filters: []service.Filter{
+			{Field: "identifier", Operation: "starts_with", Value: "x"},
+			{Field: "nope", Operation: "equals", Value: "bogus"},
+		}}},
+		{"unknown filter before", service.ListUsersInput{Filters: []service.Filter{
+			{Field: "nope", Operation: "equals", Value: "bogus"},
+			{Field: "identifier", Operation: "starts_with", Value: "x"},
+		}}},
+		{"unknown sort", service.ListUsersInput{
+			Filters: []service.Filter{{Field: "identifier", Operation: "starts_with", Value: "x"}},
+			Sorting: &service.Sorting{Field: "nope", Direction: "asc"},
+		}},
+	}
+	for _, tc := range invalid {
+		t.Run("no designating schema still refuses "+tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, _ := newMockedUserService(t)
+			tc.input.ProjectID = "proj_1"
+			_, err := svc.ListUsers(t.Context(), tc.input)
+			require.ErrorIs(t, err, domain.ErrRequestInvalid())
+		})
+	}
+}
+
 // A `schema` equality on a built-in schema's `$id` must match the users
 // stored under any of its bases, and an inequality must exclude all of them: a user created by naming one base is stored
 // under the base the project holds the row at.
@@ -678,7 +930,7 @@ const takenAttributesSchema = `{
 }`
 
 // newTakenAttributesFixture wires a user service whose write collides on a
-// unique value. holders answers the registry probe per attribute key with the
+// unique value. holders answers the unique claim probe per attribute key with the
 // id of the user holding it; a key it does not name is free. A non-nil
 // lookupErr fails the probe instead.
 func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]string, lookupErr error) (service.UserService, *servicemocks.MockAllStatements) {
@@ -716,7 +968,7 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 				return nil, lookupErr
 			}
 			// Each unique attribute of the write is one claim under its
-			// registry team scope.
+			// unique team scope.
 			var taken []domain.AttributeKey
 			for _, c := range claims {
 				if c.Key == "username" {
@@ -824,7 +1076,7 @@ func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {
 // a non-unique attribute, are not named.
 func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 	t.Parallel()
-	unique := database.NewUniqueError("zitadel_nextgen.user_unique_attributes", "pk", nil)
+	unique := database.NewUniqueError("zitadel_nextgen.user_attributes", "idx_user_attributes_unique", nil)
 
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()
@@ -940,5 +1192,90 @@ func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
 		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_other", UserID: "user_1"}).
 			Apply(t.Context(), stmts)
 		require.NoError(t, err)
+	})
+}
+
+// A search reads every property a schema designates as identifier or display
+// part, and answers with each user once, the best match first.
+func TestUserService_SearchUsers(t *testing.T) {
+	t.Parallel()
+
+	newService := func(t *testing.T) (service.UserService, *servicemocks.MockAllStatements) {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{
+				{URL: "https://example.test/named", Schema: []byte(`{"x-identifier":"email","x-display":["givenName","familyName"]}`)},
+				{URL: "https://example.test/plain", Schema: []byte(`{"x-identifier":"username"}`)},
+				{URL: "https://example.test/undesignated", Schema: []byte(`{}`)},
+			}}, nil).AnyTimes()
+		svcPool := service.NewPool(pool)
+		return service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
+	}
+	row := func(id, text string) *domain.User {
+		return &domain.User{ProjectID: "proj_1", ID: id, MatchedText: text}
+	}
+
+	t.Run("searches every designated property and keeps each user's best match", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newService(t)
+
+		var (
+			got     *database.ListOptions[domain.UserField]
+			gotOpts service.UserQueryOptions
+		)
+		stmts.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], queryOpts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got, gotOpts = opts, queryOpts
+				return &database.ListResult[*domain.User]{Items: []*domain.User{
+					row("user_ann", "ann"),
+					row("user_ann", "ann@example.com"),
+					row("user_anna", "anna"),
+					row("user_annika", "annika@example.com"),
+				}}, nil
+			})
+
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "ANN", Limit: 2})
+		require.NoError(t, err)
+
+		assert.Equal(t, &service.UserSearch{
+			ProjectID: "proj_1",
+			Prefix:    "ann",
+			Arms:      []service.UserSearchArm{{Key: "email"}, {Key: "familyName"}, {Key: "givenName"}, {Key: "username"}},
+		}, gotOpts.Search)
+		assert.Equal(t, v2user.SearchOrder(), got.Pagination.OrderBy)
+		// One schema designates three properties, so a user fills at most
+		// three rows: nine rows hold the two users asked for and one more.
+		assert.EqualValues(t, 9, got.Pagination.Limit)
+
+		require.Len(t, out.Items, 2)
+		assert.Equal(t, "user_ann", out.Items[0].ID)
+		assert.Equal(t, "ann", out.Items[0].MatchedText, "the first row of a user is their best match")
+		assert.Equal(t, "user_anna", out.Items[1].ID)
+		assert.True(t, out.More, "a third user matches")
+	})
+
+	t.Run("reports no more when every match fits", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newService(t)
+		stmts.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.User]{Items: []*domain.User{row("user_ann", "ann"), row("user_ann", "ann@example.com")}}, nil)
+
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "ann", Limit: 2})
+		require.NoError(t, err)
+		require.Len(t, out.Items, 1)
+		assert.False(t, out.More)
+	})
+
+	t.Run("text that folds to nothing finds nobody without a read", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newService(t)
+		out, err := svc.SearchUsers(t.Context(), service.SearchUsersInput{ProjectID: "proj_1", Query: "", Limit: 2})
+		require.NoError(t, err)
+		assert.Empty(t, out.Items)
+		assert.False(t, out.More)
 	})
 }

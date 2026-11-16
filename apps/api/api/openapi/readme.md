@@ -30,7 +30,7 @@ It is installed automatically when running `go tool ogen` or `go generate`.
 #### Generate the server stubs and the client
 
 ```shell
-moon run server:generate
+turbo run generate --filter=@zitadel/server
 ```
 
 It runs every directive of `apps/api/api/generate.go`: the server stubs into
@@ -86,13 +86,13 @@ The repo pins `@redocly/openapi-core` (the library behind the
 `.redocly.lint-ignore.yaml` from the repo root. Nothing needs installing:
 
 ```shell
-moon run server:openapi          # lint openapi-spec.yaml
-moon run server:generate         # also writes bundled/openapi.json (MountAPI serves it)
-moon run docs:generate          # bundle it into apps/docs/.generated/openapi.mjs
+turbo run lint --filter=@zitadel/server       # lint openapi-spec.yaml, among the server's checks
+turbo run generate --filter=@zitadel/server   # also writes bundled/openapi.json (MountAPI serves it)
+turbo run generate --filter=@zitadel/docs     # bundle it into apps/docs/.generated/openapi.mjs
 ```
 
-`scripts/bundle-openapi.mjs` (via `go generate` / `server:generate`) writes the
+`scripts/bundle-openapi.mjs` (via `go generate` / the server's `generate`) writes the
 committed `bundled/openapi.json` the Go server embeds (served at
 `{PathPrefix}/openapi.json`). Docs `generate` shapes that same file into
-`.generated/openapi.mjs`. CI's `server:check-generate-pruned` fails when the
+`.generated/openapi.mjs`. CI's `@zitadel/server#check-generate` fails when the
 JSON drifts from the YAML sources.

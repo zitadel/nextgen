@@ -32,7 +32,7 @@ const concurrency = 8;
 const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
 // The CLI reference is /docs/reference/cli, and a command's page has the
-// command's words as the segments after it: /docs/reference/cli/users/list.
+// command's words as the segments after it: /docs/reference/cli/user/list.
 // The reference's own pages beside the commands are no command's.
 const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
 const cliOwnPages = new Set(["telemetry", "release-notes"]);
@@ -240,6 +240,9 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     const command = named ?? apiCommand(operationOf(markdown));
     if (command && !markdown.includes(`npx @zitadel/cli@latest ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    if (/npx @zitadel\/cli@latest variable[^`]*--(?:data|project-level)/.test(markdown)) {
+      return `${markdownUrl(url)}: a \`variable\` command with a flag it does not have`;
     }
     if (named) {
       // The command's page links back to the operation (lib/cli-reference.ts).

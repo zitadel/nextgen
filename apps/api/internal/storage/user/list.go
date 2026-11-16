@@ -56,6 +56,28 @@ type ProjectGroup struct {
 	ProjectID string
 	IDs       []string
 	ByID      map[string]*domain.User
+	// repeats are the later rows of a user a read returned more than once (a
+	// search read returns one per attribute matched). Hydration fills the
+	// first row, which ByID holds; [FillRepeats] copies it to these.
+	repeats []repeatedUser
+}
+
+type repeatedUser struct {
+	first, repeat *domain.User
+}
+
+// FillRepeats gives every repeated row of a user what hydration loaded for
+// the user's first row. Call it once the groups are hydrated.
+func FillRepeats(groups []ProjectGroup) {
+	for _, group := range groups {
+		for _, r := range group.repeats {
+			r.repeat.Attributes = r.first.Attributes
+			r.repeat.Teams = r.first.Teams
+			r.repeat.TeamsTruncated = r.first.TeamsTruncated
+			r.repeat.LifecycleOwnerTeam = r.first.LifecycleOwnerTeam
+			r.repeat.LifecycleOwnerTeamLoaded = r.first.LifecycleOwnerTeamLoaded
+		}
+	}
 }
 
 // MembershipStatusStrings are the states an embedded membership list serves,
@@ -161,6 +183,7 @@ func (c *OwnerTeamCollector) Add(team domain.Team) {
 }
 
 // GroupByProject clears Attributes and groups users by ProjectID for hydration.
+// A user that appears more than once is hydrated once: see [FillRepeats].
 func GroupByProject(users []*domain.User) []ProjectGroup {
 	byProject := make(map[string]*ProjectGroup, len(users))
 	order := make([]string, 0, len(users))
@@ -174,6 +197,10 @@ func GroupByProject(users []*domain.User) []ProjectGroup {
 			}
 			byProject[u.ProjectID] = g
 			order = append(order, u.ProjectID)
+		}
+		if first, seen := g.ByID[u.ID]; seen {
+			g.repeats = append(g.repeats, repeatedUser{first: first, repeat: u})
+			continue
 		}
 		g.IDs = append(g.IDs, u.ID)
 		g.ByID[u.ID] = u

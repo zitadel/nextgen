@@ -14,8 +14,8 @@ properties:
     type: string
     description: |
       The error code an API call of the operation would answer with, set
-      only when it would refuse, for example `user.password_empty` or
-      `user.password_policy_violation`.
+      only when it would refuse, for example `user.password_empty`,
+      `user.password_policy_violation` or, for a sign-up, `flow.proof_invalid`.
   violations:
     type: object
     additionalProperties: true

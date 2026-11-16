@@ -1,14 +1,72 @@
-import type {
-  BuildRelease200,
-  BuildRelease201,
-  BuildReleaseBody,
-  GetReleaseById200,
-  GetReleaseById200PointersItem,
-  GetReleaseById200PointersItemKind,
+import {
+  type BuildRelease200,
+  type BuildRelease201,
+  type BuildReleaseBody,
+  type GetRelease200,
+  type GetRelease200PointersItem,
+  type GetRelease200PointersItemKind,
+  type RevokeRelease409,
+  type RevokeRelease409DetailsOriginsItem,
+  RevokeRelease409DetailsOriginsItemKind,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@/lib/backend/client";
+import { z } from "zod";
+
 import { ApiService } from "@/lib/backend/api-service";
+import type { ZitadelClient } from "@/lib/backend/client";
 import { ConflictError } from "@/lib/backend/errors";
+
+/**
+ * One origin that serves a release.
+ *
+ * @remarks
+ * Names the deployment that pins the release there, and whether the origin is
+ * a primary origin or a preview, which is freed differently: a primary origin
+ * by putting another release live on it, a preview by removing it.
+ */
+export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+
+/**
+ * What revoking a release came to: `revoked` with the release, or `in-use` with
+ * every origin that still serves it, in the order the server named them.
+ */
+export type RevokeOutcome = Readonly<
+  | {
+      outcome: "revoked";
+      release: Release;
+    }
+  | {
+      outcome: "in-use";
+      origins: readonly ServingOrigin[];
+    }
+>;
+
+/**
+ * The origins a `rel.in_use` answer names, as the API documents them.
+ *
+ * @remarks
+ * The generated client types the 409 body but, as every error body, does not
+ * validate it, so the answer is checked here before it is trusted. The kinds
+ * are the two the API documents: a primary origin is freed by putting another
+ * release live on it, a preview by removing it. A kind the API adds is
+ * therefore not parsed, and the refusal stays the plain conflict rather than
+ * naming an origin it cannot say how to free.
+ */
+const InUseBody = z.object({
+  details: z.object({
+    origins: z
+      .array(
+        z.object({
+          origin: z.string().min(1),
+          deployment_id: z.string().min(1),
+          kind: z.enum([
+            RevokeRelease409DetailsOriginsItemKind.primary,
+            RevokeRelease409DetailsOriginsItemKind.preview,
+          ]),
+        }),
+      )
+      .min(1),
+  }),
+}) satisfies z.ZodType<Pick<RevokeRelease409, "details">>;
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -20,13 +78,13 @@ export type ReleaseInput = Readonly<BuildReleaseBody>;
 export type Release = BuildRelease200 | BuildRelease201;
 
 /** A release with the revisions it points at, as a read returns it. */
-export type ReleaseRecord = GetReleaseById200;
+export type ReleaseRecord = GetRelease200;
 
 /** One revision a release pins. */
-export type ReleasePointer = GetReleaseById200PointersItem;
+export type ReleasePointer = GetRelease200PointersItem;
 
 /** The kind of resource a release pins a revision of. */
-export type ReleasePointerKind = GetReleaseById200PointersItemKind;
+export type ReleasePointerKind = GetRelease200PointersItemKind;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -59,7 +117,7 @@ export class ReleaseService extends ApiService {
    * @returns The release, with the revisions it points at.
    */
   async get(releaseId: string): Promise<ReleaseRecord> {
-    return this.client.getReleaseById(releaseId, {
+    return this.client.getRelease(releaseId, {
       project_id: this.projectId,
     });
   }
@@ -99,11 +157,26 @@ export class ReleaseService extends ApiService {
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param releaseId - The release to revoke.
-   * @returns The release, now revoked.
+   * @returns `revoked` with the release, or `in-use` with each origin that still
+   * serves it.
+   * @throws ConflictError for any other conflict, and any other failure as the
+   * client raised it, including a `rel.in_use` answer that names no origin the
+   * API documents.
    */
-  async revoke(releaseId: string): Promise<Release> {
-    return this.client.revokeRelease(releaseId, {
-      project_id: this.projectId,
-    });
+  async revoke(releaseId: string): Promise<RevokeOutcome> {
+    try {
+      const release = await this.client.revokeRelease(releaseId, {
+        project_id: this.projectId,
+      });
+      return { outcome: "revoked", release };
+    } catch (error) {
+      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
+        const served = InUseBody.safeParse(error.body);
+        if (served.success) {
+          return { outcome: "in-use", origins: served.data.details.origins };
+        }
+      }
+      throw error;
+    }
   }
 }

@@ -3,30 +3,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { startLocalZitadel } from "../../src/index";
+import { bootstrapHandlers } from "./helpers/bootstrap-api";
 import { fakeCliBin } from "./helpers/fake-cli";
 
 // The fake CLI never binds ports, so a fixed port keeps msw handlers exact.
 const PORT = 18095;
 const BASE = `http://localhost:${PORT}`;
 
-const okHandlers = [
-  http.post(`${BASE}/api/v1/projects`, () =>
-    HttpResponse.json(
-      { id: "proj_1", project_secret: "secret_1", preview_secret: "preview_1" },
-      { status: 201 },
-    ),
-  ),
-  http.post(`${BASE}/api/v1/schemas`, () => HttpResponse.json({ id: "sch_1" }, { status: 201 })),
-  http.post(`${BASE}/api/v1/flow_definitions`, () =>
-    HttpResponse.json({ id: "flowdef_1" }, { status: 201 }),
-  ),
-  http.post(`${BASE}/api/v1/releases`, () => HttpResponse.json({ id: "rel_1" }, { status: 201 })),
-  http.post(`${BASE}/api/v1/deployments`, () =>
-    HttpResponse.json({ id: "dep_1" }, { status: 201 }),
-  ),
-];
-
-const server = setupServer(...okHandlers);
+const server = setupServer(...bootstrapHandlers(BASE));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

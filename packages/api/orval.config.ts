@@ -2,6 +2,7 @@ import { defineConfig } from "orval";
 
 import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { writeOperations } from "./scripts/operations.ts";
+import { writePatternMessages } from "./scripts/pattern-messages.ts";
 
 export default defineConfig({
   zitadel: {
@@ -24,7 +25,7 @@ export default defineConfig({
       mock: true,
       // A path parameter is any string the API accepts, and schema ids are
       // routinely `$id` URIs (`https://…/default-human-user.json`). Without
-      // this, orval interpolates them raw and `/schemas/{id}` collapses the
+      // this, orval interpolates them raw and `/schemas/{schema_id}` collapses the
       // `//` on a redirect and 404s. orval only encodes the parameters —
       // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
       urlEncodeParameters: true,
@@ -50,7 +51,7 @@ export default defineConfig({
     hooks: {
       // The operations as data (`src/generated/operations.ts`), which the
       // endpoints above carry only as code. Run as a hook, it reads the spec
-      // inside this task and under its `generated-sources` lock.
+      // inside this task.
       afterAllFilesWrite: writeOperations,
     },
   },
@@ -60,6 +61,11 @@ export default defineConfig({
       // See the notes on the `zitadel` input above.
       parserOptions: { externalRefs: { allow: ["*"] } },
       override: { transformer: absoluteDocsLinks },
+    },
+    hooks: {
+      // The sentence each pattern's failure reads as, from the spec; orval's
+      // zod output carries none (scripts/pattern-messages.ts).
+      afterAllFilesWrite: writePatternMessages,
     },
     output: {
       mode: "split",

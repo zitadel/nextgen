@@ -24,7 +24,9 @@ type Limits struct {
 	// MaxRuntimeCost caps the tracked cost of one rule evaluation.
 	MaxRuntimeCost uint64
 	// MaxListSize is the assumed upper bound on context lists and strings
-	// when estimating cost, since their length is unknown statically.
+	// when estimating cost, since their length is unknown statically. A
+	// string setting's enum values may be no longer, so the bound holds for
+	// settings too.
 	MaxListSize uint64
 }
 
@@ -95,6 +97,8 @@ func settingCELType(t SettingType) (*cel.Type, error) {
 		return cel.IntType, nil
 	case SettingTypeBoolean:
 		return cel.BoolType, nil
+	case SettingTypeString:
+		return cel.StringType, nil
 	}
 	return nil, fmt.Errorf("unsupported setting type %q", t)
 }

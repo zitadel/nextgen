@@ -40,7 +40,8 @@ carries no hook. A `<zitadel-logout>` with a `<template>` child shows no menu:
 click the app's own element marked `data-action="logout"`. The canonical
 component hook list lives in `packages/components/README.md`.
 
-The checked-in automated regression path is `moon run e2e:journey`, which
+The checked-in automated regression path is
+`turbo run journey --filter=@zitadel/e2e`, which
 exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
@@ -94,15 +95,15 @@ set through the API use the policy the deployed release carries, so deploying
 without the file switches it off. The API call gets the release that serves
 its `Origin`, and the console or a caller with no `Origin`, such as the CLI,
 the newest primary deployment's. With no `Origin` and no primary deployment,
-that call answers `409` with `rel.no_default`. `policies list` and
-`policies get <id|operation>` read them back. A policy's cases live beside it
+that call answers `409` with `rel.no_default`. `policy list` and
+`policy get <id|operation>` read them back. A policy's cases live beside it
 in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
 `input` in the operation's terms (`{"password": "…"}`), optional `facts` the
 operation would look up (`self_service`, `history_matches`), and the expected
 decision (`allowed`, optionally `code` and exactly the `violations`). The
 decision and rules hold in the login too; `code` is the API's answer, and a
 flow shows each rule as `error.x-auth-methods#password_<rule>` instead.
-`policies test [operation]` evaluates every case on the server against the
+`policy test [operation]` evaluates every case on the server against the
 sibling policy file, or with `--release <id>` against the revision that
 release pins; a missing policy is tested as none. It fails with `E_VALIDATION`
 (exit 3) when a case does not hold, `data`/`details` carrying `source`,
@@ -113,12 +114,15 @@ what the user wants enforced; never invent expectations for them. `setup` writes
 the password policy with a `min_length` of 15; pass `--password-min-length <n>`
 only when the user asks for another value (`0` sets none). Managed files carry
 a marker comment; `eject` removes only
-files that still carry it, preserving anything the user replaced. For app-local
+files that still carry it, preserving anything the user replaced. It leaves the
+SDK installed: `next_commands` holds its removal, in the project's own package
+manager (`pnpm remove @zitadel/sdk-next`), for the user to run. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
 `npx @zitadel/cli@latest start` runtime. The `.zitadel/local/` that `start`
 writes into the directory still counts as empty, so a same-directory `setup`
 scaffolds without `--force` (this is exactly what the golden path does).
 `setup` installs dependencies
-with the detected package manager by default; pass `--skip-install` when the
+with the detected package manager by default (an app in a workspace uses the
+one its repository's root names); pass `--skip-install` when the
 agent or host workflow will install dependencies separately.

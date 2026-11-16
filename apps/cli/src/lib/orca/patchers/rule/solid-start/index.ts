@@ -1,6 +1,5 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "@/lib/public-cli";
 import { configCandidates } from "@/lib/orca/patchers/rule/config-paths";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
@@ -47,7 +46,9 @@ export class SolidStartPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // The auth boundary is written on every setup; a pre-existing middleware
       // at this exact path is a genuine conflict the file-writer refuses (and
@@ -83,18 +84,20 @@ export class SolidStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: sdkVersionForCli(ctx.cliVersion),
+        version: ctx.sdkVersion,
       },
     ];
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("middleware.ts"),
       src("routes/index.tsx"),

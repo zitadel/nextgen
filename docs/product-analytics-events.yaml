@@ -106,10 +106,11 @@ properties:
   # Calls to action
   snippet:
     type: string
-    values: [all, start, setup, dev, plan, apply, skills]
+    values: [all, start, setup, dev, dry_run, deploy, skills]
     description: >-
       What a copy button copied, never its text: the CLI command it runs
-      (`start`, `setup`, `plan`, `apply`), `dev` for the app's dev server,
+      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`), `dev` for
+      the app's dev server,
       `skills` for the coding agents' skills, or `all` for the website's whole
       block of commands.
 
@@ -410,10 +411,10 @@ properties:
   policy_source:
     type: string
     values: [files, release]
-    description: What `policies test` evaluated its cases against, the policy files or a release.
+    description: What `policy test` evaluated its cases against, the policy files or a release.
   case_count:
     type: number
-    description: How many cases `policies test` ran; never a case name or an input.
+    description: How many cases `policy test` ran; never a case name or an input.
   failed_count:
     type: number
     description: How many of those cases did not hold.
@@ -567,7 +568,7 @@ components:
       branding:eject: [design]
       deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
-      policies:test: [policy_source, case_count, failed_count]
+      policy:test: [policy_source, case_count, failed_count]
       start: [runtime]
       variable:get: [is_secret]
       variable:list: [variable_count]

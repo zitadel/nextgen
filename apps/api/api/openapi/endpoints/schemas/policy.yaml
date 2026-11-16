@@ -15,4 +15,5 @@ properties:
       file (policy files point at `.zitadel/meta/policy.json`). Ignored by the platform.'
 oneOf:
   - $ref: ../policies/password-set-policy-input.yaml
+  - $ref: ../policies/user-create-policy-input.yaml
 unevaluatedProperties: false

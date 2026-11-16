@@ -15,6 +15,10 @@
  * reads that file, so its schema is written by hand here
  * (`project-config.schema.json`) and never reaches the server.
  */
+import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
+import { distance } from "fastest-levenshtein";
+
+import { schemaConfigSchema } from "./schemas.js";
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
@@ -84,4 +88,99 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "policy-test.json", body: policyTestMetaSchema as object },
     { name: "project.json", body: projectConfigSchema as object },
   ];
+}
+
+/** One rule a schema file breaks, at the object it is in. */
+export type SchemaFileIssue = {
+  /** The object, as dot-joined keys from the document root; "" for the root. */
+  path: string;
+  message: string;
+  /** The key the meta-schema refuses, when the rule is about a key. */
+  key?: string;
+};
+
+/** The user meta-schema, compiled on first use and kept for the process. */
+let userSchemaCheck: ValidateFunction | undefined;
+
+function compileUserSchema(): ValidateFunction {
+  const ajv = new Ajv2020({ strict: false, validateFormats: false, allErrors: true });
+  for (const file of metaSchemaFiles()) {
+    if (file.body !== userSchemaMetaSchema) {
+      ajv.addSchema(file.body, file.name);
+    }
+  }
+  return ajv.compile(userSchemaMetaSchema);
+}
+
+const DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema";
+
+/** Every JSON Schema 2020-12 keyword, read on first use and kept for the process. */
+let draftKeywords: string[] | undefined;
+
+/**
+ * The keywords the draft 2020-12 meta-schema and the vocabularies it combines
+ * declare, as the Ajv that ships them holds them.
+ */
+function readDraftKeywords(): string[] {
+  const ajv = new Ajv2020({ strict: false });
+  const metaSchemaAt = (uri: string) =>
+    ajv.getSchema(uri)?.schema as { allOf?: { $ref: string }[]; properties?: object };
+  const draft = metaSchemaAt(DRAFT_2020_12);
+  return [
+    draft,
+    ...(draft.allOf ?? []).map(({ $ref }) => metaSchemaAt(new URL($ref, DRAFT_2020_12).href)),
+  ].flatMap((schema) => Object.keys(schema.properties ?? {}));
+}
+
+/**
+ * What the server refuses a `.zitadel/schemas/` file for, as to its shape and
+ * its keys, so `deploy`, `doctor` and the API mock judge a file alike. The
+ * shape comes from the generated Zod, which accepts a user schema or a
+ * `schema-url` reference. A user schema then also runs through the user
+ * meta-schema the server compiles, because the Zod drops what it says about
+ * keys: a misspelt keyword such as `minimumLength` is refused, with the
+ * keyword it is closest to, as is an `x-` key it does not declare. Every
+ * refused key is reported.
+ */
+export function schemaFileIssues(document: unknown): SchemaFileIssue[] {
+  const parsed = schemaConfigSchema.safeParse(document);
+  const issues: SchemaFileIssue[] = parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      }));
+  if ((document as { kind?: unknown } | null)?.kind !== "user-schema") {
+    return issues;
+  }
+
+  userSchemaCheck ??= compileUserSchema();
+  const check = userSchemaCheck;
+  if (check(document)) {
+    return issues;
+  }
+  for (const error of check.errors ?? []) {
+    // An unevaluated property is a key the meta-schema does not declare; a
+    // property name is an attribute name `property-name.json` refuses.
+    const keyword = error.params.unevaluatedProperty as string | undefined;
+    const key = keyword ?? (error.params.propertyName as string | undefined);
+    if (key === undefined) {
+      continue;
+    }
+    const path = error.instancePath.slice(1).replaceAll("/", ".");
+    let suggestion = "";
+    if (keyword !== undefined) {
+      const declared = path === "" ? userSchemaMetaSchema : userPropertyMetaSchema;
+      // A third of the key's length lets `minimumLength` reach `minLength`
+      // without matching a short key such as `kind` to `$id`.
+      draftKeywords ??= readDraftKeywords();
+      const [near] = [...draftKeywords, ...Object.keys(declared.properties)]
+        .map((allowed) => ({ allowed, cost: distance(keyword, allowed) }))
+        .filter(({ cost }) => cost <= keyword.length / 3)
+        .sort((a, b) => a.cost - b.cost);
+      suggestion = near ? `. Did you mean ${near.allowed}?` : "";
+    }
+    issues.push({ path, message: `${key} is not an allowed key${suggestion}`, key });
+  }
+  return issues;
 }

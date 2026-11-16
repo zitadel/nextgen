@@ -2,8 +2,7 @@ import { basename, join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
 import { isFile } from "@/lib/fs";
-import { MANAGED_MARKER } from "@/lib/paths";
-import { sdkVersionForCli } from "@/lib/public-cli";
+import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
@@ -23,7 +22,7 @@ import type { RendererSpec } from "./renderers/types";
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
 function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
@@ -110,9 +109,9 @@ export class NextPatcher extends AbstractRulePatcher {
     // (see nextCodeOps).
     return [
       join(view.framework.appDir, "page.tsx"),
-      ...routeTitles(getRenderer(view.rendererId)).map((route) =>
-        join(view.framework.appDir, `${route.segment}/layout.tsx`),
-      ),
+      ...routeTitles(getRenderer(view.rendererId)).map((route) => {
+        return join(view.framework.appDir, `${route.segment}/layout.tsx`);
+      }),
     ];
   }
 
@@ -218,7 +217,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       ? {
           kind: "edit",
           path: join(appDir, "page.tsx"),
-          edit: () => homePageTemplate(),
+          edit: () => {
+            return homePageTemplate();
+          },
           // Replaces create-next-app's default homepage wholesale; the
           // missing-only repair path must not replay it over user content.
           overwrites: true,
@@ -240,13 +241,13 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     // Fresh apps only: create-next-app's root layout titles every page
     // "Create Next App", while an existing app has titles of its own and may
     // have a layout beside a route already.
-    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map(
-      (route): FileOp => ({
+    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map((route): FileOp => {
+      return {
         kind: "write",
         path: join(appDir, `${route.segment}/layout.tsx`),
         contents: routeLayoutTemplate(route.title),
-      }),
-    ),
+      };
+    }),
     {
       kind: "write",
       path: join(appDir, `../${boundary.filename}`),
@@ -268,12 +269,14 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "add-dep",
       name: renderer.dependency.name,
-      version: sdkVersionForCli(ctx.cliVersion),
+      version: ctx.sdkVersion,
     },
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
     devScriptPortOp(ctx.issuer),
-  ].filter((op): op is FileOp => op !== undefined);
+  ].filter((op): op is FileOp => {
+    return op !== undefined;
+  });
 }
 
 /**
@@ -296,7 +299,7 @@ function routeTitles(renderer: RendererSpec): ReadonlyArray<{ segment: string; t
 }
 
 function routeLayoutTemplate(title: string): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: ${JSON.stringify(title)} };
@@ -308,7 +311,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
 }
 
 function homePageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { redirect } from "next/navigation";
 
 // A redirect is never an instant navigation: tell Next.js not to validate it.
@@ -362,7 +365,7 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
       `${existing} aside and rerun setup, then merge it into ${target}.`;
   return new ZitadelError(
     "E_CONFLICT",
-    `Next.js 16 won't start with both ${existing} and the ${target} setup writes`,
+    `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
     { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
   );
 }

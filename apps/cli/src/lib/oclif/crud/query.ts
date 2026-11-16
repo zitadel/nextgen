@@ -1,6 +1,8 @@
-import { ZitadelError } from "@/lib/errors";
-import type { FilterField } from "./types";
 import { distance } from "fastest-levenshtein";
+
+import { ZitadelError } from "@/lib/errors";
+
+import type { FilterField } from "./types";
 
 /**
  * The `--filter` / `--sort` grammar every list shares.
@@ -23,16 +25,22 @@ export const parseFilter = (
   filters: readonly FilterField[],
   known: readonly string[],
 ): ParsedFilter => {
-  const names = filters.map((filter) => filter.field);
+  const names = filters.map((filter) => {
+    return filter.field;
+  });
   const [name, ...rest] = raw.split("=");
   if (!name || rest.length === 0) {
     throw new ZitadelError("E_VALIDATION", `Invalid --filter "${raw}"`, {
       hint: `Use field=operation:value, e.g. ${names[0]}=${filters[0]?.operations[0]}:<value>.`,
     });
   }
-  const field = filters.find((filter) => filter.field === name);
+  const field = filters.find((filter) => {
+    return filter.field === name;
+  });
   if (!field) {
-    const near = names.find((candidate) => distance(name, candidate) <= 2);
+    const near = names.find((candidate) => {
+      return distance(name, candidate) <= 2;
+    });
     throw new ZitadelError("E_VALIDATION", `Unknown filter field "${name}"`, {
       hint: `${near ? `Did you mean ${near}? ` : ""}Filterable fields: ${names.join(", ")}.`,
       details: { field: name, ...(near ? { suggestion: near } : {}), fields: names },
@@ -50,7 +58,9 @@ export const parseFilter = (
   // literal: silently filtering for the string `contians:active` would answer
   // a question nobody asked.
   if (rawValue.length > 0) {
-    const typo = operations.find((operation) => distance(candidate, operation) <= 2);
+    const typo = operations.find((operation) => {
+      return distance(candidate, operation) <= 2;
+    });
     if (typo) {
       throw new ZitadelError("E_VALIDATION", `Unknown filter operation "${candidate}"`, {
         hint: `Did you mean ${typo}? For a literal value containing a colon, say so explicitly: ${name}=equals:${expression}.`,
@@ -110,7 +120,9 @@ export const parseSort = (
     });
   }
   if (!fields.includes(field)) {
-    const near = fields.find((candidate) => distance(field, candidate) <= 2);
+    const near = fields.find((candidate) => {
+      return distance(field, candidate) <= 2;
+    });
     throw new ZitadelError("E_VALIDATION", `Unknown sort field "${field}"`, {
       hint: `${near ? `Did you mean ${near}? ` : ""}Sortable fields: ${fields.join(", ")}.`,
       details: { field, ...(near ? { suggestion: near } : {}), fields: [...fields] },

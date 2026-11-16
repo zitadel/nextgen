@@ -17,8 +17,8 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
-// The page also reads the project's admins and grants for its admins tab (#1238,
-// #1462), its variables and its password policy; empty answers keep these tests
+// The project's Settings also read its admins and grants on their Admins page
+// (#1238, #1462), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
 // switcher names it from their list rather than by its id while its own read is
 // in flight.
@@ -59,11 +59,12 @@ describe("project detail", () => {
   it("opens the page a project link names, with that project selected", async () => {
     // `/projects/{id}` is kept for links that name a project; the page lives at
     // the scoped `/project`, so the sidebar and switcher follow the one named.
+    // Its Settings open on their first page, General (D40).
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/general"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 

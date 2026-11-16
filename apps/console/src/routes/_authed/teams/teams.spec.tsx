@@ -69,7 +69,7 @@ describe("teams screen", () => {
     // Scoped to the table: the app shell's context switcher also renders a team
     // name.
     expect(table.getByRole("link", { name: "Acme Web" })).toBeInTheDocument();
-    expect(table.getByText("active")).toBeInTheDocument();
+    expect(table.getByText("Active")).toBeInTheDocument();
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
@@ -88,8 +88,8 @@ describe("teams screen", () => {
     // state. The pill is title-cased by CSS, so the accessible text is the
     // API's own value.
     const table = within(await screen.findByRole("table"));
-    expect(table.getByText("deactivated")).toBeInTheDocument();
-    expect(table.queryByText("inactive")).not.toBeInTheDocument();
+    expect(table.getByText("Deactivated")).toBeInTheDocument();
+    expect(table.queryByText("Inactive")).not.toBeInTheDocument();
   });
 
   it("says so when there are no teams", async () => {
@@ -140,7 +140,7 @@ describe("teams screen", () => {
     );
     await renderTeams();
 
-    await userEvent.click(await screen.findByRole("button", { name: /Add/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add team" }));
 
     const name = await screen.findByLabelText("Team name");
     // `POST /teams` takes a single `name`, so the drawer is one field — not

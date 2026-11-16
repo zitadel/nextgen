@@ -1,9 +1,10 @@
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
-import { it, type Serve } from "@tests/helpers/fixtures";
+import { it, type Serve } from "@tests/fixtures";
 
 import { ZitadelError } from "@/lib/errors";
 import {
@@ -17,6 +18,7 @@ import {
   localRuntimePaths,
   loopbackReach,
   readNearestRuntimeMetadata,
+  readPlatformRuntime,
   readRuntimeMetadata,
   removeLocalData,
   resolveRuntimeBackend,
@@ -147,13 +149,9 @@ describe("findUpward", () => {
       await mkdir(join(app, ".zitadel/local"), { recursive: true });
       await chmod(join(app, ".zitadel/local"), 0o000);
 
-      try {
-        await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
-          code: "E_VALIDATION",
-        });
-      } finally {
-        await chmod(join(app, ".zitadel/local"), 0o700);
-      }
+      await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
     },
   );
 
@@ -180,7 +178,10 @@ describe("readNearestRuntimeMetadata", () => {
     await mkdir(app);
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
+      nextCommands: [
+        { id: "reset", flags: { force: true, cwd } },
+        { id: "start", flags: { cwd } },
+      ],
     });
   });
 
@@ -190,7 +191,7 @@ describe("readNearestRuntimeMetadata", () => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      nextCommands: ["zitadel reset --force", "zitadel start"],
+      nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
     });
   });
 });
@@ -267,7 +268,46 @@ describe("checkLocalServerHealth", () => {
       false,
     );
   });
+
+  it("reads the health response body to the end", async () => {
+    const { response, isRead } = aResponseWhoseBodyIsRead(200);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+
+    await checkLocalServerHealth("http://localhost:8081");
+
+    expect(isRead()).toBe(true);
+  });
 });
+
+describe("readPlatformRuntime", () => {
+  it("reads a refused runtime document body to the end", async () => {
+    const { response, isRead } = aResponseWhoseBodyIsRead(404);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+
+    await readPlatformRuntime("http://localhost:8081");
+
+    expect(isRead()).toBe(true);
+  });
+});
+
+/** A response whose body reports, once a reader has read it to the end, that it was read. */
+function aResponseWhoseBodyIsRead(status: number): { response: Response; isRead: () => boolean } {
+  const pulls: string[] = [];
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls.push("pull");
+        if (pulls.length === 1) {
+          controller.enqueue(new TextEncoder().encode("ok"));
+          return;
+        }
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { response: new Response(body, { status }), isRead: () => pulls.length > 1 };
+}
 
 describe("retargetMalformedRuntime", () => {
   const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
@@ -278,10 +318,13 @@ describe("retargetMalformedRuntime", () => {
     ["a Windows path with a space", "C:\\work\\my app"],
     ["a Windows path with an apostrophe", "C:\\work\\it's"],
     ["a POSIX path with a space", "/home/dev/my app"],
-  ])("hands over %s as arguments, not as commands", ([_name, dir]) => {
+  ])("aims the commands at %s and hands it over as it is in the arguments", ([_name, dir]) => {
     const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
 
-    expect(retargeted.nextCommands).toBeUndefined();
+    expect(retargeted.nextCommands).toEqual([
+      { id: "reset", flags: { force: true, cwd: dir } },
+      { id: "start", flags: { cwd: dir } },
+    ]);
     expect(retargeted.details).toEqual({
       x: 1,
       suggested_args: [
@@ -289,16 +332,6 @@ describe("retargetMalformedRuntime", () => {
         ["start", "--cwd", dir],
       ],
     });
-    expect(retargeted.hint).toContain("details.suggested_args");
-  });
-
-  it("writes the commands out for a path that needs no quoting", () => {
-    const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;
-
-    expect(retargeted.nextCommands).toEqual([
-      "zitadel reset --force --cwd /home/dev/app",
-      "zitadel start --cwd /home/dev/app",
-    ]);
   });
 });
 

@@ -2,8 +2,9 @@ x-meta-schema: json-schema
 title: UserSchema
 "$schema": https://json-schema.org/draft/2020-12/schema
 type: object
-# The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`, which
-# cannot live here because code generators choke on it.
+# The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]` and
+# `unevaluatedProperties: false`, which cannot live here because code
+# generators choke on the one and misread the other.
 description: |
   The meta-schema that a user schema document is validated against. A user
   schema is the JSON Schema that says which attributes a user has, and which

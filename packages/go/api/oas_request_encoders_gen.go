@@ -10,8 +10,8 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
-func encodeAddOriginRequest(
-	req *ProjectOrigin,
+func encodeAcceptInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -24,8 +24,8 @@ func encodeAddOriginRequest(
 	return nil
 }
 
-func encodeBeginUserPasskeyRegistrationRequest(
-	req *BeginUserPasskeyRegistrationRequest,
+func encodeAddProjectOriginRequest(
+	req *ProjectOrigin,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -52,8 +52,22 @@ func encodeBuildReleaseRequest(
 	return nil
 }
 
-func encodeCompleteClaimRequest(
+func encodeCompleteProjectClaimRequest(
 	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCompleteUserPasskeyRegistrationRequest(
+	req *FinishUserPasskeyRegistrationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -80,8 +94,8 @@ func encodeCreateAuthAttemptRequest(
 	return nil
 }
 
-func encodeCreateBrandingRequest(
-	req *Branding,
+func encodeCreateAuthAttemptChallengeRequest(
+	req *IssueChallengeRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -122,20 +136,6 @@ func encodeCreateFlowRequest(
 	return nil
 }
 
-func encodeCreateFlowDefinitionRequest(
-	req *CreateFlowDefinitionRequest,
-	r *http.Request,
-) error {
-	const contentType = "application/json"
-	e := new(jx.Encoder)
-	{
-		req.Encode(e)
-	}
-	encoded := e.Bytes()
-	ht.SetBody(r, bytes.NewReader(encoded), contentType)
-	return nil
-}
-
 func encodeCreateGrantRequest(
 	req *CreateGrantRequest,
 	r *http.Request,
@@ -150,8 +150,8 @@ func encodeCreateGrantRequest(
 	return nil
 }
 
-func encodeCreateIdpRequest(
-	req *CreateIdpRequest,
+func encodeCreateInvitationRequest(
+	req CreateInvitationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -180,20 +180,6 @@ func encodeCreateProjectRequest(
 
 func encodeCreateReleaseRequest(
 	req *CreateReleaseRequest,
-	r *http.Request,
-) error {
-	const contentType = "application/json"
-	e := new(jx.Encoder)
-	{
-		req.Encode(e)
-	}
-	encoded := e.Bytes()
-	ht.SetBody(r, bytes.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeCreateSchemaRequest(
-	req CreateSchemaReq,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -248,6 +234,20 @@ func encodeCreateUserRequest(
 	return nil
 }
 
+func encodeCreateUserPasskeyRegistrationRequest(
+	req *BeginUserPasskeyRegistrationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeEvaluatePolicyRequest(
 	req EvaluatePolicyRequest,
 	r *http.Request,
@@ -276,8 +276,8 @@ func encodeExchangeHandoffRequest(
 	return nil
 }
 
-func encodeFinishUserPasskeyRegistrationRequest(
-	req *FinishUserPasskeyRegistrationRequest,
+func encodeLookupInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -290,8 +290,8 @@ func encodeFinishUserPasskeyRegistrationRequest(
 	return nil
 }
 
-func encodeIssueChallengeRequest(
-	req *IssueChallengeRequest,
+func encodePublishApplicationRequest(
+	req *CreateApplicationRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -304,8 +304,8 @@ func encodeIssueChallengeRequest(
 	return nil
 }
 
-func encodePatchMyUserRequest(
-	req *PatchMyUserRequest,
+func encodePublishBrandingRequest(
+	req *Branding,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -318,8 +318,8 @@ func encodePatchMyUserRequest(
 	return nil
 }
 
-func encodePatchProjectRequest(
-	req *PatchProjectRequest,
+func encodePublishFlowDefinitionRequest(
+	req *CreateFlowDefinitionRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -332,8 +332,8 @@ func encodePatchProjectRequest(
 	return nil
 }
 
-func encodePatchUserByIDRequest(
-	req *PatchUserRequest,
+func encodePublishIdpRequest(
+	req *CreateIdpRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -348,6 +348,20 @@ func encodePatchUserByIDRequest(
 
 func encodePublishPolicyRequest(
 	req PublishPolicyRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodePublishSchemaRequest(
+	req PublishSchemaReq,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -444,8 +458,8 @@ func encodeQueryUsersRequest(
 	return nil
 }
 
-func encodeRemoveOriginRequest(
-	req *RemoveOriginReq,
+func encodeRejectInvitationRequest(
+	req *InvitationTokenRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -458,7 +472,21 @@ func encodeRemoveOriginRequest(
 	return nil
 }
 
-func encodeRemovePreviewRequest(
+func encodeRemoveProjectOriginRequest(
+	req *RemoveProjectOriginReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRemoveProjectPreviewRequest(
 	req *RemovePreviewRequest,
 	r *http.Request,
 ) error {
@@ -492,8 +520,36 @@ func encodeRollbackDeploymentRequest(
 	return nil
 }
 
+func encodeSearchRequest(
+	req *SearchRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeSetUserPasswordRequest(
 	req *SetUserPasswordRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeSetVariablesRequest(
+	req UpdateVariablesRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -520,6 +576,34 @@ func encodeSubmitFlowStepRequest(
 	return nil
 }
 
+func encodeUpdateMyUserRequest(
+	req *PatchMyUserRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateProjectRequest(
+	req *PatchProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeUpdateTeamRequest(
 	req *UpdateTeamRequest,
 	r *http.Request,
@@ -534,8 +618,8 @@ func encodeUpdateTeamRequest(
 	return nil
 }
 
-func encodeUpdateVariablesRequest(
-	req UpdateVariablesRequest,
+func encodeUpdateUserRequest(
+	req *PatchUserRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -548,7 +632,7 @@ func encodeUpdateVariablesRequest(
 	return nil
 }
 
-func encodeVerifyChallengeProofRequest(
+func encodeVerifyAuthAttemptChallengeRequest(
 	req *VerifyChallengeRequest,
 	r *http.Request,
 ) error {

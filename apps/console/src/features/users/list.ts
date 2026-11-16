@@ -7,6 +7,7 @@ import {
   schemaFlatFields,
 } from "@/features/schemas/model";
 import { displayValue, field } from "@/lib/record";
+import { dateFilterStart } from "@/lib/resource-filter";
 import {
   type UserTeam,
   userAttributes,
@@ -18,16 +19,33 @@ import {
 } from "./model";
 import type { ColumnPins } from "./column-pins";
 
-/** What the Users list is narrowed to, as the URL carries it. */
-export interface UsersSearch {
+/**
+ * What the Users list is narrowed to, as the URL carries it. A type, not an
+ * interface, so it is the record of values `ResourceFilter` reads.
+ */
+export type UsersSearch = {
+  /** The start of a user's identifier; absent for every user. */
+  q?: string;
   /** A schema's object type; absent for every schema. */
   schema?: string;
   /** One revision's id, or `older` for every revision but the newest; absent for every revision. */
   revision?: string;
-}
+  /** One of `USER_STATUSES`; absent for every status. */
+  status?: string;
+  /** Created within a range that ends now, or since a day (`parseDateFilter`); absent for any time. */
+  created?: string;
+};
 
 /** The revision filter's value for every revision of the schema but the newest. */
 export const OLDER_REVISIONS = "older";
+
+/** A user's lifecycle statuses, as the API names them. */
+export const USER_STATUSES = ["active", "suspended", "deactivated", "pending_purge"] as const;
+
+/** A status as a URL may carry it; anything else is no filter. */
+export function parseUserStatus(value: unknown): string | undefined {
+  return (USER_STATUSES as readonly unknown[]).includes(value) ? (value as string) : undefined;
+}
 
 export type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
@@ -65,21 +83,43 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 }
 
 /**
- * The server-side criteria for a search (#1669). Every revision of a schema
- * shares its `object_type`, and a user's `schema` is the revision it is on:
- * one revision is `schema equals` its id, and `older` is `schema not_equals`
- * the newest one's, `latestId`, which it needs.
+ * The server-side criteria for a search (#1669). `q` is matched by the server
+ * across every page, never against the rows already loaded: against the start
+ * of the identifier, which an index answers, and the rows then come ordered by
+ * identifier instead of newest first. Every revision of a
+ * schema shares its `object_type`, and a user's `schema` is the revision it is
+ * on: one revision is `schema equals` its id, and `older` is `schema not_equals`
+ * the newest one's, `latestId`, which it needs. `created` starts at a moment
+ * counted from `now`, so the criteria are built once per search and reused by
+ * its later pages.
  */
-export function userFilter(search: UsersSearch, latestId?: string): UserFilter {
-  if (!search.schema) return [];
-  const criteria: UserFilter = [
-    { field: "schema_object_type", operation: "equals", value: search.schema },
-  ];
-  if (search.revision === OLDER_REVISIONS) {
-    if (!latestId) throw new Error("`older` needs the newest revision's id");
-    criteria.push({ field: "schema", operation: "not_equals", value: latestId });
-  } else if (search.revision) {
-    criteria.push({ field: "schema", operation: "equals", value: search.revision });
+export function userFilter(
+  search: UsersSearch,
+  latestId?: string,
+  now: Date = new Date(),
+): UserFilter {
+  const criteria: UserFilter = search.q
+    ? [{ field: "identifier", operation: "starts_with", value: search.q }]
+    : [];
+  if (search.schema) {
+    criteria.push({ field: "schema_object_type", operation: "equals", value: search.schema });
+    if (search.revision === OLDER_REVISIONS) {
+      if (!latestId) throw new Error("`older` needs the newest revision's id");
+      criteria.push({ field: "schema", operation: "not_equals", value: latestId });
+    } else if (search.revision) {
+      criteria.push({ field: "schema", operation: "equals", value: search.revision });
+    }
+  }
+  if (search.status) {
+    criteria.push({ field: "status", operation: "equals", value: search.status });
+  }
+  const since = search.created ? dateFilterStart(search.created, now) : undefined;
+  if (since) {
+    criteria.push({
+      field: "created_at",
+      operation: "greater_than_or_equal",
+      value: since.toISOString(),
+    });
   }
   return criteria;
 }

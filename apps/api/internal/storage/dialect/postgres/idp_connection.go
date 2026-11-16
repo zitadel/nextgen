@@ -90,7 +90,10 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		// pgx scans timestamptz in Local; reads normalize to UTC.
 		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID)); err != nil {
+			return err
+		}
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
 	})
 }
 
@@ -102,20 +105,23 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	if err != nil {
 		return err
 	}
-	// One insert, so no transaction. The connection row is not read here, so
-	// CreatedAt stays as the caller had it.
-	if err := s.client.QueryRow(ctx, reviseIDPConnectionStmt,
-		entity.ProjectID,
-		revisionID,
-		entity.ID,
-		entity.Document,
-	).Scan(&entity.UpdatedAt); err != nil {
-		return idpconnection.ReviseNotFound(wrapError(err))
-	}
-	// pgx scans timestamptz in Local; reads normalize to UTC.
-	entity.UpdatedAt = entity.UpdatedAt.UTC()
-	entity.RevisionID = revisionID
-	return nil
+	// The connection row is not read here, so CreatedAt stays as the caller
+	// had it.
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := tx.QueryRow(ctx, reviseIDPConnectionStmt,
+			entity.ProjectID,
+			revisionID,
+			entity.ID,
+			entity.Document,
+		).Scan(&entity.UpdatedAt); err != nil {
+			return idpconnection.ReviseNotFound(wrapError(err))
+		}
+		// pgx scans timestamptz in Local; reads normalize to UTC.
+		entity.UpdatedAt = entity.UpdatedAt.UTC()
+		entity.RevisionID = revisionID
+		// The revision's display name is what search shows from now on.
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
+	})
 }
 
 // LockIDPConnection implements [service.IDPConnectionStatements].

@@ -22,6 +22,40 @@ export function formatDateTime(value: string): string {
   return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
 }
 
+/** A moment the server stamped finer than the second, as `…T15:32:07.123Z`. */
+const FRACTION = /T\d{2}:\d{2}:\d{2}[.,]\d/;
+
+/** The milliseconds, for a moment that has them: a whole second shows none rather than `.000`. */
+function fraction(value: string): Intl.DateTimeFormatOptions {
+  return FRACTION.test(value) ? { fractionalSecondDigits: 3 } : {};
+}
+
+/**
+ * `2026-04-28T15:32:07.123Z` → `28 Apr 2026, 15:32:07.123` in the viewer's
+ * locale and time zone: {@link formatDateTime} to the millisecond, for a log,
+ * where the events of one request fall within the same second. A moment the
+ * server stamped to the whole second shows no milliseconds. The same fallback.
+ */
+export function formatEventTime(value: string): string {
+  return format(value, {
+    ...DATE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
+/** `2026-04-28T15:32:07.123Z` → `15:32:07.123`: {@link formatEventTime} without the date. */
+export function formatClockTime(value: string): string {
+  return format(value, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
 const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
 function format(value: string, options: Intl.DateTimeFormatOptions): string {
@@ -32,6 +66,22 @@ function format(value: string, options: Intl.DateTimeFormatOptions): string {
 
 /** A day: the window in which a moment reads as "how long ago". */
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Eleven months: within it, a day and a month name one date without a year. */
+const YEARLESS_MS = 334 * DAY_MS;
+
+/**
+ * `2026-04-28T15:32:07.123Z` → `28 Apr`, or `Apr 28`: the day a log row leads
+ * with, before its {@link formatClockTime}. The year is left out while the
+ * day and month cannot be another year's, within eleven months of `now`, and
+ * written for anything further off. The same fallback as {@link formatDate}.
+ */
+export function formatEventDay(value: string, now: Date = new Date()): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const near = Math.abs(now.getTime() - parsed.getTime()) < YEARLESS_MS;
+  return parsed.toLocaleDateString(undefined, near ? { day: "numeric", month: "short" } : DATE);
+}
 
 /**
  * A moment within the last day as `6h ago` or `12m ago`, and anything older

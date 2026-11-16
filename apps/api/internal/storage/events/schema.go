@@ -74,6 +74,12 @@ var Schema = database.NewSchema(map[domain.EventField]database.FieldBinding[doma
 		Coerce:   database.CoerceString,
 		Nullable: true,
 	},
+	domain.EventFieldUserID: {
+		SQLName:  "user_id",
+		Accessor: func(e *domain.Event) any { return database.NullableValue(e.UserID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
 	domain.EventFieldClientID: {
 		SQLName:  "client_id",
 		Accessor: func(e *domain.Event) any { return e.ClientID },
@@ -104,6 +110,23 @@ var Schema = database.NewSchema(map[domain.EventField]database.FieldBinding[doma
 	domain.EventFieldFlowID: {
 		SQLName:  "flow_id",
 		Accessor: func(e *domain.Event) any { return database.NullableValue(e.FlowID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
+	domain.EventFieldOperationStatus: {
+		SQLName:  "operation_status",
+		Accessor: func(e *domain.Event) any { return database.NullableValue(OperationStatusOf(e)) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
+	domain.EventFieldStatusClass: {
+		SQLName: "status_class",
+		Accessor: func(e *domain.Event) any {
+			if e.StatusClass == nil {
+				return nil
+			}
+			return string(*e.StatusClass)
+		},
 		Coerce:   database.CoerceString,
 		Nullable: true,
 	},

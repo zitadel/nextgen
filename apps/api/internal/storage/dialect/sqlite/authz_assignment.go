@@ -101,13 +101,6 @@ SELECT EXISTS (
       AND object_type = 'project' AND relation = 'team'
       AND revoked_at IS NULL
 )`
-
-	listClaimedProjectIDsStmt = `
-SELECT DISTINCT project_id FROM authz_assignments
-WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
-  AND (? = '' OR project_id > ?)
-ORDER BY project_id
-LIMIT ?`
 )
 
 type authzAssignmentStatements struct{ statement }
@@ -268,30 +261,6 @@ func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context,
 		return false, wrapError(err)
 	}
 	return owns, nil
-}
-
-// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, afterID, afterID, int64(limit))
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, wrapError(err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, wrapError(err)
-	}
-	return ids, nil
 }
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].

@@ -12,9 +12,17 @@ export const PROXY_CREDENTIAL_POLICY_MARKER = "zitadel:proxy:v3";
 /** The marker of the exchange-only policy as it was before it knew the API prefix. */
 export const PROXY_CREDENTIAL_POLICY_V2_MARKER = "zitadel:proxy:v2";
 
-/** Whether `source` carries the credential-policy marker of either version. */
+/**
+ * The marker of a Vite `/__nextgen` entry whose target reads `ZITADEL_URL`,
+ * falling back to the address setup wrote: v3's credential policy, plus the
+ * address from the environment. Angular's proxy stays on v3.
+ */
+export const PROXY_ADDRESS_MARKER = "zitadel:proxy:v4";
+
+/** Whether `source` carries the credential-policy marker of any version. */
 export function hasProxyCredentialPolicyMarker(source: string): boolean {
   return (
+    source.includes(PROXY_ADDRESS_MARKER) ||
     source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
     source.includes(PROXY_CREDENTIAL_POLICY_V2_MARKER)
   );
@@ -106,13 +114,17 @@ function isExchangeOnlyCondition(condition: string): boolean {
     terms.length === 3 &&
     terms.includes(POST_TERM) &&
     terms.includes(NO_OVERWRITE_TERM) &&
-    terms.some((term) => PATH_TERMS.has(term))
+    terms.some((term) => {
+      return PATH_TERMS.has(term);
+    })
   );
 }
 
 function hasExchangeOnlyGuard(source: string): boolean {
   const authorizationSetter = /proxyReq\s*\.\s*setHeader\s*\(\s*["']authorization["']\s*,/gi;
-  const setterOffsets = [...source.matchAll(authorizationSetter)].map((match) => match.index);
+  const setterOffsets = [...source.matchAll(authorizationSetter)].map((match) => {
+    return match.index;
+  });
   if (setterOffsets.length === 0) {
     return false;
   }
@@ -136,7 +148,9 @@ function hasExchangeOnlyGuard(source: string): boolean {
   // Every project-secret authorization write must live inside the same exact
   // method/path/no-overwrite guard. A decoy guard next to an unconditional
   // write must not make doctor report the file as healthy.
-  return setterOffsets.every((offset) =>
-    safeBodyRanges.some(({ start, end }) => offset >= start && offset < end),
-  );
+  return setterOffsets.every((offset) => {
+    return safeBodyRanges.some(({ start, end }) => {
+      return offset >= start && offset < end;
+    });
+  });
 }

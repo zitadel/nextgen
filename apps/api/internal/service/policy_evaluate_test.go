@@ -116,6 +116,8 @@ func TestPolicyService_EvaluateCoversEveryTemplate(t *testing.T) {
 			switch operation {
 			case service.OperationPasswordSet:
 				in.PasswordSet = &service.PasswordSetEvaluation{Password: "x", SelfService: true}
+			case service.OperationUserCreate:
+				in.UserCreate = &service.UserCreateEvaluation{SolvedChallenge: domain.SignupGateProvider}
 			default:
 				t.Fatalf("no dry run input for %s: add its case to Evaluate and here", operation)
 			}

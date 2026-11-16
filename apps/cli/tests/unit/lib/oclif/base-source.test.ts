@@ -6,7 +6,7 @@ import { CLI_COMMAND_STARTED } from "@/lib/oclif/command-telemetry";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "@/lib/telemetry";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { onTerminalReadingAFile } from "@tests/fixtures/terminal";
 
 const config = await Config.load(cliPackageRoot);
 
@@ -61,10 +61,7 @@ class Sourced extends BaseCommand {
   }
 
   protected async execute(): Promise<JsonEnvelope> {
-    return this.emit({
-      status: "ok",
-      data: {},
-    });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 
@@ -103,16 +100,13 @@ class Coloured extends BaseCommand {
 
   protected async execute(): Promise<JsonEnvelope> {
     this.answer = this.isColored;
-    return this.emit({
-      status: "ok",
-      data: {},
-    });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 
 /**
  * Every answer the run gives about colour. Colour itself cannot be asserted
- * through the CLI: picocolors and consola decide it when they load, from the
+ * through the CLI: picocolors decides it when it loads, from the
  * real process streams, so a run in a test never emits an escape byte whatever
  * the flags say. What the run decides is the thing worth pinning, and
  * `biome-plugins/no-own-colour.grit` keeps a command from deciding its own.

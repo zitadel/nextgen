@@ -15,6 +15,15 @@
 >   `is_empty` and `is_not_empty`; they are added when a resource needs them.
 > - Sorting names its fields in a per-resource sort-field enum, not the
 >   filter-field enum (#1328).
+>
+> **Amendment (2026-11-10):** `starts_with` joins the shared
+> `filter-operation` enum: a case-insensitive match on the start of a text
+> value. Only a field that names it accepts it, and a field names it only when
+> an index answers it; the first is `identifier` on users
+> ([ADR 058](058-user-identity-designation-and-references.md)). Such a filter
+> returns its matches ordered by the matched field, the order of that index,
+> and refuses `sorting`: any other order would make the database collect every
+> match before it could return the first page.
 
 ## Context
 

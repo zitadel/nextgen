@@ -2,12 +2,18 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * The stroke is an outline pulled 1px inside the edge, not a border: the
+ * design draws it inside the frame, so content padded 24px sits 24px from the
+ * card's edge rather than 25px. An outline paints over the card's content, so
+ * an edge-to-edge child (Branding's preview) does not cover it.
+ */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-md border bg-card py-6 text-card-foreground shadow-sm",
+        "flex flex-col gap-6 rounded-md bg-card py-6 text-card-foreground shadow-sm outline-1 -outline-offset-1 outline-border",
         className,
       )}
       {...props}

@@ -19,8 +19,8 @@ func TestAuthzResolver_FootholdPrincipalMatch(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("direct user assignment ignores distinct home", func(t *testing.T) {
 			customer := ensureProject(t, d.stmts)
-			platform := ensureProject(t, d.stmts)
-			u := "user_direct_home_" + uniqueSuffix(t)
+			platform, schemaURL := ensureUserTestProject(t, d.stmts)
+			u := newPrincipalUser(t, d.stmts, platform, schemaURL, "user_direct_home_"+uniqueSuffix(t))
 			res := "usr_listed_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(customer, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
@@ -93,9 +93,9 @@ func TestAuthzResolver_FootholdPrincipalMatch(t *testing.T) {
 
 		t.Run("non-user principal skips local membership shortcut", func(t *testing.T) {
 			customer := ensureProject(t, d.stmts)
-			platform := ensureProject(t, d.stmts)
+			platform, schemaURL := ensureUserTestProject(t, d.stmts)
 			localTeam := "team_arm2_" + uniqueSuffix(t)
-			memberID := "user_arm2_" + uniqueSuffix(t)
+			memberID := newPrincipalUser(t, d.stmts, platform, schemaURL, "user_arm2_"+uniqueSuffix(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(customer, localTeam)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(customer, localTeam, memberID)))
 

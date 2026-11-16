@@ -119,6 +119,18 @@ func (s *JSONSchema) Document() (*jsonschema.Schema, error) {
 	return document, nil
 }
 
+// Title is the document's `title`, the name a person gives the schema. Empty
+// when the document carries none or cannot be read.
+func (s *JSONSchema) Title() string {
+	var root struct {
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(s.Schema, &root); err != nil {
+		return ""
+	}
+	return root.Title
+}
+
 // JSONSchemaField enumerates the fields of JSONSchema which can be used for
 // filtering and ordering in list operations.
 type JSONSchemaField uint8

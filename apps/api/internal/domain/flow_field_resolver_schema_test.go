@@ -313,7 +313,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 				Fields: []domain.FlowField{
 					{Name: "website", TextKey: "step.field.website", Type: domain.FlowFieldTypeURL, Validation: &domain.FlowFieldValidation{Format: "uri"}},
 					{Name: "birthday", TextKey: "step.field.birthday", Type: domain.FlowFieldTypeDate, Validation: &domain.FlowFieldValidation{Format: "date"}},
-					{Name: "created", TextKey: "step.field.created", Type: domain.FlowFieldTypeDate, Validation: &domain.FlowFieldValidation{Format: "date-time"}},
+					{Name: "created", TextKey: "step.field.created", Type: domain.FlowFieldTypeDateTime, Validation: &domain.FlowFieldValidation{Format: "date-time"}},
 					{Name: "gender", TextKey: "step.field.gender", Type: domain.FlowFieldTypeSelect, Validation: &domain.FlowFieldValidation{Enum: []string{"female", "male", "non_binary"}}},
 					{Name: "newsletter", TextKey: "step.field.newsletter", Type: domain.FlowFieldTypeCheckbox},
 				},

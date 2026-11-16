@@ -126,24 +126,36 @@ func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
 	}
 }
 
-// TestReaddedPrimaryOriginIsNotDeployed adds back a primary origin the newest
-// primary deployment left out. It serves nothing until the next deploy, not
-// an older deployment that named it.
-func TestReaddedPrimaryOriginIsNotDeployed(t *testing.T) {
+// TestDeploymentFreezesOrigins serves a primary origin only while the newest
+// primary deployment names it and the project lists it. An origin added since
+// waits for a deploy, one removed stops at once, and once a deploy has left it
+// out it stays out when it comes back.
+func TestDeploymentFreezesOrigins(t *testing.T) {
 	t.Parallel()
 
+	const added = "https://added.acme.com"
+	assertOpens := func(t *testing.T, projectID, origin string) {
+		t.Helper()
+		resp, body := openFlow(t, projectID, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
 	fixture := newDeploymentFixture(t)
-	first := fixture.deploy(t, fixture.release.ID)
-	require.IsType(t, &api.CreateDeploymentCreated{}, first, helpers.MustMarshal(t, first))
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, appOrigin)
 
-	projects := harness.EnsureProjectService(t)
-	require.NoError(t, projects.RemoveOrigin(t.Context(), fixture.project, wwwOrigin))
-	second := fixture.deploy(t, fixture.otherRelease(t))
-	require.IsType(t, &api.CreateDeploymentCreated{}, second, helpers.MustMarshal(t, second))
-	assert.Equal(t, []string{appOrigin}, origins(second.(*api.CreateDeploymentCreated).Targets))
-	fixture.addOrigin(t, domain.Origin{Pattern: wwwOrigin, Kind: domain.OriginKindPrimary})
+	fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, added, domain.ErrReleaseNotDeployed(nil).Code)
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, added)
 
-	assertFlowCode(t, fixture.project, wwwOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+	require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, appOrigin))
+	resp, body := openFlow(t, fixture.project, appOrigin)
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode, string(body))
+	assert.Equal(t, domain.ErrProjectOriginNotAllowed(nil).Code, errorCode(body))
+
+	deployPrimary(t, fixture.project)
+	fixture.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
 }
 
 // releaseID is the id of a created release. The same pointer set answers 200
@@ -200,7 +212,9 @@ func TestOriginlessFlowContinues(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	internalapi.MountAPI(mux, internalapi.WithRequestHostMiddleware, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
+	internalapi.MountAPI(mux, func(next http.Handler) http.Handler {
+		return harness.SpecChecked(t, internalapi.WithRequestHostMiddleware(next))
+	}, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	base := server.URL + client.PathPrefix
@@ -210,7 +224,7 @@ func TestOriginlessFlowContinues(t *testing.T) {
 
 	body, err := json.Marshal(map[string]string{"project_id": fixture.project, "purpose": "login"})
 	require.NoError(t, err)
-	resp, body := postFlowAtHost(t, base+"/flow", body, host, nil)
+	resp, body := postFlowAtHost(t, base+"/flows", body, host, nil)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 	var opened api.FlowResponse
 	require.NoError(t, opened.UnmarshalJSON(body), string(body))
@@ -220,7 +234,7 @@ func TestOriginlessFlowContinues(t *testing.T) {
 		"fields": map[string]string{"email": "nobody@example.test"},
 	})
 	require.NoError(t, err)
-	resp, body = postFlowAtHost(t, base+"/flow/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
+	resp, body = postFlowAtHost(t, base+"/flows/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
 	assert.Less(t, resp.StatusCode, http.StatusBadRequest, string(body))
 }
 
@@ -248,7 +262,7 @@ func openFlow(t *testing.T, projectID, origin string) (*http.Response, []byte) {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"project_id": projectID, "purpose": "login"})
 	require.NoError(t, err)
-	return postFlow(t, "/flow", body, origin, nil)
+	return postFlow(t, "/flows", body, origin, nil)
 }
 
 // submitFlow submits an email to the flow's first step from origin.
@@ -259,7 +273,7 @@ func submitFlow(t *testing.T, flowID, zflow, origin string) (*http.Response, []b
 		"fields": map[string]string{"email": "nobody@example.test"},
 	})
 	require.NoError(t, err)
-	return postFlow(t, "/flow/"+flowID+"/submit", body, origin, &http.Cookie{Name: "_zflow", Value: zflow})
+	return postFlow(t, "/flows/"+flowID+"/submit", body, origin, &http.Cookie{Name: "_zflow", Value: zflow})
 }
 
 func postFlow(t *testing.T, path string, body []byte, origin string, cookie *http.Cookie) (*http.Response, []byte) {

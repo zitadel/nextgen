@@ -63,13 +63,13 @@ export async function bootstrapProject(
     preset: options.preset,
     useCase: options.useCase,
   });
-  const schema = await client.createSchema(schemaBody, { project_id: project.id });
+  const schema = await client.publishSchema(schemaBody, { project_id: project.id });
 
   const flowBody = getDefaultLoginFlow({
     preset: options.preset,
     useCase: options.useCase,
   });
-  const flow = await client.createFlowDefinition({
+  const flow = await client.publishFlowDefinition({
     project_id: project.id,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,

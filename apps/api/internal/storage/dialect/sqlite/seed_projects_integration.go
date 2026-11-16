@@ -69,7 +69,7 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 		return fmt.Errorf("sqlite.InsertFlowDefinitionAt: expected *Pool, got %T", pool)
 	}
 	_, err := p.sqlDB.ExecContext(ctx,
-		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (?, ?, ?, '1.0.0', 'draft', '[]', '{}', ?, ?)`,
+		`INSERT INTO flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) VALUES (?, ?, ?, '1.0.0', '[]', '{}', ?, ?)`,
 		projectID, id, name, createdAt.UnixNano(), createdAt.UnixNano(),
 	)
 	return wrapError(err)
@@ -89,4 +89,19 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 		projectID, id, userID, encodedHash, createdAt.UnixNano(),
 	)
 	return wrapError(err)
+}
+
+// ReactivateUser sets a deactivated user back to active so stmttest can assert
+// that authorization reads the user's status at check time (ADR 053 §4). There
+// is no product statement that reactivates a user.
+func ReactivateUser(ctx context.Context, pool database.Pool, projectID, userID string) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("sqlite.ReactivateUser: expected *Pool, got %T", pool)
+	}
+	_, err := p.sqlDB.ExecContext(ctx,
+		`UPDATE users SET status = ?, updated_at = ? WHERE project_id = ? AND id = ?`,
+		domain.UserStatusActive.String(), time.Now().UnixNano(), projectID, userID,
+	)
+	return err
 }

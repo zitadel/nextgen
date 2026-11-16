@@ -1,5 +1,23 @@
 # @zitadel/sdk-vue
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [[`e8b083b`](https://github.com/zitadel/nextgen/commit/e8b083b0c1f3ff832100daa1138cfb682cf3804e), [`bcd9413`](https://github.com/zitadel/nextgen/commit/bcd9413e7f1065cde76afb4149fddadd3e843cb6), [`c52126e`](https://github.com/zitadel/nextgen/commit/c52126ed0bad6656dc97d582628479075a476bb1), [`b665fe5`](https://github.com/zitadel/nextgen/commit/b665fe5229180cbc604b6e57085b73236160df94), [`81df24d`](https://github.com/zitadel/nextgen/commit/81df24d34accdf7a135d2930103a7812899b3401), [`71a0eea`](https://github.com/zitadel/nextgen/commit/71a0eeaaa47a72a6ef3f35e78cb3fcf2a688124b), [`d4e7203`](https://github.com/zitadel/nextgen/commit/d4e720361e3428eb0454aafff9c0d37e89ad2824)]:
+  - @zitadel/api@0.6.0
+  - @zitadel/components@0.6.0
+  - @zitadel/sdk-core@0.6.0
+
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c), [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0), [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b), [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6), [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99), [`69df981`](https://github.com/zitadel/nextgen/commit/69df981d45891196b2146156d80d598b1b350560), [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a), [`1420ccb`](https://github.com/zitadel/nextgen/commit/1420ccb257b7acae0d055c81c3886f1e8155a268), [`f76173b`](https://github.com/zitadel/nextgen/commit/f76173bf6a4de80a8eb0c49692df1e21c1497e61), [`48d8872`](https://github.com/zitadel/nextgen/commit/48d88726409a2e414c5b9d9999d2c5701493788a), [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db), [`e7799e9`](https://github.com/zitadel/nextgen/commit/e7799e933cd71dfea188724944d3f8369d952121), [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede), [`503e27b`](https://github.com/zitadel/nextgen/commit/503e27b9017ac0bbf93e785f94b36c32ba361bfd)]:
+  - @zitadel/api@0.5.0
+  - @zitadel/components@0.5.0
+  - @zitadel/sdk-core@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

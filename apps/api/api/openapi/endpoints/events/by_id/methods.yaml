@@ -1,6 +1,6 @@
 get:
   operationId: getEvent
-  x-zitadel-cli: events get
+  x-zitadel-cli: event get
   summary: Get an event by ID
   # Events are not registered in resource_scope_index, so the query must carry
   # the project scope (ADR 049).
@@ -13,12 +13,14 @@ get:
 
     A project that is not claimed yet also answers `404`: its events are
     stored but stay invisible until the
-    [claim](/docs/concepts/project-team-user#claim) succeeds.
+    [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+    platform operators read them from the start.
   tags:
     - Events
   security:
     - oauth2:
         - events.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/event-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml

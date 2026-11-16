@@ -372,10 +372,10 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
 				Name:                "Work laptop",
-				CreateUser: func(userID string) []service.UserAction {
+				CreateUser: func(_ context.Context, userID string) ([]service.UserAction, error) {
 					assert.Equal(t, "user_minted01", userID,
 						"the factory must receive the challenge's authoritative handle")
-					return []service.UserAction{createUser}
+					return []service.UserAction{createUser}, nil
 				},
 			},
 		})
@@ -451,7 +451,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          createUserFactory(createUser),
 			},
 		})
 		require.NoError(t, err)
@@ -498,6 +498,29 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrAuthAttemptStaleChallenge())
 	})
 
+	t.Run("a refused user aborts before any write and records no failed check", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		attempt, options := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(attempt, nil)
+
+		// No Prepare, no transaction and no AuthAttemptChallengeFailed: the
+		// attestation verified, so the refusal is not a failed passkey check.
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID:   "proj",
+			AttemptID:   "att-1",
+			ChallengeID: "ch-reg-1",
+			Proof: service.PasskeyRegistrationProof{
+				AttestationResponse: attestRegistration(t, options),
+				CreateUser: func(context.Context, string) ([]service.UserAction, error) {
+					return nil, domain.ErrFlowProofInvalid()
+				},
+			},
+		})
+		assert.ErrorIs(t, err, domain.ErrFlowProofInvalid())
+	})
+
 	t.Run("create-user prepare error aborts before any write", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAllStatements(ctrl)
@@ -514,7 +537,7 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          createUserFactory(createUser),
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserInvalid())
@@ -537,9 +560,15 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 			ChallengeID: "ch-reg-1",
 			Proof: service.PasskeyRegistrationProof{
 				AttestationResponse: attestRegistration(t, options),
-				CreateUser:          func(string) []service.UserAction { return []service.UserAction{createUser} },
+				CreateUser:          createUserFactory(createUser),
 			},
 		})
 		assert.ErrorIs(t, err, domain.ErrUserAlreadyExists())
 	})
+}
+
+// createUserFactory is a provisional registration's factory that builds the
+// given actions and refuses nothing.
+func createUserFactory(actions ...service.UserAction) func(context.Context, string) ([]service.UserAction, error) {
+	return func(context.Context, string) ([]service.UserAction, error) { return actions, nil }
 }

@@ -181,7 +181,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Equal(t, "rel_preview", got.Release.ID)
 	})
 
-	t.Run("loopback with no deployment is not deployed", func(t *testing.T) {
+	t.Run("a loopback origin the project does not list has no deployment", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		loopback := "http://localhost:3000"
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{

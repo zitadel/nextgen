@@ -51,7 +51,10 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 			return wrapError(err)
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID)); err != nil {
+			return err
+		}
+		return writeSearchEntry(ctx, tx, domain.TeamSearchEntry(team))
 	})
 }
 
@@ -89,16 +92,21 @@ func (ts teamStatements) GetTeam(ctx context.Context, filter database.Filter[dom
 // Update of a deactivated or a non-existent team returns [database.NoRowFoundError].
 func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) error {
 	now := nowUnixNano()
-	row := ts.client.QueryRow(
-		ctx,
-		updateTeamStmt,
-		team.Name,
-		now,
-		team.ProjectID,
-		team.ID,
-		domain.TeamStatusActive.String(),
-	)
-	return wrapError(scanTeamRow(row, team))
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		row := tx.QueryRow(
+			ctx,
+			updateTeamStmt,
+			team.Name,
+			now,
+			team.ProjectID,
+			team.ID,
+			domain.TeamStatusActive.String(),
+		)
+		if err := scanTeamRow(row, team); err != nil {
+			return wrapError(err)
+		}
+		return writeSearchEntry(ctx, tx, domain.TeamSearchEntry(team))
+	})
 }
 
 // ListTeams implements [service.TeamStatements].

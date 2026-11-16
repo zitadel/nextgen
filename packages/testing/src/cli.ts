@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -65,6 +65,25 @@ export function runCli(options: RunCliOptions): Promise<RunCliResult> {
       resolve({ exitCode: code ?? -1, stdout, stderr });
     });
   });
+}
+
+/**
+ * Blocking variant of {@link runCli}, for the one caller that cannot await: a
+ * signal handler whose process exits on the next tick.
+ */
+export function runCliSync(options: RunCliOptions): RunCliResult {
+  const bin = options.bin ?? resolveCliBin();
+  const result = spawnSync(process.execPath, [bin, ...options.args], {
+    env: { ...process.env, ...options.env },
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+    timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    killSignal: "SIGKILL",
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  return { exitCode: result.status ?? -1, stdout: result.stdout, stderr: result.stderr };
 }
 
 export function tail(text: string, lines = 20): string {

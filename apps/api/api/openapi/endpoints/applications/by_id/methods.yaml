@@ -1,0 +1,69 @@
+get:
+  operationId: getApplication
+  summary: Get an application by ID
+  description: |
+    Returns an application that authenticates its users via Zitadel, by ID
+    at its newest revision, with each client's `client_id` in `definition`. It
+    never returns a client secret: `publishApplication` (`POST /applications`)
+    shows one once, when it creates the client.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Applications
+  security:
+    - oauth2:
+        - application.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/application-id.yaml
+  responses:
+    '200':
+      description: The application.
+      content:
+        application/json:
+          schema:
+            $ref: ../application-response.yaml
+          examples:
+            application:
+              summary: An application with one client
+              value:
+                id: app_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: shop
+                created_at: '2026-11-06T09:11:00Z'
+                updated_at: '2026-11-06T09:11:00Z'
+                definition:
+                  slug: shop
+                  name: Shop
+                  clients:
+                    - slug: web
+                      client_id: client_01KWH3B72K7M7F0N9WD3P2E4YP
+                      type: confidential
+                      grant_types:
+                        - authorization_code
+                        - refresh_token
+                      redirect_uris:
+                        - https://shop.example.com/callback
+                        - http://localhost:3000/callback
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: |
+        No application with this ID exists in the given project
+        (`app.not_found`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getApplication-error-response.yaml

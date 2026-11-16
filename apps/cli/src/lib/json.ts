@@ -48,7 +48,11 @@ export function setTopLevelJsonKey(
         },
   }).map((edit) =>
     // The library writes a new member as `"key": value`; a compact document has no space there.
-    compact ? { ...edit, content: edit.content.replace(/^(,?"(?:[^"\\]|\\.)*"): /, "$1:") } : edit,
+    {
+      return compact
+        ? { ...edit, content: edit.content.replace(/^(,?"(?:[^"\\]|\\.)*"): /, "$1:") }
+        : edit;
+    },
   );
   const next = applyEdits(source, edits);
 

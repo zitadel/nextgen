@@ -103,6 +103,7 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 	if err := store.CreateSessionToken(ctx, refreshed, oldTokenID); err != nil {
 		return nil, exchangeConflict(err)
 	}
+	refreshed.FlowID = attempt.FlowID
 	return refreshed, nil
 }
 

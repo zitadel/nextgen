@@ -114,7 +114,7 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 							Return(nil)
 					}
 				}
-				srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler(0)))
 				require.NoError(t, err)
 
 				req := httptest.NewRequest(op.method, op.path+tc.query, nil)
@@ -197,7 +197,7 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 						ListAuthorized(gomock.Any(), service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_other", UserID: "user_1", Limit: 20}).
 						Return(&service.ListProjectsResponse{}, nil)
 				}
-				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler(0)))
 				require.NoError(t, err)
 
 				req := httptest.NewRequest(op.method, op.path+tc.query, strings.NewReader(op.body))
@@ -503,4 +503,46 @@ func TestExchangeHandoffWithoutAnEnsurerIsUnchanged(t *testing.T) {
 
 	h, crypterErr := exchangeFixture(t, exchangedSession(new("user_1")), nil)
 	require.ErrorIs(t, callExchange(t, h), crypterErr)
+}
+
+// TestCreateSession_ProjectMismatch pins project isolation on POST /sessions:
+// a project secret names its own project in project_id or is refused, before
+// any session, token or audit event exists. The mocks expect no call, so a
+// session created in the other project fails the test.
+func TestCreateSession_ProjectMismatch(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	h := Handler{
+		sessionService: servicemocks.NewMockSessionService(ctrl),
+		keyService:     servicemocks.NewMockKeyService(ctrl),
+	}
+	ctx := WithScopeContext(t.Context(), ScopeContext{ProjectID: "proj_secret"})
+	_, err := h.CreateSession(ctx, &api.CreateSessionRequest{ProjectID: "proj_other"})
+	require.ErrorIs(t, err, domain.ErrProjectMismatch())
+}
+
+// TestCreateSession_UsesCredentialProject pins that a matching project_id
+// still creates the session, in the credential's project, and seals its token
+// with that project's crypter. The crypter is stubbed to fail: its error proves
+// the handler got past Create without needing a real crypter.
+func TestCreateSession_UsesCredentialProject(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	sessions := servicemocks.NewMockSessionService(ctrl)
+	sessions.EXPECT().Create(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, in service.CreateSessionInput) (*domain.Session, error) {
+			require.Equal(t, "proj_secret", in.ProjectID)
+			return &domain.Session{ProjectID: in.ProjectID, ID: "sess_1", TokenID: "tkn_1"}, nil
+		})
+	crypterErr := errors.New("crypter unavailable")
+	keys := servicemocks.NewMockKeyService(ctrl)
+	keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj_secret", domain.EncryptionKeyPurposeToken).
+		Return(nil, crypterErr)
+
+	h := Handler{sessionService: sessions, keyService: keys}
+	ctx := WithScopeContext(t.Context(), ScopeContext{ProjectID: "proj_secret"})
+	_, err := h.CreateSession(ctx, &api.CreateSessionRequest{ProjectID: "proj_secret"})
+	require.ErrorIs(t, err, crypterErr)
 }

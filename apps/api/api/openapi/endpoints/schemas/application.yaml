@@ -1,0 +1,41 @@
+x-meta-schema: true
+title: Application
+description: |
+  An application that authenticates its users via Zitadel, with its OAuth
+  clients. The document is the `application` field of the `publishApplication`
+  (`POST /applications`) body.
+type: object
+required:
+  - slug
+  - name
+  - clients
+additionalProperties: false
+properties:
+  $schema:
+    type: string
+    minLength: 1
+    description: 'Editor affordance: path or URL of this schema so editors validate and autocomplete the
+      file. Ignored by the platform.'
+  slug:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*$
+    maxLength: 64
+    description: |
+      Stable identifier of the application, unique within the project and
+      fixed for its life. Flows and other documents reference it.
+    examples:
+      - shop
+  name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: The application's name, shown to the user when consent is asked.
+    examples:
+      - Shop
+  clients:
+    type: array
+    minItems: 1
+    maxItems: 20
+    items:
+      $ref: application-client.yaml
+    description: The application's OAuth clients. Each slug is unique within the application.

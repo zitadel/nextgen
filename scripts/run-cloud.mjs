@@ -8,24 +8,22 @@
  * --local-config), so what it needs lives there, in fields a deployment does
  * not use:
  *
- * - server: `root` is the Go module, apps/api, and `entrypoint` names its
- *   cmd/cloud-launcher package. Vercel's Go builder builds
- *   it in dev and starts it on $PORT; a deployment's build runs
- *   @zitadel/cloud's `deploy` instead, which compiles the same package
- *   through turbo. The launcher, without
+ * - server: a Node.js function, apps/cloud/server/index.mjs, that starts the
+ *   launcher (apps/cloud/dist/nextgen-launcher) and forwards to it. This
+ *   script compiles the launcher first with build-launcher.sh, as a
+ *   deployment's build does through turbo. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
  * - console: its `devCommand` builds it with the add-on and serves the
  *   build, as the deployment serves it, behind the same service rewrites. Its dev server
  *   cannot sit behind those rewrites: the console's live loop stays
- *   `moon run console:dev-real`.
+ *   `turbo run dev:real --filter=@zitadel/console`.
  *
  * What only a local run needs comes from here: the builds the dev servers
  * read from disk, a throwaway master key and root admin minted on the first
  * run under .zitadel/local/cloud/, where the SQLite database lives too, and
- * the function compiled without the console (-tags noconsole) as
- * build-launcher.sh compiles it. No Vercel account, link or secret is involved (-L), and Go
- * need not be installed: Vercel's Go builder downloads the version go.mod
- * names.
+ * the launcher compiled without the console (-tags noconsole) by
+ * build-launcher.sh, which needs Go on PATH. No Vercel account, link or
+ * secret is involved (-L).
  */
 import { spawn } from "node:child_process";
 import { generateKeyPairSync } from "node:crypto";
@@ -34,7 +32,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { run, runCapture } from "./dev-process.mjs";
-import { runnerCommand } from "./task-runner.mjs";
 
 // Pinned: Services is a beta, and what `vercel dev` does with it changes from
 // one major to the next. A `vercel` on PATH of the same major is used instead.
@@ -69,7 +66,6 @@ try {
     // functions themselves (apps/cloud-functions/src/sign-in.ts).
     CLOUD_ZITADEL_URL: origin,
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
-    GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };
   console.log(`[cloud] ${origin}/ (website), /docs, /console/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
@@ -196,15 +192,21 @@ async function ensureLocalSecrets() {
 
 /**
  * What the services' dev commands read from disk: the packages the console's
- * and the docs' builds import, and the docs' generated sources. Two calls,
- * because under turbo every named task runs in every named package.
+ * and the docs' builds import, and the docs' generated sources.
  */
 async function buildPrerequisites() {
-  for (const targets of [
-    ["sdk-react:build", "api:build", "api-mock:build", "components:build"],
-    ["docs:generate", "design-tokens:generate"],
-  ]) {
-    const { command, args } = runnerCommand(targets);
-    await run(command, args, { cwd: repoRoot });
-  }
+  await run(
+    "turbo",
+    [
+      "run",
+      "@zitadel/sdk-react#build",
+      "@zitadel/api#build",
+      "@zitadel/api-mock#build",
+      "@zitadel/components#build",
+      "@zitadel/docs#generate",
+    ],
+    { cwd: repoRoot },
+  );
+  // The server service's function starts this binary (apps/cloud/server).
+  await run("sh", [join(repoRoot, "apps/cloud/build-launcher.sh")], { cwd: repoRoot });
 }

@@ -87,10 +87,12 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 	var w recordingWriter
 	authz.WriteCheckAuthz(&w, testEnv(&w), params)
 	require.NotEmpty(t, w.args)
-	assert.Equal(t, "project", w.args[0])
-	assert.Equal(t, "viewer", w.args[1])
-	assert.Equal(t, "proj_1", w.args[2])
-	assert.Equal(t, "cat_sys_1", w.args[3])
+	// The user's status in their home project comes first (#1234).
+	assert.Equal(t, []any{"proj_home", "user_a", domain.UserStatusActive.String()}, w.args[:3])
+	assert.Equal(t, "project", w.args[3])
+	assert.Equal(t, "viewer", w.args[4])
+	assert.Equal(t, "proj_1", w.args[5])
+	assert.Equal(t, "cat_sys_1", w.args[6])
 	assert.Contains(t, w.args, "user_a")
 	assert.Contains(t, w.args, "proj_home")
 	assert.Contains(t, w.args, domain.AuthzPrincipalTypeUser.String())
@@ -394,4 +396,90 @@ func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
 
 	// And it must be bound to the token's team, not merely present.
 	assert.Contains(t, w.args, "team_1")
+}
+
+// Every read that decides what a user may do asks first whether the user is
+// active in their home project (#1234): Check (both columns), the foothold,
+// the materialized list and the list predicate. Other principals have no user
+// row, and nothing reads one for them.
+func TestUserStatusReadOnEveryPath(t *testing.T) {
+	t.Parallel()
+	const statusRead = "FROM zitadel_nextgen.users u\n        WHERE u.project_id = ?\n          AND u.id = ?\n          AND u.status = ?"
+	params := func(principalType domain.AuthzPrincipalType) domain.AuthzCheckParams {
+		return domain.AuthzCheckParams{
+			CatalogID:              "cat_sys_1",
+			ProjectID:              "proj_customer",
+			PrincipalHomeProjectID: "proj_home",
+			PrincipalType:          principalType,
+			PrincipalID:            "principal_a",
+			ObjectType:             "project",
+			Relation:               "viewer",
+		}
+	}
+	paths := map[string]func(w *recordingWriter, p domain.AuthzCheckParams) int{
+		"check": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteCheckAuthz(w, testEnv(w), p)
+			return 2 // allowed and foothold
+		},
+		"check by id": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			p.ResourceID = "user_target"
+			authz.WriteCheckAuthz(w, testEnv(w), p)
+			return 2
+		},
+		"foothold": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteHasAuthzProjectFoothold(w, testEnv(w), p.ProjectID, p.PrincipalHomeProjectID, p.PrincipalType, p.PrincipalID)
+			return 1
+		},
+		"list": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteListAuthzObjectIDs(w, testEnv(w), domain.AuthzListObjectsParams{AuthzCheckParams: p, ResourceKind: domain.ResourceKindUser})
+			return 1
+		},
+		"list predicate": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteListAuthzExistsPredicate(w, testEnv(w), "zitadel_nextgen.users.id", domain.AuthzListObjectsParams{AuthzCheckParams: p, ResourceKind: domain.ResourceKindUser})
+			return 1
+		},
+	}
+	for name, write := range paths {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var w recordingWriter
+			want := write(&w, params(domain.AuthzPrincipalTypeUser))
+			sql := w.b.String()
+			require.Equal(t, want, strings.Count(sql, statusRead), sql)
+			assert.Equal(t, "proj_home", bindAtFragment(t, sql, w.args, "u.project_id = ?"), "the status is read in the home project")
+			assert.Equal(t, "principal_a", bindAtFragment(t, sql, w.args, "u.id = ?"))
+			assert.Equal(t, domain.UserStatusActive.String(), bindAtFragment(t, sql, w.args, "u.status = ?"))
+
+			for _, other := range []domain.AuthzPrincipalType{domain.AuthzPrincipalTypeSKProj, domain.AuthzPrincipalTypeSKTeam, domain.AuthzPrincipalTypeTeam} {
+				var o recordingWriter
+				write(&o, params(other))
+				assert.NotContains(t, o.b.String(), "zitadel_nextgen.users u", "%s has no user row to read", other)
+			}
+		})
+	}
+}
+
+// The status read names no outer row, so the list predicate keeps it out of
+// both correlated RSI subqueries: a planner evaluates it once, not per row.
+func TestListPredicateLiftsUserStatus(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id", domain.AuthzListObjectsParams{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:     "cat_sys_1",
+			ProjectID:     "proj_1",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_a",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		},
+		ResourceKind: domain.ResourceKindTeam,
+	})
+	sql := w.b.String()
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, firstRSI)
+	require.Equal(t, 1, strings.Count(sql, "zitadel_nextgen.users u"))
+	assert.Less(t, strings.Index(sql, "zitadel_nextgen.users u"), firstRSI)
+	assert.True(t, strings.HasPrefix(sql, "(EXISTS (\n        SELECT 1\n        FROM zitadel_nextgen.users u"),
+		"the status read must AND the whole predicate, so neither half can skip it")
 }

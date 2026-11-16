@@ -65,6 +65,10 @@ For example:
 Every property becomes available to the rest of the identity system,
 including login and registration flows.
 
+A property's `format` is enforced for the standard JSON Schema formats, such as
+`email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`,
+is only a label: use `pattern` if the value must match it.
+
 ## `required`
 
 Lists which properties every user must provide.

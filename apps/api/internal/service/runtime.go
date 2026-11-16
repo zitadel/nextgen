@@ -186,6 +186,8 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 // deploymentOf is the deployment an admitted origin serves, nil for none, as
 // the live view picks it: a listed primary origin runs the newest primary
 // deployment when that names it, a preview URL its live preview deployment.
+// A deployment freezes its origins, so one added later waits for the next
+// deploy.
 func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
 	dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
 	if err != nil {

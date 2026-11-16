@@ -1,13 +1,23 @@
 import { readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
-
 import semver from "semver";
 
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
+import { PM, type PackageJson } from "@/lib/pm";
 import { ancestors } from "@/lib/paths";
-import { type PackageJson, readPackageJson } from "@/lib/npm";
 
-export { type PackageJson, readPackageJson } from "@/lib/npm";
+export type { PackageJson } from "@/lib/pm";
+
+/**
+ * Reads the `package.json` that sits directly in `dir`.
+ *
+ * @param dir - The project directory.
+ * @returns The parsed file.
+ * @throws When there is none, or it is not a JSON object.
+ */
+export async function readPackageJson(dir: string): Promise<PackageJson> {
+  return PM.manifest(dir);
+}
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.
@@ -77,7 +87,11 @@ function admitsAtOrAbovePrereleaseFloor(
     return true;
   }
   return new semver.Range(spec).set.some((comparators) => {
-    const range = comparators.map((comparator) => comparator.value).join(" ");
+    const range = comparators
+      .map((comparator) => {
+        return comparator.value;
+      })
+      .join(" ");
     return comparators.some(({ semver: version }) => {
       const base = `${version.major}.${version.minor}.${version.patch}`;
       if (version.prerelease.length === 0 || semver.lt(base, floor.version)) {
@@ -100,7 +114,11 @@ function admitsAtOrAbovePrereleaseFloor(
  */
 function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer, exact: boolean): boolean {
   return new semver.Range(spec).set.some((comparators) => {
-    const range = comparators.map((comparator) => comparator.value).join(" ");
+    const range = comparators
+      .map((comparator) => {
+        return comparator.value;
+      })
+      .join(" ");
     return comparators.some(({ semver: version }) => {
       const base = `${version.major}.${version.minor}.${version.patch}`;
       return (
@@ -134,13 +152,19 @@ export type InstalledPackage = { version: string; path: string };
 async function isWorkspaceRoot(dir: string): Promise<boolean> {
   if (
     await readFile(join(dir, "pnpm-workspace.yaml")).then(
-      () => true,
-      () => false,
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
     )
   ) {
     return true;
   }
-  const pkg = await readPackageJson(dir).catch(() => undefined);
+  const pkg = await readPackageJson(dir).catch(() => {
+    return undefined;
+  });
   return pkg?.workspaces !== undefined && pkg.workspaces !== null;
 }
 
@@ -157,10 +181,14 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  const start = await realpath(resolve(cwd)).catch(() => resolve(cwd));
+  const start = await realpath(resolve(cwd)).catch(() => {
+    return resolve(cwd);
+  });
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
-    const contents = await readFile(path, "utf8").catch(() => undefined);
+    const contents = await readFile(path, "utf8").catch(() => {
+      return undefined;
+    });
     if (contents !== undefined) {
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };

@@ -61,6 +61,14 @@ post:
               facts:
                 self_service: true
                 history_matches: [false, true]
+          signup:
+            summary: A sign-up that solved the built-in proof of work
+            value:
+              operation: user.create
+              config:
+                challenge: zitadel_pow
+              input:
+                solved_challenge: zitadel_pow
   responses:
     '200':
       description: The decision the operation would reach.

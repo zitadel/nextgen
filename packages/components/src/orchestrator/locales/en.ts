@@ -223,6 +223,11 @@ export const en: Record<string, string> = {
   "error.sso_user_not_found": "There is no account for this sign-in yet.",
   "error.outcome_unhandled": "This step could not continue. Please try again.",
   "error.sign_in_first": "Please sign in to your account first.",
+  // The sign-up check before a password account is created, and its limits.
+  "error.signup_check_failed": "We couldn't create your account. Please try again.",
+  "error.signup_rate_limited": "Too many attempts. Please wait a minute and try again.",
+  "error.signup_secure_connection":
+    "Creating an account needs a secure connection. Open this page with https://.",
 
   // --- Notices: why the flow moved between sign-in and sign-up by itself ---
   "notice.user_not_found":

@@ -6,6 +6,7 @@
     "deploy",
     "password-policy",
     "test-policies",
+    "test-your-app",
     "migrate-user-schema",
     "sign-in-methods",
     "social-sign-in",

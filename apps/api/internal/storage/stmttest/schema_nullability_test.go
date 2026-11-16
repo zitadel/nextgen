@@ -8,13 +8,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/storage/application"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/nextgen/internal/storage/events"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/idpidentitylink"
+	"github.com/zitadel/nextgen/internal/storage/invitation"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/preview"
 	"github.com/zitadel/nextgen/internal/storage/release"
@@ -31,7 +34,19 @@ import (
 func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	t.Helper()
 	var cols []schematest.ColumnNullability
-	cols = append(cols, schematest.Columns("users", user.NewSchema("users", "json_schemas"))...)
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "project_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "flow_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "expires_at"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "payload"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_challenges", Column: "public"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "project_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "flow_id"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "window_start"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "issued"})
+	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "verified"})
+
+	cols = append(cols, schematest.Columns("users", user.NewSchema(user.SchemaSQL{}))...)
 	cols = append(cols, schematest.Columns("user_passkeys", userpasskey.Schema)...)
 	cols = append(cols, schematest.Columns("user_passwords", userpassword.Schema)...)
 	cols = append(cols, schematest.Columns("user_recovery_codes", userrecoverycodes.Schema)...)
@@ -39,6 +54,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("team_memberships", teammembership.Schema)...)
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
 	cols = append(cols, schematest.Columns("releases", release.Schema)...)
+	cols = append(cols, schematest.Columns("invitations", invitation.Schema)...)
 	cols = append(cols, schematest.Columns("variables", variable.Schema)...)
 	cols = append(cols, schematest.Columns("deployments", deployment.NewSchema(deployment.Tables{Deployments: "deployments", Origins: "deployment_origins", Previews: "previews", ProjectOrigins: "project_origins"}))...)
 	cols = append(cols, schematest.Columns("previews", preview.Schema)...)
@@ -46,6 +62,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
 	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)
 	cols = append(cols, schematest.Columns("idp_identity_links", idpidentitylink.Schema)...)
+	cols = append(cols, schematest.Columns("events", events.Schema)...)
 	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
 	require.NoError(t, err)
 	cols = append(cols, joined...)
@@ -53,6 +70,9 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	require.NoError(t, err)
 	cols = append(cols, joined...)
 	joined, err = schematest.JoinColumns(map[string]string{"p": "policies", "r": "policy_revisions"}, policystore.Schema)
+	require.NoError(t, err)
+	cols = append(cols, joined...)
+	joined, err = schematest.JoinColumns(map[string]string{"a": "applications", "r": "application_revisions"}, application.Schema)
 	require.NoError(t, err)
 	return append(cols, joined...)
 }

@@ -1,5 +1,5 @@
 import {
-  GetUserByIDResponse,
+  GetUserResponse,
   ListEventsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
@@ -37,14 +37,22 @@ describe("fieldPaths", () => {
   });
 
   it("reads a record response directly, without an item array", () => {
-    const paths = pathsOf(GetUserByIDResponse);
+    const paths = pathsOf(GetUserResponse);
     expect(allows(paths, "metadata.created_at")).toBe(true);
   });
 
   it("gathers every variant of a union response, since any of them can arrive", () => {
-    const paths = pathsOf(ListEventsResponse.shape.data.element);
+    const paths = pathsOf(ListEventsResponse.shape.events.element);
     expect(allows(paths, "event_type")).toBe(true);
     expect(allows(paths, "category")).toBe(true);
+  });
+
+  it("reads each variant's own payload, not only the last variant's", () => {
+    const paths = pathsOf(ListEventsResponse.shape.events.element);
+    expect(allows(paths, "payload.operation_id")).toBe(true);
+    expect(allows(paths, "payload.status")).toBe(true);
+    expect(allows(paths, "payload.kind")).toBe(true);
+    expect(allows(paths, "payload.nope")).toBe(false);
   });
 
   it("suggests the known paths and marks the open ones", () => {

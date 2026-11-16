@@ -9,9 +9,24 @@ import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { z } from "zod";
+
+import type { JsonObject } from "@/lib/zitadel/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
+
+/** The part of a request to store an origin these handlers read: its kind. */
+const OriginRequest = z.object({
+  kind: z.string().optional(),
+});
+
+/** The part of a request to create a project these handlers read: its name. */
+const ProjectRequest = z.object({
+  name: z.string().optional(),
+});
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
@@ -26,9 +41,6 @@ export interface Captured<T> {
  * HTTP it takes to arrange that stays in here.
  */
 export interface PlatformMock {
-  /** Makes storing a schema fail, so a command fails partway through. */
-  rejectsSchemaUploads(): void;
-
   /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
   holdsAUserWithoutAnEmail(): void;
 
@@ -62,6 +74,20 @@ export interface PlatformMock {
   rejectsAFlow(): void;
 
   /**
+   * Answers as a server from before the sign-up policy: an evaluation of one,
+   * and a release build that carries one, are refused as malformed
+   * (`req.invalid`), because the server does not know the operation.
+   */
+  predatesTheSignupPolicy(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose connection
+   * changes a field fixed for the life of the connection: `rel.invalid`, with
+   * the field named in the resource's own `details`.
+   */
+  rejectsAConnection(): void;
+
+  /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
    * with a body that is not a platform error envelope.
@@ -93,6 +119,9 @@ export interface PlatformMock {
 
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
+
+  /** Makes the project's live previews unreadable while everything else answers. */
+  cannotListPreviews(): void;
 
   /**
    * Refuses every read of a variable, as a credential without `variable.read`
@@ -142,11 +171,28 @@ export interface PlatformMock {
   admitsAHostileOriginPattern(): string;
 
   /**
+   * Answers a release build with a content hash holding a terminal escape
+   * sequence, before the colon that names its algorithm, which is the part a
+   * shortened hash keeps whole.
+   *
+   * @returns The hash it will answer with.
+   */
+  buildsAReleaseWithAHostileHash(): string;
+
+  /**
    * Answers a release revoke with an id holding a terminal escape sequence.
    *
    * @returns The id it will answer with.
    */
   revokesAHostileReleaseId(): string;
+
+  /**
+   * Answers a release revoke with `409 rel.in_use` naming a primary origin that
+   * holds a terminal escape sequence.
+   *
+   * @returns The origin it will name.
+   */
+  refusesRevokeNamingAHostileOrigin(): string;
 
   /**
    * Answers a user query with a page cursor holding a terminal escape
@@ -218,18 +264,16 @@ export function usePlatformMock(): PlatformMock {
   const holdUsers = (matching: Record<string, unknown>[], elsewhere: Record<string, unknown>[]) => {
     server.use(
       http.post("*/users/query", async ({ request }) => {
-        const body: unknown = await request.json();
         // Held to the API's own request schema, as the real server holds it, so a
         // filter shape the API would refuse fails the spec instead of passing.
-        if (!QueryUsersBody.safeParse(body).success) {
+        const query = QueryUsersBody.safeParse(await request.json());
+        if (!query.success) {
           return HttpResponse.json(
             { code: "req.invalid", message: "the request is invalid" },
             { status: 400 },
           );
         }
-        const { filter = [] } = body as {
-          filter?: Array<{ field: string; operation: string; value: string }>;
-        };
+        const { filter = [] } = query.data;
         const status = filter.find((entry) => entry.field === "status")?.value;
         const alive = (users: Record<string, unknown>[]) =>
           users.filter((user) => status === undefined || (user.status ?? "active") === status);
@@ -308,14 +352,6 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
-    rejectsSchemaUploads() {
-      server.use(
-        http.post("*/schemas", () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-        ),
-      );
-    },
-
     rejectsASchema() {
       refuseReleases([
         {
@@ -325,6 +361,32 @@ export function usePlatformMock(): PlatformMock {
           message: 'schema designation invalid: "x-display" names unknown property "nickname"',
         },
       ]);
+    },
+
+    predatesTheSignupPolicy() {
+      const unknownOperation = () =>
+        HttpResponse.json(
+          { code: "req.invalid", message: "the request is invalid" },
+          { status: 400 },
+        );
+      const isSignupPolicy = (policy: unknown) =>
+        typeof policy === "object" &&
+        policy !== null &&
+        "operation" in policy &&
+        policy.operation === "user.create";
+      // A handler that answers nothing leaves the request to the platform's own.
+      server.use(
+        http.post("*/policies/evaluate", async ({ request }) => {
+          return isSignupPolicy(await request.clone().json()) ? unknownOperation() : undefined;
+        }),
+        http.post("*/releases/build", async ({ request }) => {
+          const body = z
+            .object({ bundle: z.object({ policies: z.array(z.unknown()).optional() }) })
+            .safeParse(await request.clone().json());
+          const carriesOne = body.success && (body.data.bundle.policies ?? []).some(isSignupPolicy);
+          return carriesOne ? unknownOperation() : undefined;
+        }),
+      );
     },
 
     rejectsAFlow() {
@@ -337,6 +399,19 @@ export function usePlatformMock(): PlatformMock {
           details: {
             details: 'step "register-password": on_success create_user requires "identifier"',
           },
+        },
+      ]);
+    },
+
+    rejectsAConnection() {
+      refuseReleases([
+        {
+          kind: "idp",
+          handle: "google",
+          code: "idp.field_immutable",
+          message:
+            "identity provider connection: the field is fixed for the life of the connection",
+          details: { details: { fields: ["oidc.issuer"] } },
         },
       ]);
     },
@@ -356,7 +431,7 @@ export function usePlatformMock(): PlatformMock {
     storesOrigin(pattern: string) {
       server.use(
         http.post("*/projects/:projectId/origins", async ({ request }) => {
-          const body = (await request.json()) as { kind?: string };
+          const body = OriginRequest.parse(await request.json());
           return HttpResponse.json(
             {
               pattern,
@@ -372,7 +447,7 @@ export function usePlatformMock(): PlatformMock {
       const id = "proj-\u001b[2Jwiped";
       server.use(
         http.post("*/projects", async ({ request }) => {
-          const body = (await request.json()) as { name?: string };
+          const body = ProjectRequest.parse(await request.json());
           return HttpResponse.json(
             {
               id,
@@ -389,7 +464,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     servesAHostileOrigin() {
-      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const origin = `${PRIMARY_ORIGIN}\u001b[2Jwiped`;
       const deployment = (id: string) => {
         return {
           id,
@@ -428,6 +503,22 @@ export function usePlatformMock(): PlatformMock {
       return origin;
     },
 
+    buildsAReleaseWithAHostileHash() {
+      const hash = `sha256\u001b[2Jwiped:${"a".repeat(64)}`;
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({
+            id: "rel_1",
+            project_id: "proj_1",
+            content_hash: hash,
+            created_at: "2026-01-01T00:00:00Z",
+            revoked_at: null,
+          });
+        }),
+      );
+      return hash;
+    },
+
     revokesAHostileReleaseId() {
       const id = "rel-\u001b[2Jwiped";
       server.use(
@@ -440,6 +531,23 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    refusesRevokeNamingAHostileOrigin() {
+      const origin = "https://evil\u001b[2Jwiped.example.com";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json(
+            {
+              code: "rel.in_use",
+              message: "release: still served by an origin",
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "primary" }] },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      return origin;
     },
 
     pagesWithAHostileCursor() {
@@ -546,6 +654,14 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    cannotListPreviews() {
+      server.use(
+        http.get("*/projects/:projectId/previews", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+        ),
+      );
+    },
+
     cannotReadConnections() {
       server.use(
         http.get("*/idps/:id", () =>
@@ -572,10 +688,10 @@ export function usePlatformMock(): PlatformMock {
     },
 
     capturesBrandingPublishes() {
-      const published: Array<Record<string, unknown>> = [];
+      const published: JsonObject[] = [];
       server.use(
         http.post("*/branding", async ({ request }) => {
-          const body = (await request.json()) as Record<string, unknown>;
+          const body = toJsonObject(await request.json(), "The branding publish");
           published.push(body);
           return HttpResponse.json(
             { id: "brandrev_setup_1", created_at: "2026-08-04T00:00:00.000Z", branding: body },
@@ -604,11 +720,11 @@ export function usePlatformMock(): PlatformMock {
     },
 
     capturesRollbacks() {
-      const requests: Array<Record<string, unknown>> = [];
+      const requests: JsonObject[] = [];
       server.use(
         http.post("*/deployments/:id/rollback", async ({ request }) => {
           const text = await request.clone().text();
-          requests.push(text === "" ? {} : (JSON.parse(text) as Record<string, unknown>));
+          requests.push(text === "" ? {} : toJsonObject(JSON.parse(text), "The rollback request"));
           return undefined;
         }),
       );

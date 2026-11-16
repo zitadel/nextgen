@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { SolidStartPatcher } from "@/lib/orca/patchers/rule/solid-start";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
@@ -19,6 +20,7 @@ function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -35,7 +37,7 @@ describe("SolidStartPatcher.plan", () => {
   it("writes the middleware and file-based routes under src/", () => {
     const plan = new SolidStartPatcher().plan(ctx());
 
-    expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/middleware.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/middleware.ts")).toContain("@zitadel/sdk-solid-start/server");
     expect(writeContents(plan, "src/middleware.ts")).toContain("createNextgenMiddleware");
     // SolidStart 2 registers the default export as an array of h3 middleware, so
@@ -46,7 +48,7 @@ describe("SolidStartPatcher.plan", () => {
     );
     expect(writeContents(plan, "src/middleware.ts")).toContain("export default createMiddleware(");
 
-    expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/index.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
@@ -70,7 +72,7 @@ describe("SolidStartPatcher.plan", () => {
     // on it or overwrites it under --force.
     expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
     // The auth boundary and the auth routes are still written.
-    expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/middleware.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");

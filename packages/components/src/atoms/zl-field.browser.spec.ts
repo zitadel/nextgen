@@ -117,6 +117,28 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
+  it("submits on Enter when the field is named after a form method", async () => {
+    const { form, field } = mount(
+      `<form><zl-field name="requestSubmit" value="x"></zl-field></form>`,
+    );
+    await field.updateComplete;
+    let submitted = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(submitted).toBe(1);
+  });
+
   it("does not submit on Enter when modifier keys are held", async () => {
     const { form, field } = mount(
       `<form><zl-field name="email" value="alice@acme.com"></zl-field></form>`,

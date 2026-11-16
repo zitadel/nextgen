@@ -39,9 +39,21 @@ func sessionCookieNameFor(secure bool) string {
 	return loopbackSessionCookieName
 }
 
+// CreateSession creates an anonymous session in the credential's own project.
+// A project_id naming any other project is refused before anything is written:
+// a project secret must not mint sessions, tokens or audit events in another
+// tenant's project.
 func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionRequest) (api.CreateSessionRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if string(req.ProjectID) != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
 	input := service.CreateSessionInput{
-		ProjectID: string(req.ProjectID),
+		ProjectID: scopeCtx.ProjectID,
 		UserAgent: userAgentToDomain(req.UserAgent),
 	}
 
@@ -50,7 +62,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 		return nil, err
 	}
 
-	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, string(req.ProjectID), domain.EncryptionKeyPurposeToken)
+	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, scopeCtx.ProjectID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}

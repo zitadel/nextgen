@@ -12,8 +12,11 @@ import (
 
 const (
 	teamFieldCreatedAt = "created_at"
-	teamFieldName      = "name"
-	teamFieldStatus    = "status"
+	// teamFieldID is not a filter field of queryTeams: search (ADR 087) reads
+	// a team by id through the list, so the caller's grants narrow the read.
+	teamFieldID     = "id"
+	teamFieldName   = "name"
+	teamFieldStatus = "status"
 )
 
 type TeamService struct {
@@ -170,6 +173,15 @@ func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
 	switch f.Field {
 	case teamFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), f.Value)
+	case teamFieldID:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		if f.Operation != filterOpEquals {
+			return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, teamFieldID))
+		}
+		return database.StringEqual(database.Col(domain.TeamFieldID), value), nil
 	case teamFieldName:
 		value, err := stringFilterValue(f)
 		if err != nil {

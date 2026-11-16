@@ -7,7 +7,8 @@ import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/
 import { NextPatcher } from "@/lib/orca/patchers/rule/next";
 import { PAGE_SURFACE_BACKGROUND } from "@/lib/orca/patchers/rule/next/renderers/react";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
+import { CliPackage } from "@/lib/upgrade";
 
 function ctxFor(
   appDir: "app" | "src/app",
@@ -27,6 +28,7 @@ function ctxFor(
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    sdkVersion: CliPackage.at("0.1.0-alpha.0").selector(),
     scaffoldedFramework,
   };
 }
@@ -52,7 +54,7 @@ describe("NextPatcher.plan", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, "zitadel.json")).toContain('"project": "proj-1"');
     expect(editContents(plan, "app/page.tsx")).toBeUndefined();
-    expect(writeContents(plan, "app/login/page.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app/login/page.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
@@ -63,11 +65,11 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("businessLocales");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
-    expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app/register/page.tsx")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('variant="page"');
-    expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "middleware.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
   });
@@ -129,7 +131,7 @@ describe("NextPatcher.plan", () => {
     const plan = new NextPatcher().plan(ctxFor("app", 15, true));
     const homePage = editContents(plan, "app/page.tsx", "starter");
 
-    expect(homePage).toContain(MANAGED_MARKER);
+    expect(homePage).toContain(ManagedFile.MARKER);
     expect(homePage).toContain('redirect("/login")');
     // Cache Components' dev server logs the redirect as a failed instant
     // validation on every GET / unless the page opts out.
@@ -178,7 +180,7 @@ describe("NextPatcher.plan", () => {
 
   it("emits proxy.ts for Next 16 projects", () => {
     const plan = new NextPatcher().plan(ctxFor("app", 16));
-    expect(writeContents(plan, "proxy.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "proxy.ts")).toContain(ManagedFile.MARKER);
     expect(writeContents(plan, "proxy.ts")).toContain("export function proxy(");
     expect(writeContents(plan, "middleware.ts")).toBeUndefined();
   });
@@ -206,15 +208,12 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
-  it.each([
-    ["1.2.0", "1.2.0"],
-    ["2.0.0-beta.3", "beta"],
-  ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
-    const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+  it("pins the SDK at the version the context carries", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), sdkVersion: "beta" });
     const dep = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
     );
-    expect(dep?.version).toBe(expected);
+    expect(dep?.version).toBe("beta");
   });
 
   it("leaves schema and flow files for setup's resource materializer", () => {
@@ -248,7 +247,7 @@ describe("NextPatcher.plan", () => {
 
   it("honors the src/app directory", () => {
     const plan = new NextPatcher().plan(ctxFor("src/app"));
-    expect(writeContents(plan, "src/app/login/page.tsx")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/app/login/page.tsx")).toContain(ManagedFile.MARKER);
   });
 });
 
@@ -257,7 +256,7 @@ describe("NextPatcher.plan for a scaffolded app", () => {
     const plan = new NextPatcher().plan(ctxFor("app", undefined, true));
     const page = editContents(plan, "app/page.tsx") ?? "";
 
-    expect(page).toContain(MANAGED_MARKER);
+    expect(page).toContain(ManagedFile.MARKER);
     const imports = [...page.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
     expect(imports.length).toBeGreaterThan(0);
     expect(imports.filter((specifier) => specifier?.startsWith("."))).toEqual([]);
@@ -272,7 +271,7 @@ describe("NextPatcher.artifacts", () => {
   ])("gives the %s route a managed layout that titles the browser tab %s", (route, title) => {
     const plan = new NextPatcher().plan(ctxFor("app", 15, true));
     const layout = writeContents(plan, `app/${route}/layout.tsx`);
-    expect(layout).toContain(MANAGED_MARKER);
+    expect(layout).toContain(ManagedFile.MARKER);
     expect(layout).toContain(`export const metadata: Metadata = { title: "${title}" };`);
     expect(layout).toContain("return children;");
   });
@@ -303,8 +302,8 @@ describe("NextPatcher.artifacts", () => {
     expect(artifacts.rootConfigFiles).toEqual(["zitadel.json"]);
     expect(artifacts.directories).toEqual([".zitadel"]);
     expect(artifacts.envBackups).toEqual([".env.local", ".env.development.local"]);
-    // The react renderer's SDK package — `eject` surfaces this as
-    // `npm uninstall <name>` in next_commands.
+    // The react renderer's SDK package — `eject` suggests removing it in
+    // next_commands, with the project's own package manager.
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-next"]);
   });
 

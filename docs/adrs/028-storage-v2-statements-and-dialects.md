@@ -273,7 +273,7 @@ diverge from Postgres.
 | -------- | ------ |
 | **App-dev UX** (`zitadel start`) | Fewer prerequisites: no Docker, no Postgres install, no embedded Postgres binary/port. Same commands; faster/simpler ready path (one process + file DB). Data still under `.zitadel/local/nextgen-data`. Reset/stop semantics unchanged. Users do not pick a dialect for the happy path. |
 | **Operator / prod UX** | Unchanged — still configure Postgres or Spanner. |
-| **Contributor DevX** | No embedded Postgres binary/port management for default server runs; dialect work and `server:test-sqlite` cover the local engine. Need Postgres/Spanner only for production-parity or tagged integration tests. Tradeoff: local concurrent-writer behavior and some SQL edge cases differ from Postgres — document, do not hide. |
+| **Contributor DevX** | No embedded Postgres binary/port management for default server runs; dialect work and the server's `test:sqlite` cover the local engine. Need Postgres/Spanner only for production-parity or tagged integration tests. Tradeoff: local concurrent-writer behavior and some SQL edge cases differ from Postgres — document, do not hide. |
 
 ## Package layout
 

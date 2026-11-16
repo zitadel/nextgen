@@ -1048,6 +1048,7 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 		result       *database.ListResult[*domain.Project]
 		statementErr error
 		wantErr      error
+		noCall       bool
 		checkCall    func(t *testing.T, home, user string, opts *database.ListOptions[domain.ProjectField])
 		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
 	}{
@@ -1102,9 +1103,50 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			},
 		},
 		{
+			// Ids carry no creation order on every dialect (ADR 047), so newest
+			// first sorts on created_at, with id only to break ties.
+			name:   "order desc sorts by creation time, newest first",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Order: "desc", PageToken: "tok"},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			name:   "order asc sorts by creation time, oldest first",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Order: "asc"},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name:    "unknown order is refused before storage",
+			req:     service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Order: "sideways"},
+			wantErr: domain.ErrRequestInvalid(),
+			noCall:  true,
+		},
+		{
 			name:         "invalid cursor maps to request invalid",
 			req:          service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", PageToken: "bad"},
 			statementErr: database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			// A token names the order it was issued under; storage refuses it
+			// under another, and the caller hears a bad request, not a 500.
+			name:         "a token from another order maps to request invalid",
+			req:          service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Order: "desc", PageToken: "by-id"},
+			statementErr: database.ErrCursorOrderMismatch(),
 			wantErr:      domain.ErrRequestInvalid(),
 		},
 		{
@@ -1124,11 +1166,15 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 
 			var gotHome, gotUser string
 			var gotOpts *database.ListOptions[domain.ProjectField]
+			times := 1
+			if tc.noCall {
+				times = 0
+			}
 			statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, home, user string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 					gotHome, gotUser, gotOpts = home, user, opts
 					return tc.result, tc.statementErr
-				})
+				}).Times(times)
 
 			resp, err := svc.ListAuthorized(context.Background(), tc.req)
 			if tc.wantErr != nil {
@@ -1178,6 +1224,33 @@ func TestProjectService_ListEveryProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, resp.Projects, 2)
 	assert.Equal(t, "next", resp.NextPageToken)
+}
+
+// An operator's listing takes the order the grant query takes, so the console
+// reads newest first whichever of the two answers.
+func TestProjectService_ListEveryProjectNewestFirst(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldCreatedAt),
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}}}, nil
+		})
+
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		Order:         "desc",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 1)
 }
 
 // An operator searches like anyone (ADR 075 §6): the name filter that narrows

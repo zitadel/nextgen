@@ -163,6 +163,9 @@ func fromAPIPublishPolicy(req api.PublishPolicyRequest) (string, map[string]any,
 	case api.PasswordSetPolicyInputPublishPolicyRequest:
 		in := req.PasswordSetPolicyInput
 		return string(in.Operation), fromAPIPasswordSetConfig(in.Config), nil
+	case api.UserCreatePolicyInputPublishPolicyRequest:
+		in := req.UserCreatePolicyInput
+		return string(in.Operation), fromAPIUserCreateConfig(in.Config), nil
 	default:
 		return "", nil, domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: unknown operation")
 	}
@@ -187,6 +190,13 @@ func fromAPIEvaluatePolicy(req api.EvaluatePolicyRequest) (service.EvaluatePolic
 			Operation:   string(in.Operation),
 			Config:      fromAPIPasswordSetConfig(in.Config),
 			PasswordSet: evaluation,
+		}, nil
+	case api.UserCreateEvaluateRequestEvaluatePolicyRequest:
+		in := req.UserCreateEvaluateRequest
+		return service.EvaluatePolicyInput{
+			Operation:  string(in.Operation),
+			Config:     fromAPIUserCreateConfig(in.Config),
+			UserCreate: &service.UserCreateEvaluation{SolvedChallenge: string(in.Input.SolvedChallenge)},
 		}, nil
 	default:
 		return service.EvaluatePolicyInput{}, domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: unknown operation")
@@ -226,6 +236,14 @@ func fromAPIPasswordSetConfig(in api.PasswordSetConfig) map[string]any {
 	return config
 }
 
+func fromAPIUserCreateConfig(in api.UserCreateConfig) map[string]any {
+	config := make(map[string]any, 1)
+	if v, ok := in.Challenge.Get(); ok {
+		config["challenge"] = string(v)
+	}
+	return config
+}
+
 // toAPIPolicy types a stored revision by its operation. A stored operation
 // the API does not know is a server fault: publishing only accepts known ones.
 func toAPIPolicy(entity *domain.Policy) (*api.Policy, error) {
@@ -240,6 +258,21 @@ func toAPIPolicy(entity *domain.Policy) (*api.Policy, error) {
 			RevisionID: api.PolicyRevisionID(entity.RevisionID),
 			ProjectID:  api.ProjectID(entity.ProjectID),
 			Operation:  api.PasswordSetPolicyOperationAuthFactorPasswordSet,
+			Config:     config,
+			CreatedAt:  entity.CreatedAt,
+			UpdatedAt:  entity.UpdatedAt,
+		})
+		return &policy, nil
+	case string(api.UserCreatePolicyOperationUserCreate):
+		var config api.UserCreateConfig
+		if err := config.UnmarshalJSON(entity.Config); err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to decode stored policy config")
+		}
+		policy := api.NewUserCreatePolicyPolicy(api.UserCreatePolicy{
+			ID:         api.PolicyID(entity.ID),
+			RevisionID: api.PolicyRevisionID(entity.RevisionID),
+			ProjectID:  api.ProjectID(entity.ProjectID),
+			Operation:  api.UserCreatePolicyOperationUserCreate,
 			Config:     config,
 			CreatedAt:  entity.CreatedAt,
 			UpdatedAt:  entity.UpdatedAt,

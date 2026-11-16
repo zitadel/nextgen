@@ -113,7 +113,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return nil, normalizeFlowError(err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return nil, domain.ErrFlowNotFound()
 	}
 	// Admit Origin before reading the sealed release: a project that refuses
@@ -245,10 +245,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		logFlowStepFailure(ctx, state.ProjectID, result.Step)
-		return &api.SubmitFlowStepBadRequest{
+		return &api.SubmitFlowStepBadRequestHeaders{
 			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
 			CacheControl: api.NewOptString(sessionStateCacheControl),
-			Response:     flowResp,
+			Response:     api.NewFlowResponseSubmitFlowStepBadRequest(flowResp),
 		}, nil
 	}
 
@@ -259,7 +259,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if result.SSOBindingNonce != "" {
 		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
 	}
-	return &api.SubmitFlowStepOK{
+	return &api.FlowResponseHeaders{
 		SetCookie:    cookies,
 		CacheControl: api.NewOptString(sessionStateCacheControl),
 		Response:     flowResp,
@@ -272,7 +272,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(ctx, err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
-	if state.ID != params.ID {
+	if state.ID != params.FlowID {
 		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
@@ -390,7 +390,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 		// Path=/ ensures that each Set-Cookie replaces the previous one in
 		// the browser's cookie jar rather than accumulating — without an
 		// explicit path the browser derives the path from the request URI,
-		// which differs across /flow and /flow/{id}/submit endpoints.
+		// which differs across /flows and /flows/{flow_id}/submit endpoints.
 		Path: "/",
 	}
 	if clear {
@@ -434,6 +434,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Fields:  toFlowStepFields(step.Fields),
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
+	}
+	if step.SignupRequired {
+		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: domain.SignupGateProvider}
+	}
+	if c := step.SignupChallenge; c != nil {
+		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: domain.SignupGateProvider, Challenge: api.NewOptPowChallenge(api.PowChallenge{Protocol: c.Protocol, ChallengeID: c.ChallengeID, ProfileID: c.ProfileID, Salt: c.Salt, Nonce: c.Nonce, KeyPrefix: c.KeyPrefix, ExpiresAt: c.ExpiresAt})}
 	}
 	if len(step.SSOProviders) > 0 {
 		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
@@ -666,6 +672,10 @@ var (
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
+	case domain.ErrFlowProofInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrFlowRateLimited().Code:
+		return errorResponseWithStatusCode(http.StatusTooManyRequests, err)
 	case codeFlowCookieInvalid, codeFlowCookieExpired:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
 	case codeFlowNotFound:

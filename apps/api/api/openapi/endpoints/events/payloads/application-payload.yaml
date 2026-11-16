@@ -1,0 +1,25 @@
+title: ApplicationPayload
+type: object
+description: |
+  Payload for `application.created`, which holds every field, and
+  `application.updated`, which holds the new `revision_id`, `name` when it
+  changed, and `client_ids` when the revision added a client. The application
+  ID is the event's `entity_id`. The application document and the client
+  secrets are never included.
+required:
+  - revision_id
+properties:
+  slug:
+    type: string
+  name:
+    type: string
+  client_ids:
+    type: array
+    description: |
+      The `client_id` of each client the write created. Each of them got a new
+      secret.
+    items:
+      type: string
+  revision_id:
+    type: string
+    description: The revision the write appended.

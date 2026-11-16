@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -102,4 +103,39 @@ func designatedIdentifierKeys(ctx context.Context, stmts AllStatements, projectI
 		urlsByKey[key] = append(urlsByKey[key], schema.URL)
 	}
 	return urlsByKey, nil
+}
+
+// designatedSearchKeys are the properties any user schema revision of the
+// project designates as identifier or display part: the keys whose attributes
+// carry search text (ADR 058). perUser is the most of them one schema
+// designates, so the most ways one user can match a search over all of them.
+func designatedSearchKeys(ctx context.Context, stmts AllStatements, projectID string) (keys []domain.AttributeKey, perUser int, err error) {
+	// As in designatedIdentifierKeys: every revision's designation counts,
+	// whatever the caller's grants cover.
+	ctx = WithAuthzListUnrestricted(ctx)
+	list := listUserSchemas(ctx, stmts, projectID)
+	first, err := list(nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, 0, err
+		}
+		var designated []domain.AttributeKey
+		if identifier := domain.DesignatedIdentifier(schema.Schema); identifier != "" {
+			designated = append(designated, domain.AttributeKey(identifier))
+		}
+		for _, part := range domain.DesignatedDisplay(schema.Schema) {
+			if part != "" {
+				designated = append(designated, domain.AttributeKey(part))
+			}
+		}
+		slices.Sort(designated)
+		designated = slices.Compact(designated)
+		perUser = max(perUser, len(designated))
+		keys = append(keys, designated...)
+	}
+	slices.Sort(keys)
+	return slices.Compact(keys), perUser, nil
 }

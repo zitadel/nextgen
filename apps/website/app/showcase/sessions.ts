@@ -1,4 +1,4 @@
-import { applyCommand, appPath, planCommand, setupCommand, startCommand } from "../commands";
+import { appPath, deployCommand, dryRunCommand, setupCommand, startCommand } from "../commands";
 import type { Page, Screen, Session } from "./types";
 
 // The login's screens the steps show, drawn live from its atoms
@@ -56,12 +56,12 @@ const registration: Page = { url: "localhost:3000/register", screens: [register]
 export const loginAfterFlowChange: Page = { url: login.url, screens: [signInWithPassword, done] };
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
-// (its homepage's terminalSection, a session recorded with `script` on
-// 5 October 2026 with @zitadel/cli 1.0.0-alpha.24, the hero's commands with
-// `doctor` first): the first step is what that session's start printed, with
-// the one-time console link masked; the second the files its setup wrote (the
-// rest it summed up as "env, project config, the editable user schema and
-// login flow"); the next two its recorded diffs and command output. The pages
+// (its homepage's terminalSection), re-recorded on 10 November 2026 with
+// @zitadel/cli 0.5.0, the hero's commands: the first step is what that
+// session's start printed; the second the files its setup wrote (the rest it
+// summed up as "env, project config, the editable user schema and login
+// flow"); the next two its recorded diffs and command output, each change
+// committed before its dry run and each deploy's digest cut short. The pages
 // beside them are the screens above, as that session's app served them.
 // Re-record rather than edit when the CLI changes (AGENTS.md). The last step,
 // the brand, is live (brand-row.tsx).
@@ -69,16 +69,11 @@ export const sessions: Session[] = [
   {
     label: "Start Zitadel",
     description:
-      "`start` runs Zitadel on your machine and signs you in to its console. Users, passwords and sessions live there, not in your app.",
+      "`start` runs Zitadel on your machine. Users, passwords and sessions live there, not in your app.",
     recording: {
       title: appPath,
       command: startCommand,
-      output: [
-        "Console: signed in as admin@zitadel.localhost. Open this link (works once):",
-        "http://localhost:8080/ui/console/login?handoff=…",
-        "Local Zitadel server is ready.",
-        "(server: localhost:8080)",
-      ],
+      output: ["Local Zitadel server is ready"],
     },
   },
   {
@@ -107,17 +102,18 @@ export const sessions: Session[] = [
   {
     label: "Add a field",
     description:
-      "Add a property to the user schema, ask for it on the registration step, plan, apply. The form shows it.",
+      "Add a property to the user schema, ask for it on the registration step, commit, do a dry run, deploy. The form shows it.",
     artifact: {
       files: [
         {
           path: ".zitadel/schemas/default-human-user.json",
           lines: [
-            { type: "context", text: '  "properties": {' },
+            { type: "context", text: '      "x-unique": "project"' },
+            { type: "added", text: "    }," },
             { type: "added", text: '    "company": {' },
             { type: "added", text: '      "type": "string",' },
             { type: "added", text: '      "description": "The user\'s company."' },
-            { type: "added", text: "    }" },
+            { type: "context", text: "    }" },
           ],
         },
         {
@@ -132,10 +128,14 @@ export const sessions: Session[] = [
         },
       ],
       commands: [
-        { command: planCommand, output: "Plan: 2 new revisions." },
         {
-          command: applyCommand,
-          output: "✔ Sync complete. Changes are live — reload your app to see them.",
+          command: dryRunCommand,
+          output: "Validated 3 resources and deployed nothing (dry run)",
+        },
+        {
+          command: deployCommand,
+          output:
+            "Deployed 3 resources\nRelease sha256:a2807ed6b3c4 is now live on http://localhost:3000.",
         },
       ],
     },
@@ -148,7 +148,7 @@ export const sessions: Session[] = [
   {
     label: "Change the flow",
     description:
-      "Change what a step asks for and where it goes next, plan, apply. The login follows.",
+      "Change what a step asks for and where it goes next, commit, do a dry run, deploy. The login follows.",
     artifact: {
       // After the change the identifier step asks for the password too: its
       // pill shows it, or the flow would look like it lost the password.
@@ -166,18 +166,23 @@ export const sessions: Session[] = [
             { type: "added", text: '        "x-auth-methods#password"' },
             { type: "context", text: "      ]," },
             { type: "context", text: '      "name": "identifier",' },
-            { type: "context", text: '      "submit": {' },
-            { type: "removed", text: '        "target": "password"' },
-            { type: "added", text: '        "target": "done"' },
-            { type: "context", text: "      }," },
+            { type: "context", text: '      "transitions": {' },
+            { type: "context", text: '        "submit": {' },
+            { type: "removed", text: '          "target": "password"' },
+            { type: "added", text: '          "target": "done"' },
+            { type: "context", text: "        }," },
           ],
         },
       ],
       commands: [
-        { command: planCommand, output: "Plan: 1 new revision." },
         {
-          command: applyCommand,
-          output: "✔ Sync complete. Changes are live — reload your app to see them.",
+          command: dryRunCommand,
+          output: "Validated 3 resources and deployed nothing (dry run)",
+        },
+        {
+          command: deployCommand,
+          output:
+            "Deployed 3 resources\nRelease sha256:7166cbe0… is now live on http://localhost:3000.",
         },
       ],
     },

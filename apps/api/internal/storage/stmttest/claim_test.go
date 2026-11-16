@@ -372,18 +372,6 @@ func TestClaimStatements_OwningTeamGrant(t *testing.T) {
 				"a second active owning-team grant must conflict (ADR 054 §2)")
 		})
 
-		t.Run("list claimed project ids", func(t *testing.T) {
-			claimed := ensureProject(t, d.stmts)
-			unclaimed := ensureProject(t, d.stmts)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				domain.NewClaimTeamAssignment(claimed, "team-claim-"+uniqueSuffix(t))))
-
-			ids, err := d.stmts.ListClaimedProjectIDs(t.Context(), "", 500)
-			require.NoError(t, err)
-			assert.Contains(t, ids, claimed)
-			assert.NotContains(t, ids, unclaimed)
-		})
-
 		// The mirror of GetActiveOwningTeamGrant, asked from the team's side.
 		// It backs the guard that refuses to deactivate a team that owns one.
 		// The lookup is keyed on the team alone because the row lives on the

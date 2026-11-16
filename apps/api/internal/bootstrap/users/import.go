@@ -147,7 +147,7 @@ func userExists(ctx context.Context, stmts service.AllStatements, h Header) (boo
 // creation does (domain.CreateAttributesFromMap): from the property's
 // `x-unique` annotation in the user's schema. Without that, a bootstrap user
 // whose schema identifies users by `email` cannot be found at sign-in, because
-// identifier resolution looks the value up in the unique-attributes registry.
+// identifier resolution looks the value up among the unique claims.
 // `username` stays project-unique regardless, as it always was for bootstrap
 // users.
 func buildCreateAttributes(
@@ -159,6 +159,9 @@ func buildCreateAttributes(
 	for key, raw := range attrs {
 		value, err := decodeScalar(raw, key)
 		if err != nil {
+			return nil, err
+		}
+		if err := checkFormatFromSchema(schema, key, value); err != nil {
 			return nil, err
 		}
 		scope := uniqueScopeFromSchema(schema, key)
@@ -178,6 +181,7 @@ func buildCreateAttributes(
 		}
 		out = append(out, *attr)
 	}
+	out.MarkSearchable(domain.SearchableAttributeKeys(schema))
 	return out, nil
 }
 
@@ -241,13 +245,35 @@ func loadUserSchema(ctx context.Context, stmts service.AllStatements, h Header) 
 // is addressed the way the recursive walk addresses it: every node but the
 // last sits behind its own `properties` object.
 func uniqueScopeFromSchema(schema map[string]any, key domain.AttributeKey) domain.AttributeUniqueness {
+	scope, _ := maputil.GetNested[string](schema, propertyKeywordPath(key, domain.SchemaAnnotationUnique))
+	return domain.UniqueScopeOf(scope)
+}
+
+// checkFormatFromSchema holds a value to its property's `format`, as a user
+// write does (ADR 009 §5). Only that keyword: a document carries markers its
+// schema does not declare and may meet an empty placeholder schema, so it
+// cannot be validated as a whole. The message leaves the value out, as this
+// ends up in the server's start-up error.
+func checkFormatFromSchema(schema map[string]any, key domain.AttributeKey, value any) error {
+	text, isString := value.(string)
+	if !isString {
+		return nil
+	}
+	format, _ := maputil.GetNested[string](schema, propertyKeywordPath(key, "format"))
+	if format == "" || domain.AttributeFormatValid(format, text) {
+		return nil
+	}
+	return fmt.Errorf("attribute %q does not match its schema's format %q", key, format)
+}
+
+// propertyKeywordPath addresses a keyword of the property a flattened dotted
+// key names: every node sits behind its own `properties` object.
+func propertyKeywordPath(key domain.AttributeKey, keyword string) []string {
 	path := make([]string, 0, len(key.Nodes())*2+1)
 	for _, node := range key.Nodes() {
 		path = append(path, "properties", node)
 	}
-	path = append(path, domain.SchemaAnnotationUnique)
-	scope, _ := maputil.GetNested[string](schema, path)
-	return domain.UniqueScopeOf(scope)
+	return append(path, keyword)
 }
 
 // DialectFromConfig returns the sole configured database dialect name, or "" if unset.

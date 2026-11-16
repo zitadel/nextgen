@@ -72,7 +72,7 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 	}
 	db := newClientDB(c.client)
 	_, err := db.Update(ctx, buildStatement(
-		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (@p1, @p2, @p3, '1.0.0', 'draft', ARRAY<STRING>[], JSON '{}', @p4, @p4)`,
+		`INSERT INTO flow_definitions (project_id, id, name, schema_version, purposes, definition, created_at, updated_at) VALUES (@p1, @p2, @p3, '1.0.0', ARRAY<STRING>[], JSON '{}', @p4, @p4)`,
 		projectID, id, name, createdAt,
 	).statement())
 	return wrapError(err)
@@ -91,6 +91,22 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 	_, err := db.Update(ctx, buildStatement(
 		`INSERT INTO user_passwords (project_id, id, user_id, encoded_hash, created_at) VALUES (@p1, @p2, @p3, @p4, @p5)`,
 		projectID, id, userID, encodedHash, createdAt,
+	).statement())
+	return wrapError(err)
+}
+
+// ReactivateUser sets a deactivated user back to active so stmttest can assert
+// that authorization reads the user's status at check time (ADR 053 §4). There
+// is no product statement that reactivates a user.
+func ReactivateUser(ctx context.Context, pool database.Pool, projectID, userID string) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.ReactivateUser: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND id = @p3`,
+		domain.UserStatusActive.String(), projectID, userID,
 	).statement())
 	return wrapError(err)
 }

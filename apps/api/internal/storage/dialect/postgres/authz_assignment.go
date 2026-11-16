@@ -107,13 +107,6 @@ SELECT EXISTS (
       AND object_type = 'project' AND relation = 'team'
       AND revoked_at IS NULL
 )`
-
-	listClaimedProjectIDsStmt = `
-SELECT DISTINCT project_id FROM zitadel_nextgen.authz_assignments
-WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
-  AND ($1 = '' OR project_id > $1)
-ORDER BY project_id
-LIMIT $2`
 )
 
 type authzAssignmentStatements struct{ statement }
@@ -251,26 +244,6 @@ func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context,
 		return false, wrapError(err)
 	}
 	return owns, nil
-}
-
-// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, afterID, int64(limit))
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	ids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
-		var id string
-		err := row.Scan(&id)
-		return id, err
-	})
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return ids, nil
 }
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].

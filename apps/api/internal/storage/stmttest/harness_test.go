@@ -10,12 +10,12 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func uniqueSuffix(t *testing.T) string {
+func uniqueSuffix(t testing.TB) string {
 	t.Helper()
 	return strings.ReplaceAll(t.Name(), "/", "_") + "-" + rand.Text()
 }
 
-func uniqueProjectID(t *testing.T) string {
+func uniqueProjectID(t testing.TB) string {
 	t.Helper()
 	return "proj-" + uniqueSuffix(t)
 }

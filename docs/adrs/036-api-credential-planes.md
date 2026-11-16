@@ -80,7 +80,7 @@ public-plane.
 | Plane | Principal | Credential | Operations (today) |
 |---|---|---|---|
 | **Public** (browser) | The human / their session | Publishable key (+ session cookie for me-ops) | flow ops, `exchangeHandoff` (see below), me-ops, OIDC authorize/jwks/well-known, health probes |
-| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createHandoff`, `createSession`, `exchangeHandoff`, introspection |
+| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createAuthAttemptHandoff`, `createSession`, `exchangeHandoff`, introspection |
 | **Operator** (CLI/CI/console) | The operator or automation | Project secret today; PATs/service users with the specced resource scopes later (token lifecycle ADR, PR #450) | schemas, flow definitions, project patch/query, users, teams, releases/deployments (ADR 035) |
 
 App and operator planes share the project secret today; they are named
@@ -342,3 +342,10 @@ request with no `Origin`, and one from a console origin the project does not
 list, needs a primary deployment, and without one answers `409` with
 `rel.no_default`. A listed origin, a loopback origin, or a live preview with
 nothing deployed answers `409` with `rel.not_deployed`.
+
+## Amendment (2026-10-31): a deployment freezes its origins
+
+A deployment to `primary` freezes the project's primary origins, and a rollback
+restores the ones it names. A primary origin serves the newest primary
+deployment only when that deployment names it and the project still lists it.
+So an added origin waits for a deploy, and removing one takes effect at once.

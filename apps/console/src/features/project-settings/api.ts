@@ -22,7 +22,7 @@ export async function readDeployedPasswordPolicy(
   if (releaseId === undefined) {
     return undefined;
   }
-  const release = await api.getReleaseById(releaseId, { project_id: projectId });
+  const release = await api.getRelease(releaseId, { project_id: projectId });
   const pointer = release.pointers.find(
     (candidate) => candidate.kind === "policy" && candidate.handle === PASSWORD_SET,
   );
@@ -30,5 +30,10 @@ export async function readDeployedPasswordPolicy(
     return { config: undefined };
   }
   const revision = await api.getPolicyRevision(pointer.revision_id, { project_id: projectId });
+  // The release pins it under the password operation, so another operation's
+  // revision is a server fault, not a project without a password policy.
+  if (revision.operation !== PASSWORD_SET) {
+    throw new Error(`the release pins a ${revision.operation} revision as the password policy`);
+  }
   return { config: revision.config };
 }

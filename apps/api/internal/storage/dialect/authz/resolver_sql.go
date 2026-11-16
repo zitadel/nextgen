@@ -51,8 +51,10 @@ WHERE catalog_kind = `)
 // WriteHasAuthzProjectFoothold emits SELECT (foothold).
 // homeProjectID is the membership-edge project (empty falls back to projectID).
 func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) {
-	w.WriteString("SELECT ")
+	w.WriteString("SELECT (")
+	writePrincipalActiveAnd(w, env, domain.AuthzHomeProjectID(homeProjectID, projectID), principalType, principalID)
 	writeFoothold(w, env, projectID, homeProjectID, principalType, principalID)
+	w.WriteString(")")
 }
 
 // WriteCheckAuthz emits SELECT (allowed), (foothold) in one round-trip.
@@ -62,15 +64,65 @@ func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID, homeProjectID
 // a denial into 403, so a resource outside every authorized scope answers like
 // an unknown id (ADR 053 §7). Without a target (creates, project operations,
 // lists) the foothold stays project-wide; the list partial view depends on it.
+//
+// Both columns require the principal to be active (writePrincipalActiveAnd),
+// so an inactive user answers like an unknown one.
 func WriteCheckAuthz(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("SELECT (")
+	writePrincipalActiveAnd(w, env, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	writeCheckAllowed(w, env, params)
-	w.WriteString("), ")
+	w.WriteString("), (")
+	writePrincipalActiveAnd(w, env, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	if params.ResourceID != "" {
 		writeTargetFoothold(w, env, params)
+	} else {
+		writeFoothold(w, env, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
+	}
+	w.WriteString(")")
+}
+
+// writePrincipalActiveAnd opens every read that decides what a principal may
+// do: a user principal holds nothing unless they are active in their home
+// project (ADR 053 §3 and §4, #1234). Deactivation deletes the user's
+// membership edges, which closes the team paths, but leaves their direct
+// assignments in place, and the sessions minted for the user survive it
+// (#553). Only this read stops those assignments from counting. A user with no
+// row in the home project fails it too: an identifier is not proof that the
+// principal exists.
+//
+// Other principal types have no user row and emit nothing. For a user it emits
+// writeUserActiveExists followed by " AND ", so the caller writes the condition
+// it guards next. The read names no outer row, so a planner evaluates it once
+// per statement, not once per listed row.
+func writePrincipalActiveAnd(w ArgWriter, env Env, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) {
+	if principalType != domain.AuthzPrincipalTypeUser {
 		return
 	}
-	writeFoothold(w, env, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
+	writeUserActiveExists(w, env, homeProjectID, principalID)
+	w.WriteString(`
+    AND `)
+}
+
+// writeUserActiveExists emits EXISTS (…) for "userID is active in projectID":
+// one primary-key read on users (project_id, id). The platform operator path
+// asks it of the platform project (ADR 075 §3), every other path of the
+// principal's home project (writePrincipalActiveAnd).
+func writeUserActiveExists(w ArgWriter, env Env, projectID, userID string) {
+	w.WriteString(`EXISTS (
+        SELECT 1
+        FROM `)
+	writeTable(w, env, "users")
+	w.WriteString(` u
+        WHERE u.project_id = `)
+	w.WriteArg(projectID)
+	w.WriteString(`
+          AND u.id = `)
+	w.WriteArg(userID)
+	w.WriteString(`
+          AND u.status = `)
+	w.WriteArg(domain.UserStatusActive.String())
+	w.WriteString(`
+    )`)
 }
 
 func writeCheckAllowed(w ArgWriter, env Env, params domain.AuthzCheckParams) {
@@ -102,6 +154,7 @@ FROM `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r
 WHERE `)
+	writePrincipalActiveAnd(w, env, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	writeListAuthzRSIBase(w, env, params, "", func() {
 		writeConstantVisibilityArms(w, env, params.AuthzCheckParams)
 		w.WriteString(`
@@ -123,7 +176,12 @@ ORDER BY r.resource_id`)
 //
 // `C AND EXISTS(base)` is required, not cosmetic: an object with no RSI row must
 // stay invisible even when C is true, so C alone can never grant it.
+//
+// The principal's status test (writePrincipalActiveAnd) is constant too, so it
+// leads the whole predicate rather than repeating inside either half.
 func WriteListAuthzExistsPredicate(w ArgWriter, env Env, outerResourceIDExpr string, params domain.AuthzListObjectsParams) {
+	w.WriteString(`(`)
+	writePrincipalActiveAnd(w, env, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 	w.WriteString(`((`)
 	writeConstantVisibilityArms(w, env, params.AuthzCheckParams)
 	w.WriteString(`)
@@ -134,7 +192,7 @@ func WriteListAuthzExistsPredicate(w ArgWriter, env Env, outerResourceIDExpr str
 	writeListAuthzRSIExists(w, env, params, outerResourceIDExpr, func() {
 		writeCorrelatedVisibilityArms(w, env, params.AuthzCheckParams)
 	})
-	w.WriteString(`)`)
+	w.WriteString(`))`)
 }
 
 // writeListAuthzRSIExists wraps one half of the lifted predicate in

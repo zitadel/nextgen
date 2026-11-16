@@ -205,6 +205,10 @@ export const it: Locale = {
   "error.sso_user_not_found": "Non esiste ancora un account per questo accesso.",
   "error.outcome_unhandled": "Non è stato possibile proseguire questo passaggio. Riprova.",
   "error.sign_in_first": "Accedi prima al tuo account.",
+  "error.signup_check_failed": "Non è stato possibile creare il tuo account. Riprova.",
+  "error.signup_rate_limited": "Troppi tentativi. Attendi un minuto e riprova.",
+  "error.signup_secure_connection":
+    "Per creare un account serve una connessione sicura. Apri questa pagina con https://.",
 
   // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione ---
   "notice.user_not_found":

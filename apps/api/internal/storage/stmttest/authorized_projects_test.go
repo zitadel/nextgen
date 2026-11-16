@@ -19,7 +19,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// authorizedProjectsOrderAsc is the only ordering the discovery query serves.
+// authorizedProjectsOrderAsc is the discovery query's order when the caller
+// asks for none; projectsOrderByCreationAsc is the one it can ask for.
 var authorizedProjectsOrderAsc = database.OrderBy[domain.ProjectField]{
 	Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
 	Direction: database.OrderAsc,

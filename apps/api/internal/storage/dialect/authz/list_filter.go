@@ -26,3 +26,13 @@ func RequireManagementListFilter(ctx context.Context) error {
 	}
 	return ErrListFilterRequired
 }
+
+// RequireUnfilteredBatch is RequireManagementListFilter for a read across
+// several projects: it needs the one-shot skip or an unrestricted context, and
+// refuses a list filter, which it could not apply to one project alone.
+func RequireUnfilteredBatch(ctx context.Context) error {
+	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
+		return service.ErrListFilterUnsupported
+	}
+	return RequireManagementListFilter(ctx)
+}

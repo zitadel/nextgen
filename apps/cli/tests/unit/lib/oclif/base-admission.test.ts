@@ -32,10 +32,7 @@ class Admission extends BaseCommand {
 
   protected async execute(input: Admitted<typeof Admission>): Promise<JsonEnvelope> {
     this.received = input;
-    return this.emit({
-      status: "ok",
-      data: {},
-    });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 

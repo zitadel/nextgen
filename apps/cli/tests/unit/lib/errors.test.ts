@@ -6,11 +6,11 @@ import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
+  failureText,
   isCancellation,
-  isErrno,
   toZitadelError,
 } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -37,7 +37,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
+      nextCommands: [{ id: "doctor" }, { id: "setup" }],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -45,7 +45,7 @@ describe("ZitadelError", () => {
     expect(err.message).toBe("boom");
     expect(err.code).toBe("E_CONFLICT");
     expect(err.hint).toBe("try again");
-    expect(err.nextCommands).toEqual(["zitadel doctor", "zitadel init"]);
+    expect(err.nextCommands).toEqual([{ id: "doctor" }, { id: "setup" }]);
     expect(err.details).toEqual({ field: "x" });
   });
 
@@ -100,6 +100,44 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_VALIDATION");
     expect(result.message).toBe("missing");
     expect(result.hint).toBe("A required file or directory is missing.");
+  });
+
+  it.each([
+    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
+    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
+    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
+    [
+      "a ConfigError for a file the OS refused to read",
+      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for a file the OS would not let it touch",
+      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for any other errno",
+      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
+      "E_VALIDATION",
+    ],
+  ])("maps %s to %s", (_name, err, code) => {
+    expect(toZitadelError(err).code).toBe(code);
+  });
+
+  it("passes a ConfigError's message, hint and details on", () => {
+    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
+    const result = toZitadelError(err);
+    expect([result.message, result.hint, result.details]).toEqual([
+      "boom",
+      "do this",
+      { file: "a.json" },
+    ]);
+  });
+
+  it("leaves out the hint and details a ConfigError has none of", () => {
+    const result = toZitadelError(new ConfigError("boom"));
+    expect([result.hint, result.details]).toEqual([undefined, undefined]);
   });
 
   it.each([
@@ -471,23 +509,55 @@ describe("resources the platform rejected", () => {
     );
   });
 
+  it("appends the fields a connection may not change", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.field_immutable",
+            kind: "idp",
+            handle: "zitadel-cloud",
+            message:
+              "identity provider connection: the field is fixed for the life of the connection",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp zitadel-cloud: identity provider connection: the field is fixed for the life of the connection: oidc.issuer.",
+    );
+  });
+
+  it("appends the endpoints a connection left out", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.endpoints_partial",
+            kind: "idp",
+            handle: "acme-sso",
+            message: "identity provider connection: the endpoints are partially set",
+            details: { details: { missing: ["jwks_uri", "token_endpoint"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp acme-sso: identity provider connection: the endpoints are partially set: jwks_uri, token_endpoint.",
+    );
+  });
+
   it("adds no hint when a resource has no message", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,
     );
-  });
-});
-
-describe("isErrno", () => {
-  it("matches an error carrying the given code", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "ENOENT" }), "ENOENT")).toBe(true);
-  });
-
-  it("does not match another code, a missing code or a non-object", () => {
-    expect(isErrno(Object.assign(new Error("gone"), { code: "EACCES" }), "ENOENT")).toBe(false);
-    expect(isErrno(new Error("no code"), "ENOENT")).toBe(false);
-    expect(isErrno(undefined, "ENOENT")).toBe(false);
-    expect(isErrno("ENOENT", "ENOENT")).toBe(false);
   });
 });
 
@@ -509,5 +579,63 @@ describe("isCancellation", () => {
     expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
     expect(isCancellation(new Error("Cancelled."))).toBe(false);
     expect(isCancellation(undefined)).toBe(false);
+  });
+});
+
+// Every failure the CLI reports is one grammar: `Error: <sentence> (E_CODE)`,
+// said once, with the sentence the envelope's `message` carries.
+describe("a failure as a person is shown it", () => {
+  describe("an ordinary message", () => {
+    it.each([
+      ["variable not found"],
+      ["release: still served by an origin"],
+      ["npm install failed"],
+      ["http://localhost:9/users/query got no response"],
+      ["usr_1 was not found on the project"],
+      [".zitadel/state.json could not be read"],
+      ["--client-id was given an empty value"],
+      ["POST http://localhost:9/users/query got no response"],
+    ])("leaves %j exactly as it was thrown", (message) => {
+      expect(failureText(message).sentence).toBe(message);
+    });
+  });
+
+  describe("oclif's own rendering of a refused command line", () => {
+    const refused =
+      "The following error occurred:\n  Missing required flag kind\nSee more help with --help";
+
+    it("states the reason as the one sentence, without oclif's heading", () => {
+      expect(failureText(refused).sentence).toBe("Missing required flag kind");
+    });
+
+    it("says the command line was refused, so --help can be offered under Next:", () => {
+      expect(failureText(refused).misuse).toBe(true);
+    });
+
+    it("drops oclif's own help footer, which nothing else writes", () => {
+      expect(failureText(refused).sentence).not.toContain("--help");
+    });
+
+    it("joins the reasons when the command line was wrong in more than one way", () => {
+      const both =
+        "The following errors occurred:\n  Missing required flag kind\n  Missing required flag pattern\nSee more help with --help";
+
+      expect(failureText(both).sentence).toBe(
+        "Missing required flag kind; Missing required flag pattern",
+      );
+    });
+
+    it("names what a heading introduces on the heading's own line", () => {
+      const missing = "Missing 1 required arg:\nurl  the origin to add\nSee more help with --help";
+
+      expect(failureText(missing).sentence).toBe("Missing 1 required arg: url");
+    });
+
+    it("leaves an ordinary failure's own lines alone", () => {
+      expect(failureText("Bad port\nUse 1 to 65535.")).toEqual({
+        sentence: "Bad port\nUse 1 to 65535.",
+        misuse: false,
+      });
+    });
   });
 });

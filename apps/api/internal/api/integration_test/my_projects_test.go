@@ -3,7 +3,10 @@
 package integration_test
 
 import (
+	"cmp"
+	"context"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -187,6 +190,108 @@ func TestListMyProjects(t *testing.T) {
 		// The second page is the last: look-ahead sees no further row, so it
 		// carries no token and there is no trailing empty page (#849).
 		assert.False(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
+	})
+
+	// The storage half of `exclude_platform` (D42): the excluded project is left
+	// out with the grants and the name search, so a page is never short a row.
+	t.Run("an excluded project is left out of the page", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		name := helpers.ProjectName()
+		excluded, err := harness.EnsureProjectService(t).Create(t.Context(), name+" one", nil, false)
+		require.NoError(t, err)
+		kept, err := harness.EnsureProjectService(t).Create(t.Context(), name+" two", nil, false)
+		require.NoError(t, err)
+		harness.SeedProjectViewer(t, excluded.ID, userID)
+		harness.SeedProjectViewer(t, kept.ID, userID)
+
+		listed, err := harness.EnsureProjectService(t).ListAuthorized(t.Context(), service.ListAuthorizedProjectsRequest{
+			HomeProjectID:    platform.ID,
+			UserID:           userID,
+			NameContains:     name,
+			Limit:            1,
+			ExcludeProjectID: excluded.ID,
+		})
+		require.NoError(t, err)
+		require.Len(t, listed.Projects, 1)
+		assert.Equal(t, kept.ID, listed.Projects[0].ID)
+		assert.Empty(t, listed.NextPageToken)
+	})
+
+	// The harness pins an ordinary project as the platform project, as a
+	// self-hoster's platform.project_id does: it is not reserved, so
+	// `exclude_platform` keeps it (Console ADR 0004 §2).
+	t.Run("exclude_platform keeps a pinned ordinary project", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		grant := harness.SeedProjectViewer(t, platform.ID, userID)
+		t.Cleanup(func() {
+			_ = stmts.RevokeAuthzAssignment(context.Background(), platform.ID, grant.ID)
+		})
+
+		listed := listMyProjects(t, sessionClientForUser(t, userID), api.ListMyProjectsParams{
+			ExcludePlatform: api.NewOptBool(true),
+		})
+		assert.Equal(t, []string{platform.ID}, myProjectIDs(listed))
+	})
+
+	// `order` reaches the statement and its token is held to it. That each
+	// dialect pages creation order correctly is stmttest's to prove
+	// (TestCursorBattle_DrainAllListIncarnations).
+	t.Run("order desc pages newest first", func(t *testing.T) {
+		t.Parallel()
+
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		created := make([]*domain.Project, 0, 3)
+		for range 3 {
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, false)
+			require.NoError(t, err)
+			harness.SeedProjectViewer(t, project.ID, userID)
+			created = append(created, project)
+		}
+		// Newest first by the stored timestamps, id breaking a tie as the
+		// list breaks it.
+		slices.SortStableFunc(created, func(a, b *domain.Project) int {
+			return cmp.Or(b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.ID, a.ID))
+		})
+		want := make([]string, 0, len(created))
+		for _, project := range created {
+			want = append(want, project.ID)
+		}
+
+		client := sessionClientForUser(t, userID)
+		desc := api.NewOptSortDirection(api.SortDirectionDesc)
+		page1 := listMyProjects(t, client, api.ListMyProjectsParams{Limit: api.NewOptLimit(2), Order: desc})
+		assert.Equal(t, want[:2], myProjectIDs(page1))
+		require.True(t, page1.NextPageToken.Set, helpers.MustMarshal(t, page1))
+
+		page2 := listMyProjects(t, client, api.ListMyProjectsParams{
+			Limit:     api.NewOptLimit(2),
+			Order:     desc,
+			PageToken: api.NewOptPageToken(page1.NextPageToken.Value),
+		})
+		assert.Equal(t, want[2:], myProjectIDs(page2))
+		assert.False(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
+
+		// The token continues the newest-first list only: under the default
+		// order, or oldest first, it is a bad request, not a page of some
+		// other list.
+		for name, order := range map[string]api.OptSortDirection{
+			"no order": {},
+			"asc":      api.NewOptSortDirection(api.SortDirectionAsc),
+		} {
+			resp, err := client.ListMyProjects(t.Context(), api.ListMyProjectsParams{
+				Limit:     api.NewOptLimit(2),
+				Order:     order,
+				PageToken: api.NewOptPageToken(page1.NextPageToken.Value),
+			})
+			require.NoError(t, err, name)
+			bad, ok := resp.(*api.ListMyProjectsBadRequest)
+			require.True(t, ok, "%s: %s", name, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("req.invalid"), bad.Code, name)
+		}
 	})
 
 	// Deactivating a user does not revoke the sessions already minted for it

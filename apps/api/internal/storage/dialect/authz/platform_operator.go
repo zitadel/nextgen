@@ -21,7 +21,8 @@ func WriteCheckPlatformOperator(w ArgWriter, env Env, params domain.AuthzPlatfor
 //     tupleset is the checked type's platform relation.
 //   - The user-side assignment lives in the platform project, not in the
 //     project being checked. It names the user directly, with no team
-//     expansion, and counts only while that user is active there (#1234).
+//     expansion, and counts only while that user is active there
+//     (writeUserActiveExists, the read every user principal's check makes).
 //
 // It references no outer row, so a list predicate evaluates it once.
 func writePlatformOperatorExists(w ArgWriter, env Env, params domain.AuthzPlatformCheckParams) {
@@ -76,20 +77,8 @@ func writePlatformOperatorExists(w ArgWriter, env Env, params domain.AuthzPlatfo
           AND `)
 	writeDirectPrincipal(w, "a", domain.AuthzPrincipalTypeUser.String(), params.UserID)
 	w.WriteString(`
-          AND EXISTS (
-            SELECT 1
-            FROM `)
-	writeTable(w, env, "users")
-	w.WriteString(` u
-            WHERE u.project_id = `)
-	w.WriteArg(params.PlatformProjectID)
+          AND `)
+	writeUserActiveExists(w, env, params.PlatformProjectID, params.UserID)
 	w.WriteString(`
-              AND u.id = `)
-	w.WriteArg(params.UserID)
-	w.WriteString(`
-              AND u.status = `)
-	w.WriteArg(domain.UserStatusActive.String())
-	w.WriteString(`
-          )
     )`)
 }

@@ -72,6 +72,7 @@ properties:
       Unique step identifier within this flow. Used as transition targets
       and returned in the API response as `step.name`.
     pattern: "^[a-z][a-z0-9_-]*$"
+    x-zitadel-pattern-message: "must start with a lowercase letter and use only lowercase letters, digits, _ and -"
     example: login
 
   fields:
@@ -135,6 +136,7 @@ properties:
     items:
       type: string
       pattern: ^[a-z0-9][a-z0-9_-]*$
+      x-zitadel-pattern-message: "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -"
       maxLength: 64
     default: []
     example: [google]

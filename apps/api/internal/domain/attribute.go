@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -124,12 +125,12 @@ func MergeAttributesPatch(current, patch map[string]any) map[string]any {
 	return merged
 }
 
-// RegistryTeamScopes resolves the registry team scope of each attribute, index
+// UniqueTeamScopes resolves the unique team scope of each attribute, index
 // aligned with attrs: project-unique values are project-wide (""), team-unique
 // values keep their already-stored scope when preserved knows the key and fall
 // back to fallback otherwise. Entries for non-unique attributes stay "" and go
 // unused. Pass a nil preserved map when nothing is stored yet (create).
-func (attrs CreateAttributes) RegistryTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
+func (attrs CreateAttributes) UniqueTeamScopes(preserved map[AttributeKey]string, fallback string) []string {
 	scopes := make([]string, len(attrs))
 	for i, a := range attrs {
 		if a.UniqueScope != AttributeUniquenessTeam {
@@ -149,6 +150,10 @@ type CreateAttribute struct {
 	Value       any                 `json:"value"`
 	UniqueScope AttributeUniqueness `json:"unique_scope"`
 	ValueHash   [sha256.Size]byte   `json:"value_hash"`
+	// SearchText is what a prefix search compares for this attribute (see
+	// [SearchText]). Nil for an attribute no search reads: only the ones
+	// [CreateAttributes.MarkSearchable] names carry it.
+	SearchText *string `json:"-"`
 }
 
 func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
@@ -172,7 +177,7 @@ func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness)
 }
 
 // UniqueValueHash is the one comparison function behind attribute uniqueness:
-// the unique-attributes registry stores it and identifier resolution looks it
+// the unique index stores it and identifier resolution looks it
 // up, so both always agree on what counts as the same value (ADR 058 §4a).
 // String values are Unicode case-folded before hashing — Alice@Example.com
 // and alice@example.com are one unique value — while the attribute itself
@@ -186,6 +191,70 @@ func UniqueValueHash(value any) ([sha256.Size]byte, error) {
 		return [sha256.Size]byte{}, fmt.Errorf("failed to marshal attribute value: %w", err)
 	}
 	return sha256.Sum256(raw), nil
+}
+
+// SearchTextMaxRunes caps the text an attribute is searched by. The text is an
+// index key, which every database limits in size, and a prefix search reads
+// only the start of a value.
+const SearchTextMaxRunes = 256
+
+// SearchText is the text a prefix search compares for an attribute value, and
+// for the term searched for: the value under the Unicode case folding
+// [UniqueValueHash] uses, cut to [SearchTextMaxRunes]. A value and a term
+// therefore agree on case exactly as uniqueness does. It reports false for a
+// value that is not a string or folds to nothing, which no search can match.
+func SearchText(value any) (string, bool) {
+	s, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	folded := cases.Fold().String(s)
+	if cut := runeOffset(folded, SearchTextMaxRunes); cut < len(folded) {
+		folded = folded[:cut]
+	}
+	return folded, folded != ""
+}
+
+// runeOffset is the byte offset after the first n runes of s, or len(s) when s
+// holds fewer.
+func runeOffset(s string, n int) int {
+	for offset := range s {
+		if n == 0 {
+			return offset
+		}
+		n--
+	}
+	return len(s)
+}
+
+// SearchableAttributeKeys are the properties of a user schema a search reads:
+// the designated identifier and the display parts (ADR 058 §1 and §2).
+func SearchableAttributeKeys(schema map[string]any) []AttributeKey {
+	var keys []AttributeKey
+	if identifier, _ := schema[SchemaAnnotationIdentifier].(string); identifier != "" {
+		keys = append(keys, AttributeKey(identifier))
+	}
+	display, _ := schema[SchemaAnnotationDisplay].([]any)
+	for _, entry := range display {
+		if path, _ := entry.(string); path != "" {
+			keys = append(keys, AttributeKey(path))
+		}
+	}
+	return keys
+}
+
+// MarkSearchable sets the search text of the attributes keys names, in place.
+// An attribute whose value has no search text (see [SearchText]) stays
+// unmarked.
+func (attrs CreateAttributes) MarkSearchable(keys []AttributeKey) {
+	for i := range attrs {
+		if !slices.Contains(keys, attrs[i].Key) {
+			continue
+		}
+		if text, ok := SearchText(attrs[i].Value); ok {
+			attrs[i].SearchText = &text
+		}
+	}
 }
 
 type CreateAttributes []CreateAttribute

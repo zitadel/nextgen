@@ -19,17 +19,22 @@ import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdow
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableCell } from "@/components/ui/table";
 import { formatRecent } from "@/lib/date";
-import { type Deployment, KIND_LABEL, releaseRevoked } from "@/features/deployments/deployment";
+import {
+  type Deployment,
+  KIND_LABEL,
+  releaseRevoked,
+  rollbackChangesNothing,
+} from "@/features/deployments/deployment";
 
 /** One row of the directory. The whole row opens the release it deployed. */
 export function DeploymentRowItem({
   deployment,
-  liveReleaseId,
+  live,
   onChanged,
 }: {
   deployment: Deployment;
-  /** The release the primary origins serve now. */
-  liveReleaseId?: string;
+  /** The deployment the primary origins serve now. */
+  live?: Deployment;
   onChanged: () => void | Promise<void>;
 }) {
   const navigate = useNavigate();
@@ -40,13 +45,13 @@ export function DeploymentRowItem({
   // redeploy. A revoked release cannot go live again.
   const redeploy = deployment.kind === "primary" && !releaseRevoked(deployment);
   // Previews are deployed to again rather than rolled back; a revoked release
-  // cannot go live again; and an earlier deployment of the live release would
-  // change nothing. None of those rows offers it. A superseded row rolls back
+  // cannot go live again; and an earlier deployment of the live release to
+  // the same origins would change nothing. None of those rows offers it. A superseded row rolls back
   // to itself; the live row opens the choice of what to go back to.
   const rollback =
     deployment.kind === "primary" &&
     !releaseRevoked(deployment) &&
-    (deployment.status === "live" || deployment.release_id !== liveReleaseId);
+    (deployment.status === "live" || !rollbackChangesNothing(deployment, live));
 
   return (
     <ResourceRow onOpen={() => void navigate({ to: "/releases/$releaseId", params })}>

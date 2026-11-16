@@ -24,6 +24,11 @@ import type { IconName } from "./zl-icon.js";
  */
 export type ZlFieldType = CreateFlow201StepFieldsItemType;
 
+/** The HTML input for a wire type: the same name, except for `date_time`. */
+function nativeInputType(type: ZlFieldType): string {
+  return type === "date_time" ? "datetime-local" : type;
+}
+
 /** Detail shape emitted by the `zl-input` event (input + clear). */
 export type ZlFieldInputDetail = { name: string; value: string };
 
@@ -153,7 +158,7 @@ export class ZlField extends FormAtom {
   private concealOnSubmit = (): void => {
     if (!this.revealed) return;
     this.revealed = false;
-    if (this.inputEl) this.inputEl.type = this.type;
+    if (this.inputEl) this.inputEl.type = nativeInputType(this.type);
   };
 
   override formResetCallback(): void {
@@ -250,7 +255,7 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${this.revealed ? "text" : this.type}
+            type=${this.revealed ? "text" : nativeInputType(this.type)}
             spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
             autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
             autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
@@ -489,7 +494,9 @@ export class ZlField extends FormAtom {
       const form = this.internals.form;
       if (form) {
         event.preventDefault();
-        form.requestSubmit();
+        // A listed element named requestSubmit or reset shadows the form's
+        // method through named access, so the prototype is called.
+        HTMLFormElement.prototype.requestSubmit.call(form);
       }
     }
   };

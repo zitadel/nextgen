@@ -20,6 +20,8 @@ export type ManagedRuntimeDiscovery = Readonly<{
 
 type ProcessRow = Readonly<{
   command: string;
+  /** The command as reported: its arguments alone, never the environment it ran with. */
+  shown?: string;
   pid: number;
   ppid?: number;
 }>;
@@ -50,23 +52,34 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
     .then(parsePsRows)
     .then(
-      (rows) => ({ rows }),
-      (error: unknown) => ({ error: errorMessage(error) }),
+      (rows) => {
+        return { rows };
+      },
+      (error: unknown) => {
+        return { error: errorMessage(error) };
+      },
     );
   if ("error" in listed) {
     return { supported: false, processes: [], error: listed.error };
   }
 
-  const candidates = listed.rows.filter((row) => isRuntimeCandidate(row.command));
+  const candidates = listed.rows.filter((row) => {
+    return isRuntimeCandidate(row.command);
+  });
   const hydrated = await Promise.all(
-    candidates.map(async (row) => ({
-      ...row,
-      command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
-    })),
+    candidates.map(async (row) => {
+      return {
+        ...row,
+        command: await hydrateCommand("eww", row.pid, row.command, opts?.timeoutMs ?? 1000),
+        shown: await hydrateCommand("ww", row.pid, row.command, opts?.timeoutMs ?? 1000),
+      };
+    }),
   );
   const processes = hydrated
     .map(toManagedRuntimeProcess)
-    .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
+    .filter((candidate): candidate is ManagedRuntimeProcess => {
+      return candidate !== undefined;
+    });
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
@@ -74,9 +87,18 @@ async function runPs(args: string[], timeoutMs: number): Promise<string> {
   return (await execa("ps", args, { timeout: timeoutMs })).stdout;
 }
 
-async function hydrateCommand(pid: number, fallback: string, timeoutMs: number): Promise<string> {
+/**
+ * The full command of `pid`: `eww` adds the environment it ran with, which only
+ * tells a managed runtime apart and is never reported; `ww` gives its arguments.
+ */
+async function hydrateCommand(
+  flags: "eww" | "ww",
+  pid: number,
+  fallback: string,
+  timeoutMs: number,
+): Promise<string> {
   try {
-    const hydrated = await runPs(["eww", "-p", String(pid), "-o", "command="], timeoutMs);
+    const hydrated = await runPs([flags, "-p", String(pid), "-o", "command="], timeoutMs);
     return hydrated.trim() || fallback;
   } catch {
     return fallback;
@@ -116,7 +138,7 @@ function toManagedRuntimeProcess(row: ProcessRow): ManagedRuntimeProcess | undef
   return {
     pid: row.pid,
     ppid: row.ppid,
-    command: stripEnvironmentNoise(row.command),
+    command: stripEnvironmentNoise(row.shown ?? row.command),
     kind: wrapper ? "server-wrapper" : "server-binary",
     ...(dataDir ? { data_dir: dataDir } : {}),
   };
@@ -141,7 +163,9 @@ function isServerBinary(command: string): boolean {
   }
   return (
     isCliLocalDataDir(extractDataDir(command)) &&
-    commandTokens(command).some((token) => basename(token) === "nextgen")
+    commandTokens(command).some((token) => {
+      return basename(token) === "nextgen";
+    })
   );
 }
 
@@ -166,7 +190,9 @@ function stripEnvironmentNoise(command: string): string {
 }
 
 function commandTokens(command: string): string[] {
-  return command.split(/\s+/).filter((token) => !/^[A-Z_][A-Z0-9_]*=/.test(token));
+  return command.split(/\s+/).filter((token) => {
+    return !/^[A-Z_][A-Z0-9_]*=/.test(token);
+  });
 }
 
 function uniqueByPid(
@@ -176,5 +202,7 @@ function uniqueByPid(
   for (const processInfo of processes) {
     byPid.set(processInfo.pid, processInfo);
   }
-  return [...byPid.values()].sort((a, b) => a.pid - b.pid);
+  return [...byPid.values()].sort((a, b) => {
+    return a.pid - b.pid;
+  });
 }

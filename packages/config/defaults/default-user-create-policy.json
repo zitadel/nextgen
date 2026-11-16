@@ -1,0 +1,6 @@
+{
+  "operation": "user.create",
+  "config": {
+    "challenge": "zitadel_pow"
+  }
+}

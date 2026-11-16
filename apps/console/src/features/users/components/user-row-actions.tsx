@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { DeleteUserDialog } from "@/features/users/components/delete-user-dialog";
 import { RowMenu } from "@/components/resource-list";
@@ -31,7 +30,7 @@ export function UserRowActions({
 
   return (
     <>
-      <RowMenu name={name} icon={MoreVertical}>
+      <RowMenu name={name}>
         <DropdownMenuItem asChild>
           <Link to="/users/$userId" params={{ userId }}>
             View details

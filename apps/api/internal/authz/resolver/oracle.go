@@ -14,8 +14,10 @@ type Graph struct {
 	Assignments []*domain.AuthzAssignment
 	Memberships []*domain.AuthzMembershipEdge
 	Resources   []*domain.ResourceScope
-	// ActiveUsers are the users whose status is active. Only the platform
-	// operator path reads it (ADR 075 §3).
+	// ActiveUsers are the users whose status is active. Every path a user
+	// principal takes reads it in their home project (ADR 053 §4), the platform
+	// operator path in the platform project (ADR 075 §3). A user missing from
+	// it holds nothing.
 	ActiveUsers map[UserKey]bool
 }
 
@@ -28,6 +30,9 @@ type UserKey struct {
 // OracleCheck applies MVP rules: direct+closure, team membership expand, bounded TTU.
 func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID, objectType, relation string) bool {
 	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return false
+	}
 	now := time.Now()
 	if g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) {
 		return true
@@ -39,6 +44,9 @@ func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalT
 // arms (by-id Check), then the sk_team_ team constraint.
 func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
 	home := p.HomeProjectID()
+	if !g.principalActive(home, p.PrincipalType, p.PrincipalID) {
+		return false
+	}
 	now := time.Now()
 	allowed := g.OracleCheck(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation)
 	if !allowed && p.ResourceTeamID != "" {
@@ -56,6 +64,9 @@ func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
 // OracleList returns resource ids of kind authorized under project / team / resource scopes.
 func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID string, kind domain.ResourceKind, objectType, relation string) []string {
 	home := domain.AuthzHomeProjectID(principalHomeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return []string{}
+	}
 	now := time.Now()
 	projectWide := g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) ||
 		g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
@@ -181,6 +192,9 @@ func (g *Graph) resourceIDs(projectID string, kind domain.ResourceKind) []string
 // homeProjectID is the membership-edge project (empty falls back to projectID).
 func (g *Graph) OracleFoothold(projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) bool {
 	home := domain.AuthzHomeProjectID(homeProjectID, projectID)
+	if !g.principalActive(home, principalType, principalID) {
+		return false
+	}
 	now := time.Now()
 	for _, a := range g.Assignments {
 		if a.ProjectID != projectID || !assignmentActive(a, now) {
@@ -210,11 +224,14 @@ func (g *Graph) OracleFootholdParams(p domain.AuthzCheckParams) bool {
 	if p.ResourceID == "" {
 		return g.OracleFoothold(p.ProjectID, p.PrincipalHomeProjectID, p.PrincipalType, p.PrincipalID)
 	}
+	home := p.HomeProjectID()
+	if !g.principalActive(home, p.PrincipalType, p.PrincipalID) {
+		return false
+	}
 	isUser := p.PrincipalType == domain.AuthzPrincipalTypeUser
 	if isUser && p.ResourceID == p.PrincipalID {
 		return true
 	}
-	home := p.HomeProjectID()
 	now := time.Now()
 	for _, a := range g.Assignments {
 		if a.ProjectID != p.ProjectID || !assignmentActive(a, now) || !assignmentCoversTarget(a, p) {
@@ -329,6 +346,13 @@ func (g *Graph) implies(fromType, fromRel, toType, toRel string) bool {
 		}
 	}
 	return fromType == toType && fromRel == toRel
+}
+
+// principalActive mirrors writePrincipalActiveAnd: a user principal counts only
+// while active in their home project (ADR 053 §4). Other principal types have
+// no user row to read.
+func (g *Graph) principalActive(home string, pType domain.AuthzPrincipalType, pID string) bool {
+	return pType != domain.AuthzPrincipalTypeUser || g.ActiveUsers[UserKey{ProjectID: home, UserID: pID}]
 }
 
 func (g *Graph) principalMatches(home string, pType domain.AuthzPrincipalType, pID string, a *domain.AuthzAssignment) bool {

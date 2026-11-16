@@ -10,7 +10,6 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check ."
   },
   "dependencies": {
@@ -25,6 +24,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/cloud-functions": "workspace:*",
     "@zitadel/console": "workspace:*",
     "@zitadel/sdk-react": "workspace:*",

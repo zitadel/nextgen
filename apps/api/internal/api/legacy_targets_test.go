@@ -40,7 +40,7 @@ func (d *deployTargets) CreateDeployment(_ context.Context, req *api.CreateDeplo
 func deployThrough(t *testing.T, path, body string) (*deployTargets, *httptest.ResponseRecorder) {
 	t.Helper()
 	handler := &deployTargets{}
-	servers, err := NewServers(handler, admitAll{}, api.WithErrorHandler(OgenErrorHandler))
+	servers, err := NewServers(handler, admitAll{}, api.WithErrorHandler(OgenErrorHandler(0)))
 	require.NoError(t, err)
 	mux := http.NewServeMux()
 	identity := func(h http.Handler) http.Handler { return h }

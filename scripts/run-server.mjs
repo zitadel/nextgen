@@ -4,15 +4,13 @@ import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, run, runCapture } from "./dev-process.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
-import { runnerCommand } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
   if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
-    const build = runnerCommand(["console:build"]);
-    await run(build.command, build.args, { cwd: repoRoot });
+    await run("turbo", ["run", "@zitadel/console#build"], { cwd: repoRoot });
   }
   // The module compiles in apps/api, but the server runs from the repository
   // root, as before the module moved: its default config search (`.`,

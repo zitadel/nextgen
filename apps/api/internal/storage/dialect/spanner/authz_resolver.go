@@ -80,6 +80,40 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 	return out.allowed, out.foothold, nil
 }
 
+// checkAuthzProjectsPerStatement is how many projects one statement of
+// CheckAuthzProjects decides. Spanner refuses a query with more than 20 joins
+// (https://cloud.google.com/spanner/quotas#query-limits), and the check
+// writes four for each project, so the ten projects of one search were 40.
+// Four projects are 16.
+const checkAuthzProjectsPerStatement = 4
+
+// CheckAuthzProjects implements [service.AuthzResolverStatements], in
+// statements of checkAuthzProjectsPerStatement projects each.
+func (s authzResolverStatements) CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error) {
+	results := make([]domain.AuthzCheckResult, len(projectIDs))
+	for first := 0; first < len(projectIDs); first += checkAuthzProjectsPerStatement {
+		chunk := projectIDs[first:min(first+checkAuthzProjectsPerStatement, len(projectIDs))]
+		var c statementCompiler
+		authz.WriteCheckAuthzProjects(&c, spannerAuthzEnv(), params, chunk)
+		err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				// The project's place in this statement.
+				var arm int64
+				var result domain.AuthzCheckResult
+				if err := row.Columns(&arm, &result.Allowed, &result.Foothold); err != nil {
+					return err
+				}
+				results[first+int(arm)] = result
+				return nil
+			})
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+	}
+	return results, nil
+}
+
 // CheckPlatformOperator implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
 	var c statementCompiler

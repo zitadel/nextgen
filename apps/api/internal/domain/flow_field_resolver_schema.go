@@ -191,8 +191,10 @@ func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, erro
 		return FlowFieldTypeEmail, nil
 	case "uri":
 		return FlowFieldTypeURL, nil
-	case "date", "date-time":
+	case "date":
 		return FlowFieldTypeDate, nil
+	case "date-time":
+		return FlowFieldTypeDateTime, nil
 	}
 	if jsonType == "boolean" {
 		return FlowFieldTypeCheckbox, nil

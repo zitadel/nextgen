@@ -65,7 +65,7 @@ describe("team detail", () => {
     // The status sits on the detail as well as the list, so a deactivated team
     // reads as deactivated on its own screen.
     await screen.findByRole("heading", { name: "Acme Web" });
-    expect(screen.getByText("deactivated")).toBeInTheDocument();
+    expect(screen.getByText("Deactivated")).toBeInTheDocument();
   });
 
   it("leaves out the primary domain the API does not carry", async () => {

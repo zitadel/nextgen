@@ -13,6 +13,7 @@ description: |
   Which names CSS actually knows is the browser's business: an unrecognized
   one is stored and paints nothing, rather than being refused here.
 pattern: '^(?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|[a-zA-Z]{3,24}|[a-zA-Z][a-zA-Z-]{2,12}\((?:[0-9a-zA-Z%.,+/# -]|[a-zA-Z][a-zA-Z-]{2,12}\([0-9a-zA-Z%.,+/# -]*\))*\))$'
+x-zitadel-pattern-message: "must be hex (#4F46E5), a CSS colour name, or a colour function such as rgb(), hsl() or oklch()"
 examples:
   # One per accepted form, so the list reads as the grammar rather than as a
   # palette. Every entry is checked against the pattern itself by

@@ -95,7 +95,7 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Every window is `app/window.tsx` and every command line
   `app/command-line.tsx`; colors come from the `@theme` in `app/globals.css`.
 - Next resolves `@zitadel/components` to its `dist/`, so `build` and `dev`
-  depend on `components:build` in moon and in turbo.
+  depend on `@zitadel/components#build`.
 
 ## The changelog
 
@@ -104,8 +104,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   every change of each version; never list them all here.
 - `app/changelog/entries.ts` reads the entries when the site builds, and finds
   the release that ships each one's pull requests in the published packages'
-  `CHANGELOG.md`, which `build` lists as inputs in `moon.yml` and
-  `turbo.json`. A broken entry fails the build.
+  `CHANGELOG.md`, which `build` lists as inputs in `turbo.json`. A broken
+  entry fails the build.
 - Render an entry's Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
   The feed carries each entry's plain-text summary instead.
@@ -142,8 +142,8 @@ nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.m
 ## Checks
 
 ```sh
-moon run website:typecheck website:lint website:test website:build
-moon run website:start   # the build on port 3004
+turbo run typecheck lint test build --filter=@zitadel/website
+turbo run start --filter=@zitadel/website   # the build on port 3004
 ```
 
 Vercel runs `turbo run build --filter=@zitadel/website`; the build's key

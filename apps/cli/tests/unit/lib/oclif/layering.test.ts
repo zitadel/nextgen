@@ -12,7 +12,8 @@ const LAYER = posix.join("lib", "oclif");
 /**
  * The modules outside the layer that the glue may reach for, each standing for
  * itself and everything under it: the envelope and its errors, the command
- * line, the palette, the spelling it is printed in, the suggestion builders,
+ * line, the palette, the spelling it is printed in, the plural a noun takes,
+ * the suggestion builders,
  * the telemetry and process plumbing every command pays for, and the backend
  * the generated resource commands speak through.
  */
@@ -22,41 +23,35 @@ const GENERIC = [
   "lib/consent",
   "lib/errors",
   "lib/host",
-  "lib/input",
   "lib/json",
+  "lib/names",
   "lib/paths",
-  "lib/public-cli",
+  "lib/plural",
   "lib/server",
-  "lib/style",
   "lib/suggestion",
   "lib/telemetry",
+  "lib/ui",
   "lib/terminal-text",
-  "lib/user-agent",
-  "lib/warnings",
+  "lib/runtime",
 ];
 
 /**
  * Product knowledge the glue still reaches for, each one a leak to move into
  * the commands that own it. The list only shrinks: a new one fails the test.
  */
-const LEAKS = [
-  "lib/environment",
-  "lib/journey-guidance",
-  "lib/local-server/processes",
-  "lib/skills-hint",
-];
+const LEAKS = ["lib/environment", "lib/local-server/processes", "lib/skills"];
 
 /**
  * Domain libs that still reach into the layer, each one a dependency pointing
  * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
- * and `lib/telemetry/consent` want a type the envelope owns, `lib/claim-state`
- * wants the server-kind bucket, and `lib/api-request` is the `zitadel api`
+ * and `lib/telemetry/consent` want a type the envelope owns, `lib/claim`
+ * wants the server-kind bucket, and `lib/api/call` is the `zitadel api`
  * argument parser, which reads the generated commands' own helpers.
  */
 const INBOUND = [
-  "lib/api-request.ts",
-  "lib/claim-state.ts",
-  "lib/server.ts",
+  "lib/api/call.ts",
+  "lib/claim/claim.ts",
+  "lib/server/server.ts",
   "lib/telemetry/consent.ts",
 ];
 
@@ -132,7 +127,7 @@ describe("the oclif layer", () => {
 
     for (const file of await layerFiles()) {
       for (const target of await reachesOutside(file)) {
-        if (target.startsWith("commands/")) {
+        if (target.startsWith("cli/commands/")) {
           importing.push(`${file} -> ${target}`);
         }
       }

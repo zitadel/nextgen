@@ -52,9 +52,12 @@ func (h *Harness) seedProjectRole(t testing.TB, projectID, userID, relation stri
 // shape that makes a claimer an operator: the seeded catalog resolves
 // `project.admin` for the team's members through `member from team`, and admin
 // closes to editor and viewer (ADR 054 §5). A test that seeds a direct user
-// grant instead would not exercise that tuple-to-userset path.
-func (h *Harness) SeedOwningTeam(t testing.TB, projectID, teamID string) {
+// grant instead would not exercise that tuple-to-userset path. A project holds
+// one active owning team, so a caller seeding a project it does not delete
+// revokes the returned assignment.
+func (h *Harness) SeedOwningTeam(t testing.TB, projectID, teamID string) *domain.AuthzAssignment {
 	t.Helper()
 	asgn := domain.NewClaimTeamAssignment(projectID, teamID)
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+	return asgn
 }

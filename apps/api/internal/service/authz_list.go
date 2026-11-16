@@ -43,6 +43,12 @@ type authzListSkipOnce struct {
 // DB outage.
 var ErrListFilterRequired = errors.New("authz list filter missing")
 
+// ErrListFilterUnsupported means a read across several projects ran with an
+// AuthzListFilter on the context. Such a read is for projects whose gate
+// allows every row; a filter would narrow one project's rows, and the read has
+// no way to apply it to that project alone.
+var ErrListFilterUnsupported = errors.New("authz list filter not supported by a read across projects")
+
 // WithAuthzListUnrestricted marks a nested non-HTTP list (create uniqueness,
 // login Resolve, stmttest). It skips the #838 tripwire
 // and ignores an inherited AuthzListFilter so a nested query cannot see zero

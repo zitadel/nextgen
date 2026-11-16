@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
+import { PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { Origins } from "@/lib/backend";
 import { stableStringify } from "@/lib/json";
-import { projectMetaSchemas } from "@/lib/meta-schemas";
-import { DEFAULT_SERVER } from "@/lib/server";
+import { MetaSchemas } from "@/lib/meta-schemas";
+import { Server } from "@/lib/server";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { FileWriter } from "./file-writer";
@@ -20,6 +21,7 @@ import {
 } from "./guidance";
 import type {
   ConfigWiringStatus,
+  DevelopmentServerUrl,
   EjectActions,
   Patcher,
   PatchContext,
@@ -28,6 +30,7 @@ import type {
   PatchView,
 } from "@/lib/orca/patchers/types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
+import { Project } from "@/lib/project";
 
 /**
  * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
@@ -56,13 +59,57 @@ const LOCAL_SERVER_ENV_COMMENT = [
   "NEXTGEN_INSTRUMENTATION_LOG_LEVEL=debug.",
 ];
 
+/** What the CLI reads, as opposed to `.env.local`, which the app reads. */
+const DEVELOPMENT_ENV_FILE = ".env.development.local";
+
 export abstract class AbstractRulePatcher implements Patcher {
   abstract canPatch(framework: string): boolean;
 
-  /** Apply the full plan (base `.zitadel/` files + framework routes). */
+  /**
+   * Apply the full plan (base `.zitadel/` files + framework routes), then
+   * write the editor meta-schemas into `.zitadel/meta/`.
+   *
+   * The meta-schemas are CLI-owned generated output, so they are not in the
+   * plan: {@link MetaSchemas.write} writes them, as it does for `doctor --fix`
+   * and `branding eject`, replacing an outdated copy without `force` and
+   * never writing through a symlink. What it wrote joins the plan's result,
+   * with paths on disk as the file-writer reports them.
+   *
+   * @param ctx - What the integration is applied with.
+   * @param opts - Where, and whether to write or only report.
+   * @returns Every file the run touched or skipped, and every dependency it added.
+   * @throws `E_CONFLICT` when {@link preflight} refuses the project, or a
+   *   planned file holds something else and `force` is not set.
+   */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     await this.preflight(ctx, opts.cwd);
-    return new FileWriter(opts).scaffold(this.plan(ctx));
+    const result = await new FileWriter(opts).scaffold(this.plan(ctx));
+    const meta = await MetaSchemas.of(ctx.cliVersion).write(opts.cwd, {
+      dryRun: opts.dryRun,
+    });
+    const metaFiles = meta.written.map((artifact) => {
+      return { ...artifact, path: join(opts.cwd, artifact.path) };
+    });
+    return {
+      ...result,
+      files: [...result.files, ...metaFiles],
+      filesWritten: [
+        ...result.filesWritten,
+        ...metaFiles
+          .filter((artifact) => {
+            return artifact.kind === "file";
+          })
+          .map((artifact) => {
+            return artifact.path;
+          }),
+      ],
+      filesSkipped: [
+        ...result.filesSkipped,
+        ...meta.unchanged.map((path) => {
+          return join(opts.cwd, path);
+        }),
+      ],
+    };
   }
 
   /**
@@ -100,7 +147,9 @@ export abstract class AbstractRulePatcher implements Patcher {
             }
             if (op.kind === "edit" && op.overwrites) {
               const candidates = typeof op.path === "string" ? [op.path] : op.path;
-              return !candidates.some((candidate) => excluded.has(candidate));
+              return !candidates.some((candidate) => {
+                return excluded.has(candidate);
+              });
             }
             return true;
           });
@@ -198,10 +247,9 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [
-          path,
-          infrastructure.has(path) ? "infrastructure" : "presentation",
-        ]),
+        markedFiles.map((path) => {
+          return [path, infrastructure.has(path) ? "infrastructure" : "presentation"];
+        }),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),
@@ -278,9 +326,9 @@ export abstract class AbstractRulePatcher implements Patcher {
   private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
       { kind: "mkdir", path: ".zitadel", mode: 0o700 },
-      { kind: "mkdir", path: ".zitadel/flows" },
-      { kind: "mkdir", path: ".zitadel/schemas" },
-      { kind: "append-gitignore", entries: [".zitadel/secret", ".env*", "!.env.example"] },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.flows },
+      { kind: "mkdir", path: CONFIG_DIRECTORIES.schemas },
+      { kind: "append-gitignore", rules: Project.gitignore().rules },
       {
         kind: "write",
         path: ".zitadel/secret",
@@ -322,7 +370,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       // What the CLI reads, as opposed to `.env.local`, which the app reads.
       {
         kind: "merge-env",
-        path: ".env.development.local",
+        path: DEVELOPMENT_ENV_FILE,
         mode: 0o600,
         // The CLI's own file: a value a prompt saved here before setup ran
         // must give way to the project setup just created.
@@ -342,21 +390,25 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "write",
         path: ".zitadel/state.json",
-        contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
+        contents: `${stableStringify({ framework: ctx.framework.id })}\n`,
       },
-      // The dialect meta-schemas, committed with the project so the relative
-      // `$schema` pointers of `zitadel.json` and the flow files resolve
-      // offline (editor validation) and agents can read the flow/schema
-      // dialect without the docs site. Their
-      // descriptions become editor tooltips inside the generated app, so the
-      // `zitadel …` mentions are rewritten to the runnable public form on the
-      // way out — the shared source keeps the bare spelling the server wants.
-      { kind: "mkdir", path: META_SCHEMA_DIR },
-      ...projectMetaSchemas(ctx.cliVersion).map(
-        (file): FileOp => ({ kind: "write", path: file.path, contents: file.contents }),
-      ),
       ...guidanceOps(ctx),
     ];
+  }
+
+  /**
+   * The `ZITADEL_URL` a Vite app's dev proxy reads from its env files once
+   * {@link baseOps} ran. They write it to `.env.development.local`, replacing a
+   * value on setup and adding a missing one on repair, and Vite ranks that
+   * file above the others, so the rest of the chain never decides it. It is
+   * the value the file holds when `doctor` read one there, and `ctx.server`,
+   * the server `zitadel.json` names, otherwise.
+   */
+  protected developmentServerUrl(ctx: PatchContext): DevelopmentServerUrl {
+    const held = ctx.developmentServerUrl;
+    return held === undefined
+      ? { value: ctx.server, file: DEVELOPMENT_ENV_FILE, held: false }
+      : { value: held, file: DEVELOPMENT_ENV_FILE, held: true };
   }
 
   /**
@@ -394,12 +446,16 @@ function guidanceOps(ctx: PatchContext): FileOp[] {
     {
       kind: "edit",
       path: "AGENTS.md",
-      edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
+      edit: (source) => {
+        return upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER);
+      },
     },
     {
       kind: "edit",
       path: "README.md",
-      edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
+      edit: (source) => {
+        return upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER);
+      },
     },
   ];
 }
@@ -428,11 +484,11 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
   };
 }
 
-/** Normalizes a server URL to its origin, falling back to {@link DEFAULT_SERVER}. */
+/** Normalizes a server URL to its origin, falling back to {@link Server.DEFAULT}. */
 function resolveServerOrigin(source: string): string {
   try {
     return new URL(source).origin;
   } catch {
-    return DEFAULT_SERVER;
+    return Server.DEFAULT;
   }
 }

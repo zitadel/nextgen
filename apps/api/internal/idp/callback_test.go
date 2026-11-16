@@ -475,6 +475,19 @@ func TestVerifyIDToken(t *testing.T) {
 			wantCause: oidc.ErrIssuerInvalid,
 		},
 		{
+			// A stored issuer in the form the provider does not publish never
+			// verifies a token, so a connection in that form links nobody.
+			name: "an issuer that differs by a trailing slash is rejected",
+			token: func(t *testing.T, p *provider) string {
+				claims := p.claims()
+				claims["iss"] = p.srv.URL + "/"
+				return sign(t, p.key, jose.RS256, "k1", claims)
+			},
+			nonce:     "the-nonce",
+			wantErr:   domain.ErrIDPIDTokenInvalid(nil),
+			wantCause: oidc.ErrIssuerInvalid,
+		},
+		{
 			name: "an audience without the client is rejected",
 			token: func(t *testing.T, p *provider) string {
 				claims := p.claims()

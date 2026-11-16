@@ -30,6 +30,8 @@ type ListSchemasInput struct {
 	ProjectID string
 	// ObjectTypes narrows the list to any of the given object types.
 	ObjectTypes []string
+	// ID narrows the list to the revision with this id.
+	ID string
 	// Kind is nil when the caller did not filter by one. It is a pointer rather
 	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
 	// it cannot double as "no filter".
@@ -378,6 +380,9 @@ func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput)
 			objectTypes[i] = database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType)
 		}
 		filters = append(filters, database.Or(objectTypes...))
+	}
+	if input.ID != "" {
+		filters = append(filters, database.Equal(database.Col(domain.JSONSchemaFieldURL), input.ID))
 	}
 	// Schemas persisted without their document being parsed — ingested by URL,
 	// or a $ref target pulled in during resolution (#812) — are stored as

@@ -3,6 +3,7 @@ package domain
 import (
 	"cmp"
 	"encoding/json"
+	"time"
 )
 
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
@@ -14,6 +15,24 @@ type RequestAPIPayload struct {
 	RouteTemplate string `json:"route_template"`
 	Status        int    `json:"status"`
 	DurationMs    int64  `json:"duration_ms"`
+}
+
+// Indexed is what a request.api event is listed by beside its payload, the
+// operation and the class of the response status (Event.OperationID and
+// Event.StatusClass). A request refused before an operation ran names no
+// operation. A status outside 100–599, which the payload's schema rules out,
+// has no class, and then neither is set: a list by operation reads the
+// operation's events one class at a time, so each indexed operation needs one.
+func (p RequestAPIPayload) Indexed() (operationID *string, statusClass *HTTPStatusClass) {
+	class, ok := HTTPStatusClassOf(p.Status)
+	if !ok {
+		return nil, nil
+	}
+	if p.OperationID != "" {
+		id := p.OperationID
+		operationID = &id
+	}
+	return operationID, &class
 }
 
 // ProjectPayload is shared by project.created (full snapshot) and
@@ -143,7 +162,6 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 // carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
 	Name       string                  `json:"name,omitempty"`
-	Status     string                  `json:"status,omitempty"`
 	UserSchema string                  `json:"user_schema,omitempty"`
 	Purposes   map[string]string       `json:"purposes,omitempty"`
 	Audience   *FlowdefAudiencePayload `json:"audience,omitempty"`
@@ -162,7 +180,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 	}
 	return FlowdefPayload{
 		Name:       fd.Name,
-		Status:     fd.Status.String(),
 		UserSchema: fd.UserSchema,
 		Purposes:   flowdefPurposesWire(fd.Purposes),
 		Audience:   flowdefAudiencePayload(fd.Audience),
@@ -327,6 +344,58 @@ type AuthzRevokedPayload struct {
 	Relation      string `json:"relation,omitempty"`
 }
 
+// InvitationProjectMemberPayload is the project_member object of an
+// invitation event: the relation its link grants.
+type InvitationProjectMemberPayload struct {
+	Relation string `json:"relation"`
+}
+
+// InvitationTeamMemberPayload is the team_member object of an invitation
+// event: the team its link joins, and the role there.
+type InvitationTeamMemberPayload struct {
+	TeamID string `json:"team_id"`
+	Role   string `json:"role"`
+}
+
+// InvitationCreatedPayload sets only the object Type names. Invitation
+// payloads never carry the metadata or the token (ADR 086 §5).
+type InvitationCreatedPayload struct {
+	Type                 string                          `json:"type"`
+	ProjectMember        *InvitationProjectMemberPayload `json:"project_member,omitempty"`
+	TeamMember           *InvitationTeamMemberPayload    `json:"team_member,omitempty"`
+	JourneyID            string                          `json:"journey_id"`
+	ReplacesInvitationID string                          `json:"replaces_invitation_id,omitempty"`
+	ExpiresAt            time.Time                       `json:"expires_at"`
+}
+
+// InvitationAcceptedPayload names the accepting user. Grant events written on
+// accept carry this event's request_id; there are none when the user already
+// holds an identical active grant.
+type InvitationAcceptedPayload struct {
+	Type          string                          `json:"type"`
+	ProjectMember *InvitationProjectMemberPayload `json:"project_member,omitempty"`
+	TeamMember    *InvitationTeamMemberPayload    `json:"team_member,omitempty"`
+	JourneyID     string                          `json:"journey_id"`
+	UserID        string                          `json:"user_id"`
+}
+
+type InvitationRejectedPayload struct {
+	JourneyID string `json:"journey_id"`
+	UserID    string `json:"user_id"`
+}
+
+// Reasons on invitation.cancelled: an administrator's cancel, or a replace.
+const (
+	InvitationCancelReasonCancelled = "cancelled"
+	InvitationCancelReasonReplaced  = "replaced"
+)
+
+type InvitationCancelledPayload struct {
+	JourneyID              string `json:"journey_id"`
+	Reason                 string `json:"reason"`
+	ReplacedByInvitationID string `json:"replaced_by_invitation_id,omitempty"`
+}
+
 type AuthFactorPayload struct {
 	UserID   string `json:"user_id"`
 	FactorID string `json:"factor_id,omitempty"`
@@ -394,4 +463,42 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 		payload.Template = cmp.Or(after.Template, new(""))
 	}
 	return payload, nil
+}
+
+// SignupChallengePayload is empty: challenge and flow IDs live on event columns.
+type SignupChallengePayload struct{}
+
+// ApplicationPayload is shared by application.created (snapshot) and
+// application.updated (delta). ClientIDs are the clients the write created,
+// each of which got a secret. The document body and the secrets stay out.
+type ApplicationPayload struct {
+	Slug       string   `json:"slug,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	ClientIDs  []string `json:"client_ids,omitempty"`
+	RevisionID string   `json:"revision_id"`
+}
+
+// ApplicationPayloadSnapshot is the application.created payload. clients must
+// hold the client_ids storage filled in.
+func ApplicationPayloadSnapshot(app *Application, doc ApplicationDocument, clients []*ApplicationClient) ApplicationPayload {
+	return ApplicationPayload{Slug: app.Slug, Name: doc.Name, ClientIDs: applicationClientIDs(clients), RevisionID: app.RevisionID}
+}
+
+// ApplicationPayloadDelta is the application.updated payload: the new revision
+// id, the name when it differs from previous, and the clients the revision
+// added. The slug is fixed for the life of the application.
+func ApplicationPayloadDelta(previous, next ApplicationDocument, app *Application, clients []*ApplicationClient) ApplicationPayload {
+	payload := ApplicationPayload{ClientIDs: applicationClientIDs(clients), RevisionID: app.RevisionID}
+	if previous.Name != next.Name {
+		payload.Name = next.Name
+	}
+	return payload
+}
+
+func applicationClientIDs(clients []*ApplicationClient) []string {
+	ids := make([]string, 0, len(clients))
+	for _, client := range clients {
+		ids = append(ids, client.ClientID)
+	}
+	return ids
 }

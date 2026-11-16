@@ -7,7 +7,6 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { enforceMode } from "@/lib/fs-safe";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -17,7 +16,8 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { shellCommand } from "@/lib/suggestion";
+import { SecretFile } from "@/lib/project/secret-file";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -62,7 +62,9 @@ export async function findLocalAdminFor(
 ): Promise<LocalAdmin | undefined> {
   for (const dir of ancestors(cwd, homedir())) {
     if ((await findLocalAdminDir(dir)) !== dir) continue;
-    const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
+    const runtime = await readRuntimeMetadata(dir).catch(() => {
+      return undefined;
+    });
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
@@ -114,9 +116,9 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
     nextCommands: [
-      shellCommand(`rm ${LOCAL_ADMIN_FILE}`),
-      unscopedCommand("reset --force"),
-      unscopedCommand("start"),
+      shellCommand("rm", LOCAL_ADMIN_FILE),
+      { id: "reset", flags: { force: true } },
+      { id: "start" },
     ],
     ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });
@@ -160,7 +162,7 @@ export async function ensureLocalAdmin(
       mode: 0o644,
     },
   );
-  await enforceMode(staging, 0o644);
+  await SecretFile.enforceMode(staging, 0o644);
   await rename(staging, userFile);
 
   return { admin, userFile };
@@ -194,6 +196,6 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-  await enforceMode(path, 0o600);
+  await SecretFile.enforceMode(path, 0o600);
   return true;
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -30,6 +31,8 @@ type Config struct {
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
+	// OAuth switches the OAuth 2.0 authorization server on (ADR 081).
+	OAuth OAuthConfig `mapstructure:"oauth"`
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
@@ -47,8 +50,18 @@ type OriginsConfig struct {
 	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
+// OAuthConfig configures the OAuth 2.0 authorization server each project
+// can enable (ADR 081, ADR 082).
+type OAuthConfig struct {
+	// Enabled mounts the authorization server: every project's RFC 8414
+	// metadata at its well-known path and its endpoints under
+	// oauth.Prefix. Off by default while the server is being built.
+	Enabled bool `mapstructure:"enabled"`
+}
+
 // EventsConfig configures audit event retention and deployment export sinks.
 type EventsConfig struct {
+	Request   audit.RequestConfig   `mapstructure:"request"`
 	Retention audit.RetentionConfig `mapstructure:"retention"`
 	Export    audit.ExportConfig    `mapstructure:"export"`
 }
@@ -202,6 +215,14 @@ type ServerConfig struct {
 	// it only behind a proxy that overwrites the header: otherwise a client
 	// chooses its own request ID.
 	RequestIDHeader string `mapstructure:"request_id_header"`
+	// IdleTimeout is how long the server keeps a connection open while it
+	// waits for the next request on it. A proxy in front that reuses its
+	// connections has to give up on an idle one before the server does: a
+	// request it sends as the server closes the connection is lost, and one
+	// that is not safe to send twice, a POST, ends as the proxy's 502. Zero
+	// or less never closes an idle connection, for a server whose only client
+	// is such a proxy.
+	IdleTimeout time.Duration `mapstructure:"idle_timeout"`
 }
 
 func (c ServerConfig) Validate() error {
@@ -211,13 +232,21 @@ func (c ServerConfig) Validate() error {
 	if _, err := configuredConsoleOrigins(c.ConsoleOrigins); err != nil {
 		return err
 	}
-	// ensure there are no path collisions between idp callbacks and the console path
+	// The console path must not collide with another handler's paths: the
+	// mux panics at startup on a duplicate pattern.
 	if !c.ConsoleEnabled {
 		return nil
 	}
+	reserved := map[string]string{
+		oauth.Prefix:   "the OAuth server",
+		"/.well-known": "the OAuth server metadata",
+	}
 	for _, prefix := range api.IDPCallbackPathPrefixes() {
+		reserved[prefix] = "the sign-in provider callback"
+	}
+	for prefix, owner := range reserved {
 		if c.ConsolePath == prefix || strings.HasPrefix(c.ConsolePath, prefix+"/") {
-			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for the sign-in provider callback", c.ConsolePath, prefix)
+			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for %s", c.ConsolePath, prefix, owner)
 		}
 	}
 	return nil

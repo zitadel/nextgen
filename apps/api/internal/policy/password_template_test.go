@@ -33,7 +33,7 @@ func passwordContext(length int, historyMatches ...bool) map[string]any {
 func TestEmbeddedCatalog(t *testing.T) {
 	e, err := policy.New()
 	require.NoError(t, err)
-	assert.Equal(t, []string{passwordSet}, e.Operations())
+	assert.Equal(t, []string{passwordSet, userCreate}, e.Operations())
 }
 
 // The template's bounds are the server's technical limits. Raising one in the

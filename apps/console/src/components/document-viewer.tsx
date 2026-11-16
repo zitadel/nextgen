@@ -43,16 +43,23 @@ const ACCENT_TAB = "data-[state=active]:bg-accent";
  * `fields` adds a Fields tab before JSON and YAML, open first: the same
  * document as a list a reader reads rather than copies, so it has no copy
  * button of its own.
+ *
+ * `cliHint={false}` is the full-size viewer around a record rather than
+ * configuration (an event on the Events screen): nothing deploys it, so it has
+ * no hint either.
  */
 export function DocumentViewer({
   document,
   noun,
   compact = false,
+  cliHint = !compact,
   fields,
 }: {
   document: unknown;
   noun: string;
   compact?: boolean;
+  /** The foot naming the command that deploys the document. Off when compact. */
+  cliHint?: boolean;
   fields?: ReactNode;
 }) {
   const [view, setView] = useState<View>(fields ? "fields" : "json");
@@ -152,7 +159,7 @@ export function DocumentViewer({
         </code>
       </pre>
 
-      {!compact && (
+      {cliHint && (
         <CliHint>
           Edit the {noun} locally, then deploy your changes with{" "}
           <CliCommand>{CLI_DEPLOY}</CliCommand>. Deploying creates a new revision.

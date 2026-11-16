@@ -20,10 +20,11 @@ type foreignTeamGrant struct {
 
 func seedForeignTeamGrant(t *testing.T, stmts service.AllStatements, withCustomerAssignment bool) foreignTeamGrant {
 	t.Helper()
+	platform, schemaURL := ensureUserTestProject(t, stmts)
 	g := foreignTeamGrant{
-		platform: ensureProject(t, stmts),
+		platform: platform,
 		customer: ensureProject(t, stmts),
-		userID:   "user_home_" + uniqueSuffix(t),
+		userID:   newPrincipalUser(t, stmts, platform, schemaURL, "user_home_"+uniqueSuffix(t)),
 		teamID:   "team_agency_" + uniqueSuffix(t),
 	}
 	require.NoError(t, stmts.CreateTeam(t.Context(), newTestTeam(g.platform, g.teamID)))
@@ -66,8 +67,8 @@ func TestAuthzResolver_Home(t *testing.T) {
 		}
 
 		t.Run("home project id defaults to project", func(t *testing.T) {
-			projectID := ensureProject(t, d.stmts)
-			u := "user_home_def_" + uniqueSuffix(t)
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			u := newPrincipalUser(t, d.stmts, projectID, schemaURL, "user_home_def_"+uniqueSuffix(t))
 			team := "team_home_def_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
@@ -139,8 +140,8 @@ func TestAuthzResolver_Home(t *testing.T) {
 
 		t.Run("local membership shortcut ignores distinct home", func(t *testing.T) {
 			customer := ensureProject(t, d.stmts)
-			platform := ensureProject(t, d.stmts)
-			userID := "user_local_" + uniqueSuffix(t)
+			platform, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := newPrincipalUser(t, d.stmts, platform, schemaURL, "user_local_"+uniqueSuffix(t))
 			localTeam := "team_local_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(customer, localTeam)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(customer, localTeam, userID)))

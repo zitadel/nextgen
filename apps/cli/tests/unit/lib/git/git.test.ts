@@ -1,7 +1,7 @@
 import { chmod, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
 import { Git, GitResult } from "@/lib/git/git";
@@ -15,10 +15,6 @@ async function git(cwd: string, args: string[]): Promise<string> {
 }
 
 beforeEach(isolateGit);
-
-afterEach(async () => {
-  await scratch.cleanup();
-});
 
 describe("Git", () => {
   it("returns an exit code it was told to accept as an answer", async () => {

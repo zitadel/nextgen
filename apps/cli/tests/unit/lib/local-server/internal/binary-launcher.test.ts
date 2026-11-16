@@ -1,14 +1,15 @@
 import { spawn } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { AppendedLog, BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
 import { launched } from "@/lib/local-server/internal/lifecycle";
-import { ManualClock } from "@tests/helpers/clock";
+import { ManualClock } from "@tests/fixtures/clock";
+import type { Daemons } from "@tests/fixtures/daemon";
+import { it } from "@tests/fixtures";
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 const resolver = vi.hoisted(() => ({ missing: false }));
@@ -36,7 +37,6 @@ vi.mock("node:child_process", async (importOriginal) => {
 
 describe("local server binary helpers", () => {
   afterEach(() => {
-    vi.useRealTimers();
     // `clearAllMocks` resets the `spawn` mock's call history between tests. Under
     // Vitest 4 `restoreAllMocks` only restores `spyOn` spies and no longer clears
     // a `vi.fn()` module mock's `.mock.calls`, so without this a later test reads
@@ -44,9 +44,8 @@ describe("local server binary helpers", () => {
     vi.clearAllMocks();
   });
 
-  it("spawns the server with the address, data dir, and public base env", async () => {
+  it("spawns the server with the address, data dir, and public base env", async ({ dir }) => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
     const runtime = await new BinaryLauncher({
       cliVersion: "0.0.0-test",
@@ -67,9 +66,10 @@ describe("local server binary helpers", () => {
     expect(runtime.env).toEqual({ injected: [] });
   });
 
-  it("passes resolved project variables through the child environment, never argv", async () => {
+  it("passes resolved project variables through the child environment, never argv", async ({
+    dir,
+  }) => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
     const runtime = await new BinaryLauncher({
       cliVersion: "0.0.0-test",
@@ -115,9 +115,8 @@ describe("local server binary helpers", () => {
     ).toBe("override");
   });
 
-  it("starts the binary the server package resolves, not its wrapper script", async () => {
+  it("starts the binary the server package resolves, not its wrapper script", async ({ dir }) => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "");
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
     await new BinaryLauncher({
       cliVersion: "0.0.0-test",
@@ -130,7 +129,7 @@ describe("local server binary helpers", () => {
     expect(args).toEqual(["--migrate"]);
   });
 
-  it("reports a server binary that cannot be run instead of crashing", async () => {
+  it("reports a server binary that cannot be run instead of crashing", async ({ dir }) => {
     const { EventEmitter } = await import("node:events");
     vi.mocked(spawn).mockImplementationOnce((() => {
       const failing = Object.assign(new EventEmitter(), { pid: undefined, unref: () => undefined });
@@ -138,7 +137,6 @@ describe("local server binary helpers", () => {
       return failing;
     }) as never);
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/x/nextgen");
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
     const launching = new BinaryLauncher({
       cliVersion: "0.0.0-test",
@@ -152,7 +150,7 @@ describe("local server binary helpers", () => {
     });
   });
 
-  it("recognises its server when the process list cuts long commands short", async () => {
+  it("recognises its server when the process list cuts long commands short", async ({ daemon }) => {
     vi.stubEnv("COLUMNS", "40");
     const real = await vi.importActual<typeof import("node:child_process")>("node:child_process");
     const child = real.spawn(
@@ -160,23 +158,19 @@ describe("local server binary helpers", () => {
       ["-e", "setTimeout(() => undefined, 30000)", `${"x".repeat(120)}/nextgen`],
       { stdio: "ignore" },
     );
+    daemon.adopt(child.pid ?? 0);
     const record = aBinaryRecord({ pid: child.pid ?? 0 });
 
-    try {
-      await expect(
-        new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" }).isAlive(
-          record,
-        ),
-      ).resolves.toBe(true);
-    } finally {
-      child.kill("SIGKILL");
-    }
+    await expect(
+      new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" }).isAlive(
+        record,
+      ),
+    ).resolves.toBe(true);
   });
 
-  it("says how to repair the install when the server binary cannot be found", async () => {
+  it("says how to repair the install when the server binary cannot be found", async ({ dir }) => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "");
     resolver.missing = true;
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
     const launching = new BinaryLauncher({
       cliVersion: "0.0.0-test",
@@ -191,18 +185,17 @@ describe("local server binary helpers", () => {
     resolver.missing = false;
   });
 
-  it("trusts a launch that has only just returned, whatever the process list calls it", async () => {
+  it("trusts a launch that has only just returned, whatever the process list calls it", async ({
+    daemon,
+  }) => {
     const real = await vi.importActual<typeof import("node:child_process")>("node:child_process");
     const child = real.spawn("sleep", ["30"], { stdio: "ignore" });
     const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
+    daemon.adopt(child.pid ?? 0);
     const record = aBinaryRecord({ pid: child.pid ?? 0 });
 
-    try {
-      await expect(launcher.isLaunchedAlive(launched(record))).resolves.toBe(true);
-      await expect(launcher.isAlive(record)).resolves.toBe(false);
-    } finally {
-      child.kill("SIGKILL");
-    }
+    await expect(launcher.isLaunchedAlive(launched(record))).resolves.toBe(true);
+    await expect(launcher.isAlive(record)).resolves.toBe(false);
   });
 
   describe("telling one directory's server from another's", () => {
@@ -215,48 +208,40 @@ describe("local server binary helpers", () => {
      * not `sleep`: macOS keeps the environment of its own programs out of `ps`,
      * and the environment is where the data directory is read.
      */
-    async function aServerOf(dataDir: string) {
-      return (await real()).spawn(
+    async function aServerOf(dataDir: string, daemon: Daemons) {
+      const child = (await real()).spawn(
         process.execPath,
         ["-e", "setTimeout(() => undefined, 30000)", "/opt/zitadel/nextgen"],
         { stdio: "ignore", env: { ...process.env, NEXTGEN_SERVER_DATA_DIR: dataDir } },
       );
+      daemon.adopt(child.pid ?? 0);
+      return child;
     }
 
-    it("accepts the process that serves the record's data directory", async () => {
-      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data");
+    it("accepts the process that serves the record's data directory", async ({ daemon }) => {
+      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data", daemon);
 
-      try {
-        await expect(
-          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
-        ).resolves.toBe(true);
-      } finally {
-        child.kill("SIGKILL");
-      }
+      await expect(
+        launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+      ).resolves.toBe(true);
     });
 
-    it("refuses the process that serves another directory's data", async () => {
-      const child = await aServerOf("/projects/b/.zitadel/local/nextgen-data");
+    it("refuses the process that serves another directory's data", async ({ daemon }) => {
+      const child = await aServerOf("/projects/b/.zitadel/local/nextgen-data", daemon);
 
-      try {
-        await expect(
-          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
-        ).resolves.toBe(false);
-      } finally {
-        child.kill("SIGKILL");
-      }
+      await expect(
+        launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+      ).resolves.toBe(false);
     });
 
-    it("does not take a data directory that only starts like the record's for the same one", async () => {
-      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data-old");
+    it("does not take a data directory that only starts like the record's for the same one", async ({
+      daemon,
+    }) => {
+      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data-old", daemon);
 
-      try {
-        await expect(
-          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
-        ).resolves.toBe(false);
-      } finally {
-        child.kill("SIGKILL");
-      }
+      await expect(
+        launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+      ).resolves.toBe(false);
     });
   });
 
@@ -309,8 +294,7 @@ describe("local server binary helpers", () => {
     expect(kill).toHaveBeenCalledWith(12345, "SIGTERM");
   });
 
-  it("sends SIGKILL to the process group when SIGTERM does not stop it", async () => {
-    vi.useFakeTimers();
+  it("sends SIGKILL to the process group when SIGTERM does not stop it", async ({ clock }) => {
     const kill = vi
       .spyOn(process, "kill")
       .mockImplementation((_pid: number, _signal?: string | number) => {
@@ -318,7 +302,7 @@ describe("local server binary helpers", () => {
       });
 
     const stopped = BinaryLauncher.stopPid(12345);
-    await vi.advanceTimersByTimeAsync(12_500);
+    await clock.advanceAsync(12_500);
 
     await expect(stopped).resolves.toMatchObject({
       pid: 12345,
@@ -332,18 +316,8 @@ describe("local server binary helpers", () => {
 });
 
 describe("reading a server's log file", () => {
-  const dirs: string[] = [];
-
-  afterEach(async () => {
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  /** Where a server's log goes, holding `content` if any is given. */
-  async function aLogFile(content?: string | Buffer): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-server-log-"));
-    dirs.push(dir);
+  /** Where a server's log goes in `dir`, holding `content` if any is given. */
+  async function aLogFile(dir: string, content?: string | Buffer): Promise<string> {
     const path = join(dir, "server.log");
     if (content !== undefined) {
       await writeFile(path, content);
@@ -351,8 +325,8 @@ describe("reading a server's log file", () => {
     return path;
   }
 
-  it("reads the whole file first, then only what was appended", async () => {
-    const path = await aLogFile("level=INFO msg=one\n");
+  it("reads the whole file first, then only what was appended", async ({ dir }) => {
+    const path = await aLogFile(dir, "level=INFO msg=one\n");
     const log = new AppendedLog(path);
 
     await expect(log.next()).resolves.toBe("level=INFO msg=one\n");
@@ -361,8 +335,8 @@ describe("reading a server's log file", () => {
     await expect(log.next()).resolves.toBe("");
   });
 
-  it("keeps a character whole when a read ends inside it", async () => {
-    const path = await aLogFile(Buffer.from([0xc3]));
+  it("keeps a character whole when a read ends inside it", async ({ dir }) => {
+    const path = await aLogFile(dir, Buffer.from([0xc3]));
     const log = new AppendedLog(path);
 
     await expect(log.next()).resolves.toBe("");
@@ -370,8 +344,8 @@ describe("reading a server's log file", () => {
     await expect(log.next()).resolves.toBe("é\n");
   });
 
-  it("reads a file that is not there yet as empty, and the file once it is", async () => {
-    const path = await aLogFile();
+  it("reads a file that is not there yet as empty, and the file once it is", async ({ dir }) => {
+    const path = await aLogFile(dir);
     const log = new AppendedLog(path);
 
     await expect(log.next()).resolves.toBe("");
@@ -379,8 +353,8 @@ describe("reading a server's log file", () => {
     await expect(log.next()).resolves.toBe("level=INFO msg=up\n");
   });
 
-  it("reads a file that got shorter, as after it was deleted, from the top", async () => {
-    const path = await aLogFile("level=INFO msg=a long first line\n");
+  it("reads a file that got shorter, as after it was deleted, from the top", async ({ dir }) => {
+    const path = await aLogFile(dir, "level=INFO msg=a long first line\n");
     const log = new AppendedLog(path);
     await log.next();
 
@@ -389,8 +363,10 @@ describe("reading a server's log file", () => {
     await expect(log.next()).resolves.toBe("level=INFO msg=b\n");
   });
 
-  it("follows the file until it is stopped, handing over what was there apart from what came after", async () => {
-    const path = await aLogFile("level=INFO msg=one\n");
+  it("follows the file until it is stopped, handing over what was there apart from what came after", async ({
+    dir,
+  }) => {
+    const path = await aLogFile(dir, "level=INFO msg=one\n");
     const stop = new AbortController();
     const existing: string[] = [];
     const appended: string[] = [];

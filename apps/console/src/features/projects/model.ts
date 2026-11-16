@@ -13,7 +13,7 @@ export interface ProjectRef {
 }
 
 /** What a project read carries that the chrome uses. */
-interface ProjectRead {
+export interface ProjectRead {
   id: string;
   name: string;
   origins?: ReadonlyArray<{ pattern: string; kind: string }>;

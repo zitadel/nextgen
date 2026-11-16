@@ -57,7 +57,7 @@ export async function completeLogin(
   // caller navigates to next ("Navigation to /x is interrupted by another
   // navigation to /"). The shell's account menu renders only once the guard
   // has let the layout through, so waiting for it waits for the sign-in to
-  // have finished landing. The account menu rather than the sidebar: the
-  // landing may be Projects, the home, which draws no sidebar.
+  // have finished landing. The account menu rather than a sidebar entry: the
+  // landing may be Projects, the home, whose sidebar lists no project's screens.
   await page.getByRole("button", { name: /^Account:/ }).waitFor();
 }

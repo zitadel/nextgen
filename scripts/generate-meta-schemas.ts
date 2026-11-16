@@ -9,7 +9,12 @@
  * value is `true`, or `json-schema` when the instances it validates are JSON
  * Schema documents themselves; those gain `allOf: [{$ref: <draft-2020-12>}]`,
  * which the YAML cannot spell because orval resolves every `$ref` it finds,
- * even under an `x-` key, and the draft is not part of the spec. Its consumers
+ * even under an `x-` key, and the draft is not part of the spec. They also
+ * trade the YAML's `additionalProperties: true` for `unevaluatedProperties:
+ * false`, so a document holds only the draft's keywords and the ones the YAML
+ * lists: a misspelt keyword such as `minimumLength` is refused instead of
+ * constraining nothing. The YAML stays open because code generators, which
+ * do not see the draft, would refuse every keyword. Its consumers
  * are the Go server, which compiles the user meta-schemas at runtime to
  * validate the JSON Schema documents customers upload, and the CLI, which
  * ships the flow and branding schemas into a project's `.zitadel/meta/` so
@@ -165,12 +170,21 @@ export function generateSchema(source: string, emitted: ReadonlySet<string>): Sc
   const defs = new Map<string, Schema>();
   const yaml = loadYaml(source);
   const body = convert(yaml, dirname(source), emitted, defs) as Schema;
+  const documents = yaml[EMIT_KEY] === "json-schema";
+  // The YAML keeps `additionalProperties: true` so code generators, which do
+  // not see the draft, carry every keyword through; the JSON closes it.
+  if (documents && body.additionalProperties !== true) {
+    throw new Error(
+      `${basename(source)}: a json-schema meta-schema must declare additionalProperties: true`,
+    );
+  }
+  const { additionalProperties: _open, ...closed } = body;
   return {
     $comment: MARKER,
     $schema: DRAFT,
     title: defName(source),
-    ...body,
-    ...(yaml[EMIT_KEY] === "json-schema" ? { allOf: [{ $ref: DRAFT }] } : {}),
+    ...(documents ? closed : body),
+    ...(documents ? { allOf: [{ $ref: DRAFT }], unevaluatedProperties: false } : {}),
     ...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
   };
 }

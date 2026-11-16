@@ -1,15 +1,14 @@
 import type {
-  CreateFlowDefinition201,
-  CreateFlowDefinitionBody,
+  PublishFlowDefinition201,
+  PublishFlowDefinitionBody,
   GetFlowDefinition200,
   ListFlowDefinitions200,
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
-
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of flow definitions. */
@@ -25,10 +24,10 @@ export type FlowPage = Page<FlowSummary>;
 export type FlowRecord = GetFlowDefinition200;
 
 /** What creating a flow definition takes: the schema it pins and the flow itself. */
-export type FlowInput = Readonly<Omit<CreateFlowDefinitionBody, "project_id">>;
+export type FlowInput = Readonly<Omit<PublishFlowDefinitionBody, "project_id">>;
 
 /** A flow definition revision as creation returns it. */
-export type CreatedFlow = CreateFlowDefinition201;
+export type CreatedFlow = PublishFlowDefinition201;
 
 /**
  * The login flow definitions of one project: listing them, reading one by
@@ -109,7 +108,7 @@ export class FlowService extends ApiService {
     const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No flow definition named "${reference}"`, {
-        hint: "Run `flow-definitions list` to see the flows this project has.",
+        hint: "Run `flow-definition list` to see the flows this project has.",
       });
     }
     return current;
@@ -122,7 +121,7 @@ export class FlowService extends ApiService {
    * @returns The revision that was created.
    */
   async create(input: FlowInput): Promise<CreatedFlow> {
-    return this.client.createFlowDefinition({
+    return this.client.publishFlowDefinition({
       ...input,
       project_id: this.projectId,
     });

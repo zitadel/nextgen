@@ -217,7 +217,7 @@ change are not a supported mixed-version combination.
   `api/openapi/components/headers/set-cookie-session-token.yaml`, the session
   operations in `api/openapi/endpoints/sessions/`, and
   `api/openapi/endpoints/projects/by_id/claim/complete/methods.yaml`.
-  Regenerate `api/generated` with `moon run server:generate`.
+  Regenerate `api/generated` with `turbo run generate --filter=@zitadel/server`.
 - **Server tests**: update cookie literals in `internal/api` and
   `internal/api/integration_test`, including the generated-client and CSRF
   helpers. Test both new names on their allowed transports, rejection of

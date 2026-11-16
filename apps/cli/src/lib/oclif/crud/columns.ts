@@ -1,8 +1,11 @@
 import { refusalError } from "@/lib/oclif/refusal";
+
 import { allows, type FieldPaths, observedPaths, suggestable } from "./paths";
 
 function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
-  const missing = chosen.filter((field) => !allows(paths, field));
+  const missing = chosen.filter((field) => {
+    return !allows(paths, field);
+  });
   if (missing.length === 0) {
     return;
   }
@@ -17,7 +20,7 @@ function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
       },
     },
     {
-      noun: missing.length === 1 ? "column" : "columns",
+      noun: new Intl.PluralRules("en").select(missing.length) === "one" ? "column" : "columns",
       missing: missing.join(", "),
       available: available.join(", "),
       missingList: missing,
@@ -39,7 +42,9 @@ export const readColumns = (
 ): readonly string[] => {
   const chosen = raw
     .split(",")
-    .map((field) => field.trim())
+    .map((field) => {
+      return field.trim();
+    })
     .filter(Boolean);
   if (chosen.length === 0) {
     throw refusalError(

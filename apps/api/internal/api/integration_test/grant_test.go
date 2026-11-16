@@ -91,7 +91,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.False(t, created.User.Value.Schema.IsSet())
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        created.ID,
+			GrantID:   created.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -102,14 +102,14 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.True(t, got.User.Value.Identifier.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        created.ID,
+			GrantID:   created.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 
 		getAgain, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        created.ID,
+			GrantID:   created.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.False(t, created.User.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        created.ID,
+			GrantID:   created.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, first))
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        created.ID,
+			GrantID:   created.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -206,14 +206,14 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		setupID := asgns[0].ID
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        setupID,
+			GrantID:   setupID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
 		assertGrantNotFound(t, getResp)
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        setupID,
+			GrantID:   setupID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -234,14 +234,14 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		require.NoError(t, err)
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        asgn.ID,
+			GrantID:   asgn.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
 		assertGrantNotFound(t, getResp)
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-			ID:        asgn.ID,
+			GrantID:   asgn.ID,
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
@@ -275,7 +275,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("create by identifier", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		userResp, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
@@ -341,7 +341,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("repeat identifier is accepted and writes nothing new", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		userResp, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
@@ -365,7 +365,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		// Admin: the write check runs before validation, so a viewer would
 		// be refused before the self-grant rule is ever reached.
 		harness.SeedProjectAdmin(t, project.ID, userID)
-		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		userResp, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
@@ -388,7 +388,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	t.Run("identifier hit and miss are indistinguishable", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		userResp, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
@@ -551,7 +551,7 @@ func TestGrantQuery(t *testing.T) {
 
 	params := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
 	getParams := func(id string) api.GetGrantParams {
-		return api.GetGrantParams{ID: id, ProjectID: api.ProjectID(project.ID)}
+		return api.GetGrantParams{GrantID: id, ProjectID: api.ProjectID(project.ID)}
 	}
 
 	userID := harness.CreateUserWithTeam(t, platform.ID)
@@ -576,7 +576,7 @@ func TestGrantQuery(t *testing.T) {
 	revokedGrant, ok := revokedResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, revokedResp))
 	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-		ID:        revokedGrant.ID,
+		GrantID:   revokedGrant.ID,
 		ProjectID: api.ProjectID(project.ID),
 	})
 	require.NoError(t, err)
@@ -751,9 +751,9 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.NoError(t, err)
 	revokedGrant, ok := revokedGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, revokedGrantResp))
-	delUser, err := platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(revokedUserID)})
+	delUser, err := platformClient.DeleteUser(t.Context(), api.DeleteUserParams{UserID: api.UserID(revokedUserID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.DeleteUserByIDNoContent{}, delUser, helpers.MustMarshal(t, delUser))
+	require.IsType(t, &api.DeleteUserNoContent{}, delUser, helpers.MustMarshal(t, delUser))
 
 	// The project's own secret may not expand (ADR 059 amendment); a platform
 	// user with read on both projects may.
@@ -784,7 +784,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.True(t, listedUser.User.IsSet())
 	require.True(t, listedUser.User.Value.Schema.IsSet())
 	require.True(t, listedUser.User.Value.Metadata.IsSet())
-	getUser, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+	getUser, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(userID)})
 	require.NoError(t, err)
 	wantUser, ok := getUser.(*api.User)
 	require.True(t, ok, helpers.MustMarshal(t, getUser))
@@ -867,7 +867,7 @@ func TestGrantQueryExpand(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryGrantsForbidden).Code)
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        userGrant.ID,
+			GrantID:   userGrant.ID,
 			ProjectID: api.ProjectID(project.ID),
 			Expand:    expandPrincipal,
 		})
@@ -878,7 +878,7 @@ func TestGrantQueryExpand(t *testing.T) {
 
 	t.Run("GET expand inlines extras", func(t *testing.T) {
 		getResp, err := reader.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        userGrant.ID,
+			GrantID:   userGrant.ID,
 			ProjectID: api.ProjectID(project.ID),
 			Expand:    expandPrincipal,
 		})
@@ -980,7 +980,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	assert.Equal(t, api.UserID(subjectID), created.User.Value.UserID)
 
 	getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
-		ID:        created.ID,
+		GrantID:   created.ID,
 		ProjectID: api.ProjectID(project.ID),
 	})
 	require.NoError(t, err)
@@ -1006,7 +1006,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	assert.Equal(t, api.ErrorCode("user.permission_denied"), expandResp.(*api.QueryGrantsForbidden).Code)
 
 	delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
-		ID:        created.ID,
+		GrantID:   created.ID,
 		ProjectID: api.ProjectID(project.ID),
 	})
 	require.NoError(t, err)
@@ -1083,7 +1083,8 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 
 	// A schema that designates a display, so the label carries one as well as
 	// the identifier; the seeded default designates no display properties.
-	// It lives in the shared platform project, so it goes when the test ends.
+	// It stays in the shared platform project after the test: a release
+	// another test deploys there may pin it.
 	suffix := strings.ToLower(helpers.RandString(8))
 	displaySchema := harness.CreateUserSchema(t, platform, `{
 		"title": "GrantLabelSchema",
@@ -1118,9 +1119,8 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 	t.Cleanup(func() {
 		stmts := harness.EnsureServiceDB(t).Statements()
 		_ = stmts.DeleteUserByID(context.Background(), platform.ID, targetID)
-		_ = stmts.DeleteJSONSchemaByID(context.Background(), platform.ID, displaySchema)
 	})
-	targetResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
+	targetResp, err := platformClient.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(targetID)})
 	require.NoError(t, err)
 	target, ok := targetResp.(*api.User)
 	require.True(t, ok, helpers.MustMarshal(t, targetResp))
@@ -1138,7 +1138,7 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 
 	createParams := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
 	getParams := func(id string, expand ...api.GrantExpand) api.GetGrantParams {
-		return api.GetGrantParams{ID: id, ProjectID: api.ProjectID(project.ID), Expand: expand}
+		return api.GetGrantParams{GrantID: id, ProjectID: api.ProjectID(project.ID), Expand: expand}
 	}
 	queryParams := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
 	expandPrincipal := []api.GrantExpand{api.GrantExpandPrincipal}
@@ -1209,9 +1209,9 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 	})
 
 	t.Run("the project secret cannot read the user", func(t *testing.T) {
-		userResp, err := attacker.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
+		userResp, err := attacker.GetUser(t.Context(), api.GetUserParams{UserID: api.UserID(targetID)})
 		require.NoError(t, err)
-		notFound, ok := userResp.(*api.GetUserByIDNotFound)
+		notFound, ok := userResp.(*api.GetUserNotFound)
 		require.True(t, ok, helpers.MustMarshal(t, userResp))
 		assert.Equal(t, api.ErrorCode("user.not_found"), notFound.Code)
 

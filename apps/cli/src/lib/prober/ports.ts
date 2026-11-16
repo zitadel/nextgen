@@ -37,7 +37,9 @@ export async function listenersForPort(
   port: number,
   opts?: { readonly timeoutMs?: number },
 ): Promise<ReadonlyArray<TcpListener>> {
-  return (await listListeningTcpListeners(opts)).filter((listener) => listener.port === port);
+  return (await listListeningTcpListeners(opts)).filter((listener) => {
+    return listener.port === port;
+  });
 }
 
 /** Runs `lsof` with the canned argv and resolves to its stdout. */
@@ -63,9 +65,16 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
         ? Number.parseInt(pidLine.slice(1), 10)
         : Number.NaN;
       const pid = Number.isFinite(parsedPid) && parsedPid > 0 ? parsedPid : undefined;
-      const command = lines.find((line) => line.startsWith("c"))?.slice(1) || undefined;
+      const command =
+        lines
+          .find((line) => {
+            return line.startsWith("c");
+          })
+          ?.slice(1) || undefined;
       return lines
-        .filter((line) => line.startsWith("n"))
+        .filter((line) => {
+          return line.startsWith("n");
+        })
         .flatMap((line): TcpListener[] => {
           const address = line.slice(1);
           const colon = address.lastIndexOf(":");
@@ -83,5 +92,7 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
           return [{ address, command, host, pid, port }];
         });
     })
-    .sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
+    .sort((a, b) => {
+      return a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0);
+    });
 }

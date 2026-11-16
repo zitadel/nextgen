@@ -3,7 +3,7 @@ import { CSRF_HEADER } from "@/lib/backend/transport";
 import { createZitadelClient } from "@/lib/backend";
 import type { LocalAdmin } from "./admin-credential";
 import { adminSessionCookie, localAdminRequest } from "./sign-in";
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 
 /** The team a project was attached to, and when. */
 export type ProjectOwner = { team_id: string; claimed_at: string };
@@ -24,23 +24,27 @@ export async function claimProjectAsAdmin(input: {
   const { serverUrl, projectId, projectSecret, admin, signal } = input;
 
   const { challenge_id } = await createZitadelClient({
-    userAgent: userAgent(),
+    userAgent: Runtime.current().userAgent(),
     baseUrl: serverUrl,
     token: projectSecret,
     signal,
-  }).initClaim(projectId, localAdminRequest(serverUrl));
+  }).createProjectClaim(projectId, localAdminRequest(serverUrl));
 
   // claim/complete authenticates by the admin's session cookie, not a bearer
   // token, so this client carries none. As a cookie-authenticated write it
   // also needs the session's CSRF token (ADR 053 §5), which the same cookie
   // reads from GET /sessions/me/csrf.
   const cookie = await adminSessionCookie(serverUrl, admin, signal);
-  const session = createZitadelClient({ userAgent: userAgent(), baseUrl: serverUrl, signal });
+  const session = createZitadelClient({
+    userAgent: Runtime.current().userAgent(),
+    baseUrl: serverUrl,
+    signal,
+  });
   const { csrf_token } = await session.getMySessionCsrfToken(
     undefined,
     localAdminRequest(serverUrl, { cookie }),
   );
-  const { team_id, claimed_at } = await session.completeClaim(
+  const { team_id, claimed_at } = await session.completeProjectClaim(
     projectId,
     { challenge_id },
     localAdminRequest(serverUrl, { cookie, [CSRF_HEADER]: csrf_token }),

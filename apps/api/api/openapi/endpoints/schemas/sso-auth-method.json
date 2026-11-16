@@ -19,6 +19,7 @@
       "items": {
         "type": "string",
         "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "x-zitadel-pattern-message": "must start with a lowercase letter or digit and use only lowercase letters, digits, _ and -",
         "maxLength": 64,
         "examples": [
           "google",

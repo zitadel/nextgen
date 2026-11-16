@@ -88,6 +88,24 @@ func (h *Harness) EnsurePasswordPolicy(t testing.TB) *service.PasswordPolicy {
 	return h.passwordPolicy.value
 }
 
+// EnsureUserCreatePolicy is the sign-up gate the server wires: the embedded
+// policy catalog and the project's user.create instance, resolved through the
+// policy service.
+func (h *Harness) EnsureUserCreatePolicy(t testing.TB) *service.UserCreatePolicy {
+	t.Helper()
+	policies := h.EnsurePolicyService(t)
+	h.userCreatePolicy.mutex.Lock()
+	defer h.userCreatePolicy.mutex.Unlock()
+
+	if h.userCreatePolicy.value == nil {
+		engine, err := policy.New()
+		require.NoError(t, err)
+		h.userCreatePolicy.value, err = service.NewUserCreatePolicy(engine, policies)
+		require.NoError(t, err)
+	}
+	return h.userCreatePolicy.value
+}
+
 func (h *Harness) EnsureHasherFactory(t testing.TB) *crypto.HasherFactory {
 	t.Helper()
 	h.hasherFactory.mutex.Lock()

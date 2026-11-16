@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 /**
  * The server's custom go/analysis checks plus the Biome lint of its JavaScript
- * launcher: turbo's version of the inline script behind `server:lint` in
- * apps/server/moon.yml. Moon keeps its own until the cutover, so a change to
- * the checks goes into both.
+ * launcher: the server's `lint` script (`@zitadel/server#lint`).
  *
  * The analyzers (today egresslint, ADR 061) run directly rather than through
  * `go vet`, so the built-in vet analyzers keep running alongside (the `vet`

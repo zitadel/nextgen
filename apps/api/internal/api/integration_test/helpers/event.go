@@ -16,6 +16,7 @@ func (h *Harness) EnsureEventService(t testing.TB) *service.EventService {
 	if h.eventService.value == nil {
 		h.eventService.value = service.NewEventService(
 			h.EnsureServiceDB(t),
+			h.EnsurePlatformProject(t).ID,
 		)
 	}
 	return h.eventService.value

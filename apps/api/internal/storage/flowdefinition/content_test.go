@@ -63,7 +63,7 @@ func TestContent_TransitionRoundTrip_PreservesActionAndPurpose(t *testing.T) {
 
 	got, err := flowdefinition.ToDomain(
 		def.ProjectID, def.ID, def.Name, def.SchemaVersion,
-		def.Status, now, now, raw,
+		now, now, raw,
 	)
 	require.NoError(t, err)
 
@@ -112,7 +112,7 @@ func TestContent_UnknownTransitionPurposeRejected(t *testing.T) {
 
 	_, err := flowdefinition.ToDomain(
 		"proj-1", "flow-1", "combined", "1",
-		domain.FlowDefinitionStatusActive, time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
+		time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `invalid purpose "shopping"`)
@@ -150,7 +150,7 @@ func TestContent_SSOProvidersRoundTrip_StoresSlugs(t *testing.T) {
 
 	got, err := flowdefinition.ToDomain(
 		def.ProjectID, def.ID, def.Name, "1",
-		domain.FlowDefinitionStatusActive, now, now, raw,
+		now, now, raw,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"google", "corp_idp"}, got.Steps[0].SSOProviders)
@@ -177,7 +177,7 @@ func TestContent_LegacySSOProviderObjectsDecodeAsSlugs(t *testing.T) {
 
 	got, err := flowdefinition.ToDomain(
 		"proj-1", "flow-1", "login", "1",
-		domain.FlowDefinitionStatusActive, time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
+		time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"google", "corp_idp"}, got.Steps[0].SSOProviders)
@@ -212,7 +212,7 @@ func TestContent_MalformedSSOProviderRejected(t *testing.T) {
 
 			_, err := flowdefinition.ToDomain(
 				"proj-1", "flow-1", "login", "1",
-				domain.FlowDefinitionStatusActive, time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
+				time.Unix(1700000000, 0), time.Unix(1700000000, 0), raw,
 			)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)

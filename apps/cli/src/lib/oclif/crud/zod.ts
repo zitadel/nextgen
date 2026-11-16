@@ -54,26 +54,35 @@ const MAX_WRAPPER_DEPTH = 10;
 export const unwrap = (
   schema: ZodLike | undefined,
   depth = MAX_WRAPPER_DEPTH,
-): ZodLike | undefined =>
-  schema?.def?.innerType && depth > 0 ? unwrap(schema.def.innerType, depth - 1) : schema;
+): ZodLike | undefined => {
+  return schema?.def?.innerType && depth > 0 ? unwrap(schema.def.innerType, depth - 1) : schema;
+};
 
 /** The wrappers around a field, outermost first, the field's own type last. */
-const layers = (schema: ZodLike | undefined, depth = 0): ZodLike[] =>
-  schema && depth <= MAX_WRAPPER_DEPTH ? [schema, ...layers(schema.def?.innerType, depth + 1)] : [];
+const layers = (schema: ZodLike | undefined, depth = 0): ZodLike[] => {
+  return schema && depth <= MAX_WRAPPER_DEPTH
+    ? [schema, ...layers(schema.def?.innerType, depth + 1)]
+    : [];
+};
 
 /**
  * Whether a body may leave the field out: it is `optional`, or carries a
  * `default` the schema fills in. A `nullable` field is still required; it only
  * accepts `null` as its value.
  */
-export const isOptionalField = (field: ZodLike | undefined): boolean =>
-  typeof field?.isOptional === "function"
+export const isOptionalField = (field: ZodLike | undefined): boolean => {
+  return typeof field?.isOptional === "function"
     ? field.isOptional()
-    : layers(field).some((layer) => ["optional", "default"].includes(layer.def?.type ?? ""));
+    : layers(field).some((layer) => {
+        return ["optional", "default"].includes(layer.def?.type ?? "");
+      });
+};
 
 /** The value the schema fills in for a field left out, when it has one. */
 export const defaultOf = (field: ZodLike | undefined): { value: unknown } | undefined => {
-  const layer = layers(field).find((candidate) => candidate.def?.type === "default");
+  const layer = layers(field).find((candidate) => {
+    return candidate.def?.type === "default";
+  });
   return layer ? { value: layer.def?.defaultValue } : undefined;
 };
 
@@ -82,10 +91,11 @@ export const isInteger = (schema: ZodLike | undefined): boolean => {
   const type = unwrap(schema);
   return (
     (type?.def?.format ?? "").includes("int") ||
-    (type?.def?.checks ?? []).some(
-      (check) =>
-        check._zod?.def?.check === "number_format" && (check._zod.def.format ?? "").includes("int"),
-    )
+    (type?.def?.checks ?? []).some((check) => {
+      return (
+        check._zod?.def?.check === "number_format" && (check._zod.def.format ?? "").includes("int")
+      );
+    })
   );
 };
 
@@ -103,9 +113,15 @@ export const objectOf = (schema: ZodLike | undefined): ZodLike | undefined => {
   if (type?.def?.type !== "union") {
     return undefined;
   }
-  const members = (type.def.options ?? []).map((member) => unwrap(member));
-  const objects = members.filter((member) => member?.def?.type === "object" && member.shape);
-  const nulls = members.filter((member) => member?.def?.type === "null");
+  const members = (type.def.options ?? []).map((member) => {
+    return unwrap(member);
+  });
+  const objects = members.filter((member) => {
+    return member?.def?.type === "object" && member.shape;
+  });
+  const nulls = members.filter((member) => {
+    return member?.def?.type === "null";
+  });
   return objects.length === 1 && objects.length + nulls.length === members.length
     ? objects[0]
     : undefined;

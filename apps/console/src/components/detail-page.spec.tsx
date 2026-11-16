@@ -2,8 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
-import { MetaRule, MetaValue } from "./detail-meta";
-import { DetailHeader } from "./detail-page";
+import { DetailHeader, DetailRow, DetailRows } from "./detail-page";
 import { Page } from "./layout";
 
 function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
@@ -12,13 +11,10 @@ function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
       <DetailHeader
         icon={Box}
         title="Engineering"
-        meta={
-          <>
-            <MetaValue label="Team ID" value="team_01" copyable />
-            <MetaRule />
-            <MetaValue label="Created" value="Jul 12, 2026" />
-          </>
-        }
+        meta={[
+          { label: "Team ID", value: "team_01", copyable: true },
+          { label: "Created", value: "Jul 12, 2026" },
+        ]}
         {...props}
       />
     </Page>,
@@ -32,11 +28,13 @@ describe("detail header", () => {
     expect(screen.getAllByRole("heading")).toHaveLength(1);
   });
 
-  it("carries the identifying values in the header card", () => {
+  it("lists the identifying values under the title, the id copyable", () => {
     renderHeader();
-    expect(screen.getByText("team_01")).toBeInTheDocument();
+    const terms = screen.getAllByRole("term").map((term) => term.textContent);
+    expect(terms).toEqual(["Team ID", "Created"]);
     expect(screen.getByText("Jul 12, 2026")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Team ID" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy Created" })).not.toBeInTheDocument();
   });
 
   it("renders the status beside the title and the subtitle beneath it", () => {
@@ -51,9 +49,98 @@ describe("detail header", () => {
   });
 
   it("keeps the icon out of the accessibility tree", () => {
-    const { container } = render(
-      <DetailHeader icon={Box} title="Engineering" meta={<MetaValue label="ID" value="x" />} />,
-    );
+    const { container } = render(<DetailHeader icon={Box} title="Engineering" meta={[]} />);
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("draws no icon tile for configuration", () => {
+    const { container } = render(<DetailHeader title="Default login" meta={[]} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("puts the link to the screen's list above the title", () => {
+    renderHeader({ parent: <a href="/authentication">Identity providers</a> });
+    const link = screen.getByRole("link", { name: "Identity providers" });
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(link.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("names an unlabelled value for screen readers only", () => {
+    renderHeader({
+      meta: [
+        { label: "Identifier", value: "maya@acme.com", labelHidden: true },
+        { label: "User ID", value: "user_01", copyable: true },
+      ],
+    });
+    // The value keeps its name for a screen reader, paired as a term.
+    expect(screen.getAllByRole("term")[0]).toHaveTextContent("Identifier");
+    expect(screen.getAllByRole("definition")[0]).toHaveTextContent("maya@acme.com");
+  });
+
+  it("leaves out an item without a value", () => {
+    renderHeader({
+      meta: [
+        { label: "User ID", value: "user_01", copyable: true },
+        { label: "Created", value: undefined },
+      ],
+    });
+    expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(["User ID"]);
+  });
+
+  it("draws no identity line when there are no values", () => {
+    const { container } = render(<DetailHeader icon={Box} title="Engineering" meta={[]} />);
+    expect(container.querySelector("dl")).toBeNull();
+  });
+
+  it("puts the action after the title", () => {
+    renderHeader({ action: <button type="button">Actions</button> });
+    const action = screen.getByRole("button", { name: "Actions" });
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(title.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("detail rows", () => {
+  it("rules between rows, never after the last", () => {
+    const { container } = render(
+      <DetailRows>
+        <DetailRow label="Message">a</DetailRow>
+        <DetailRow label="Git commit">b</DetailRow>
+        <DetailRow label="Created by">c</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(container.querySelectorAll("[data-slot=separator]")).toHaveLength(2);
+    expect(list?.lastElementChild).toHaveTextContent("Created by");
+  });
+
+  it("keeps a list a list: it holds only its items, each rule inside one", () => {
+    const { container } = render(
+      <DetailRows as="ul">
+        <DetailRow label="Password">Not set</DetailRow>
+        <DetailRow label="Passkey">Not set up</DetailRow>
+      </DetailRows>,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // axe's `list` rule: no `role="none"` items or bare rules beside the rows.
+    const list = container.querySelector("ul");
+    expect([...(list?.children ?? [])].map((child) => child.tagName)).toEqual(["LI", "LI"]);
+    expect([...(list?.children ?? [])].some((child) => child.hasAttribute("role"))).toBe(false);
+    expect(list?.children[1]?.querySelector("[data-slot=separator]")).not.toBeNull();
+  });
+});
+
+describe("detail rows on their own width", () => {
+  it("lays nested rows out on the list's width, not the viewport's", () => {
+    const { container } = render(
+      <DetailRows container>
+        <DetailRow label="Length">15 characters</DetailRow>
+      </DetailRows>,
+    );
+    const list = container.firstElementChild;
+    expect(list).toHaveClass("@container/detail-rows");
+    const row = list?.firstElementChild;
+    expect(row).toHaveClass("@md/detail-rows:flex-row");
+    expect(row).not.toHaveClass("sm:flex-row");
   });
 });

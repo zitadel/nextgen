@@ -10,6 +10,16 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+// activeIn marks users active in their home project. A user principal missing
+// from Graph.ActiveUsers holds nothing (ADR 053 §4).
+func activeIn(home string, users ...string) map[UserKey]bool {
+	m := make(map[UserKey]bool, len(users))
+	for _, u := range users {
+		m[UserKey{ProjectID: home, UserID: u}] = true
+	}
+	return m
+}
+
 func TestOracle_HandBuilt(t *testing.T) {
 	closure := []compiler.Implication{
 		{Source: compiler.Relation{Type: "project", Name: "viewer"}, Implied: compiler.Relation{Type: "project", Name: "viewer"}, Depth: 0},
@@ -29,7 +39,8 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("direct allow", func(t *testing.T) {
 		g := Graph{
-			Closure: closure,
+			ActiveUsers: activeIn("p1", "alice", "bob"),
+			Closure:     closure,
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "p1", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
@@ -44,7 +55,8 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("team expand", func(t *testing.T) {
 		g := Graph{
-			Closure: closure,
+			ActiveUsers: activeIn("p1", "alice"),
+			Closure:     closure,
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "p1", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "eng",
@@ -61,8 +73,9 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("ttu", func(t *testing.T) {
 		g := Graph{
-			Closure: closure,
-			Edges:   edges,
+			ActiveUsers: activeIn("p1", "alice"),
+			Closure:     closure,
+			Edges:       edges,
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "p1", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "eng",
@@ -85,8 +98,9 @@ func TestOracle_HandBuilt(t *testing.T) {
 		}
 		scoped.ApplyScope(domain.NewResourceAssignmentScope("alice"))
 		g := Graph{
-			Closure: closure,
-			Edges:   edges,
+			ActiveUsers: activeIn("p1", "alice"),
+			Closure:     closure,
+			Edges:       edges,
 			Assignments: []*domain.AuthzAssignment{
 				{
 					ProjectID: "p1", CatalogID: "c1",
@@ -104,7 +118,8 @@ func TestOracle_HandBuilt(t *testing.T) {
 		revoked := time.Now()
 		past := time.Now().Add(-time.Hour)
 		g := Graph{
-			Closure: closure,
+			ActiveUsers: activeIn("p1", "alice", "bob"),
+			Closure:     closure,
 			Assignments: []*domain.AuthzAssignment{
 				{
 					ProjectID: "p1", CatalogID: "c1",
@@ -128,6 +143,7 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("foothold membership only", func(t *testing.T) {
 		g := Graph{
+			ActiveUsers: activeIn("p1", "alice"),
 			Memberships: []*domain.AuthzMembershipEdge{
 				domain.NewUserTeamMembershipEdge("p1", "eng", "alice"),
 			},
@@ -138,7 +154,8 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("foreign team foothold uses home", func(t *testing.T) {
 		g := Graph{
-			Closure: closure,
+			ActiveUsers: activeIn("platform", "alice"),
+			Closure:     closure,
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "customer", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
@@ -172,6 +189,7 @@ func TestOracle_HandBuilt(t *testing.T) {
 	t.Run("targeted foothold follows scope", func(t *testing.T) {
 		teamA, resX := "team_a", "usr_x"
 		g := Graph{
+			ActiveUsers: activeIn("p1", "scoped", "single", "wide", "member", "nobody"),
 			Assignments: []*domain.AuthzAssignment{
 				{ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "scoped",
 					ScopeKind: domain.AuthzScopeKindTeam, ScopeTeamID: &teamA},
@@ -210,12 +228,67 @@ func TestOracle_HandBuilt(t *testing.T) {
 
 	t.Run("local membership shortcut ignores distinct home", func(t *testing.T) {
 		g := Graph{
+			ActiveUsers: activeIn("platform", "alice"),
 			Memberships: []*domain.AuthzMembershipEdge{
 				domain.NewUserTeamMembershipEdge("customer", "local", "alice"),
 			},
 		}
 		assert.True(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 		assert.False(t, g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "bob"))
+	})
+
+	// ADR 053 §4: every path a user principal takes holds only while the user is
+	// active in their home project, the direct grant included (#1234).
+	t.Run("an inactive user holds nothing", func(t *testing.T) {
+		g := Graph{
+			Closure: closure,
+			Edges:   edges,
+			Assignments: []*domain.AuthzAssignment{
+				{
+					ProjectID: "customer", CatalogID: "c1",
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
+					ObjectType: "project", Relation: "viewer",
+					ScopeKind: domain.AuthzScopeKindProject,
+				},
+				{
+					ProjectID: "customer", CatalogID: "c1",
+					PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
+					ObjectType: "project", Relation: "team",
+					ScopeKind: domain.AuthzScopeKindProject,
+				},
+			},
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("platform", "agency", "bob"),
+			},
+			Resources: []*domain.ResourceScope{domain.NewUserResourceScope("customer", "usr_1")},
+		}
+		decide := func(user string) []bool {
+			by := domain.AuthzCheckParams{
+				ProjectID: "customer", PrincipalHomeProjectID: "platform",
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: user,
+				ObjectType: "project", Relation: "viewer", ResourceID: user,
+			}
+			return []bool{
+				g.OracleCheck("customer", "platform", domain.AuthzPrincipalTypeUser, user, "project", "viewer"),
+				g.OracleCheckParams(by),
+				g.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, user),
+				g.OracleFootholdParams(by),
+				len(g.OracleList("customer", "platform", domain.AuthzPrincipalTypeUser, user, domain.ResourceKindUser, "project", "viewer")) > 0,
+			}
+		}
+		all := []bool{true, true, true, true, true}
+		none := []bool{false, false, false, false, false}
+
+		g.ActiveUsers = activeIn("platform", "alice", "bob")
+		assert.Equal(t, all, decide("alice"), "direct grant")
+		assert.Equal(t, all, decide("bob"), "tuple-to-userset through a team")
+
+		g.ActiveUsers = activeIn("customer", "alice", "bob")
+		assert.Equal(t, none, decide("alice"), "active in the target, not the home project")
+
+		g.ActiveUsers = nil
+		assert.Equal(t, none, decide("alice"), "direct grant")
+		assert.Equal(t, none, decide("bob"), "tuple-to-userset through a team")
 	})
 
 	t.Run("sk_team constraint", func(t *testing.T) {
@@ -292,7 +365,8 @@ func TestOracle_FootholdPrincipalMatch(t *testing.T) {
 
 	t.Run("direct user assignment ignores distinct home", func(t *testing.T) {
 		g := Graph{
-			Closure: closure,
+			ActiveUsers: activeIn("platform", "alice"),
+			Closure:     closure,
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "customer", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
@@ -323,6 +397,7 @@ func TestOracle_FootholdPrincipalMatch(t *testing.T) {
 	t.Run("revoked foreign team assignment is not foothold", func(t *testing.T) {
 		revoked := time.Now()
 		g := Graph{
+			ActiveUsers: activeIn("platform", "alice"),
 			Assignments: []*domain.AuthzAssignment{{
 				ProjectID: "customer", CatalogID: "c1",
 				PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: "agency",
@@ -340,6 +415,7 @@ func TestOracle_FootholdPrincipalMatch(t *testing.T) {
 
 	t.Run("non-user principal skips local membership shortcut", func(t *testing.T) {
 		g := Graph{
+			ActiveUsers: activeIn("platform", "agency"),
 			Memberships: []*domain.AuthzMembershipEdge{
 				domain.NewUserTeamMembershipEdge("customer", "local", "agency"),
 			},

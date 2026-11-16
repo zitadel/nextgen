@@ -1,10 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { deletedData, mutatedData } from "@/lib/oclif/envelope";
-import type { CommandResult } from "@/lib/oclif/types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "@/lib/oclif/crud/shared";
 import type { DeleteSpec, Json } from "@/lib/oclif/crud/types";
+import { deletedData, mutatedData } from "@/lib/oclif/envelope";
 import { prose } from "@/lib/oclif/rendering";
+import type { CommandResult } from "@/lib/oclif/types";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+
 import {
   type OperationDefinition,
   type OperationInput,
@@ -34,6 +36,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
     options,
   }: OperationDefinition<Ctx, DeleteSpec<Ctx>>): OperationStatics {
     const verb = spec.verb ?? "delete";
+
     return {
       description: `${capitalize(verb)} ${article(resource.singular)} ${resource.singular} by id.`,
       examples: [`<%= config.bin %> ${topic} ${verb} <id> --force --json`],
@@ -46,7 +49,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
         }),
         ...options.flags,
       },
-      args: idArg(resource),
+      args: idArg(resource, topic),
     };
   }
 
@@ -59,15 +62,34 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
     return this.confirmed({
       verb,
       name: `${verb} ${resource.singular} ${id}`,
-      message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      preview: () => dryRunResult({ verb, topic, id }),
-      prepare: () => this.context(),
+      message: async () => {
+        const { projectId, server } = await this.connect();
+
+        return `${capitalize(verb)} ${resource.singular} ${id} in project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
+      },
+      preview: async () => {
+        return dryRunResult({
+          verb,
+          topic,
+          noun: resource.singular,
+          id,
+          next: await this.realRun(),
+        });
+      },
+      prepare: () => {
+        return this.context();
+      },
       apply: async (consent, context) => {
         await spec.call(context, id, consent);
+
         return {
           status: "ok",
           data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
           pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
+          summary: {
+            title: `${capitalize(past)} ${resource.singular} ${escapeControlCharacters(id, { keepLayout: false })}`,
+            sections: [],
+          },
         };
       },
     });

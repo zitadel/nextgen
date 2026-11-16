@@ -1,0 +1,19 @@
+---
+title: Search
+description: Find the users, teams and configuration of a project that match a text, in one request.
+---
+
+Search answers what a person types into one field: part of an email address, a
+team's name, the title of a schema, or an id copied from a log. One request
+looks through the types you name (users, teams, user schemas, flow definitions
+and identity providers) and returns the best matches of each.
+
+A result is a reference: its type, its id, a title and sometimes a subtitle.
+Read the resource itself through its own operations, for example under
+[Users](/docs/reference/api/users) or [Teams](/docs/reference/api/teams).
+
+How text is matched and ranked can change between versions, so treat the
+results as suggestions. To filter by an exact rule, or to page through every
+match, use the type's query operation.
+
+<Operations />

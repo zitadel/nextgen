@@ -212,6 +212,11 @@ export const de: Locale = {
   "error.outcome_unhandled":
     "Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
   "error.sign_in_first": "Bitte melde dich zuerst bei deinem Konto an.",
+  "error.signup_check_failed": "Wir konnten dein Konto nicht erstellen. Bitte versuche es erneut.",
+  "error.signup_rate_limited":
+    "Zu viele Versuche. Bitte warte eine Minute und versuche es dann erneut.",
+  "error.signup_secure_connection":
+    "Für ein neues Konto ist eine sichere Verbindung nötig. Öffne diese Seite mit https://.",
 
   // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt ---
   "notice.user_not_found":

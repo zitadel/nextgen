@@ -17,12 +17,15 @@ const (
 	flowDefinitionsTable = "flow_definitions"
 
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions ` +
-		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
+		`(project_id, id, name, schema_version, purposes, definition, created_at, updated_at) ` +
+		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
 
-	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2`
+	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2 THEN RETURN name`
 
-	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
+	// newestFlowDefinitionByNameStmt is one descent of the name revision index.
+	newestFlowDefinitionByNameStmt = flowDefinitionQuery + ` WHERE project_id = @p1 AND name = @p2 ORDER BY created_at DESC LIMIT 1`
+
+	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, definition, created_at, updated_at ` +
 		`FROM flow_definitions`
 
 	// latestRevisionPerName keeps only the newest revision of each flow name.
@@ -42,7 +45,7 @@ const (
 )
 
 var flowDefinitionColumns = []string{
-	"project_id", "id", "name", "schema_version", "status", "definition", "created_at", "updated_at",
+	"project_id", "id", "name", "schema_version", "definition", "created_at", "updated_at",
 }
 
 type flowDefinitionStatements struct{ statement }
@@ -74,7 +77,6 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			entity.ID,
 			entity.Name,
 			entity.SchemaVersion,
-			entity.Status.String(),
 			purposes,
 			definition,
 		).statement()
@@ -82,7 +84,11 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			return err
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID)); err != nil {
+			return err
+		}
+		// The new revision is the newest of its name, so search answers with it.
+		return writeSearchEntry(ctx, tx, domain.FlowDefinitionSearchEntry(entity))
 	})
 }
 
@@ -143,37 +149,59 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
 	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
-		n, err := tx.Update(ctx, buildStatement(deleteFlowDefinitionStmt, projectID, id).statement())
-		if err != nil {
+		var names []string
+		if err := tx.Write(ctx, buildStatement(deleteFlowDefinitionStmt, projectID, id).statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			names, err = collectRows(iter, func(row *spanner.Row) (string, error) {
+				var name string
+				return name, row.Columns(&name)
+			})
+			return err
+		}); err != nil {
 			return wrapError(err)
 		}
-		if n == 0 {
+		if len(names) == 0 {
 			return nil
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
+		if err := rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id); err != nil {
+			return err
+		}
+		return f.replaceSearchEntry(ctx, tx, projectID, names[0])
 	})
+}
+
+// replaceSearchEntry points the search entry of a flow name at its newest
+// revision left, or removes it when none is.
+func (f flowDefinitionStatements) replaceSearchEntry(ctx context.Context, tx queryExecutor, projectID, name string) error {
+	var newest []*domain.FlowDefinition
+	if err := tx.Query(ctx, buildStatement(newestFlowDefinitionByNameStmt, projectID, name).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		newest, err = collectRows(iter, f.scanFlowDefinition)
+		return err
+	}); err != nil {
+		return err
+	}
+	if len(newest) == 0 {
+		return deleteSearchEntry(ctx, tx, projectID, domain.ResourceKindFlowDefinition, name)
+	}
+	return writeSearchEntry(ctx, tx, domain.FlowDefinitionSearchEntry(newest[0]))
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(row *spanner.Row) (*domain.FlowDefinition, error) {
 	var (
 		projectID, id, name, schemaVersion string
-		statusStr                          string
 		definitionJSON                     spanner.NullJSON
 		createdAt, updatedAt               time.Time
 	)
-	if err := row.Columns(&projectID, &id, &name, &schemaVersion, &statusStr, &definitionJSON, &createdAt, &updatedAt); err != nil {
+	if err := row.Columns(&projectID, &id, &name, &schemaVersion, &definitionJSON, &createdAt, &updatedAt); err != nil {
 		return nil, err
-	}
-	status, err := domain.FlowDefinitionStatusString(statusStr)
-	if err != nil {
-		return nil, wrapError(err)
 	}
 	raw, err := decodeNullJSON(definitionJSON)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, raw)
+	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, createdAt, updatedAt, raw)
 }
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

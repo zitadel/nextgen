@@ -9,9 +9,14 @@ const entry = {
   "app-runner": "src/app-runner.ts",
 };
 
+// The Vitest entry is ESM only: Vitest itself is ESM only and loads global
+// setup and test modules through its own ESM runner, so no require() chain
+// ever reaches it and the CJS build leaves it out.
+const esmEntry = { ...entry, vitest: "src/vitest.ts" };
+
 export default defineConfig([
   {
-    entry,
+    entry: esmEntry,
     outDir: "dist",
     format: ["esm"],
     failOnWarn: true,
@@ -21,7 +26,13 @@ export default defineConfig([
     clean: true,
     target: "es2022",
     deps: {
-      neverBundle: ["@zitadel/api", "@zitadel/cli", "@zitadel/config", "@playwright/test"],
+      neverBundle: [
+        "@zitadel/api",
+        "@zitadel/cli",
+        "@zitadel/config",
+        "@playwright/test",
+        /^vitest(\/|$)/,
+      ],
     },
   },
   {

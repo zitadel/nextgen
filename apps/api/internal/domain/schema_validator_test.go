@@ -82,7 +82,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				},
 				"required": ["email"],
 				"properties": {
-					"email": { "kind": "user-property", "type": "string", "title": "Email" }
+					"email": { "type": "string", "title": "Email" }
 				}
 			}`),
 		},
@@ -201,11 +201,9 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
 		{
-			// A property is an open bag: the dialect names the annotations it
-			// consumes, and carries anything else through untouched. Dropping
-			// an annotation from the vocabulary therefore stops documenting
-			// it, it does not start rejecting documents that still carry it.
-			name: "undeclared annotation on a property is accepted",
+			// A property holds JSON Schema keywords and the annotations the
+			// dialect consumes; any other key would constrain nothing.
+			name: "undeclared annotation on a property is refused",
 			input: []byte(`{
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
@@ -224,6 +222,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 					}
 				}
 			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
 		},
 		{
 			name: "missing metaSchema",
@@ -417,6 +416,81 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestTenantSchemaValidator_SchemaKeywords(t *testing.T) {
+	v := newTestValidator(t)
+	userSchema := func(root, properties string) []byte {
+		return []byte(`{
+			"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+			"kind": "user-schema",
+			"objectType": "human-user",
+			"x-auth-methods": { "passkey": { "enabled": true } },
+			` + root + `
+			"properties": {` + properties + `}
+		}`)
+	}
+
+	tests := []struct {
+		name  string
+		input []byte
+		// refused is the location the validator names; empty when the
+		// document is valid.
+		refused string
+	}{
+		{
+			name:    "a misspelt keyword on a property",
+			input:   userSchema(``, `"firstName": { "type": "string", "minimumLength": 3 }`),
+			refused: "additionalProperties/firstName/unevaluatedProperties/minimumLength",
+		},
+		{
+			name: "a misspelt keyword on a nested property",
+			input: userSchema(``, `"address": { "type": "object", "properties": {
+				"zip": { "type": "string", "maxLenght": 5 } } }`),
+			refused: "additionalProperties/zip/unevaluatedProperties/maxLenght",
+		},
+		{
+			name:    "an unknown keyword at the root",
+			input:   userSchema(`"requird": ["email"],`, ``),
+			refused: "unevaluatedProperties/requird",
+		},
+		{
+			name:    "a root-only key on a property",
+			input:   userSchema(``, `"email": { "type": "string", "kind": "user-property" }`),
+			refused: "additionalProperties/email/unevaluatedProperties/kind",
+		},
+		{
+			name:    "an undeclared x- key at the root",
+			input:   userSchema(`"x-team-note": "kept",`, ``),
+			refused: "unevaluatedProperties/x-team-note",
+		},
+		{
+			name:    "a root annotation on a property",
+			input:   userSchema(``, `"email": { "type": "string", "x-identifier": "email" }`),
+			refused: "additionalProperties/email/unevaluatedProperties/x-identifier",
+		},
+		{
+			name: "the declared annotations at the root and on a property",
+			input: userSchema(`"x-identifier": "email", "x-display": ["email"],`,
+				`"email": { "type": "string", "x-unique": "project", "x-claim": "email", "x-audit": true }`),
+		},
+		{
+			name:  "an attribute named like a keyword",
+			input: userSchema(``, `"minimumLength": { "type": "integer", "minimum": 0 }`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.ValidateAgainstMetaSchema(tt.input)
+			if tt.refused == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, domain.ErrSchemaValidationFailed)
+			assert.Contains(t, err.Error(), tt.refused)
 		})
 	}
 }

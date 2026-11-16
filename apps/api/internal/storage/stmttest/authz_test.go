@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/authz/compiler"
 	"github.com/zitadel/nextgen/internal/authz/openfga"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -254,6 +255,16 @@ func newTestAssignment(projectID, id string, principalType domain.AuthzPrincipal
 	}
 	a.ApplyScope(scope)
 	return a
+}
+
+// newPrincipalUser creates userID in projectID, a schema project from
+// ensureUserTestProject, and returns the id. A user principal holds nothing
+// unless they are active in their home project (ADR 053 §4, #1234), so every
+// grant fixture asked about a user names one this created.
+func newPrincipalUser(t *testing.T, stmts service.AllStatements, projectID, schemaURL, userID string) string {
+	t.Helper()
+	require.NoError(t, stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Principal")))
+	return userID
 }
 
 func strPtr(s string) *string { return &s }

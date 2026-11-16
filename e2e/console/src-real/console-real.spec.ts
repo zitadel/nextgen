@@ -28,19 +28,29 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
 
   // The directory lists name and creation date. A row opens the project —
-  // selects it and lands on its first screen — and the project's own page, where
-  // the id is, is `Settings` in the sidebar that selection fills.
+  // selects it and lands on its Overview (D35) — and the project's Settings,
+  // in the sidebar that selection fills, open on General (D40).
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
 
-  await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
+  await expect(page).toHaveURL(new RegExp(`/\\?project=${zitadel.handle.projectId}$`));
+  // Each card reads on its own, so a refused read would show in the card
+  // rather than as the error boundary: both cards are what proves the reads.
+  await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Recent activity" })).toBeVisible();
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
   await page
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Settings" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
-  await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
+  );
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
   expect(pageErrors).toEqual([]);
 });
@@ -86,7 +96,7 @@ test("shows a seeded user in the list and detail views", async ({ page, zitadel,
   // The selected project rides along on every link (`?project=`).
   await expect(page).toHaveURL(new RegExp(`/users/${user.id}\\?project=`));
   await expect(page.getByRole("heading", { name: user.email, exact: true })).toBeVisible();
-  await expect(page.getByText(user.id, { exact: true })).toBeVisible();
+  await expect(page.getByTitle(user.id, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
@@ -148,7 +158,7 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
-  await expect(row.getByText("active", { exact: true })).toBeVisible();
+  await expect(row.getByText("Active", { exact: true })).toBeVisible();
 });
 
 test("gives a colleague admin access to the project, and takes it away", async ({
@@ -188,7 +198,10 @@ test("gives a colleague admin access to the project, and takes it away", async (
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${zitadel.handle.projectId}`);
-    await page.getByRole("tab", { name: "Admins" }).click();
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Admins" })
+      .click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
     // The operator's own grant (the one `signIn` wrote) comes back through
@@ -248,7 +261,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
 }) => {
   // The admins list is people only (#1462), so a grant to a team is a row of
   // its own from the grants read. Asserted against a real instance because
-  // which read carries the team, and that `DELETE /grants/{id}` takes the
+  // which read carries the team, and that `DELETE /grants/{grant_id}` takes the
   // team's grant without touching the operator's own, are server behaviour.
   const operator = await seed.user();
   const projectId = zitadel.handle.projectId;
@@ -268,7 +281,10 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${projectId}`);
-    await page.getByRole("tab", { name: "Admins" }).click();
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Admins" })
+      .click();
     const row = page.getByRole("row").filter({ hasText: team.name });
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
     await expect(row.getByText("Team", { exact: true })).toBeVisible();
@@ -294,7 +310,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     // come back as an id-only team row on later runs.
     if (grantId)
       await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
-    await zitadel.api.deleteTeam(team.id).catch(() => undefined);
+    await zitadel.api.deactivateTeam(team.id).catch(() => undefined);
   }
 });
 
@@ -314,7 +330,10 @@ test("answers the same way for an address that belongs to nobody", async ({
   await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await page.getByRole("tab", { name: "Admins" }).click();
+  await page
+    .getByRole("navigation", { name: "Project settings" })
+    .getByRole("link", { name: "Admins" })
+    .click();
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
   await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);

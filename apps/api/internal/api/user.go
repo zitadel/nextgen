@@ -39,11 +39,11 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.CreateUserRequest, pa
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
+func (h *Handler) DeleteUser(ctx context.Context, params api.DeleteUserParams) (api.DeleteUserRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opDelete)
 	if err != nil {
 		if errors.Is(err, errResourceGone) {
-			return &api.DeleteUserByIDNoContent{}, nil
+			return &api.DeleteUserNoContent{}, nil
 		}
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 		return nil, err
 	}
 
-	return &api.DeleteUserByIDNoContent{}, nil
+	return &api.DeleteUserNoContent{}, nil
 }
 
 // QueryUsers is the users list (ADR 031, #1300 §2), defaulting to the
@@ -330,7 +330,7 @@ func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResp
 	return res
 }
 
-func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
+func (h *Handler) GetUser(ctx context.Context, params api.GetUserParams) (api.GetUserRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, params api.PatchUserByIDParams) (api.PatchUserByIDRes, error) {
+func (h *Handler) UpdateUser(ctx context.Context, req *api.PatchUserRequest, params api.UpdateUserParams) (api.UpdateUserRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
 	if err != nil {
 		return nil, err
@@ -386,9 +386,9 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 	return domainUserToApiUser(user)
 }
 
-// PatchMyUser updates the user of the cookie's session, held to project_id when
+// UpdateMyUser updates the user of the cookie's session, held to project_id when
 // the caller names one (requireSelf).
-func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
+func (h *Handler) UpdateMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.UpdateMyUserParams) (api.UpdateMyUserRes, error) {
 	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
@@ -644,6 +644,10 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrUserPasswordHashingBusy().Code:
+		// Retry-After is set by OgenErrorHandler: no ResponseWriter reaches
+		// this far.
+		return errorResponseWithStatusCode(http.StatusTooManyRequests, err)
 	default:
 		return internalErrorResponse(err)
 	}

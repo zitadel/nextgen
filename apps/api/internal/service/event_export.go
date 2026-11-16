@@ -16,6 +16,9 @@ type EventExportAdapter struct {
 	Pool *DB
 }
 
+// ListProjectIDs returns every project, the ones the shipper's deployment
+// sinks export: they are the platform operators', who see every project's
+// events, claimed or not (ADR 049 §4).
 func (a EventExportAdapter) ListProjectIDs(ctx context.Context) (_ []string, err error) {
 	ctx, end := startSpan(ctx, "EventExportAdapter.ListProjectIDs")
 	defer end(&err)
@@ -55,29 +58,6 @@ func collectProjectIDs(
 		ids = append(ids, project.ID)
 	}
 	return ids, nil
-}
-
-// ListClaimedProjectIDs returns project IDs that have completed claim
-// (active owning-team grant, ADR 054 §2), matching ADR 049 export visibility.
-func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) (_ []string, err error) {
-	ctx, end := startSpan(ctx, "EventExportAdapter.ListClaimedProjectIDs")
-	defer end(&err)
-
-	var (
-		after string
-		all   []string
-	)
-	for {
-		ids, err := a.Pool.Statements().ListClaimedProjectIDs(ctx, after, listProjectIDsPageSize)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, ids...)
-		if len(ids) < listProjectIDsPageSize {
-			return all, nil
-		}
-		after = ids[len(ids)-1]
-	}
 }
 
 func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (_ int64, err error) {

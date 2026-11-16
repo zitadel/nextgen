@@ -1,0 +1,13 @@
+title: InvitationAcceptedCommonPayload
+description: |
+  Fields every `invitation.accepted` payload carries, whatever its `type`.
+type: object
+required:
+  - journey_id
+  - user_id
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  user_id:
+    type: string
