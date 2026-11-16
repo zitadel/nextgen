@@ -1,10 +1,9 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
 
 import {
   localContainerName,
@@ -12,6 +11,7 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "@/lib/local-server/runtime";
+import { it } from "@tests/helpers/fixtures";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
@@ -19,10 +19,9 @@ import { stripAnsi } from "@tests/helpers/run-cli";
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
 // status keeps its lifecycle-only output.
-const server = setupServer(http.post("*/users/query", () => HttpResponse.error()));
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterAll(() => server.close());
+it.beforeEach(({ server }) => {
+  server.use(http.post("*/users/query", () => HttpResponse.error()));
+});
 
 const SECRET = {
   project_id: "proj-001",
@@ -35,31 +34,28 @@ const SECRET = {
   created_at: new Date(Date.now() - 60_000).toISOString(),
 };
 
-const tempDirs: string[] = [];
-
-async function makeProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-status-"));
-  tempDirs.push(cwd);
+/**
+ * Makes the directory hold the folder a project keeps its files in.
+ *
+ * @param cwd - The directory.
+ * @returns Once the folder is there.
+ */
+async function makeProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
-  return cwd;
 }
 
 function status(cwd: string) {
   return runCliForTest(["status", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"]);
 }
 
-afterEach(async () => {
-  server.resetHandlers();
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
-async function configuredProject(): Promise<string> {
-  const cwd = await makeProject();
+/**
+ * Makes the directory a project that is configured, with a secret.
+ *
+ * @param cwd - The directory.
+ * @returns Once the project's files are written.
+ */
+async function configuredProject(cwd: string): Promise<void> {
+  await makeProject(cwd);
   await writeFile(
     join(cwd, "zitadel.json"),
     JSON.stringify({
@@ -69,12 +65,13 @@ async function configuredProject(): Promise<string> {
   );
   await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
-  return cwd;
 }
 
 describe("status command", () => {
-  it("returns an ok envelope for a healthy project with config and secret", async () => {
-    const cwd = await configuredProject();
+  it("returns an ok envelope for a healthy project with config and secret", async ({
+    dir: cwd,
+  }) => {
+    await configuredProject(cwd);
 
     const res = await status(cwd);
 
@@ -97,8 +94,10 @@ describe("status command", () => {
     );
   });
 
-  it("keeps the command overview out of what a script reads, in the text and the envelope alike", async () => {
-    const cwd = await configuredProject();
+  it("keeps the command overview out of what a script reads, in the text and the envelope alike", async ({
+    dir: cwd,
+  }) => {
+    await configuredProject(cwd);
 
     const text = await runCliForTest([
       "status",
@@ -113,8 +112,10 @@ describe("status command", () => {
     expect(json.stdout).not.toContain("Explore all commands");
   });
 
-  it("reports a project with no owning team as temporary and points at claim", async () => {
-    const cwd = await configuredProject();
+  it("reports a project with no owning team as temporary and points at claim", async ({
+    dir: cwd,
+  }) => {
+    await configuredProject(cwd);
 
     const res = await status(cwd);
 
@@ -137,8 +138,10 @@ describe("status command", () => {
   // stays suggested: the local record can be stale (claimed from another
   // machine reads detached) and the server resolves the grant before the
   // window, so running claim is the safe authoritative check.
-  it("switches to reconciliation guidance once the claim window has closed", async () => {
-    const cwd = await configuredProject();
+  it("switches to reconciliation guidance once the claim window has closed", async ({
+    dir: cwd,
+  }) => {
+    await configuredProject(cwd);
     await writeFile(
       join(cwd, ".zitadel/secret"),
       JSON.stringify({ ...SECRET, created_at: "2026-01-01T00:00:00.000Z" }),
@@ -163,8 +166,8 @@ describe("status command", () => {
     );
   });
 
-  it("reports the owning team once claimed, and stops nudging", async () => {
-    const cwd = await configuredProject();
+  it("reports the owning team once claimed, and stops nudging", async ({ dir: cwd }) => {
+    await configuredProject(cwd);
     await writeFile(
       join(cwd, ".zitadel/secret"),
       JSON.stringify({ ...SECRET, claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" }),
@@ -192,8 +195,8 @@ describe("status command", () => {
 
   // The project lives wherever `zitadel.json` says, not wherever this
   // invocation is pointed: `--server local` retargets the health probe only.
-  it("omits claim state for a local project, whatever --server says", async () => {
-    const cwd = await makeProject();
+  it("omits claim state for a local project, whatever --server says", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
       JSON.stringify({
@@ -214,8 +217,10 @@ describe("status command", () => {
     );
   });
 
-  it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
-    const cwd = await makeProject();
+  it("reports orphaned-config when zitadel.json exists but secret is missing", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
       JSON.stringify({ project: "orphan", server: "https://api.zitadel.cloud" }),
@@ -239,8 +244,10 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
 
-  it("reports the resolved environment's project when --env names one without a local secret", async () => {
-    const cwd = await makeProject();
+  it("reports the resolved environment's project when --env names one without a local secret", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
       JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
@@ -263,8 +270,10 @@ describe("status command", () => {
     expect(json.data.project.project_id).toBe("proj-prod");
   });
 
-  it("reports a named environment that binds no project as not configured", async () => {
-    const cwd = await makeProject();
+  it("reports a named environment that binds no project as not configured", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     await writeFile(
       join(cwd, "zitadel.json"),
@@ -285,8 +294,8 @@ describe("status command", () => {
     );
   });
 
-  it("reports not-configured when zitadel.json is missing entirely", async () => {
-    const cwd = await makeProject();
+  it("reports not-configured when zitadel.json is missing entirely", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await status(cwd);
 
@@ -310,15 +319,16 @@ describe("status command", () => {
     );
   });
 
-  it("normalizes relative --cwd before reading runtime metadata", async () => {
-    const cwd = await makeProject();
+  it("normalizes relative --cwd before reading runtime metadata", async ({
+    dir: cwd,
+    other: binDir,
+  }) => {
+    await makeProject(cwd);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
 
     // The docker-backend fixture makes status spawn `docker inspect`; a fake
     // on PATH keeps the test hermetic — with a wedged Docker daemon the real
     // CLI blocks on the socket forever instead of failing fast.
-    const binDir = await mkdtemp(join(tmpdir(), "zitadel-status-fake-docker-"));
-    tempDirs.push(binDir);
     await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
     await chmod(join(binDir, "docker"), 0o755);
 
@@ -344,8 +354,8 @@ describe("status command", () => {
     expect(json.data.server.runtime.data_dir).toBe(localRuntimePaths(cwd).dataDir);
   });
 
-  it("falls back to the secret project_id when config.project is absent", async () => {
-    const cwd = await makeProject();
+  it("falls back to the secret project_id when config.project is absent", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     await writeFile(
       join(cwd, "zitadel.json"),
       JSON.stringify({ server: "https://api.zitadel.cloud" }),
@@ -365,8 +375,11 @@ describe("status command", () => {
     expect(json.data.project.issuer).toBeUndefined();
   });
 
-  it("stages verify-login guidance while the project has no users", async () => {
-    const cwd = await configuredProject();
+  it("stages verify-login guidance while the project has no users", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await configuredProject(cwd);
     server.use(http.post("*/users/query", () => HttpResponse.json({ users: [] })));
 
     const res = await status(cwd);
@@ -391,8 +404,8 @@ describe("status command", () => {
     );
   });
 
-  it("switches to customize/publish guidance once users exist", async () => {
-    const cwd = await configuredProject();
+  it("switches to customize/publish guidance once users exist", async ({ server, dir: cwd }) => {
+    await configuredProject(cwd);
     server.use(http.post("*/users/query", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
 
     const res = await status(cwd);
@@ -417,9 +430,9 @@ describe("status command", () => {
   });
 
   describe("with tests add", () => {
-    /** A configured project whose zitadel.json records `framework`. */
-    async function aProjectOf(framework: string): Promise<string> {
-      const cwd = await configuredProject();
+    /** Makes the directory a configured project whose zitadel.json records `framework`. */
+    async function aProjectOf(cwd: string, framework: string): Promise<void> {
+      await configuredProject(cwd);
       await writeFile(
         join(cwd, "zitadel.json"),
         JSON.stringify({
@@ -428,11 +441,10 @@ describe("status command", () => {
           framework: { id: framework },
         }),
       );
-      return cwd;
     }
 
     /** Answers the user-presence probe with `count` users. */
-    function withUsers(count: number): void {
+    function withUsers(server: SetupServer, count: number): void {
       server.use(
         http.post("*/users/query", () => {
           return HttpResponse.json({
@@ -447,9 +459,9 @@ describe("status command", () => {
     /** The run's envelope, as far as these tests read it. */
     type Next = { data: { next_actions: string[]; next_commands: string[] } };
 
-    it("offers it once a sign-in has worked in a Next.js app", async () => {
-      const cwd = await aProjectOf("next");
-      withUsers(1);
+    it("offers it once a sign-in has worked in a Next.js app", async ({ server, dir: cwd }) => {
+      await aProjectOf(cwd, "next");
+      withUsers(server, 1);
 
       const res = await status(cwd);
 
@@ -458,9 +470,12 @@ describe("status command", () => {
       );
     });
 
-    it("never names it in next_commands, where an agent would run it unasked", async () => {
-      const cwd = await aProjectOf("next");
-      withUsers(1);
+    it("never names it in next_commands, where an agent would run it unasked", async ({
+      server,
+      dir: cwd,
+    }) => {
+      await aProjectOf(cwd, "next");
+      withUsers(server, 1);
 
       const res = await status(cwd);
 
@@ -469,12 +484,12 @@ describe("status command", () => {
       );
     });
 
-    it.each([
+    it.for<[string, string, number]>([
       ["before the first sign-in", "next", 0],
       ["for a framework it writes no suite for", "nuxt", 1],
-    ])("does not offer it %s", async (_, framework, users) => {
-      const cwd = await aProjectOf(framework);
-      withUsers(users);
+    ])("does not offer it %s", async ([_, framework, users], { server, dir: cwd }) => {
+      await aProjectOf(cwd, framework);
+      withUsers(server, users);
 
       const res = await status(cwd);
 
@@ -483,9 +498,12 @@ describe("status command", () => {
       );
     });
 
-    it("answers with its next steps in the cases it does not offer it", async () => {
-      const cwd = await aProjectOf("nuxt");
-      withUsers(1);
+    it("answers with its next steps in the cases it does not offer it", async ({
+      server,
+      dir: cwd,
+    }) => {
+      await aProjectOf(cwd, "nuxt");
+      withUsers(server, 1);
 
       const res = await status(cwd);
 
@@ -495,8 +513,8 @@ describe("status command", () => {
     });
   });
 
-  it("keeps lifecycle-only output when the platform is unreachable", async () => {
-    const cwd = await configuredProject();
+  it("keeps lifecycle-only output when the platform is unreachable", async ({ dir: cwd }) => {
+    await configuredProject(cwd);
 
     const res = await status(cwd);
 
@@ -519,8 +537,8 @@ describe("status command", () => {
     );
   });
 
-  it("says in text that no local server was started in the directory", async () => {
-    const cwd = await configuredProject();
+  it("says in text that no local server was started in the directory", async ({ dir: cwd }) => {
+    await configuredProject(cwd);
 
     const res = await asTerminal(() =>
       runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
@@ -529,8 +547,8 @@ describe("status command", () => {
     expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
   });
 
-  it("says the same in text read by a pipe", async () => {
-    const cwd = await configuredProject();
+  it("says the same in text read by a pipe", async ({ dir: cwd }) => {
+    await configuredProject(cwd);
 
     const res = await runCliForTest([
       "status",
@@ -543,11 +561,9 @@ describe("status command", () => {
     expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
   });
 
-  it("says in text where a stopped local server last ran", async () => {
-    const cwd = await configuredProject();
+  it("says in text where a stopped local server last ran", async ({ dir: cwd, other: binDir }) => {
+    await configuredProject(cwd);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
-    const binDir = await mkdtemp(join(tmpdir(), "zitadel-status-fake-docker-"));
-    tempDirs.push(binDir);
     await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
     await chmod(join(binDir, "docker"), 0o755);
 
@@ -561,11 +577,12 @@ describe("status command", () => {
     );
   });
 
-  it("says in text when Docker could not be asked about the local server", async () => {
-    const cwd = await configuredProject();
+  it("says in text when Docker could not be asked about the local server", async ({
+    dir: cwd,
+    other: noDocker,
+  }) => {
+    await configuredProject(cwd);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
-    const noDocker = await mkdtemp(join(tmpdir(), "zitadel-status-no-docker-"));
-    tempDirs.push(noDocker);
 
     const res = await runCliForTest(
       ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
@@ -578,8 +595,8 @@ describe("status command", () => {
   // It resolves the project without opening a connection — the user-presence
   // probe connects quietly and swallows every failure — so nothing else can
   // record where it ran.
-  it("names the project it reported on, not only the server", async () => {
-    const cwd = await configuredProject();
+  it("names the project it reported on, not only the server", async ({ dir: cwd }) => {
+    await configuredProject(cwd);
 
     const res = await asTerminal(() =>
       runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),

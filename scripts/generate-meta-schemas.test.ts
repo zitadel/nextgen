@@ -8,16 +8,14 @@
  * instead of shipping a quietly different contract.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "vitest";
 
+import { test } from "./fixtures.ts";
 import { DRAFT, MARKER, findSources, generateSchema } from "./generate-meta-schemas.ts";
 
-/** Writes `files` into a fresh directory and generates `name` from it. */
-function generate(files: Record<string, string>, name: string) {
-  const dir = mkdtempSync(join(tmpdir(), "meta-schemas-"));
+/** Writes `files` into `dir` and generates `name` from it. */
+function generate(dir: string, files: Record<string, string>, name: string) {
   for (const [file, body] of Object.entries(files)) {
     writeFileSync(join(dir, file), body);
   }
@@ -28,8 +26,9 @@ function generate(files: Record<string, string>, name: string) {
   };
 }
 
-test("emits only marked files, stamped with the marker, draft and a derived title", () => {
+test("emits only marked files, stamped with the marker, draft and a derived title", ({ dir }) => {
   const { sources, schema } = generate(
+    dir,
     {
       "user-thing.yaml": "x-meta-schema: true\ntype: object\n",
       "component.yaml": "type: string\n",
@@ -43,16 +42,18 @@ test("emits only marked files, stamped with the marker, draft and a derived titl
   assert.equal("x-meta-schema" in schema, false);
 });
 
-test("keeps a title the YAML declares", () => {
+test("keeps a title the YAML declares", ({ dir }) => {
   const { schema } = generate(
+    dir,
     { "a.yaml": "x-meta-schema: true\ntitle: Explicit\ntype: object\n" },
     "a.yaml",
   );
   assert.equal(schema.title, "Explicit");
 });
 
-test("renames OpenAPI example to examples without clobbering an explicit list", () => {
+test("renames OpenAPI example to examples without clobbering an explicit list", ({ dir }) => {
   const { schema } = generate(
+    dir,
     {
       "a.yaml": [
         "x-meta-schema: true",
@@ -73,8 +74,11 @@ test("renames OpenAPI example to examples without clobbering an explicit list", 
   assert.deepEqual(properties.listed, { type: "string", examples: ["x", "y"] });
 });
 
-test("lets an x-local: file field hold its value or a $file reference, annotations outside", () => {
+test("lets an x-local: file field hold its value or a $file reference, annotations outside", ({
+  dir,
+}) => {
   const { schema } = generate(
+    dir,
     {
       "a.yaml": [
         "x-meta-schema: true",
@@ -102,15 +106,17 @@ test("lets an x-local: file field hold its value or a $file reference, annotatio
   assert.equal(reference?.additionalProperties, false);
 });
 
-test("rejects an x-local kind it does not know", () => {
+test("rejects an x-local kind it does not know", ({ dir }) => {
   assert.throws(
-    () => generate({ "a.yaml": "x-meta-schema: true\ntype: string\nx-local: url\n" }, "a.yaml"),
+    () =>
+      generate(dir, { "a.yaml": "x-meta-schema: true\ntype: string\nx-local: url\n" }, "a.yaml"),
     /unsupported x-local value "url"/,
   );
 });
 
-test("keeps a $ref to another emitted file as a sibling .json reference", () => {
+test("keeps a $ref to another emitted file as a sibling .json reference", ({ dir }) => {
   const { schema } = generate(
+    dir,
     {
       "parent.yaml":
         "x-meta-schema: true\ntype: object\nproperties:\n  child:\n    $ref: child.yaml\n",
@@ -122,8 +128,9 @@ test("keeps a $ref to another emitted file as a sibling .json reference", () => 
   assert.equal("$defs" in schema, false);
 });
 
-test("inlines a non-emitted $ref once under $defs and survives self-reference", () => {
+test("inlines a non-emitted $ref once under $defs and survives self-reference", ({ dir }) => {
   const { schema } = generate(
+    dir,
     {
       "flow.yaml": [
         "x-meta-schema: true",
@@ -156,12 +163,14 @@ test("inlines a non-emitted $ref once under $defs and survives self-reference", 
   });
 });
 
-test("adds the draft allOf only to json-schema meta-schemas", () => {
+test("adds the draft allOf only to json-schema meta-schemas", ({ dir, other }) => {
   const documents = generate(
+    dir,
     { "doc.yaml": "x-meta-schema: json-schema\ntype: object\nadditionalProperties: true\n" },
     "doc.yaml",
   ).schema;
   const plain = generate(
+    other,
     { "leaf.yaml": "x-meta-schema: true\ntype: string\n" },
     "leaf.yaml",
   ).schema;
@@ -169,8 +178,9 @@ test("adds the draft allOf only to json-schema meta-schemas", () => {
   assert.equal("allOf" in plain, false);
 });
 
-test("closes a json-schema meta-schema to the draft's keywords and its own", () => {
+test("closes a json-schema meta-schema to the draft's keywords and its own", ({ dir }) => {
   const { schema } = generate(
+    dir,
     {
       "doc.yaml":
         "x-meta-schema: json-schema\ntype: object\nadditionalProperties: true\n" +
@@ -183,9 +193,9 @@ test("closes a json-schema meta-schema to the draft's keywords and its own", () 
   assert.deepEqual(schema.properties, { "x-unique": { type: "string" } });
 });
 
-test("refuses a json-schema meta-schema whose YAML is not open", () => {
+test("refuses a json-schema meta-schema whose YAML is not open", ({ dir }) => {
   assert.throws(
-    () => generate({ "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" }, "doc.yaml"),
+    () => generate(dir, { "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" }, "doc.yaml"),
     /must declare additionalProperties: true/,
   );
 });

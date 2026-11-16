@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { onTestFinished, vi } from "vitest";
 import {
   createServer,
   type InlineConfig,
@@ -12,11 +12,16 @@ import {
   resolveConfig,
 } from "vite";
 
+import { scratchDir } from "./scratch";
+
 /** The dev server of a generated app, running in this process. */
 export interface DevApp {
   /** Where the browser opens the app: `http://localhost:<port>`. */
   readonly origin: string;
-  /** Stops the dev server and removes its app directory. */
+  /**
+   * Stops the dev server. The test's end does the same, and removes the app
+   * directory, so a test that needs the server gone sooner is the only one to call it.
+   */
   close(): Promise<void>;
 }
 
@@ -61,21 +66,19 @@ export async function aVitePreview(config: string, env: AppEnv): Promise<DevApp>
       logLevel: "silent",
       preview: { port: 0 },
     });
+    onTestFinished(() => {
+      return server.close();
+    });
     const address = server.httpServer.address();
     if (!address || typeof address === "string") {
-      await server.close();
       throw new Error("the Vite preview server did not listen on a TCP port");
     }
     return {
       origin: `http://localhost:${address.port}`,
       async close() {
         await server.close();
-        await rm(dir, { recursive: true, force: true });
       },
     };
-  } catch (error) {
-    await rm(dir, { recursive: true, force: true });
-    throw error;
   } finally {
     process.chdir(cwd);
     restore(previous);
@@ -84,7 +87,7 @@ export async function aVitePreview(config: string, env: AppEnv): Promise<DevApp>
 
 /** An app directory holding `config` as `vite.config.mjs`, `files`, and `vite` resolving to the workspace's copy. */
 async function anAppDir(config: string, files: AppFiles): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-vite-"));
+  const dir = await scratchDir("zitadel-vite-");
   await mkdir(join(dir, "node_modules"));
   await symlink(viteDir, join(dir, "node_modules", "vite"), "dir");
   await writeFile(join(dir, "vite.config.mjs"), config);
@@ -95,22 +98,26 @@ async function anAppDir(config: string, files: AppFiles): Promise<string> {
   return dir;
 }
 
-/** Sets `env` in the process environment, returning what it replaced. */
+/**
+ * Sets `env` in the process environment for the test, returning what it replaced.
+ *
+ * @param env - The variables to set.
+ * @returns The values the variables had, to put back with {@link restore}.
+ */
 function applied(env: AppEnv): Record<string, string | undefined> {
   const previous = Object.fromEntries(Object.keys(env).map((name) => [name, process.env[name]]));
-  Object.assign(process.env, env);
+  for (const [name, value] of Object.entries(env)) {
+    vi.stubEnv(name, value);
+  }
   return previous;
 }
 
 /**
  * Loads a generated `vite.config` the way `vite build` does, from an app
- * directory of its own, and removes the directory again.
+ * directory of its own, which is removed when the test ends.
  */
 export async function aViteBuildConfig(config: string, env: AppEnv): Promise<ResolvedConfig> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-vite-"));
-  await mkdir(join(dir, "node_modules"));
-  await symlink(viteDir, join(dir, "node_modules", "vite"), "dir");
-  await writeFile(join(dir, "vite.config.mjs"), config);
+  const dir = await anAppDir(config, {});
   const previous = applied(env);
   try {
     return await resolveConfig(
@@ -119,7 +126,6 @@ export async function aViteBuildConfig(config: string, env: AppEnv): Promise<Res
     );
   } finally {
     restore(previous);
-    await rm(dir, { recursive: true, force: true });
   }
 }
 
@@ -128,7 +134,7 @@ export async function aViteBuildConfig(config: string, env: AppEnv): Promise<Res
  * builds on when `angular.json` points its `proxyConfig` at the file.
  */
 export async function aProxyConfApp(proxyConf: string, env: AppEnv): Promise<DevApp> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-ng-"));
+  const dir = await scratchDir("zitadel-ng-");
   await writeFile(join(dir, "proxy.conf.cjs"), proxyConf);
   return serve(dir, env, () => ({
     configFile: false,
@@ -136,6 +142,16 @@ export async function aProxyConfApp(proxyConf: string, env: AppEnv): Promise<Dev
   }));
 }
 
+/**
+ * Starts Vite's dev server on a port the OS picks, in `dir`, with `env` set while it is built. The
+ * server is stopped when the test ends.
+ *
+ * @param dir - The app directory, which is also the working directory while the server is built.
+ * @param env - The variables to set while the server is built.
+ * @param config - The Vite configuration to serve.
+ * @returns The running app.
+ * @throws Error when the server does not listen on a TCP port.
+ */
 async function serve(dir: string, env: AppEnv, config: () => InlineConfig): Promise<DevApp> {
   const previous = applied(env);
   const cwd = process.cwd();
@@ -151,35 +167,33 @@ async function serve(dir: string, env: AppEnv, config: () => InlineConfig): Prom
       // across test files running in parallel.
       server: { ...inline.server, port: 0, watch: null },
     });
+    onTestFinished(() => {
+      return server.close();
+    });
     await server.listen();
     const address = server.httpServer?.address();
     if (!address || typeof address === "string") {
-      await server.close();
       throw new Error("the Vite dev server did not listen on a TCP port");
     }
     return {
       origin: `http://localhost:${address.port}`,
       async close() {
         await server.close();
-        await rm(dir, { recursive: true, force: true });
       },
     };
-  } catch (error) {
-    await rm(dir, { recursive: true, force: true });
-    throw error;
   } finally {
     process.chdir(cwd);
     restore(previous);
   }
 }
 
-/** Puts back the environment variables a run set, as they were before it. */
+/**
+ * Puts back the environment variables a run set, as they were before it.
+ *
+ * @param previous - What {@link applied} returned.
+ */
 function restore(previous: Readonly<Record<string, string | undefined>>): void {
   for (const [name, value] of Object.entries(previous)) {
-    if (value === undefined) {
-      delete process.env[name];
-    } else {
-      process.env[name] = value;
-    }
+    vi.stubEnv(name, value);
   }
 }

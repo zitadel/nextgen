@@ -9,6 +9,8 @@ export interface BaseTest {
   watch: false;
   globals: true;
   fileParallelism: true;
+  unstubEnvs: true;
+  unstubGlobals: true;
   passWithNoTests: boolean;
   include: string[];
   reporters: ["default", "junit"];
@@ -49,6 +51,8 @@ export interface EdgeProject {
   test: {
     name: "edge";
     globals: true;
+    unstubEnvs: true;
+    unstubGlobals: true;
     environment: "edge-runtime";
     include: string[];
     exclude: string[];

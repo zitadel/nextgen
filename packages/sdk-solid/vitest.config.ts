@@ -25,6 +25,8 @@ export default defineConfig({
         cacheDir: ".vitest/dom",
         plugins: [solid()],
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "dom",
           globals: true,
           environment: "jsdom",
@@ -37,6 +39,8 @@ export default defineConfig({
         cacheDir: ".vitest/ssr",
         plugins: [solid({ ssr: true })],
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "ssr",
           globals: true,
           environment: "node",
@@ -47,6 +51,8 @@ export default defineConfig({
         cacheDir: ".vitest/hydrate",
         plugins: [solid({ solid: { hydratable: true } })],
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "hydrate",
           globals: true,
           environment: "jsdom",

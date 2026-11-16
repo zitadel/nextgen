@@ -1,59 +1,49 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { VueDetector } from "@/lib/orca/detectors/vue";
+import { it } from "@tests/helpers/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const dirs: string[] = [];
-
-async function project(deps: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "vue-detect-"));
-  dirs.push(cwd);
+async function project(cwd: string, deps: Record<string, string>): Promise<string> {
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: deps }));
   return cwd;
 }
 
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("VueDetector", () => {
-  it("recognises a Vite + Vue app and reports appDir 'src'", async () => {
-    const facts = await new VueDetector().detect(await project({ vue: "^3", vite: "^5" }));
+  it("recognises a Vite + Vue app and reports appDir 'src'", async ({ dir }) => {
+    const facts = await new VueDetector().detect(await project(dir, { vue: "^3", vite: "^5" }));
     expect(facts?.id).toBe("vue");
     expect(facts?.appDir).toBe("src");
   });
 
-  it("excludes Nuxt (which ships Vue) so NuxtDetector wins", async () => {
+  it("excludes Nuxt (which ships Vue) so NuxtDetector wins", async ({ dir }) => {
     expect(
-      await new VueDetector().detect(await project({ nuxt: "^4", vue: "^3", vite: "^5" })),
+      await new VueDetector().detect(await project(dir, { nuxt: "^4", vue: "^3", vite: "^5" })),
     ).toBeNull();
   });
 
-  it("returns null without vite", async () => {
-    expect(await new VueDetector().detect(await project({ vue: "^3" }))).toBeNull();
+  it("returns null without vite", async ({ dir }) => {
+    expect(await new VueDetector().detect(await project(dir, { vue: "^3" }))).toBeNull();
   });
 
-  it("returns null without vue", async () => {
-    expect(await new VueDetector().detect(await project({ vite: "^5" }))).toBeNull();
+  it("returns null without vue", async ({ dir }) => {
+    expect(await new VueDetector().detect(await project(dir, { vite: "^5" }))).toBeNull();
   });
 
-  it("refuses Vue 3.1, below the 3.2 floor", async () => {
+  it("refuses Vue 3.1, below the 3.2 floor", async ({ dir }) => {
     const caught = await rejectionOf(async () =>
-      new VueDetector().detect(await project({ vue: "~3.1.0", vite: "^5" })),
+      new VueDetector().detect(await project(dir, { vue: "~3.1.0", vite: "^5" })),
     );
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
   });
 
-  it("accepts Vue 3.2", async () => {
-    const facts = await new VueDetector().detect(await project({ vue: "^3.2.0", vite: "^5" }));
+  it("accepts Vue 3.2", async ({ dir }) => {
+    const facts = await new VueDetector().detect(await project(dir, { vue: "^3.2.0", vite: "^5" }));
     expect(facts?.id).toBe("vue");
   });
 });

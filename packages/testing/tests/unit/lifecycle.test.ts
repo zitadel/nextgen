@@ -1,10 +1,9 @@
-import { access, mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { access } from "node:fs/promises";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { bootLocalServer } from "../../src/lifecycle";
+import { it } from "./fixtures";
 import { fakeCliBin } from "./helpers/fake-cli";
 
 const exists = (path: string) =>
@@ -14,12 +13,12 @@ const exists = (path: string) =>
   );
 
 describe("bootLocalServer", () => {
-  it("boots via the CLI and parses the start envelope", async () => {
+  it("boots via the CLI and parses the start envelope", async ({ port }) => {
     const fake = await fakeCliBin();
-    const server = await bootLocalServer({ cliBin: fake.binPath, port: 18092 });
+    const server = await bootLocalServer({ cliBin: fake.binPath, port });
 
-    expect(server.baseUrl).toBe("http://localhost:18092");
-    expect(server.runtime.port).toBe(18092);
+    expect(server.baseUrl).toBe(`http://localhost:${port}`);
+    expect(server.runtime.port).toBe(port);
     expect(server.runtime.pid).toBe(4242);
     expect(server.runtime.logPath).toContain(".zitadel/local/server.log");
 
@@ -134,9 +133,8 @@ describe("bootLocalServer", () => {
     await expect(exists(server.runtime.dir)).resolves.toBe(true);
   });
 
-  it("never removes a caller-provided dir", async () => {
+  it("never removes a caller-provided dir", async ({ dir }) => {
     const fake = await fakeCliBin();
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-caller-dir-"));
     const server = await bootLocalServer({ cliBin: fake.binPath, dir });
     expect(server.runtime.dir).toBe(dir);
     await server.stop();

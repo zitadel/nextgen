@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished } from "vitest";
 
 import avatarCss from "./avatar.css?inline";
 
@@ -12,11 +12,10 @@ describe("avatar.css (chromium)", () => {
     style.textContent = avatarCss;
     document.head.appendChild(style);
     avatar = document.body.appendChild(document.createElement("span"));
-  });
-
-  afterEach(() => {
-    avatar.remove();
-    style.remove();
+    onTestFinished(() => {
+      avatar.remove();
+      style.remove();
+    });
   });
 
   it("holds still by default", () => {

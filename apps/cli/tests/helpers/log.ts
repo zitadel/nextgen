@@ -1,4 +1,5 @@
 import { installLogSink, type LogLevel } from "@/lib/log";
+import { test as base } from "./port";
 
 /** One line of narration, as the code under test said it. */
 export interface Said {
@@ -20,3 +21,21 @@ export function recordLog(): { said: Said[]; stop: () => void } {
   });
   return { said, stop };
 }
+
+/** What {@link recordLog} gives back: the lines said so far, and the way to stop listening. */
+export type RecordedLog = ReturnType<typeof recordLog>;
+
+/**
+ * `test` with the narration of the code under test, read instead of drawn.
+ *
+ * - `recorded` is the {@link recordLog} sink, listening for the length of the test; it stops
+ *   when the test ends, or earlier through its own `stop`.
+ */
+export const test = base.extend<{ recorded: RecordedLog }>({
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  async recorded({}, use) {
+    const sink = recordLog();
+    await use(sink);
+    sink.stop();
+  },
+});

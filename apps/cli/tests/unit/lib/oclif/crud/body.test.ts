@@ -1,10 +1,10 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { readRawBody } from "@/lib/oclif/crud/body";
+import { it } from "@tests/helpers/fixtures";
 
 describe("readRawBody", () => {
   it("parses --data", async () => {
@@ -13,8 +13,7 @@ describe("readRawBody", () => {
     });
   });
 
-  it("reads --file", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-body-"));
+  it("reads --file", async ({ dir }) => {
     const file = join(dir, "team.json");
     await writeFile(file, '{"name":"from-file"}');
     await expect(readRawBody({ file }, "team create")).resolves.toEqual({ name: "from-file" });
@@ -28,18 +27,14 @@ describe("readRawBody", () => {
     await expect(readRawBody({}, "team create")).resolves.toBeUndefined();
   });
 
-  it("refuses `--file -` when stdin is a terminal, rather than waiting on it", async () => {
-    const tty = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-    try {
-      await expect(readRawBody({ file: "-" }, "user create")).rejects.toMatchObject({
-        code: "E_VALIDATION",
-        message: "--file - reads the body from a pipe, but nothing is piped in",
-        hint: expect.stringContaining("cat body.json | zitadel user create"),
-      });
-    } finally {
-      Object.defineProperty(process.stdin, "isTTY", { value: tty, configurable: true });
-    }
+  it("refuses `--file -` when stdin is a terminal, rather than waiting on it", async ({
+    terminal: _terminal,
+  }) => {
+    await expect(readRawBody({ file: "-" }, "user create")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "--file - reads the body from a pipe, but nothing is piped in",
+      hint: expect.stringContaining("cat body.json | zitadel user create"),
+    });
   });
 });
 
@@ -53,8 +48,7 @@ describe("the body as it arrives", () => {
     ).resolves.toEqual({ attributes: { password: "hunter2" } });
   });
 
-  it("returns the same body from a file, which never reaches argv", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-secret-"));
+  it("returns the same body from a file, which never reaches argv", async ({ dir }) => {
     const file = join(dir, "body.json");
     await writeFile(file, '{"attributes":{"password":"hunter2"}}');
     await expect(readRawBody({ file }, "user create")).resolves.toEqual({

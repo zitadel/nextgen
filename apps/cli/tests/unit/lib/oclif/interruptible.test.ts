@@ -1,7 +1,8 @@
 import { Command, type Config } from "@oclif/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, onTestFinished, vi } from "vitest";
 
 import { Interruptible } from "@/lib/oclif/interruptible";
+import { it } from "@tests/helpers/fixtures";
 
 /** A command that only exposes what the mixin gives it. */
 class Probe extends Interruptible(Command) {
@@ -32,21 +33,14 @@ function stubExit() {
   return vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 }
 
-const running: Probe[] = [];
-
 function listening(): Probe {
   const command = probe();
-  running.push(command);
+  onTestFinished(() => {
+    command.stop();
+  });
   command.listen();
   return command;
 }
-
-afterEach(() => {
-  for (const command of running.splice(0)) {
-    command.stop();
-  }
-  vi.useRealTimers();
-});
 
 describe("Interruptible", () => {
   it("holds one listener for the command, however often it starts", () => {
@@ -86,14 +80,13 @@ describe("Interruptible", () => {
     expect(command.cancel.aborted).toBe(true);
   });
 
-  it("exits 130 when the command is still running after the grace", () => {
-    vi.useFakeTimers();
+  it("exits 130 when the command is still running after the grace", ({ clock }) => {
     const exit = stubExit();
     listening();
 
     pressCtrlC();
     expect(exit).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1_000);
+    clock.advance(1_000);
 
     expect(exit).toHaveBeenCalledWith(130);
   });
@@ -108,14 +101,13 @@ describe("Interruptible", () => {
     expect(exit).toHaveBeenCalledWith(130);
   });
 
-  it("disarms the grace when the command finishes inside it", () => {
-    vi.useFakeTimers();
+  it("disarms the grace when the command finishes inside it", ({ clock }) => {
     const exit = stubExit();
     const command = listening();
 
     pressCtrlC();
     command.stop();
-    vi.advanceTimersByTime(1_000);
+    clock.advance(1_000);
 
     expect(exit).not.toHaveBeenCalled();
   });

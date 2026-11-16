@@ -47,7 +47,6 @@ async function signedToken(claims: object): Promise<string> {
 describe("the JWT entry in the edge runtime", () => {
   afterEach(() => {
     clearJwksCache();
-    vi.unstubAllGlobals();
   });
 
   it("verifies a token against the issuer's JWKS", async () => {

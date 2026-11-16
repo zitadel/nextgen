@@ -42,7 +42,6 @@ describe("session checks in the Next.js middleware", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     mockHeaders.clear();
   });
 

@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
+
+import { it } from "@/test/clock.fixture";
 
 import { downloadEvents } from "./export";
 import type { ProjectEvent } from "./model";
@@ -16,13 +18,12 @@ const EVENT = {
 
 describe("downloadEvents", () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
-  it("saves the events through a link in the document, and keeps the blob until the download has started", () => {
-    vi.useFakeTimers();
+  it("saves the events through a link in the document, and keeps the blob until the download has started", ({
+    clock,
+  }) => {
     const blobs: Blob[] = [];
     const revoke = vi.fn();
     vi.stubGlobal("URL", {
@@ -55,7 +56,7 @@ describe("downloadEvents", () => {
     expect(document.querySelector("a[download]")).toBeNull();
     // A blob revoked in the same tick can be gone before the browser reads it.
     expect(revoke).not.toHaveBeenCalled();
-    vi.runAllTimers();
+    clock.runAll();
     expect(revoke).toHaveBeenCalledWith("blob:events");
   });
 });

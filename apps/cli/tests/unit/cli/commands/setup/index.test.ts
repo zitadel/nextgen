@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { parseEnv } from "node:util";
 
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
@@ -3722,7 +3721,7 @@ describe("SettleAnswers", () => {
 });
 
 describe("ClaimOwnership", () => {
-  it.each([
+  it.for([
     {
       situation: "a runtime document naming the platform project",
       answer: () => {
@@ -3753,11 +3752,11 @@ describe("ClaimOwnership", () => {
     },
   ])(
     "is $hosts for $situation, failing closed so setup never nudges into a claim that would fail",
-    async ({ answer, hosts }) => {
+    async ({ answer, hosts }, { dir }) => {
       server.use(http.get(`${LOCAL_SERVER}/console/runtime.json`, answer));
 
       const owned = await new ClaimOwnership({
-        cwd: join(tmpdir(), "zitadel-no-local-admin"),
+        cwd: join(dir, "zitadel-no-local-admin"),
         dryRun: false,
         signal: new AbortController().signal,
         suggest: aSuggest(),

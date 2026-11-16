@@ -25,7 +25,6 @@ describeEdgeServer(serve);
 describe("the runtime config in the edge runtime", () => {
   afterEach(() => {
     setRuntimeConfig({ nextgen: {} });
-    vi.unstubAllGlobals();
   });
 
   it("sends the project secret from the runtime config on the handoff exchange", async () => {

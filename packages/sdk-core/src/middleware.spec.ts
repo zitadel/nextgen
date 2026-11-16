@@ -1,9 +1,9 @@
 import { createSign, generateKeyPairSync } from "node:crypto";
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
+import { test as it } from "./__tests__/fixtures.js";
 import { clearJwksCache } from "./jwt.js";
 import {
   HOP_BY_HOP,
@@ -233,29 +233,22 @@ describe("HOP_BY_HOP", () => {
 });
 
 describe("a compressed upstream answer", () => {
-  let server: Server;
-  let base: string;
   const exchanged = { session: { user_id: "usr_1" }, padding: "x".repeat(2048) };
 
-  beforeEach(async () => {
-    server = createServer((_req, res) => {
-      const body = gzipSync(JSON.stringify(exchanged));
-      res.writeHead(200, {
-        "content-type": "application/json",
-        "content-encoding": "gzip",
-        "content-length": String(body.length),
-      });
-      res.end(body);
-    });
-    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  });
-
-  afterEach(async () => {
-    await new Promise((done) => server.close(done));
-  });
-
-  it("reaches the browser as the plain body fetch decoded, without a coding that claims otherwise", async () => {
+  it("reaches the browser as the plain body fetch decoded, without a coding that claims otherwise", async ({
+    serve,
+  }) => {
+    const base = await serve(
+      createServer((_req, res) => {
+        const body = gzipSync(JSON.stringify(exchanged));
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "content-encoding": "gzip",
+          "content-length": String(body.length),
+        });
+        res.end(body);
+      }),
+    );
     // A successful handoff exchange behind a compressing edge: fetch decodes
     // the body but keeps the header, so a forwarded `content-encoding: gzip`
     // made the browser fail to decode a 200 (#2466).
@@ -338,7 +331,6 @@ describe("opaque session tokens", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -1052,10 +1044,6 @@ describe("proxySessionCookies", () => {
       return fetchMock;
     }
 
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
-
     it("ends and clears a second session of this project on sign-out", async () => {
       const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
       const cookies = proxySessionCookies(
@@ -1375,7 +1363,6 @@ describe("resolveSession", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     clearJwksCache();
   });

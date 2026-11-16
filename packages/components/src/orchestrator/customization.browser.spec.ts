@@ -1,8 +1,9 @@
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
+import { test } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
@@ -81,9 +82,38 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
   throw new Error("waitFor timed out");
 }
 
+/**
+ * `it` with what the embedding app's page adds to the document head:
+ *
+ * - `appStylesheet` stands in for the embedding app's own stylesheet; every
+ *   one a test adds is removed when it ends.
+ * - `fontLink` takes the tenant font link out of the head once the test ends.
+ */
+const it = test.extend<{ appStylesheet: (css: string) => void; fontLink: undefined }>({
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  async appStylesheet({}, use) {
+    const styles: HTMLStyleElement[] = [];
+    await use((css) => {
+      const style = document.createElement("style");
+      style.textContent = css;
+      document.head.appendChild(style);
+      styles.push(style);
+    });
+    for (const style of styles) {
+      style.remove();
+    }
+  },
+  fontLink: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      await use(undefined);
+      document.getElementById("zl-font-link")?.remove();
+    },
+    { auto: true },
+  ],
+});
+
 describe("<zitadel-login> host-app customisation (chromium)", () => {
-  let host: HTMLDivElement;
-  let appStyle: HTMLStyleElement | undefined;
   let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
 
@@ -94,26 +124,14 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
       projectId: "custom-test",
       url: "http://localhost:4000",
     });
-    host = document.createElement("div");
-    document.body.appendChild(host);
   });
 
   afterEach(() => {
-    host.remove();
-    appStyle?.remove();
-    appStyle = undefined;
     stub?.restore();
-    document.getElementById("zl-font-link")?.remove();
   });
 
-  /** Stand in for the embedding app's own stylesheet. */
-  function appStylesheet(css: string): void {
-    appStyle = document.createElement("style");
-    appStyle.textContent = css;
-    document.head.appendChild(appStyle);
-  }
-
   async function mount(
+    host: HTMLElement,
     response: CreateFlow201,
     configure?: (el: ZitadelLogin) => void,
   ): Promise<ZitadelLogin> {
@@ -129,13 +147,16 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     return element;
   }
 
-  it("host-page --zl-* tokens repaint through both shadow boundaries", async () => {
+  it("host-page --zl-* tokens repaint through both shadow boundaries", async ({
+    host,
+    appStylesheet,
+  }) => {
     // Both roles, because the two boundaries read different ones: card chrome
     // takes `card-foreground`, a control on that card takes `foreground`.
     appStylesheet(
       `zitadel-login { --zl-foreground: ${HOST_RED}; --zl-card-foreground: ${HOST_RED}; }`,
     );
-    const element = await mount(identifierStep);
+    const element = await mount(host, identifierStep);
 
     // On the host element itself.
     expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(HOST_RED);
@@ -151,23 +172,29 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(getComputedStyle(input).color).toBe(HOST_RED);
   });
 
-  it("the embedding app's CSS outranks the tenant's server-side branding", async () => {
+  it("the embedding app's CSS outranks the tenant's server-side branding", async ({
+    host,
+    appStylesheet,
+  }) => {
     // The app owns its page: a first-party embed must be able to match its
     // own design system even when the tenant has brand colours configured.
     appStylesheet(`zitadel-login { --zl-card-foreground: ${HOST_RED}; }`);
-    const element = await mount(brandedStep);
+    const element = await mount(host, brandedStep);
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(getComputedStyle(title).color).toBe(HOST_RED);
   });
 
-  it("the primary button consumes the --zl-primary pair from the host", async () => {
+  it("the primary button consumes the --zl-primary pair from the host", async ({
+    host,
+    appStylesheet,
+  }) => {
     // The semantic brand knob: setting the `primary` pair on the host
     // element restyles the primary CTA through both shadow boundaries.
     const HOST_BLUE = "rgb(0, 0, 255)";
     appStylesheet(
       `zitadel-login { --zl-primary: ${HOST_RED}; --zl-primary-foreground: ${HOST_BLUE}; }`,
     );
-    const element = await mount(identifierStep);
+    const element = await mount(host, identifierStep);
     const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
     expect(atom).toBeTruthy();
     const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
@@ -176,17 +203,17 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(getComputedStyle(button).color).toBe(HOST_BLUE);
   });
 
-  it("suppress-header collapses the card's header region, not just the text", async () => {
+  it("suppress-header collapses the card's header region, not just the text", async ({ host }) => {
     // The headings going sr-only is not enough: the card's flex layout kept
     // a blank 32px header band while the header slot stayed assigned. The
     // stamped attribute pulls the header region out of the flow.
-    const plain = await mount(identifierStep);
+    const plain = await mount(host, identifierStep);
     const plainCard = plain.shadowRoot?.querySelector("zl-card") as HTMLElement;
     const plainHeight = plainCard.getBoundingClientRect().height;
     plain.remove();
     stub?.restore();
 
-    const suppressed = await mount(identifierStep, (el) => {
+    const suppressed = await mount(host, identifierStep, (el) => {
       el.suppressHeader = true;
     });
     const suppressedCard = suppressed.shadowRoot?.querySelector("zl-card") as HTMLElement;
@@ -196,7 +223,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(suppressedHeight).toBeLessThan(plainHeight - 40);
   });
 
-  it("tenant palette.link recolors card links and nothing else", async () => {
+  it("tenant palette.link recolors card links and nothing else", async ({ host }) => {
     // `palette.link` sets `--zl-link`; only links take it.
     const linkedStep = {
       ...identifierStep,
@@ -209,13 +236,13 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
       },
       branding: { theme: { dark: { palette: { link: "#ff0000" } } } },
     } as unknown as CreateFlow201;
-    const element = await mount(linkedStep);
+    const element = await mount(host, linkedStep);
     const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
     expect(link).toBeTruthy();
     expect(getComputedStyle(link).color).toBe(HOST_RED);
   });
 
-  it("takes the mark from the side the widget resolved", async () => {
+  it("takes the mark from the side the widget resolved", async ({ host }) => {
     // The two files are the same lockup in different ink. Painting the light
     // one on a dark card is invisible, so the side owns its own mark.
     const ON_DARK = "https://cdn.example.com/on-dark.svg";
@@ -229,12 +256,12 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
         },
       },
     } as unknown as CreateFlow201;
-    const element = await mount(logoStep);
+    const element = await mount(host, logoStep);
     const logo = element.shadowRoot?.querySelector(".zl-card-logo") as HTMLImageElement;
     expect(logo?.getAttribute("src")).toBe(ON_DARK);
   });
 
-  it("keeps what was typed when the theme flips mid-step", async () => {
+  it("keeps what was typed when the theme flips mid-step", async ({ host }) => {
     // The rendered string carries the resolved side's mark, so a flip rebuilds
     // the form. Whatever the visitor had typed has to survive that.
     const twoSided = {
@@ -247,7 +274,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
         },
       },
     } as unknown as CreateFlow201;
-    const element = await mount(twoSided);
+    const element = await mount(host, twoSided);
     const field = element.shadowRoot?.querySelector("zl-field") as HTMLElement & {
       formValue: string;
     };
@@ -267,7 +294,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(after.formValue).toBe("someone@example.com");
   });
 
-  it("does not carry a key from the unresolved side across a theme flip", async () => {
+  it("does not carry a key from the unresolved side across a theme flip", async ({ host }) => {
     // `link` is set on dark only. After flipping to light it must fall back to
     // the maintained default rather than keeping the dark brand colour.
     const oneSidedKey = {
@@ -287,7 +314,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
         },
       },
     } as unknown as CreateFlow201;
-    const element = await mount(oneSidedKey);
+    const element = await mount(host, oneSidedKey);
     const linkColor = (): string => {
       const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
       return getComputedStyle(link).color;
@@ -300,7 +327,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(linkColor()).not.toBe("rgb(0, 255, 0)");
   });
 
-  it("does not paint a light key onto the dark surface", async () => {
+  it("does not paint a light key onto the dark surface", async ({ host }) => {
     const isolatedStep = {
       ...identifierStep,
       branding: {
@@ -311,14 +338,16 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
         },
       },
     } as unknown as CreateFlow201;
-    const element = await mount(isolatedStep);
+    const element = await mount(host, isolatedStep);
     const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
     const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
     expect(getComputedStyle(button).backgroundColor).not.toBe(HOST_RED);
   });
 
-  it("suppress-header hides the card heading visually but keeps it accessible", async () => {
-    const element = await mount(identifierStep, (el) => {
+  it("suppress-header hides the card heading visually but keeps it accessible", async ({
+    host,
+  }) => {
+    const element = await mount(host, identifierStep, (el) => {
       el.suppressHeader = true;
     });
     // Reflected on the host and stamped onto the template shell, so the
@@ -336,12 +365,12 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(style.display).not.toBe("none");
   });
 
-  it("the host page owns placement, width, and flow position", async () => {
+  it("the host page owns placement, width, and flow position", async ({ host, appStylesheet }) => {
     // A widget must lay out as a normal block in its parent — no viewport
     // claim, no breaking out of the container, no forced width.
     host.style.cssText = "display: flex; justify-content: flex-end; width: 900px;";
     appStylesheet(`zitadel-login { width: 380px; margin-top: 24px; }`);
-    const element = await mount(identifierStep);
+    const element = await mount(host, identifierStep);
 
     const rect = element.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();
@@ -351,8 +380,8 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(rect.height).toBeLessThan(window.innerHeight);
   });
 
-  it("locales override copy without forking the template", async () => {
-    const element = await mount(identifierStep, (el) => {
+  it("locales override copy without forking the template", async ({ host }) => {
+    const element = await mount(host, identifierStep, (el) => {
       el.lang = "en";
       el.locales = { en: { "identifier.title": "Welcome back to Acme" } };
     });
@@ -365,21 +394,23 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   // a document we do not own. `branding.write` must not carry that into an
   // embedding app, which is why the widget applies the family and leaves the
   // loading to the page around it.
-  it("widget mode does not inject the tenant font into the embedding document", async () => {
-    const element = await mount(fontStep);
+  it("widget mode does not inject the tenant font into the embedding document", async ({
+    host,
+  }) => {
+    const element = await mount(host, fontStep);
     expect(element.variant).not.toBe("page");
     expect(document.getElementById("zl-font-link")).toBeNull();
   });
 
-  it("page mode does inject it, because the document is ours", async () => {
-    await mount(fontStep, (el) => {
+  it("page mode does inject it, because the document is ours", async ({ host }) => {
+    await mount(host, fontStep, (el) => {
       el.variant = "page";
     });
     const link = document.getElementById("zl-font-link") as HTMLLinkElement | null;
     expect(link?.href).toBe(TENANT_FONT_HREF);
   });
 
-  it("emits flow events the host app can drive its own UI from", async () => {
+  it("emits flow events the host app can drive its own UI from", async ({ host }) => {
     const steps: string[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.addEventListener("zitadel-flow-step", (event) => {

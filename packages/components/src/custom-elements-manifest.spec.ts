@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import { DISPATCHED_EVENTS } from "./events.js";
 
@@ -34,16 +34,23 @@ function parse(file: string): Manifest {
   return manifest;
 }
 
-function regenerate(): Manifest {
-  // The analyzer resolves `--outdir` against its cwd, so the temp dir lives
-  // under the package root and is passed by its relative name.
-  const out = mkdtempSync(join(root, ".cem-"));
-  try {
-    execFileSync(process.execPath, [cem, "analyze", "--outdir", basename(out)], { cwd: root });
-    return parse(join(out, "custom-elements.json"));
-  } finally {
-    rmSync(out, { recursive: true, force: true });
-  }
+/**
+ * `it` with `dir`, a fresh directory the analyzer writes into, removed when the
+ * test ends. The analyzer resolves `--outdir` against its cwd, so the directory
+ * lives under the package root and is passed by its relative name.
+ */
+const it = test.extend<{ dir: string }>({
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  async dir({}, use) {
+    const dir = mkdtempSync(join(root, ".cem-"));
+    await use(dir);
+    rmSync(dir, { recursive: true, force: true });
+  },
+});
+
+function regenerate(out: string): Manifest {
+  execFileSync(process.execPath, [cem, "analyze", "--outdir", basename(out)], { cwd: root });
+  return parse(join(out, "custom-elements.json"));
 }
 
 const committed = parse(join(root, "custom-elements.json"));
@@ -68,8 +75,8 @@ const EXPECTED_TAGS = [
 ];
 
 describe("custom-elements.json", () => {
-  it("is up to date with the element sources", () => {
-    expect(committed).toEqual(regenerate());
+  it("is up to date with the element sources", ({ dir }) => {
+    expect(committed).toEqual(regenerate(dir));
   });
 
   it("declares every zitadel-* and zl-* element", () => {

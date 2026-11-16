@@ -5,7 +5,7 @@
  * above, or throws, so the cookies go into both.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
@@ -19,10 +19,6 @@ const SESSION = `zitadel_session_${PROJECT}`;
 describe("session cookies on h3 v2's error headers", () => {
   beforeEach(() => {
     clearSessionCheckCache();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it("writes a copied session cookie to the headers of an error answer as well", async () => {

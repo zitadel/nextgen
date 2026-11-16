@@ -11,6 +11,8 @@ export default defineConfig({
       {
         cacheDir: ".vitest/node",
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "node",
           globals: true,
           environment: "node",

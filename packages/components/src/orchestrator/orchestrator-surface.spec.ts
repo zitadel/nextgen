@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 
+import { test } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
@@ -20,8 +21,22 @@ import { ZitadelSession } from "./zitadel-session.js";
  * `session-surface.browser.spec.ts`).
  */
 
+/**
+ * `it` that takes the tenant font link out of the document head once the test
+ * ends, whatever the test left there.
+ */
+const it = test.extend<{ fontLink: undefined }>({
+  fontLink: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      await use(undefined);
+      document.getElementById("zl-font-link")?.remove();
+    },
+    { auto: true },
+  ],
+});
+
 describe("orchestrator surface contract", () => {
-  let host: HTMLDivElement;
   let consoleError: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -30,17 +45,14 @@ describe("orchestrator surface contract", () => {
     // network needed to assert the surface contract.
     _resetConfigForTesting();
     consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    host = document.createElement("div");
-    document.body.appendChild(host);
   });
 
   afterEach(() => {
-    host.remove();
     consoleError.mockRestore();
-    document.getElementById("zl-font-link")?.remove();
   });
 
   async function mount<T extends HTMLElement & { updateComplete: Promise<boolean> }>(
+    host: HTMLElement,
     tag: string,
     configure?: (el: T) => void,
   ): Promise<T> {
@@ -67,16 +79,16 @@ describe("orchestrator surface contract", () => {
       expect(theme?.state).not.toBe(true);
     });
 
-    it("defaults to the content-sized widget with no stated theme", async () => {
-      const element = await mount<ZitadelLogin | ZitadelSession>(tag);
+    it("defaults to the content-sized widget with no stated theme", async ({ host }) => {
+      const element = await mount<ZitadelLogin | ZitadelSession>(host, tag);
       expect(element.variant).toBe("widget");
       expect(element.theme).toBe("");
       // `variant` reflects so host pages can select on it.
       expect(element.getAttribute("variant")).toBe("widget");
     });
 
-    it("stamps an explicit theme onto the host", async () => {
-      const element = await mount<ZitadelLogin | ZitadelSession>(tag, (el) => {
+    it("stamps an explicit theme onto the host", async ({ host }) => {
+      const element = await mount<ZitadelLogin | ZitadelSession>(host, tag, (el) => {
         el.theme = "light";
       });
       expect(element.dataset.theme).toBe("light");
@@ -88,8 +100,8 @@ describe("orchestrator surface contract", () => {
       expect(element.hasAttribute("data-theme-dark")).toBe(true);
     });
 
-    it("page variant defaults to the dark design-system surface", async () => {
-      const element = await mount<ZitadelLogin | ZitadelSession>(tag, (el) => {
+    it("page variant defaults to the dark design-system surface", async ({ host }) => {
+      const element = await mount<ZitadelLogin | ZitadelSession>(host, tag, (el) => {
         el.variant = "page";
       });
       expect(element.dataset.theme).toBe("dark");
@@ -97,8 +109,8 @@ describe("orchestrator surface contract", () => {
     });
   });
 
-  it("<zitadel-session> stamps widget polarity on its page shell", async () => {
-    const element = await mount<ZitadelSession>("zitadel-session");
+  it("<zitadel-session> stamps widget polarity on its page shell", async ({ host }) => {
+    const element = await mount<ZitadelSession>(host, "zitadel-session");
     const shell = element.shadowRoot?.querySelector("zl-page-shell");
     expect(shell?.hasAttribute("data-widget")).toBe(true);
 
@@ -107,18 +119,18 @@ describe("orchestrator surface contract", () => {
     expect(shell?.hasAttribute("data-widget")).toBe(false);
   });
 
-  it("an unbranded page surface links no font stylesheet", async () => {
+  it("an unbranded page surface links no font stylesheet", async ({ host }) => {
     // The package loads no face of its own: without a tenant `font_url` the
     // token stack falls back to the system font, so no visitor's address
     // reaches a font CDN by default (ADR 025, amended).
-    await mount<ZitadelSession>("zitadel-session", (el) => {
+    await mount<ZitadelSession>(host, "zitadel-session", (el) => {
       el.variant = "page";
     });
     expect(document.head.querySelector('link[rel="stylesheet"]')).toBeNull();
   });
 
-  it("<zitadel-logout> resolves an explicit theme instead of pinning dark", async () => {
-    const element = await mount<ZitadelLogout>("zitadel-logout", (el) => {
+  it("<zitadel-logout> resolves an explicit theme instead of pinning dark", async ({ host }) => {
+    const element = await mount<ZitadelLogout>(host, "zitadel-logout", (el) => {
       el.theme = "light";
     });
     expect(element.dataset.theme).toBe("light");
@@ -130,8 +142,10 @@ describe("orchestrator surface contract", () => {
     expect(element.hasAttribute("data-theme-dark")).toBe(true);
   });
 
-  it("<zitadel-login> keeps the header shown and stable when suppressHeader is unset", async () => {
-    const element = await mount<ZitadelLogin>("zitadel-login");
+  it("<zitadel-login> keeps the header shown and stable when suppressHeader is unset", async ({
+    host,
+  }) => {
+    const element = await mount<ZitadelLogin>(host, "zitadel-login");
     // The card paints after the element's first async render, so wait for it.
     const card = await vi.waitUntil(() => element.shadowRoot?.querySelector("zl-card"));
 

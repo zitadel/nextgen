@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/helpers/fixtures";
 
 type Options = { mutex: string | null; retries: number; command: string[] };
 type Result = { code?: number; signal?: string };
@@ -43,9 +44,8 @@ async function attempts(file: string): Promise<number> {
 }
 
 describe("task-guard outside turbo", () => {
-  it("runs the command once, without a lock, and passes its exit code on", async () => {
+  it("runs the command once, without a lock, and passes its exit code on", async ({ dir }) => {
     const { guard } = await loadModule();
-    const dir = await mkdtemp(join(tmpdir(), "task-guard-"));
     const counter = join(dir, "count");
     const lockBase = join(dir, "locks");
 
@@ -74,9 +74,8 @@ describe("task-guard outside turbo", () => {
 });
 
 describe("task-guard under turbo", () => {
-  it("retries a failing command until it passes", async () => {
+  it("retries a failing command until it passes", async ({ dir }) => {
     const { guard } = await loadModule();
-    const dir = await mkdtemp(join(tmpdir(), "task-guard-"));
     const counter = join(dir, "count");
 
     const result = await guard(
@@ -88,9 +87,8 @@ describe("task-guard under turbo", () => {
     expect(await attempts(counter)).toBe(3);
   });
 
-  it("gives up after the last retry with the command's exit code", async () => {
+  it("gives up after the last retry with the command's exit code", async ({ dir }) => {
     const { guard } = await loadModule();
-    const dir = await mkdtemp(join(tmpdir(), "task-guard-"));
     const counter = join(dir, "count");
 
     const result = await guard(
@@ -102,9 +100,8 @@ describe("task-guard under turbo", () => {
     expect(await attempts(counter)).toBe(3);
   });
 
-  it("releases the lock when the command is done", async () => {
+  it("releases the lock when the command is done", async ({ dir }) => {
     const { guard, lockDir } = await loadModule();
-    const dir = await mkdtemp(join(tmpdir(), "task-guard-"));
     const lockBase = join(dir, "locks");
 
     await guard(
@@ -117,18 +114,18 @@ describe("task-guard under turbo", () => {
 });
 
 describe("the lock", () => {
-  it("waits while a live process holds it", async () => {
+  it("waits while a live process holds it", async ({ dir }) => {
     const { acquire, lockDir } = await loadModule();
-    const lock = lockDir("held", "/repo", await mkdtemp(join(tmpdir(), "task-guard-")));
+    const lock = lockDir("held", "/repo", dir);
     await mkdir(lock, { recursive: true });
     await writeFile(join(lock, "pid"), `${process.pid}\n`);
 
     await expect(acquire(lock, { maxWaitMs: 300 })).rejects.toThrow(/gave up waiting/);
   });
 
-  it("reclaims a lock whose holder is gone", async () => {
+  it("reclaims a lock whose holder is gone", async ({ dir }) => {
     const { acquire, lockDir } = await loadModule();
-    const lock = lockDir("stale", "/repo", await mkdtemp(join(tmpdir(), "task-guard-")));
+    const lock = lockDir("stale", "/repo", dir);
     await mkdir(lock, { recursive: true });
     // No process has this pid: pids stay far below it on Linux and macOS.
     await writeFile(join(lock, "pid"), "2147483646\n");
@@ -140,8 +137,7 @@ describe("the lock", () => {
 });
 
 describe("the command line", () => {
-  it("runs the command when the script is reached through a symlink", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "task-guard-"));
+  it("runs the command when the script is reached through a symlink", async ({ dir }) => {
     const link = join(dir, "task-guard.mjs");
     await symlink(script, link);
 

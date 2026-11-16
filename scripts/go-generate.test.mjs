@@ -1,19 +1,14 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { afterEach, expect, test } from "vitest";
+import { expect } from "vitest";
 
+import { test } from "./fixtures.ts";
 import { findGeneratePackages } from "./go-generate.mjs";
 
-const roots = [];
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
-
-test("generation discovers production directives only within its own Go module", () => {
-  const root = mkdtempSync(join(tmpdir(), "nextgen-generate-"));
-  roots.push(root);
+test("generation discovers production directives only within its own Go module", ({
+  dir: root,
+}) => {
   const files = {
     "go.mod": "module example.com/root\n",
     "api/generate.go": "package api\n//go:generate echo api\n",

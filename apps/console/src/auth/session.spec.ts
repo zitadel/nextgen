@@ -4,7 +4,7 @@ import {
   setApiCsrfToken,
 } from "@zitadel/api/runtime/auth";
 import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 import {
   _resetSessionForTesting,
@@ -15,6 +15,7 @@ import {
   signOut,
 } from "./session";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
+import { dateTest as it, type Clock } from "@/test/clock.fixture";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
 
@@ -25,7 +26,6 @@ beforeEach(() => {
 afterEach(() => {
   setApiCsrfToken(undefined);
   _resetRuntimeForTesting();
-  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -104,13 +104,12 @@ describe("fetchSession", () => {
   // The token is stable for the life of a cookie: re-validating the session
   // after the cache window does not read it again, so a failing read there
   // cannot wipe a token that works.
-  it("reads the token once, not on every re-validation", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  it("reads the token once, not on every re-validation", async ({ clock }) => {
     stubSession("user_a");
     const calls = stubCsrf(token("tok"));
     await fetchSession();
 
-    vi.setSystemTime(Date.now() + 60_000);
+    clock.skip(60_000);
     stubCsrf(failing);
     await fetchSession();
 
@@ -120,13 +119,14 @@ describe("fetchSession", () => {
 
   // Another tab signed in as someone else. Loading their token here would arm
   // this page's open forms to write as them, so the page starts over instead.
-  it("starts over, without loading the new person's token, when someone else is signed in", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  it("starts over, without loading the new person's token, when someone else is signed in", async ({
+    clock,
+  }) => {
     stubSession("user_a");
     stubCsrf(token("tok_a"));
     await fetchSession();
 
-    vi.setSystemTime(Date.now() + 60_000);
+    clock.skip(60_000);
     stubSession("user_b");
     const calls = stubCsrf(token("tok_b"));
     // It never settles: answering null would send the guard to /login while
@@ -150,21 +150,20 @@ describe("fetchSession", () => {
     ["an anonymous session", () => stubSessionBody({ user_id: undefined })],
     ["an expired session", () => stubSessionBody({ user_id: "user_a", state: "expired" })],
   ] as const)("after %s", (_, loseSession) => {
-    async function signInThenLose() {
-      vi.useFakeTimers({ toFake: ["Date"] });
+    async function signInThenLose(clock: Clock) {
       stubSession("user_a");
       stubCsrf(token("tok_a"));
       await fetchSession();
 
-      vi.setSystemTime(Date.now() + 60_000);
+      clock.skip(60_000);
       loseSession();
       expect(await fetchSession()).toBeNull();
       // The token belonged to the lost session.
       expect(getApiCsrfToken()).toBeUndefined();
     }
 
-    it("carries on when the same person signs in again", async () => {
-      await signInThenLose();
+    it("carries on when the same person signs in again", async ({ clock }) => {
+      await signInThenLose(clock);
       stubSession("user_a");
       stubCsrf(token("tok_a2"));
 
@@ -173,8 +172,8 @@ describe("fetchSession", () => {
       expect(sessionPage.reload).not.toHaveBeenCalled();
     });
 
-    it("starts over when someone else signs in", async () => {
-      await signInThenLose();
+    it("starts over when someone else signs in", async ({ clock }) => {
+      await signInThenLose(clock);
       stubSession("user_b");
       const calls = stubCsrf(token("tok_b"));
 
@@ -200,13 +199,12 @@ describe("fetchSession", () => {
     expect(getApiCsrfToken()).toBeUndefined();
   });
 
-  it("keeps the person when the session cannot be read", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  it("keeps the person when the session cannot be read", async ({ clock }) => {
     stubSession("user_a");
     stubCsrf(token("tok_a"));
     await fetchSession();
 
-    vi.setSystemTime(Date.now() + 60_000);
+    clock.skip(60_000);
     stubSession("unreachable");
     expect(await fetchSession()).toBeNull();
     expect(getApiCsrfToken()).toBe("tok_a");
@@ -382,13 +380,12 @@ describe("CSRF rejection", () => {
 
   // A navigation's fetchSession can see the other person first and start over
   // while the re-check is still reading: the page reloads once, not twice.
-  it("leaves a start-over that happened meanwhile alone", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  it("leaves a start-over that happened meanwhile alone", async ({ clock }) => {
     stubSession("user_a");
     stubCsrf(token("tok_a"));
     await fetchSession();
 
-    vi.setSystemTime(Date.now() + 60_000);
+    clock.skip(60_000);
     let answer!: () => void;
     const held = new Promise<void>((resolve) => (answer = resolve));
     let reads = 0;

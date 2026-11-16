@@ -1,9 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import OriginRm from "@/cli/commands/origin/rm";
 import { answering } from "@tests/helpers/keyboard";
@@ -34,17 +33,13 @@ it.beforeEach(({ server }) => {
   );
 });
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function anAppDir(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-origin-rm-"));
-  dirs.push(cwd);
+/**
+ * Writes the files of a scaffolded app into a directory.
+ *
+ * @param cwd - The directory to write them in.
+ * @returns Once the files are written.
+ */
+async function anAppDir(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -57,7 +52,6 @@ async function anAppDir(): Promise<string> {
       created_at: "2026-01-01T00:00:00.000Z",
     }),
   );
-  return cwd;
 }
 
 function remove(cwd: string, extra: string[] = []) {
@@ -75,8 +69,8 @@ function remove(cwd: string, extra: string[] = []) {
 }
 
 describe("origin rm", () => {
-  it("removes the pattern and reports it when forced", async () => {
-    const cwd = await anAppDir();
+  it("removes the pattern and reports it when forced", async ({ dir: cwd }) => {
+    await anAppDir(cwd);
 
     const result = await remove(cwd, ["--force"]);
 
@@ -87,8 +81,11 @@ describe("origin rm", () => {
     });
   });
 
-  it("still reports the removal when the remaining origins cannot be read", async ({ server }) => {
-    const cwd = await anAppDir();
+  it("still reports the removal when the remaining origins cannot be read", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await anAppDir(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/projects/:id`, () =>
         HttpResponse.json({ code: "internal" }, { status: 500 }),
@@ -104,8 +101,8 @@ describe("origin rm", () => {
     });
   });
 
-  it("refuses without --force when non-interactive, and makes no request", async () => {
-    const cwd = await anAppDir();
+  it("refuses without --force when non-interactive, and makes no request", async ({ dir: cwd }) => {
+    await anAppDir(cwd);
 
     const result = await remove(cwd);
 
@@ -113,8 +110,8 @@ describe("origin rm", () => {
     expect(removed).toEqual([]);
   });
 
-  it("makes no request on a dry run", async () => {
-    const cwd = await anAppDir();
+  it("makes no request on a dry run", async ({ dir: cwd }) => {
+    await anAppDir(cwd);
 
     const result = await remove(cwd, ["--force", "--dry-run"]);
 
@@ -122,8 +119,8 @@ describe("origin rm", () => {
     expect(removed).toEqual([]);
   });
 
-  it("keeps the active --env in the suggested retry command", async () => {
-    const cwd = await anAppDir();
+  it("keeps the active --env in the suggested retry command", async ({ dir: cwd }) => {
+    await anAppDir(cwd);
     await writeFile(
       join(cwd, ".env.production.local"),
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
@@ -138,8 +135,9 @@ describe("origin rm", () => {
 
   it("names the environment the last origin was removed from in how to add one back", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await anAppDir();
+    await anAppDir(cwd);
     await writeFile(
       join(cwd, ".env.production.local"),
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
@@ -157,8 +155,10 @@ describe("origin rm", () => {
     ]);
   });
 
-  it("keeps a control character in the pattern as it was typed, in the question it carries as data", async () => {
-    const cwd = await anAppDir();
+  it("keeps a control character in the pattern as it was typed, in the question it carries as data", async ({
+    dir: cwd,
+  }) => {
+    await anAppDir(cwd);
 
     const result = await runCliForTest([
       "origin",
@@ -177,8 +177,10 @@ describe("origin rm", () => {
     expect(envelope.hint).toContain("\u001b[31m");
   });
 
-  it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
-    const cwd = await anAppDir();
+  it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async ({
+    dir: cwd,
+  }) => {
+    await anAppDir(cwd);
 
     const result = await runCliForTest([
       "origin",
@@ -198,8 +200,8 @@ describe("origin rm", () => {
 });
 
 describe("origin rm asked on a terminal", () => {
-  const removingOn = async (serverUrl: string) => {
-    const cwd = await anAppDir();
+  const removingOn = async (cwd: string, serverUrl: string) => {
+    await anAppDir(cwd);
     const talk = answering(false);
     await asPerson(() =>
       runCommand(OriginRm, "origin:rm", [PRIMARY_ORIGIN, "--cwd", cwd, "--server", serverUrl]),
@@ -207,16 +209,20 @@ describe("origin rm asked on a terminal", () => {
     return talk;
   };
 
-  it("asks whether to remove the pattern, naming the project and a remote server", async () => {
-    const talk = await removingOn(SERVER);
+  it("asks whether to remove the pattern, naming the project and a remote server", async ({
+    dir,
+  }) => {
+    const talk = await removingOn(dir, SERVER);
 
     expect(talk.asked()).toEqual([
       `Remove ${PRIMARY_ORIGIN} from project proj_unit on api.zitadel.example?`,
     ]);
   });
 
-  it("spells out a control character in the pattern in the question it draws", async () => {
-    const cwd = await anAppDir();
+  it("spells out a control character in the pattern in the question it draws", async ({
+    dir: cwd,
+  }) => {
+    await anAppDir(cwd);
     const talk = answering(false);
 
     await asPerson(() => {
@@ -234,8 +240,8 @@ describe("origin rm asked on a terminal", () => {
     ]);
   });
 
-  it("names a local server by its host and port", async () => {
-    const talk = await removingOn("http://localhost:8112");
+  it("names a local server by its host and port", async ({ dir }) => {
+    const talk = await removingOn(dir, "http://localhost:8112");
 
     expect(talk.asked()).toEqual([
       `Remove ${PRIMARY_ORIGIN} from project proj_unit on localhost:8112?`,

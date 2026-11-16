@@ -2,11 +2,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureZitadel } from "@zitadel/api/config";
 import * as sdkReact from "@zitadel/sdk-react";
-import { act, createElement, createRef, type ElementType } from "react";
+import { act, createElement, createRef, type ElementType, type ReactElement } from "react";
 import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import ts from "typescript";
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it as base, vi } from "vitest";
 
 import type {
   ZitadelFlowCompleteDetail,
@@ -36,8 +36,61 @@ import { widgetTags } from "@zitadel/sdk-core/types";
 const project = configureZitadel({ projectId: "proj_1", proxyPath: "/__nextgen" });
 
 let fetchCalls: { url: string; body: string }[];
-let container: HTMLDivElement;
-let root: Root | undefined;
+
+/**
+ * `it` extended with `render`, which puts server markup in a host div attached
+ * to the document and hands back the host with a `hydrate` and a `mount` for
+ * it. The React roots are unmounted and the host is removed when the test ends.
+ */
+const it = base.extend<{
+  render: (markup?: string) => {
+    container: HTMLDivElement;
+    hydrate: (ui: ReactElement) => Promise<void>;
+    mount: (ui: ReactElement) => Promise<void>;
+  };
+}>({
+  /**
+   * Provides the `render` function and tears down everything it mounted.
+   *
+   * @param _context The fixtures this one depends on, none.
+   * @param use Hands the value to the test.
+   * @returns Resolves once the test and the teardown have finished.
+   */
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  render: async ({}, use) => {
+    const containers: HTMLDivElement[] = [];
+    const roots: Root[] = [];
+    await use((markup = "") => {
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = markup;
+      containers.push(container);
+      return {
+        container,
+        hydrate: async (ui) => {
+          await act(async () => {
+            roots.push(hydrateRoot(container, ui));
+          });
+        },
+        mount: async (ui) => {
+          await act(async () => {
+            const root = createRoot(container);
+            roots.push(root);
+            root.render(ui);
+          });
+        },
+      };
+    });
+    await act(async () => {
+      for (const root of roots) {
+        root.unmount();
+      }
+    });
+    for (const container of containers) {
+      container.remove();
+    }
+  },
+});
 
 beforeEach(() => {
   // The stubbed backend answers 503, which the widget reports on the console.
@@ -52,15 +105,9 @@ beforeEach(() => {
       return Response.json({ code: "unavailable" }, { status: 503 });
     }),
   );
-  container = document.createElement("div");
-  document.body.append(container);
 });
 
-afterEach(async () => {
-  await act(async () => root?.unmount());
-  root = undefined;
-  container.remove();
-  vi.unstubAllGlobals();
+afterEach(() => {
   vi.restoreAllMocks();
 });
 
@@ -117,55 +164,47 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expect(renderToString(createElement(Widget as ElementType, { project }))).toBe("");
   });
 
-  it("starts no flow before hydration", async () => {
-    container.innerHTML = renderToString(register());
+  it("starts no flow before hydration", async ({ render }) => {
+    render(renderToString(register()));
     await settle();
 
     expect(fetchCalls).toEqual([]);
   });
 
-  it("starts one flow, with the requested purpose, once hydrated", async () => {
-    container.innerHTML = renderToString(register());
+  it("starts one flow, with the requested purpose, once hydrated", async ({ render }) => {
+    const { hydrate } = render(renderToString(register()));
     await settle();
-    await act(async () => {
-      root = hydrateRoot(container, register());
-    });
+    await hydrate(register());
     await settle();
 
     expect(flowPurposes()).toEqual(["register"]);
   });
 
-  it("binds the props before the hydrated widget starts", async () => {
-    container.innerHTML = renderToString(register());
-    await act(async () => {
-      root = hydrateRoot(container, register());
-    });
+  it("binds the props before the hydrated widget starts", async ({ render }) => {
+    const { container, hydrate } = render(renderToString(register()));
+    await hydrate(register());
     await settle();
 
     const element = container.querySelector(widgetTags.login);
     expect([element?.purpose, element?.variant]).toEqual(["register", "page"]);
   });
 
-  it("mounts at once on a client render", async () => {
-    await act(async () => {
-      root = createRoot(container);
-      root.render(register());
-    });
+  it("mounts at once on a client render", async ({ render }) => {
+    const { mount } = render();
+    await mount(register());
     await settle();
 
     expect(flowPurposes()).toEqual(["register"]);
   });
 
-  it.each([
+  it.for([
     ["ZitadelLogin", ZitadelLogin, widgetTags.login],
     ["ZitadelLogout", ZitadelLogout, widgetTags.logout],
     ["ZitadelSession", ZitadelSession, widgetTags.session],
-  ])("forwards a ref on %s to the element", async (_name, Widget, tag) => {
+  ] as const)("forwards a ref on %s to the element", async ([_name, Widget, tag], { render }) => {
     const ref = createRef<HTMLElement>();
-    await act(async () => {
-      root = createRoot(container);
-      root.render(createElement(Widget as ElementType, { project, ref }));
-    });
+    const { mount } = render();
+    await mount(createElement(Widget as ElementType, { project, ref }));
 
     expect(ref.current?.localName).toBe(tag);
   });
@@ -248,15 +287,13 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
   Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
 
 describe("wrapper config parity", () => {
-  it.each([
+  it.for([
     ["ZitadelLoginConfig", widgetTags.login, ZitadelLogin, loginConfig],
     ["ZitadelSessionConfig", widgetTags.session, ZitadelSession, sessionConfig],
     ["ZitadelLogoutConfig", widgetTags.logout, ZitadelLogout, logoutConfig],
-  ])("forwards every %s key to <%s>", async (_name, tag, Widget, config) => {
-    await act(async () => {
-      root = createRoot(container);
-      root.render(createElement(Widget as ElementType, config));
-    });
+  ] as const)("forwards every %s key to <%s>", async ([_name, tag, Widget, config], { render }) => {
+    const { container, mount } = render();
+    await mount(createElement(Widget as ElementType, config));
 
     expect(elementValues(container.querySelector(tag) as Element, config)).toEqual(config);
   });

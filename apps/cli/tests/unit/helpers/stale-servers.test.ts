@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { availableParallelism, tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect } from "vitest";
 
 import config from "../../../vitest.config";
+import { it } from "@tests/helpers/fixtures";
 import { PORT_WORKERS } from "@tests/helpers/ports";
 import { ownerIsAlive, staleFakeServers } from "@tests/helpers/stale-servers";
 
@@ -37,27 +38,32 @@ describe("staleFakeServers", () => {
 });
 
 describe("ownerIsAlive", () => {
-  const serverDirOwnedBy = async (owner: string | undefined) => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-owner-"));
-    onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  /**
+   * Records an owner in a server directory.
+   *
+   * @param dir - The server's directory.
+   * @param owner - The owner to record, or `undefined` to record none.
+   * @returns The directory.
+   */
+  const serverDirOwnedBy = async (dir: string, owner: string | undefined) => {
     if (owner !== undefined) {
       await writeFile(join(dir, "owner"), owner);
     }
     return dir;
   };
 
-  it("is true for a process that is running", async () => {
-    expect(ownerIsAlive(await serverDirOwnedBy(String(process.pid)))).toBe(true);
+  it("is true for a process that is running", async ({ dir }) => {
+    expect(ownerIsAlive(await serverDirOwnedBy(dir, String(process.pid)))).toBe(true);
   });
 
-  it("is false for a process that has ended", async () => {
+  it("is false for a process that has ended", async ({ dir }) => {
     const ended = spawnSync(process.execPath, ["-e", ""]).pid;
 
-    expect(ownerIsAlive(await serverDirOwnedBy(String(ended)))).toBe(false);
+    expect(ownerIsAlive(await serverDirOwnedBy(dir, String(ended)))).toBe(false);
   });
 
-  it("is false when no owner was recorded", async () => {
-    expect(ownerIsAlive(await serverDirOwnedBy(undefined))).toBe(false);
+  it("is false when no owner was recorded", async ({ dir }) => {
+    expect(ownerIsAlive(await serverDirOwnedBy(dir, undefined))).toBe(false);
   });
 });
 

@@ -1,5 +1,9 @@
+import { Readable } from "node:stream";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, onTestFinished } from "vitest";
+
+import { atTerminal, type Terminal } from "./keyboard";
+import { test as base } from "./log";
 
 /**
  * Makes every test in the calling suite run as though a person were at a
@@ -126,3 +130,96 @@ export const asOneLine = (shown: string): string =>
     .replace(/\s+/g, " ")
     .replaceAll(" \\ ", " ")
     .trim();
+
+/** The terminal a test's run is at, and the knobs a test turns to change what the run finds. */
+export interface TerminalFixture extends Terminal {
+  /**
+   * Pipes `value` into stdin and makes it report that it is not a terminal, as a command reads
+   * what is piped to it. A ready-made stream is used as it is, for a test that wants to see
+   * whether, or when, it is read.
+   */
+  stdin(value: string | Readable): void;
+  /** Sets whether stdout reports being a terminal. */
+  tty(on: boolean): void;
+  /** Sets how many columns wide stdout reports being. */
+  columns(count: number): void;
+  /** Sets the platform the process reports running on, such as `"win32"`. */
+  platform(name: NodeJS.Platform): void;
+}
+
+/**
+ * Remembers where a property is now, and gives it back as it was: its own descriptor, or none at
+ * all when it had none of its own.
+ *
+ * @param target - The object the property is on.
+ * @param name - The property's name.
+ * @returns Puts the property back.
+ */
+function remembering(target: object, name: string): () => void {
+  const found = Object.getOwnPropertyDescriptor(target, name);
+  return () => {
+    if (found === undefined) {
+      Reflect.deleteProperty(target, name);
+    } else {
+      Object.defineProperty(target, name, found);
+    }
+  };
+}
+
+/**
+ * Puts the test's run at a terminal, as {@link atTerminal} does, and adds the controls a test
+ * uses to change what the run finds there. Every swap is undone when the test ends.
+ *
+ * Each property is remembered before the terminal is put in place, so what is given back is what
+ * the test started with whatever order the two sets of cleanups run in.
+ *
+ * @returns The terminal and its controls.
+ */
+function atControllableTerminal(): TerminalFixture {
+  const restore = [
+    remembering(process, "stdin"),
+    remembering(process, "platform"),
+    remembering(process.stdout, "isTTY"),
+    remembering(process.stdout, "columns"),
+  ];
+  const terminal = atTerminal();
+  onTestFinished(() => {
+    for (const put of restore) {
+      put();
+    }
+  });
+  return {
+    ...terminal,
+    stdin(value) {
+      const source = typeof value === "string" ? Readable.from([value]) : value;
+      const piped = Object.assign(source, { isTTY: false });
+      Object.defineProperty(process, "stdin", { value: piped, configurable: true });
+    },
+    tty(on) {
+      Object.defineProperty(process.stdout, "isTTY", {
+        value: on,
+        writable: true,
+        configurable: true,
+      });
+    },
+    columns(count) {
+      Object.defineProperty(process.stdout, "columns", { value: count, configurable: true });
+    },
+    platform(name) {
+      Object.defineProperty(process, "platform", { value: name, configurable: true });
+    },
+  };
+}
+
+/**
+ * `test` with the terminal the run is at: stdout and stdin are patched for the test that names it
+ * and given back when it ends. A test that does not name it keeps the runner's own streams.
+ *
+ * - `terminal` is that terminal, to read what was drawn, type at, and change.
+ */
+export const test = base.extend<{ terminal: TerminalFixture }>({
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  terminal: async ({}, use) => {
+    await use(atControllableTerminal());
+  },
+});

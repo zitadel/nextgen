@@ -8,7 +8,7 @@ import type {
 } from "@zitadel/components";
 
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { render, waitFor } from "@testing-library/svelte";
+import { render as renderSvelte, waitFor } from "@testing-library/svelte";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -25,7 +25,7 @@ import {
 import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it as base, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import type {
@@ -46,6 +46,49 @@ import {
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
+/**
+ * `it` extended with `render`, which puts server markup in a host div attached
+ * to the document and hands back a `hydrate` for the host. The hydrated apps
+ * are unmounted and the host is removed when the test ends.
+ */
+const it = base.extend<{
+  render: (markup: string) => {
+    host: HTMLDivElement;
+    hydrate: (component: typeof ZitadelLogin, props: Record<string, unknown>) => void;
+  };
+}>({
+  /**
+   * Provides the `render` function and tears down everything it mounted.
+   *
+   * @param _context The fixtures this one depends on, none.
+   * @param use Hands the value to the test.
+   * @returns Resolves once the test and the teardown have finished.
+   */
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  render: async ({}, use) => {
+    const hosts: HTMLDivElement[] = [];
+    const apps: ReturnType<typeof hydrate>[] = [];
+    await use((markup) => {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      host.innerHTML = markup;
+      hosts.push(host);
+      return {
+        host,
+        hydrate: (component, props) => {
+          apps.push(hydrate(component, { target: host, props }));
+        },
+      };
+    });
+    for (const app of apps) {
+      await unmount(app);
+    }
+    for (const host of hosts) {
+      host.remove();
+    }
+  },
+});
+
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) throw new Error(`no <${tag}> was rendered`);
@@ -54,7 +97,7 @@ function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElemen
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
-    const { container } = render(ZitadelLogin, {
+    const { container } = renderSvelte(ZitadelLogin, {
       props: { project, purpose: "login" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -63,7 +106,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = render(ZitadelLogin, {
+    const { container } = renderSvelte(ZitadelLogin, {
       props: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -72,7 +115,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("forwards resumeFlowId to the widget", () => {
-    const { container } = render(ZitadelLogin, {
+    const { container } = renderSvelte(ZitadelLogin, {
       props: { project, resumeFlowId: "flow_123" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -80,7 +123,7 @@ describe("ZitadelLogin", () => {
   });
 
   it("reads a null resumeFlowId as no handle", () => {
-    const { container } = render(ZitadelLogin, {
+    const { container } = renderSvelte(ZitadelLogin, {
       props: { project, resumeFlowId: null },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -89,7 +132,7 @@ describe("ZitadelLogin", () => {
 
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
-    const { container } = render(ZitadelLogin, {
+    const { container } = renderSvelte(ZitadelLogin, {
       props: { project, locales, lang: "de" },
     });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -101,7 +144,7 @@ describe("ZitadelLogin", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = render(ZitadelLogin, {
+      const { container } = renderSvelte(ZitadelLogin, {
         props: { project, [handlerProp]: spy },
       });
       const el = container.querySelector(widgetTags.login);
@@ -112,7 +155,7 @@ describe("ZitadelLogin", () => {
   );
 
   it("exposes the underlying element via getElement()", () => {
-    const { component, container } = render(ZitadelLogin, {
+    const { component, container } = renderSvelte(ZitadelLogin, {
       props: { project, purpose: "login" },
     });
     const el = component.getElement();
@@ -123,14 +166,14 @@ describe("ZitadelLogin", () => {
 
 describe("ZitadelLogout", () => {
   it("binds the project handle as a property", () => {
-    const { container } = render(ZitadelLogout, { props: { project } });
+    const { container } = renderSvelte(ZitadelLogout, { props: { project } });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = render(ZitadelLogout, {
+    const { container } = renderSvelte(ZitadelLogout, {
       props: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
@@ -142,7 +185,7 @@ describe("ZitadelLogout", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = render(ZitadelLogout, {
+      const { container } = renderSvelte(ZitadelLogout, {
         props: { project, [handlerProp]: spy },
       });
       const el = container.querySelector(widgetTags.logout);
@@ -155,7 +198,7 @@ describe("ZitadelLogout", () => {
   it("passes an async callback's promise to the event's waitUntil", async () => {
     const ran = vi.fn();
     const registered: Array<Promise<unknown>> = [];
-    const { container } = render(ZitadelLogout, {
+    const { container } = renderSvelte(ZitadelLogout, {
       props: { project, onSignout: () => Promise.resolve().then(() => ran()) },
     });
     const el = widgetIn(container, widgetTags.logout);
@@ -170,7 +213,7 @@ describe("ZitadelLogout", () => {
   });
 
   it("exposes the underlying element via getElement()", () => {
-    const { component, container } = render(ZitadelLogout, {
+    const { component, container } = renderSvelte(ZitadelLogout, {
       props: { project },
     });
     const el = component.getElement();
@@ -181,14 +224,14 @@ describe("ZitadelLogout", () => {
 
 describe("ZitadelSession", () => {
   it("binds the project handle as a property", () => {
-    const { container } = render(ZitadelSession, { props: { project } });
+    const { container } = renderSvelte(ZitadelSession, { props: { project } });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = render(ZitadelSession, {
+    const { container } = renderSvelte(ZitadelSession, {
       props: { projectId: "proj-test", proxyPath: "/__nextgen" },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -197,7 +240,7 @@ describe("ZitadelSession", () => {
   });
 
   it("forwards the surface variant/theme", () => {
-    const { container } = render(ZitadelSession, {
+    const { container } = renderSvelte(ZitadelSession, {
       props: { project, variant: "page", theme: "light", suppressHeader: true },
     });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -210,7 +253,7 @@ describe("ZitadelSession", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = render(ZitadelSession, {
+      const { container } = renderSvelte(ZitadelSession, {
         props: { project, [handlerProp]: spy },
       });
       const el = container.querySelector(widgetTags.session);
@@ -221,7 +264,7 @@ describe("ZitadelSession", () => {
   );
 
   it("exposes the underlying element via getElement()", () => {
-    const { component, container } = render(ZitadelSession, {
+    const { component, container } = renderSvelte(ZitadelSession, {
       props: { project },
     });
     const el = component.getElement();
@@ -285,19 +328,19 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
 
 describe("wrapper config parity", () => {
   it("forwards every ZitadelLoginConfig key to <zitadel-login>", () => {
-    const { container } = render(ZitadelLogin, { props: { ...loginConfig } });
+    const { container } = renderSvelte(ZitadelLogin, { props: { ...loginConfig } });
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
   });
 
   it("forwards every ZitadelSessionConfig key to <zitadel-session>", () => {
-    const { container } = render(ZitadelSession, { props: { ...sessionConfig } });
+    const { container } = renderSvelte(ZitadelSession, { props: { ...sessionConfig } });
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
   });
 
   it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", () => {
-    const { container } = render(ZitadelLogout, { props: { ...logoutConfig } });
+    const { container } = renderSvelte(ZitadelLogout, { props: { ...logoutConfig } });
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
@@ -344,7 +387,7 @@ describe("unset props keep the element's defaults", () => {
     ["theme", ""],
     ["suppressHeader", false],
   ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
-    const { container } = render(ZitadelSession, { props: { project } });
+    const { container } = renderSvelte(ZitadelSession, { props: { project } });
 
     expect(widgetIn(container, widgetTags.session)[prop]).toBe(expected);
   });
@@ -356,13 +399,13 @@ describe("unset props keep the element's defaults", () => {
     ["lang", ""],
     ["suppressPasswordToggle", false],
   ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
-    const { container } = render(ZitadelLogin, { props: { project } });
+    const { container } = renderSvelte(ZitadelLogin, { props: { project } });
 
     expect(widgetIn(container, widgetTags.login)[prop]).toBe(expected);
   });
 
   it("ZitadelLogout keeps the default theme", () => {
-    const { container } = render(ZitadelLogout, { props: { project } });
+    const { container } = renderSvelte(ZitadelLogout, { props: { project } });
 
     expect(widgetIn(container, widgetTags.logout).theme).toBe("");
   });
@@ -376,7 +419,9 @@ describe("props that become unset restore the element's defaults", () => {
     ["theme", "light", ""],
     ["suppressHeader", true, false],
   ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
-    const { container, rerender } = render(ZitadelSession, { props: { project, [prop]: given } });
+    const { container, rerender } = renderSvelte(ZitadelSession, {
+      props: { project, [prop]: given },
+    });
     const el = widgetIn(container, widgetTags.session);
     expect(el[prop]).toBe(given);
 
@@ -392,7 +437,9 @@ describe("props that become unset restore the element's defaults", () => {
     ["lang", "de", ""],
     ["suppressPasswordToggle", true, false],
   ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
-    const { container, rerender } = render(ZitadelLogin, { props: { project, [prop]: given } });
+    const { container, rerender } = renderSvelte(ZitadelLogin, {
+      props: { project, [prop]: given },
+    });
     const el = widgetIn(container, widgetTags.login);
     expect(el[prop]).toBe(given);
 
@@ -402,7 +449,9 @@ describe("props that become unset restore the element's defaults", () => {
   });
 
   it("ZitadelLogout restores the default theme", async () => {
-    const { container, rerender } = render(ZitadelLogout, { props: { project, theme: "light" } });
+    const { container, rerender } = renderSvelte(ZitadelLogout, {
+      props: { project, theme: "light" },
+    });
     const el = widgetIn(container, widgetTags.logout);
     expect(el.theme).toBe("light");
 
@@ -468,27 +517,22 @@ describe("hydrating a server-rendered login", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts its first flow with the purpose the server rendered", async () => {
+  it("starts its first flow with the purpose the server rendered", async ({ render }) => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = document.createElement("div");
-    document.body.appendChild(host);
     const markup = serverMarkup({ project: globalProject, purpose: "register" });
     expect(markup).not.toContain("[object Object]");
-    host.innerHTML = markup;
+    const { host, hydrate: hydrateLogin } = render(markup);
     const firstStep = new Promise((resolve) =>
       host
         .querySelector(widgetTags.login)
         ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
     );
 
-    const app = hydrate(ZitadelLogin, {
-      target: host,
-      props: { project: globalProject, purpose: "register" },
-    });
+    hydrateLogin(ZitadelLogin, { project: globalProject, purpose: "register" });
 
     await firstStep;
     const bodies = await Promise.all(
@@ -501,29 +545,24 @@ describe("hydrating a server-rendered login", () => {
     const created = bodies.filter((body) => body?.project_id);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
-    await unmount(app);
-    host.remove();
   });
 
-  it("loads the supplied flow on its first request instead of creating one", async () => {
+  it("loads the supplied flow on its first request instead of creating one", async ({ render }) => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    host.innerHTML = serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    const { host, hydrate: hydrateLogin } = render(
+      serverMarkup({ project: globalProject, resumeFlowId: "flow_123" }),
+    );
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>
       rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
     );
 
-    const app = hydrate(ZitadelLogin, {
-      target: host,
-      props: { project: globalProject, resumeFlowId: "flow_123" },
-    });
+    hydrateLogin(ZitadelLogin, { project: globalProject, resumeFlowId: "flow_123" });
 
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
@@ -534,8 +573,6 @@ describe("hydrating a server-rendered login", () => {
     await rendered?.updateComplete;
     await Promise.all(fetched.mock.results.map((result) => result.value));
     expect(fetched).toHaveBeenCalledTimes(1);
-    await unmount(app);
-    host.remove();
   });
 });
 
@@ -549,7 +586,7 @@ async function renderAttributes(
   const component = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout }[
     widget
   ] as Component<Record<string, unknown>>;
-  const { container } = render(component, { props: { ...props } });
+  const { container } = renderSvelte(component, { props: { ...props } });
   const el = container.querySelector(`zitadel-${widget}`);
   expect(el, `<zitadel-${widget}> missing from the markup`).not.toBeNull();
   return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
@@ -595,9 +632,9 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
   };
   const props = propsOf(attributes);
   const { container, component, rerender } = {
-    login: () => render(ZitadelLogin, { props }),
-    logout: () => render(ZitadelLogout, { props }),
-    session: () => render(ZitadelSession, { props }),
+    login: () => renderSvelte(ZitadelLogin, { props }),
+    logout: () => renderSvelte(ZitadelLogout, { props }),
+    session: () => renderSvelte(ZitadelSession, { props }),
   }[widget]();
   return {
     container,

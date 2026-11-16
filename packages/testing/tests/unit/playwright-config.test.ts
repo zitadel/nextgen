@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { nextAppEnv } from "../../src/app-env";
 import { parseAppRunnerConfig, parseSupervisorConfig } from "../../src/orchestration";
@@ -29,16 +29,8 @@ const options = (): OptionsWithApp => ({
 });
 
 describe("withZitadel", () => {
-  let handshakeBefore: string | undefined;
   beforeEach(() => {
-    handshakeBefore = process.env.ZITADEL_TESTING_HANDSHAKE;
-  });
-  afterEach(() => {
-    if (handshakeBefore === undefined) {
-      delete process.env.ZITADEL_TESTING_HANDSHAKE;
-    } else {
-      process.env.ZITADEL_TESTING_HANDSHAKE = handshakeBefore;
-    }
+    vi.stubEnv("ZITADEL_TESTING_HANDSHAKE", undefined);
   });
 
   it("generates the boot and app entries with agreeing readiness URLs", () => {

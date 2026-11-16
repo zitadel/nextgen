@@ -1,8 +1,9 @@
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach } from "vitest";
+import { onTestFinished } from "vitest";
+
+import { scratchDir } from "./scratch";
 
 /**
  * How the stand-in for the server binary is built. `plain` is the server
@@ -40,12 +41,15 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
 process.on("SIGINT", () => server.close(() => process.exit(0)));
 `;
 
-const startedPids: number[] = [];
-const startedDirs: string[] = [];
-
-/** A stand-in for the server binary, which the CLI starts from the path in `ZITADEL_SERVER_BINARY`. */
+/**
+ * A stand-in for the server binary, which the CLI starts from the path in `ZITADEL_SERVER_BINARY`.
+ * Its directory is removed when the test ends.
+ *
+ * @param shape - How the stand-in behaves.
+ * @returns The path of the executable to start.
+ */
 export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-fake-server-"));
+  const dir = await scratchDir("zitadel-fake-server-");
   // The run that made this server, so a later run can tell it from one left behind.
   await writeFile(join(dir, "owner"), String(process.pid));
   const server = join(dir, "nextgen");
@@ -70,40 +74,43 @@ require("node:child_process")
   return launcher;
 }
 
-/** Remembers a server a test started by its pid, so that none outlives the test. */
-export function trackLocalServer(pid: number): void {
-  startedPids.push(pid);
-}
-
 /**
- * Remembers a directory a test started a server in. The server is found through
- * the directory's own record when the test is over, whether or not the start
- * that made it reported success, so a test that fails halfway cannot leak one.
+ * Makes sure the local server a test starts in a directory does not outlive the
+ * test. The server is found through the directory's own record
+ * (`.zitadel/local/runtime.json`) when the test is over, whether or not the start
+ * that made it reported success, so a test that fails halfway cannot leak one;
+ * the server and its process group are then killed.
+ *
+ * `onTestFinished` callbacks run in reverse order of registration, so this
+ * teardown runs before the removal of any directory that was registered earlier
+ * (a `scratchDir`, or the `dir` fixture, whose teardown runs after every
+ * `onTestFinished` callback). Call it after the directory exists, so the record is
+ * still there to be read when the server is stopped.
+ *
+ * @param dir - The directory the test starts a server in.
  */
 export function trackLocalServerDir(dir: string): void {
-  startedDirs.push(dir);
-}
-
-/** Stops every local server the tests started, once each test is over. */
-export function useLocalServers(): void {
-  afterEach(async () => {
-    const pids = startedPids.splice(0);
-    for (const dir of startedDirs.splice(0)) {
-      const pid = await recordedPid(dir);
-      if (pid !== undefined) {
-        pids.push(pid);
-      }
+  onTestFinished(async () => {
+    const pid = await recordedPid(dir);
+    if (pid === undefined) {
+      return;
     }
-    for (const pid of pids) {
-      for (const target of [-pid, pid]) {
-        try {
-          process.kill(target, "SIGKILL");
-        } catch {}
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, "SIGKILL");
+      } catch {
+        // Already gone, which is what was asked for.
       }
     }
   });
 }
 
+/**
+ * The pid a directory's local server recorded.
+ *
+ * @param dir - The directory the server was started in.
+ * @returns The pid, or `undefined` when there is no readable record.
+ */
 async function recordedPid(dir: string): Promise<number | undefined> {
   try {
     const record = JSON.parse(await readFile(join(dir, ".zitadel/local/runtime.json"), "utf8"));

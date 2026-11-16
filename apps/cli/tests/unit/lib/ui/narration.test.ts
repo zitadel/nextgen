@@ -1,5 +1,5 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import { log } from "@/lib/log";
 import { MARK } from "@/lib/ui/marks";
@@ -19,21 +19,15 @@ class Collected {
   }
 }
 
-const installed: Narration[] = [];
-
 /** A narration installed as the sink, torn down however the test ends. */
 const drawn = (chain = new Collected(), options: { debug?: boolean; silent?: boolean } = {}) => {
   const narration = new Narration(chain);
   narration.install(options);
-  installed.push(narration);
+  onTestFinished(() => {
+    narration.restore();
+  });
   return { chain, narration };
 };
-
-afterEach(() => {
-  for (const narration of installed.splice(0)) {
-    narration.restore();
-  }
-});
 
 describe("Narration", () => {
   it("draws what a command says into the chain", () => {

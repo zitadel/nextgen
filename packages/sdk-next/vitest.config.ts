@@ -46,6 +46,8 @@ export default defineConfig({
         // build only collects them for server rendering.
         resolve: { alias, conditions: ["browser"] },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "jsdom",
           globals: true,
           environment: "jsdom",

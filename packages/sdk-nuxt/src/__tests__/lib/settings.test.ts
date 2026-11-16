@@ -1,10 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_URL, resolveProjectSecret, resolveUrl } from "../../runtime/lib/settings";
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 describe("resolveUrl", () => {
   it("prefers the runtime config over ZITADEL_URL", () => {

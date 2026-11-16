@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, onTestFinished, vi } from "vitest";
 import type { TestProject } from "vitest/node";
 
 import type { InstanceHandle } from "../../src/types";
 import { injectZitadel, zitadelGlobalSetup } from "../../src/vitest";
+import { it as base } from "./fixtures";
 import { bootstrapHandlers } from "./helpers/bootstrap-api";
 import { fakeCliBin, type FakeCli } from "./helpers/fake-cli";
 
@@ -17,15 +17,20 @@ vi.mock("vitest", async (importOriginal) => ({
   inject: (key: string) => provided.get(key),
 }));
 
-// The fake CLI never binds ports, so a fixed port keeps msw handlers exact.
-const PORT = 18096;
-const BASE = `http://localhost:${PORT}`;
+// The fake CLI never binds ports; msw answers on whatever port the test was given.
+const it = base.extend<{ origin: string; handled: undefined }>({
+  origin: async ({ port }, use) => {
+    await use(`http://localhost:${port}`);
+  },
+  handled: [
+    async ({ server, origin }, use) => {
+      server.use(...bootstrapHandlers(origin));
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+});
 
-const server = setupServer(...bootstrapHandlers(BASE));
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 beforeEach(() => provided.clear());
 
 /** The slice of a TestProject the global setup touches. */
@@ -50,11 +55,14 @@ function startedDir(fake: FakeCli): string {
 }
 
 describe("zitadelGlobalSetup", () => {
-  it("boots one instance, provides its handle, and stops it on teardown", async () => {
+  it("boots one instance, provides its handle, and stops it on teardown", async ({
+    port,
+    origin,
+  }) => {
     const fake = await fakeCliBin();
     const teardown = await zitadelGlobalSetup({
       cliBin: fake.binPath,
-      port: PORT,
+      port,
       appOrigins: ["http://localhost:3002"],
     })(fakeProject());
 
@@ -62,7 +70,7 @@ describe("zitadelGlobalSetup", () => {
     expect(provided.size).toBe(1);
     const [handle] = [...provided.values()] as InstanceHandle[];
     expect(handle).toEqual({
-      baseUrl: BASE,
+      baseUrl: origin,
       projectId: "proj_1",
       projectSecret: "secret_1",
       schemaId: "sch_1",
@@ -98,9 +106,9 @@ describe("zitadelGlobalSetup", () => {
       }
     });
 
-    it("stops the instance before the handler returns and removes its dir", async () => {
+    it("stops the instance before the handler returns and removes its dir", async ({ port }) => {
       const fake = await fakeCliBin();
-      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port })(fakeProject());
       const dir = startedDir(fake);
       expect(existsSync(dir)).toBe(true);
 
@@ -114,20 +122,20 @@ describe("zitadelGlobalSetup", () => {
       expect(process.listenerCount(signal)).toBe(0);
     });
 
-    it("re-raises the signal when nothing else ends the process", async () => {
+    it("re-raises the signal when nothing else ends the process", async ({ port }) => {
       const fake = await fakeCliBin();
-      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port })(fakeProject());
 
       process.emit(signal, signal);
 
       expect(kill).toHaveBeenCalledWith(process.pid, signal);
     });
 
-    it("leaves the exit to the runner's own handler", async () => {
+    it("leaves the exit to the runner's own handler", async ({ port }) => {
       const runnerExit = vi.fn();
       process.on(signal, runnerExit);
       const fake = await fakeCliBin();
-      await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
+      await zitadelGlobalSetup({ cliBin: fake.binPath, port })(fakeProject());
 
       process.emit(signal, signal);
 
@@ -136,11 +144,9 @@ describe("zitadelGlobalSetup", () => {
       expect(callsNow(fake).filter((args) => args[0] === "stop")).toHaveLength(1);
     });
 
-    it("drops its handler on teardown", async () => {
+    it("drops its handler on teardown", async ({ port }) => {
       const fake = await fakeCliBin();
-      const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(
-        fakeProject(),
-      );
+      const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port })(fakeProject());
       expect(process.listenerCount(signal)).toBe(1);
 
       await teardown();
@@ -151,18 +157,15 @@ describe("zitadelGlobalSetup", () => {
 });
 
 describe("injectZitadel", () => {
-  it("connects to the handle the global setup provided", async () => {
+  it("connects to the handle the global setup provided", async ({ port }) => {
     const fake = await fakeCliBin();
-    const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port: PORT })(fakeProject());
-    try {
-      const zitadel = injectZitadel();
-      expect(zitadel.handle).toEqual([...provided.values()][0]);
-      expect(typeof zitadel.seedUser).toBe("function");
-      expect(typeof zitadel.seedSession).toBe("function");
-      expect(zitadel.identity().email).toMatch(/@/);
-    } finally {
-      await teardown();
-    }
+    const teardown = await zitadelGlobalSetup({ cliBin: fake.binPath, port })(fakeProject());
+    onTestFinished(teardown);
+    const zitadel = injectZitadel();
+    expect(zitadel.handle).toEqual([...provided.values()][0]);
+    expect(typeof zitadel.seedUser).toBe("function");
+    expect(typeof zitadel.seedSession).toBe("function");
+    expect(zitadel.identity().email).toMatch(/@/);
   });
 
   it("names the missing global setup when nothing was provided", () => {

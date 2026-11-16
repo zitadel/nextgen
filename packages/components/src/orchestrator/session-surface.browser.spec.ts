@@ -1,7 +1,8 @@
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
+import { test } from "../test/fixtures.js";
 import "./zitadel-session.js";
 import type { ZitadelSession } from "./zitadel-session.js";
 
@@ -64,8 +65,18 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
   throw new Error("waitFor timed out");
 }
 
+/** `it` whose host is 360px wide. */
+const it = test.extend<{ surroundings: undefined }>({
+  surroundings: [
+    async ({ host }, use) => {
+      host.style.width = "360px";
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+});
+
 describe("<zitadel-session> surface (chromium)", () => {
-  let host: HTMLDivElement;
   let stub: ReturnType<typeof installSessionFetchStub> | undefined;
   let project: ZitadelProject;
 
@@ -76,17 +87,16 @@ describe("<zitadel-session> surface (chromium)", () => {
       projectId: "session-surface-test",
       url: "http://localhost:4000",
     });
-    host = document.createElement("div");
-    host.style.width = "360px";
-    document.body.appendChild(host);
   });
 
   afterEach(() => {
-    host.remove();
     stub?.restore();
   });
 
-  async function mount(configure?: (el: ZitadelSession) => void): Promise<ZitadelSession> {
+  async function mount(
+    host: HTMLElement,
+    configure?: (el: ZitadelSession) => void,
+  ): Promise<ZitadelSession> {
     stub = installSessionFetchStub();
     const element = document.createElement("zitadel-session") as ZitadelSession;
     element.project = project;
@@ -99,8 +109,8 @@ describe("<zitadel-session> surface (chromium)", () => {
     return element;
   }
 
-  it("widget default: content-sized, and transparent through every layer", async () => {
-    const element = await mount();
+  it("widget default: content-sized, and transparent through every layer", async ({ host }) => {
+    const element = await mount(host);
     expect(element.getAttribute("variant")).toBe("widget");
 
     const rect = element.getBoundingClientRect();
@@ -126,8 +136,8 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
-  it("variant=page claims the viewport and paints the shell dark by default", async () => {
-    const element = await mount((el) => {
+  it("variant=page claims the viewport and paints the shell dark by default", async ({ host }) => {
+    const element = await mount(host, (el) => {
       el.variant = "page";
     });
     expect(element.dataset.theme).toBe("dark");
@@ -140,8 +150,8 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
   });
 
-  it("theme=light repaints the page surface and card text", async () => {
-    const element = await mount((el) => {
+  it("theme=light repaints the page surface and card text", async ({ host }) => {
+    const element = await mount(host, (el) => {
       el.variant = "page";
       el.theme = "light";
     });
@@ -157,8 +167,8 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(luminance(getComputedStyle(identity).color)).toBeLessThan(150);
   });
 
-  it("suppress-header clips only the heading and keeps the identity visible", async () => {
-    const element = await mount((el) => {
+  it("suppress-header clips only the heading and keeps the identity visible", async ({ host }) => {
+    const element = await mount(host, (el) => {
       el.suppressHeader = true;
     });
 

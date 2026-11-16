@@ -2,7 +2,7 @@ import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Config, Errors } from "@oclif/core";
-import { describe, expect } from "vitest";
+import { describe, expect, onTestFinished } from "vitest";
 
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
@@ -1013,6 +1013,9 @@ describe("auth-method sso enable when the schema cannot be written", () => {
     server.events.on("request:start", ({ request }) => {
       sent.push(`${request.method} ${new URL(request.url).pathname}`);
     });
+    onTestFinished(() => {
+      server.events.removeAllListeners();
+    });
     const schemaFile = join(cwd, ".zitadel/schemas/default-human-user.json");
     await chmod(schemaFile, 0o400);
     await chmod(join(cwd, ".zitadel/schemas"), 0o500);
@@ -1034,10 +1037,6 @@ describe("auth-method sso enable when the schema cannot be written", () => {
           CONFIG,
         );
       });
-    }).finally(async () => {
-      await chmod(join(cwd, ".zitadel/schemas"), 0o700);
-      await chmod(schemaFile, 0o600);
-      server.events.removeAllListeners();
     });
 
     expect(failure).toMatchObject({ code: "EEXIT", oclif: { exit: 1 } });

@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { Config } from "@oclif/core";
 
 import Api, { readOperation } from "@/cli/commands/api/index";
 
 import { ZitadelError } from "@/lib/errors";
-import { it } from "@tests/helpers/fixtures";
+import { atScreenRecording as it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { type Answer, answering } from "@tests/helpers/keyboard";
@@ -17,27 +17,7 @@ import { asTerminal } from "@tests/helpers/terminal";
 // running the command class from source, where `input` is the one module that
 // asks.
 
-const tty = {
-  stdout: Object.getOwnPropertyDescriptor(process.stdout, "isTTY"),
-  stdin: Object.getOwnPropertyDescriptor(process.stdin, "isTTY"),
-};
-
-function restore(stream: NodeJS.WriteStream | NodeJS.ReadStream, found?: PropertyDescriptor) {
-  if (found === undefined) {
-    delete (stream as { isTTY?: boolean }).isTTY;
-  } else {
-    Object.defineProperty(stream, "isTTY", found);
-  }
-}
-
-beforeEach(() => {
-  Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-  Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-});
-
 afterEach(() => {
-  restore(process.stdout, tty.stdout);
-  restore(process.stdin, tty.stdin);
   vi.restoreAllMocks();
 });
 
@@ -65,8 +45,6 @@ async function api(dir: string, ...argv: string[]) {
 
 /** Run `zitadel api` from source in `cwd`. */
 async function apiIn(cwd: string, ...argv: string[]) {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const config = await Config.load({ root: cliPackageRoot });
   return Api.run(

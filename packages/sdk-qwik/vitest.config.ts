@@ -48,6 +48,8 @@ export default defineConfig({
           conditions: ["browser"],
         },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "browser",
           globals: true,
           setupFiles: ["src/test-setup.ts"],
@@ -67,6 +69,8 @@ export default defineConfig({
         cacheDir: ".vitest/ssr",
         plugins: [qwikVite()],
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "ssr",
           globals: true,
           environment: "node",

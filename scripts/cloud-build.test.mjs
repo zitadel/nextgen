@@ -1,21 +1,12 @@
 import { execFileSync } from "node:child_process";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, expect, test } from "vitest";
+import { expect } from "vitest";
+
+import { test } from "./fixtures.ts";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
-const roots = [];
 const realPnpm = (process.env.PATH ?? "")
   .split(delimiter)
   .map((directory) => join(directory, "pnpm"))
@@ -24,13 +15,8 @@ function write(root, file, contents, mode) {
   mkdirSync(dirname(join(root, file)), { recursive: true });
   writeFileSync(join(root, file), contents, { mode });
 }
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-});
 
-function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "nextgen-cloud-build-"));
-  roots.push(root);
+function fixture(root) {
   for (const file of [
     "turbo.json",
     "apps/cloud/turbo.json",
@@ -157,8 +143,11 @@ function metadata(root) {
     .split("\n");
 }
 
-test("restored Go caches skip compilation, refresh metadata and still migrate and deploy", async () => {
-  const first = fixture();
+test("restored Go caches skip compilation, refresh metadata and still migrate and deploy", async ({
+  dir,
+  other,
+}) => {
+  const first = fixture(dir);
   write(first, ".vercel/cache/golang/obsolete", "old cache");
   write(first, "apps/api/.vercel/cache/golang/pkg/mod/obsolete", "old module");
   write(first, "apps/api/.vercel/cache/golang/go-build/obsolete", "old object");
@@ -174,7 +163,7 @@ test("restored Go caches skip compilation, refresh metadata and still migrate an
   expect(readFileSync(join(first, "calls"), "utf8")).toBe("migrate\ndeploy\n");
 
   await new Promise((resolve) => setTimeout(resolve, 1100));
-  const next = fixture();
+  const next = fixture(other);
   cpSync(join(first, ".vercel/cache"), join(next, ".vercel/cache"), { recursive: true });
   const downloaded = ".vercel/cache/cloud-go/modules/cache/download/example.com/module/@v/v1.0.0";
   write(next, `${downloaded}.zip`, "redundant archive");

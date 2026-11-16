@@ -87,7 +87,6 @@ const BUSINESS_SCHEMA = {
 };
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   localStorage.clear();
 });
 

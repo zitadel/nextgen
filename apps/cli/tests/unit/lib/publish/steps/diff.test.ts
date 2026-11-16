@@ -246,12 +246,10 @@ describe("diffStep", () => {
   });
 
   describe("--json", () => {
-    it("writes nothing to stdout", async ({ dir }) => {
-      const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-
+    it("writes nothing to stdout", async ({ dir, terminal }) => {
       await diffStep.run(aRunIn(dir, [], { json: true }));
 
-      expect(stdout).not.toHaveBeenCalled();
+      expect(terminal.shown()).toBe("");
     });
 
     it("reports each changed file against the live commit", async ({ dir }) => {

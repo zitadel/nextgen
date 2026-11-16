@@ -29,6 +29,8 @@ const projects = journeys.flatMap((journey) =>
   selectScenarios(scenarios, process.env.EVAL_SCENARIOS).flatMap((scenario) =>
     Array.from({ length: repeats }, (_, index) => index + 1).map((repeat) => ({
       test: {
+        unstubEnvs: true,
+        unstubGlobals: true,
         name: `eval:${scenario.name}:${journey}${repeats === 1 ? "" : `:r${repeat}`}`,
         include: ["tests/journey.eval.test.ts"],
         provide: { scenario, repeat, journey },
@@ -40,6 +42,8 @@ const projects = journeys.flatMap((journey) =>
 );
 
 /** Unit tests mirror their source file and need no container, so they always run. */
-const unit = { test: { name: "unit", include: ["src/**/*.test.ts"] } };
+const unit = {
+  test: { name: "unit", unstubEnvs: true, unstubGlobals: true, include: ["src/**/*.test.ts"] },
+};
 
 export default { test: { maxWorkers: parallel, projects: [unit, ...projects] } };

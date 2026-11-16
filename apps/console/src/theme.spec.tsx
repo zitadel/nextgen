@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 
 import { THEME_STORAGE_KEY, useTheme } from "./theme";
 
@@ -21,10 +21,12 @@ describe("theme", () => {
     tokens.textContent =
       ':root { --zl-background: #050505; } :root[data-theme="light"] { --zl-background: #fafafa; }';
     document.head.append(tokens);
+    onTestFinished(() => {
+      tokens.remove();
+    });
   });
 
   afterEach(() => {
-    tokens.remove();
     for (const name of ["color-scheme", "theme-color"]) {
       document.head.querySelector(`meta[name="${name}"]`)?.remove();
     }

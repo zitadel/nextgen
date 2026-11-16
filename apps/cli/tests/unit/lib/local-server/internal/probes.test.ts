@@ -1,34 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { defaultClaimsDir, TcpPorts } from "@/lib/local-server/internal/probes";
-
-const servers: Server[] = [];
-const claimDirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of claimDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-  for (const server of servers.splice(0)) {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-});
-
-function listenOn(host: string | undefined): Promise<number> {
-  return new Promise((resolve) => {
-    const server = createServer();
-    servers.push(server);
-    server.listen({ port: 0, host }, () => {
-      const address = server.address();
-      resolve(typeof address === "object" && address ? address.port : 0);
-    });
-  });
-}
+import { it } from "@tests/unit/lib/local-server/occupied-port";
 
 describe("defaultClaimsDir", () => {
   it("is inside the temp directory, so a claim never lands in a project", () => {
@@ -51,29 +26,22 @@ describe("defaultClaimsDir", () => {
 describe("TcpPorts reservations", () => {
   const port = 8080;
 
-  async function claimsDir(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-claims-"));
-    claimDirs.push(dir);
-    return dir;
-  }
-
-  it("gives a port to one start at a time", async () => {
-    const dir = await claimsDir();
+  it("gives a port to one start at a time", async ({ dir }) => {
     await new TcpPorts(dir).reserve(port);
 
     await expect(new TcpPorts(dir).reserve(port)).resolves.toBeUndefined();
   });
 
-  it("gives the port out again once it is released", async () => {
-    const ports = new TcpPorts(await claimsDir());
+  it("gives the port out again once it is released", async ({ dir }) => {
+    const ports = new TcpPorts(dir);
     const release = await ports.reserve(port);
     await release?.();
 
     await expect(ports.reserve(port)).resolves.toBeTypeOf("function");
   });
 
-  it("keeps different ports apart", async () => {
-    const ports = new TcpPorts(await claimsDir());
+  it("keeps different ports apart", async ({ dir }) => {
+    const ports = new TcpPorts(dir);
     await ports.reserve(port);
 
     await expect(ports.reserve(port + 1)).resolves.toBeTypeOf("function");
@@ -101,14 +69,14 @@ describe("TcpPorts", () => {
     });
   });
 
-  it("reports a port held on all interfaces as taken", async () => {
-    const port = await listenOn(undefined);
+  it("reports a port held on all interfaces as taken", async ({ occupiedPort }) => {
+    const port = await occupiedPort();
 
     await expect(new TcpPorts().isFree(port)).resolves.toBe(false);
   });
 
-  it("reports a port held on the loopback address alone as taken", async () => {
-    const port = await listenOn("127.0.0.1");
+  it("reports a port held on the loopback address alone as taken", async ({ occupiedPort }) => {
+    const port = await occupiedPort("127.0.0.1");
 
     await expect(new TcpPorts().isFree(port)).resolves.toBe(false);
   });

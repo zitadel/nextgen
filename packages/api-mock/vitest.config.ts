@@ -30,6 +30,8 @@ export default defineConfig({
         cacheDir: ".vitest/unit",
         resolve: { conditions: sourceConditions },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "unit",
           globals: true,
           environment: "node",
@@ -41,6 +43,8 @@ export default defineConfig({
         cacheDir: ".vitest/browser",
         resolve: { conditions: sourceConditions },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "browser",
           globals: true,
           include: ["src/**/*.browser.spec.ts"],

@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { flowAction, flowField, identity } from "@zitadel/testing/playwright";
 
-import { harness, onProductionDomain, start, zitadel } from "../support/cli";
+import { onProductionDomain } from "../support/cli";
+import { test } from "../support/fixtures";
 
 /**
  * The CLI against the deployment, as a developer meets the hosted cloud: from
@@ -24,19 +25,14 @@ test.skip(onProductionDomain(), "each run leaves a project behind: previews only
 const deployment = new URL(process.env.CLOUD_URL ?? "").origin;
 const PASSWORD_POLICY = ".zitadel/policies/auth.factor.password.set.json";
 
-let app: string;
 let projectId: string;
 const releases: string[] = [];
 
-test.beforeAll(async () => {
-  // A new empty directory for each attempt, under a name setup accepts as
-  // the new app's package name.
-  app = join(await mkdtemp(join(harness().dir, "attempt-")), "cloud-app");
-  await mkdir(app);
+test.beforeAll(() => {
   releases.length = 0;
 });
 
-test("setup creates a project on the deployment", async () => {
+test("setup creates a project on the deployment", async ({ app, zitadel }) => {
   const setup = await zitadel(
     ["setup", "--framework", "react", "--server", deployment, "--skip-install"],
     app,
@@ -48,7 +44,7 @@ test("setup creates a project on the deployment", async () => {
   projectId = setup.data.project.project_id;
 });
 
-test("deploy publishes the project's configuration as a release", async () => {
+test("deploy publishes the project's configuration as a release", async ({ app, zitadel }) => {
   const deploy = await zitadel(["deploy", "-m", "First release"], app);
 
   expect(deploy.status, deploy.transcript).toBe("ok");
@@ -56,7 +52,7 @@ test("deploy publishes the project's configuration as a release", async () => {
   releases.push(deploy.data.release_id);
 });
 
-test("variable set stores a variable that variable list reads back", async () => {
+test("variable set stores a variable that variable list reads back", async ({ app, zitadel }) => {
   const set = await zitadel(["variable", "set", "CLOUD_CHECK", "from-the-cli"], app);
   expect(set.status, set.transcript).toBe("ok");
 
@@ -68,7 +64,7 @@ test("variable set stores a variable that variable list reads back", async () =>
   );
 });
 
-test("origin add allows an origin that origin list reads back", async () => {
+test("origin add allows an origin that origin list reads back", async ({ app, zitadel }) => {
   const add = await zitadel(
     ["origin", "add", "https://app.example.test", "--kind", "primary"],
     app,
@@ -81,7 +77,7 @@ test("origin add allows an origin that origin list reads back", async () => {
   expect(list.data.items).toContainEqual({ pattern: "https://app.example.test", kind: "primary" });
 });
 
-test("deploy publishes a changed configuration as a new release", async () => {
+test("deploy publishes a changed configuration as a new release", async ({ app, zitadel }) => {
   await changePasswordMinimum(app, 16);
 
   const deploy = await zitadel(["deploy", "-m", "Second release"], app);
@@ -92,7 +88,7 @@ test("deploy publishes a changed configuration as a new release", async () => {
   releases.push(deploy.data.release_id);
 });
 
-test("deployment list shows both deployments, the latest one live", async () => {
+test("deployment list shows both deployments, the latest one live", async ({ app, zitadel }) => {
   const list = await zitadel(["deployment", "list"], app);
 
   expect(list.status, list.transcript).toBe("ok");
@@ -107,7 +103,7 @@ test("deployment list shows both deployments, the latest one live", async () => 
   ]);
 });
 
-test("deployment rollback brings the previous release back live", async () => {
+test("deployment rollback brings the previous release back live", async ({ app, zitadel }) => {
   const rollback = await zitadel(["deployment", "rollback", "--force"], app);
   expect(rollback.status, rollback.transcript).toBe("ok");
   expect(rollback.data.release_id).toBe(releases[0]);
@@ -120,7 +116,11 @@ test("deployment rollback brings the previous release back live", async () => {
   ]);
 });
 
-test("claim links to the console, where signing up claims the project", async ({ page }) => {
+test("claim links to the console, where signing up claims the project", async ({
+  page,
+  app,
+  start,
+}) => {
   test.setTimeout(240_000);
   const claim = start(["claim", "--non-interactive"], app);
   const printed = await claim.find(/https?:\/\/\S+\/console\/claim\?\S+/);
@@ -145,7 +145,7 @@ test("claim links to the console, where signing up claims the project", async ({
   expect([...consoleLinks], claimed.transcript).toEqual([expect.stringContaining(projectId)]);
 });
 
-test("claim again reports the project as already claimed", async () => {
+test("claim again reports the project as already claimed", async ({ app, zitadel }) => {
   const claim = await zitadel(["claim"], app);
 
   expect(claim.status, claim.transcript).toBe("skipped");

@@ -1,25 +1,16 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
+import { it } from "@tests/helpers/fixtures";
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.cloud";
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
 
 /** A project directory with no `.env.<name>.local` beside it, so nothing is bound. */
-async function aProjectWithNothingBound(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-env-list-"));
-  dirs.push(cwd);
+async function aProjectWithNothingBound(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -43,14 +34,16 @@ const listed = async (cwd: string): Promise<string> => {
 };
 
 describe("zitadel env list", () => {
-  it("says nothing was found in the words every list uses when nothing is bound", async () => {
-    const out = await listed(await aProjectWithNothingBound());
+  it("says nothing was found in the words every list uses when nothing is bound", async ({
+    dir,
+  }) => {
+    const out = await listed(await aProjectWithNothingBound(dir));
 
     expect(out).toContain("No environments found");
   });
 
-  it("points at env add in the envelope when nothing is bound", async () => {
-    const cwd = await aProjectWithNothingBound();
+  it("points at env add in the envelope when nothing is bound", async ({ dir }) => {
+    const cwd = await aProjectWithNothingBound(dir);
 
     const res = await runCliForTest([
       "env",
@@ -68,14 +61,14 @@ describe("zitadel env list", () => {
     });
   });
 
-  it("orders nobody about in that sentence", async () => {
-    const out = await listed(await aProjectWithNothingBound());
+  it("orders nobody about in that sentence", async ({ dir }) => {
+    const out = await listed(await aProjectWithNothingBound(dir));
 
     expect(out).not.toContain("Run ");
   });
 
-  it("counts in the same nouns once something is bound", async () => {
-    const cwd = await aProjectWithNothingBound();
+  it("counts in the same nouns once something is bound", async ({ dir }) => {
+    const cwd = await aProjectWithNothingBound(dir);
     await writeFile(
       join(cwd, ".env.development.local"),
       `ZITADEL_URL=${SERVER}\nZITADEL_PROJECT_ID=proj_test\n`,

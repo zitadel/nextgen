@@ -55,6 +55,8 @@ export default defineConfig({
           }),
         ],
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "jsdom",
           globals: true,
           environment: "jsdom",

@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test } from "vitest";
 
+import { test } from "./fixtures.mjs";
 import {
   formatMarkdownTable,
   formatOffset,
@@ -48,18 +47,15 @@ test("timePhase records a failed phase and rethrows its error", async () => {
   assert.deepEqual(phases, [{ phase: "start", ms: 900, ok: false }]);
 });
 
-test("readPhases reads prepare-app's file and treats a missing or broken one as empty", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-journey-timings-test-"));
-  try {
-    const path = join(dir, "timings.json");
-    assert.deepEqual(await readPhases(path), []);
-    await writeFile(path, `${JSON.stringify([{ phase: "doctor", ms: 9800, ok: true }])}\n`);
-    assert.deepEqual(await readPhases(path), [{ phase: "doctor", ms: 9800, ok: true }]);
-    await writeFile(path, "[{");
-    assert.deepEqual(await readPhases(path), []);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+test("readPhases reads prepare-app's file and treats a missing or broken one as empty", async ({
+  dir,
+}) => {
+  const path = join(dir, "timings.json");
+  assert.deepEqual(await readPhases(path), []);
+  await writeFile(path, `${JSON.stringify([{ phase: "doctor", ms: 9800, ok: true }])}\n`);
+  assert.deepEqual(await readPhases(path), [{ phase: "doctor", ms: 9800, ok: true }]);
+  await writeFile(path, "[{");
+  assert.deepEqual(await readPhases(path), []);
 });
 
 test("formatOffset prints minutes and zero-padded seconds", () => {

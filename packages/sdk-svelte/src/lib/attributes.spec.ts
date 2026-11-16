@@ -1,12 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { onClient, proxyPathAttr } from "./attributes";
 
 describe("onClient", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("returns the value in a browser", () => {
     const value = { projectId: "p" };
 

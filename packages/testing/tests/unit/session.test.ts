@@ -1,6 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import {
   browserSessionCookieName,
@@ -9,6 +8,7 @@ import {
   sessionCookieName,
 } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
+import { it as base } from "./fixtures";
 
 const BASE = "http://zitadel-testing.invalid";
 
@@ -53,7 +53,7 @@ const userHandlers = [
   http.put(`${BASE}/api/v1/users/:userId/password`, () => new HttpResponse(null, { status: 204 })),
 ];
 
-const server = setupServer(
+const handlers = [
   ...userHandlers,
   http.post(`${BASE}/api/v1/flows`, async ({ request }) => {
     captured.flowStart = (await request.json()) as Record<string, unknown>;
@@ -79,11 +79,19 @@ const server = setupServer(
       session_token: "session-token-1",
     });
   }),
-);
+];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+const it = base.extend<{ handled: undefined }>({
+  handled: [
+    async ({ server }, use) => {
+      server.use(...handlers);
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+});
+
 afterEach(() => {
-  server.resetHandlers();
   captured.submits = [];
   captured.submitCookies = [];
   delete captured.flowStart;
@@ -91,7 +99,6 @@ afterEach(() => {
   delete captured.exchangeBody;
   delete captured.exchangeProject;
 });
-afterAll(() => server.close());
 
 describe("seedSession", () => {
   it("drives the two-step flow like the orchestrator and exchanges the handoff", async () => {
@@ -136,7 +143,7 @@ describe("seedSession", () => {
     });
   });
 
-  it("mints for an existing user without seeding and honors the flow name", async () => {
+  it("mints for an existing user without seeding and honors the flow name", async ({ server }) => {
     const zitadel = connectZitadel(handle);
     const user = { id: "user_9", email: "kept@acme.com", password: "Fixed-pw-1" };
     server.use(
@@ -160,7 +167,7 @@ describe("seedSession", () => {
     expect(captured.submits[0]).toMatchObject({ fields: { email: "kept@acme.com" } });
   });
 
-  it("fails loudly on a step declaring fields it cannot fill", async () => {
+  it("fails loudly on a step declaring fields it cannot fill", async ({ server }) => {
     server.use(
       http.post(`${BASE}/api/v1/flows`, () =>
         HttpResponse.json(
@@ -179,7 +186,7 @@ describe("seedSession", () => {
     );
   });
 
-  it("explains a missing Origin when the allowlist rejects the call", async () => {
+  it("explains a missing Origin when the allowlist rejects the call", async ({ server }) => {
     server.use(
       http.post(`${BASE}/api/v1/flows`, () =>
         HttpResponse.json(
@@ -192,7 +199,7 @@ describe("seedSession", () => {
     await expect(zitadel.seedSession()).rejects.toThrow(/No Origin header was sent.*appOrigins/s);
   });
 
-  it("caps the number of flow steps instead of looping", async () => {
+  it("caps the number of flow steps instead of looping", async ({ server }) => {
     server.use(
       http.post(`${BASE}/api/v1/flows/:id/submit`, () => HttpResponse.json(identifierStep)),
     );

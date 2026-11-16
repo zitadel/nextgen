@@ -1,9 +1,7 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
   hasZitadelConfig,
@@ -13,14 +11,7 @@ import {
   writeZitadelSecret,
 } from "@/lib/project";
 import { ZitadelError } from "@/lib/errors";
-
-const tempDirs: string[] = [];
-
-async function makeTempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-shared-test-"));
-  tempDirs.push(dir);
-  return dir;
-}
+import { it } from "@tests/helpers/fixtures";
 
 const VALID_SECRET = {
   project_id: "proj-001",
@@ -31,14 +22,8 @@ const VALID_SECRET = {
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
-afterEach(async () => {
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
-  tempDirs.length = 0;
-});
-
 describe("hasZitadelConfig", () => {
-  it("is true when zitadel.json exists, false otherwise", async () => {
-    const cwd = await makeTempDir();
+  it("is true when zitadel.json exists, false otherwise", async ({ dir: cwd }) => {
     expect(await hasZitadelConfig(cwd)).toBe(false);
     await writeFile(join(cwd, "zitadel.json"), "{}");
     expect(await hasZitadelConfig(cwd)).toBe(true);
@@ -46,8 +31,7 @@ describe("hasZitadelConfig", () => {
 });
 
 describe("hasZitadelSecret", () => {
-  it("is true only when .zitadel/secret exists", async () => {
-    const cwd = await makeTempDir();
+  it("is true only when .zitadel/secret exists", async ({ dir: cwd }) => {
     expect(await hasZitadelSecret(cwd)).toBe(false);
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     expect(await hasZitadelSecret(cwd)).toBe(false);
@@ -57,16 +41,14 @@ describe("hasZitadelSecret", () => {
 });
 
 describe("readZitadelConfig", () => {
-  it("round-trips a real zitadel.json file", async () => {
-    const cwd = await makeTempDir();
+  it("round-trips a real zitadel.json file", async ({ dir: cwd }) => {
     const config = { framework: "next", project_id: "proj-001" };
     await writeFile(join(cwd, "zitadel.json"), JSON.stringify(config));
 
     await expect(readZitadelConfig(cwd)).resolves.toEqual(config);
   });
 
-  it("throws an actionable E_VALIDATION error when the file is missing", async () => {
-    const cwd = await makeTempDir();
+  it("throws an actionable E_VALIDATION error when the file is missing", async ({ dir: cwd }) => {
     try {
       await readZitadelConfig(cwd);
       expect.unreachable("expected readZitadelConfig to throw");
@@ -80,16 +62,16 @@ describe("readZitadelConfig", () => {
     }
   });
 
-  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async () => {
-    const cwd = await makeTempDir();
+  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async ({
+    dir: cwd,
+  }) => {
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(readZitadelConfig(cwd)).rejects.toThrow();
     await expect(readZitadelConfig(cwd)).rejects.not.toBeInstanceOf(ZitadelError);
   });
 
-  it("rejects a non-object JSON root via parseJsonObject", async () => {
-    const cwd = await makeTempDir();
+  it("rejects a non-object JSON root via parseJsonObject", async ({ dir: cwd }) => {
     await writeFile(join(cwd, "zitadel.json"), JSON.stringify([1, 2, 3]));
 
     await expect(readZitadelConfig(cwd)).rejects.toThrow("must contain a JSON object");
@@ -97,16 +79,14 @@ describe("readZitadelConfig", () => {
 });
 
 describe("readZitadelSecret", () => {
-  it("round-trips a real .zitadel/secret file", async () => {
-    const cwd = await makeTempDir();
+  it("round-trips a real .zitadel/secret file", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(VALID_SECRET));
 
     await expect(readZitadelSecret(cwd)).resolves.toEqual(VALID_SECRET);
   });
 
-  it("throws an actionable E_VALIDATION error when the file is missing", async () => {
-    const cwd = await makeTempDir();
+  it("throws an actionable E_VALIDATION error when the file is missing", async ({ dir: cwd }) => {
     try {
       await readZitadelSecret(cwd);
       expect.unreachable("expected readZitadelSecret to throw");
@@ -120,8 +100,7 @@ describe("readZitadelSecret", () => {
     }
   });
 
-  it("throws when a required string field is missing", async () => {
-    const cwd = await makeTempDir();
+  it("throws when a required string field is missing", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     const { project_secret: _omit, ...partial } = VALID_SECRET;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(partial));
@@ -131,8 +110,7 @@ describe("readZitadelSecret", () => {
     );
   });
 
-  it("throws when preview_origins is not an array", async () => {
-    const cwd = await makeTempDir();
+  it("throws when preview_origins is not an array", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/secret"),
@@ -144,8 +122,7 @@ describe("readZitadelSecret", () => {
     );
   });
 
-  it("defaults missing primary_origins to an empty array", async () => {
-    const cwd = await makeTempDir();
+  it("defaults missing primary_origins to an empty array", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     const { primary_origins: _omit, ...legacy } = VALID_SECRET;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(legacy));
@@ -156,8 +133,9 @@ describe("readZitadelSecret", () => {
     });
   });
 
-  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async () => {
-    const cwd = await makeTempDir();
+  it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/secret"), "{ broken");
 
@@ -172,8 +150,7 @@ describe("writeZitadelSecret", () => {
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...VALID_SECRET, ...extra }));
   }
 
-  it("round-trips through readZitadelSecret", async () => {
-    const cwd = await makeTempDir();
+  it("round-trips through readZitadelSecret", async ({ dir: cwd }) => {
     await seed(cwd);
 
     const secret = await readZitadelSecret(cwd);
@@ -190,8 +167,7 @@ describe("writeZitadelSecret", () => {
     });
   });
 
-  it("preserves keys it does not know about", async () => {
-    const cwd = await makeTempDir();
+  it("preserves keys it does not know about", async ({ dir: cwd }) => {
     await seed(cwd, { future_field: { nested: true } });
 
     const secret = await readZitadelSecret(cwd);
@@ -201,8 +177,7 @@ describe("writeZitadelSecret", () => {
     expect(written).toMatchObject({ future_field: { nested: true }, team_id: "team-42" });
   });
 
-  it("writes at 0600 and leaves no temp file behind", async () => {
-    const cwd = await makeTempDir();
+  it("writes at 0600 and leaves no temp file behind", async ({ dir: cwd }) => {
     await seed(cwd);
 
     await writeZitadelSecret(cwd, await readZitadelSecret(cwd));
@@ -212,8 +187,7 @@ describe("writeZitadelSecret", () => {
     expect(await readdir(join(cwd, ".zitadel"))).toEqual(["secret"]);
   });
 
-  it("writes deterministic, newline-terminated JSON", async () => {
-    const cwd = await makeTempDir();
+  it("writes deterministic, newline-terminated JSON", async ({ dir: cwd }) => {
     await seed(cwd);
     const secret = await readZitadelSecret(cwd);
 

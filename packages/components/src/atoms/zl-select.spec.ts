@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { describe, expect, onTestFinished, vi } from "vitest";
 
 import "./zl-select.js";
 import type { ZlSelect, ZlSelectChangeDetail, ZlSelectOption } from "./zl-select.js";
+import { it } from "../test/fixtures.js";
 
 /**
  * jsdom-friendly markup/aria behaviour for `<zl-select>`. The form-association
@@ -20,18 +21,8 @@ const OPTIONS: ZlSelectOption[] = [
 ];
 
 describe("<zl-select> markup", () => {
-  let host: HTMLDivElement;
-
-  beforeEach(() => {
-    host = document.createElement("div");
-    document.body.appendChild(host);
-  });
-
-  afterEach(() => {
-    host.remove();
-  });
-
   async function mount(
+    host: HTMLElement,
     props: Partial<Pick<ZlSelect, "name" | "label" | "value" | "placeholder" | "options">> = {},
   ): Promise<ZlSelect> {
     const el = document.createElement("zl-select");
@@ -53,15 +44,17 @@ describe("<zl-select> markup", () => {
     return el.shadowRoot?.querySelector(".zr-select__trigger") as HTMLDivElement;
   }
 
-  it("renders the visible label and wires it to the native control", async () => {
-    const el = await mount({ name: "country", label: "Country" });
+  it("renders the visible label and wires it to the native control", async ({ host }) => {
+    const el = await mount(host, { name: "country", label: "Country" });
     const label = el.shadowRoot?.querySelector(".zr-select__label span");
     expect(label?.textContent).toBe("Country");
     expect(native(el).getAttribute("aria-labelledby")).toContain("-label");
   });
 
-  it("uses a real native <select> as the operable control, collapsed by default", async () => {
-    const el = await mount({ name: "country" });
+  it("uses a real native <select> as the operable control, collapsed by default", async ({
+    host,
+  }) => {
+    const el = await mount(host, { name: "country" });
     expect(native(el).tagName).toBe("SELECT");
     // The styled popup is a pointer-only visual layer, hidden from AT.
     const listbox = el.shadowRoot?.querySelector(".zr-select__listbox");
@@ -70,13 +63,13 @@ describe("<zl-select> markup", () => {
     expect(trigger(el).getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("derives a stable native-control test id from the name", async () => {
-    const el = await mount({ name: "country" });
+  it("derives a stable native-control test id from the name", async ({ host }) => {
+    const el = await mount(host, { name: "country" });
     expect(native(el).getAttribute("data-testid")).toBe("zitadel-select-country");
   });
 
-  it("renders a native option per item plus a leading empty option", async () => {
-    const el = await mount({ name: "country", placeholder: "Pick one" });
+  it("renders a native option per item plus a leading empty option", async ({ host }) => {
+    const el = await mount(host, { name: "country", placeholder: "Pick one" });
     const options = native(el).querySelectorAll("option");
     expect(options.length).toBe(4);
     expect(options[0]?.value).toBe("");
@@ -84,10 +77,12 @@ describe("<zl-select> markup", () => {
     expect(options[3]?.disabled).toBe(true);
   });
 
-  it("keeps a single leading empty option when the enum itself lists an empty member", async () => {
+  it("keeps a single leading empty option when the enum itself lists an empty member", async ({
+    host,
+  }) => {
     // A schema enum may explicitly list "" as an allowed value; the leading
     // placeholder row must not produce a second, duplicate empty option.
-    const el = await mount({
+    const el = await mount(host, {
       name: "country",
       placeholder: "Pick one",
       options: [{ value: "", label: "Unspecified" }, ...OPTIONS],
@@ -98,27 +93,31 @@ describe("<zl-select> markup", () => {
     expect(empties[0]?.textContent?.trim()).toBe("Pick one");
   });
 
-  it("reflects the chosen value onto the native control", async () => {
-    const el = await mount({ name: "country", value: "de" });
+  it("reflects the chosen value onto the native control", async ({ host }) => {
+    const el = await mount(host, { name: "country", value: "de" });
     expect(native(el).value).toBe("de");
   });
 
-  it("shows the placeholder in the trigger until a value is selected", async () => {
-    const el = await mount({ name: "country", placeholder: "Pick one" });
+  it("shows the placeholder in the trigger until a value is selected", async ({ host }) => {
+    const el = await mount(host, { name: "country", placeholder: "Pick one" });
     const value = el.shadowRoot?.querySelector(".zr-select__value");
     expect(value?.textContent?.trim()).toBe("Pick one");
     expect(value?.classList.contains("zr-select__value--placeholder")).toBe(true);
   });
 
-  it("shows the selected option label in the trigger and drops the placeholder class", async () => {
-    const el = await mount({ name: "country", value: "de" });
+  it("shows the selected option label in the trigger and drops the placeholder class", async ({
+    host,
+  }) => {
+    const el = await mount(host, { name: "country", value: "de" });
     const value = el.shadowRoot?.querySelector(".zr-select__value");
     expect(value?.textContent?.trim()).toBe("Germany");
     expect(value?.classList.contains("zr-select__value--placeholder")).toBe(false);
   });
 
-  it("paints the styled popup rows with leading empty row, selection, and disabled state", async () => {
-    const el = await mount({ name: "country", value: "us", placeholder: "Pick one" });
+  it("paints the styled popup rows with leading empty row, selection, and disabled state", async ({
+    host,
+  }) => {
+    const el = await mount(host, { name: "country", value: "us", placeholder: "Pick one" });
     const rows = el.shadowRoot?.querySelectorAll(".zr-select__option");
     expect(rows?.length).toBe(4);
     expect(rows?.[0]?.getAttribute("data-value")).toBe("");
@@ -128,8 +127,8 @@ describe("<zl-select> markup", () => {
     expect(rows?.[3]?.hasAttribute("data-disabled")).toBe(true);
   });
 
-  it("commits a pointer choice from the styled popup and emits zl-change", async () => {
-    const el = await mount({ name: "country" });
+  it("commits a pointer choice from the styled popup and emits zl-change", async ({ host }) => {
+    const el = await mount(host, { name: "country" });
     el.open = true;
     await el.updateComplete;
     const changes: ZlSelectChangeDetail[] = [];
@@ -144,8 +143,10 @@ describe("<zl-select> markup", () => {
     expect(changes).toEqual([{ name: "country", value: "de" }]);
   });
 
-  it("commits a native-control change (native popup / automation) and emits zl-change", async () => {
-    const el = await mount({ name: "country" });
+  it("commits a native-control change (native popup / automation) and emits zl-change", async ({
+    host,
+  }) => {
+    const el = await mount(host, { name: "country" });
     const changes: ZlSelectChangeDetail[] = [];
     el.addEventListener("zl-change", (event) => {
       changes.push((event as CustomEvent<ZlSelectChangeDetail>).detail);
@@ -185,8 +186,8 @@ describe("<zl-select> markup", () => {
     expect(heardOnPage).not.toHaveBeenCalled();
   });
 
-  it("lets the user clear back to the empty option", async () => {
-    const el = await mount({ name: "country", value: "us" });
+  it("lets the user clear back to the empty option", async ({ host }) => {
+    const el = await mount(host, { name: "country", value: "us" });
     el.value = "";
     await el.updateComplete;
     expect(native(el).value).toBe("");
@@ -194,8 +195,8 @@ describe("<zl-select> markup", () => {
     expect(value?.classList.contains("zr-select__value--placeholder")).toBe(true);
   });
 
-  it("exposes and restores the chosen value through formValue", async () => {
-    const el = await mount({ name: "country", value: "de" });
+  it("exposes and restores the chosen value through formValue", async ({ host }) => {
+    const el = await mount(host, { name: "country", value: "de" });
     expect(el.formValue).toBe("de");
     el.formValue = "us";
     expect(el.value).toBe("us");
@@ -203,16 +204,16 @@ describe("<zl-select> markup", () => {
     expect(el.value).toBe("");
   });
 
-  it("toggles the styled popup open from the visual trigger", async () => {
-    const el = await mount({ name: "country" });
+  it("toggles the styled popup open from the visual trigger", async ({ host }) => {
+    const el = await mount(host, { name: "country" });
     expect(el.open).toBe(false);
     trigger(el).click();
     await el.updateComplete;
     expect(el.open).toBe(true);
   });
 
-  it("closes the open styled popup on Escape", async () => {
-    const el = await mount({ name: "country" });
+  it("closes the open styled popup on Escape", async ({ host }) => {
+    const el = await mount(host, { name: "country" });
     el.open = true;
     await el.updateComplete;
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -220,8 +221,8 @@ describe("<zl-select> markup", () => {
     expect(el.open).toBe(false);
   });
 
-  it("reflects disabled and open to host attributes", async () => {
-    const el = await mount({ name: "country" });
+  it("reflects disabled and open to host attributes", async ({ host }) => {
+    const el = await mount(host, { name: "country" });
     el.disabled = true;
     el.open = true;
     await el.updateComplete;
@@ -230,8 +231,10 @@ describe("<zl-select> markup", () => {
     expect(el.open).toBe(false);
   });
 
-  it("shows an inline error, marks the control invalid, and wires aria-describedby", async () => {
-    const el = await mount({ name: "country" });
+  it("shows an inline error, marks the control invalid, and wires aria-describedby", async ({
+    host,
+  }) => {
+    const el = await mount(host, { name: "country" });
     let error = el.shadowRoot?.querySelector(".zr-select__error");
     // No error → the message node is hidden and the control is valid.
     expect(error?.hasAttribute("hidden")).toBe(true);

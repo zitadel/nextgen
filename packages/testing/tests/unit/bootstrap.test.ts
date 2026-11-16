@@ -1,10 +1,10 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf } from "vitest";
 
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { type BootstrappedProject, bootstrapProject } from "../../src/bootstrap";
+import { it as base } from "./fixtures";
 
 // Never resolved on the network: msw intercepts everything, and unhandled
 // requests error out (a stray fetch would otherwise freeze sandboxed vitest).
@@ -22,7 +22,7 @@ interface Captured {
 
 const captured: Captured = {};
 
-const server = setupServer(
+const handlers = [
   http.post(`${BASE}/api/v1/projects`, async ({ request }) => {
     captured.projectBody = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json(
@@ -55,16 +55,23 @@ const server = setupServer(
     captured.deploymentBody = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ id: "dep_1" }, { status: 201 });
   }),
-);
+];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+const it = base.extend<{ handled: undefined }>({
+  handled: [
+    async ({ server }, use) => {
+      server.use(...handlers);
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+});
+
 afterEach(() => {
-  server.resetHandlers();
   for (const key of Object.keys(captured) as (keyof Captured)[]) {
     delete captured[key];
   }
 });
-afterAll(() => server.close());
 
 describe("bootstrapProject", () => {
   it("creates project, schema, and flow in setup order", async () => {
@@ -120,7 +127,7 @@ describe("bootstrapProject", () => {
     });
   });
 
-  it("propagates API errors with status", async () => {
+  it("propagates API errors with status", async ({ server }) => {
     server.use(
       http.post(`${BASE}/api/v1/projects`, () =>
         HttpResponse.json({ code: "req.invalid", message: "nope" }, { status: 400 }),

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
+import { describe, expect } from "vitest";
+import { chmod, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { it } from "@tests/helpers/fixtures";
 
 type ServerWrapperModule = {
   ensureExecutable: (binaryPath: string, platform?: string) => void;
@@ -43,9 +44,8 @@ describe("@zitadel/server wrapper", () => {
     );
   });
 
-  it("repairs executable permissions for installed POSIX binaries", async () => {
+  it("repairs executable permissions for installed POSIX binaries", async ({ dir }) => {
     const { ensureExecutable } = await loadModule();
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-server-wrapper-"));
     const binaryPath = join(dir, "nextgen");
     await writeFile(binaryPath, "#!/bin/sh\n");
     await chmod(binaryPath, 0o644);

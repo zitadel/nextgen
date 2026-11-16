@@ -32,6 +32,12 @@ export const baseTest = {
   // here so no project can silently regress to serial execution). Files within
   // a project run concurrently; turbo runs the projects concurrently on top.
   fileParallelism: true,
+  // Undo `vi.stubEnv` and `vi.stubGlobal` after every test, so no file restores
+  // them by hand and none can leak one into the next test. An inline project in
+  // `projects` inherits nothing from here unless it sets `extends: true`, so
+  // each one repeats both options in its own `test` block.
+  unstubEnvs: true,
+  unstubGlobals: true,
   // Fail loud when a suite's include matches nothing (a broken glob or all tests
   // removed), restoring the pre-migration behavior. A genuinely test-less lane
   // overrides this to `true` in its own config.
@@ -175,6 +181,8 @@ export function edgeProject({
     test: {
       name: "edge",
       globals: true,
+      unstubEnvs: true,
+      unstubGlobals: true,
       environment: "edge-runtime",
       include: specs,
       exclude,

@@ -65,17 +65,22 @@ export type Running = {
    */
   find(pattern: RegExp, timeoutMs?: number): Promise<string>;
   exited(timeoutMs?: number): Promise<Exited>;
+  /** Ends the process if it is still running; the `start` fixture calls it when the test ends. */
+  kill(): void;
 };
 
 /**
  * Runs `zitadel <args> --non-interactive --json` in `cwd`, as an agent drives
- * it, and returns the envelope with what the run printed.
+ * it, and returns the envelope with what the run printed. A test gets it
+ * through the `zitadel` fixture, which starts the process with `launch` so it
+ * is killed if the test ends first.
  */
-export async function zitadel(
+export async function runZitadel(
   args: string[],
   cwd: string,
+  launch: (args: string[], cwd: string) => Running = spawnCli,
 ): Promise<Envelope & { transcript: string }> {
-  const run = await start([...args, "--non-interactive", "--json"], cwd).exited();
+  const run = await launch([...args, "--non-interactive", "--json"], cwd).exited();
   let envelope: Envelope;
   try {
     envelope = JSON.parse(run.stdout);
@@ -88,9 +93,10 @@ export async function zitadel(
 /**
  * Starts `zitadel <args>` in `cwd` and leaves it running. The packed CLI
  * talks to the deployment through the bypass proxy when there is one, and
- * never sees the bypass secret; it sends no telemetry.
+ * never sees the bypass secret; it sends no telemetry. A test gets it through
+ * the `start` fixture, which kills what a test left running.
  */
-export function start(args: string[], cwd: string): Running {
+export function spawnCli(args: string[], cwd: string): Running {
   const { bin, dir, proxy } = harness();
   // Playwright forces colour on its workers; a developer's piped run has none.
   const {
@@ -120,6 +126,9 @@ export function start(args: string[], cwd: string): Running {
     `$ zitadel ${args.join(" ")}\n--- stdout\n${stdout}\n--- stderr\n${stderr}`;
 
   return {
+    kill: () => {
+      child.kill();
+    },
     find: (pattern, timeoutMs = 60_000) =>
       within(
         timeoutMs,

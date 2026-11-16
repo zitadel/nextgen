@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FLOW_COLLECTIONS, FLOW_WRITES, SIGN_IN_PREFIX } from "./contract";
 import { forwardSignIn, isApiPath, isFlowWrite } from "./sign-in";
@@ -8,11 +8,6 @@ const bot = async () => ({ isBot: true, isVerifiedBot: false });
 
 // Unset unless a test sets it, whatever the shell running the tests exports.
 beforeEach(() => vi.stubEnv("CLOUD_ZITADEL_URL", ""));
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-});
 
 // Where the server answers the flow operations: `/flows`, and until 1.0.0 the
 // old `/flow` (root ADR 077 §4). Every check holds for both.

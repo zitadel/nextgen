@@ -1,5 +1,5 @@
 import { createApp, toWebHandler } from "h3";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { middlewareOptions } from "../../runtime/server/handler";
 
@@ -33,11 +33,6 @@ async function moduleHandler(
 }
 
 describe("module server handler", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
   it("proxies to the ZITADEL_URL the server runs with when the build fixed no URL", async () => {
     vi.stubEnv("ZITADEL_URL", "http://runtime.test");
     const upstream = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));

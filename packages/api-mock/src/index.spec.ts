@@ -1,3 +1,4 @@
+import { test } from "./__tests__/fixtures.js";
 import { signupProof } from "./fixtures/signup-pow.js";
 import { configureZitadel } from "@zitadel/api/config";
 import {
@@ -6,8 +7,8 @@ import {
   getFlowStep,
   submitFlowStep,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import type { SetupServer } from "msw/node";
+import { beforeAll, describe, expect, vi } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
 import {
@@ -37,21 +38,15 @@ function decodeJwtPayload(token: string): { sub: string } {
   };
 }
 
-const server = setupServer();
 let mock: MockHandle = setupMockHandlers();
 
 beforeAll(() => {
   // Any absolute URL works — the orval-generated handlers match `*/flows*`
   // with a wildcard prefix.
   configureZitadel({ proxyPath: "http://localhost", projectId: PROJECT_ID });
-  server.listen({ onUnhandledRequest: "error" });
 });
 
-afterAll(() => {
-  server.close();
-});
-
-beforeEach(() => {
+test.beforeEach(({ server }) => {
   mock = setupMockHandlers();
   server.use(...mock.handlers);
   mock.reset();
@@ -59,10 +54,6 @@ beforeEach(() => {
   // The passkey offer is a module-level overlay like branding; clear it so a
   // test that enables it cannot leak the action into the next test's flow.
   clearPasskey();
-});
-
-afterEach(() => {
-  server.resetHandlers();
 });
 
 describe("setupMockHandlers", () => {
@@ -193,7 +184,7 @@ describe("setupMockHandlers", () => {
     expect(password.step.purpose).toBe("register");
   });
 
-  test.each([
+  test.for([
     {
       purpose: "login",
       email: "new@example.com",
@@ -210,7 +201,7 @@ describe("setupMockHandlers", () => {
     },
   ] as const)(
     "routes $purpose for $email and explains the automatic switch once",
-    async ({ purpose, email, name, nextPurpose, notice }) => {
+    async ({ purpose, email, name, nextPurpose, notice }, { server }) => {
       mock = setupMockHandlers({ accounts: ["known@example.com"] });
       server.resetHandlers(...mock.handlers);
       const start = await createFlow({ purpose, project_id: PROJECT_ID });
@@ -229,25 +220,28 @@ describe("setupMockHandlers", () => {
     },
   );
 
-  test.each([
+  test.for([
     { purpose: "login", email: "KNOWN@example.com", name: "password" },
     { purpose: "register", email: "new@example.com", name: "register-password" },
-  ] as const)("keeps $purpose for $email without a notice", async ({ purpose, email, name }) => {
-    mock = setupMockHandlers({ accounts: ["known@example.com"] });
-    server.resetHandlers(...mock.handlers);
-    const start = await createFlow({ purpose, project_id: PROJECT_ID });
-    const next = await submitFlowStep(start.id, {
-      session_token: start.session_token,
-      action: "submit",
-      fields: { email },
-    });
+  ] as const)(
+    "keeps $purpose for $email without a notice",
+    async ({ purpose, email, name }, { server }) => {
+      mock = setupMockHandlers({ accounts: ["known@example.com"] });
+      server.resetHandlers(...mock.handlers);
+      const start = await createFlow({ purpose, project_id: PROJECT_ID });
+      const next = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email },
+      });
 
-    expect(next.step).toMatchObject({ name, purpose });
-    expect(next.step.notice).toBeUndefined();
-  });
+      expect(next.step).toMatchObject({ name, purpose });
+      expect(next.step.notice).toBeUndefined();
+    },
+  );
 
   /** A mock whose typed emails route by account, as `accounts` opts in. */
-  function routeByAccount(accounts: readonly string[]): void {
+  function routeByAccount(server: SetupServer, accounts: readonly string[]): void {
     mock = setupMockHandlers({ accounts });
     server.resetHandlers(...mock.handlers);
   }
@@ -262,17 +256,17 @@ describe("setupMockHandlers", () => {
     return { id: start.id, next };
   }
 
-  test("a provider's return asks the same accounts as a typed email", async () => {
-    routeByAccount(["known@example.com"]);
+  test("a provider's return asks the same accounts as a typed email", async ({ server }) => {
+    routeByAccount(server, ["known@example.com"]);
     const id = mock.returnFromProvider({ provider: "google", email: "known@example.com" });
 
     expect((await getFlowStep(id)).step.name).toBe("sso-conflict");
   });
 
-  test("the password-account fixture signs in instead of failing sign-up", async () => {
+  test("the password-account fixture signs in instead of failing sign-up", async ({ server }) => {
     // The default flow wires user_already_exists on register, so the
     // collision is the switch, not the unwired `error.email_exists`.
-    routeByAccount([]);
+    routeByAccount(server, []);
     const { next } = await submitEmail("register", "exists@example.com");
 
     expect(next.step).toMatchObject({
@@ -283,8 +277,8 @@ describe("setupMockHandlers", () => {
     expect(next.step.error).toBeUndefined();
   });
 
-  test("back from the password step a sign-up switched to signs up again", async () => {
-    routeByAccount(["known@example.com"]);
+  test("back from the password step a sign-up switched to signs up again", async ({ server }) => {
+    routeByAccount(server, ["known@example.com"]);
     const { id, next: password } = await submitEmail("register", "known@example.com");
 
     const back = await submitFlowStep(id, {
@@ -314,8 +308,8 @@ describe("setupMockHandlers", () => {
     expect(backAgain.step).toMatchObject({ name: "identifier", purpose: "login" });
   });
 
-  test("an account the mock signs up is found by the next flow until reset", async () => {
-    routeByAccount(["known@example.com"]);
+  test("an account the mock signs up is found by the next flow until reset", async ({ server }) => {
+    routeByAccount(server, ["known@example.com"]);
     const { id, next: password } = await submitEmail("register", "new@example.com");
     const done = await submitFlowStep(id, {
       session_token: password.session_token,

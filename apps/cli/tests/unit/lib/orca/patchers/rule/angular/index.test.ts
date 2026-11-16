@@ -2,7 +2,7 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 
-import { afterEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect, onTestFinished, vi } from "vitest";
 
 import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
@@ -856,10 +856,8 @@ const OTHER_SESSION_COOKIES = [
 
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
-  const apps: DevApp[] = [];
 
-  afterEach(async () => {
-    await Promise.all(apps.splice(0).map((app) => app.close()));
+  afterEach(() => {
     remote.answerWith(undefined);
   });
 
@@ -869,7 +867,9 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
       ZITADEL_PROJECT_SECRET: "sk_proj_test",
       ZITADEL_PROJECT_ID: projectId,
     });
-    apps.push(app);
+    onTestFinished(async () => {
+      await app.close();
+    });
     return app;
   }
 

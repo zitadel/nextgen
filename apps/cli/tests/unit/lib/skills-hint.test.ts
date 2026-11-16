@@ -190,10 +190,7 @@ describe("the two ways of offering the skills", () => {
     ["in CI", { CI: "1" }, true],
     ["when opted out", { NO_SKILLS_PROMPT: "1" }, true],
     ["when nobody is watching", {}, false],
-  ])("agree they have nothing to offer %s", async ([_when, extra, interactive], { said }) => {
-    const dir = (await import("node:fs")).mkdtempSync(
-      join((await import("node:os")).tmpdir(), "zitadel-skills-agree-"),
-    );
+  ])("agree they have nothing to offer %s", async ([_when, extra, interactive], { dir, said }) => {
     const env = { ...envIn(dir), ...extra };
 
     await showSkillsHint({ env, interactive, skillsAdd });

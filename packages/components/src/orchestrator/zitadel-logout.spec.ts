@@ -1,10 +1,10 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
 import "./zitadel-logout.js";
+import { sharedHostIt as it } from "./fixtures.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
 
 /**
@@ -72,11 +72,12 @@ const okHandler = http.delete(`${API_BASE}/api/v1/sessions/me`, ({ request }) =>
   return new HttpResponse(null, { status: 204 });
 });
 
-const server = setupServer(meHandler, csrfHandler, okHandler);
-
 beforeAll(() => {
   configureZitadel({ proxyPath: API_BASE, projectId: "test" });
-  server.listen({ onUnhandledRequest: "error" });
+});
+
+it.beforeEach(({ server }) => {
+  server.resetHandlers(meHandler, csrfHandler, okHandler);
 });
 
 afterEach(() => {
@@ -85,11 +86,6 @@ afterEach(() => {
   currentEmail = "";
   currentUserId = "user_test";
   sessionStatus = 200;
-  server.resetHandlers(meHandler, csrfHandler, okHandler);
-});
-
-afterAll(() => {
-  server.close();
 });
 
 /**
@@ -118,26 +114,15 @@ async function flush(element: ZitadelLogout): Promise<void> {
 }
 
 describe("<zitadel-logout>", () => {
-  let host: HTMLDivElement;
-
-  beforeAll(() => {
-    host = document.createElement("div");
-    document.body.appendChild(host);
-  });
-
-  afterEach(() => {
-    host.innerHTML = "";
-  });
-
-  function mount(markup = "<zitadel-logout></zitadel-logout>"): ZitadelLogout {
+  function mount(host: HTMLElement, markup = "<zitadel-logout></zitadel-logout>"): ZitadelLogout {
     host.innerHTML = markup;
     return host.querySelector("zitadel-logout") as ZitadelLogout;
   }
 
-  it("renders the avatar trigger collapsed by default", async () => {
+  it("renders the avatar trigger collapsed by default", async ({ host }) => {
     currentName = "Alice Liddell";
     currentEmail = "alice@acme.com";
-    const element = mount();
+    const element = mount(host);
     await flush(element);
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     expect(trigger).toBeTruthy();
@@ -146,10 +131,10 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".dropdown")).toBeNull();
   });
 
-  it("opens the dropdown and shows the signed-in identity on click", async () => {
+  it("opens the dropdown and shows the signed-in identity on click", async ({ host }) => {
     currentName = "Alice Liddell";
     currentEmail = "alice@acme.com";
-    const element = mount();
+    const element = mount(host);
     await flush(element);
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     trigger.click();
@@ -161,58 +146,66 @@ describe("<zitadel-logout>", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("falls back to the user_id initial when the session has no name/email", async () => {
+  it("falls back to the user_id initial when the session has no name/email", async ({ host }) => {
     currentName = "";
     currentEmail = "";
     currentUserId = "user_01ABC";
-    const element = mount();
+    const element = mount(host);
     await flush(element);
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     expect(trigger.textContent?.trim()).toBe("U");
   });
 
-  it("falls back to a placeholder initial when there is no active session", async () => {
+  it("falls back to a placeholder initial when there is no active session", async ({ host }) => {
     sessionStatus = 401;
-    const element = mount();
+    const element = mount(host);
     await flush(element);
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     expect(trigger.textContent?.trim()).toBe("?");
   });
 
-  it("substitutes template tokens and wires data-action='logout' triggers", async () => {
+  it("substitutes template tokens and wires data-action='logout' triggers", async ({ host }) => {
     currentName = "Bob Builder";
     currentEmail = "bob@example.com";
-    const element = mount(`
+    const element = mount(
+      host,
+      `
       <zitadel-logout>
         <template>
           <button data-action="logout">Sign out {{display}} ({{identifier}}) [{{initial}}]</button>
         </template>
       </zitadel-logout>
-    `);
+    `,
+    );
     await flush(element);
     const button = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
     expect(button.textContent).toBe("Sign out Bob Builder (bob@example.com) [B]");
     expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
-  it("renders identity values containing token-like substrings literally", async () => {
+  it("renders identity values containing token-like substrings literally", async ({ host }) => {
     // A display name that embeds "{{email}}" must not get re-substituted by
     // a later replacement pass — substitution is single-pass by contract.
     currentName = "Evil {{email}} Person";
     currentEmail = "evil@example.com";
-    const element = mount(`
+    const element = mount(
+      host,
+      `
       <zitadel-logout>
         <template>
           <button data-action="logout">Sign out {{display}}</button>
         </template>
       </zitadel-logout>
-    `);
+    `,
+    );
     await flush(element);
     const button = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
     expect(button.textContent).toBe("Sign out Evil {{email}} Person");
   });
 
-  it("re-projects the template with identity when project is assigned after mount", async () => {
+  it("re-projects the template with identity when project is assigned after mount", async ({
+    host,
+  }) => {
     // No config resolvable at connect: the control still renders, but with a
     // blank identity. When a framework assigns `project` post-mount and the
     // fetch succeeds, the projected markup must update (not stay blank).
@@ -220,13 +213,16 @@ describe("<zitadel-logout>", () => {
     try {
       currentName = "Carol Danvers";
       currentEmail = "carol@acme.com";
-      const element = mount(`
+      const element = mount(
+        host,
+        `
         <zitadel-logout>
           <template>
             <button data-action="logout">Bye {{name}} [{{initial}}]</button>
           </template>
         </zitadel-logout>
-      `);
+      `,
+      );
       await element.updateComplete;
       const before = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
       expect(before.textContent).toBe("Bye  [?]");
@@ -241,10 +237,12 @@ describe("<zitadel-logout>", () => {
     }
   });
 
-  it("calls DELETE /sessions/me with credentials and the CSRF token, fires zitadel-signout", async () => {
+  it("calls DELETE /sessions/me with credentials and the CSRF token, fires zitadel-signout", async ({
+    host,
+  }) => {
     currentName = "Alice Liddell";
     currentEmail = "alice@acme.com";
-    const element = mount();
+    const element = mount(host);
     await flush(element);
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
@@ -270,7 +268,7 @@ describe("<zitadel-logout>", () => {
     });
   });
 
-  it("navigates to post-sign-out-url after successful revoke", async () => {
+  it("navigates to post-sign-out-url after successful revoke", async ({ host }) => {
     currentName = "Alice";
     currentEmail = "alice@acme.com";
     Object.defineProperty(window, "location", {
@@ -278,7 +276,7 @@ describe("<zitadel-logout>", () => {
       value: { ...window.location, href: "" },
       writable: true,
     });
-    const element = mount();
+    const element = mount(host);
     element.postSignOutUrl = "https://app.test/done";
     await flush(element);
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
@@ -291,13 +289,15 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
-  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
+  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async ({
+    host,
+  }) => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { ...window.location, href: "" },
       writable: true,
     });
-    const element = mount();
+    const element = mount(host);
     element.postSignOutUrl = "https://app.test/done";
     await flush(element);
     const finish = new AbortController();
@@ -322,12 +322,15 @@ describe("<zitadel-logout>", () => {
     await vi.waitFor(() => expect(window.location.href).toBe("https://app.test/done"));
   });
 
-  it("signs out using project-id / proxy-path attributes with no global config", async () => {
+  it("signs out using project-id / proxy-path attributes with no global config", async ({
+    host,
+  }) => {
     // Drop the global so only the declarative attributes can configure the
     // element; restore it afterwards so later tests keep their global config.
     _resetConfigForTesting();
     try {
       const element = mount(
+        host,
         `<zitadel-logout project-id="test" proxy-path="${API_BASE}"></zitadel-logout>`,
       );
       await flush(element);
@@ -346,13 +349,13 @@ describe("<zitadel-logout>", () => {
 
   // A session that ended elsewhere (signed out in another tab, or expired) is
   // refused as no session at all: there is nothing left to sign out of.
-  it("completes sign-out when the session is already gone", async () => {
+  it("completes sign-out when the session is already gone", async ({ host, server }) => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { ...window.location, href: "" },
       writable: true,
     });
-    const element = mount();
+    const element = mount(host);
     element.postSignOutUrl = "https://app.test/done";
     await flush(element);
     server.use(
@@ -378,8 +381,10 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
-  it("completes sign-out without a revoke when the token read finds no session", async () => {
-    const element = mount();
+  it("completes sign-out without a revoke when the token read finds no session", async ({
+    host,
+  }) => {
+    const element = mount(host);
     await flush(element);
     sessionStatus = 401;
 
@@ -397,8 +402,8 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".error-bar")).toBeNull();
   });
 
-  it("surfaces a network error in the dropdown without redirecting", async () => {
-    const element = mount();
+  it("surfaces a network error in the dropdown without redirecting", async ({ host, server }) => {
+    const element = mount(host);
     await flush(element);
     server.use(http.delete(`${API_BASE}/api/v1/sessions/me`, () => HttpResponse.error()));
 

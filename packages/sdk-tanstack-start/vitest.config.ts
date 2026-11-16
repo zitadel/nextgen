@@ -21,6 +21,8 @@ export default defineConfig({
         // Each project is its own Vite instance, so each gets its own cacheDir.
         cacheDir: ".vitest/server",
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "server",
           globals: true,
           environment: "node",
@@ -32,6 +34,8 @@ export default defineConfig({
         cacheDir: ".vitest/react",
         resolve: { conditions: ["browser"] },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "react",
           globals: true,
           environment: "jsdom",

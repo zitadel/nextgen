@@ -39,6 +39,8 @@ export default defineConfig({
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "unit",
           globals: true,
           // The default 5s is too tight when the gate runs the whole graph on one runner.
@@ -57,6 +59,8 @@ export default defineConfig({
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
         test: {
+          unstubEnvs: true,
+          unstubGlobals: true,
           name: "browser",
           globals: true,
           setupFiles: ["src/internal/lit-dev-mode.ts"],

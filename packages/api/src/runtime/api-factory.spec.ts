@@ -1,7 +1,8 @@
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createServer } from "node:http";
 
-import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf } from "vitest";
+
+import { test as it, type Serve } from "../__tests__/fixtures";
 
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
 import type { paging } from "../generated/paging";
@@ -9,14 +10,8 @@ import { createZitadelClient, type ItemOf } from "./api-factory";
 
 type Paging = typeof paging;
 
-const servers: Server[] = [];
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
-});
-
 /** Answers `GET /deployments` two pages deep, recording each request's URL and bearer. */
-async function deployments(): Promise<{ base: string; requests: string[][] }> {
+async function deployments(serve: Serve): Promise<{ base: string; requests: string[][] }> {
   const requests: string[][] = [];
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -30,16 +25,17 @@ async function deployments(): Promise<{ base: string; requests: string[][] }> {
       }),
     );
   });
-  servers.push(server);
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
+  return { base: await serve(server), requests };
 }
 
 /**
  * Answers any paged request two pages deep, its list under `field`, reading the
  * cursor from the query or the JSON body; records each request's path and body.
  */
-async function twoPages(field: string): Promise<{ base: string; requests: unknown[][] }> {
+async function twoPages(
+  serve: Serve,
+  field: string,
+): Promise<{ base: string; requests: unknown[][] }> {
   const requests: unknown[][] = [];
   const server = createServer((req, res) => {
     let text = "";
@@ -55,28 +51,24 @@ async function twoPages(field: string): Promise<{ base: string; requests: unknow
       res.end(JSON.stringify({ [field]: [], ...(second ? {} : { next_page_token: "t1" }) }));
     });
   });
-  servers.push(server);
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
+  return { base: await serve(server), requests };
 }
 
 /** Answers any request, recording the `User-Agent` each one carried. */
-async function agents(): Promise<{ base: string; seen: (string | undefined)[] }> {
+async function agents(serve: Serve): Promise<{ base: string; seen: (string | undefined)[] }> {
   const seen: (string | undefined)[] = [];
   const server = createServer((req, res) => {
     seen.push(req.headers["user-agent"]);
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ deployments: [] }));
   });
-  servers.push(server);
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, seen };
+  return { base: await serve(server), seen };
 }
 
 describe("createZitadelClient", () => {
-  it("keeps two clients' user agents apart while both are in flight", async () => {
-    const one = await agents();
-    const two = await agents();
+  it("keeps two clients' user agents apart while both are in flight", async ({ serve }) => {
+    const one = await agents(serve);
+    const two = await agents(serve);
     const first = createZitadelClient({ baseUrl: one.base, userAgent: "zitadel-cli/first" });
     const second = createZitadelClient({ baseUrl: two.base, userAgent: "zitadel-cli/second" });
 
@@ -90,9 +82,9 @@ describe("createZitadelClient", () => {
     expect(two.seen).toEqual(["zitadel-cli/second"]);
   });
 
-  it("walks a paged function's pages with its own base URL and token", async () => {
-    const { base, requests } = await deployments();
-    const elsewhere = await deployments();
+  it("walks a paged function's pages with its own base URL and token", async ({ serve }) => {
+    const { base, requests } = await deployments(serve);
+    const elsewhere = await deployments(serve);
     const client = createZitadelClient({ baseUrl: base, token: "secret" });
     const other = createZitadelClient({ baseUrl: elsewhere.base, token: "other" });
 
@@ -117,9 +109,9 @@ describe("createZitadelClient", () => {
     expect(elsewhere.requests).toEqual([["/api/v1/deployments?project_id=proj_2", "Bearer other"]]);
   });
 
-  it("keeps two clients' walks apart while both are in flight", async () => {
-    const one = await deployments();
-    const two = await deployments();
+  it("keeps two clients' walks apart while both are in flight", async ({ serve }) => {
+    const one = await deployments(serve);
+    const two = await deployments(serve);
     const first = createZitadelClient({ baseUrl: one.base, token: "one" });
     const second = createZitadelClient({ baseUrl: two.base, token: "two" });
 
@@ -152,17 +144,15 @@ describe("createZitadelClient", () => {
     >();
   });
 
-  it("sends its user agent on every request", async () => {
+  it("sends its user agent on every request", async ({ serve }) => {
     const seen: string[] = [];
     const server = createServer((req, res) => {
       seen.push(req.headers["user-agent"] ?? "");
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({ deployments: [] }));
     });
-    servers.push(server);
-    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
     const client = createZitadelClient({
-      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      baseUrl: await serve(server),
       userAgent: "zitadel-cli/1.0.0",
     });
 
@@ -173,8 +163,8 @@ describe("createZitadelClient", () => {
     expect(seen).toEqual(["zitadel-cli/1.0.0"]);
   });
 
-  it("applies its response hook to every page", async () => {
-    const { base } = await deployments();
+  it("applies its response hook to every page", async ({ serve }) => {
+    const { base } = await deployments(serve);
     const client = createZitadelClient({
       baseUrl: base,
       onResponse: (body) => ({
@@ -192,8 +182,8 @@ describe("createZitadelClient", () => {
     expect(listed.map((deployment) => deployment.id)).toEqual(["DEP_1", "DEP_2"]);
   });
 
-  it("applies its hooks when the global Promise has been replaced", async () => {
-    const { base } = await deployments();
+  it("applies its hooks when the global Promise has been replaced", async ({ serve }) => {
+    const { base } = await deployments(serve);
     const seen: unknown[] = [];
     const client = createZitadelClient({
       baseUrl: base,
@@ -216,8 +206,8 @@ describe("createZitadelClient", () => {
     expect(seen).toHaveLength(1);
   });
 
-  it("walks every page when its response hook reshapes them", async () => {
-    const { base } = await deployments();
+  it("walks every page when its response hook reshapes them", async ({ serve }) => {
+    const { base } = await deployments(serve);
     const client = createZitadelClient({
       baseUrl: base,
       onResponse: (body) => {
@@ -233,8 +223,8 @@ describe("createZitadelClient", () => {
     expect(listed).toHaveLength(2);
   });
 
-  it("hands its response hook's failures to its error hook", async () => {
-    const { base } = await deployments();
+  it("hands its response hook's failures to its error hook", async ({ serve }) => {
+    const { base } = await deployments(serve);
     const client = createZitadelClient({
       baseUrl: base,
       onResponse: () => {
@@ -267,8 +257,10 @@ describe("createZitadelClient", () => {
     await expect(listed).rejects.toThrow("handled");
   });
 
-  it("puts a later page's page_token in the query parameters after a path parameter", async () => {
-    const { base, requests } = await twoPages("previews");
+  it("puts a later page's page_token in the query parameters after a path parameter", async ({
+    serve,
+  }) => {
+    const { base, requests } = await twoPages(serve, "previews");
 
     await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1", { limit: 1 });
 
@@ -278,8 +270,10 @@ describe("createZitadelClient", () => {
     ]);
   });
 
-  it("puts a later page's page_token in query parameters the caller left off", async () => {
-    const { base, requests } = await twoPages("previews");
+  it("puts a later page's page_token in query parameters the caller left off", async ({
+    serve,
+  }) => {
+    const { base, requests } = await twoPages(serve, "previews");
 
     await createZitadelClient({ baseUrl: base }).listProjectPreviews.all("proj_1");
 
@@ -289,8 +283,8 @@ describe("createZitadelClient", () => {
     ]);
   });
 
-  it("puts a later page's page_token in the body of a query", async () => {
-    const { base, requests } = await twoPages("users");
+  it("puts a later page's page_token in the body of a query", async ({ serve }) => {
+    const { base, requests } = await twoPages(serve, "users");
 
     await createZitadelClient({ baseUrl: base }).queryUsers.all({ limit: 1 });
 

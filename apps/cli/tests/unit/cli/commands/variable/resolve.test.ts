@@ -13,7 +13,7 @@ import { onTerminalReadingAFile } from "@tests/helpers/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /** One deployment as the live list answers it. */
 function aDeployment(id: string, origin: string) {
@@ -47,7 +47,6 @@ async function aProject(options: {
     id: "proj_1",
     secret: "sk_proj_1",
   });
-  dirs.push(cwd);
   server.use(
     http.get(`${SERVER}/api/v1/deployments`, () => {
       return HttpResponse.json({

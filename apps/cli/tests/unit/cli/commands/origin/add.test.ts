@@ -1,9 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
@@ -25,17 +24,7 @@ it.beforeEach(({ server }) => {
   );
 });
 
-const dirs: string[] = [];
-
-afterEach(async () => {
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function anAppDir(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-origin-add-"));
-  dirs.push(cwd);
+async function anAppDir(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -69,24 +58,24 @@ async function add(cwd: string, ...extra: string[]) {
 }
 
 describe("origin add", () => {
-  it("sends the pattern and kind to the project's origins endpoint", async () => {
-    const cwd = await anAppDir();
+  it("sends the pattern and kind to the project's origins endpoint", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     await add(cwd, PRIMARY_ORIGIN, "--kind", "primary");
 
     expect(requests).toEqual([{ pattern: PRIMARY_ORIGIN, kind: "primary" }]);
   });
 
-  it("reports the stored pattern and kind", async () => {
-    const cwd = await anAppDir();
+  it("reports the stored pattern and kind", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     const { envelope } = await add(cwd, PREVIEW_PATTERN, "--kind", "preview");
 
     expect(envelope.data).toMatchObject({ pattern: PREVIEW_PATTERN, kind: "preview" });
   });
 
-  it("requires --kind", async () => {
-    const cwd = await anAppDir();
+  it("requires --kind", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     const { result } = await add(cwd, PRIMARY_ORIGIN);
 
@@ -94,8 +83,8 @@ describe("origin add", () => {
     expect(requests).toEqual([]);
   });
 
-  it("rejects a kind that is neither primary nor preview", async () => {
-    const cwd = await anAppDir();
+  it("rejects a kind that is neither primary nor preview", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     const { result } = await add(cwd, PRIMARY_ORIGIN, "--kind", "sandbox");
 
@@ -103,8 +92,8 @@ describe("origin add", () => {
     expect(requests).toEqual([]);
   });
 
-  it("makes no request on a dry run", async () => {
-    const cwd = await anAppDir();
+  it("makes no request on a dry run", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
 
     const { result, envelope } = await add(cwd, PRIMARY_ORIGIN, "--kind", "primary", "--dry-run");
 
@@ -113,8 +102,8 @@ describe("origin add", () => {
     expect(envelope.data).toMatchObject({ dry_run: true, verb: "add", topic: "origin" });
   });
 
-  it("keeps the active --env in the suggested next command", async () => {
-    const cwd = await anAppDir();
+  it("keeps the active --env in the suggested next command", async ({ dir }) => {
+    const cwd = await anAppDir(dir);
     await writeFile(
       join(cwd, ".env.production.local"),
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",

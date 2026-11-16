@@ -1,6 +1,5 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import type { SetupServer } from "msw/node";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -61,8 +60,13 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpe
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;
 
-async function makeProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-"));
+/**
+ * Makes a directory a project of the platform's, with a secret.
+ *
+ * @param cwd - The directory.
+ * @returns Once the project's files are written.
+ */
+async function makeProject(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -75,7 +79,6 @@ async function makeProject(): Promise<string> {
       created_at: "2026-01-01T00:00:00Z",
     }),
   );
-  return cwd;
 }
 
 const user = (id: string) => ({
@@ -136,8 +139,7 @@ describe("resource registry", () => {
     }
   });
 
-  it("reads the project and credential of --env-file", async ({ server }) => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
+  it("reads the project and credential of --env-file", async ({ server, dir: cwd }) => {
     const file = join(cwd, "staging.env");
     await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
     const seen: { project: string | null; authorization: string | null }[] = [];
@@ -159,19 +161,22 @@ describe("resource registry", () => {
 
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
-  it.each([
+  it.for<[string, string[]]>([
     ["a read verb", ["user", "list", "--environment", "prod"]],
     ["a write verb", ["team", "create", "--name", "t", "--environment", "production"]],
-  ])("refuses the environment flag on %s before any request", async (_case, argv) => {
-    const cwd = await makeProject();
+  ])(
+    "refuses the environment flag on %s before any request",
+    async ([_case, argv], { dir: cwd }) => {
+      await makeProject(cwd);
 
-    const res = await run(cwd, argv);
+      const res = await run(cwd, argv);
 
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("Nonexistent flag");
-  });
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("Nonexistent flag");
+    },
+  );
 
   it("gives every field of every write a flag of its own, so none shadows another", () => {
     // A field whose flag would collide gets none (ADR 071 §2), which is safe
@@ -268,8 +273,11 @@ describe("filter grammar", () => {
 });
 
 describe("user list", () => {
-  it("sends filters and sorting in the query body and returns a page", async ({ server }) => {
-    const cwd = await makeProject();
+  it("sends filters and sorting in the query body and returns a page", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
@@ -316,8 +324,8 @@ describe("user list", () => {
     expect(json.data.next_page_token).toBe("p2");
   });
 
-  it("drains every page with --all", async ({ server }) => {
-    const cwd = await makeProject();
+  it("drains every page with --all", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const tokens: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
@@ -337,8 +345,8 @@ describe("user list", () => {
     expect(json.data.next_page_token).toBeNull();
   });
 
-  it("follows a cursor back as the server wrote it with --all", async ({ server }) => {
-    const cwd = await makeProject();
+  it("follows a cursor back as the server wrote it with --all", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const tokens: unknown[] = [];
     server.use(
       http.post<never, { page_token?: string }>(
@@ -360,8 +368,9 @@ describe("user list", () => {
 
   it("follows a cursor back as the server wrote it on a GET list with --all", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await makeProject();
+    await makeProject(cwd);
     const tokens: (string | null)[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
@@ -381,8 +390,9 @@ describe("user list", () => {
 
   it("writes a control character the server sent as an escape, and the cursor back as it came", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await makeProject();
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({
@@ -404,8 +414,8 @@ describe("user list", () => {
     });
   });
 
-  it("rejects an unknown filter field before any request", async () => {
-    const cwd = await makeProject();
+  it("rejects an unknown filter field before any request", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["user", "list", "--filter", "email=a@b.c"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
@@ -414,8 +424,8 @@ describe("user list", () => {
     expect(json.hint).toContain("Filterable fields");
   });
 
-  it("emits tab-separated rows when stdout is not a terminal", async ({ server }) => {
-    const cwd = await makeProject();
+  it("emits tab-separated rows when stdout is not a terminal", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1"), user("user_2")] }),
@@ -445,8 +455,8 @@ describe("user list", () => {
     expect(res.stdout).not.toContain("2 users");
   });
 
-  it("takes --plain to force the machine form", async ({ server }) => {
-    const cwd = await makeProject();
+  it("takes --plain to force the machine form", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -468,32 +478,22 @@ describe("user list", () => {
 });
 
 describe("get rendering", () => {
-  const asTerminal = async <T>(run: () => Promise<T>): Promise<T> => {
-    const tty = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-    try {
-      return await run();
-    } finally {
-      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
-    }
-  };
-
-  it("lays the record out field by field on a terminal", async ({ server }) => {
-    const cwd = await makeProject();
+  it("lays the record out field by field on a terminal", async ({ server, dir: cwd, terminal }) => {
+    await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
-    const res = await asTerminal(() =>
-      runCliForTest([
-        "user",
-        "get",
-        "user_1",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--non-interactive",
-      ]),
-    );
+    terminal.tty(true);
+
+    const res = await runCliForTest([
+      "user",
+      "get",
+      "user_1",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+    ]);
 
     expect(res.exitCode).toBe(0);
     // Headed by what identifies the user, then labelled fields — not raw JSON.
@@ -502,8 +502,8 @@ describe("get rendering", () => {
     expect(res.stdout).not.toContain('"metadata": {');
   });
 
-  it("still prints the whole object when piped", async ({ server }) => {
-    const cwd = await makeProject();
+  it("still prints the whole object when piped", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await runCliForTest([
@@ -521,31 +521,35 @@ describe("get rendering", () => {
     expect(JSON.parse(res.stdout)).toMatchObject({ id: "user_1", schema: "sch_default" });
   });
 
-  it("takes --fields on a terminal too", async ({ server }) => {
-    const cwd = await makeProject();
+  it("takes --fields on a terminal too", async ({ server, dir: cwd, terminal }) => {
+    await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
-    const res = await asTerminal(() =>
-      runCliForTest([
-        "user",
-        "get",
-        "user_1",
-        "--fields",
-        "attributes.email",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--non-interactive",
-      ]),
-    );
+    terminal.tty(true);
+
+    const res = await runCliForTest([
+      "user",
+      "get",
+      "user_1",
+      "--fields",
+      "attributes.email",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+    ]);
 
     expect(res.stdout).toMatch(/email\s+user_1@example\.com/);
     expect(res.stdout).not.toContain("status");
   });
 
-  it("shows a policy's config, the setting a reader looks it up for", async ({ server }) => {
-    const cwd = await makeProject();
+  it("shows a policy's config, the setting a reader looks it up for", async ({
+    server,
+    dir: cwd,
+    terminal,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
@@ -560,25 +564,29 @@ describe("get rendering", () => {
       ),
     );
 
-    const res = await asTerminal(() =>
-      runCliForTest([
-        "policy",
-        "get",
-        "pol_1",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--non-interactive",
-      ]),
-    );
+    terminal.tty(true);
+
+    const res = await runCliForTest([
+      "policy",
+      "get",
+      "pol_1",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+    ]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toMatch(/config\s+\{"min_length":12\}/);
   });
 
-  it("shows an empty config, which says the policy enforces nothing", async ({ server }) => {
-    const cwd = await makeProject();
+  it("shows an empty config, which says the policy enforces nothing", async ({
+    server,
+    dir: cwd,
+    terminal,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
@@ -593,18 +601,18 @@ describe("get rendering", () => {
       ),
     );
 
-    const res = await asTerminal(() =>
-      runCliForTest([
-        "policy",
-        "get",
-        "pol_1",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--non-interactive",
-      ]),
-    );
+    terminal.tty(true);
+
+    const res = await runCliForTest([
+      "policy",
+      "get",
+      "pol_1",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+    ]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toMatch(/config\s+\{\}/);
@@ -622,8 +630,8 @@ describe("policy", () => {
     updated_at: "2026-01-01T00:00:00Z",
   };
 
-  it("gets a policy by id", async ({ server }) => {
-    const cwd = await makeProject();
+  it("gets a policy by id", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/policies/pol_1`, ({ request }) => {
         expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
@@ -637,8 +645,8 @@ describe("policy", () => {
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
   });
 
-  it("gets a policy by its operation through the list's filter", async ({ server }) => {
-    const cwd = await makeProject();
+  it("gets a policy by its operation through the list's filter", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const queries: URLSearchParams[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
@@ -654,8 +662,11 @@ describe("policy", () => {
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
   });
 
-  it("answers E_NOT_FOUND for an operation the project has no policy for", async ({ server }) => {
-    const cwd = await makeProject();
+  it("answers E_NOT_FOUND for an operation the project has no policy for", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/policies`, () =>
         HttpResponse.json({ policies: [], next_page_token: null }),
@@ -668,8 +679,10 @@ describe("policy", () => {
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
   });
 
-  it("answers E_NOT_FOUND for a name that is neither an id nor an operation, without a request", async () => {
-    const cwd = await makeProject();
+  it("answers E_NOT_FOUND for a name that is neither an id nor an operation, without a request", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     const res = await run(cwd, ["policy", "get", "password"]);
 
@@ -677,8 +690,8 @@ describe("policy", () => {
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
   });
 
-  it("lists policies narrowed to one operation", async ({ server }) => {
-    const cwd = await makeProject();
+  it("lists policies narrowed to one operation", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const queries: URLSearchParams[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
@@ -701,8 +714,8 @@ describe("policy", () => {
 });
 
 describe("user get / create / update / delete", () => {
-  it("gets one user by id", async ({ server }) => {
-    const cwd = await makeProject();
+  it("gets one user by id", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
     const res = await run(cwd, ["user", "get", "user_1"]);
     expect(res.exitCode).toBe(0);
@@ -710,8 +723,8 @@ describe("user get / create / update / delete", () => {
     expect(json.data.id).toBe("user_1");
   });
 
-  it("maps a platform 404 to E_NOT_FOUND", async ({ server }) => {
-    const cwd = await makeProject();
+  it("maps a platform 404 to E_NOT_FOUND", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/users/user_missing`, () =>
         HttpResponse.json({ code: "user.not_found", message: "no such user" }, { status: 404 }),
@@ -724,8 +737,9 @@ describe("user get / create / update / delete", () => {
 
   it("creates a user from --data, scoping by project_id, and suggests the get command", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await makeProject();
+    await makeProject(cwd);
     const urls: string[] = [];
     const bodies: unknown[] = [];
     server.use(
@@ -752,8 +766,8 @@ describe("user get / create / update / delete", () => {
     expect(json.data.next_commands[0]).toContain("user get user_new");
   });
 
-  it("creates from --file", async ({ server }) => {
-    const cwd = await makeProject();
+  it("creates from --file", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const file = join(cwd, "user.json");
     await writeFile(file, JSON.stringify({ schema: "sch_default", attributes: {} }));
     server.use(
@@ -766,8 +780,10 @@ describe("user get / create / update / delete", () => {
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("user_file");
   });
 
-  it("rejects a body whose field has the wrong type, without calling the API", async () => {
-    const cwd = await makeProject();
+  it("rejects a body whose field has the wrong type, without calling the API", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["team", "create", "--data", JSON.stringify({ name: 42 })]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as {
@@ -780,8 +796,8 @@ describe("user get / create / update / delete", () => {
     expect(json.details.issues.length).toBeGreaterThan(0);
   });
 
-  it("names the missing field when --data omits a required one", async () => {
-    const cwd = await makeProject();
+  it("names the missing field when --data omits a required one", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["user", "create", "--data", JSON.stringify({ attributes: {} })]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; details: { missing: string[] } };
@@ -789,8 +805,8 @@ describe("user get / create / update / delete", () => {
     expect(json.details.missing).toEqual(["schema"]);
   });
 
-  it("previews a create with --dry-run", async () => {
-    const cwd = await makeProject();
+  it("previews a create with --dry-run", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, [
       "user",
       "create",
@@ -803,8 +819,8 @@ describe("user get / create / update / delete", () => {
     expect(json.data).toMatchObject({ dry_run: true, verb: "create", topic: "user" });
   });
 
-  it("patches a user", async ({ server }) => {
-    const cwd = await makeProject();
+  it("patches a user", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
@@ -823,8 +839,11 @@ describe("user get / create / update / delete", () => {
     expect(bodies.at(-1)).toEqual({ attributes: { givenName: "Ada" } });
   });
 
-  it("asks the server on a dry run of a user update, and only then", async ({ server }) => {
-    const cwd = await makeProject();
+  it("asks the server on a dry run of a user update, and only then", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
@@ -853,8 +872,8 @@ describe("user get / create / update / delete", () => {
     });
   });
 
-  it("leaves dry_run to --dry-run, never to the body flags", async ({ server }) => {
-    const cwd = await makeProject();
+  it("leaves dry_run to --dry-run, never to the body flags", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
@@ -878,8 +897,11 @@ describe("user get / create / update / delete", () => {
     );
   });
 
-  it("answers a refused dry run with one error envelope naming the fields", async ({ server }) => {
-    const cwd = await makeProject();
+  it("answers a refused dry run with one error envelope naming the fields", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.patch(`${SERVER}/api/v1/users/user_1`, () =>
         HttpResponse.json(
@@ -908,8 +930,8 @@ describe("user get / create / update / delete", () => {
     expect(JSON.stringify(json.details)).toContain("attributes.phones.0.fax");
   });
 
-  it("requires --force to delete non-interactively", async () => {
-    const cwd = await makeProject();
+  it("requires --force to delete non-interactively", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["user", "delete", "user_1"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
@@ -917,8 +939,8 @@ describe("user get / create / update / delete", () => {
     expect(json.next_commands[0]).toContain("user delete user_1 --force");
   });
 
-  it("deletes with --force", async ({ server }) => {
-    const cwd = await makeProject();
+  it("deletes with --force", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const hits: true[] = [];
     server.use(
       http.delete(`${SERVER}/api/v1/users/user_1`, () => {
@@ -938,26 +960,28 @@ describe("user get / create / update / delete", () => {
 });
 
 describe("--file -", () => {
-  it("fails fast when nothing is piped in, instead of waiting on the keyboard", async () => {
-    const cwd = await makeProject();
-    const tty = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-    try {
-      const res = await run(cwd, ["user", "create", "--file", "-"]);
-      expect(res.exitCode).toBe(3);
-      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
-      expect(json.code).toBe("E_VALIDATION");
-      expect(json.message).toBe("--file - reads the body from a pipe, but nothing is piped in");
-      expect(json.hint).toContain("--data");
-    } finally {
-      Object.defineProperty(process.stdin, "isTTY", { value: tty, configurable: true });
-    }
+  it("fails fast when nothing is piped in, instead of waiting on the keyboard", async ({
+    dir: cwd,
+    terminal: _terminal,
+  }) => {
+    await makeProject(cwd);
+
+    const res = await run(cwd, ["user", "create", "--file", "-"]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe("--file - reads the body from a pipe, but nothing is piped in");
+    expect(json.hint).toContain("--data");
   });
 });
 
 describe("piped output", () => {
-  it("omits the project and server lines when stdout is not a terminal", async ({ server }) => {
-    const cwd = await makeProject();
+  it("omits the project and server lines when stdout is not a terminal", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -985,8 +1009,12 @@ describe("piped output", () => {
 });
 
 describe("the drain spinner", () => {
-  it("is stopped when a page fails, so it does not outlive the command", async ({ server }) => {
-    const cwd = await makeProject();
+  it("is stopped when a page fails, so it does not outlive the command", async ({
+    server,
+    dir: cwd,
+    terminal,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ code: "boom" }, { status: 500 }),
@@ -995,34 +1023,29 @@ describe("the drain spinner", () => {
 
     // The spinner holds a SIGINT handler between start and stop; counting them
     // proves the failing drain released it.
-    const tty = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    terminal.tty(true);
     const before = process.listenerCount("SIGINT");
-    try {
-      // Human mode on purpose: `--json` silences the spinner, so a run with it
-      // would prove nothing.
-      const res = await runCliForTest([
-        "user",
-        "list",
-        "--all",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--non-interactive",
-        "--no-telemetry",
-      ]);
-      expect(res.exitCode).toBe(4);
-      expect(process.listenerCount("SIGINT")).toBe(before);
-    } finally {
-      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
-    }
+    // Human mode on purpose: `--json` silences the spinner, so a run with it
+    // would prove nothing.
+    const res = await runCliForTest([
+      "user",
+      "list",
+      "--all",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--no-telemetry",
+    ]);
+    expect(res.exitCode).toBe(4);
+    expect(process.listenerCount("SIGINT")).toBe(before);
   });
 });
 
 describe("field validation is independent of the data", () => {
-  it("refuses an unknown path before any request is made", async () => {
-    const cwd = await makeProject();
+  it("refuses an unknown path before any request is made", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     // No handler is registered: reaching the server would fail the test.
     const res = await run(cwd, ["user", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
@@ -1033,8 +1056,9 @@ describe("field validation is independent of the data", () => {
 
   it("refuses the same path on an empty page, where sampling could not judge", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await makeProject();
+    await makeProject(cwd);
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["user", "list", "--fields", "id,emial"]);
@@ -1044,8 +1068,8 @@ describe("field validation is independent of the data", () => {
     );
   });
 
-  it("accepts a path under the open attributes record", async ({ server }) => {
-    const cwd = await makeProject();
+  it("accepts a path under the open attributes record", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -1058,8 +1082,8 @@ describe("field validation is independent of the data", () => {
 });
 
 describe("chosen columns", () => {
-  it("takes --fields, resolving nested paths", async ({ server }) => {
-    const cwd = await makeProject();
+  it("takes --fields, resolving nested paths", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -1086,8 +1110,11 @@ describe("chosen columns", () => {
     expect(rows.stdout.trim()).toBe("user_1\tuser_1@example.com");
   });
 
-  it("names the columns a record actually has when a path is wrong", async ({ server }) => {
-    const cwd = await makeProject();
+  it("names the columns a record actually has when a path is wrong", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -1110,8 +1137,11 @@ describe("chosen columns", () => {
     expect(json.details.available).toContain("metadata.status");
   });
 
-  it("validates --fields on get whether the output is piped or not", async ({ server }) => {
-    const cwd = await makeProject();
+  it("validates --fields on get whether the output is piped or not", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await run(cwd, ["user", "get", "user_1", "--fields", "nope"]);
@@ -1121,8 +1151,8 @@ describe("chosen columns", () => {
     );
   });
 
-  it("rejects an empty --fields", async ({ server }) => {
-    const cwd = await makeProject();
+  it("rejects an empty --fields", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -1137,8 +1167,11 @@ describe("chosen columns", () => {
 });
 
 describe("next page suggestion", () => {
-  it("suggests a runnable next page that repeats the sorting and filters", async ({ server }) => {
-    const cwd = await makeProject();
+  it("suggests a runnable next page that repeats the sorting and filters", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "p2" }),
@@ -1164,8 +1197,8 @@ describe("next page suggestion", () => {
     );
   });
 
-  it("repeats the named parameters of a GET-backed list", async ({ server }) => {
-    const cwd = await makeProject();
+  it("repeats the named parameters of a GET-backed list", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/events`, () =>
         HttpResponse.json({ events: [{ id: "evt_1" }], next_page_token: "p2" }),
@@ -1190,8 +1223,8 @@ describe("next page suggestion", () => {
     );
   });
 
-  it("quotes a value a shell would otherwise split", async ({ server }) => {
-    const cwd = await makeProject();
+  it("quotes a value a shell would otherwise split", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, () =>
         HttpResponse.json({ teams: [], next_page_token: "p2" }),
@@ -1204,8 +1237,8 @@ describe("next page suggestion", () => {
     expect(json.data.next_commands[0]).toContain("--filter 'name=contains:two words'");
   });
 
-  it("suggests nothing on the last page", async ({ server }) => {
-    const cwd = await makeProject();
+  it("suggests nothing on the last page", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")] }),
@@ -1220,8 +1253,8 @@ describe("next page suggestion", () => {
     expect(json.data.next_commands).toBeUndefined();
   });
 
-  it("suggests nothing after --all drained every page", async ({ server }) => {
-    const cwd = await makeProject();
+  it("suggests nothing after --all drained every page", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
     const served = vi.fn();
     server.use(
@@ -1238,8 +1271,8 @@ describe("next page suggestion", () => {
 });
 
 describe("body field flags", () => {
-  it("builds the body from one flag per schema field", async ({ server }) => {
-    const cwd = await makeProject();
+  it("builds the body from one flag per schema field", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, () => HttpResponse.json({ teams: [] })),
@@ -1254,8 +1287,8 @@ describe("body field flags", () => {
     expect(bodies.at(-1)).toEqual({ name: "platform" });
   });
 
-  it("collects repeated key=value entries into an open record", async ({ server }) => {
-    const cwd = await makeProject();
+  it("collects repeated key=value entries into an open record", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
@@ -1281,8 +1314,8 @@ describe("body field flags", () => {
     });
   });
 
-  it("lets a field flag override the same key in --data", async ({ server }) => {
-    const cwd = await makeProject();
+  it("lets a field flag override the same key in --data", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
@@ -1303,8 +1336,8 @@ describe("body field flags", () => {
     expect(bodies.at(-1)).toEqual({ name: "flag-wins" });
   });
 
-  it("rejects a value outside a field's allowed set before any request", async () => {
-    const cwd = await makeProject();
+  it("rejects a value outside a field's allowed set before any request", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, [
       "grant",
       "create",
@@ -1319,8 +1352,8 @@ describe("body field flags", () => {
     expect(json.message).toContain("robot");
   });
 
-  it("names the required flags that are missing", async () => {
-    const cwd = await makeProject();
+  it("names the required flags that are missing", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     // The locator (`user`/`team`) is a nested object, so it rides in --data;
     // `relation` is the only required scalar flag the framework knows about.
     const res = await run(cwd, [
@@ -1342,8 +1375,11 @@ describe("body field flags", () => {
     expect(json.details.missing).toEqual(["relation"]);
   });
 
-  it("accepts a required field supplied through --data instead of its flag", async ({ server }) => {
-    const cwd = await makeProject();
+  it("accepts a required field supplied through --data instead of its flag", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/grants`, async ({ request }) => {
@@ -1362,8 +1398,8 @@ describe("body field flags", () => {
     expect(bodies.at(-1)).toEqual({ user: { user_id: "user_1" }, relation: "viewer" });
   });
 
-  it("reports a single missing field in the singular", async () => {
-    const cwd = await makeProject();
+  it("reports a single missing field in the singular", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["user", "create", "--attributes", "email=a@b.c"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
@@ -1371,15 +1407,15 @@ describe("body field flags", () => {
     expect(json.hint).toContain("include it in --data");
   });
 
-  it("points a write missing a field at its help", async () => {
-    const cwd = await makeProject();
+  it("points a write missing a field at its help", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["user", "create", "--attributes", "email=a@b.c"]);
     const json = parseJson(res.stdout) as { next_commands: string[] };
     expect(json.next_commands).toEqual([expectedPublicCliCommand("user create --help")]);
   });
 
-  it("points at both input modes when no body is given at all", async () => {
-    const cwd = await makeProject();
+  it("points at both input modes when no body is given at all", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["team", "create"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
@@ -1387,15 +1423,15 @@ describe("body field flags", () => {
     expect(json.hint).toContain("--data");
   });
 
-  it("points a write without a body at its help", async () => {
-    const cwd = await makeProject();
+  it("points a write without a body at its help", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["team", "create"]);
     const json = parseJson(res.stdout) as { next_commands: string[] };
     expect(json.next_commands).toEqual([expectedPublicCliCommand("team create --help")]);
   });
 
-  it("updates through field flags too", async ({ server }) => {
-    const cwd = await makeProject();
+  it("updates through field flags too", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/teams/team_1`, async ({ request }) => {
@@ -1453,8 +1489,11 @@ describe("nested bodies", () => {
     return seen;
   };
 
-  it("creates an identity provider connection from its nested fields alone", async ({ server }) => {
-    const cwd = await makeProject();
+  it("creates an identity provider connection from its nested fields alone", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const seen = capturingIdps(server);
 
     const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS]);
@@ -1463,8 +1502,11 @@ describe("nested bodies", () => {
     expect(seen.at(-1)?.idp).toMatchObject(connection);
   });
 
-  it("takes the connection document inline, its client_secret a reference", async ({ server }) => {
-    const cwd = await makeProject();
+  it("takes the connection document inline, its client_secret a reference", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const seen = capturingIdps(server);
 
     const res = await run(cwd, ["idp", "create", "--data", JSON.stringify(connection)]);
@@ -1473,8 +1515,10 @@ describe("nested bodies", () => {
     expect(seen.at(-1)?.idp).toMatchObject(connection);
   });
 
-  it("refuses a literal client secret on the command line, pointing at a reference", async () => {
-    const cwd = await makeProject();
+  it("refuses a literal client secret on the command line, pointing at a reference", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const literal = CONNECTION_FLAGS.map((arg) =>
       arg === "${{ ACME_SSO_CLIENT_SECRET }}" ? "hunter2" : arg,
     );
@@ -1489,8 +1533,9 @@ describe("nested bodies", () => {
 
   it("takes an endpoint URL, which is no credential though its name says token", async ({
     server,
+    dir: cwd,
   }) => {
-    const cwd = await makeProject();
+    await makeProject(cwd);
     const seen = capturingIdps(server);
 
     const res = await run(cwd, [
@@ -1507,8 +1552,8 @@ describe("nested bodies", () => {
     expect(res.stdout).toContain("https://sso.acme.example/token");
   });
 
-  it("lists the fields an oidc block is missing once it is given", async () => {
-    const cwd = await makeProject();
+  it("lists the fields an oidc block is missing once it is given", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await run(cwd, [
       "idp",
@@ -1531,8 +1576,8 @@ describe("nested bodies", () => {
     expect(json.details.missing).toEqual(["oidc.issuer", "oidc.client_secret"]);
   });
 
-  it("refuses a --set path the connection does not have", async () => {
-    const cwd = await makeProject();
+  it("refuses a --set path the connection does not have", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
 
@@ -1542,8 +1587,11 @@ describe("nested bodies", () => {
     );
   });
 
-  it("changes one attribute of a --file body instead of replacing them all", async ({ server }) => {
-    const cwd = await makeProject();
+  it("changes one attribute of a --file body instead of replacing them all", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const file = join(cwd, "user.json");
     await writeFile(
       file,
@@ -1576,8 +1624,8 @@ describe("nested bodies", () => {
     });
   });
 
-  it("still refuses a password in an inline --data body", async () => {
-    const cwd = await makeProject();
+  it("still refuses a password in an inline --data body", async ({ dir: cwd }) => {
+    await makeProject(cwd);
 
     const res = await run(cwd, [
       "user",
@@ -1595,8 +1643,8 @@ describe("nested bodies", () => {
     );
   });
 
-  it("sets a project's hashing method through its nested fields", async ({ server }) => {
-    const cwd = await makeProject();
+  it("sets a project's hashing method through its nested fields", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/projects/prj_1`, async ({ request }) => {
@@ -1619,8 +1667,10 @@ describe("nested bodies", () => {
     expect(bodies.at(-1)).toEqual({ password_hash: { algorithm: "bcrypt", params: { cost: 12 } } });
   });
 
-  it("previews a connection with its reference and its fixed values shown", async () => {
-    const cwd = await makeProject();
+  it("previews a connection with its reference and its fixed values shown", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
 
     const res = await run(cwd, ["idp", "create", ...CONNECTION_FLAGS, "--dry-run"]);
 
@@ -1633,8 +1683,8 @@ describe("nested bodies", () => {
 });
 
 describe("dry runs", () => {
-  it("previews a delete without --force, since it sends nothing", async () => {
-    const cwd = await makeProject();
+  it("previews a delete without --force, since it sends nothing", async ({ dir: cwd }) => {
+    await makeProject(cwd);
     const res = await run(cwd, ["team", "deactivate", "team_1", "--dry-run"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
@@ -1649,8 +1699,10 @@ describe("dry runs", () => {
     });
   });
 
-  it("keeps a credential out of the preview when the body came from a file", async () => {
-    const cwd = await makeProject();
+  it("keeps a credential out of the preview when the body came from a file", async ({
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const file = join(cwd, "body.json");
     await writeFile(
       file,
@@ -1665,8 +1717,11 @@ describe("dry runs", () => {
 });
 
 describe("an empty list writes nothing", () => {
-  it("leaves stdout empty when piped, so `wc -l` counts no records", async ({ server }) => {
-    const cwd = await makeProject();
+  it("leaves stdout empty when piped, so `wc -l` counts no records", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await runCliForTest([
@@ -1683,8 +1738,8 @@ describe("an empty list writes nothing", () => {
     expect(res.stdout).toBe("");
   });
 
-  it("still reports the empty page in the envelope", async ({ server }) => {
-    const cwd = await makeProject();
+  it("still reports the empty page in the envelope", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["user", "list"]);
@@ -1693,8 +1748,11 @@ describe("an empty list writes nothing", () => {
 });
 
 describe("delete outcomes", () => {
-  it("names the command after what the endpoint does, not after removal", async ({ server }) => {
-    const cwd = await makeProject();
+  it("names the command after what the endpoint does, not after removal", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
@@ -1709,8 +1767,8 @@ describe("delete outcomes", () => {
     });
   });
 
-  it("still reports a user delete as deleted", async ({ server }) => {
-    const cwd = await makeProject();
+  it("still reports a user delete as deleted", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.delete(`${SERVER}/api/v1/users/user_1`, () => new HttpResponse(null, { status: 204 })),
     );
@@ -1725,8 +1783,8 @@ describe("delete outcomes", () => {
 });
 
 describe("page tokens are opaque", () => {
-  it("quotes a token that would otherwise be split by a shell", async ({ server }) => {
-    const cwd = await makeProject();
+  it("quotes a token that would otherwise be split by a shell", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "tok en;rm -rf /" }),
@@ -1740,8 +1798,8 @@ describe("page tokens are opaque", () => {
 });
 
 describe("other resources", () => {
-  it("session revoke terminates the session and says so", async ({ server }) => {
-    const cwd = await makeProject();
+  it("session revoke terminates the session and says so", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     server.use(
       http.delete(
         `${SERVER}/api/v1/sessions/sess_1`,
@@ -1757,8 +1815,8 @@ describe("other resources", () => {
     });
   });
 
-  it("team list scopes the query by project_id", async ({ server }) => {
-    const cwd = await makeProject();
+  it("team list scopes the query by project_id", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: string[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
@@ -1771,8 +1829,11 @@ describe("other resources", () => {
     expect(new URL(urls.at(-1) ?? "").searchParams.get("project_id")).toBe("proj_test");
   });
 
-  it("event list sends the shared filter grammar as query parameters", async ({ server }) => {
-    const cwd = await makeProject();
+  it("event list sends the shared filter grammar as query parameters", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const urls: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
@@ -1814,8 +1875,11 @@ describe("other resources", () => {
     expect(json.data.items[0]?.id).toBe("evt_1");
   });
 
-  it("event list maps --sort direction onto the order query parameter", async ({ server }) => {
-    const cwd = await makeProject();
+  it("event list maps --sort direction onto the order query parameter", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const urls: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
@@ -1846,8 +1910,8 @@ describe("configuration resources are read-only", () => {
     }
   });
 
-  it("lists schemas through the shared filter grammar", async ({ server }) => {
-    const cwd = await makeProject();
+  it("lists schemas through the shared filter grammar", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
@@ -1881,8 +1945,11 @@ describe("configuration resources are read-only", () => {
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
   });
 
-  it("reads a page of branding revisions and the cursor to the next", async ({ server }) => {
-    const cwd = await makeProject();
+  it("reads a page of branding revisions and the cursor to the next", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/branding`, ({ request }) => {
@@ -1911,8 +1978,8 @@ describe("schema list shows the current schemas, not the history", () => {
   // Editing a schema mints a new revision, so the unfiltered list is a history
   // of the same object types repeated. `schema list` asks the endpoint for
   // the latest of each instead, which is what the console shows.
-  it("sends revisions=latest when the caller does not say", async ({ server }) => {
-    const cwd = await makeProject();
+  it("sends revisions=latest when the caller does not say", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
@@ -1942,9 +2009,9 @@ describe("schema list shows the current schemas, not the history", () => {
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_04", "sch_05"]);
   });
 
-  it("still gives the full history when asked for it", async ({ server }) => {
+  it("still gives the full history when asked for it", async ({ server, dir: cwd }) => {
     // The behaviour #947 protected is one filter away, not gone.
-    const cwd = await makeProject();
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
@@ -1959,8 +2026,8 @@ describe("schema list shows the current schemas, not the history", () => {
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("all");
   });
 
-  it("lets a named field beat its own default", async ({ server }) => {
-    const cwd = await makeProject();
+  it("lets a named field beat its own default", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const seen: Array<string | null> = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
@@ -1978,8 +2045,8 @@ describe("schema list shows the current schemas, not the history", () => {
 });
 
 describe("a schema or flow is addressable by name as well as by id", () => {
-  it("fetches a revision directly when given one", async ({ server }) => {
-    const cwd = await makeProject();
+  it("fetches a revision directly when given one", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const paths: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/sch_04`, ({ request }) => {
@@ -1997,8 +2064,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   // A customer's `$id` is any string the API accepts, so the client has to
   // send it whole. Unencoded, the `//` collapses on a redirect and the fetch
   // 404s — the bug behind #1272.
-  it("encodes a revision id that is a URL", async ({ server }) => {
-    const cwd = await makeProject();
+  it("encodes a revision id that is a URL", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const id = "https://zitadel.com/schemas/v1/default-human-user.json";
     const paths: string[] = [];
     server.use(
@@ -2018,8 +2085,11 @@ describe("a schema or flow is addressable by name as well as by id", () => {
 
   // `urn:example:human` is a revision id with none of the shapes the CLI used
   // to test for. The server decides what an id is, not a prefix check.
-  it("fetches a revision whose id looks like neither a prefix nor a URL", async ({ server }) => {
-    const cwd = await makeProject();
+  it("fetches a revision whose id looks like neither a prefix nor a URL", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const paths: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
@@ -2034,8 +2104,11 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(paths.at(-1)).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
   });
 
-  it("resolves an object type to its current revision once the fetch 404s", async ({ server }) => {
-    const cwd = await makeProject();
+  it("resolves an object type to its current revision once the fetch 404s", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
@@ -2056,8 +2129,11 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(json.data.id).toBe("sch_04");
   });
 
-  it("says so when the ref is neither a revision nor an object type", async ({ server }) => {
-    const cwd = await makeProject();
+  it("says so when the ref is neither a revision nor an object type", async ({
+    server,
+    dir: cwd,
+  }) => {
+    await makeProject(cwd);
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
       http.get(`${SERVER}/api/v1/schemas`, () => HttpResponse.json({ schemas: [] })),
@@ -2073,8 +2149,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
 
   // A 500 is the server failing, not the server saying "that was a name".
   // Falling through to the list would turn it into a misleading E_NOT_FOUND.
-  it("does not fall back to the object-type lookup on a non-404", async ({ server }) => {
-    const cwd = await makeProject();
+  it("does not fall back to the object-type lookup on a non-404", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const hits: true[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
@@ -2092,8 +2168,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     expect(json.code).not.toBe("E_NOT_FOUND");
   });
 
-  it("resolves a flow name to its newest revision", async ({ server }) => {
-    const cwd = await makeProject();
+  it("resolves a flow name to its newest revision", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
@@ -2116,8 +2192,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
 describe("flow definitions list the current flows", () => {
   // #1246 added `revisions` to GET /flow_definitions, so flows now behave like
   // schemas: a bare list is the current flows, not every revision of each.
-  it("sends revisions=latest when the caller does not say", async ({ server }) => {
-    const cwd = await makeProject();
+  it("sends revisions=latest when the caller does not say", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
@@ -2132,8 +2208,8 @@ describe("flow definitions list the current flows", () => {
     expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
   });
 
-  it("still gives the full history when asked", async ({ server }) => {
-    const cwd = await makeProject();
+  it("still gives the full history when asked", async ({ server, dir: cwd }) => {
+    await makeProject(cwd);
     const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {

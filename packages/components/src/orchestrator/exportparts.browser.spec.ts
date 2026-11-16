@@ -1,8 +1,9 @@
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
+import { test } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 import { exportpartsFor } from "./exportparts.js";
@@ -70,9 +71,33 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
   throw new Error("waitFor timed out");
 }
 
+/**
+ * `it` with the host page's stylesheet, exactly what an embedding app would
+ * ship, in the document head for every test and removed when it ends.
+ */
+const it = test.extend<{ hostStyles: undefined }>({
+  hostStyles: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      const style = document.createElement("style");
+      style.textContent = `
+      zitadel-login::part(field-input) {
+        text-transform: uppercase;
+        letter-spacing: 3px;
+      }
+      zitadel-login::part(button-root) {
+        border-radius: 0px;
+      }
+    `;
+      document.head.appendChild(style);
+      await use(undefined);
+      style.remove();
+    },
+    { auto: true },
+  ],
+});
+
 describe("<zitadel-login> ::part() forwarding (chromium)", () => {
-  let host: HTMLDivElement;
-  let hostStyles: HTMLStyleElement;
   let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
 
@@ -83,29 +108,13 @@ describe("<zitadel-login> ::part() forwarding (chromium)", () => {
       projectId: "parts-test",
       url: "http://localhost:4000",
     });
-    // Host-page stylesheet, exactly what an embedding app would ship.
-    hostStyles = document.createElement("style");
-    hostStyles.textContent = `
-      zitadel-login::part(field-input) {
-        text-transform: uppercase;
-        letter-spacing: 3px;
-      }
-      zitadel-login::part(button-root) {
-        border-radius: 0px;
-      }
-    `;
-    document.head.appendChild(hostStyles);
-    host = document.createElement("div");
-    document.body.appendChild(host);
   });
 
   afterEach(() => {
-    host.remove();
-    hostStyles.remove();
     stub?.restore();
   });
 
-  async function mount(response: CreateFlow201): Promise<ZitadelLogin> {
+  async function mount(host: HTMLElement, response: CreateFlow201): Promise<ZitadelLogin> {
     stub = installFlowFetchStub([response]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
@@ -116,8 +125,8 @@ describe("<zitadel-login> ::part() forwarding (chromium)", () => {
     return element;
   }
 
-  it("host-page ::part() restyles a template-rendered atom's internals", async () => {
-    const element = await mount(identifierStep);
+  it("host-page ::part() restyles a template-rendered atom's internals", async ({ host }) => {
+    const element = await mount(host, identifierStep);
     const field = element.shadowRoot?.querySelector("zl-field") as HTMLElement & {
       updateComplete: Promise<unknown>;
     };
@@ -130,8 +139,8 @@ describe("<zitadel-login> ::part() forwarding (chromium)", () => {
     expect(style.letterSpacing).toBe("3px");
   });
 
-  it("forwarding covers atoms appended by the mandatory-gates patcher", async () => {
-    const element = await mount(patchedStep);
+  it("forwarding covers atoms appended by the mandatory-gates patcher", async ({ host }) => {
+    const element = await mount(host, patchedStep);
     const button = (await waitFor(() =>
       element.shadowRoot?.querySelector('zl-button[hierarchy="primary"]'),
     )) as HTMLElement & { updateComplete: Promise<unknown> };
@@ -142,8 +151,8 @@ describe("<zitadel-login> ::part() forwarding (chromium)", () => {
     expect(getComputedStyle(root).borderRadius).toBe("0px");
   });
 
-  it("part-less atoms stay unstamped", async () => {
-    const element = await mount(identifierStep);
+  it("part-less atoms stay unstamped", async ({ host }) => {
+    const element = await mount(host, identifierStep);
     // The attribution pill renders a zl-icon (no declared parts) in the
     // orchestrator's shadow root.
     for (const icon of element.shadowRoot?.querySelectorAll("zl-icon") ?? []) {

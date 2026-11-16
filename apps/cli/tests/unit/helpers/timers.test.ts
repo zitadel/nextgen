@@ -1,24 +1,20 @@
 import * as timers from "node:timers/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+import { it } from "@tests/helpers/fixtures";
 
 describe("node:timers/promises under the shared setup", () => {
-  it("resolves with the given value once fake timers advance past the delay", async () => {
-    vi.useFakeTimers();
+  it("resolves with the given value once fake timers advance past the delay", async ({ clock }) => {
     const waited = sleep(10_000, "done");
 
-    await vi.advanceTimersByTimeAsync(10_000);
+    await clock.advanceAsync(10_000);
 
     await expect(waited).resolves.toBe("done");
   });
 
   it("rejects with an AbortError when the signal aborts mid-wait", async () => {
-    vi.useFakeTimers();
     const controller = new AbortController();
     const waited = sleep(10_000, undefined, { signal: controller.signal });
 

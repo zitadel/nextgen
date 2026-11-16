@@ -1,145 +1,76 @@
-import { chmod, lstat, mkdtemp, readdir, rm } from "node:fs/promises";
-import { createServer, type RequestListener, type Server } from "node:http";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { setupServer } from "msw/node";
-import { test as base } from "vitest";
+import { test as base } from "./daemon";
+import type { RecordedLog } from "./log";
+import { removeTree } from "./scratch";
+import type { TerminalFixture } from "./terminal";
 
-import { atTerminal, type Terminal } from "./keyboard";
-import { recordLog } from "./log";
-import { nextPort } from "./ports";
-
-/** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
-export type Serve = (handler: RequestListener, host?: string) => Promise<string>;
+export type { Serve } from "./http";
 
 /**
- * Give every directory under a path its owner's permissions back, so a test
- * that took them away (to see how a directory no one may read is refused) does
- * not leave a tree that cannot be removed. A file needs none: removing one
- * depends only on the directory it is in.
+ * Makes a temp directory, hands it to the test, and removes it when the test is over, giving back
+ * the permissions the test took away if it had to.
  *
- * @param path - The path to unlock, with everything under it.
+ * @param use - Runs the test with the directory.
+ * @returns Once the directory is gone.
  */
-async function unlock(path: string): Promise<void> {
-  const stats = await lstat(path).catch(() => {
-    return undefined;
-  });
-  if (stats === undefined || !stats.isDirectory()) {
-    return;
-  }
-  await chmod(path, 0o755);
-  for (const name of await readdir(path)) {
-    await unlock(join(path, name));
-  }
-}
-
 async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-"));
   await use(dir);
-  await rm(dir, { recursive: true, force: true }).catch(async () => {
-    await unlock(dir);
-    await rm(dir, { recursive: true, force: true });
-  });
+  await removeTree(dir);
 }
 
 /**
- * `test` with fixtures: a test that names one in its first argument gets it,
- * and the teardown runs after the test whether it passed or not.
+ * The CLI's one `test`: every fixture, from the helper file named for what it provides. Vitest
+ * cannot merge extended tests, so each of those files extends the one before it and this adds the
+ * last two. A test that names a fixture in its first argument gets it, and the teardown runs after
+ * the test whether it passed or not.
  *
  * - `dir` is a fresh temp directory, removed when the test ends.
  * - `other` is a second one, for a test that needs two apart.
- * - `server` is an MSW server listening for the test, one that fails a request nothing handled.
- * - `serve` starts an HTTP server on a free port, answers with the handler, and gives back its base
- *   URL; every server it started is closed when the test ends.
- * - `port` is a port from this worker's own block (see `ports.ts`), for a test that hands one to the
- *   CLI. A test that needs a second one calls `nextPort()`.
+ * - `server` and `serve` are in `http.ts`: an MSW server that fails a request nothing handled, and
+ *   an HTTP server on a free port.
+ * - `port` is in `port.ts`: a port from this worker's own block.
+ * - `recorded` is in `log.ts`: what the code under test said through `log`.
+ * - `terminal` is in `terminal.ts`: the terminal the run is at, and its controls.
+ * - `clock` is in `clock.ts`: fake timers the test advances.
+ * - `daemon` is in `daemon.ts`: processes that are ended when the test ends.
  */
 export const test = base.extend<{
   dir: string;
   other: string;
-  server: ReturnType<typeof setupServer>;
-  serve: Serve;
-  port: number;
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   dir: ({}, use) => withTempDir(use),
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   other: ({}, use) => withTempDir(use),
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  async server({}, use) {
-    const server = setupServer();
-    server.listen({ onUnhandledRequest: "error" });
-    await use(server);
-    server.resetHandlers();
-    server.close();
-  },
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  async serve({}, use) {
-    const started: Server[] = [];
-    await use(async (handler, host = "localhost") => {
-      const server = createServer(handler);
-      started.push(server);
-      await new Promise<void>((resolve) => server.listen(0, host, () => resolve()));
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        throw new Error("the test server did not expose a TCP address");
-      }
-      return `http://${host}:${String(address.port)}`;
-    });
-    await Promise.all(
-      started.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))),
-    );
-  },
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  port: ({}, use) => use(nextPort()),
 });
 
 /**
- * `test` with the terminal the run is at: stdout and stdin are patched for every test, exactly as
- * {@link atTerminal} does it, and given back when the test ends.
- *
- * - `screen` is that terminal, to read what was drawn.
+ * `test` that records what is said through `log` in every test, and stops recording when it ends.
+ * `recorded` is the sink, as in `test`, to read the lines or to stop it early.
  */
-export const atScreen = test.extend<{ screen: Terminal }>({
-  screen: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      await use(atTerminal());
+export const recording = test.extend<{ listening: RecordedLog }>({
+  listening: [
+    async ({ recorded }, use) => {
+      await use(recorded);
     },
     { auto: true },
   ],
 });
 
 /**
- * Records what is said through `log` for the length of a test, and stops when it ends.
- *
- * @param use - Runs the test with the sink.
+ * `recording` with the terminal the run is at in every test: stdout and stdin are patched as
+ * `terminal` does it, and given back when the test ends. `terminal` and `recorded` are the same
+ * ones `test` has.
  */
-async function withRecordedLog(use: (sink: ReturnType<typeof recordLog>) => Promise<void>) {
-  const sink = recordLog();
-  await use(sink);
-  sink.stop();
-}
-
-/**
- * `test` that records what is said through `log` in every test, and stops recording when it ends.
- *
- * - `recorded` is the {@link recordLog} sink, to read the lines or to stop it early.
- */
-export const recording = test.extend<{ recorded: ReturnType<typeof recordLog> }>({
-  recorded: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    ({}, use) => withRecordedLog(use),
-    { auto: true },
-  ],
-});
-
-/** `atScreen` with `recorded` as well: the terminal the run is at, and what is said through `log`. */
-export const atScreenRecording = atScreen.extend<{ recorded: ReturnType<typeof recordLog> }>({
-  recorded: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    ({}, use) => withRecordedLog(use),
+export const atScreenRecording = recording.extend<{ atTheTerminal: TerminalFixture }>({
+  atTheTerminal: [
+    async ({ terminal }, use) => {
+      await use(terminal);
+    },
     { auto: true },
   ],
 });

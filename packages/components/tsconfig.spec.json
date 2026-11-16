@@ -22,6 +22,8 @@
     "src/**/__tests__/**/*.ts",
     "src/**/__tests__/**/*.tsx",
     "src/test-setup.ts",
+    "src/test/**/*.ts",
+    "src/orchestrator/fixtures.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ],

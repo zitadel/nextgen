@@ -1,8 +1,7 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
   EMPTY_ENV,
@@ -11,13 +10,19 @@ import {
   loadEnvFiles,
   loadProjectEnv,
 } from "@/lib/local-server/env-vars";
+import { it } from "@tests/helpers/fixtures";
 
-async function projectWith(files: Record<string, string>): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-env-test-"));
+/**
+ * Writes env files into a project directory.
+ *
+ * @param cwd - The directory that is the project.
+ * @param files - The contents of each file, by name.
+ * @returns Once every file is written.
+ */
+async function projectWith(cwd: string, files: Record<string, string>): Promise<void> {
   for (const [name, contents] of Object.entries(files)) {
     await writeFile(join(cwd, name), contents, "utf8");
   }
-  return cwd;
 }
 
 /** A shell that turns every local default off, so a test sees only the files. */
@@ -26,15 +31,18 @@ const NO_DEFAULTS = Object.fromEntries(Object.keys(LOCAL_DEFAULTS).map((name) =>
 const ALLOW_LIST = "NEXTGEN_HTTPCLIENT_ALLOW_LIST";
 
 describe("dev-runtime env", () => {
-  it("parses KEY=value lines, comments, quoted values, and a leading BOM", async () => {
-    const cwd = await projectWith({
+  it("parses KEY=value lines, comments, quoted values, and a leading BOM", async ({ dir: cwd }) => {
+    await projectWith(cwd, {
       ".env": "\uFEFF# comment\nA=1\nB=\"two words\"\nC='single'\n",
     });
     await expect(loadEnvFiles(cwd)).resolves.toEqual({ A: "1", B: "two words", C: "single" });
   });
 
-  it("lets .env.local shadow .env and skips files that do not exist", async () => {
-    const cwd = await projectWith({
+  it("lets .env.local shadow .env and skips files that do not exist", async ({
+    dir: cwd,
+    other,
+  }) => {
+    await projectWith(cwd, {
       ".env.local": "SHARED=local\nONLY_LOCAL=yes\n",
       ".env": "SHARED=base\nONLY_BASE=yes\n",
     });
@@ -44,11 +52,13 @@ describe("dev-runtime env", () => {
       ONLY_LOCAL: "yes",
       ONLY_BASE: "yes",
     });
-    await expect(loadEnvFiles(await projectWith({}))).resolves.toEqual({});
+    await expect(loadEnvFiles(other)).resolves.toEqual({});
   });
 
-  it("forwards only NEXTGEN_* names, sorted, and never the rest of the files", async () => {
-    const cwd = await projectWith({
+  it("forwards only NEXTGEN_* names, sorted, and never the rest of the files", async ({
+    dir: cwd,
+  }) => {
+    await projectWith(cwd, {
       ".env.local":
         "NEXTGEN_GOOGLE_SECRET=canary\nZITADEL_PROJECT_SECRET=app-side\nDATABASE_URL=postgres://nope\nnextgen_lower=no\n",
       ".env": "NEXTGEN_API_KEY=key\nNEXTGEN_GOOGLE_SECRET=loses\n",
@@ -60,8 +70,8 @@ describe("dev-runtime env", () => {
     });
   });
 
-  it("never reads the keys the CLI sets itself at spawn", async () => {
-    const cwd = await projectWith({
+  it("never reads the keys the CLI sets itself at spawn", async ({ dir: cwd }) => {
+    await projectWith(cwd, {
       ".env.local":
         "NEXTGEN_SERVER_DATA_DIR=/elsewhere\nNEXTGEN_SERVER_ADDRESS=:1\nNEXTGEN_SERVER_PUBLIC_BASE=http://x\nNEXTGEN_OK=1\n",
     });
@@ -71,40 +81,41 @@ describe("dev-runtime env", () => {
     });
   });
 
-  it("treats an empty value as unset", async () => {
-    const cwd = await projectWith({ ".env.local": "NEXTGEN_EMPTY=\nNEXTGEN_SET=x\n" });
+  it("treats an empty value as unset", async ({ dir: cwd }) => {
+    await projectWith(cwd, { ".env.local": "NEXTGEN_EMPTY=\nNEXTGEN_SET=x\n" });
     await expect(loadProjectEnv(cwd, NO_DEFAULTS)).resolves.toEqual({
       values: { NEXTGEN_SET: "x" },
       injected: ["NEXTGEN_SET"],
     });
   });
 
-  it("yields the empty result for a project with no env files", async () => {
-    await expect(loadProjectEnv(await projectWith({}), NO_DEFAULTS)).resolves.toEqual(EMPTY_ENV);
+  it("yields the empty result for a project with no env files", async ({ dir }) => {
+    await expect(loadProjectEnv(dir, NO_DEFAULTS)).resolves.toEqual(EMPTY_ENV);
   });
 
-  it("lets a local server fetch from loopback by default", async () => {
-    await expect(loadProjectEnv(await projectWith({}), {})).resolves.toEqual({
+  it("lets a local server fetch from loopback by default", async ({ dir }) => {
+    await expect(loadProjectEnv(dir, {})).resolves.toEqual({
       values: { [ALLOW_LIST]: "localhost,127.0.0.0/8,::1/128" },
       injected: [ALLOW_LIST],
     });
   });
 
-  it("lets an env file replace a default", async () => {
-    const cwd = await projectWith({ ".env.local": `${ALLOW_LIST}=127.0.0.1\n` });
+  it("lets an env file replace a default", async ({ dir: cwd }) => {
+    await projectWith(cwd, { ".env.local": `${ALLOW_LIST}=127.0.0.1\n` });
     await expect(loadProjectEnv(cwd, {})).resolves.toEqual({
       values: { [ALLOW_LIST]: "127.0.0.1" },
       injected: [ALLOW_LIST],
     });
   });
 
-  it("turns a default off when an env file sets it empty", async () => {
-    const cwd = await projectWith({ ".env": `${ALLOW_LIST}=\n` });
+  it("turns a default off when an env file sets it empty", async ({ dir: cwd }) => {
+    await projectWith(cwd, { ".env": `${ALLOW_LIST}=\n` });
     await expect(loadProjectEnv(cwd, {})).resolves.toEqual(EMPTY_ENV);
   });
 
-  it("leaves a default to the shell when the shell sets it, empty included", async () => {
-    const cwd = await projectWith({});
+  it("leaves a default to the shell when the shell sets it, empty included", async ({
+    dir: cwd,
+  }) => {
     await expect(loadProjectEnv(cwd, { [ALLOW_LIST]: "10.0.0.0/8" })).resolves.toEqual(EMPTY_ENV);
     await expect(loadProjectEnv(cwd, { [ALLOW_LIST]: "" })).resolves.toEqual(EMPTY_ENV);
   });

@@ -15,13 +15,11 @@ import { runCommand } from "@tests/helpers/run-cli";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
 async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
-  const project = await aProjectWithTwoDeploys("zitadel-rollback-");
-  dirs.push(project.cwd);
-  return project;
+  return aProjectWithTwoDeploys("zitadel-rollback-");
 }
 
 describe("deployment rollback", () => {

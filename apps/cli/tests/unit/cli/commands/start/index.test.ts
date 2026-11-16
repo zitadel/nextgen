@@ -1,9 +1,5 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import Start from "@/cli/commands/start";
 import {
@@ -11,6 +7,7 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
+import { it } from "@tests/helpers/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 
 const config = {
@@ -30,9 +27,14 @@ class Reading extends Start {
   }
 }
 
-/** A directory that remembers a server on `port`, whatever port that is. */
-async function aDirectoryRemembering(port: number): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-start-"));
+/**
+ * Makes a directory remember a server on `port`, whatever port that is.
+ *
+ * @param cwd - The directory.
+ * @param port - The port the server is remembered on.
+ * @returns Once the directory remembers it.
+ */
+async function aDirectoryRemembering(cwd: string, port: number): Promise<void> {
   await writeRuntimeMetadata(cwd, {
     schema_version: 1,
     backend: "docker",
@@ -45,18 +47,19 @@ async function aDirectoryRemembering(port: number): Promise<string> {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   });
-  return cwd;
 }
 
 describe("the port a directory remembers", () => {
-  it("is where the server is, when no port is asked for", async () => {
-    const cwd = await aDirectoryRemembering(3000);
+  it("is where the server is, when no port is asked for", async ({ dir: cwd }) => {
+    await aDirectoryRemembering(cwd, 3000);
 
     await expect(new Reading([], config).sourceFor(cwd)).resolves.toBe("http://localhost:3000");
   });
 
-  it("is nothing where it is no port a server can listen on, so the default stands", async () => {
-    const cwd = await aDirectoryRemembering(99_999);
+  it("is nothing where it is no port a server can listen on, so the default stands", async ({
+    dir: cwd,
+  }) => {
+    await aDirectoryRemembering(cwd, 99_999);
 
     await expect(new Reading([], config).sourceFor(cwd)).resolves.toBe("http://localhost:8080");
   });

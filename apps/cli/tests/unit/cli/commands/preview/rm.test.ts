@@ -13,7 +13,7 @@ import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { runCommand } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
-const { server, dirs } = usePlatformServer();
+const { server } = usePlatformServer();
 
 /** A project whose live previews come in two pages, `pr-2` only behind the cursor. */
 async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed: string[] }> {
@@ -41,7 +41,6 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
     ),
   );
   const cwd = await aProjectDirectory("zitadel-preview-rm-", { id: "proj_test", secret: "ps" });
-  dirs.push(cwd);
   return { cwd, removed };
 }
 

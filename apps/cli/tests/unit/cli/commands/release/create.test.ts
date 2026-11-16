@@ -1,16 +1,13 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import ReleaseCreate from "@/cli/commands/release/create";
+import { it } from "@tests/helpers/fixtures";
 import { parseFlag } from "@tests/helpers/inputs";
 import { HttpResponse, http } from "msw";
+import type { SetupServer } from "msw/node";
 import { asTerminal } from "@tests/helpers/terminal";
 import { makeProject } from "@tests/helpers/local-project";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
-import { setupServer } from "msw/node";
 
 describe("-m", () => {
   it("trims a message", async () => {
@@ -46,7 +43,6 @@ describe("-m", () => {
 describe("release create at a terminal", () => {
   const SERVER = "https://api.zitadel.cloud";
   const HASH = `sha256:${"d9b331a42e4e2d770718644ee48b679d9ffa7c3821f84d6e6ca849d4e2377691"}`;
-  const server = setupServer();
 
   /** A user-schema the server would accept, so the bundle validates. */
   const SCHEMA = {
@@ -58,17 +54,14 @@ describe("release create at a terminal", () => {
     properties: { email: { "x-unique": "project" } },
   };
 
-  beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-  afterAll(() => server.close());
-  const dirs: string[] = [];
-  afterEach(async () => {
-    server.resetHandlers();
-    await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-  });
-
-  const created = async (): Promise<string> => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-release-create-"));
-    dirs.push(dir);
+  /**
+   * Runs `release create` at a terminal against a linked project.
+   *
+   * @param server - The msw server that answers the build.
+   * @param dir - The directory the project is made in.
+   * @returns What the command printed, without colour.
+   */
+  const created = async (server: SetupServer, dir: string): Promise<string> => {
     const cwd = await makeProject(dir, { linked: true, schemas: { "human-user": SCHEMA } });
     server.use(
       http.post(`${SERVER}/api/v1/releases/build`, () =>
@@ -89,16 +82,19 @@ describe("release create at a terminal", () => {
   };
 
   describe("release create", () => {
-    it("keeps what it did in the footer, rather than losing it to a long headline", async () => {
-      const out = await created();
+    it("keeps what it did in the footer, rather than losing it to a long headline", async ({
+      server,
+      dir,
+    }) => {
+      const out = await created(server, dir);
 
       // The footer carries what the command did, with the place after it.
       expect(out).toContain("Created rel_1 · project proj_01TEST");
       expect(out).not.toMatch(/^\s*project proj_01TEST on/m);
     });
 
-    it("leaves the content digest to --json and release get", async () => {
-      const out = await created();
+    it("leaves the content digest to --json and release get", async ({ server, dir }) => {
+      const out = await created(server, dir);
 
       expect(out).not.toContain(HASH);
     });

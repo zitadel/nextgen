@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { liveDirectory } from "./zitadel";
 
@@ -18,11 +18,6 @@ function serve(answers: Record<string, unknown>) {
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-});
 
 describe("the person calling", () => {
   it("is the one Zitadel says the cookie is, asked past a preview's protection", async () => {

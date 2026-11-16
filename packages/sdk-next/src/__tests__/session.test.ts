@@ -21,8 +21,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
   _resetConfigForTesting();
 });
 

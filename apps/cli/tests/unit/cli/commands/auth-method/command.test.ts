@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { Config, Errors } from "@oclif/core";
 
@@ -26,7 +26,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { asOneLine, asTerminal, useTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -186,15 +186,8 @@ function printed(talk: Person): string {
   ].join("\n");
 }
 
-useTerminal();
-
-beforeEach(() => {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => {
-    return true;
-  });
-  vi.spyOn(process.stderr, "write").mockImplementation(() => {
-    return true;
-  });
+it.beforeEach(({ terminal }) => {
+  terminal.tty(true);
   vi.spyOn(console, "log").mockImplementation(() => {
     return undefined;
   });

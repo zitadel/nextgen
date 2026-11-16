@@ -32,8 +32,6 @@ describe("trackEvent", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
     vi.mocked(track).mockClear();
   });
 

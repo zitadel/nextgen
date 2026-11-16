@@ -1,8 +1,27 @@
 import { tokensCss } from "@zitadel/design-tokens";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import "./zl-alert.js";
 import type { ZlAlert } from "./zl-alert.js";
+import { type Render, test } from "../test/fixtures.js";
+
+/**
+ * `it` with the design tokens injected into the document head and the host
+ * narrowed to 320px, narrow enough to wrap the long message, for every test.
+ */
+const it = test.extend<{ surroundings: undefined }>({
+  surroundings: [
+    async ({ host }, use) => {
+      const style = document.createElement("style");
+      style.textContent = tokensCss;
+      document.head.appendChild(style);
+      host.style.width = "320px";
+      await use(undefined);
+      style.remove();
+    },
+    { auto: true },
+  ],
+});
 
 /**
  * Icon geometry, in a real browser because jsdom has no layout. Tokens are
@@ -10,27 +29,8 @@ import type { ZlAlert } from "./zl-alert.js";
  * `line-height` falls back to a value the product never renders.
  */
 describe("<zl-alert> icon geometry (chromium)", () => {
-  let host: HTMLDivElement;
-  let style: HTMLStyleElement;
-
-  beforeEach(() => {
-    style = document.createElement("style");
-    style.textContent = tokensCss;
-    document.head.appendChild(style);
-    host = document.createElement("div");
-    host.style.width = "320px"; // narrow enough to wrap the long message
-    document.body.appendChild(host);
-  });
-
-  afterEach(() => {
-    host.remove();
-    style.remove();
-  });
-
-  async function mount(markup: string): Promise<ZlAlert> {
-    host.innerHTML = markup;
-    const alert = host.querySelector("zl-alert") as ZlAlert;
-    await alert.updateComplete;
+  async function mount(render: Render, markup: string): Promise<ZlAlert> {
+    const alert = await render<ZlAlert>(markup);
     // The inner <zl-icon> renders into its own shadow root a frame later.
     await new Promise((resolve) => requestAnimationFrame(resolve));
     return alert;
@@ -46,17 +46,17 @@ describe("<zl-alert> icon geometry (chromium)", () => {
   const LONG =
     "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.";
 
-  it("keeps the glyph at 16px however long the message is", async () => {
+  it("keeps the glyph at 16px however long the message is", async ({ render }) => {
     for (const message of ["flow not found", LONG]) {
-      const box = glyphBox(await mount(`<zl-alert severity="error">${message}</zl-alert>`));
+      const box = glyphBox(await mount(render, `<zl-alert severity="error">${message}</zl-alert>`));
       expect({ w: box.width, h: box.height }).toEqual({ w: 16, h: 16 });
     }
   });
 
-  it("centres the glyph on the first line of text, wrapped or not", async () => {
+  it("centres the glyph on the first line of text, wrapped or not", async ({ render }) => {
     const centreY = (r: DOMRect) => (r.top + r.bottom) / 2;
     for (const message of ["flow not found", LONG]) {
-      const alert = await mount(`<zl-alert severity="error">${message}</zl-alert>`);
+      const alert = await mount(render, `<zl-alert severity="error">${message}</zl-alert>`);
       const text = alert.shadowRoot?.querySelector(".zr-alert__message") as HTMLElement;
       const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
       const firstLineCentre = text.getBoundingClientRect().top + lineHeight / 2;
