@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   aProjectWithTwoDeploys,
+  aReleaseServedOn,
   PLATFORM_URL,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
@@ -86,7 +87,12 @@ describe("deployment list", () => {
   });
 
   describe("the expiry of a preview", () => {
-    const EXPIRES = "2026-02-01T00:00:00Z";
+    const TIME = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
+
+    /** What `--plain` prints for a preview deployment, its expiry cell left to the test. */
+    const previewRow = (id: string, releaseId: string, expires: string | RegExp) => {
+      return [id, releaseId, "deploy", PREVIEW_URL, TIME, "preview", expires];
+    };
 
     /** A preview deployment, live unless a later one replaced it. */
     const previewDeployment = (id: string, status: "live" | "inactive" = "live") => {
@@ -98,39 +104,49 @@ describe("deployment list", () => {
       });
     };
 
-    /** The previews the API lists: the one under test, still live. */
-    const livePreviews = () => {
-      return HttpResponse.json({
-        previews: [
-          { origin: PREVIEW_URL, expires_at: EXPIRES, created_at: "2026-01-01T00:00:00Z" },
-        ],
-        next_page_token: null,
+    /** A project on the mock with one preview deployment live, and the row it prints. */
+    async function aLivePreview() {
+      const served = await aReleaseServedOn("zitadel-deployment-list-", {
+        primary: false,
+        preview: true,
       });
-    };
+      dirs.push(served.cwd);
+      return {
+        cwd: served.cwd,
+        row: (expires: string | RegExp) => {
+          return previewRow(served.deploymentOn("preview"), served.releaseId, expires);
+        },
+      };
+    }
 
-    /** The previews the API refuses to list. */
-    const refusedPreviews = () => {
-      return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
-    };
-
-    /** A project whose deployments list answers `deployments`; returns the previews reads. */
-    async function listing(
-      deployments: readonly Answer<ListDeployments200DeploymentsItem>[],
-      previews: () => Response = livePreviews,
-    ): Promise<{ cwd: string; asked: string[] }> {
-      const cwd = await twoDeploys();
+    /** Records every read of the previews and lets the mock answer it. */
+    const watchingPreviews = (): string[] => {
       const asked: string[] = [];
+      server.use(
+        http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
+          asked.push(request.url);
+        }),
+      );
+      return asked;
+    };
+
+    /** Makes the mock refuse to list the previews. */
+    const refusingPreviews = () => {
+      server.use(
+        http.get(`${SERVER}/api/v1/projects/:projectId/previews`, () => {
+          return HttpResponse.json({ code: "forbidden", message: "no" }, { status: 403 });
+        }),
+      );
+    };
+
+    /** Makes the mock list `deployments` in place of the project's own. */
+    const listingInstead = (deployments: readonly Answer<ListDeployments200DeploymentsItem>[]) => {
       server.use(
         http.get(`${SERVER}/api/v1/deployments`, () => {
           return HttpResponse.json({ deployments, next_page_token: null });
         }),
-        http.get(`${SERVER}/api/v1/projects/:projectId/previews`, ({ request }) => {
-          asked.push(request.url);
-          return previews();
-        }),
       );
-      return { cwd, asked };
-    }
+    };
 
     /** The command as a script reads it, piped. */
     const plain = (cwd: string) => {
@@ -143,26 +159,16 @@ describe("deployment list", () => {
     };
 
     it("prints the expiry of the live preview", async () => {
-      const { cwd } = await listing([previewDeployment("dep_1")]);
+      const { cwd, row } = await aLivePreview();
 
       const result = await plain(cwd);
 
-      expect(result).toPrintPlainRow(
-        "dep_1",
-        "rel_1",
-        "deploy",
-        PREVIEW_URL,
-        /^2026-01-01T/,
-        "preview",
-        EXPIRES,
-      );
+      expect(result).toPrintPlainRow(...row(TIME));
     });
 
-    it("reads the previews once for a page of live and replaced previews", async () => {
-      const { cwd, asked } = await listing([
-        previewDeployment("dep_2"),
-        previewDeployment("dep_1", "inactive"),
-      ]);
+    it("reads the previews once for a page that has a live preview", async () => {
+      const { cwd } = await aLivePreview();
+      const asked = watchingPreviews();
 
       await plain(cwd);
 
@@ -170,29 +176,32 @@ describe("deployment list", () => {
     });
 
     it("prints nothing for a deployment a later one replaced", async () => {
-      const { cwd } = await listing([
-        previewDeployment("dep_2"),
-        previewDeployment("dep_1", "inactive"),
-      ]);
+      const { cwd } = await aLivePreview();
+      listingInstead([previewDeployment("dep_2"), previewDeployment("dep_1", "inactive")]);
 
       const result = await plain(cwd);
 
-      expect(result).toPrintPlainRow(
-        "dep_1",
-        "rel_1",
-        "deploy",
-        PREVIEW_URL,
-        /^2026-01-01T/,
-        "preview",
-        "",
-      );
+      expect(result).toPrintPlainRow(...previewRow("dep_1", "rel_1", ""));
     });
 
     it.each([
-      ["a page of primary deployments", [aDeployment()]],
-      ["a page of replaced preview deployments", [previewDeployment("dep_1", "inactive")]],
-    ])("does not read the previews for %s", async (_page, deployments) => {
-      const { cwd, asked } = await listing(deployments);
+      [
+        "a page of primary deployments",
+        async () => {
+          return twoDeploys();
+        },
+      ],
+      [
+        "a page of replaced preview deployments",
+        async () => {
+          const { cwd } = await aLivePreview();
+          listingInstead([previewDeployment("dep_1", "inactive")]);
+          return cwd;
+        },
+      ],
+    ])("does not read the previews for %s", async (_page, arrange) => {
+      const asked = watchingPreviews();
+      const cwd = await arrange();
 
       const result = await plain(cwd);
 
@@ -201,23 +210,17 @@ describe("deployment list", () => {
     });
 
     it("still lists the deployments when the previews cannot be read", async () => {
-      const { cwd } = await listing([previewDeployment("dep_1")], refusedPreviews);
+      const { cwd, row } = await aLivePreview();
+      refusingPreviews();
 
       const result = await plain(cwd);
 
-      expect(result).toPrintPlainRow(
-        "dep_1",
-        "rel_1",
-        "deploy",
-        PREVIEW_URL,
-        /^2026-01-01T/,
-        "preview",
-        "",
-      );
+      expect(result).toPrintPlainRow(...row(""));
     });
 
     it("warns when the previews cannot be read", async () => {
-      const { cwd } = await listing([previewDeployment("dep_1")], refusedPreviews);
+      const { cwd } = await aLivePreview();
+      refusingPreviews();
 
       const result = await plain(cwd);
 
@@ -225,7 +228,7 @@ describe("deployment list", () => {
     });
 
     it("still lists the preview under --json", async () => {
-      const { cwd } = await listing([previewDeployment("dep_1")]);
+      const { cwd } = await aLivePreview();
 
       const result = await json(cwd);
 
@@ -233,7 +236,8 @@ describe("deployment list", () => {
     });
 
     it("does not read the previews under --json", async () => {
-      const { cwd, asked } = await listing([previewDeployment("dep_1")]);
+      const { cwd } = await aLivePreview();
+      const asked = watchingPreviews();
 
       const result = await json(cwd);
 
