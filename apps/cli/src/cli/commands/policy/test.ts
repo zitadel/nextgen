@@ -3,13 +3,8 @@ import { Args } from "@oclif/core";
 import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";

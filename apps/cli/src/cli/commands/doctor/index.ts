@@ -31,13 +31,8 @@ import {
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { log, warnings as invocationWarnings } from "@/lib/ui";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";

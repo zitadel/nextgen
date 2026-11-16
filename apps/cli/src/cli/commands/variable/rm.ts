@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";

@@ -1,13 +1,8 @@
 import { Args } from "@oclif/core";
 
 import { Operation } from "@/lib/backend";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */

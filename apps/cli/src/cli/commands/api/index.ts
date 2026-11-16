@@ -15,9 +15,9 @@ import {
 import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/ui";
 import { Server } from "@/lib/server";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
-  CommandGroups,
   CREDENTIALS,
   EnvironmentCommand,
   type JsonEnvelope,

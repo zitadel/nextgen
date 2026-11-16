@@ -9,8 +9,8 @@ import {
   runtimeSummary,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
-  CommandGroups,
   type Connection,
   EnvironmentCommand,
   type JsonEnvelope,

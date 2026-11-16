@@ -2,13 +2,8 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { type Deployment, DeploymentService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";

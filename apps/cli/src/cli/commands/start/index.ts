@@ -17,13 +17,8 @@ import {
   resolveRuntimeBackend,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";

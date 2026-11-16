@@ -3,9 +3,9 @@ import { z } from "zod";
 
 import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
-  CommandGroups,
   type CommandResult,
   CREDENTIALS,
   type JsonEnvelope,

@@ -81,7 +81,7 @@ import {
   type WriteResult,
   type WriteShape,
 } from "@/lib/oclif/crud";
-import { CommandGroups } from "@/lib/oclif/groups";
+import { CommandGroups } from "@/cli/commands/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */

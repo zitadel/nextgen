@@ -5,13 +5,8 @@ import { z } from "zod";
 import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
 import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  type Connection,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type Connection, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";

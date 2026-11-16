@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
 import { GetDeploymentParams } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";

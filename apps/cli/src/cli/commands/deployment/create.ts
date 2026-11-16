@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseParams } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";

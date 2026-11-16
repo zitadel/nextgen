@@ -6,7 +6,8 @@ import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-serve
 import { LocalServer } from "@/lib/local-server/server";
 import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { section, log } from "@/lib/ui";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";

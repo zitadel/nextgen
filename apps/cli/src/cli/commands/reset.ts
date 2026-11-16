@@ -10,7 +10,8 @@ import {
   readRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { type Fact, section } from "@/lib/ui";
 

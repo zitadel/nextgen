@@ -1,7 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 
 import { PreviewService } from "@/lib/backend";
-import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive, Settled } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";

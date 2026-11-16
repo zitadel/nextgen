@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";

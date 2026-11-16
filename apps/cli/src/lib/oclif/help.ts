@@ -3,11 +3,11 @@ import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/
 import { Skills } from "@/lib/skills";
 import { Spelling, suggesterFor } from "@/lib/suggestion";
 
-import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
+import { compareInGroup } from "./groups";
 import { aliasedCommands, aliasedNouns } from "./plural-aliases";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
-type GroupedCommand = Command.Loadable & { group?: CommandGroup; groupOrder?: number };
+type GroupedCommand = Command.Loadable & { group?: string; groupOrder?: number };
 
 /** One line of the root screen: a command, or a family of commands under one name. */
 type Row = { name: string; summary: string; order: number };
@@ -37,7 +37,10 @@ const UTILITY_ORDER: readonly string[] = ["commands", "search", "autocomplete", 
  * command, spelled as they are declared. Wired in via `oclif.helpClass` in
  * `package.json`.
  */
-export default class ZitadelHelp extends Help {
+export abstract class GroupedHelp extends Help {
+  /** The groups the root screen lists, in print order; commands with no group are listed with the last. */
+  protected abstract readonly groups: readonly string[];
+
   override async showHelp(argv: string[]): Promise<void> {
     const nouns = aliasedNouns(this.config.commands);
     const subject = argv.findIndex((word) => {
@@ -53,11 +56,13 @@ export default class ZitadelHelp extends Help {
   protected override async showRootHelp(): Promise<void> {
     const { bin } = this.config;
     const commands = this.rootCommands();
-    const groups = COMMAND_GROUPS.map((group) => {
-      return [group, this.rowsOf(this.commandsOf(commands, group))] as const;
-    }).filter(([, rows]) => {
-      return rows.length > 0;
-    });
+    const groups = this.groups
+      .map((group) => {
+        return [group, this.rowsOf(this.commandsOf(commands, group))] as const;
+      })
+      .filter(([, rows]) => {
+        return rows.length > 0;
+      });
     const width = Math.max(
       0,
       ...groups.flatMap(([, rows]) => {
@@ -125,10 +130,10 @@ export default class ZitadelHelp extends Help {
    * The commands a group lists. oclif's own utilities declare no group and are
    * listed with the last one.
    */
-  private commandsOf(commands: readonly GroupedCommand[], group: CommandGroup): GroupedCommand[] {
+  private commandsOf(commands: readonly GroupedCommand[], group: string): GroupedCommand[] {
     return commands.filter((command) => {
       return (
-        command.group === group || (command.group === undefined && group === CommandGroups.cli)
+        command.group === group || (command.group === undefined && group === this.groups.at(-1))
       );
     });
   }

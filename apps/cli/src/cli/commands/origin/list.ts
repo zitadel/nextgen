@@ -1,5 +1,6 @@
 import { OriginService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */

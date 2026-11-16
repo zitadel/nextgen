@@ -8,13 +8,8 @@ import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Environment, type InitialDeployment } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
 import { log, warnings } from "@/lib/ui";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";

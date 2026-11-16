@@ -2,13 +2,8 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { PreviewService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-  PreviewCommand,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type JsonEnvelope, nonBlankString, PreviewCommand } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";

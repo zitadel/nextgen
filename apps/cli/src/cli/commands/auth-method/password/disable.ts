@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { AuthMethodCommand } from "@/cli/commands/auth-method/command";
-import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import type { Admitted, JsonEnvelope } from "@/lib/oclif";
 
 /**
  * `zitadel auth-method password disable` — disable password sign-in for a user schema.

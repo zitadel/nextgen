@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";

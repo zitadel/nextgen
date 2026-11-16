@@ -1,4 +1,5 @@
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { Skills } from "@/lib/skills";
 import { escapeControlCharacters } from "@/lib/terminal-text";

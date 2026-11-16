@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, reads } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";

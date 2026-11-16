@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Plugin } from "@oclif/core";
 import { describe, expect } from "vitest";
 
-import { COMMAND_GROUPS } from "@/lib/oclif/groups";
+import { COMMAND_GROUPS } from "@/cli/commands/groups";
 import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import {

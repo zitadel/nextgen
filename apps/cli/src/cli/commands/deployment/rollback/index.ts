@@ -9,7 +9,8 @@ import {
 } from "@/lib/backend";
 import { RollbackDeploymentParams } from "@/lib/backend/schemas";
 import { isCancellation, toZitadelError } from "@/lib/errors";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";

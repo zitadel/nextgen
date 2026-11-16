@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { COMMANDS } from "@/index";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand, FLAG_VARIABLES } from "@/lib/oclif/base";
-import { CommandGroups } from "@/lib/oclif/groups";
+import { COMMAND_GROUPS, CommandGroups } from "@/cli/commands/groups";
 import { cliReference } from "@/lib/oclif/reference";
 
 const packageRoot = join(import.meta.dirname, "../../../..");
@@ -43,7 +43,10 @@ describe("command-reference.json", () => {
     const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
       oclif: { bin: string };
     };
-    const reference = { $comment: marker, ...cliReference(COMMANDS, manifest.oclif.bin) };
+    const reference = {
+      $comment: marker,
+      ...cliReference(COMMANDS, manifest.oclif.bin, COMMAND_GROUPS),
+    };
 
     await expect(`${JSON.stringify(reference, null, 2)}\n`).toMatchFileSnapshot(
       join(packageRoot, "command-reference.json"),
@@ -61,6 +64,7 @@ describe("cliReference", () => {
         setup: aCommand({ groupOrder: 1 }),
       },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.groups).toEqual(Object.values(CommandGroups));
@@ -76,6 +80,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       { "auth-method:sso:enable": aCommand({ aliases: ["sso:on"] }) },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands[0]).toMatchObject({
@@ -88,6 +93,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       { setup: aCommand({ flags: { force: Flags.boolean({ description: "Overwrite." }) } }) },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.globalFlags.map((flag) => flag.name)).toEqual([
@@ -103,7 +109,7 @@ describe("cliReference", () => {
   });
 
   it("lists the environment variables of the global flags in the flags' order", () => {
-    const reference = cliReference({ setup: aCommand() }, "zitadel");
+    const reference = cliReference({ setup: aCommand() }, "zitadel", COMMAND_GROUPS);
 
     const flags = Object.keys(BaseCommand.baseFlags);
     const positions = reference.env.map(({ flag }) => flags.indexOf(flag));
@@ -113,7 +119,7 @@ describe("cliReference", () => {
   });
 
   it("maps each error code to the exit code a failure with it returns", () => {
-    const reference = cliReference({ setup: aCommand() }, "zitadel");
+    const reference = cliReference({ setup: aCommand() }, "zitadel", COMMAND_GROUPS);
 
     expect(reference.exitCodes).toEqual(EXIT_CODES);
   });
@@ -127,6 +133,7 @@ describe("cliReference", () => {
         }),
       },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands[0]?.flags.map((flag) => flag.name)).toEqual(["provider", "schema"]);
@@ -153,6 +160,7 @@ describe("cliReference", () => {
         }),
       },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands[0]?.flags).toEqual([
@@ -190,6 +198,7 @@ describe("cliReference", () => {
         }),
       },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands[0]?.args).toEqual([
@@ -211,6 +220,7 @@ describe("cliReference", () => {
         }),
       },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands[0]).toMatchObject({
@@ -226,6 +236,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       { setup: aCommand(), design: aCommand({ hidden: true }) },
       "zitadel",
+      COMMAND_GROUPS,
     );
 
     expect(reference.commands.map(({ id }) => id)).toEqual(["setup"]);
@@ -246,6 +257,8 @@ describe("cliReference", () => {
       /global flags/,
     ],
   ])("refuses %s", (_case, statics, message) => {
-    expect(() => cliReference({ setup: aCommand(statics) }, "zitadel")).toThrow(message);
+    expect(() => cliReference({ setup: aCommand(statics) }, "zitadel", COMMAND_GROUPS)).toThrow(
+      message,
+    );
   });
 });

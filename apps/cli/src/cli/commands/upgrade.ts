@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { execa } from "execa";
 
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { Skills } from "@/lib/skills";
 import { style } from "@/lib/ui";

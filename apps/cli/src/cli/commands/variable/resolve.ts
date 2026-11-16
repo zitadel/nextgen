@@ -4,13 +4,8 @@ import { z } from "zod";
 import { DeploymentService, type Variable } from "@/lib/backend";
 import { ListDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";

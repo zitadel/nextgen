@@ -3,7 +3,7 @@ import type { Command, Interfaces } from "@oclif/core";
 import { EXIT_CODES, type ZitadelErrorCode } from "@/lib/errors";
 
 import { BaseCommand, FLAG_VARIABLES } from "./base";
-import { COMMAND_GROUPS, type CommandGroup, compareInGroup } from "./groups";
+import { compareInGroup } from "./groups";
 import type { FlagVariable } from "./types";
 
 /**
@@ -55,7 +55,7 @@ export type ExampleReference = { command: string; description?: string };
 export type CommandReference = {
   /** The command as typed after the bin: `auth-method sso enable`. */
   id: string;
-  group: CommandGroup;
+  group: string;
   description: string;
   aliases?: string[];
   /** oclif's `state`, such as `beta` or `deprecated`. */
@@ -69,7 +69,7 @@ export type CommandReference = {
 
 export type CliReference = {
   bin: string;
-  groups: CommandGroup[];
+  groups: string[];
   globalFlags: FlagReference[];
   /** In the order of the global flags they stand in for. */
   env: FlagVariable[];
@@ -79,7 +79,7 @@ export type CliReference = {
 };
 
 /** A command class with the root-help statics {@link BaseCommand} declares. */
-type ReferencedCommand = typeof Command & { group?: CommandGroup; groupOrder?: number };
+type ReferencedCommand = typeof Command & { group?: string; groupOrder?: number };
 
 /**
  * The `--json` oclif puts before the base flags of a command that sets
@@ -91,10 +91,11 @@ const JSON_FLAG: FlagReference = {
   type: "boolean",
 };
 
-/** The reference of a COMMANDS table (`src/index.ts`) whose binary is `bin`. */
+/** The reference of a COMMANDS table (`src/index.ts`) whose binary is `bin`, its commands under `groups` in that order. */
 export function cliReference(
   commands: Readonly<Record<string, typeof Command>>,
   bin: string,
+  groups: readonly string[],
 ): CliReference {
   const entries = Object.entries(commands)
     .map(([id, command]) => {
@@ -104,11 +105,11 @@ export function cliReference(
       return !command.hidden;
     })
     .map(({ id, command }) => {
-      return { id, command, group: groupOf(id, command) };
+      return { id, command, group: groupOf(id, command, groups) };
     })
     .sort((a, b) => {
       return (
-        COMMAND_GROUPS.indexOf(a.group) - COMMAND_GROUPS.indexOf(b.group) ||
+        groups.indexOf(a.group) - groups.indexOf(b.group) ||
         compareInGroup(
           { id: a.id, groupOrder: a.command.groupOrder },
           { id: b.id, groupOrder: b.command.groupOrder },
@@ -120,7 +121,7 @@ export function cliReference(
 
   return {
     bin,
-    groups: [...COMMAND_GROUPS],
+    groups: [...groups],
     globalFlags: [
       JSON_FLAG,
       ...flagReferences(BaseCommand.baseFlags, (text) => {
@@ -137,10 +138,10 @@ export function cliReference(
   };
 }
 
-function groupOf(id: string, command: ReferencedCommand): CommandGroup {
+function groupOf(id: string, command: ReferencedCommand, groups: readonly string[]): string {
   const { group } = command;
-  if (group === undefined || !COMMAND_GROUPS.includes(group)) {
-    throw new Error(`${id} declares no group of lib/oclif/groups.ts as its static group.`);
+  if (group === undefined || !groups.includes(group)) {
+    throw new Error(`${id} declares no group of the CLI's list as its static group.`);
   }
   return group;
 }
@@ -148,7 +149,7 @@ function groupOf(id: string, command: ReferencedCommand): CommandGroup {
 function commandReference(
   id: string,
   command: ReferencedCommand,
-  group: CommandGroup,
+  group: string,
   bin: string,
 ): CommandReference {
   // The global flags are listed once, for every command, so each must take
