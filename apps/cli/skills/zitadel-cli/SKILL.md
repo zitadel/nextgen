@@ -403,12 +403,6 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
-- `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
-  live expiry of a live preview deployment's preview (the earliest, when it made
-  several), empty for any other deployment, such as a primary one, a replaced
-  one, or one whose preview is gone. It is also empty when the previews could
-  not be read, and a warning says so. `--json` items are the API's records,
-  unchanged and without `expires`.
 - `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
   they use a GitHub pull request's title, Vercel's commit message, or a clean
   worktree's commit subject; with none, a non-interactive `deploy` fails. A
@@ -433,6 +427,13 @@ Each invocation prints one JSON object:
   and also stop serving when they expire. Revoke again once none serves it.
   Without origins the CLI can read, the conflict is the plain one: no `hint`, no
   `next_commands`, and `details` holds the server's `status`, `url` and `body`.
+- `deployment list` rows carry `kind` (`primary` or `preview`) and `expires`: the
+  live expiry of a live preview deployment's preview (the earliest, when it made
+  several), empty for any other deployment, such as a primary one, a replaced
+  one, or one whose preview is gone. It is also empty when the previews could
+  not be read, and a warning says so. `--json` items are the API's records,
+  unchanged and without `expires`: read a preview's expiry as JSON with
+  `preview list --json`.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve <id>`.
