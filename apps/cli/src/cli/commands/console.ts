@@ -69,34 +69,38 @@ export default class Console extends BaseCommand {
     resolveServer: false,
   };
 
+  /** The server a remote console is opened for, read once by {@link sourceOf}. */
+  private named: string | undefined;
+
   /**
-   * The server the console signs into, read before the run has a context so
-   * that every event and any refusal names it: `start` may have run in a
-   * parent of the app directory, and its runtime metadata sits beside the
-   * admin it created, so both are read from there.
+   * The server the console is about, read before the run has a context so that
+   * every event and any refusal names it. The local server a `start` left in this
+   * directory or a parent (its runtime metadata sits beside the admin it
+   * created) is the one; only without it does `--server`, or else the project's
+   * own server, decide. The environment is read
+   * once, here, from the process: the run has no context of its own yet.
    */
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await findLocalAdminDir(cwd);
     if (found === undefined) {
-      const named = await projectServerOf(cwd, flags.server);
-      if (named !== undefined) {
-        return named;
-      }
+      this.named = await projectServerOf(cwd, flags.server);
     }
 
-    return (await readRuntimeMetadata(found ?? cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+    return (
+      this.named ??
+      (await readRuntimeMetadata(found ?? cwd))?.server_url ??
+      DEFAULT_LOCAL_SERVER_URL
+    );
   }
 
   protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
-    // A local admin means a server was started here, and it is the console that
-    // was asked for. Without one, a project on a server that is not on this
-    // machine has only that server's console to open.
-    const found = await findLocalAdminDir(this.cwd);
-    const named = found === undefined ? await projectServerOf(this.cwd, flags.server) : undefined;
-    if (named !== undefined && !Server.at(named).isLoopback()) {
-      return this.openRemote(Server.at(named).consoleUrl(), flags.noOpen);
+    // With no local server started here, the server `--server` or the project
+    // names, when it is not on this machine, has only its own console to open.
+    if (this.named !== undefined && !Server.at(this.named).isLoopback()) {
+      return this.openRemote(Server.at(this.named).consoleUrl(), flags.noOpen);
     }
 
+    const found = await findLocalAdminDir(this.cwd);
     const localDir = found ?? this.cwd;
     const admin = await readLocalAdmin(localDir);
     if (admin === undefined) {
@@ -159,6 +163,10 @@ export default class Console extends BaseCommand {
    * local admin to sign in as, so the page is the server's own and the
    * developer signs in there; a dry run opens nothing, as it would not for a
    * local server.
+   *
+   * @param consoleUrl - The server's console.
+   * @param noOpen - Whether `--no-open` asked to print the link only.
+   * @returns The result, naming the link and whether a browser was opened.
    */
   private async openRemote(consoleUrl: string, noOpen: boolean): Promise<JsonEnvelope> {
     if (this.dryRun) {
