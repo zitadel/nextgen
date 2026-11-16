@@ -351,8 +351,8 @@ func (s *InvitationService) inviterRefs(ctx context.Context, projectID string, i
 }
 
 // InviterCheck reports whether userID still administers projectID, reading
-// through stmts inside the accept's transaction. The authz resolver provides
-// it (resolver.ProjectAdminCheck); the service can't import the resolver.
+// through stmts inside the accept's transaction. The API layer provides it
+// (api.InviterAdminCheck), next to the other authz checks.
 type InviterCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (bool, error)
 
 // Lookup finds a pending invitation by its link's token for userID.

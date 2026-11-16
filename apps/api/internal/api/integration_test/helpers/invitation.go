@@ -5,7 +5,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/authz/resolver"
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -22,7 +22,7 @@ func (h *Harness) EnsureInvitationService(t testing.TB) *service.InvitationServi
 			h.EnsureKeyService(t),
 			h.EnsureGrantService(t),
 			service.StatementsUserRefResolver{Pool: db},
-			resolver.ProjectAdminCheck(platformID),
+			api.InviterAdminCheck(platformID),
 			ConsoleOrigin+"/ui/console",
 			platformID,
 		)
