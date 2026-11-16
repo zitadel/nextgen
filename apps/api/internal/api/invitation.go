@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
@@ -11,11 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// invitationStubPhase stays 0; its other cases only feed gen_openapi_errors
-// the token endpoints' codes until #2853. Keep each switch to its op's set.
-var invitationStubPhase int
-
-// WithInvitationService wires the invitation admin endpoints, like
+// WithInvitationService wires the invitation endpoints, like
 // WithPolicyService.
 func (h *Handler) WithInvitationService(s *service.InvitationService) *Handler {
 	h.invitationService = s
@@ -77,16 +74,13 @@ func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitation
 		Limit:     int(params.Limit.Or(0)),
 		PageToken: string(params.PageToken.Or("")),
 	}
-	// Several statuses and expand=inviter land with the implementation.
-	if len(params.Status) > 1 || len(params.Expand) > 0 {
-		return nil, domain.ErrNotImplemented()
-	}
-	if len(params.Status) == 1 {
-		req.Status = new(domain.InvitationStatus(params.Status[0]))
+	for _, status := range params.Status {
+		req.Statuses = append(req.Statuses, domain.InvitationStatus(status))
 	}
 	if v, ok := params.Type.Get(); ok {
 		req.Type = new(domain.InvitationType(v))
 	}
+	req.ExpandInviter = slices.Contains(params.Expand, api.InvitationExpandInviter)
 	listed, err := h.invitationService.List(ctx, req)
 	if err != nil {
 		return nil, err
@@ -97,6 +91,14 @@ func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitation
 		mapped, err := invitationResponse(inv, now)
 		if err != nil {
 			return nil, err
+		}
+		if req.ExpandInviter {
+			// Present, and null for a project secret, only when expanded.
+			if inv.Inviter != nil {
+				mapped.InvitationProjectMember.Inviter.SetTo(userRefToAPI(*inv.Inviter))
+			} else {
+				mapped.InvitationProjectMember.Inviter.SetToNull()
+			}
 		}
 		resp.Invitations = append(resp.Invitations, *mapped)
 	}
@@ -177,50 +179,82 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 }
 
 func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.LookupInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		return nil, domain.ErrInvitationNotFound()
-	default:
-		return nil, domain.ErrNotImplemented()
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
+		return nil, err
 	}
+	found, err := h.invitationService.Lookup(ctx, req.Token, userID)
+	if err != nil {
+		return nil, err
+	}
+	if found.Type != domain.InvitationTypeProjectMember || found.ProjectMember == nil {
+		return nil, domain.ErrInternal(fmt.Errorf("invitation %q has an unknown type %q", found.ID, found.Type))
+	}
+	view := api.InvitationLookupProjectMemberResponse{
+		ProjectID:   api.ProjectID(found.ProjectID),
+		ProjectName: found.ProjectName,
+		ExpiresAt:   found.ExpiresAt,
+		Status:      api.InvitationStatus(found.StatusAt(time.Now())),
+		Type:        api.InvitationLookupProjectMemberResponseTypeProjectMember,
+		ProjectMember: api.InvitationProjectMemberPayload{
+			Relation: api.InvitationProjectMemberPayloadRelation(found.ProjectMember.Relation),
+		},
+	}
+	if found.CreatedBy != nil {
+		view.CreatedBy.SetTo(*found.CreatedBy)
+	} else {
+		view.CreatedBy.SetToNull()
+	}
+	if found.CreatedByType != nil {
+		view.CreatedByType.SetTo(api.InvitationLookupProjectMemberResponseCreatedByType(*found.CreatedByType))
+	} else {
+		view.CreatedByType.SetToNull()
+	}
+	if found.Inviter != nil {
+		view.Inviter.SetTo(userRefToAPI(*found.Inviter))
+	} else {
+		view.Inviter.SetToNull()
+	}
+	resp := api.NewInvitationLookupProjectMemberResponseInvitationLookupResponse(view)
+	return &resp, nil
 }
 
 func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.AcceptInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		// Unknown and finished tokens share the public not_found.
-		return nil, domain.ErrInvitationNotFound()
-	case 2:
-		return nil, domain.ErrInvitationSelfAccept()
-	case 3:
-		return nil, domain.ErrInvitationProjectUnclaimed()
-	case 4:
-		return nil, domain.ErrInvitationPlatformRequired()
-	case 5:
-		return nil, domain.ErrInvitationInviterNotAdmin()
-	case 6:
-		// Accepting emits invitation.accepted.
-		return nil, domain.ErrEventInvalid(nil, nil)
-	default:
-		return nil, domain.ErrNotImplemented()
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
+		return nil, err
 	}
+	accepted, err := h.invitationService.Accept(ctx, req.Token, userID)
+	if err != nil {
+		return nil, err
+	}
+	return invitationResponse(accepted, time.Now())
 }
 
 func (h *Handler) RejectInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.RejectInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		return nil, domain.ErrInvitationNotFound()
-	case 2:
-		return nil, domain.ErrInvitationSelfReject()
-	case 3:
-		// Declining emits invitation.rejected.
-		return nil, domain.ErrEventInvalid(nil, nil)
-	default:
-		return nil, domain.ErrNotImplemented()
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
+		return nil, err
 	}
+	rejected, err := h.invitationService.Reject(ctx, req.Token, userID)
+	if err != nil {
+		return nil, err
+	}
+	return invitationResponse(rejected, time.Now())
+}
+
+// invitationRedeemer is the user redeeming a link: only a session of a user
+// homed in the platform project may (ADR 086 §10).
+func (h *Handler) invitationRedeemer(ctx context.Context) (string, error) {
+	token, _ := sessionTokenFromContext(ctx)
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return "", invalidSessionCredential(err)
+	}
+	if h.platformProjectID != "" && self.ProjectID() != h.platformProjectID {
+		return "", invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+	return self.UserID(), nil
 }
 
 func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
