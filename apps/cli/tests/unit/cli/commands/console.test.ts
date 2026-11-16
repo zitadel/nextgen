@@ -80,4 +80,102 @@ describe("console", () => {
       title: "Would mint a console sign-in link (dry run)",
     });
   });
+
+  it.for([
+    ["a cloud project", "https://preview.zitadel.com", "https://preview.zitadel.com/console/"],
+    ["a self-hosted project", "https://auth.example.com", "https://auth.example.com/ui/console/"],
+  ])(
+    "prints the console of %s without needing a local server",
+    async ([, server, url], { dir }) => {
+      const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+        HOME: dir,
+        USERPROFILE: dir,
+        ZITADEL_URL: server,
+      });
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        status: string;
+        source: string;
+        data: { console_url: string; browser_opened: boolean };
+      };
+      expect(json.status).toBe("ok");
+      expect(json.source).toBe(server);
+      expect(json.data).toMatchObject({ console_url: url, browser_opened: false });
+      expect(res.stdout).not.toContain("start");
+    },
+  );
+
+  it("opens nothing on a dry run against a cloud project", async ({ dir }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "https://preview.zitadel.com",
+    });
+
+    const json = parseJson(res.stdout) as { data: { dry_run: boolean; console_url: string } };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      console_url: "https://preview.zitadel.com/console/",
+    });
+  });
+
+  it("still asks for a local admin when the project's server is on this machine", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "http://localhost:8080",
+    });
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toBe(
+      "No local admin in this directory or its parents",
+    );
+  });
+
+  it("keeps to the local console when a local server was started, whatever the project names", async ({
+    dir,
+  }) => {
+    const { admin } = await ensureLocalAdmin(dir);
+
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--dry-run"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "https://preview.zitadel.com",
+    });
+
+    expect((parseJson(res.stdout) as { data: { signed_in_as: string } }).data.signed_in_as).toBe(
+      admin.email,
+    );
+  });
+
+  it("prints the console of the server --server names, over the one the project names", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(
+      ["console", "--cwd", dir, "--json", "--no-open", "--server", "https://preview.zitadel.com"],
+      { HOME: dir, USERPROFILE: dir, ZITADEL_URL: "https://auth.example.com" },
+    );
+
+    expect((parseJson(res.stdout) as { data: { console_url: string } }).data.console_url).toBe(
+      "https://preview.zitadel.com/console/",
+    );
+  });
+
+  it("names a server that is not a URL instead of saying no local admin exists", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "not a url",
+    });
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).not.toBe(
+      "No local admin in this directory or its parents",
+    );
+  });
 });

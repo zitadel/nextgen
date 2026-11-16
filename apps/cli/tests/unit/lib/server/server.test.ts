@@ -144,3 +144,37 @@ describe("Server.hostUnlessDefault", () => {
     expect(Server.at("not a url").hostUnlessDefault()).toBeUndefined();
   });
 });
+
+describe("Server.isCloud", () => {
+  it.for([Server.DEFAULT, "https://acme.zitadel.cloud", "https://zitadel.cloud/path"])(
+    "accepts %s",
+    (url) => {
+      expect(Server.at(url).isCloud()).toBe(true);
+    },
+  );
+
+  it.for(["https://auth.example.com", "http://localhost:8080", "https://evilzitadel.cloud", "x"])(
+    "rejects %s",
+    (url) => {
+      expect(Server.at(url).isCloud()).toBe(false);
+    },
+  );
+});
+
+describe("Server.consoleUrl", () => {
+  it("is /console/ on the hosted cloud", () => {
+    expect(Server.at("https://preview.zitadel.com/api/v1").consoleUrl()).toBe(
+      "https://preview.zitadel.com/console/",
+    );
+  });
+
+  it("is /ui/console/ on any other server", () => {
+    expect(Server.at("https://auth.example.com").consoleUrl()).toBe(
+      "https://auth.example.com/ui/console/",
+    );
+  });
+
+  it("refuses an address that is not a URL", () => {
+    expect(() => Server.at("not a url").consoleUrl()).toThrow(/Invalid server/);
+  });
+});

@@ -549,6 +549,11 @@ export default class Claim extends EnvironmentCommand {
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
     const title = "This project already belongs to a team";
+    // The platform's own link to the project when it gave one, else the server's
+    // console, so a project claimed earlier still says where to manage it.
+    const consoleUrl =
+      data.dashboard_url ??
+      (URL.canParse(this.meta.source) ? Server.at(this.meta.source).consoleUrl() : undefined);
 
     return this.emit({
       status: "skipped",
@@ -556,10 +561,19 @@ export default class Claim extends EnvironmentCommand {
       data: {
         title,
         ...data,
+        ...(consoleUrl === undefined ? {} : { console_url: consoleUrl }),
       },
       summary: {
         title,
-        sections: [section(undefined, ["Team", escapeControlCharacters(data.team_id)])],
+        sections: [
+          section(
+            undefined,
+            ["Team", escapeControlCharacters(data.team_id)],
+            ...(consoleUrl === undefined
+              ? []
+              : [["Console", escapeControlCharacters(consoleUrl)] as const]),
+          ),
+        ],
       },
     });
   }
