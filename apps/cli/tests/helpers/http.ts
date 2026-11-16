@@ -42,7 +42,12 @@ export const test = base.extend<{
       return `http://${host}:${String(address.port)}`;
     });
     await Promise.all(
-      started.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))),
+      started.map((server) => {
+        return new Promise<void>((resolve) => {
+          server.close(() => resolve());
+          server.closeAllConnections();
+        });
+      }),
     );
   },
 });
