@@ -1,12 +1,13 @@
+import { Readable } from "node:stream";
+
 import { describe, expect, it } from "vitest";
 
 import { Stdin } from "@/lib/stdin";
 
 describe("Stdin.read", () => {
-  const streamOf = (...chunks: string[]) =>
-    (async function* () {
-      yield* chunks;
-    })() as unknown as NodeJS.ReadableStream;
+  const streamOf = (...chunks: string[]) => {
+    return Readable.from(chunks);
+  };
 
   it("joins chunks", async () => {
     expect(await Stdin.on(streamOf("abc", "def")).read()).toBe("abcdef");
