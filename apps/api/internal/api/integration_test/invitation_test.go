@@ -301,18 +301,18 @@ func TestInvitationAdminLimits(t *testing.T) {
 		ownerID := api.ProjectID(owner.ID)
 		foreign := createdID(t, create(t, otherClient, api.ProjectID(other.ID), ""))
 
-		got, err := ownerClient.GetInvitation(t.Context(), api.GetInvitationParams{ID: foreign, ProjectID: ownerID})
+		got, err := ownerClient.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: foreign, ProjectID: ownerID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetInvitationNotFound{}, got, helpers.MustMarshal(t, got))
 
-		cancelled, err := ownerClient.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: foreign, ProjectID: ownerID})
+		cancelled, err := ownerClient.CancelInvitation(t.Context(), api.CancelInvitationParams{InvitationID: foreign, ProjectID: ownerID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CancelInvitationNotFound{}, cancelled, helpers.MustMarshal(t, cancelled))
 
 		require.IsType(t, &api.CreateInvitationNotFound{}, create(t, ownerClient, ownerID, foreign))
 
 		// The other project's invitation is untouched.
-		still, err := otherClient.GetInvitation(t.Context(), api.GetInvitationParams{ID: foreign, ProjectID: api.ProjectID(other.ID)})
+		still, err := otherClient.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: foreign, ProjectID: api.ProjectID(other.ID)})
 		require.NoError(t, err)
 		inv, ok := still.(*api.Invitation)
 		require.True(t, ok, helpers.MustMarshal(t, still))
@@ -540,10 +540,10 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.False(t, ok, "a rejected invitation matches neither pending nor accepted")
 
 		// The administrator removes the declined invitation, and its metadata with it.
-		cancelled, err := owner.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: created.ID, ProjectID: projectID})
+		cancelled, err := owner.CancelInvitation(t.Context(), api.CancelInvitationParams{InvitationID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CancelInvitationNoContent{}, cancelled, helpers.MustMarshal(t, cancelled))
-		gone, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{ID: created.ID, ProjectID: projectID})
+		gone, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.GetInvitationNotFound{}, gone, helpers.MustMarshal(t, gone))
 	})
@@ -559,7 +559,7 @@ func TestInvitationRedeem(t *testing.T) {
 		require.IsType(t, &api.RejectInvitationUnauthorized{}, reject(t, colleague, token))
 		require.IsType(t, &api.AcceptInvitationUnauthorized{}, accept(t, colleague, token))
 
-		got, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{ID: created.ID, ProjectID: projectID})
+		got, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{InvitationID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		inv, ok := got.(*api.Invitation)
 		require.True(t, ok, helpers.MustMarshal(t, got))
@@ -614,7 +614,7 @@ func TestInvitationRedeem(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, granted))
 
 		_, token := invite(t, admin, api.InvitationProjectMemberPayloadRelationAdmin)
-		_, err = secret.DeleteGrant(t.Context(), api.DeleteGrantParams{ID: grant.ID, ProjectID: projectID})
+		_, err = secret.DeleteGrant(t.Context(), api.DeleteGrantParams{GrantID: grant.ID, ProjectID: projectID})
 		require.NoError(t, err)
 
 		_, colleague := newColleague(t)
