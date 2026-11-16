@@ -1,26 +1,9 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { test as base } from "./daemon";
 import type { RecordedLog } from "./log";
-import { removeTree } from "./scratch";
+import { scratchDir } from "./scratch";
 import type { TerminalFixture } from "./terminal";
 
 export type { Serve } from "./http";
-
-/**
- * Makes a temp directory, hands it to the test, and removes it when the test is over, giving back
- * the permissions the test took away if it had to.
- *
- * @param use - Runs the test with the directory.
- * @returns Once the directory is gone.
- */
-async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), "zitadel-"));
-  await use(dir);
-  await removeTree(dir);
-}
 
 /**
  * The CLI's one `test`: every fixture, from the helper file named for what it provides. Vitest
@@ -28,11 +11,10 @@ async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
  * last two. A test that names a fixture in its first argument gets it, and the teardown runs after
  * the test whether it passed or not.
  *
- * - `dir` is a fresh temp directory, removed when the test ends.
+ * - `dir` is a fresh temp directory, removed once every fixture is torn down.
  * - `other` is a second one, for a test that needs two apart.
- * - `server` and `serve` are in `http.ts`: an MSW server that fails a request nothing handled, and
- *   an HTTP server on a free port.
- * - `port` is in `port.ts`: a port from this worker's own block.
+ * - `server` and `serve` and `port` are in `http.ts`: an MSW server that fails a request nothing handled, an HTTP
+ *   server on a free port, and a port from this worker's own block.
  * - `recorded` is in `log.ts`: what the code under test said through `log`.
  * - `terminal` is in `terminal.ts`: the terminal the run is at, and its controls.
  * - `clock` is in `clock.ts`: fake timers the test advances.
@@ -43,9 +25,13 @@ export const test = base.extend<{
   other: string;
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  dir: ({}, use) => withTempDir(use),
+  async dir({}, use) {
+    await use(await scratchDir("zitadel-"));
+  },
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  other: ({}, use) => withTempDir(use),
+  async other({}, use) {
+    await use(await scratchDir("zitadel-"));
+  },
 });
 
 /**

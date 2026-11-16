@@ -237,7 +237,7 @@ it stays here deliberately rather than by oversight.
     a TCP listener on a port the OS picks and returns the port, for a test of
     what the CLI does on a port that is taken.
 - A fixture lives in the helper file named for what it provides (`http.ts`,
-  `port.ts`, `log.ts`, `terminal.ts`, `clock.ts`, `daemon.ts`), defined with
+  `log.ts`, `terminal.ts`, `clock.ts`, `daemon.ts`), defined with
   `test.extend`. Vitest cannot merge extended tests, so each extends the one
   before it and `fixtures.ts` adds `dir` and `other` and exports the CLI's one
   `it`. A fixture only one test file uses stays in that file; when a second file

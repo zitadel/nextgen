@@ -114,7 +114,7 @@ export function trackLocalServerDir(dir: string): void {
 async function recordedPid(dir: string): Promise<number | undefined> {
   try {
     const record = JSON.parse(await readFile(join(dir, ".zitadel/local/runtime.json"), "utf8"));
-    return typeof record.pid === "number" ? record.pid : undefined;
+    return Number.isInteger(record.pid) && record.pid > 0 ? record.pid : undefined;
   } catch {
     return undefined;
   }

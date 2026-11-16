@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { connect } from "node:net";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { test as base } from "./clock";
+import { scratchDir } from "./scratch";
 
 /**
  * When a spawned process counts as started: its output matches a pattern, or something accepts a
@@ -45,7 +45,12 @@ export interface Daemons {
    *   wrote.
    */
   spawn(command: string, args: readonly string[], options?: SpawnOptions): Promise<Daemon>;
-  /** Takes over a process the code under test started, to be ended with the test. */
+  /**
+   * Takes over a process the code under test started, to be ended with the test.
+   *
+   * @throws Error when `pid` is not a positive integer, which would signal a group that is not the
+   *   process's own.
+   */
   adopt(pid: number): void;
   /**
    * A path, in a directory of the daemon's own, for a program to append the ids of the processes it
@@ -70,91 +75,246 @@ const LOOK_AGAIN_MS = 20;
  */
 const realTimeout = globalThis.setTimeout;
 
-/**
- * Waits for a real moment to pass, whatever the test did to the clock.
- *
- * @param ms - How long.
- * @returns Once it has.
- */
-function pause(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    realTimeout(resolve, ms);
-  });
-}
+/** The processes a test started or took over, and how to end them. */
+class DaemonPool implements Daemons {
+  private readonly pids = new Set<number>();
+  private readonly logs: string[] = [];
+  private readonly home: string;
 
-/**
- * Whether a process, or a process group when the id is negative, can be signalled.
- *
- * @param target - The process id, or a group's id negated.
- * @returns Whether it exists.
- */
-function exists(target: number): boolean {
-  try {
-    process.kill(target, 0);
-    return true;
-  } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM";
+  /**
+   * @param home - A directory that outlives the test's own fixtures, for the pid logs.
+   */
+  constructor(home: string) {
+    this.home = home;
   }
-}
 
-/**
- * Whether the process or anything in the group it leads is still there.
- *
- * @param pid - The process id.
- * @returns Whether any of it runs.
- */
-function running(pid: number): boolean {
-  return exists(-pid) || exists(pid);
-}
+  async spawn(
+    command: string,
+    args: readonly string[],
+    options: SpawnOptions = {},
+  ): Promise<Daemon> {
+    const child = spawn(command, [...args], {
+      cwd: options.cwd,
+      env: options.env,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const chunks: string[] = [];
+    const listeners = new Set<() => void>();
+    const state = { closed: false };
+    const closed = new Promise<void>((resolve) => {
+      child.once("close", () => {
+        state.closed = true;
+        resolve();
+      });
+    });
+    for (const stream of [child.stdout, child.stderr]) {
+      stream.setEncoding("utf8");
+      stream.on("data", (chunk: string) => {
+        chunks.push(chunk);
+        for (const listener of listeners) {
+          listener();
+        }
+        listeners.clear();
+      });
+    }
+    const output = (): string => {
+      return chunks.join("");
+    };
+    const pid = await new Promise<number>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("spawn", () => {
+        if (child.pid === undefined) {
+          reject(new Error(`${command} started without a pid`));
+          return;
+        }
+        resolve(child.pid);
+      });
+    });
+    this.pids.add(pid);
+    void closed.then(() => {
+      this.pids.delete(pid);
+    });
+    const failed = async (): Promise<Error> => {
+      await DaemonPool.end(pid);
+      return new Error(`${command} exited before it was ready. It wrote:\n${output()}`);
+    };
+    const { ready } = options;
+    if (ready instanceof RegExp) {
+      while (!ready.test(output())) {
+        if (state.closed) {
+          throw await failed();
+        }
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            listeners.add(resolve);
+          }),
+          closed,
+        ]);
+      }
+    } else if (ready !== undefined) {
+      const { port, host = "127.0.0.1" } = ready;
+      while (!(await DaemonPool.accepts(port, host))) {
+        if (state.closed) {
+          throw await failed();
+        }
+        await Promise.race([closed, DaemonPool.pause(LOOK_AGAIN_MS)]);
+      }
+    }
+    return {
+      pid,
+      output,
+      stop: () => {
+        return DaemonPool.end(pid);
+      },
+    };
+  }
 
-/**
- * Sends a signal to the process and to the group it leads. A process that is gone is no error.
- *
- * @param pid - The process id.
- * @param signal - What to send.
- */
-function send(pid: number, signal: NodeJS.Signals): void {
-  for (const target of [-pid, pid]) {
+  adopt(pid: number): void {
+    if (!Number.isInteger(pid) || pid <= 0) {
+      throw new Error(`cannot adopt ${String(pid)}: it is not a process id`);
+    }
+    this.pids.add(pid);
+  }
+
+  pidLog(): string {
+    const path = join(this.home, `pids-${String(this.logs.length)}.log`);
+    this.logs.push(path);
+    return path;
+  }
+
+  /**
+   * Ends every process that was started, taken over, or named in a pid log.
+   *
+   * @returns Once all of them are gone.
+   */
+  async dispose(): Promise<void> {
+    for (const path of this.logs) {
+      const text = await readFile(path, "utf8").catch(() => {
+        return "";
+      });
+      for (const line of text.split(/\r?\n/)) {
+        const pid = Number.parseInt(line, 10);
+        if (Number.isInteger(pid) && pid > 0) {
+          this.pids.add(pid);
+        }
+      }
+    }
+    await Promise.all(
+      [...this.pids].map((pid) => {
+        return DaemonPool.end(pid);
+      }),
+    );
+  }
+
+  /**
+   * Waits for a real moment to pass, whatever the test did to the clock.
+   *
+   * @param ms - How long.
+   * @returns Once it has.
+   */
+  private static pause(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      realTimeout(resolve, ms);
+    });
+  }
+
+  /**
+   * Whether something accepts a TCP connection on the port.
+   *
+   * @param port - The port.
+   * @param host - The host.
+   * @returns Whether a connection was made.
+   */
+  private static accepts(port: number, host: string): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const socket = connect({ port, host });
+      socket.once("connect", () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once("error", () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+  }
+
+  /**
+   * Whether a process, or a process group when the id is negative, can be signalled.
+   *
+   * @param target - The process id, or a group's id negated.
+   * @returns Whether it exists.
+   */
+  private static exists(target: number): boolean {
     try {
-      process.kill(target, signal);
-    } catch {
-      // Already gone, which is what was asked for.
-    }
-  }
-}
-
-/**
- * Waits for a process and its group to be gone.
- *
- * @param pid - The process id.
- * @returns Whether it left within the grace period.
- */
-async function leaves(pid: number): Promise<boolean> {
-  for (const _look of Array.from({ length: GRACE_MS / LOOK_AGAIN_MS }, (_, index) => index)) {
-    if (!running(pid)) {
+      process.kill(target, 0);
       return true;
+    } catch (error) {
+      return error instanceof Error && "code" in error && error.code === "EPERM";
     }
-    await pause(LOOK_AGAIN_MS);
   }
-  return !running(pid);
-}
 
-/**
- * Ends a process and its group: asks first, insists when it does not leave.
- *
- * @param pid - The process id.
- * @returns Once it is gone, or once it has been given its grace period after `SIGKILL`.
- */
-async function end(pid: number): Promise<void> {
-  if (!running(pid)) {
-    return;
+  /**
+   * Whether the process or anything in the group it leads is still there.
+   *
+   * @param pid - The process id.
+   * @returns Whether any of it runs.
+   */
+  private static running(pid: number): boolean {
+    return DaemonPool.exists(-pid) || DaemonPool.exists(pid);
   }
-  send(pid, "SIGTERM");
-  if (await leaves(pid)) {
-    return;
+
+  /**
+   * Sends a signal to the process and to the group it leads. A process that is gone is no error.
+   *
+   * @param pid - The process id.
+   * @param signal - What to send.
+   */
+  private static send(pid: number, signal: NodeJS.Signals): void {
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, signal);
+      } catch {
+        // Already gone, which is what was asked for.
+      }
+    }
   }
-  send(pid, "SIGKILL");
-  await leaves(pid);
+
+  /**
+   * Waits for a process and its group to be gone.
+   *
+   * @param pid - The process id.
+   * @returns Whether it left within the grace period.
+   */
+  private static async leaves(pid: number): Promise<boolean> {
+    const deadline = Date.now() + GRACE_MS;
+    while (DaemonPool.running(pid)) {
+      if (Date.now() >= deadline) {
+        return false;
+      }
+      await DaemonPool.pause(LOOK_AGAIN_MS);
+    }
+    return true;
+  }
+
+  /**
+   * Ends a process and its group: asks first, insists when it does not leave.
+   *
+   * @param pid - The process id.
+   * @returns Once it is gone, or once it has been given its grace period after `SIGKILL`.
+   */
+  private static async end(pid: number): Promise<void> {
+    if (!DaemonPool.running(pid)) {
+      return;
+    }
+    DaemonPool.send(pid, "SIGTERM");
+    if (await DaemonPool.leaves(pid)) {
+      return;
+    }
+    DaemonPool.send(pid, "SIGKILL");
+    await DaemonPool.leaves(pid);
+  }
 }
 
 /**
@@ -168,121 +328,8 @@ async function end(pid: number): Promise<void> {
 export const test = base.extend<{ daemon: Daemons }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   async daemon({}, use) {
-    const pids = new Set<number>();
-    const logs: string[] = [];
-    const home = await mkdtemp(join(tmpdir(), "daemon-"));
-    await use({
-      async spawn(command, args, options = {}) {
-        const child = spawn(command, [...args], {
-          cwd: options.cwd,
-          env: options.env,
-          detached: true,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
-        const chunks: string[] = [];
-        const listeners = new Set<() => void>();
-        const state = { closed: false };
-        const closed = new Promise<void>((resolve) => {
-          child.once("close", () => {
-            state.closed = true;
-            resolve();
-          });
-        });
-        for (const stream of [child.stdout, child.stderr]) {
-          stream.setEncoding("utf8");
-          stream.on("data", (chunk: string) => {
-            chunks.push(chunk);
-            for (const listener of listeners) {
-              listener();
-            }
-            listeners.clear();
-          });
-        }
-        const output = (): string => {
-          return chunks.join("");
-        };
-        const pid = await new Promise<number>((resolve, reject) => {
-          child.once("error", reject);
-          child.once("spawn", () => {
-            if (child.pid === undefined) {
-              reject(new Error(`${command} started without a pid`));
-              return;
-            }
-            resolve(child.pid);
-          });
-        });
-        pids.add(pid);
-        const failed = async (): Promise<Error> => {
-          await end(pid);
-          return new Error(`${command} exited before it was ready. It wrote:\n${output()}`);
-        };
-        const { ready } = options;
-        if (ready instanceof RegExp) {
-          while (!ready.test(output())) {
-            if (state.closed) {
-              throw await failed();
-            }
-            await Promise.race([
-              new Promise<void>((resolve) => {
-                listeners.add(resolve);
-              }),
-              closed,
-            ]);
-          }
-        } else if (ready !== undefined) {
-          const { port, host = "127.0.0.1" } = ready;
-          while (
-            !(await new Promise<boolean>((resolve) => {
-              const socket = connect({ port, host });
-              socket.once("connect", () => {
-                socket.destroy();
-                resolve(true);
-              });
-              socket.once("error", () => {
-                socket.destroy();
-                resolve(false);
-              });
-            }))
-          ) {
-            if (state.closed) {
-              throw await failed();
-            }
-            await Promise.race([closed, pause(LOOK_AGAIN_MS)]);
-          }
-        }
-        return {
-          pid,
-          output,
-          stop: () => {
-            return end(pid);
-          },
-        };
-      },
-      adopt(pid) {
-        pids.add(pid);
-      },
-      pidLog() {
-        const path = join(home, `pids-${String(logs.length)}.log`);
-        logs.push(path);
-        return path;
-      },
-    });
-    for (const path of logs) {
-      const text = await readFile(path, "utf8").catch(() => {
-        return "";
-      });
-      for (const line of text.split(/\r?\n/)) {
-        const pid = Number.parseInt(line, 10);
-        if (Number.isInteger(pid) && pid > 0) {
-          pids.add(pid);
-        }
-      }
-    }
-    await Promise.all(
-      [...pids].map((pid) => {
-        return end(pid);
-      }),
-    );
-    await rm(home, { recursive: true, force: true });
+    const pool = new DaemonPool(await scratchDir("daemon-"));
+    await use(pool);
+    await pool.dispose();
   },
 });

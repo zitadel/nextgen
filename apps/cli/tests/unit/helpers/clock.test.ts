@@ -24,8 +24,11 @@ describe("clock", () => {
       setTimeout(() => fired.push("done"), 100);
 
       clock.advance(99);
+      const early = [...fired];
+      clock.advance(1);
 
-      expect(fired).toEqual([]);
+      expect(early).toEqual([]);
+      expect(fired).toEqual(["done"]);
     });
 
     it("lets the promise a timer resolves settle as time advances", async ({ clock }) => {

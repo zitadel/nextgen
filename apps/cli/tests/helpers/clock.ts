@@ -50,6 +50,52 @@ export interface TimeControls {
   only(...names: FakedTimers): void;
 }
 
+/** Fake timers that stand still until the test moves them, and give the real ones back. */
+class FakeTimers implements TimeControls {
+  /** Installs fake timers for every timer Vitest can fake. */
+  constructor() {
+    vi.useFakeTimers();
+  }
+
+  advance(ms: number): void {
+    vi.advanceTimersByTime(ms);
+  }
+
+  async advanceAsync(ms: number): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms);
+  }
+
+  async next(): Promise<void> {
+    await vi.advanceTimersToNextTimerAsync();
+  }
+
+  runAll(): void {
+    vi.runAllTimers();
+  }
+
+  async runAllAsync(): Promise<void> {
+    await vi.runAllTimersAsync();
+  }
+
+  runPending(): void {
+    vi.runOnlyPendingTimers();
+  }
+
+  pending(): number {
+    return vi.getTimerCount();
+  }
+
+  only(...names: FakedTimers): void {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: names });
+  }
+
+  /** Gives the real timers back. */
+  dispose(): void {
+    vi.useRealTimers();
+  }
+}
+
 /**
  * `test` with a clock that stands still until the test moves it: fake timers are on before the
  * test starts and the real ones are back when it ends.
@@ -59,34 +105,8 @@ export interface TimeControls {
 export const test = base.extend<{ clock: TimeControls }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   async clock({}, use) {
-    vi.useFakeTimers();
-    await use({
-      advance: (ms) => {
-        vi.advanceTimersByTime(ms);
-      },
-      advanceAsync: async (ms) => {
-        await vi.advanceTimersByTimeAsync(ms);
-      },
-      next: async () => {
-        await vi.advanceTimersToNextTimerAsync();
-      },
-      runAll: () => {
-        vi.runAllTimers();
-      },
-      runAllAsync: async () => {
-        await vi.runAllTimersAsync();
-      },
-      runPending: () => {
-        vi.runOnlyPendingTimers();
-      },
-      pending: () => {
-        return vi.getTimerCount();
-      },
-      only: (...names) => {
-        vi.useRealTimers();
-        vi.useFakeTimers({ toFake: names });
-      },
-    });
-    vi.useRealTimers();
+    const timers = new FakeTimers();
+    await use(timers);
+    timers.dispose();
   },
 });

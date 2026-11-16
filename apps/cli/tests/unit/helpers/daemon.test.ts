@@ -153,6 +153,12 @@ describe("daemon", () => {
       expect(runs(pid)).toBe(true);
     });
 
+    it.for([0, -1, 1.5, Number.NaN])("refuses %s as a process id to adopt", (pid, { daemon }) => {
+      expect(() => {
+        daemon.adopt(pid);
+      }).toThrow("is not a process id");
+    });
+
     it("ends the process a log names", async ({ daemon }) => {
       const child = spawn(process.execPath, ["-e", STAY], { detached: true, stdio: "ignore" });
       child.unref();

@@ -1,37 +1,8 @@
 import { Readable } from "node:stream";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, beforeEach, onTestFinished } from "vitest";
 
 import { atTerminal, type Terminal } from "./keyboard";
 import { test as base } from "./log";
-
-/**
- * Makes every test in the calling suite run as though a person were at a
- * terminal: stdout and stdin report `isTTY`, so a command is interactive
- * unless it is told otherwise. Each test gets the streams back as it found
- * them, so a stream that had no own `isTTY` gets none back.
- *
- * @returns Once the hooks are registered.
- */
-export function useTerminal(): void {
-  const found = new Map<NodeJS.WriteStream | NodeJS.ReadStream, PropertyDescriptor | undefined>();
-  beforeEach(() => {
-    for (const stream of [process.stdout, process.stdin]) {
-      found.set(stream, Object.getOwnPropertyDescriptor(stream, "isTTY"));
-      Object.defineProperty(stream, "isTTY", { value: true, configurable: true });
-    }
-  });
-  afterEach(() => {
-    for (const [stream, descriptor] of found) {
-      if (descriptor === undefined) {
-        Reflect.deleteProperty(stream, "isTTY");
-      } else {
-        Object.defineProperty(stream, "isTTY", descriptor);
-      }
-    }
-    found.clear();
-  });
-}
 
 /**
  * Runs `run` with stdout and stdin reporting `isTTY` as given, and restores
@@ -167,6 +138,69 @@ function remembering(target: object, name: string): () => void {
 }
 
 /**
+ * The terminal a test's run is at: {@link atTerminal}'s keyboard and screen, with the controls a
+ * test turns to change what the run finds. What it patched is given back by {@link dispose}.
+ */
+class TestTerminal implements TerminalFixture {
+  private readonly restore = [
+    remembering(process, "stdin"),
+    remembering(process, "platform"),
+    remembering(process.stdout, "isTTY"),
+    remembering(process.stdout, "columns"),
+  ];
+  private readonly screen = atTerminal();
+
+  get keyboard(): Terminal["keyboard"] {
+    return this.screen.keyboard;
+  }
+
+  rawModes(): boolean[] {
+    return this.screen.rawModes();
+  }
+
+  shown(): string {
+    return this.screen.shown();
+  }
+
+  plain(): string {
+    return this.screen.plain();
+  }
+
+  errors(): string {
+    return this.screen.errors();
+  }
+
+  stdin(value: string | Readable): void {
+    const source = typeof value === "string" ? Readable.from([value]) : value;
+    const piped = Object.assign(source, { isTTY: false });
+    Object.defineProperty(process, "stdin", { value: piped, configurable: true });
+  }
+
+  tty(on: boolean): void {
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: on,
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  columns(count: number): void {
+    Object.defineProperty(process.stdout, "columns", { value: count, configurable: true });
+  }
+
+  platform(name: NodeJS.Platform): void {
+    Object.defineProperty(process, "platform", { value: name, configurable: true });
+  }
+
+  /** Puts back the properties the controls changed, as they were. */
+  dispose(): void {
+    for (const put of this.restore) {
+      put();
+    }
+  }
+}
+
+/**
  * `test` with the terminal the run is at: stdout and stdin are patched for the test that names it
  * and given back when it ends. A test that does not name it keeps the runner's own streams.
  *
@@ -175,38 +209,8 @@ function remembering(target: object, name: string): () => void {
 export const test = base.extend<{ terminal: TerminalFixture }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   terminal: async ({}, use) => {
-    const restore = [
-      remembering(process, "stdin"),
-      remembering(process, "platform"),
-      remembering(process.stdout, "isTTY"),
-      remembering(process.stdout, "columns"),
-    ];
-    const terminal = atTerminal();
-    onTestFinished(() => {
-      for (const put of restore) {
-        put();
-      }
-    });
-    await use({
-      ...terminal,
-      stdin(value) {
-        const source = typeof value === "string" ? Readable.from([value]) : value;
-        const piped = Object.assign(source, { isTTY: false });
-        Object.defineProperty(process, "stdin", { value: piped, configurable: true });
-      },
-      tty(on) {
-        Object.defineProperty(process.stdout, "isTTY", {
-          value: on,
-          writable: true,
-          configurable: true,
-        });
-      },
-      columns(count) {
-        Object.defineProperty(process.stdout, "columns", { value: count, configurable: true });
-      },
-      platform(name) {
-        Object.defineProperty(process, "platform", { value: name, configurable: true });
-      },
-    });
+    const terminal = new TestTerminal();
+    await use(terminal);
+    terminal.dispose();
   },
 });
