@@ -9,7 +9,7 @@ import {
   localRuntimePaths,
   readRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";

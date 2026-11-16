@@ -8,7 +8,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Connection,

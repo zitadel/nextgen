@@ -2,7 +2,7 @@ import semver from "semver";
 
 import { toZitadelError } from "@/lib/errors";
 import { readNearestRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { Server } from "@/lib/server";

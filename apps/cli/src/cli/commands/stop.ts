@@ -6,7 +6,7 @@ import {
   localContainerName,
   readRuntimeMetadata,
 } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Fact, section } from "@/lib/ui";

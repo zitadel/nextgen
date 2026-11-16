@@ -1,4 +1,4 @@
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { Server } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 

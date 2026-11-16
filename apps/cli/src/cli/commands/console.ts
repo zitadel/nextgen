@@ -4,7 +4,7 @@ import { openInBrowser } from "@/lib/browser";
 import { Environment } from "@/lib/environment";
 import { findLocalAdminDir, readLocalAdmin } from "@/lib/server/local/admin-credential";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { consoleSignInUrl } from "@/lib/server/local/sign-in";
 import { Server } from "@/lib/server";
 import { section, log } from "@/lib/ui";

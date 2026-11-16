@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { startedServer } from "@/lib/server/local/started";
 import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/server/local/runtime";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/server/local/server-log";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";

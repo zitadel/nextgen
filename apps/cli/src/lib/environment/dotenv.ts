@@ -8,7 +8,7 @@ import type { Values } from "./types";
 /**
  * A dotenv file, read for the keys an environment cares about. Parsed with
  * `node:util`'s `parseEnv`, which is why this stays separate from the local
- * runtime's loader in `local-server/env-vars.ts`: that one is hard-coded to
+ * runtime's loader in `server/local/env-vars.ts`: that one is hard-coded to
  * its own keys.
  */
 export class Dotenv {

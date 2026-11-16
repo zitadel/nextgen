@@ -1,5 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { LocalServer } from "@/lib/server/local/server";
+import { LocalServer } from "@/lib/server";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
