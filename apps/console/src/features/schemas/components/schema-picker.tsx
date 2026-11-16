@@ -8,7 +8,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@/components/ui/combobox";
-import type { UserSchema } from "@/features/schemas/model";
+import { schemaFields, type UserSchema } from "@/features/schemas/model";
 
 /** A schema plus the id needed to reference it in the created user's `schema`. */
 export interface SchemaOption {
@@ -56,6 +56,8 @@ export function SchemaPicker({
         options={(schemas ?? []).map((option) => ({
           value: option.id,
           label: option.name,
+          // Typing a property name finds the schemas that collect it.
+          keywords: schemaFields(option.schema).map((field) => field.key),
         }))}
         selected={selected ? [selected.id] : []}
         searchPlaceholder="Search schemas"

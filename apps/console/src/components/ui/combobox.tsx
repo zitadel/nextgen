@@ -207,6 +207,8 @@ export interface ComboboxOption {
    * under it, so it is not read as one more of them.
    */
   chip?: "destructive" | "warning" | "secondary";
+  /** More words search matches the row by, which the row does not draw. */
+  keywords?: string[];
 }
 
 /** A run of rows under a caption, as the design's menu label draws it. */
@@ -351,12 +353,13 @@ export function ComboboxContent({
                       key={option.value}
                       // The value is cmdk's name for the row, so it must be unique:
                       // two schemas or projects may share a label. Search matches
-                      // the label and the description, so typing a property name
-                      // finds the schemas that collect it.
+                      // the label, the description and the option's keywords.
                       value={option.value}
-                      keywords={
-                        option.description ? [option.label, option.description] : [option.label]
-                      }
+                      keywords={[
+                        option.label,
+                        ...(option.description ? [option.description] : []),
+                        ...(option.keywords ?? []),
+                      ]}
                       className={cn(
                         option.description && !option.chip ? ITEM_CUSTOM : ITEM_SIMPLE,
                         !navigating && ITEM_RESTING,

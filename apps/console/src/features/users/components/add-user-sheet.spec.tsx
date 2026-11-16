@@ -327,6 +327,12 @@ describe("add user sheet", () => {
     // The schema's name is each option's only line: no list of its properties.
     expect(await screen.findByRole("option", { name: "Business" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Minimal" })).toBeInTheDocument();
+    // A property name it does not draw still finds the schemas that collect it.
+    await userEvent.type(screen.getByPlaceholderText("Search schemas"), "companyName");
+    await waitFor(() =>
+      expect(screen.queryByRole("option", { name: "Minimal" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("option", { name: "Business" })).toBeInTheDocument();
     // The Users list behind the sheet walks the same pages for its filter
     // before the sheet opens; the sheet's own walk is the last two reads.
     expect(askedTokens.slice(-2)).toEqual([null, "tok_2"]);
