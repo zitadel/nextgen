@@ -200,6 +200,12 @@ export class Deployment {
    * When the preview this deployment made expires. A deployment a later one
    * replaced is not what its URL serves now, so it has no expiry of its own.
    *
+   * @remarks
+   * The API does not say which of its origins a deployment still serves, only
+   * whether it serves any. A deployment that kept one origin and lost another
+   * to a later deployment can therefore show the later deployment's expiry,
+   * when that is the earlier one.
+   *
    * @param expiries - Each live preview's expiry, by origin.
    * @returns The earliest expiry among the origins that still have a live
    *   preview, or an empty string when this deployment is not live or is not

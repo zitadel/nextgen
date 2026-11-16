@@ -52,7 +52,8 @@ export class PreviewService extends ApiService {
   /**
    * Read when some previews expire, without reading more of the list than it
    * takes. The API cannot filter previews by origin, so this walks the pages
-   * and stops at the first one that completes the answer.
+   * and stops at the first one that completes the answer. An origin with no
+   * live preview never completes it, so asking for one reads every page.
    *
    * @param origins - The preview origins to look for.
    * @returns The expiry of each origin that still has a live preview, by
