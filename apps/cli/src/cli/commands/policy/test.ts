@@ -3,13 +3,8 @@ import { Args } from "@oclif/core";
 import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-  nonBlankString,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
@@ -182,7 +177,8 @@ export default class PolicyTestCommand extends EnvironmentCommand {
 A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.
 
 The server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.`;
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.signIn;
+  static override groupOrder = 6;
 
   static override examples = [
     "<%= config.bin %> policy test",

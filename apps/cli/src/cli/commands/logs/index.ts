@@ -5,7 +5,8 @@ import { startedServer } from "@/cli/commands/local-server/started";
 import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
@@ -54,8 +55,8 @@ const NOT_STARTED_REFUSAL = {
 export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %> --follow",

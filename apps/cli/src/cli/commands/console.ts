@@ -8,7 +8,8 @@ import { LocalServer } from "@/lib/local-server/server";
 import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { Server } from "@/lib/server";
 import { section, log } from "@/lib/ui";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -51,8 +52,8 @@ async function projectServerOf(cwd: string, serverFlag: unknown): Promise<string
 export default class Console extends BaseCommand {
   static override description =
     "Open the console of the server the project uses.\n\nWhere a local server was started, the console opens signed in as the local admin the start command created: run this in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.";
-  static override group = CommandGroups.localDevelopment;
-  static override groupOrder = 1;
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 5;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

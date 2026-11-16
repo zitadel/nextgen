@@ -29,10 +29,10 @@ import {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
 } from "@/lib/idp";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
   type Admitted,
   BaseCommand,
-  CommandGroups,
   type CommandResult,
   type JsonEnvelope,
   nonBlankString,

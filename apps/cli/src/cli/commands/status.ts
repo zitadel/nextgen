@@ -9,8 +9,8 @@ import {
   runtimeSummary,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { CommandGroups } from "@/cli/commands/groups";
 import {
-  CommandGroups,
   type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
@@ -38,7 +38,7 @@ import { TestKit } from "@/lib/test-kit";
  */
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
-  static override group = CommandGroups.gettingStarted;
+  static override group = CommandGroups.localServer;
   static override groupOrder = 3;
 
   protected override async toMeta(
