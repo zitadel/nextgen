@@ -321,9 +321,12 @@ describe("add user sheet", () => {
     // Two schemas across the pages, so nothing is preselected.
     await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
+    // No leading glyph on the trigger.
+    expect(picker.querySelector("svg.lucide-braces")).toBeNull();
     await userEvent.click(picker);
-    expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Minimal/ })).toBeInTheDocument();
+    // The schema's name is each option's only line: no list of its properties.
+    expect(await screen.findByRole("option", { name: "Business" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Minimal" })).toBeInTheDocument();
     // The Users list behind the sheet walks the same pages for its filter
     // before the sheet opens; the sheet's own walk is the last two reads.
     expect(askedTokens.slice(-2)).toEqual([null, "tok_2"]);

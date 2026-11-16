@@ -1,4 +1,3 @@
-import { Braces } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -16,7 +15,6 @@ export interface SchemaOption {
   id: string;
   schema: UserSchema;
   name: string;
-  summary: string;
 }
 
 /** Searchable schema picker, composed from the shared Combobox. */
@@ -43,7 +41,6 @@ export function SchemaPicker({
           open={open}
           disabled={loading}
           className="w-full"
-          addon={<Braces className="size-4" />}
           onOpen={() => setOpen(true)}
         >
           {selected ? (
@@ -59,7 +56,6 @@ export function SchemaPicker({
         options={(schemas ?? []).map((option) => ({
           value: option.id,
           label: option.name,
-          description: option.summary || undefined,
         }))}
         selected={selected ? [selected.id] : []}
         searchPlaceholder="Search schemas"

@@ -152,22 +152,6 @@ export function schemaDisplayName(schema: UserSchema, id: string): string {
 }
 
 /**
- * The property names a schema defines, joined for the picker's second line
- * (`email · givenName · familyName`). Deliberately the raw keys rather than
- * humanised labels: the point of the line is to show which attributes the
- * schema will ask for, and the keys are what the API actually stores.
- *
- * Ordered through {@link schemaFields} so the summary lists the properties in
- * the same sequence the form renders them — and so it does not inherit the
- * response's randomised key order.
- */
-export function schemaFieldSummary(schema: UserSchema): string {
-  return schemaFields(schema)
-    .map((entry) => entry.key)
-    .join(" · ");
-}
-
-/**
  * Build the form controls for a schema.
  *
  * **Field order is not decided here, and deliberately encodes no intent.**
