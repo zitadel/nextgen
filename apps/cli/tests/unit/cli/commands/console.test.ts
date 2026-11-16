@@ -150,4 +150,32 @@ describe("console", () => {
       admin.email,
     );
   });
+
+  it("prints the console of the server --server names, over the one the project names", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(
+      ["console", "--cwd", dir, "--json", "--no-open", "--server", "https://preview.zitadel.com"],
+      { HOME: dir, USERPROFILE: dir, ZITADEL_URL: "https://auth.example.com" },
+    );
+
+    expect((parseJson(res.stdout) as { data: { console_url: string } }).data.console_url).toBe(
+      "https://preview.zitadel.com/console/",
+    );
+  });
+
+  it("names a server that is not a URL instead of saying no local admin exists", async ({
+    dir,
+  }) => {
+    const res = await runCliForTest(["console", "--cwd", dir, "--json", "--no-open"], {
+      HOME: dir,
+      USERPROFILE: dir,
+      ZITADEL_URL: "not a url",
+    });
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).not.toBe(
+      "No local admin in this directory or its parents",
+    );
+  });
 });

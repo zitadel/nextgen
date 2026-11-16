@@ -21,18 +21,23 @@ const NO_LOCAL_ADMIN_REFUSAL = {
 } as const satisfies Refusal;
 
 /**
- * The server the project in `cwd` names (`ZITADEL_URL`, from the environment or
- * the project's `.env` files), or `undefined` when it names none or its
- * environment cannot be read, which is for `connect()` to say, not for a command
- * that only opens a page.
+ * The server this run is about when no local server was started: the one
+ * `--server` names, else the project's own (`ZITADEL_URL`, from the
+ * environment or the project's `.env` files). A server that cannot be resolved
+ * is the run's error, not a missing local setup.
  *
  * @param cwd - The directory the run addresses.
- * @returns The server's address, if the project names one.
+ * @param serverFlag - The `--server` the run was given, if any.
+ * @returns The server's address, or `undefined` when none is named.
  */
-async function projectServerOf(cwd: string): Promise<string | undefined> {
-  const environment = await Environment.resolve({ cwd, env: process.env }).catch(() => undefined);
+async function projectServerOf(cwd: string, serverFlag: unknown): Promise<string | undefined> {
+  const environment = await Environment.resolve({
+    cwd,
+    env: process.env,
+    serverFlag: typeof serverFlag === "string" ? serverFlag : undefined,
+  });
 
-  return environment?.values.ZITADEL_URL?.value;
+  return environment.values.ZITADEL_URL?.value;
 }
 
 /**
@@ -69,10 +74,10 @@ export default class Console extends BaseCommand {
    * parent of the app directory, and its runtime metadata sits beside the
    * admin it created, so both are read from there.
    */
-  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
     const found = await findLocalAdminDir(cwd);
     if (found === undefined) {
-      const named = await projectServerOf(cwd);
+      const named = await projectServerOf(cwd, flags.server);
       if (named !== undefined) {
         return named;
       }
@@ -86,7 +91,7 @@ export default class Console extends BaseCommand {
     // was asked for. Without one, a project on a server that is not on this
     // machine has only that server's console to open.
     const found = await findLocalAdminDir(this.cwd);
-    const named = found === undefined ? await projectServerOf(this.cwd) : undefined;
+    const named = found === undefined ? await projectServerOf(this.cwd, flags.server) : undefined;
     if (named !== undefined && !Server.at(named).isLoopback()) {
       return this.openRemote(Server.at(named).consoleUrl(), flags.noOpen);
     }
