@@ -93,6 +93,9 @@
       "origin": {
         "description": "Manage the project's allowed origins."
       },
+      "invitation": {
+        "description": "Invite people into the project with a link."
+      },
       "release": {
         "description": "Build and manage releases."
       },

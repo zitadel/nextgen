@@ -17,8 +17,8 @@ properties:
     $ref: ../../components/schemas/project-id.yaml
   metadata:
     description: |
-      Who the administrator said the link is for. Null after accept or decline.
-      Cancel and replace delete the row.
+      Who the administrator said the link is for. Null after accept; a
+      decline keeps it. Cancel and replace delete the row.
     oneOf:
       - $ref: invitation-metadata.yaml
       - type: 'null'
@@ -51,15 +51,28 @@ properties:
       Correlates this invitation with its replacements. A replacement keeps the
       original's `journey_id`. It is a random correlation id, not a resource id.
     example: q7Z0bX2rT1aM4cV8nL5wYg
-  accepted_by:
-    description: The user who redeemed the link. Null until accepted.
+  responded_by:
+    description: |
+      The user who accepted or declined the link; `status` says which. Null
+      while the invitation is pending or expired.
     oneOf:
       - type: string
         example: user_01JD4F2H6K8M0P2R4T6V8X0Z2B
       - type: 'null'
-  accepted_at:
-    description: When the invitation was accepted. Null until accepted.
+  responded_at:
+    description: |
+      When the invitation was accepted or declined. Null while it is pending or
+      expired.
     oneOf:
       - type: string
         format: date-time
+      - type: 'null'
+  inviter:
+    description: |
+      The user who created the invitation, resolved for display: render
+      `display`, falling back to `identifier`, then `user_id`. Present only
+      when `listInvitations` is called with `expand=inviter`; null when a
+      project secret created the invitation.
+    oneOf:
+      - $ref: ../../components/schemas/user-ref.yaml
       - type: 'null'
