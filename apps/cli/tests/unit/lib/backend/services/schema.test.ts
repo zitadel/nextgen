@@ -95,7 +95,7 @@ describe("SchemaService.get", () => {
     ).rejects.toMatchObject({
       name: "NotFoundError",
       message: 'No schema named "typo"',
-      hint: "Run `schema list` to see the object types this project has.",
+      hint: "List the project's schemas to see the object types it has.",
     });
   });
 

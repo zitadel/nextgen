@@ -3,6 +3,7 @@ import type { Interfaces } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import type { PackageCommand } from "@/lib/pm";
+import { isSecretFlag, isSecretKey } from "@/lib/secret-key";
 import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
@@ -616,6 +617,56 @@ const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
  */
 export function withoutCredentials(word: string): string {
   return word.replace(CREDENTIALS, "$1");
+}
+
+/** A key anywhere in a parsed JSON value that reads as a credential's name. */
+function holdsSecretKey(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(holdsSecretKey);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.entries(value).some(([key, nested]) => {
+      return isSecretKey(key) || holdsSecretKey(nested);
+    });
+  }
+
+  return false;
+}
+
+/** `name=value` or `path:=json`, the shape of `--field` and `--set`. */
+const ASSIGNMENT = /^([^=:\s]+)(:?=)([\s\S]*)$/;
+
+/**
+ * `word` as a suggestion may print it, with a placeholder where it could hold a
+ * secret: the value of a flag or argument named like a credential, the value of
+ * a `name=value` assignment whose name reads as one, and a JSON document with
+ * a credential's key anywhere in it. A suggestion repeats what the run was
+ * given, and the run's output goes to terminals and CI logs, so a typed
+ * secret must never travel into it.
+ *
+ * @param name - The flag or argument the word was given to, as code or the command line spells it.
+ * @param word - The word as it was typed.
+ * @returns The word, or a placeholder for it.
+ */
+export function withoutSecret(name: string, word: string): string {
+  if (isSecretFlag(name)) {
+    return `<${spelled(name)}>`;
+  }
+  const assignment = ASSIGNMENT.exec(word);
+  if (assignment !== null && isSecretKey(assignment[1] ?? "")) {
+    return `${assignment[1]}${assignment[2]}<value>`;
+  }
+  if (/^\s*[[{]/.test(word)) {
+    try {
+      if (holdsSecretKey(JSON.parse(word))) {
+        return "<json>";
+      }
+    } catch {
+      return word;
+    }
+  }
+
+  return word;
 }
 
 /** `envFile` as `env-file`: a name as code reads it, spelled as the command line takes it. */

@@ -4,6 +4,7 @@ import { helpOf, type Suggested } from "@/lib/suggestion";
 
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
+import { named } from "@/lib/names";
 import { mergeDocuments, setAt, valueAt } from "./document";
 import { type BodyField, bodyFromFlags } from "./fields";
 import { findCredential, type References, refuseSecret } from "./secrets";
@@ -30,6 +31,17 @@ const argvParts = (
         ]
       : []),
     ...fields.flatMap((field) => {
+      const given = field.flag === undefined ? undefined : flags[named(field.flag)];
+      // A repeated record flag is checked entry by entry: the body keeps only the
+      // last of two entries for a key, so a secret typed first would pass unseen.
+      if (field.kind === "record" && Array.isArray(given)) {
+        return given.map((entry) => {
+          return {
+            value: setAt({}, field.path, Object.fromEntries([entry])),
+            source: `--${field.flag}`,
+          };
+        });
+      }
       const value = valueAt(fromFlags, field.path);
       return value === undefined || field.flag === undefined
         ? []

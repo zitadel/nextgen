@@ -1,27 +1,10 @@
 import { ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
+import { isSecretKey, wordsOf } from "@/lib/secret-key";
 
 import { fieldOf, objectOf, unwrap, type ZodLike } from "./zod";
 
-/**
- * Names whose value is a credential. Anything on the command line — a flag
- * value, and equally `--data "$(cat body.json)"`, which the shell expands
- * before the CLI runs — is visible to other processes, kept in shell history,
- * and captured by CI logs. Only a named file or stdin keeps it out of argv,
- * so those are the routes the errors point at.
- */
-const SECRET_WORDS = new Set([
-  "password",
-  "passwd",
-  "pwd",
-  "secret",
-  "token",
-  "credential",
-  "credentials",
-]);
-
-/** Secret names that only read as such once their words are joined. */
-const SECRET_COMPOUNDS = ["apikey", "privatekey", "accesskey", "secretkey"];
+export { isSecretKey };
 
 /**
  * Last words that make a credential-sounding name the name of an address:
@@ -30,35 +13,6 @@ const SECRET_COMPOUNDS = ["apikey", "privatekey", "accesskey", "secretkey"];
  * itself — so only a value that is an address passes ({@link isBareAddress}).
  */
 const ADDRESS_WORDS = new Set(["endpoint", "url", "uri"]);
-
-/** A name's words, whether it is spelled in snake_case, kebab-case or camelCase. */
-const wordsOf = (key: string): readonly string[] => {
-  return key
-    .replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map((word) => {
-      return word.toLowerCase();
-    });
-};
-
-/**
- * Whether a property name reads as a credential, so `client_secret`, `api-key`
- * and `userToken` all match while `passwordless` — one word that merely starts
- * the same way — does not. `token_endpoint` matches too: what lets its URL
- * through is the value, not the name.
- */
-export const isSecretKey = (key: string): boolean => {
-  const words = wordsOf(key);
-  return (
-    words.some((word) => {
-      return SECRET_WORDS.has(word);
-    }) ||
-    SECRET_COMPOUNDS.some((compound) => {
-      return words.join("").includes(compound);
-    })
-  );
-};
 
 /** Whether a name ends in a word that names an address (`token_endpoint`, `jwks_uri`). */
 const isAddressKey = (key: string): boolean => {

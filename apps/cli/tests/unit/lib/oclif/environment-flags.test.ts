@@ -120,6 +120,13 @@ const NAMED = Object.entries(COMMANDS)
     return second.words.length - first.words.length;
   });
 
+/**
+ * What `zitadel init` writes into a customer's project as documentation. It is
+ * read by no run, so there is no selector to carry, and no sweep may touch it
+ * (`src/lib/orca/AGENTS.md`).
+ */
+const STATIC_DOCS = "lib/orca/";
+
 /** What a person can read in a string: a literal, or a piece of a template. */
 type Prose = ts.StringLiteralLike | ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail;
 
@@ -146,15 +153,17 @@ function scopedCommandsNamedIn(text: string): number[] {
   const source = parsedSource("source.ts", text);
   return nodesOf(source, isProse)
     .filter((node) => {
-      return [...node.text.matchAll(/\bzitadel ([a-z][a-z-]*(?: [a-z][a-z-]*)*)/g)].some(
-        (match) => {
-          const words = match[1] ?? "";
-          const named = NAMED.find((command) => {
-            return words === command.words || words.startsWith(`${command.words} `);
-          });
-          return named?.scoped === true;
-        },
-      );
+      const spelled = [
+        ...node.text.matchAll(/\bzitadel ([a-z][a-z-]*(?: [a-z][a-z-]*)*)/g),
+        ...node.text.matchAll(/`([a-z][a-z-]*(?: [a-z][a-z-]*)*)[^`]*`/g),
+      ];
+      return spelled.some((match) => {
+        const words = match[1] ?? "";
+        const named = NAMED.find((command) => {
+          return words === command.words || words.startsWith(`${command.words} `);
+        });
+        return named?.scoped === true;
+      });
     })
     .map((node) => {
       return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
@@ -195,7 +204,9 @@ describe("a command that takes the run's selector", () => {
 
   it("is named nowhere in the source", async () => {
     const root = join(import.meta.dirname, "../../../../src");
-    const files = await sourcesUnder(root);
+    const files = (await sourcesUnder(root)).filter((file) => {
+      return !file.startsWith(STATIC_DOCS);
+    });
     const found = await Promise.all(
       files.map(async (file) => {
         return scopedCommandsNamedIn(await readFile(join(root, file), "utf8")).map((line) => {

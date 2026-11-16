@@ -407,7 +407,7 @@ export class VariableService extends ApiService {
         hint:
           kind === "preview"
             ? "A name has a preview value only once one is set with `--preview`."
-            : "Set one with `variable set`.",
+            : "Set the variable first.",
       });
     }
     return Variable.of(name, value);

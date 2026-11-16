@@ -1480,6 +1480,38 @@ describe("auth-method sso enable", () => {
       });
     });
 
+    it("suggests no dry run, which would check the files and not the refused change", async ({
+      dir,
+    }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).not.toMatchObject({
+        next_commands: expect.arrayContaining([expect.stringContaining("deploy")]),
+      });
+    });
+
+    it("never prints the client secret it was piped, in any refusal", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout + result.stderr).not.toContain(SECRET);
+    });
+
     it("writes no connection", async ({ dir }) => {
       const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
