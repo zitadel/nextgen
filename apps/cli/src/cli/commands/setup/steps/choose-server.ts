@@ -1,7 +1,6 @@
-import { Server } from "@/lib/server";
+import { LocalRuntime, LocalServer, Server } from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
-import { LocalRuntime, LocalServer } from "@/lib/server";
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
 import { outdatedLocalServer, promptContext } from "@/cli/commands/setup/shared";
 

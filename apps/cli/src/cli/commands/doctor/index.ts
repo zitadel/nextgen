@@ -7,6 +7,7 @@ import {
   DockerGuidance,
   LocalRuntime,
   LocalServer,
+  Server,
   StartedServer,
   type LocalServers,
   type ManagedRuntimeProcess,
@@ -34,7 +35,6 @@ import {
   stepsOf,
 } from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
-import { Server } from "@/lib/server";
 import {
   Guidance,
   shellCommand,
