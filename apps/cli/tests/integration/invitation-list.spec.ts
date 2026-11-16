@@ -155,6 +155,15 @@ describe("invitation list", () => {
 
         expect(result).toPrint("Ada\\x1b[2Jwiped");
       });
+
+      it("says how to list accepted invitations when it leaves out every one", async () => {
+        const app = await aSetUpApp();
+        platform.acceptsInvitation(await app.invite());
+
+        const result = await app.run(LIST);
+
+        expect(result.stderr).toContain("pass --status accepted to list them");
+      });
     });
   });
 });

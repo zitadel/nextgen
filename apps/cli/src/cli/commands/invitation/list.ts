@@ -119,7 +119,11 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
       };
     });
     const columns = COLUMNS;
-    const empty = "No invitations found";
+    // A list that found nothing drops the footer, so the default says it here.
+    const empty =
+      flags.status === undefined
+        ? "No invitations found; accepted ones are left out, pass --status accepted to list them"
+        : "No invitations found";
     const footer =
       flags.status === undefined
         ? ["Accepted invitations are left out; pass --status accepted to list them"]

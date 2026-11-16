@@ -150,3 +150,17 @@ test("an invitation list keeps its status and type filters", () => {
 
   expect(sample).toContain(`${cli} invitation list --status pending --type project_member`);
 });
+
+test("an unfiltered invitation list names every status, as the request lists them", () => {
+  const sample =
+    cliSample(
+      operation("listInvitations", "invitation list"),
+      "/invitations",
+      {},
+      invitationRequest({}),
+    ) ?? "";
+
+  expect(sample).toContain(
+    `${cli} invitation list --status pending --status accepted --status rejected --status expired`,
+  );
+});
