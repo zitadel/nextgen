@@ -1215,6 +1215,20 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("with a schema and no client id", () => {
+    it("keeps --schema in the retry it suggests", async ({ dir }) => {
+      const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--schema", "employees"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: [expect.stringContaining("--schema employees")],
+      });
+    });
+  });
+
   describe("with a blank --client-id", () => {
     it("refuses it rather than taking it as one", async ({ dir }) => {
       const cwd = await aProject(dir);
