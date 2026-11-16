@@ -183,8 +183,20 @@ export class PublishCredentials extends WizardStep<
           `${answer.endpoints.issuer}, not the provider`,
       );
     }
-    reportClientIdOutcome(idVariable, clientId, this.deps.suggest);
-    reportSecretOutcome(secret, false, this.deps.suggest);
+    reportClientIdOutcome(
+      idVariable,
+      clientId,
+      this.deps.suggest({ id: "variable:set", args: { name: idVariable } }),
+    );
+    reportSecretOutcome(
+      secret,
+      false,
+      this.deps.suggest({
+        id: "variable:set",
+        args: { name: secret.name },
+        flags: { secret: true },
+      }),
+    );
     return [
       [
         slug,

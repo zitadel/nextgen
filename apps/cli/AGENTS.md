@@ -47,6 +47,9 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
+- Never give library code under `src/lib/` a `Suggest`, `Again` or `Guidance` (only `suggestion/`,
+  `oclif/` and `local-server/` may): hand the command data or a `{ id, … }` suggestion object, or
+  take a function the command supplies. `tests/unit/lib/suggestion/layering.test.ts` fails on it.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
 - Suggest `cd`, `docker`, `git` or `rm` as `shellCommand(program, ...words)`,

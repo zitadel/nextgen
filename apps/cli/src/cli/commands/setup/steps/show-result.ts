@@ -13,7 +13,7 @@ import {
 } from "@/cli/commands/setup/shared";
 import { Claim } from "@/lib/claim";
 import { pathExists } from "@/lib/fs";
-import { callbackUriFor, republishCommands } from "@/lib/idp";
+import { callbackUriFor, unpublished } from "@/lib/idp";
 import type { CommandResult } from "@/lib/oclif";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { painted } from "@/lib/oclif/rendering";
@@ -281,9 +281,9 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       }).kind === "detached" ||
         (isLocal && (this.deps.dryRun || hostsPlatform)))
         ? {
-            actions: [Claim.nudge(this.deps.suggest, deadline)],
-            boxActions: [Claim.boxNudge(this.deps.suggest, deadline)],
-            commands: [Claim.command(this.deps.suggest)],
+            actions: [Claim.nudge(this.deps.suggest({ id: "claim" }), deadline)],
+            boxActions: [Claim.boxNudge(this.deps.suggest({ id: "claim" }), deadline)],
+            commands: [this.deps.suggest({ id: "claim" })],
           }
         : {
             actions: [],
@@ -672,7 +672,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             ...claimNudge.actions,
           ],
           commands: [
-            ...republishCommands(
+            ...unpublished(
               answers.sso.flatMap((answer) => {
                 const slug = providerOf(answer.selection).slug;
                 const outcome = ssoOutcomes.get(slug);
@@ -689,8 +689,13 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   },
                 ];
               }),
-              this.deps.suggest,
-            ),
+            ).map((missing) => {
+              return this.deps.suggest({
+                id: "variable:set",
+                args: { name: missing.name },
+                flags: { secret: missing.secret },
+              });
+            }),
             ...deployStep.commands,
             ...installOutcome.nextCommands,
             ...consoleStep.commands,

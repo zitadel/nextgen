@@ -88,7 +88,6 @@ export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Ne
         color: this.deps.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
         narrate: this.deps.narrate,
-        suggest: this.deps.suggest,
       });
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
