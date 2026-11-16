@@ -1,28 +1,29 @@
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { CreateFlow201, CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 import { clearBranding, PASSWORD_FIELD, setupMockHandlers } from "@zitadel/api-mock";
-import { afterEach, describe, expect, vi } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
-import { it } from "./fixtures.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
+const server = setupServer();
 let mock = setupMockHandlers();
 let element: ZitadelLogin;
 let steps: CreateFlow201["step"][];
 
-it.beforeEach(({ server, onTestFinished }) => {
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterAll(() => server.close());
+
+beforeEach(() => {
   _resetConfigForTesting();
   clearBranding();
   mock = setupMockHandlers({ accounts: ["known@example.com"] });
   server.resetHandlers(...mock.handlers);
   steps = [];
   element = document.createElement("zitadel-login");
-  onTestFinished(() => {
-    element.remove();
-  });
   element.project = configureZitadel({
     proxyPath: "https://flow.test.invalid",
     projectId: "demo-project",
@@ -33,7 +34,9 @@ it.beforeEach(({ server, onTestFinished }) => {
 });
 
 afterEach(() => {
+  element.remove();
   vi.restoreAllMocks();
+  server.resetHandlers();
 });
 
 function root(): ShadowRoot {

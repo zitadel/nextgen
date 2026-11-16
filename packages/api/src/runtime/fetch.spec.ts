@@ -1,9 +1,8 @@
 import { createServer as createHttpServer } from "node:http";
-import { createServer } from "node:net";
+import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { test as it, type Serve } from "../__tests__/fixtures";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
   ApiError,
@@ -15,26 +14,38 @@ import {
   setRequestPolicy,
 } from "./fetch";
 
-afterEach(() => {
+const servers: Server[] = [];
+const sockets: Socket[] = [];
+
+afterEach(async () => {
   setRequestPolicy({});
+  for (const socket of sockets.splice(0)) socket.destroy();
+  await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
 });
 
+async function listening(server: Server): Promise<string> {
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
 /** A port nothing listens on: bound once to learn a free number, then released. */
-async function closedPort(serve: Serve): Promise<string> {
+async function closedPort(): Promise<string> {
   const server = createServer();
-  const url = await serve(server);
+  const url = await listening(server);
   await new Promise((done) => server.close(done));
+  servers.splice(servers.indexOf(server), 1);
   return url;
 }
 
 /** Accepts the connection and never answers. */
-function silent(serve: Serve): Promise<string> {
-  return serve(createServer());
+function silent(): Promise<string> {
+  return listening(createServer((socket) => sockets.push(socket)));
 }
 
 describe("customFetch", () => {
-  it("rejects a refused connection with an unreachable NetworkError", async ({ serve }) => {
-    const base = await closedPort(serve);
+  it("rejects a refused connection with an unreachable NetworkError", async () => {
+    const base = await closedPort();
 
     const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
 
@@ -43,8 +54,8 @@ describe("customFetch", () => {
     expect((error as Error).message).toBe(`GET ${base}/health got no response (ECONNREFUSED)`);
   });
 
-  it("rejects a server that never answers with a timeout NetworkError", async ({ serve }) => {
-    const base = await silent(serve);
+  it("rejects a server that never answers with a timeout NetworkError", async () => {
+    const base = await silent();
     setRequestPolicy({ timeoutMs: 50 });
 
     const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
@@ -53,8 +64,8 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ reason: "timeout" });
   });
 
-  it("rejects with the caller's abort reason when the policy signal fires", async ({ serve }) => {
-    const base = await silent(serve);
+  it("rejects with the caller's abort reason when the policy signal fires", async () => {
+    const base = await silent();
     const controller = new AbortController();
     const cancelled = new Error("cancelled by the user");
     setRequestPolicy({ signal: controller.signal });
@@ -65,8 +76,8 @@ describe("customFetch", () => {
     expect(await pending).toBe(cancelled);
   });
 
-  it("treats a per-call timeout signal as a timeout", async ({ serve }) => {
-    const base = await silent(serve);
+  it("treats a per-call timeout signal as a timeout", async () => {
+    const base = await silent();
 
     const error = await customFetch(`${base}/health`, {
       method: "GET",
@@ -76,12 +87,12 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ name: "NetworkError", reason: "timeout" });
   });
 
-  it("still rejects a failing status with an ApiError", async ({ serve }) => {
+  it("still rejects a failing status with an ApiError", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(503, { "content-type": "application/json" });
       res.end(JSON.stringify({ code: "unavailable", message: "down" }));
     });
-    const base = await serve(http);
+    const base = await listening(http as unknown as Server);
 
     const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
 
@@ -89,12 +100,12 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ status: 503, requestId: undefined });
   });
 
-  it("says a server without the operation may predate the API prefix", async ({ serve }) => {
+  it("says a server without the operation may predate the API prefix", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ code: "req.not_found", message: "not found" }));
     });
-    const base = await serve(http);
+    const base = await listening(http as unknown as Server);
 
     const error = await customFetch(`${base}/api/v1/users/me`, { method: "GET" }).catch(
       (e: unknown) => e,
@@ -106,12 +117,12 @@ describe("customFetch", () => {
     );
   });
 
-  it("keeps the plain message for a resource that is not there", async ({ serve }) => {
+  it("keeps the plain message for a resource that is not there", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ code: "usr.not_found", message: "not found" }));
     });
-    const base = await serve(http);
+    const base = await listening(http as unknown as Server);
 
     const error = await customFetch(`${base}/api/v1/users/usr_1`, { method: "GET" }).catch(
       (e: unknown) => e,
@@ -120,16 +131,14 @@ describe("customFetch", () => {
     expect((error as Error).message).toBe(`GET ${base}/api/v1/users/usr_1 returned 404`);
   });
 
-  it("rejects an answer whose body cannot be read as unreadable, not as no response", async ({
-    serve,
-  }) => {
+  it("rejects an answer whose body cannot be read as unreadable, not as no response", async () => {
     // A proxy that forwards `content-encoding` over a body fetch already
     // decoded: the status arrives, the body fails to decode (#2466).
     const http = createHttpServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json", "content-encoding": "gzip" });
       res.end(JSON.stringify({ session: { user_id: "usr_1" } }));
     });
-    const base = await serve(http);
+    const base = await listening(http as unknown as Server);
 
     const error = await customFetch(`${base}/sessions/exchange`, { method: "POST" }).catch(
       (e: unknown) => e,
@@ -142,12 +151,12 @@ describe("customFetch", () => {
     );
   });
 
-  it("keeps the server's request ID on the ApiError", async ({ serve }) => {
+  it("keeps the server's request ID on the ApiError", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(400, { "content-type": "application/json", "x-request-id": "req_01TEST" });
       res.end(JSON.stringify({ code: "req.invalid", message: "invalid" }));
     });
-    const base = await serve(http);
+    const base = await listening(http as unknown as Server);
 
     const error = await customFetch(`${base}/users`, { method: "GET" }).catch((e: unknown) => e);
 
@@ -156,8 +165,8 @@ describe("customFetch", () => {
 });
 
 describe("request", () => {
-  it("is bound only by the policy it is given, not by a client's", async ({ serve }) => {
-    const base = await silent(serve);
+  it("is bound only by the policy it is given, not by a client's", async () => {
+    const base = await silent();
     setRequestPolicy({ timeoutMs: 10 });
 
     const outcome = await Promise.race([
@@ -193,6 +202,7 @@ beforeEach(() => {
 afterEach(() => {
   setApiCsrfToken(undefined);
   setApiCsrfRejectionHandler(undefined);
+  vi.unstubAllGlobals();
 });
 
 /** Answers each request with the next response; records the CSRF header sent. */

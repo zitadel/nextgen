@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { emit, LISTENER_WAIT_MS } from "./emit.js";
 
@@ -13,21 +13,16 @@ function hostWithListener(work: () => Promise<unknown> | undefined): HTMLElement
   return host;
 }
 
-/**
- * `it` with fake timers: `clock` is Vitest's timer control, started before the
- * test body runs and put back to real timers when the test ends.
- */
-const it = test.extend<{ clock: typeof vi }>({
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  async clock({}, use) {
-    vi.useFakeTimers();
-    await use(vi);
-    vi.useRealTimers();
-  },
-});
-
 describe("emit with waitForListeners", () => {
-  it("resolves at once when no listener registers work", async ({ clock }) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resolves at once when no listener registers work", async () => {
     const done = vi.fn();
 
     void emit(
@@ -36,37 +31,35 @@ describe("emit with waitForListeners", () => {
       {},
       { waitForListeners: true },
     ).then(done);
-    await clock.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(done).toHaveBeenCalledOnce();
   });
 
-  it("holds until a registered promise settles, even when it rejects", async ({ clock }) => {
+  it("holds until a registered promise settles, even when it rejects", async () => {
     const host = hostWithListener(
       () => new Promise((_, reject) => setTimeout(() => reject(new Error("failed")), 500)),
     );
     const done = vi.fn();
 
     void emit(host, "zitadel-test", {}, { waitForListeners: true }).then(done);
-    await clock.advanceTimersByTimeAsync(499);
+    await vi.advanceTimersByTimeAsync(499);
     expect(done).not.toHaveBeenCalled();
 
-    await clock.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(done).toHaveBeenCalledOnce();
   });
 
-  it("clears its timer once the listeners have settled", async ({ clock }) => {
+  it("clears its timer once the listeners have settled", async () => {
     const host = hostWithListener(() => new Promise((resolve) => setTimeout(resolve, 500)));
 
     void emit(host, "zitadel-test", {}, { waitForListeners: true });
-    await clock.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(500);
 
-    expect(clock.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("takes the fast path with no timer when a listener registers nothing thenable", async ({
-    clock,
-  }) => {
+  it("takes the fast path with no timer when a listener registers nothing thenable", async () => {
     const host = document.createElement("div");
     host.addEventListener("zitadel-test", (event) => {
       if (event instanceof CustomEvent) {
@@ -76,13 +69,13 @@ describe("emit with waitForListeners", () => {
     const done = vi.fn();
 
     void emit(host, "zitadel-test", {}, { waitForListeners: true }).then(done);
-    await clock.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(done).toHaveBeenCalledOnce();
-    expect(clock.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("stops waiting for a promise that never settles after the wait limit", async ({ clock }) => {
+  it("stops waiting for a promise that never settles after the wait limit", async () => {
     const done = vi.fn();
 
     void emit(
@@ -91,14 +84,14 @@ describe("emit with waitForListeners", () => {
       {},
       { waitForListeners: true },
     ).then(done);
-    await clock.advanceTimersByTimeAsync(LISTENER_WAIT_MS - 1);
+    await vi.advanceTimersByTimeAsync(LISTENER_WAIT_MS - 1);
     expect(done).not.toHaveBeenCalled();
 
-    await clock.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(done).toHaveBeenCalledOnce();
   });
 
-  it("leaves the detail untouched and waits for nothing without the option", async ({ clock }) => {
+  it("leaves the detail untouched and waits for nothing without the option", async () => {
     const host = document.createElement("div");
     const received = vi.fn();
     host.addEventListener("zitadel-test", (event) => {
@@ -107,7 +100,7 @@ describe("emit with waitForListeners", () => {
     const done = vi.fn();
 
     void emit(host, "zitadel-test", { n: 1 }).then(done);
-    await clock.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(received).toHaveBeenCalledWith({ n: 1 });
     expect(done).toHaveBeenCalledOnce();

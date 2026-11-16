@@ -1,9 +1,8 @@
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { it } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
@@ -95,6 +94,7 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
 }
 
 describe("<zitadel-login> theming (chromium)", () => {
+  let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
 
@@ -105,16 +105,16 @@ describe("<zitadel-login> theming (chromium)", () => {
       projectId: "theme-test",
       url: "http://localhost:4000",
     });
+    host = document.createElement("div");
+    document.body.appendChild(host);
   });
 
   afterEach(() => {
+    host.remove();
     stub?.restore();
   });
 
-  async function mount(
-    host: HTMLElement,
-    configure?: (el: ZitadelLogin) => void,
-  ): Promise<ZitadelLogin> {
+  async function mount(configure?: (el: ZitadelLogin) => void): Promise<ZitadelLogin> {
     stub = installFlowFetchStub([identifierStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
@@ -133,8 +133,8 @@ describe("<zitadel-login> theming (chromium)", () => {
     return getComputedStyle(probe).getPropertyValue(name).trim();
   }
 
-  it("theme=light repaints the atom-facing surface and text tokens", async ({ host }) => {
-    const element = await mount(host, (el) => {
+  it("theme=light repaints the atom-facing surface and text tokens", async () => {
+    const element = await mount((el) => {
       el.theme = "light";
       el.variant = "page";
     });
@@ -165,8 +165,8 @@ describe("<zitadel-login> theming (chromium)", () => {
    * colours alone never caught it, so drive the states and measure contrast.
    */
   for (const theme of ["light", "dark"] as const) {
-    it(`theme=${theme} keeps every button state legible`, async ({ host }) => {
-      const element = await mount(host, (el) => {
+    it(`theme=${theme} keeps every button state legible`, async () => {
+      const element = await mount((el) => {
         el.theme = theme;
         el.variant = "page";
       });
@@ -212,8 +212,8 @@ describe("<zitadel-login> theming (chromium)", () => {
    * dark slab on a light page whatever the theme resolved to. It is plain text
    * on the `foreground` role now, and the logotype inherits that colour.
    */
-  it("theme=light darkens the trustmark so it reads on a light page", async ({ host }) => {
-    const element = await mount(host, (el) => {
+  it("theme=light darkens the trustmark so it reads on a light page", async () => {
+    const element = await mount((el) => {
       el.theme = "light";
       el.variant = "page";
     });
@@ -239,10 +239,8 @@ describe("<zitadel-login> theming (chromium)", () => {
    * — a white border on a white card, invisible against the page.
    */
   for (const theme of ["light", "dark"] as const) {
-    it(`theme=${theme} keeps the card edge distinct from the surfaces it separates`, async ({
-      host,
-    }) => {
-      const element = await mount(host, (el) => {
+    it(`theme=${theme} keeps the card edge distinct from the surfaces it separates`, async () => {
+      const element = await mount((el) => {
         el.theme = theme;
         el.variant = "page";
       });
@@ -265,8 +263,8 @@ describe("<zitadel-login> theming (chromium)", () => {
     });
   }
 
-  it("theme=dark keeps the design system's primary surface", async ({ host }) => {
-    const element = await mount(host, (el) => {
+  it("theme=dark keeps the design system's primary surface", async () => {
+    const element = await mount((el) => {
       el.theme = "dark";
       el.variant = "page";
     });
@@ -278,8 +276,8 @@ describe("<zitadel-login> theming (chromium)", () => {
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
   });
 
-  it("page mode defaults to dark; the element's theme beats tenant branding", async ({ host }) => {
-    const pageDefault = await mount(host, (el) => {
+  it("page mode defaults to dark; the element's theme beats tenant branding", async () => {
+    const pageDefault = await mount((el) => {
       el.variant = "page";
     });
     expect(pageDefault.dataset.theme).toBe("dark");

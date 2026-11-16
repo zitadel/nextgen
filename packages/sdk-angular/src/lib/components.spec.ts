@@ -50,6 +50,7 @@ const outputOf = (instance: object, event: string): SubscribableOutput => {
 };
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
 

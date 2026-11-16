@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it as base } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   assembleChangelog,
@@ -13,16 +13,6 @@ import {
   readEntries,
   readPackageChangelogs,
 } from "./entries";
-
-/** `it` whose tests may name `dir`: an empty directory removed when the test ends. */
-const it = base.extend<{ dir: string }>({
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  dir: async ({}, use) => {
-    const dir = mkdtempSync(join(tmpdir(), "changelog-"));
-    await use(dir);
-    rmSync(dir, { recursive: true, force: true });
-  },
-});
 
 // Two packages' CHANGELOG.md as Changesets writes them: a changeset's entry,
 // its pull request first, in every package it lists.
@@ -185,7 +175,15 @@ describe("assembleChangelog", () => {
 });
 
 describe("readChangelog", () => {
-  function repository(root: string, files: Record<string, string>): string {
+  let root: string | undefined;
+
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = undefined;
+  });
+
+  function repository(files: Record<string, string>): string {
+    root = mkdtempSync(join(tmpdir(), "changelog-"));
     for (const [path, content] of Object.entries(files)) {
       mkdirSync(dirname(join(root, path)), { recursive: true });
       writeFileSync(join(root, path), content);
@@ -193,10 +191,8 @@ describe("readChangelog", () => {
     return root;
   }
 
-  it("reads the fixed group's changelogs by their title, without the server's platform packages", ({
-    dir,
-  }) => {
-    const repo = repository(dir, {
+  it("reads the fixed group's changelogs by their title, without the server's platform packages", () => {
+    const repo = repository({
       ".changeset/config.json": JSON.stringify({
         fixed: [
           ["@zitadel/cli", "@zitadel/server-linux-x64", "@zitadel/sdk-next", "@zitadel/testing"],
@@ -214,8 +210,8 @@ describe("readChangelog", () => {
     ]);
   });
 
-  it("reads the entries with their releases", ({ dir }) => {
-    const repo = repository(dir, {
+  it("reads the entries with their releases", () => {
+    const repo = repository({
       ".changeset/config.json": JSON.stringify({ fixed: [["@zitadel/cli"]] }),
       "apps/cli/CHANGELOG.md": CLI,
       "packages/.gitkeep": "",

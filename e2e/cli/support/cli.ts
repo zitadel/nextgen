@@ -65,29 +65,17 @@ export type Running = {
    */
   find(pattern: RegExp, timeoutMs?: number): Promise<string>;
   exited(timeoutMs?: number): Promise<Exited>;
-  /**
-   * Ends the process and everything it started if it is still running, and resolves once it is
-   * gone: `SIGTERM` to its process group, then `SIGKILL` after a grace period. The `start`
-   * fixture calls it when the test ends.
-   */
-  kill(): Promise<void>;
 };
-
-/** How long a process group has to end after `SIGTERM` before it is killed. */
-const TERMINATION_GRACE_MS = 5_000;
 
 /**
  * Runs `zitadel <args> --non-interactive --json` in `cwd`, as an agent drives
- * it, and returns the envelope with what the run printed. A test gets it
- * through the `zitadel` fixture, which starts the process with `launch` so it
- * is killed if the test ends first.
+ * it, and returns the envelope with what the run printed.
  */
-export async function runZitadel(
+export async function zitadel(
   args: string[],
   cwd: string,
-  launch: (args: string[], cwd: string) => Running = spawnCli,
 ): Promise<Envelope & { transcript: string }> {
-  const run = await launch([...args, "--non-interactive", "--json"], cwd).exited();
+  const run = await start([...args, "--non-interactive", "--json"], cwd).exited();
   let envelope: Envelope;
   try {
     envelope = JSON.parse(run.stdout);
@@ -100,10 +88,9 @@ export async function runZitadel(
 /**
  * Starts `zitadel <args>` in `cwd` and leaves it running. The packed CLI
  * talks to the deployment through the bypass proxy when there is one, and
- * never sees the bypass secret; it sends no telemetry. A test gets it through
- * the `start` fixture, which kills what a test left running.
+ * never sees the bypass secret; it sends no telemetry.
  */
-export function spawnCli(args: string[], cwd: string): Running {
+export function start(args: string[], cwd: string): Running {
   const { bin, dir, proxy } = harness();
   // Playwright forces colour on its workers; a developer's piped run has none.
   const {
@@ -116,7 +103,6 @@ export function spawnCli(args: string[], cwd: string): Running {
     cwd,
     env: { ...env, DO_NOT_TRACK: "1", NO_COLOR: "1" },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
   });
   let stdout = "";
   let stderr = "";
@@ -132,31 +118,8 @@ export function spawnCli(args: string[], cwd: string): Running {
   });
   const transcript = () =>
     `$ zitadel ${args.join(" ")}\n--- stdout\n${stdout}\n--- stderr\n${stderr}`;
-  const endGroup = async (): Promise<void> => {
-    const group = child.pid;
-    if (group === undefined || child.exitCode !== null || child.signalCode !== null) {
-      return;
-    }
-    const signal = (name: "SIGTERM" | "SIGKILL") => {
-      try {
-        process.kill(-group, name);
-      } catch {
-        return;
-      }
-    };
-    signal("SIGTERM");
-    const ended = await Promise.race([
-      exit.then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), TERMINATION_GRACE_MS)),
-    ]);
-    if (!ended) {
-      signal("SIGKILL");
-      await exit;
-    }
-  };
 
   return {
-    kill: endGroup,
     find: (pattern, timeoutMs = 60_000) =>
       within(
         timeoutMs,
@@ -178,7 +141,7 @@ export function spawnCli(args: string[], cwd: string): Running {
       ),
     exited: async (timeoutMs = 120_000) => {
       const exitCode = await within(timeoutMs, exit, () => {
-        void endGroup();
+        child.kill();
         return `still running after ${timeoutMs} ms\n${transcript()}`;
       });
       return { exitCode, stdout, stderr, transcript: transcript() };

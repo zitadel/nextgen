@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import manifestJson from "../package.json";
-import { $, createSignal, render as renderQwik, type Signal } from "@qwik.dev/core";
+import { $, createSignal, render, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -15,7 +15,7 @@ import {
   type WidgetName,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { afterAll, beforeAll, describe, expect, it as base, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -71,40 +71,12 @@ const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resol
  * browser (see vitest.config.ts) where `render`, element upgrade, and native
  * events all behave as in production. Returns the mounted host.
  */
-async function renderWidget(jsx: Parameters<typeof renderQwik>[1]): Promise<HTMLElement> {
+async function renderWidget(jsx: Parameters<typeof render>[1]): Promise<HTMLElement> {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  await renderQwik(host, jsx);
+  await render(host, jsx);
   return host;
 }
-
-/**
- * `it` extended with `render`, which puts markup in a host div attached to the
- * document and returns it. The host is removed when the test ends.
- */
-const it = base.extend<{ render: (markup: string) => HTMLDivElement }>({
-  /**
-   * Provides the `render` function and removes every host it created.
-   *
-   * @param _context The fixtures this one depends on, none.
-   * @param use Hands the value to the test.
-   * @returns Resolves once the test and the teardown have finished.
-   */
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  render: async ({}, use) => {
-    const hosts: HTMLDivElement[] = [];
-    await use((markup) => {
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      host.innerHTML = markup;
-      hosts.push(host);
-      return host;
-    });
-    for (const host of hosts) {
-      host.remove();
-    }
-  },
-});
 
 /**
  * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
@@ -491,15 +463,14 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
 });
 
 describe("resumed server markup", () => {
-  it("starts a register flow from the attributes alone, before any binder runs", async ({
-    render,
-  }) => {
+  it("starts a register flow from the attributes alone, before any binder runs", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
     // What Qwik Router sends and then resumes: attributes only, no `ref` binder
     // and no property handle.
-    render(
-      '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>',
-    );
+    host.innerHTML =
+      '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>';
 
     await expect
       .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__resumed")))
@@ -525,13 +496,15 @@ describe("resuming a server-rendered login", () => {
 
   afterAll(() => closeServerMarkup());
 
-  it("starts its first flow with the purpose the server rendered", async ({ render }) => {
+  it("starts its first flow with the purpose the server rendered", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = render(await serverMarkup({ project: globalProject, purpose: "register" }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
     const firstStep = new Promise((resolve) =>
       host
         .querySelector(widgetTags.login)
@@ -551,15 +524,18 @@ describe("resuming a server-rendered login", () => {
     const created = bodies.filter((body) => body?.project_id);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
   });
 
-  it("loads the supplied flow on its first request instead of creating one", async ({ render }) => {
+  it("loads the supplied flow on its first request instead of creating one", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = render(await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>
@@ -577,6 +553,7 @@ describe("resuming a server-rendered login", () => {
     await rendered?.updateComplete;
     await Promise.all(fetched.mock.results.map((result) => result.value));
     expect(fetched).toHaveBeenCalledTimes(1);
+    host.remove();
   });
 });
 
@@ -924,7 +901,7 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
     container,
     ref: () => refs[widget].value,
     update: async (next: Attributes) => {
-      await renderQwik(container, elementFor(next));
+      await render(container, elementFor(next));
       await macrotask();
     },
   };

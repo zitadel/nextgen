@@ -1,13 +1,11 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, vi } from "vitest";
-
-import { it, type Clock } from "@/test/clock.fixture";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TYPING_PAUSE_MS } from "./use-debounced";
 import { useSearchDraft } from "./use-search-draft";
 
 /** The hook over a committed value the test moves, as navigation moves the URL. */
-function renderDraft(initial: string, clock: Clock) {
+function renderDraft(initial: string) {
   const write = vi.fn();
   const hook = renderHook(({ committed }) => useSearchDraft(committed, write), {
     initialProps: { committed: initial },
@@ -16,14 +14,17 @@ function renderDraft(initial: string, clock: Clock) {
     write,
     draft: () => hook.result.current[0],
     type: (text: string) => act(() => hook.result.current[1](text)),
-    pause: () => act(() => clock.advance(TYPING_PAUSE_MS)),
+    pause: () => act(() => vi.advanceTimersByTime(TYPING_PAUSE_MS)),
     commit: (committed: string) => hook.rerender({ committed }),
   };
 }
 
 describe("useSearchDraft", () => {
-  it("writes the trimmed draft once typing pauses, once", ({ clock }) => {
-    const field = renderDraft("", clock);
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("writes the trimmed draft once typing pauses, once", () => {
+    const field = renderDraft("");
     field.type("ac");
     field.type("acme ");
     expect(field.write).not.toHaveBeenCalled();
@@ -32,8 +33,8 @@ describe("useSearchDraft", () => {
     expect(field.write.mock.calls).toEqual([["acme"]]);
   });
 
-  it("keeps what was typed since when its own write lands", ({ clock }) => {
-    const field = renderDraft("", clock);
+  it("keeps what was typed since when its own write lands", () => {
+    const field = renderDraft("");
     field.type("acme");
     field.pause();
     field.type("acme c");
@@ -42,8 +43,8 @@ describe("useSearchDraft", () => {
     expect(field.draft()).toBe("acme c");
   });
 
-  it("takes a value committed from elsewhere, and never writes the old draft back", ({ clock }) => {
-    const field = renderDraft("", clock);
+  it("takes a value committed from elsewhere, and never writes the old draft back", () => {
+    const field = renderDraft("");
     field.type("acme");
     field.pause();
     field.commit("acme");

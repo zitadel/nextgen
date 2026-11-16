@@ -29,8 +29,6 @@
     "src/**/*.test.tsx",
     "src/**/__tests__/**",
     "src/test-setup.ts",
-    "src/test/**",
-    "src/orchestrator/fixtures.ts",
     "src/jsx.d.ts"
   ]
 }

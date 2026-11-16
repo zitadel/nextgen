@@ -7,7 +7,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { act, render as renderReact, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -24,7 +24,7 @@ import {
 import * as React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it as base, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   businessLocales,
@@ -51,48 +51,6 @@ import {
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-/**
- * `it` extended with `render`, which puts server markup in a host div attached
- * to the document and hands back a `hydrate` for the host. The test's React
- * roots are unmounted and the host is removed when the test ends.
- */
-const it = base.extend<{
-  render: (markup: string) => { host: HTMLDivElement; hydrate: (ui: React.ReactNode) => void };
-}>({
-  /**
-   * Provides the `render` function and tears down everything it mounted.
-   *
-   * @param _context The fixtures this one depends on, none.
-   * @param use Hands the value to the test.
-   * @returns Resolves once the test and the teardown have finished.
-   */
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  render: async ({}, use) => {
-    const hosts: HTMLDivElement[] = [];
-    const roots: ReturnType<typeof hydrateRoot>[] = [];
-    await use((markup) => {
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      host.innerHTML = markup;
-      hosts.push(host);
-      return {
-        host,
-        hydrate: (ui) => {
-          roots.push(hydrateRoot(host, ui));
-        },
-      };
-    });
-    await act(async () => {
-      for (const root of roots) {
-        root.unmount();
-      }
-    });
-    for (const host of hosts) {
-      host.remove();
-    }
-  },
-});
-
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) throw new Error(`no <${tag}> was rendered`);
@@ -101,16 +59,14 @@ function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElemen
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
-    const { container } = renderReact(<ZitadelLogin project={project} purpose="login" />);
+    const { container } = render(<ZitadelLogin project={project} purpose="login" />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = renderReact(
-      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
-    );
+    const { container } = render(<ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
@@ -118,28 +74,26 @@ describe("ZitadelLogin", () => {
 
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
-    const { container } = renderReact(
-      <ZitadelLogin project={project} locales={locales} lang="de" />,
-    );
+    const { container } = render(<ZitadelLogin project={project} locales={locales} lang="de" />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(el!.locales).toBe(locales);
     expect(el!.lang).toBe("de");
   });
 
   it("forwards resumeFlowId to the widget", () => {
-    const { container } = renderReact(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
+    const { container } = render(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(el!.resumeFlowId).toBe("flow_123");
   });
 
   it("reads a null resumeFlowId as no handle", () => {
-    const { container } = renderReact(<ZitadelLogin project={project} resumeFlowId={null} />);
+    const { container } = render(<ZitadelLogin project={project} resumeFlowId={null} />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(el!.resumeFlowId).toBe("");
   });
 
   it("forwards the preview props to the widget", () => {
-    const { container } = renderReact(
+    const { container } = render(
       <ZitadelLogin project={project} previewState="success" previewSuccessStep="done" />,
     );
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
@@ -151,9 +105,7 @@ describe("ZitadelLogin", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = renderReact(
-        <ZitadelLogin project={project} {...{ [handlerProp]: spy }} />,
-      );
+      const { container } = render(<ZitadelLogin project={project} {...{ [handlerProp]: spy }} />);
       const el = container.querySelector(widgetTags.login);
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
@@ -163,7 +115,7 @@ describe("ZitadelLogin", () => {
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLoginElement>();
-    const { container } = renderReact(<ZitadelLogin ref={ref} project={project} />);
+    const { container } = render(<ZitadelLogin ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector(widgetTags.login));
     expect(ref.current?.tagName.toLowerCase()).toBe(widgetTags.login);
   });
@@ -171,16 +123,14 @@ describe("ZitadelLogin", () => {
 
 describe("ZitadelLogout", () => {
   it("binds the project handle as a property", () => {
-    const { container } = renderReact(<ZitadelLogout project={project} />);
+    const { container } = render(<ZitadelLogout project={project} />);
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = renderReact(
-      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
-    );
+    const { container } = render(<ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />);
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
@@ -190,9 +140,7 @@ describe("ZitadelLogout", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = renderReact(
-        <ZitadelLogout project={project} {...{ [handlerProp]: spy }} />,
-      );
+      const { container } = render(<ZitadelLogout project={project} {...{ [handlerProp]: spy }} />);
       const el = container.querySelector(widgetTags.logout);
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
@@ -203,7 +151,7 @@ describe("ZitadelLogout", () => {
   it("passes an async callback's promise to the event's waitUntil", async () => {
     const ran = vi.fn();
     const registered: Array<Promise<unknown>> = [];
-    const { container } = renderReact(
+    const { container } = render(
       <ZitadelLogout project={project} onSignout={() => Promise.resolve().then(() => ran())} />,
     );
     const el = widgetIn(container, widgetTags.logout);
@@ -219,7 +167,7 @@ describe("ZitadelLogout", () => {
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLogoutElement>();
-    const { container } = renderReact(<ZitadelLogout ref={ref} project={project} />);
+    const { container } = render(<ZitadelLogout ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector(widgetTags.logout));
     expect(ref.current?.tagName.toLowerCase()).toBe(widgetTags.logout);
   });
@@ -227,23 +175,21 @@ describe("ZitadelLogout", () => {
 
 describe("ZitadelSession", () => {
   it("binds the project handle as a property", () => {
-    const { container } = renderReact(<ZitadelSession project={project} />);
+    const { container } = render(<ZitadelSession project={project} />);
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", () => {
-    const { container } = renderReact(
-      <ZitadelSession projectId="proj-test" proxyPath="/__nextgen" />,
-    );
+    const { container } = render(<ZitadelSession projectId="proj-test" proxyPath="/__nextgen" />);
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it("forwards the surface variant/theme", () => {
-    const { container } = renderReact(
+    const { container } = render(
       <ZitadelSession project={project} variant="page" theme="light" suppressHeader />,
     );
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
@@ -256,7 +202,7 @@ describe("ZitadelSession", () => {
     "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = renderReact(
+      const { container } = render(
         <ZitadelSession project={project} {...{ [handlerProp]: spy }} />,
       );
       const el = container.querySelector(widgetTags.session);
@@ -268,7 +214,7 @@ describe("ZitadelSession", () => {
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelSessionElement>();
-    const { container } = renderReact(<ZitadelSession ref={ref} project={project} />);
+    const { container } = render(<ZitadelSession ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector(widgetTags.session));
     expect(ref.current?.tagName.toLowerCase()).toBe(widgetTags.session);
   });
@@ -280,17 +226,17 @@ describe("hydrating a server-rendered login", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts its first flow with the purpose the server rendered", async ({ render }) => {
+  it("starts its first flow with the purpose the server rendered", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const { hydrate } = render(
-      renderToString(<ZitadelLogin project={globalProject} purpose="register" />),
-    );
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = renderToString(<ZitadelLogin project={globalProject} purpose="register" />);
 
-    hydrate(<ZitadelLogin project={globalProject} purpose="register" />);
+    hydrateRoot(host, <ZitadelLogin project={globalProject} purpose="register" />);
 
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     const bodies = await Promise.all(
@@ -302,16 +248,19 @@ describe("hydrating a server-rendered login", () => {
     );
     const created = bodies.filter((body) => body?.project_id);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
   });
 
-  it("loads the supplied flow on its first request instead of creating one", async ({ render }) => {
+  it("loads the supplied flow on its first request instead of creating one", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
     const login = <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />;
-    const { host, hydrate } = render(renderToString(login));
+    host.innerHTML = renderToString(login);
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>
@@ -319,7 +268,7 @@ describe("hydrating a server-rendered login", () => {
     );
 
     await act(async () => {
-      hydrate(login);
+      hydrateRoot(host, login);
     });
 
     await waitFor(() => expect(fetched).toHaveBeenCalled());
@@ -331,6 +280,7 @@ describe("hydrating a server-rendered login", () => {
     await rendered?.updateComplete;
     await Promise.all(fetched.mock.results.map((result) => result.value));
     expect(fetched).toHaveBeenCalledTimes(1);
+    host.remove();
   });
 });
 
@@ -340,9 +290,7 @@ describe("a login resumed to completion before it hydrates", () => {
     vi.restoreAllMocks();
   });
 
-  it("exchanges the handoff and navigates to the server-rendered post-sign-in URL", async ({
-    render,
-  }) => {
+  it("exchanges the handoff and navigates to the server-rendered post-sign-in URL", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
@@ -366,20 +314,23 @@ describe("a login resumed to completion before it hydrates", () => {
       configurable: true,
       value: { ...location, assign },
     });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
     try {
       const login = (
         <ZitadelLogin project={globalProject} resumeFlowId="flow_123" postSignInUrl="/home" />
       );
       // The element upgrades from the server markup and finishes the flow
       // before React has hydrated anything.
-      const { hydrate } = render(renderToString(login));
+      host.innerHTML = renderToString(login);
       await waitFor(() => expect(assign).toHaveBeenCalledWith("/home"));
       expect(exchanged).toHaveLength(1);
       expect(exchanged[0]).toContain("handoff-token");
 
-      hydrate(login);
+      hydrateRoot(host, login);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
+      host.remove();
     }
   });
 });
@@ -400,10 +351,11 @@ describe("a login with a keyed project handle", () => {
     expect(renderToString(<ZitadelLogin project={keyed} />)).toBe("");
   });
 
-  it("starts its first flow once, with the bearer, after mounting", async ({ render }) => {
+  it("starts its first flow once, with the bearer, after mounting", async () => {
     const fetched = vi.spyOn(globalThis, "fetch");
-    const { host, hydrate } = render("");
-    hydrate(<ZitadelLogin project={keyed} />);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    hydrateRoot(host, <ZitadelLogin project={keyed} />);
 
     await waitFor(() => expect(host.querySelector(widgetTags.login)).not.toBeNull());
     expect(widgetIn(host, widgetTags.login).project).toBe(keyed);
@@ -412,6 +364,7 @@ describe("a login with a keyed project handle", () => {
     const [input, init] = fetched.mock.calls[0]!;
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
     expect(headers.get("authorization")).toBe("Bearer pk_test_123");
+    host.remove();
   });
 });
 
@@ -431,7 +384,7 @@ describe("unset props keep the element's defaults", () => {
     ["theme", ""],
     ["suppressHeader", false],
   ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
-    const { container } = renderReact(<ZitadelSession project={project} />);
+    const { container } = render(<ZitadelSession project={project} />);
 
     expect(widgetIn(container, widgetTags.session)[prop]).toBe(expected);
   });
@@ -443,13 +396,13 @@ describe("unset props keep the element's defaults", () => {
     ["lang", ""],
     ["suppressPasswordToggle", false],
   ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
-    const { container } = renderReact(<ZitadelLogin project={project} />);
+    const { container } = render(<ZitadelLogin project={project} />);
 
     expect(widgetIn(container, widgetTags.login)[prop]).toBe(expected);
   });
 
   it("ZitadelLogout keeps the default theme", () => {
-    const { container } = renderReact(<ZitadelLogout project={project} />);
+    const { container } = render(<ZitadelLogout project={project} />);
 
     expect(widgetIn(container, widgetTags.logout).theme).toBe("");
   });
@@ -463,7 +416,7 @@ describe("props that become unset restore the element's defaults", () => {
     ["theme", "light", ""],
     ["suppressHeader", true, false],
   ] as const)("ZitadelSession restores the default %s", (prop, given, expected) => {
-    const { container, rerender } = renderReact(
+    const { container, rerender } = render(
       <ZitadelSession project={project} {...{ [prop]: given }} />,
     );
     const el = widgetIn(container, widgetTags.session);
@@ -481,7 +434,7 @@ describe("props that become unset restore the element's defaults", () => {
     ["lang", "de", ""],
     ["suppressPasswordToggle", true, false],
   ] as const)("ZitadelLogin restores the default %s", (prop, given, expected) => {
-    const { container, rerender } = renderReact(
+    const { container, rerender } = render(
       <ZitadelLogin project={project} {...{ [prop]: given }} />,
     );
     const el = widgetIn(container, widgetTags.login);
@@ -493,7 +446,7 @@ describe("props that become unset restore the element's defaults", () => {
   });
 
   it("ZitadelLogout restores the default theme", () => {
-    const { container, rerender } = renderReact(<ZitadelLogout project={project} theme="light" />);
+    const { container, rerender } = render(<ZitadelLogout project={project} theme="light" />);
     const el = widgetIn(container, widgetTags.logout);
     expect(el.theme).toBe("light");
 
@@ -548,19 +501,19 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
 
 describe("wrapper config parity", () => {
   it("forwards every ZitadelLoginConfig key to <zitadel-login>", () => {
-    const { container } = renderReact(<ZitadelLogin {...loginConfig} />);
+    const { container } = render(<ZitadelLogin {...loginConfig} />);
     const el = container.querySelector<ZitadelLoginElement>(widgetTags.login);
     expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
   });
 
   it("forwards every ZitadelSessionConfig key to <zitadel-session>", () => {
-    const { container } = renderReact(<ZitadelSession {...sessionConfig} />);
+    const { container } = render(<ZitadelSession {...sessionConfig} />);
     const el = container.querySelector<ZitadelSessionElement>(widgetTags.session);
     expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
   });
 
   it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", () => {
-    const { container } = renderReact(<ZitadelLogout {...logoutConfig} />);
+    const { container } = render(<ZitadelLogout {...logoutConfig} />);
     const el = container.querySelector<ZitadelLogoutElement>(widgetTags.logout);
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
@@ -677,7 +630,7 @@ async function mountWidget(widget: WidgetName, attributes: Attributes) {
       }}
     />
   );
-  const { container, rerender } = renderReact(elementFor(attributes));
+  const { container, rerender } = render(elementFor(attributes));
   return {
     container,
     ref: () => element,

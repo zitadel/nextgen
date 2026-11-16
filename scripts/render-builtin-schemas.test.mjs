@@ -6,10 +6,11 @@
  * built-in rendered, and no `$ref` into the namespace that would answer 404.
  */
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { test } from "vitest";
 
-import { test } from "./fixtures.ts";
 import {
   documentRefs,
   HOSTED_BASE,
@@ -23,8 +24,9 @@ import { DEFAULT_BUILTIN_SCHEMA_BASE } from "../packages/config/src/builtin-sche
 
 const BASE = "https://schemas.example.test/v1";
 
-/** Writes `files` (name to document) into `dir`, and returns `dir`. */
-function sourceDir(dir, files) {
+/** A source directory holding `files` (name to document). */
+function sourceDir(files) {
+  const dir = mkdtempSync(join(tmpdir(), "builtin-schemas-"));
   for (const [name, document] of Object.entries(files)) {
     writeFileSync(join(dir, name), JSON.stringify(document));
   }
@@ -94,8 +96,8 @@ test("every built-in is rendered under the hosted base, its $refs all served", (
   );
 });
 
-test("a $ref into the namespace that names no built-in fails the build", ({ dir: source }) => {
-  const dir = sourceDir(source, {
+test("a $ref into the namespace that names no built-in fails the build", () => {
+  const dir = sourceDir({
     "a.json": { properties: { b: { $ref: "b.json#/$defs/x" } } },
     "c.json": { type: "string" },
   });
@@ -116,10 +118,11 @@ test("a base is an absolute http(s) URL; a trailing slash is dropped", () => {
   }
 });
 
-test("the files land under the base's path, and stale ones go", ({ dir, other: out }) => {
+test("the files land under the base's path, and stale ones go", () => {
+  const out = mkdtempSync(join(tmpdir(), "builtin-schemas-out-"));
   const documents = renderBuiltinSchemas({
     base: BASE,
-    sourceDir: sourceDir(dir, { "a.json": { $ref: "b.json" }, "b.json": { type: "string" } }),
+    sourceDir: sourceDir({ "a.json": { $ref: "b.json" }, "b.json": { type: "string" } }),
   });
   const first = writeBuiltinSchemas(documents, { base: BASE, outDir: out });
   assert.equal(first, join(out, "v1"));

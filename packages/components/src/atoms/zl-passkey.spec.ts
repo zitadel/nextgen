@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-passkey.js";
 import type { ZlPasskey } from "./zl-passkey.js";
-import { test } from "../test/fixtures.js";
 
 /**
  * Behaviour contract for `<zl-passkey>`, driven through its public events and
@@ -45,25 +44,16 @@ function fakeAttestation(): PublicKeyCredential {
   } as unknown as PublicKeyCredential;
 }
 
-/**
- * `it` with fake timers: `clock` is Vitest's timer control, started before the
- * test body runs and put back to real timers when the test ends.
- */
-const it = test.extend<{ clock: typeof vi }>({
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  async clock({}, use) {
-    vi.useFakeTimers();
-    await use(vi);
-    vi.useRealTimers();
-  },
-});
-
 describe("<zl-passkey>", () => {
+  let host: HTMLDivElement;
   let credentials: CredentialsStub;
   let originalCredentials: PropertyDescriptor | undefined;
   let originalPublicKeyCredential: PropertyDescriptor | undefined;
 
   beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+
     credentials = {
       get: vi.fn(async () => fakeAssertion()),
       create: vi.fn(async () => fakeAssertion()),
@@ -81,6 +71,7 @@ describe("<zl-passkey>", () => {
   });
 
   afterEach(() => {
+    host.remove();
     if (originalCredentials) {
       Object.defineProperty(navigator, "credentials", originalCredentials);
     } else {
@@ -109,7 +100,7 @@ describe("<zl-passkey>", () => {
     });
   }
 
-  it("errors (not aborted) when started without options", async ({ host }) => {
+  it("errors (not aborted) when started without options", async () => {
     const el = create({ manual: true });
     host.appendChild(el);
     const detail = nextEvent<{ error: string; aborted: boolean; challenge_id: string }>(
@@ -123,7 +114,7 @@ describe("<zl-passkey>", () => {
     expect(result.challenge_id).toBe("chal-1");
   });
 
-  it("errors when WebAuthn is unsupported", async ({ host }) => {
+  it("errors when WebAuthn is unsupported", async () => {
     delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
     const el = create({ manual: true, options: { challenge: "AAAA" } });
     host.appendChild(el);
@@ -134,16 +125,14 @@ describe("<zl-passkey>", () => {
     expect(result.error).toMatch(/not supported/i);
   });
 
-  it("does not auto-start the ceremony in manual mode", async ({ host }) => {
+  it("does not auto-start the ceremony in manual mode", async () => {
     const el = create({ manual: true, options: { challenge: "AAAA" } });
     host.appendChild(el);
     await Promise.resolve();
     expect(credentials.get).not.toHaveBeenCalled();
   });
 
-  it("auto-starts on connect and serialises the assertion into base64url proof", async ({
-    host,
-  }) => {
+  it("auto-starts on connect and serialises the assertion into base64url proof", async () => {
     const el = create({
       ceremony: "authenticate",
       options: {
@@ -198,7 +187,7 @@ describe("<zl-passkey>", () => {
     expect(heardOnPage).not.toHaveBeenCalled();
   });
 
-  it("decodes allowCredentials descriptors into ArrayBuffer ids", async ({ host }) => {
+  it("decodes allowCredentials descriptors into ArrayBuffer ids", async () => {
     const el = create({
       ceremony: "authenticate",
       options: {
@@ -218,7 +207,7 @@ describe("<zl-passkey>", () => {
     expect(descriptor?.type).toBe("public-key");
   });
 
-  it("auto-starts registration once and passes user labels to create()", async ({ host }) => {
+  it("auto-starts registration once and passes user labels to create()", async () => {
     credentials.create.mockResolvedValue(fakeAttestation());
     const el = create({
       ceremony: "register",
@@ -253,7 +242,7 @@ describe("<zl-passkey>", () => {
     expect(result.proof.response.attestationObject).toBeTypeOf("string");
   });
 
-  it("aborts the in-flight ceremony when disconnected", async ({ host }) => {
+  it("aborts the in-flight ceremony when disconnected", async () => {
     credentials.get.mockImplementation(
       (arg: { signal?: AbortSignal }) =>
         new Promise((_resolve, reject) => {
@@ -271,7 +260,7 @@ describe("<zl-passkey>", () => {
     expect(result.aborted).toBe(true);
   });
 
-  it("emits zl-passkey-started when the ceremony actually begins", async ({ host }) => {
+  it("emits zl-passkey-started when the ceremony actually begins", async () => {
     const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
     const order: string[] = [];
     el.addEventListener("zl-passkey-started", () => order.push("started"));
@@ -285,7 +274,7 @@ describe("<zl-passkey>", () => {
     expect(order).toEqual(["started", "result"]);
   });
 
-  it("does not emit zl-passkey-started when a guard rejects the start", async ({ host }) => {
+  it("does not emit zl-passkey-started when a guard rejects the start", async () => {
     const startedListener = vi.fn();
     const el = create({ manual: true });
     el.addEventListener("zl-passkey-started", startedListener);
@@ -296,7 +285,7 @@ describe("<zl-passkey>", () => {
     expect(startedListener).not.toHaveBeenCalled();
   });
 
-  it("renders pending status + cancel while in flight and clears them after", async ({ host }) => {
+  it("renders pending status + cancel while in flight and clears them after", async () => {
     let resolveGet!: (value: PublicKeyCredential) => void;
     credentials.get.mockImplementation(
       () => new Promise<PublicKeyCredential>((resolve) => (resolveGet = resolve)),
@@ -322,7 +311,7 @@ describe("<zl-passkey>", () => {
     expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
   });
 
-  it("renders no pending UI when silent", async ({ host }) => {
+  it("renders no pending UI when silent", async () => {
     // A ceremony that never settles — only the pending state matters here.
     credentials.get.mockImplementation(() => new Promise(() => undefined));
     const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" }, silent: true });
@@ -331,9 +320,7 @@ describe("<zl-passkey>", () => {
     expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
   });
 
-  it("cancel click aborts the ceremony without leaking zl-submit to ancestors", async ({
-    host,
-  }) => {
+  it("cancel click aborts the ceremony without leaking zl-submit to ancestors", async () => {
     credentials.get.mockImplementation(
       (arg: { signal?: AbortSignal }) =>
         new Promise((_resolve, reject) => {
@@ -361,26 +348,31 @@ describe("<zl-passkey>", () => {
     expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
   });
 
-  it("classifies NotAllowedError at the server timeout as timed_out", async ({ host, clock }) => {
-    let rejectGet!: (reason: unknown) => void;
-    credentials.get.mockImplementation(
-      () => new Promise((_resolve, reject) => (rejectGet = reject)),
-    );
-    const el = create({
-      ceremony: "authenticate",
-      options: { challenge: "AAAA", timeout: 60_000 },
-    });
-    const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
-    host.appendChild(el);
+  it("classifies NotAllowedError at the server timeout as timed_out", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({
+        ceremony: "authenticate",
+        options: { challenge: "AAAA", timeout: 60_000 },
+      });
+      const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
 
-    clock.advanceTimersByTime(60_000);
-    rejectGet(new DOMException("timed out", "NotAllowedError"));
-    const result = await errored;
-    expect(result.aborted).toBe(true);
-    expect(result.timed_out).toBe(true);
+      vi.advanceTimersByTime(60_000);
+      rejectGet(new DOMException("timed out", "NotAllowedError"));
+      const result = await errored;
+      expect(result.aborted).toBe(true);
+      expect(result.timed_out).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("treats a prompt NotAllowedError as a cancellation, not a timeout", async ({ host }) => {
+  it("treats a prompt NotAllowedError as a cancellation, not a timeout", async () => {
     let rejectGet!: (reason: unknown) => void;
     credentials.get.mockImplementation(
       () => new Promise((_resolve, reject) => (rejectGet = reject)),
@@ -398,17 +390,22 @@ describe("<zl-passkey>", () => {
     expect(result.timed_out).toBe(false);
   });
 
-  it("never claims a timeout when the server sent no timeout", async ({ host, clock }) => {
-    let rejectGet!: (reason: unknown) => void;
-    credentials.get.mockImplementation(
-      () => new Promise((_resolve, reject) => (rejectGet = reject)),
-    );
-    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
-    const errored = nextEvent<{ timed_out: boolean }>(el, "zl-passkey-error");
-    host.appendChild(el);
-    clock.advanceTimersByTime(600_000);
-    rejectGet(new DOMException("dismissed", "NotAllowedError"));
-    const result = await errored;
-    expect(result.timed_out).toBe(false);
+  it("never claims a timeout when the server sent no timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+      const errored = nextEvent<{ timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
+      vi.advanceTimersByTime(600_000);
+      rejectGet(new DOMException("dismissed", "NotAllowedError"));
+      const result = await errored;
+      expect(result.timed_out).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import net from "node:net";
+import { test } from "vitest";
 
-import { test } from "./fixtures.mjs";
 import {
   JOURNEY_PORT_BLOCK_SIZE,
   JOURNEY_PORT_BLOCK_START,
@@ -64,10 +64,16 @@ test("throws once the whole block is exhausted", async () => {
   await assert.rejects(() => reservePort(new Set()), /no free port in 100-101/);
 });
 
-test("canListen reports a bound port as unavailable", async ({ listen }) => {
+test("canListen reports a bound port as unavailable", async () => {
   const server = net.createServer();
-  const boundPort = await listen(server);
-  assert.equal(await canListen(boundPort), false);
-  await new Promise((resolveClose) => server.close(resolveClose));
+  const boundPort = await new Promise((resolvePort, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolvePort(server.address().port));
+  });
+  try {
+    assert.equal(await canListen(boundPort), false);
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+  }
   assert.equal(await canListen(boundPort), true);
 });

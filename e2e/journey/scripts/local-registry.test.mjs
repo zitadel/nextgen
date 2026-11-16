@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { afterEach, test } from "vitest";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
-import { test } from "./fixtures.mjs";
 import {
   localRegistryPaths,
   localRegistryPort,
@@ -15,9 +16,21 @@ import {
   startLocalRegistry,
 } from "./local-registry.mjs";
 
-test("prepares local package tarballs and publishes them to Verdaccio", async ({ dir }) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
-  const workDir = await subdir(dir, "work");
+const tempDirs = [];
+
+afterEach(async () => {
+  while (tempDirs.length > 0) {
+    const dir = tempDirs.pop();
+    if (dir) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("prepares local package tarballs and publishes them to Verdaccio", async () => {
+  const repoRoot = await fixtureRepo();
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
   const paths = localRegistryPaths(workDir);
   const calls = [];
   const logs = [];
@@ -127,10 +140,11 @@ test("scrubs inherited npm config before pointing installs at the local registry
   );
 });
 
-test("uses prebuilt tarballs without rebuilding release packages", async ({ dir }) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
-  const workDir = await subdir(dir, "work");
-  const prebuiltTarballsDir = await subdir(dir, "prebuilt");
+test("uses prebuilt tarballs without rebuilding release packages", async () => {
+  const repoRoot = await fixtureRepo();
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const prebuiltTarballsDir = await mkdtemp(join(tmpdir(), "zitadel-prebuilt-tarballs-"));
+  tempDirs.push(workDir, prebuiltTarballsDir);
   const paths = localRegistryPaths(workDir);
   const calls = [];
   const logs = [];
@@ -178,14 +192,13 @@ test("uses prebuilt tarballs without rebuilding release packages", async ({ dir 
   );
 });
 
-test("builds and packs only what a generated app installs for the app package set", async ({
-  dir,
-}) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
+test("builds and packs only what a generated app installs for the app package set", async () => {
+  const repoRoot = await fixtureRepo();
   for (const pkg of APP_RELEASE_PACKAGES) {
     await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
   }
-  const workDir = await subdir(dir, "work");
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
   const paths = localRegistryPaths(workDir);
   const env = { PATH: "/bin" };
   const runCalls = [];
@@ -232,15 +245,14 @@ test("builds and packs only what a generated app installs for the app package se
   );
 });
 
-test("packs a CI journey's own set from the builds turbo ran, without a turbo run", async ({
-  dir,
-}) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
+test("packs a CI journey's own set from the builds turbo ran, without a turbo run", async () => {
+  const repoRoot = await fixtureRepo();
   const packageDirs = ["apps/cli", "packages/sdk-svelte"];
-  for (const packageDir of packageDirs) {
-    await mkdir(join(repoRoot, packageDir, "dist"), { recursive: true });
+  for (const dir of packageDirs) {
+    await mkdir(join(repoRoot, dir, "dist"), { recursive: true });
   }
-  const workDir = await subdir(dir, "work");
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
   const paths = localRegistryPaths(workDir);
   const env = { PATH: "/bin" };
   const runCalls = [];
@@ -277,13 +289,12 @@ test("packs a CI journey's own set from the builds turbo ran, without a turbo ru
   );
 });
 
-test("copies the tarballs every journey shares and packs only the journey's own", async ({
-  dir,
-}) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
+test("copies the tarballs every journey shares and packs only the journey's own", async () => {
+  const repoRoot = await fixtureRepo();
   await mkdir(join(repoRoot, "packages/sdk-svelte", "dist"), { recursive: true });
-  const workDir = await subdir(dir, "work");
-  const sharedDir = await subdir(dir, "shared");
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const sharedDir = await mkdtemp(join(tmpdir(), "zitadel-shared-tarballs-"));
+  tempDirs.push(workDir, sharedDir);
   await writeFile(join(sharedDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "cli");
   const paths = localRegistryPaths(workDir);
   const runCalls = [];
@@ -333,12 +344,11 @@ test("copies the tarballs every journey shares and packs only the journey's own"
   );
 });
 
-test("keeps a reused store's proxied packages and trusts their metadata for an hour", async ({
-  dir,
-}) => {
-  const repoRoot = await fixtureRepo(await subdir(dir, "repo"));
-  const workDir = await subdir(dir, "work");
-  const prebuiltTarballsDir = await subdir(dir, "prebuilt");
+test("keeps a reused store's proxied packages and trusts their metadata for an hour", async () => {
+  const repoRoot = await fixtureRepo();
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const prebuiltTarballsDir = await mkdtemp(join(tmpdir(), "zitadel-prebuilt-tarballs-"));
+  tempDirs.push(workDir, prebuiltTarballsDir);
   await fixtureTarballs(prebuiltTarballsDir);
   const paths = localRegistryPaths(workDir);
   // A store restored from CI's cache: a package an earlier run proxied from
@@ -373,20 +383,27 @@ test("keeps a reused store's proxied packages and trusts their metadata for an h
   );
 });
 
-test("refuses to start Verdaccio on a port something already serves", async ({ dir, listen }) => {
-  const port = await listen(createServer((_request, response) => response.end("{}")));
-  const workDir = await subdir(dir, "work");
-  await assert.rejects(
-    startLocalRegistry({
-      env: {},
-      paths: localRegistryPaths(workDir),
-      registryPort: port,
-      repoRoot: workDir,
-    }),
-    new RegExp(`127\\.0\\.0\\.1:${port} is already in use`),
-  );
-  // Refused before anything was started or logged.
-  await assert.rejects(stat(localRegistryPaths(workDir).registryLogPath), { code: "ENOENT" });
+test("refuses to start Verdaccio on a port something already serves", async () => {
+  const server = createServer((_request, response) => response.end("{}"));
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  try {
+    const { port } = server.address();
+    await assert.rejects(
+      startLocalRegistry({
+        env: {},
+        paths: localRegistryPaths(workDir),
+        registryPort: port,
+        repoRoot: workDir,
+      }),
+      new RegExp(`127\\.0\\.0\\.1:${port} is already in use`),
+    );
+    // Refused before anything was started or logged.
+    await assert.rejects(stat(localRegistryPaths(workDir).registryLogPath), { code: "ENOENT" });
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+  }
 });
 
 test("validates explicit local registry ports and derives stable defaults", () => {
@@ -401,13 +418,10 @@ test("validates explicit local registry ports and derives stable defaults", () =
   assert.equal(localRegistryPort("/repo", {}), port);
 });
 
-async function subdir(dir, name) {
-  const path = join(dir, name);
-  await mkdir(path, { recursive: true });
-  return path;
-}
+async function fixtureRepo() {
+  const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-local-registry-repo-"));
+  tempDirs.push(repoRoot);
 
-async function fixtureRepo(repoRoot) {
   for (const dir of packageDirs) {
     const name = packageNameForDir(dir);
     const packageDir = join(repoRoot, dir);

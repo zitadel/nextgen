@@ -1,40 +1,35 @@
 import { http, HttpResponse } from "msw";
-import type { setupServer } from "msw/node";
-import { describe, expect } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { startLocalZitadel } from "../../src/index";
-import { it as base } from "./fixtures";
 import { bootstrapHandlers } from "./helpers/bootstrap-api";
 import { fakeCliBin } from "./helpers/fake-cli";
 
-// The fake CLI never binds ports; msw answers on whatever port the test was given.
-const it = base.extend<{ origin: string; handled: undefined }>({
-  origin: async ({ port }, use) => {
-    await use(`http://localhost:${port}`);
-  },
-  handled: [
-    async ({ server, origin }, use) => {
-      server.use(...bootstrapHandlers(origin));
-      await use(undefined);
-    },
-    { auto: true },
-  ],
-});
+// The fake CLI never binds ports, so a fixed port keeps msw handlers exact.
+const PORT = 18095;
+const BASE = `http://localhost:${PORT}`;
 
-const failProjects = (server: ReturnType<typeof setupServer>, origin: string) =>
+const server = setupServer(...bootstrapHandlers(BASE));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+const failProjects = () =>
   server.use(
-    http.post(`${origin}/api/v1/projects`, () =>
+    http.post(`${BASE}/api/v1/projects`, () =>
       HttpResponse.json({ code: "req.invalid", message: "nope" }, { status: 400 }),
     ),
   );
 
 describe("startLocalZitadel", () => {
-  it("returns a connected, disposable instance on success", async ({ port, origin }) => {
+  it("returns a connected, disposable instance on success", async () => {
     const fake = await fakeCliBin();
-    const zitadel = await startLocalZitadel({ cliBin: fake.binPath, port });
+    const zitadel = await startLocalZitadel({ cliBin: fake.binPath, port: PORT });
 
     expect(zitadel.handle).toMatchObject({
-      baseUrl: origin,
+      baseUrl: BASE,
       projectId: "proj_1",
       projectSecret: "secret_1",
       schemaId: "sch_1",
@@ -47,11 +42,11 @@ describe("startLocalZitadel", () => {
     expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
   });
 
-  it("stops the booted instance when bootstrap fails", async ({ port, server, origin }) => {
-    failProjects(server, origin);
+  it("stops the booted instance when bootstrap fails", async () => {
+    failProjects();
     const fake = await fakeCliBin();
 
-    await expect(startLocalZitadel({ cliBin: fake.binPath, port })).rejects.toMatchObject({
+    await expect(startLocalZitadel({ cliBin: fake.binPath, port: PORT })).rejects.toMatchObject({
       status: 400,
     });
 
@@ -59,13 +54,13 @@ describe("startLocalZitadel", () => {
     expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
   });
 
-  it("aggregates the bootstrap error with a cleanup failure", async ({ port, server, origin }) => {
-    failProjects(server, origin);
+  it("aggregates the bootstrap error with a cleanup failure", async () => {
+    failProjects();
     const fake = await fakeCliBin({ stopExitCode: 1 });
 
     let error: unknown;
     try {
-      await startLocalZitadel({ cliBin: fake.binPath, port });
+      await startLocalZitadel({ cliBin: fake.binPath, port: PORT });
     } catch (caught) {
       error = caught;
     }

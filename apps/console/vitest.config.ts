@@ -18,6 +18,7 @@ export default defineConfig(async (env) =>
         VITE_CONSOLE_API_BASE: "http://localhost",
         VITE_CONSOLE_RUNTIME_FALLBACK: "",
       },
+      unstubEnvs: true,
       // Above RTL's 5s async timeout; test setup loads the router before tests.
       testTimeout: 30_000,
     },

@@ -4,136 +4,110 @@ import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { vi } from "vitest";
+import { afterAll, beforeAll, test } from "vitest";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
-import { test } from "./fixtures.mjs";
 import { packageName } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const script = join(here, "verify-tarballs.mjs");
 
-// The tarball sets are built inside the first test that asks for them, which takes several seconds.
-vi.setConfig({ testTimeout: 30_000 });
-
 // The script resolves required package names from the repo manifests, so the
 // fixture tarballs must carry the real names. Fabricate one minimal valid
 // tarball per package: server platform packages additionally need their
 // executable bin to satisfy assertServerPlatformBinary.
-/**
- * The fabricated tarball sets, built once per file in a directory of their own and removed
- * when the file's tests are done.
- */
-const it = test.extend({
-  sets: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      const fixtureRoot = await mkdtemp(join(tmpdir(), "verify-tarballs-test-"));
-      const sets = {
-        fixtureRoot,
-        releaseSetDir: join(fixtureRoot, "release-set"),
-        independentVersionsDir: join(fixtureRoot, "independent-versions"),
-        invalidVersionDir: join(fixtureRoot, "invalid-version"),
-        nonExecutableBinaryDir: join(fixtureRoot, "non-executable-binary"),
-        extraPackageDir: join(fixtureRoot, "extra-package"),
-        missingPackageDir: join(fixtureRoot, "missing-package"),
-        cliMissingSkillDir: join(fixtureRoot, "cli-missing-skill"),
-      };
-      await mkdir(sets.releaseSetDir, { recursive: true });
+let fixtureRoot;
+let releaseSetDir;
+let independentVersionsDir;
+let invalidVersionDir;
+let nonExecutableBinaryDir;
+let extraPackageDir;
+let missingPackageDir;
+let cliMissingSkillDir;
 
-      for (const dir of PUBLIC_PACKAGE_DIRS) {
-        await makeTarball(fixtureRoot, sets.releaseSetDir, await packageName(repoRoot, dir));
-      }
-      // Each variant is the release set with one package's tarball replaced.
-      await cp(sets.releaseSetDir, sets.independentVersionsDir, { recursive: true });
-      await makeTarball(fixtureRoot, sets.independentVersionsDir, "@zitadel/components", {
-        version: "0.2.0-alpha.1",
-      });
-      await makeTarball(fixtureRoot, sets.independentVersionsDir, "@zitadel/sdk-next", {
-        version: "0.1.0-alpha.4",
-      });
-      await cp(sets.releaseSetDir, sets.invalidVersionDir, { recursive: true });
-      await makeTarball(fixtureRoot, sets.invalidVersionDir, "@zitadel/sdk-next", {
-        version: "workspace:*",
-      });
-      await cp(sets.releaseSetDir, sets.nonExecutableBinaryDir, { recursive: true });
-      await makeTarball(fixtureRoot, sets.nonExecutableBinaryDir, "@zitadel/server-darwin-arm64", {
-        executable: false,
-      });
-      await cp(sets.releaseSetDir, sets.extraPackageDir, { recursive: true });
-      await makeTarball(fixtureRoot, sets.extraPackageDir, "@zitadel/api-mock");
-      await cp(sets.releaseSetDir, sets.missingPackageDir, { recursive: true });
-      await rm(join(sets.missingPackageDir, "zitadel-testing.tgz"));
-      await cp(sets.releaseSetDir, sets.cliMissingSkillDir, { recursive: true });
-      await makeTarball(fixtureRoot, sets.cliMissingSkillDir, "@zitadel/cli", {
-        omitCliSkill: true,
-      });
-      await use(sets);
-      await rm(fixtureRoot, { recursive: true, force: true });
-    },
-    { scope: "file" },
-  ],
+beforeAll(async () => {
+  fixtureRoot = await mkdtemp(join(tmpdir(), "verify-tarballs-test-"));
+  releaseSetDir = join(fixtureRoot, "release-set");
+  independentVersionsDir = join(fixtureRoot, "independent-versions");
+  invalidVersionDir = join(fixtureRoot, "invalid-version");
+  nonExecutableBinaryDir = join(fixtureRoot, "non-executable-binary");
+  extraPackageDir = join(fixtureRoot, "extra-package");
+  missingPackageDir = join(fixtureRoot, "missing-package");
+  cliMissingSkillDir = join(fixtureRoot, "cli-missing-skill");
+  await mkdir(releaseSetDir, { recursive: true });
+
+  for (const dir of PUBLIC_PACKAGE_DIRS) {
+    await makeTarball(releaseSetDir, await packageName(repoRoot, dir));
+  }
+  // Each variant is the release set with one package's tarball replaced.
+  await cp(releaseSetDir, independentVersionsDir, { recursive: true });
+  await makeTarball(independentVersionsDir, "@zitadel/components", { version: "0.2.0-alpha.1" });
+  await makeTarball(independentVersionsDir, "@zitadel/sdk-next", { version: "0.1.0-alpha.4" });
+  await cp(releaseSetDir, invalidVersionDir, { recursive: true });
+  await makeTarball(invalidVersionDir, "@zitadel/sdk-next", { version: "workspace:*" });
+  await cp(releaseSetDir, nonExecutableBinaryDir, { recursive: true });
+  await makeTarball(nonExecutableBinaryDir, "@zitadel/server-darwin-arm64", { executable: false });
+  await cp(releaseSetDir, extraPackageDir, { recursive: true });
+  await makeTarball(extraPackageDir, "@zitadel/api-mock");
+  await cp(releaseSetDir, missingPackageDir, { recursive: true });
+  await rm(join(missingPackageDir, "zitadel-testing.tgz"));
+  await cp(releaseSetDir, cliMissingSkillDir, { recursive: true });
+  await makeTarball(cliMissingSkillDir, "@zitadel/cli", { omitCliSkill: true });
 });
 
-it("accepts exactly the public release set", ({ sets: { releaseSetDir } }) => {
+afterAll(async () => {
+  await rm(fixtureRoot, { recursive: true, force: true });
+});
+
+test("accepts exactly the public release set", () => {
   const strict = runVerify(releaseSetDir);
   assert.equal(strict.status, 0, strict.stderr);
   assert.match(strict.stdout, /verified \d+ installable tarballs/);
 });
 
-it("accepts packages whose versions differ from each other", ({
-  sets: { independentVersionsDir },
-}) => {
+test("accepts packages whose versions differ from each other", () => {
   const result = runVerify(independentVersionsDir);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /verified \d+ installable tarballs/);
 });
 
-it("rejects a public tarball whose version is not semver", ({ sets: { invalidVersionDir } }) => {
+test("rejects a public tarball whose version is not semver", () => {
   const result = runVerify(invalidVersionDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /public package tarballs must use semver versions/);
 });
 
-it("rejects a server platform tarball whose binary is not executable", ({
-  sets: { nonExecutableBinaryDir },
-}) => {
+test("rejects a server platform tarball whose binary is not executable", () => {
   const result = runVerify(nonExecutableBinaryDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /contains non-executable bin\/nextgen/);
 });
 
-it("rejects tarballs outside the release set as unexpected", ({ sets: { extraPackageDir } }) => {
+test("rejects tarballs outside the release set as unexpected", () => {
   const result = runVerify(extraPackageDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unexpected package @zitadel\/api-mock/);
 });
 
-it("rejects a set missing a public release package", ({ sets: { missingPackageDir } }) => {
+test("rejects a set missing a public release package", () => {
   const result = runVerify(missingPackageDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing tarball for @zitadel\/testing/);
 });
 
-it("rejects a @zitadel/cli tarball missing the agent skill bundle", ({
-  sets: { cliMissingSkillDir },
-}) => {
+test("rejects a @zitadel/cli tarball missing the agent skill bundle", () => {
   const result = runVerify(cliMissingSkillDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing CLI agent skill files/);
 });
 
-it("--app-packages accepts exactly what a generated app installs", async ({
-  sets: { releaseSetDir },
-  dir,
-}) => {
-  const appSetDir = join(dir, "app-set");
+test("--app-packages accepts exactly what a generated app installs", async () => {
+  const appSetDir = join(fixtureRoot, "app-set");
   await mkdir(appSetDir, { recursive: true });
   for (const pkg of APP_RELEASE_PACKAGES) {
-    await makeTarball(dir, appSetDir, pkg.name);
+    await makeTarball(appSetDir, pkg.name);
   }
 
   const result = runVerify(appSetDir, "--app-packages");
@@ -147,12 +121,12 @@ it("--app-packages accepts exactly what a generated app installs", async ({
   );
 });
 
-it("--packages accepts exactly a journey's own set", async ({ dir }) => {
+test("--packages accepts exactly a journey's own set", async () => {
   const dirs = ["apps/cli", "packages/sdk-svelte"];
-  const journeySetDir = join(dir, "journey-set");
+  const journeySetDir = join(fixtureRoot, "journey-set");
   await mkdir(journeySetDir, { recursive: true });
-  for (const packageDir of dirs) {
-    await makeTarball(dir, journeySetDir, await packageName(repoRoot, packageDir));
+  for (const dir of dirs) {
+    await makeTarball(journeySetDir, await packageName(repoRoot, dir));
   }
 
   const flag = `--packages=${dirs.join(",")}`;
@@ -167,7 +141,7 @@ it("--packages accepts exactly a journey's own set", async ({ dir }) => {
   );
 });
 
-it("unknown flags are rejected", ({ sets: { releaseSetDir } }) => {
+test("unknown flags are rejected", () => {
   const result = runVerify(releaseSetDir, "--bogus");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unknown flags: --bogus/);
@@ -182,13 +156,12 @@ function runVerify(dir, ...flags) {
  * directory already has one.
  */
 async function makeTarball(
-  stageRoot,
   outDir,
   name,
   { omitCliSkill = false, version = "1.0.0", executable = true } = {},
 ) {
   const safe = name.replace(/[@/]/g, "-").replace(/^-/, "");
-  const stage = join(stageRoot, "stage", safe);
+  const stage = join(fixtureRoot, "stage", safe);
   const packageDir = join(stage, "package");
   await rm(stage, { recursive: true, force: true });
   await mkdir(packageDir, { recursive: true });

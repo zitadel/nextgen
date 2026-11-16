@@ -1,9 +1,9 @@
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { connectZitadel, identity } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
-import { it as base } from "./fixtures";
 
 const BASE = "http://zitadel-testing.invalid";
 
@@ -24,7 +24,7 @@ interface Captured {
 
 const captured: Captured = {};
 
-const handlers = [
+const server = setupServer(
   http.post(`${BASE}/api/v1/users`, async ({ request }) => {
     captured.userBody = (await request.json()) as Record<string, unknown>;
     captured.userAuth = request.headers.get("authorization");
@@ -36,23 +36,16 @@ const handlers = [
     captured.passwordUserId = params.userId as string;
     return new HttpResponse(null, { status: 204 });
   }),
-];
+);
 
-const it = base.extend<{ handled: undefined }>({
-  handled: [
-    async ({ server }, use) => {
-      server.use(...handlers);
-      await use(undefined);
-    },
-    { auto: true },
-  ],
-});
-
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
+  server.resetHandlers();
   for (const key of Object.keys(captured) as (keyof Captured)[]) {
     delete captured[key];
   }
 });
+afterAll(() => server.close());
 
 describe("seedUser via connectZitadel", () => {
   it("creates the user against the schema and sets an immediately-usable password", async () => {
@@ -109,7 +102,7 @@ describe("seedUser via connectZitadel", () => {
     });
   });
 
-  it("propagates unique-email conflicts", async ({ server }) => {
+  it("propagates unique-email conflicts", async () => {
     server.use(
       http.post(`${BASE}/api/v1/users`, () =>
         HttpResponse.json({ code: "user.exists", message: "duplicate" }, { status: 409 }),
@@ -149,7 +142,7 @@ describe("seed vocabulary", () => {
     expect(identity().email).not.toBe(who.email);
   });
 
-  it("seedUsers applies the per-index template and keeps unique defaults", async ({ server }) => {
+  it("seedUsers applies the per-index template and keeps unique defaults", async () => {
     let nextId = 0;
     server.use(
       http.post(`${BASE}/api/v1/users`, async ({ request }) => {

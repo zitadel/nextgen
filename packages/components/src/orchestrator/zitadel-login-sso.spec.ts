@@ -7,10 +7,10 @@ import {
 } from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, vi } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
-import { it, type Server } from "./fixtures.js";
 import type { ZlSsoProviders } from "../atoms/zl-sso-providers.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
@@ -37,10 +37,15 @@ const GOOGLE = { id: "google", name: "Google", template: "google" };
 const ACME = { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" };
 
 let mock: MockHandle = setupMockHandlers();
+const server = setupServer(...mock.handlers);
 
 let testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
 
-it.beforeEach(({ server }) => {
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: "error" });
+});
+
+beforeEach(() => {
   _resetConfigForTesting();
   testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
@@ -52,6 +57,11 @@ it.beforeEach(({ server }) => {
 
 afterEach(() => {
   clearSsoProviders();
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
 });
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
@@ -65,7 +75,18 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): 
 }
 
 describe("<zitadel-login> with identity providers", () => {
-  async function mountLogin(host: HTMLElement): Promise<ZitadelLogin> {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mountLogin(): Promise<ZitadelLogin> {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.project = testProject;
@@ -83,8 +104,6 @@ describe("<zitadel-login> with identity providers", () => {
    * widget makes until `ready` renders. `url` is the address it leaves behind.
    */
   async function landOn(
-    host: HTMLElement,
-    server: Server,
     location: string,
     ready: string,
   ): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
@@ -130,8 +149,8 @@ describe("<zitadel-login> with identity providers", () => {
     return assign.mock.calls.map((call) => String(call[0]));
   }
 
-  it("renders a button for every provider the step offers", async ({ host }) => {
-    const element = await mountLogin(host);
+  it("renders a button for every provider the step offers", async () => {
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
 
@@ -142,8 +161,8 @@ describe("<zitadel-login> with identity providers", () => {
     expect(labels).toEqual(["Continue with Google", "Continue with Acme SSO"]);
   });
 
-  it("submits the reserved sso action with the chosen connection id", async ({ host }) => {
-    const element = await mountLogin(host);
+  it("submits the reserved sso action with the chosen connection id", async () => {
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
 
@@ -167,11 +186,11 @@ describe("<zitadel-login> with identity providers", () => {
     expect(submits[0]?.body.sso_provider_id).toBe(GOOGLE.id);
   });
 
-  it("sends the page URL with this flow's id as the return target", async ({ host }) => {
+  it("sends the page URL with this flow's id as the return target", async () => {
     const { href } = window.location;
     window.history.replaceState(null, "", "/login?tab=sso#top");
     try {
-      const element = await mountLogin(host);
+      const element = await mountLogin();
       const atom = providerAtom(element);
       await atom.updateComplete;
 
@@ -200,8 +219,8 @@ describe("<zitadel-login> with identity providers", () => {
     }
   });
 
-  it("hands the browser to the provider's authorize URL", async ({ host }) => {
-    const element = await mountLogin(host);
+  it("hands the browser to the provider's authorize URL", async () => {
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
 
@@ -215,10 +234,10 @@ describe("<zitadel-login> with identity providers", () => {
     expect(navigations).toEqual(["https://idp.mock.invalid/authorize"]);
   });
 
-  it("emits zitadel-flow-redirect rather than flow-complete on the way out", async ({ host }) => {
+  it("emits zitadel-flow-redirect rather than flow-complete on the way out", async () => {
     // A host listening for completion must not treat leaving for the provider
     // as a finished sign-in: the flow resumes at the callback.
-    const element = await mountLogin(host);
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
     const redirects: CustomEvent[] = [];
@@ -237,10 +256,8 @@ describe("<zitadel-login> with identity providers", () => {
     expect(completes).toHaveLength(0);
   });
 
-  it("waits for work a zitadel-flow-redirect listener registers before navigating", async ({
-    host,
-  }) => {
-    const element = await mountLogin(host);
+  it("waits for work a zitadel-flow-redirect listener registers before navigating", async () => {
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
     const finish = new AbortController();
@@ -269,8 +286,8 @@ describe("<zitadel-login> with identity providers", () => {
     expect(calls).toEqual(["https://idp.mock.invalid/authorize"]);
   });
 
-  it("does not paint the redirect step it is navigating away from", async ({ host }) => {
-    const element = await mountLogin(host);
+  it("does not paint the redirect step it is navigating away from", async () => {
+    const element = await mountLogin();
     const atom = providerAtom(element);
     await atom.updateComplete;
 
@@ -284,9 +301,7 @@ describe("<zitadel-login> with identity providers", () => {
     expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
   });
 
-  it("still completes a terminal redirect rather than treating it as a provider hop", async ({
-    host,
-  }) => {
+  it("still completes a terminal redirect rather than treating it as a provider hop", async () => {
     // The engine copies the relying party's redirect_uri onto `redirect_url`
     // when a sign-in completes, so a terminal step carries the same field a
     // provider hop does. Reading only that field made every OIDC/SAML
@@ -337,10 +352,8 @@ describe("<zitadel-login> with identity providers", () => {
    */
   describe("the provider round trip", () => {
     /** Choose the first provider and return where the page was sent and asked to come back to. */
-    async function leaveForProvider(
-      host: HTMLElement,
-    ): Promise<{ redirectUrl: string; returnTarget: string }> {
-      const element = await mountLogin(host);
+    async function leaveForProvider(): Promise<{ redirectUrl: string; returnTarget: string }> {
+      const element = await mountLogin();
       const atom = providerAtom(element);
       await atom.updateComplete;
       const navigations = await withStubbedNavigation(async () => {
@@ -371,11 +384,8 @@ describe("<zitadel-login> with identity providers", () => {
       return res.headers.get("location") ?? "";
     }
 
-    it("comes back through the callback and resumes onto the next step", async ({
-      host,
-      server,
-    }) => {
-      const { redirectUrl, returnTarget } = await leaveForProvider(host);
+    it("comes back through the callback and resumes onto the next step", async () => {
+      const { redirectUrl, returnTarget } = await leaveForProvider();
       expect(redirectUrl).toBe("https://idp.mock.invalid/authorize");
 
       const location = await provider({ state: "s", code: "c", email: "ada@example.test" });
@@ -383,37 +393,31 @@ describe("<zitadel-login> with identity providers", () => {
 
       // A fresh page load: a widget that ignored `?flow=` would start a new
       // flow and leave the user on a blank sign-in screen.
-      const { element, seen } = await landOn(host, server, location, 'zl-field[name="given_name"]');
+      const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
       expect(seen).toContain("GET /api/v1/flows/flow_mock");
       expect(seen).not.toContain("POST /api/v1/flows");
       expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
     });
 
-    it.for<[string, string]>([
+    it.each([
       ["access_denied", "Sign-in cancelled"],
       ["server_error", "Sign-in failed"],
-    ])(
-      "shows the localised error on the step it started from after %s",
-      async ([error, title], { host, server }) => {
-        const { returnTarget } = await leaveForProvider(host);
+    ])("shows the localised error on the step it started from after %s", async (error, title) => {
+      const { returnTarget } = await leaveForProvider();
 
-        const location = await provider({ state: "s", error });
-        expect(location).toBe(returnTarget);
+      const location = await provider({ state: "s", error });
+      expect(location).toBe(returnTarget);
 
-        const { element } = await landOn(host, server, location, "zl-alert");
-        const alert = element.shadowRoot?.querySelector("zl-alert");
-        expect(alert?.getAttribute("heading")).toBe(title);
-        // Back on the identifier, not stranded on the redirect step.
-        expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
-      },
-    );
+      const { element } = await landOn(location, "zl-alert");
+      const alert = element.shadowRoot?.querySelector("zl-alert");
+      expect(alert?.getAttribute("heading")).toBe(title);
+      // Back on the identifier, not stranded on the redirect step.
+      expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    });
   });
 
   describe("when the server answers flow.sso_user_schema_mismatch", () => {
-    it("starts a fresh flow whose notice does not ask the visitor to start again", async ({
-      host,
-      server,
-    }) => {
+    it("starts a fresh flow whose notice does not ask the visitor to start again", async () => {
       server.use(
         http.get(
           "*/flows/:id",
@@ -429,12 +433,7 @@ describe("<zitadel-login> with identity providers", () => {
         ),
       );
 
-      const { element } = await landOn(
-        host,
-        server,
-        "/login?keep=1&flow=flow_stale#top",
-        "zl-field, zl-alert",
-      );
+      const { element } = await landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
       const text = element.shadowRoot?.textContent ?? "";
@@ -450,13 +449,12 @@ describe("<zitadel-login> with identity providers", () => {
         { status: 409 },
       );
 
-    const resumeStale = (host: HTMLElement, server: Server) =>
-      landOn(host, server, "/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
+    const resumeStale = () => landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
 
-    it("starts a fresh flow and tells the user why", async ({ server, host }) => {
+    it("starts a fresh flow and tells the user why", async () => {
       server.use(http.get("*/flows/:id", restartRequired, { once: true }));
 
-      const { element, seen, url } = await resumeStale(host, server);
+      const { element, seen, url } = await resumeStale();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
       expect(seen.filter((r) => r === "POST /api/v1/flows")).toHaveLength(1);
@@ -467,18 +465,18 @@ describe("<zitadel-login> with identity providers", () => {
       );
     });
 
-    it("restarts only once when the fresh flow is refused too", async ({ server, host }) => {
+    it("restarts only once when the fresh flow is refused too", async () => {
       server.use(http.get("*/flows/:id", restartRequired), http.post("*/flows", restartRequired));
 
-      const { element, seen } = await resumeStale(host, server);
+      const { element, seen } = await resumeStale();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(seen.filter((r) => r === "POST /api/v1/flows")).toHaveLength(1);
       expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
     });
 
-    it("does not carry typed values into the replacement flow", async ({ host, server }) => {
-      const element = await mountLogin(host);
+    it("does not carry typed values into the replacement flow", async () => {
+      const element = await mountLogin();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
       const submitted: Array<Record<string, unknown>> = [];
       const record = async ({ request }: { request: Request }) => {
@@ -538,7 +536,7 @@ describe("<zitadel-login> with identity providers", () => {
     details: { details: { fields: ["_zflow"] } },
   };
 
-  it.for([
+  it.each([
     { source: "the URL", status: 400, body: missingCookie, mount: (el: ZitadelLogin) => el },
     { source: "the URL", status: 404, body: notFound, mount: (el: ZitadelLogin) => el },
     { source: "the URL", status: 410, body: notFound, mount: (el: ZitadelLogin) => el },
@@ -553,7 +551,7 @@ describe("<zitadel-login> with identity providers", () => {
     },
   ])(
     "starts over when the flow from $source answers $status",
-    async ({ source, status, body, mount }, { host, server }) => {
+    async ({ source, status, body, mount }) => {
       // The cookie window can close during the external sign-in, and a flow
       // can finish in another tab. The handle then names nothing, and a page
       // stuck on a startup error has no way forward.
@@ -587,7 +585,7 @@ describe("<zitadel-login> with identity providers", () => {
     },
   );
 
-  it("offers no providers when the project has enabled none", async ({ host }) => {
+  it("offers no providers when the project has enabled none", async () => {
     clearSsoProviders();
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";

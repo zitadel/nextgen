@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, type NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 
@@ -37,6 +37,10 @@ async function copied(path: string): Promise<NextResponse> {
 describe("session cookies in Next's response cookie jar", () => {
   beforeEach(() => {
     clearSessionCheckCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("keeps the copied session cookie when a composed middleware sets a cookie of its own", async () => {

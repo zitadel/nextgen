@@ -1,8 +1,7 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { configureZitadel } from "@zitadel/api/config";
 
-import { it, type Render } from "../test/fixtures.js";
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
 
@@ -48,24 +47,29 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
 }
 
 describe("<zitadel-logout> open/close (chromium)", () => {
+  let host: HTMLDivElement;
   let originalFetch: typeof fetch;
 
   beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
     originalFetch = globalThis.fetch;
   });
 
   afterEach(() => {
+    host.remove();
     globalThis.fetch = originalFetch;
   });
 
-  async function mount(render: Render): Promise<ZitadelLogout> {
-    const element = await render<ZitadelLogout>(`<zitadel-logout></zitadel-logout>`);
+  async function mount(): Promise<ZitadelLogout> {
+    host.innerHTML = `<zitadel-logout></zitadel-logout>`;
+    const element = host.querySelector("zitadel-logout") as ZitadelLogout;
     await waitFor(() => element.shadowRoot?.querySelector(".trigger"));
     return element;
   }
 
-  it("closes when a click lands outside the element", async ({ render }) => {
-    const element = await mount(render);
+  it("closes when a click lands outside the element", async () => {
+    const element = await mount();
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     trigger.click();
     await element.updateComplete;
@@ -76,8 +80,8 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.querySelector(".dropdown")).toBeNull();
   });
 
-  it("closes on Escape and returns focus to the trigger", async ({ render }) => {
-    const element = await mount(render);
+  it("closes on Escape and returns focus to the trigger", async () => {
+    const element = await mount();
     const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
     trigger.click();
     await element.updateComplete;
@@ -88,10 +92,8 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(trigger);
   });
 
-  it("calls DELETE /sessions/me with credentials and the session's CSRF token", async ({
-    render,
-  }) => {
-    const element = await mount(render);
+  it("calls DELETE /sessions/me with credentials and the session's CSRF token", async () => {
+    const element = await mount();
     const fetchMock = vi.fn(async (url: string) =>
       String(url).includes("/sessions/me/csrf")
         ? Response.json({ csrf_token: "csrf_test" })

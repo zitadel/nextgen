@@ -1,8 +1,7 @@
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { describeEnvelopeError, type CliEnvelope } from "../../src/envelope";
 import { bootLocalServer } from "../../src/lifecycle";
-import { it } from "./fixtures";
 import { fakeCliBin } from "./helpers/fake-cli";
 
 const errorEnvelope = (overrides: Partial<CliEnvelope<unknown>> = {}): CliEnvelope<unknown> => ({
@@ -35,12 +34,12 @@ describe("describeEnvelopeError", () => {
 });
 
 describe("bootLocalServer failure surfacing", () => {
-  it("surfaces the error envelope's hint and next commands over raw tails", async ({ port }) => {
+  it("surfaces the error envelope's hint and next commands over raw tails", async () => {
     const fake = await fakeCliBin({
       startExitCode: 1,
       startStdout: JSON.stringify(errorEnvelope()),
     });
-    await expect(bootLocalServer({ cliBin: fake.binPath, port })).rejects.toThrow(
+    await expect(bootLocalServer({ cliBin: fake.binPath, port: 18099 })).rejects.toThrow(
       /hint: Reinstall @zitadel\/cli[\s\S]*next: npm install @zitadel\/cli@latest/,
     );
   });

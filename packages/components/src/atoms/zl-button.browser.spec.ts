@@ -1,8 +1,7 @@
-import { describe, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import "./zl-button.js";
 import type { ZlButton } from "./zl-button.js";
-import { it } from "../test/fixtures.js";
 
 /**
  * Real-browser form participation for `<zl-button>`. The button is a
@@ -13,7 +12,18 @@ import { it } from "../test/fixtures.js";
  * Chromium via `pnpm test:browser`.
  */
 describe("<zl-button> form participation (chromium)", () => {
-  it("submits the owning form when type=submit is clicked", async ({ host }) => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("submits the owning form when type=submit is clicked", async () => {
     host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
     const form = host.querySelector("form") as HTMLFormElement;
     const button = host.querySelector("zl-button") as ZlButton;
@@ -27,7 +37,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
-  it("falls back to attributes when upgraded properties are empty", async ({ host }) => {
+  it("falls back to attributes when upgraded properties are empty", async () => {
     host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
     const form = host.querySelector("form") as HTMLFormElement;
     const button = host.querySelector("zl-button") as ZlButton;
@@ -50,9 +60,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
-  it("submits when automation dispatches the click on the custom-element host", async ({
-    host,
-  }) => {
+  it("submits when automation dispatches the click on the custom-element host", async () => {
     host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
     const form = host.querySelector("form") as HTMLFormElement;
     const button = host.querySelector("zl-button") as ZlButton;
@@ -69,9 +77,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
-  it("does not emit zl-submit when a submit-type button delegates to the form", async ({
-    host,
-  }) => {
+  it("does not emit zl-submit when a submit-type button delegates to the form", async () => {
     // A submit button hands off to form.requestSubmit() so native constraint
     // validation runs; emitting zl-submit too would let the orchestrator
     // submit even when a required field is invalid. The form `submit` event is
@@ -97,7 +103,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(zlSubmits).toBe(0);
   });
 
-  it("blocks submission when a required field is empty", async ({ host }) => {
+  it("blocks submission when a required field is empty", async () => {
     // The whole point of delegating to the form: an invalid required control
     // must stop the submit (and no zl-submit escape hatch fires).
     host.innerHTML = `<form><input name="x" required /><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
@@ -121,7 +127,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(zlSubmits).toBe(0);
   });
 
-  it("resets the owning form when type=reset is clicked", async ({ host }) => {
+  it("resets the owning form when type=reset is clicked", async () => {
     host.innerHTML = `<form><input name="x" value="seed" /><zl-button type="reset" label="Reset"></zl-button></form>`;
     const input = host.querySelector("input") as HTMLInputElement;
     const button = host.querySelector("zl-button") as ZlButton;
@@ -131,7 +137,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(input.value).toBe("seed");
   });
 
-  it("resets the owning form when a field is named reset", async ({ host }) => {
+  it("resets the owning form when a field is named reset", async () => {
     host.innerHTML = `<form><input name="reset" value="seed" /><zl-button type="reset" label="Reset"></zl-button></form>`;
     const input = host.querySelector("input") as HTMLInputElement;
     const button = host.querySelector("zl-button") as ZlButton;
@@ -141,7 +147,7 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(input.value).toBe("seed");
   });
 
-  it("delegates focus from the host to the inner button", async ({ host }) => {
+  it("delegates focus from the host to the inner button", async () => {
     host.innerHTML = `<zl-button label="Focus me"></zl-button>`;
     const button = host.querySelector("zl-button") as ZlButton;
     await button.updateComplete;

@@ -11,8 +11,6 @@ export default defineConfig({
       {
         cacheDir: ".vitest/jsdom",
         test: {
-          unstubEnvs: true,
-          unstubGlobals: true,
           name: "jsdom",
           globals: true,
           environment: "jsdom",

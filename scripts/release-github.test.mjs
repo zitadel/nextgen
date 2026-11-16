@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { test } from "./fixtures.ts";
+import { test } from "vitest";
 
 import {
   GENERATED_BLOCK_END,
@@ -51,7 +51,8 @@ function fakePackages(...shorts) {
   }));
 }
 
-async function writeChangelogFixture(repoRoot, packages) {
+async function writeChangelogFixture(packages) {
+  const repoRoot = await mkdtemp(join(tmpdir(), "release-github-test-"));
   for (const pkg of packages) {
     const dir = join(repoRoot, pkg.path);
     await mkdir(dir, { recursive: true });
@@ -79,9 +80,8 @@ const GITHUB_ENV = {
   GITHUB_SHA: "deadbeef",
 };
 
-test("collectReleaseChanges lists each change once, with its packages and highest bump, without dependency-only or platform package noise", async ({
-  dir: repoRoot,
-}) => {
+test("collectReleaseChanges lists each change once, with its packages and highest bump, without dependency-only or platform package noise", async () => {
+  const repoRoot = await mkdtemp(join(tmpdir(), "release-github-test-"));
   const write = async (path, source) => {
     await mkdir(join(repoRoot, path), { recursive: true });
     await writeFile(join(repoRoot, path, "CHANGELOG.md"), source);
@@ -307,12 +307,12 @@ test("fitGeneratedReleaseFacts reports failure when only breaking changes are le
   assert.ok(result.block.includes(breaking.text));
 });
 
-test("dry run caps the created release body at the GitHub limit", async ({ dir }) => {
+test("dry run caps the created release body at the GitHub limit", async () => {
   const packages = [
     { name: "@x/huge", path: "packages/huge", version: "9.9.9-alpha.1", entry: "y".repeat(130000) },
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -335,9 +335,7 @@ test("dry run caps the created release body at the GitHub limit", async ({ dir }
   assert.ok(result.body.includes("- `@x/tiny`: a small fix"));
 });
 
-test("a breaking change too long for the body fails the release instead of being omitted", async ({
-  dir,
-}) => {
+test("a breaking change too long for the body fails the release instead of being omitted", async () => {
   const packages = [
     {
       name: "@x/huge",
@@ -347,7 +345,7 @@ test("a breaking change too long for the body fails the release instead of being
       entry: `Drops a flag.\n\n  **Breaking:** ${"y".repeat(130000)}`,
     },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -358,12 +356,12 @@ test("a breaking change too long for the body fails the release instead of being
   );
 });
 
-test("update path preserves product notes and fits the body around them", async ({ dir }) => {
+test("update path preserves product notes and fits the body around them", async () => {
   const packages = [
     { name: "@x/huge", path: "packages/huge", version: "9.9.9-alpha.1", entry: "y".repeat(90000) },
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -407,11 +405,11 @@ test("update path preserves product notes and fits the body around them", async 
   assert.ok(patchedBody.includes(GENERATED_BLOCK_END));
 });
 
-test("update path fails loudly when product notes alone exceed the limit", async ({ dir }) => {
+test("update path fails loudly when product notes alone exceed the limit", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -437,11 +435,11 @@ test("update path fails loudly when product notes alone exceed the limit", async
   );
 });
 
-test("create path posts a draft prerelease when no release exists for the tag", async ({ dir }) => {
+test("create path posts a draft prerelease when no release exists for the tag", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -472,11 +470,11 @@ test("create path posts a draft prerelease when no release exists for the tag", 
   assert.ok(createBody.body.includes(GENERATED_BLOCK_START));
 });
 
-test("existing releases are found by scanning paginated release listings", async ({ dir }) => {
+test("existing releases are found by scanning paginated release listings", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -519,11 +517,11 @@ test("existing releases are found by scanning paginated release listings", async
   assert.equal(calls[2].init.method, "PATCH");
 });
 
-test("dry runs never call GitHub", async ({ dir }) => {
+test("dry runs never call GitHub", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -544,11 +542,11 @@ test("dry runs never call GitHub", async ({ dir }) => {
   assert.equal(called, false);
 });
 
-test("real release creation fails clearly when required env is missing", async ({ dir }) => {
+test("real release creation fails clearly when required env is missing", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -565,11 +563,11 @@ test("real release creation fails clearly when required env is missing", async (
   );
 });
 
-test("renderGeneratedReleaseFacts still renders the untruncated block", async ({ dir }) => {
+test("renderGeneratedReleaseFacts still renders the untruncated block", async () => {
   const packages = [
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -583,9 +581,7 @@ test("renderGeneratedReleaseFacts still renders the untruncated block", async ({
   assert.ok(roundTripped.startsWith("notes"));
 });
 
-test("the version pull request lists each change once under the release's tag, without the platform packages", async ({
-  dir,
-}) => {
+test("the version pull request lists each change once under the release's tag, without the platform packages", async () => {
   const shared = "[#7](https://github.com/zitadel/nextgen/pull/7) - Sign-ins keep their project.";
   const packages = [
     {
@@ -609,7 +605,7 @@ test("the version pull request lists each change once under the release's tag, w
       entry: "Platform package detail.",
     },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -623,14 +619,12 @@ test("the version pull request lists each change once under the release's tag, w
   assert.ok(!body.includes("server-linux-x64"));
 });
 
-test("the version pull request omits changes to stay under GitHub's limit and points at its diff", async ({
-  dir,
-}) => {
+test("the version pull request omits changes to stay under GitHub's limit and points at its diff", async () => {
   const packages = [
     { name: "@x/huge", path: "packages/huge", version: "9.9.9-alpha.1", entry: "y".repeat(70000) },
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );
@@ -649,9 +643,7 @@ test("the version pull request omits changes to stay under GitHub's limit and po
   );
 });
 
-test("a breaking change too long for the version pull request fails instead of being omitted", async ({
-  dir,
-}) => {
+test("a breaking change too long for the version pull request fails instead of being omitted", async () => {
   const packages = [
     {
       name: "@x/huge",
@@ -661,7 +653,7 @@ test("a breaking change too long for the version pull request fails instead of b
       entry: `**Breaking:** ${"y".repeat(70000)}`,
     },
   ];
-  const repoRoot = await writeChangelogFixture(dir, packages);
+  const repoRoot = await writeChangelogFixture(packages);
   const metadata = fakeMetadata(
     packages.map(({ name, path, version }) => ({ name, path, version })),
   );

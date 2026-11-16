@@ -1,10 +1,10 @@
 import { waitFor } from "@solidjs/testing-library";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
-import type { ComponentProps, JSX } from "solid-js";
+import type { ComponentProps } from "solid-js";
 import { hydrate } from "solid-js/web";
 import { createServer } from "vite";
 import solid from "vite-plugin-solid";
-import { afterEach, beforeAll, describe, expect, it as base, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ZitadelLogin } from "./index";
 import { widgetTags } from "@zitadel/sdk-core/types";
@@ -37,49 +37,6 @@ async function loadServerMarkup(): Promise<(props: ComponentProps<typeof Zitadel
   }
 }
 
-/**
- * `it` extended with `render`, which puts server markup in a host div attached
- * to the document and hands back the host with a `hydrate` for it. The
- * hydrated roots are disposed and the host is removed when the test ends.
- */
-const it = base.extend<{
-  render: (markup: string) => {
-    host: HTMLDivElement;
-    hydrate: (ui: () => JSX.Element) => void;
-  };
-}>({
-  /**
-   * Provides the `render` function and tears down everything it mounted.
-   *
-   * @param _context The fixtures this one depends on, none.
-   * @param use Hands the value to the test.
-   * @returns Resolves once the test and the teardown have finished.
-   */
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  render: async ({}, use) => {
-    const hosts: HTMLDivElement[] = [];
-    const disposers: (() => void)[] = [];
-    await use((markup) => {
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      host.innerHTML = markup;
-      hosts.push(host);
-      return {
-        host,
-        hydrate: (ui) => {
-          disposers.push(hydrate(ui, host));
-        },
-      };
-    });
-    for (const dispose of disposers) {
-      dispose();
-    }
-    for (const host of hosts) {
-      host.remove();
-    }
-  },
-});
-
 describe("hydrating a server-rendered login", () => {
   let serverMarkup: (props: ComponentProps<typeof ZitadelLogin>) => string;
 
@@ -95,15 +52,15 @@ describe("hydrating a server-rendered login", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts its first flow with the purpose the server rendered", async ({ render }) => {
+  it("starts its first flow with the purpose the server rendered", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const { host, hydrate: hydrateLogin } = render(
-      serverMarkup({ project: globalProject, purpose: "register" }),
-    );
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = serverMarkup({ project: globalProject, purpose: "register" });
     const firstStep = new Promise((resolve) =>
       host
         .querySelector(widgetTags.login)
@@ -112,7 +69,10 @@ describe("hydrating a server-rendered login", () => {
 
     // What the server's hydration script defines before the client hydrates.
     Object.assign(window, { _$HY: { events: [], completed: new WeakSet(), r: {} } });
-    hydrateLogin(() => <ZitadelLogin project={globalProject} purpose="register" />);
+    const dispose = hydrate(
+      () => <ZitadelLogin project={globalProject} purpose="register" />,
+      host,
+    );
 
     await firstStep;
     const bodies = await Promise.all(
@@ -125,17 +85,19 @@ describe("hydrating a server-rendered login", () => {
     const created = bodies.filter((body) => body?.project_id);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    dispose();
+    host.remove();
   });
 
-  it("loads the supplied flow on its first request instead of creating one", async ({ render }) => {
+  it("loads the supplied flow on its first request instead of creating one", async () => {
     const globalProject = configureZitadel({
       projectId: "proj-global",
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const { host, hydrate: hydrateLogin } = render(
-      serverMarkup({ project: globalProject, resumeFlowId: "flow_123" }),
-    );
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>
@@ -144,7 +106,10 @@ describe("hydrating a server-rendered login", () => {
 
     // What the server's hydration script defines before the client hydrates.
     Object.assign(window, { _$HY: { events: [], completed: new WeakSet(), r: {} } });
-    hydrateLogin(() => <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />);
+    const dispose = hydrate(
+      () => <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />,
+      host,
+    );
 
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
@@ -155,5 +120,7 @@ describe("hydrating a server-rendered login", () => {
     await rendered?.updateComplete;
     await Promise.all(fetched.mock.results.map((result) => result.value));
     expect(fetched).toHaveBeenCalledTimes(1);
+    dispose();
+    host.remove();
   });
 });

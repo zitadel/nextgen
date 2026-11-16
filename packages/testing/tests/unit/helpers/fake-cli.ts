@@ -1,8 +1,6 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { onTestFinished } from "vitest";
 
 export interface FakeCliBehavior {
   startExitCode?: number;
@@ -27,9 +25,6 @@ export interface FakeCli {
  */
 export async function fakeCliBin(behavior: FakeCliBehavior = {}): Promise<FakeCli> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-fake-cli-"));
-  onTestFinished(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
   const recordPath = join(dir, "calls.jsonl");
   const binPath = join(dir, "fake-zitadel.cjs");
   const script = `

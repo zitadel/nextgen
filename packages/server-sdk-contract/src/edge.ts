@@ -1,6 +1,6 @@
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The address the runtime reports for the client of every edge case. */
 export const CLIENT_ADDRESS = "203.0.113.7";
@@ -36,6 +36,10 @@ export function describeEdgeServer(serve: EdgeServe): void {
         forwarded.push(new Request(input, init));
         return new Response("pong");
       });
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
 
     it("answers a protected route with a redirect to the login path", async () => {

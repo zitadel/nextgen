@@ -1,11 +1,10 @@
-import { describe, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { applyBaseTokens, applyBrandingTokens } from "../orchestrator/branding-to-tokens.js";
 import type { Branding, BrandingPalette } from "../orchestrator/branding.js";
 
 import "./zl-sso-providers.js";
 import type { ZlSsoProviders } from "./zl-sso-providers.js";
-import { it } from "../test/fixtures.js";
 
 /**
  * Provider buttons paint from `--zl-provider*`, which the tenant palette never
@@ -40,11 +39,18 @@ const LOUD_BRANDING = {
 type Paint = { background: string; border: string; label: string };
 
 describe("<zl-sso-providers> branding isolation (chromium)", () => {
-  async function paint(
-    host: HTMLElement,
-    theme: "light" | "dark",
-    branding: Branding | undefined,
-  ): Promise<Paint> {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function paint(theme: "light" | "dark", branding: Branding | undefined): Promise<Paint> {
     host.replaceChildren();
     const surface = document.createElement("div");
     surface.setAttribute("data-theme", theme);
@@ -63,11 +69,11 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     return { background: inner.backgroundColor, border: inner.borderTopColor, label: label.color };
   }
 
-  it.for(["light", "dark"] as const)(
+  it.each(["light", "dark"] as const)(
     "keeps the %s provider button off the tenant palette",
-    async (theme, { host }) => {
-      const shipped = await paint(host, theme, undefined);
-      const branded = await paint(host, theme, LOUD_BRANDING);
+    async (theme) => {
+      const shipped = await paint(theme, undefined);
+      const branded = await paint(theme, LOUD_BRANDING);
 
       expect(branded).toEqual(shipped);
       for (const colour of Object.values(branded)) {
@@ -76,9 +82,9 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     },
   );
 
-  it.for(["light", "dark"] as const)(
+  it.each(["light", "dark"] as const)(
     "paints the monochrome GitHub mark in the %s button's foreground, off the tenant palette",
-    async (theme, { host }) => {
+    async (theme) => {
       host.replaceChildren();
       const surface = document.createElement("div");
       surface.setAttribute("data-theme", theme);
@@ -105,7 +111,7 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     },
   );
 
-  it("gives the light and dark GitHub mark different colours", async ({ host }) => {
+  it("gives the light and dark GitHub mark different colours", async () => {
     // Guards the assertion above: a mark stuck on one colour would match its
     // label in one mode only by accident.
     const fills: string[] = [];
@@ -126,10 +132,10 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     expect(fills[0]).not.toBe(fills[1]);
   });
 
-  it("still lets the branding reach the rest of the surface", async ({ host }) => {
+  it("still lets the branding reach the rest of the surface", async () => {
     // Guards the test itself: if the branding sheet stopped applying, the
     // isolation assertion above would pass vacuously.
-    await paint(host, "light", LOUD_BRANDING);
+    await paint("light", LOUD_BRANDING);
     const surface = host.firstElementChild as HTMLElement;
     const probe = document.createElement("span");
     probe.style.color = "var(--zl-foreground)";

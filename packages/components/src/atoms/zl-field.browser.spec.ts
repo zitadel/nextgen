@@ -1,9 +1,8 @@
-import { describe, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
-import { it } from "../test/fixtures.js";
 
 /**
  * Real-browser checks for the form-participation contract documented in
@@ -14,26 +13,34 @@ import { it } from "../test/fixtures.js";
  * Chromium).
  */
 describe("<zl-field> form participation (chromium)", () => {
-  function mount(host: HTMLElement, html: string): { form: HTMLFormElement; field: ZlField } {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  function mount(html: string): { form: HTMLFormElement; field: ZlField } {
     host.innerHTML = html;
     const form = host.querySelector("form") as HTMLFormElement;
     const field = host.querySelector("zl-field") as ZlField;
     return { form, field };
   }
 
-  it("contributes its value to the enclosing FormData", async ({ host }) => {
-    const { form, field } = mount(
-      host,
-      `<form><zl-field name="email" type="email"></zl-field></form>`,
-    );
+  it("contributes its value to the enclosing FormData", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" type="email"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
     expect(new FormData(form).get("email")).toBe("alice@acme.com");
   });
 
-  it("flags valueMissing when required and empty", async ({ host }) => {
-    const { form, field } = mount(host, `<form><zl-field name="email" required></zl-field></form>`);
+  it("flags valueMissing when required and empty", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" required></zl-field></form>`);
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
     field.value = "alice@acme.com";
@@ -41,22 +48,16 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(form.checkValidity()).toBe(true);
   });
 
-  it("forwards a custom error message via setValidity", async ({ host }) => {
-    const { form, field } = mount(
-      host,
-      `<form><zl-field name="email" value="x"></zl-field></form>`,
-    );
+  it("forwards a custom error message via setValidity", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" value="x"></zl-field></form>`);
     await field.updateComplete;
     field.error = "That email is already registered.";
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
   });
 
-  it("restores its initial value when the host form is reset", async ({ host }) => {
-    const { form, field } = mount(
-      host,
-      `<form><zl-field name="email" value="seed"></zl-field></form>`,
-    );
+  it("restores its initial value when the host form is reset", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" value="seed"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
@@ -65,13 +66,11 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(field.value).toBe("seed");
   });
 
-  it("clears text written straight into the native input when the form is reset", async ({
-    host,
-  }) => {
+  it("clears text written straight into the native input when the form is reset", async () => {
     // A password manager can fill the native input without an input event, so
     // the host's `value` never learns about it. Reset goes through the native
     // control, so the text goes with it either way.
-    const { form, field } = mount(host, `<form><zl-field name="email"></zl-field></form>`);
+    const { form, field } = mount(`<form><zl-field name="email"></zl-field></form>`);
     await field.updateComplete;
     const native = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     native.value = "bob@example.com";
@@ -81,9 +80,8 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(new FormData(form).get("email")).toBe("");
   });
 
-  it("is disabled by an enclosing fieldset", async ({ host }) => {
+  it("is disabled by an enclosing fieldset", async () => {
     const { form, field } = mount(
-      host,
       `<form><fieldset disabled><zl-field name="email" value="x"></zl-field></fieldset></form>`,
     );
     await field.updateComplete;
@@ -97,9 +95,8 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(new FormData(form).get("email")).toBe("x");
   });
 
-  it("submits the owning form when Enter is pressed inside the input", async ({ host }) => {
+  it("submits the owning form when Enter is pressed inside the input", async () => {
     const { form, field } = mount(
-      host,
       `<form><zl-field name="email" value="alice@acme.com"></zl-field></form>`,
     );
     await field.updateComplete;
@@ -120,9 +117,8 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
-  it("submits on Enter when the field is named after a form method", async ({ host }) => {
+  it("submits on Enter when the field is named after a form method", async () => {
     const { form, field } = mount(
-      host,
       `<form><zl-field name="requestSubmit" value="x"></zl-field></form>`,
     );
     await field.updateComplete;
@@ -143,9 +139,8 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
-  it("does not submit on Enter when modifier keys are held", async ({ host }) => {
+  it("does not submit on Enter when modifier keys are held", async () => {
     const { form, field } = mount(
-      host,
       `<form><zl-field name="email" value="alice@acme.com"></zl-field></form>`,
     );
     await field.updateComplete;
@@ -167,25 +162,24 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(0);
   });
 
-  it("delegates focus from the host to the inner input", async ({ host }) => {
-    const { field } = mount(host, `<form><zl-field name="email"></zl-field></form>`);
+  it("delegates focus from the host to the inner input", async () => {
+    const { field } = mount(`<form><zl-field name="email"></zl-field></form>`);
     await field.updateComplete;
     field.focus();
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.shadowRoot?.activeElement).toBe(input);
   });
 
-  it("submits a read-only value with the form", async ({ host }) => {
+  it("submits a read-only value with the form", async () => {
     const { form, field } = mount(
-      host,
       `<form><zl-field name="email" value="alice@acme.com" readonly></zl-field></form>`,
     );
     await field.updateComplete;
     expect(new FormData(form).get("email")).toBe("alice@acme.com");
   });
 
-  it("keeps the clear button out of the tab order but still clickable", async ({ host }) => {
-    const { field } = mount(host, `<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
+  it("keeps the clear button out of the tab order but still clickable", async () => {
+    const { field } = mount(`<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
     await field.updateComplete;
     const button = field.shadowRoot?.querySelector(
       'button[part="trailing-action"]',
@@ -196,9 +190,8 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(field.value).toBe("");
   });
 
-  it("syncs native input/change events with host value and FormData", async ({ host }) => {
+  it("syncs native input/change events with host value and FormData", async () => {
     const { form, field } = mount(
-      host,
       `<form><zl-field name="email" data-testid="zitadel-field-email"></zl-field></form>`,
     );
     await field.updateComplete;
@@ -237,9 +230,18 @@ describe("<zl-field> form participation (chromium)", () => {
 });
 
 describe("<zl-field> help text (chromium)", () => {
-  it("gives an error the help text's place, and the help back once the error clears", async ({
-    host,
-  }) => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("gives an error the help text's place, and the help back once the error clears", async () => {
     host.innerHTML = `<zl-field name="password" error="Too short"><span slot="help">At least 15 characters.</span></zl-field>`;
     const field = host.querySelector("zl-field") as ZlField;
     await field.updateComplete;
@@ -258,10 +260,18 @@ describe("<zl-field> help text (chromium)", () => {
 });
 
 describe("<zl-field> password toggle (chromium)", () => {
-  async function mountRevealed(
-    host: HTMLElement,
-    markup: string,
-  ): Promise<{
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mountRevealed(markup: string): Promise<{
     form: HTMLFormElement;
     field: ZlField;
     input: HTMLInputElement;
@@ -278,7 +288,7 @@ describe("<zl-field> password toggle (chromium)", () => {
     return { form, field, input };
   }
 
-  it("keeps focus and the caret where they were across a real click", async ({ host }) => {
+  it("keeps focus and the caret where they were across a real click", async () => {
     host.innerHTML = `<zl-field name="pw" type="password" value="hunter2"></zl-field>`;
     const field = host.querySelector("zl-field") as ZlField;
     field.passwordToggle = true;
@@ -310,7 +320,7 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(blurred).toBe(false);
   });
 
-  it("is reachable with Tab and toggles from the keyboard without submitting", async ({ host }) => {
+  it("is reachable with Tab and toggles from the keyboard without submitting", async () => {
     host.innerHTML = `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`;
     const form = host.querySelector("form") as HTMLFormElement;
     const field = host.querySelector("zl-field") as ZlField;
@@ -344,9 +354,8 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(submitted).toBe(0);
   });
 
-  it("hides the value when the owning form is reset", async ({ host }) => {
+  it("hides the value when the owning form is reset", async () => {
     const { form, field, input } = await mountRevealed(
-      host,
       `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
     );
     form.reset();
@@ -354,9 +363,8 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(input.type).toBe("password");
   });
 
-  it("hides the value before any submit listener runs", async ({ host }) => {
+  it("hides the value before any submit listener runs", async () => {
     const { form, input } = await mountRevealed(
-      host,
       `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
     );
     let typeAtSubmit = "";
@@ -369,9 +377,8 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(typeAtSubmit).toBe("password");
   });
 
-  it("stops listening once the field leaves its form", async ({ host }) => {
+  it("stops listening once the field leaves its form", async () => {
     const { form, field, input } = await mountRevealed(
-      host,
       `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
     );
     host.appendChild(field);
@@ -380,9 +387,8 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(input.type).toBe("text");
   });
 
-  it("never leaves the value revealed when a suffix takes the toggle's place", async ({ host }) => {
+  it("never leaves the value revealed when a suffix takes the toggle's place", async () => {
     const { field, input } = await mountRevealed(
-      host,
       `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
     );
     const suffix = document.createElement("span");

@@ -7,6 +7,7 @@ vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 
 describe("track", () => {
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.mocked(vercelTrack).mockClear();
   });
 

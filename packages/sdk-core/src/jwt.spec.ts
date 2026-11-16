@@ -56,6 +56,7 @@ function opts(issuer: string): VerifyJwtOptions {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

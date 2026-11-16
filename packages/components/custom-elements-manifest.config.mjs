@@ -65,7 +65,7 @@ function sortModulesPlugin() {
 
 export default {
   globs: ["src/**/*.ts"],
-  exclude: ["src/**/*.spec.ts", "src/**/*.d.ts", "src/test/**", "src/orchestrator/fixtures.ts"],
+  exclude: ["src/**/*.spec.ts", "src/**/*.d.ts"],
   outdir: ".",
   // The `"customElements"` field is committed to package.json by hand; keep the
   // analyzer from rewriting it (it would point the field at a test's temp dir).

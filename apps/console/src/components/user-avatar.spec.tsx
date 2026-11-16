@@ -1,7 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, vi } from "vitest";
-
-import { frameTest as it } from "@/test/clock.fixture";
+import { describe, expect, it, vi } from "vitest";
 
 import { ProjectMark } from "./project-mark";
 import { UserAvatar } from "./user-avatar";
@@ -19,7 +17,8 @@ describe("UserAvatar", () => {
     expect(project?.classList.contains("zl-avatar-moving")).toBe(false);
   });
 
-  it("eases up to speed on hover, and coasts back to rest", ({ clock }) => {
+  it("eases up to speed on hover, and coasts back to rest", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
     // jsdom runs no CSS animations, so stand in for the gradient's.
     const updatePlaybackRate = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "getAnimations", {
@@ -29,25 +28,26 @@ describe("UserAvatar", () => {
     try {
       const { rerender } = render(<UserAvatar seed="user_1" />);
       rerender(<UserAvatar seed="user_1" fast />);
-      clock.advance(1500);
+      vi.advanceTimersByTime(1500);
       // It picks up speed rather than jumping to it.
       const rising = updatePlaybackRate.mock.lastCall?.[0] as number;
       expect(rising).toBeGreaterThan(1);
       expect(rising).toBeLessThan(4);
-      clock.advance(2000);
+      vi.advanceTimersByTime(2000);
       expect(updatePlaybackRate).toHaveBeenLastCalledWith(4);
 
       rerender(<UserAvatar seed="user_1" />);
-      clock.advance(1500);
+      vi.advanceTimersByTime(1500);
       // Halfway through the slow-down it is still faster than at rest.
       const midway = updatePlaybackRate.mock.lastCall?.[0] as number;
       expect(midway).toBeGreaterThan(1);
       expect(midway).toBeLessThan(4);
 
-      clock.advance(2000);
+      vi.advanceTimersByTime(2000);
       expect(updatePlaybackRate).toHaveBeenLastCalledWith(1);
     } finally {
       delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
+      vi.useRealTimers();
     }
   });
 });

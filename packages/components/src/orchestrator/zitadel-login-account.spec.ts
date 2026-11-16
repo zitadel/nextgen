@@ -5,10 +5,10 @@ import {
   type MockHandle,
 } from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
-import { describe, expect } from "vitest";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import "./zitadel-login.js";
-import { sharedHostIt as it } from "./fixtures.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
@@ -19,16 +19,29 @@ import type { ZitadelLogin } from "./zitadel-login.js";
 const API_BASE = "https://account.test.invalid";
 
 let mock: MockHandle = setupMockHandlers();
+const server = setupServer(...mock.handlers);
 
 let testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
 
-it.beforeEach(({ server }) => {
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: "error" });
+});
+
+beforeEach(() => {
   _resetConfigForTesting();
   testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
   clearBranding();
+});
+
+afterEach(() => {
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
 });
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
@@ -80,8 +93,19 @@ function submittedActions(): string[] {
 }
 
 describe("<zitadel-login> around the step", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
   describe("the account a step signs in to", () => {
-    it("names it on the password step, with its avatar", async ({ host }) => {
+    it("names it on the password step, with its avatar", async () => {
       const element = await mount(host);
       type(element, "email", "Alice@Acme.com");
       submit(element);
@@ -91,9 +115,7 @@ describe("<zitadel-login> around the step", () => {
       expect(account.hasAttribute("avatar")).toBe(true);
     });
 
-    it("names it without an avatar while signing up, before the account exists", async ({
-      host,
-    }) => {
+    it("names it without an avatar while signing up, before the account exists", async () => {
       const element = attach(host, (login) => {
         login.purpose = "register";
       });
@@ -109,7 +131,7 @@ describe("<zitadel-login> around the step", () => {
       expect(account.hasAttribute("avatar")).toBe(false);
     });
 
-    it("changes it by going back to the step that collects it", async ({ host }) => {
+    it("changes it by going back to the step that collects it", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
       submit(element);
@@ -123,7 +145,7 @@ describe("<zitadel-login> around the step", () => {
       expect(query(element, '[data-testid="zitadel-account"]')).toBeNull();
     });
 
-    it("forgets a typed password when the account changes", async ({ host }) => {
+    it("forgets a typed password when the account changes", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
       submit(element);
@@ -144,7 +166,7 @@ describe("<zitadel-login> around the step", () => {
       expect(password.value ?? "").toBe("");
     });
 
-    it("keeps a typed password when its own step refuses it", async ({ host }) => {
+    it("keeps a typed password when its own step refuses it", async () => {
       const element = await mount(host);
       type(element, "email", "wrong@example.com");
       submit(element);
@@ -163,14 +185,14 @@ describe("<zitadel-login> around the step", () => {
       expect(password.value).toBe("not-the-password");
     });
 
-    it("is not shown on a step that collects the identifier itself", async ({ host }) => {
+    it("is not shown on a step that collects the identifier itself", async () => {
       const element = await mount(host);
       expect(query(element, '[data-testid="zitadel-account"]')).toBeNull();
     });
   });
 
   describe("progress", () => {
-    it("shows none on the primary button when a link was used", async ({ host }) => {
+    it("shows none on the primary button when a link was used", async () => {
       const element = await mount(host);
       const link = query(element, '[data-testid="zitadel-action-register-link"]');
       expect(link).not.toBeNull();
@@ -182,7 +204,7 @@ describe("<zitadel-login> around the step", () => {
       expect(query(element, 'zl-button[action="submit"]')?.hasAttribute("loading")).toBe(false);
     });
 
-    it("shows on the primary button when it submitted", async ({ host }) => {
+    it("shows on the primary button when it submitted", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
 

@@ -1,10 +1,9 @@
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
-import { test } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid";
 // Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
@@ -304,23 +303,8 @@ async function loadedImage(element: ZitadelLogin, selector: string): Promise<HTM
   });
 }
 
-/**
- * `it` whose host is 360px wide, and which takes the tenant font link out of
- * the document head once the test ends: the font link is document-level state
- * the orchestrator manages on update, so tests are isolated from each other.
- */
-const it = test.extend<{ surroundings: undefined }>({
-  surroundings: [
-    async ({ host }, use) => {
-      host.style.width = "360px";
-      await use(undefined);
-      document.getElementById("zl-font-link")?.remove();
-    },
-    { auto: true },
-  ],
-});
-
 describe("<zitadel-login> widget-first embedding (chromium)", () => {
+  let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
   let resetViewport = false;
@@ -332,10 +316,17 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
       projectId: "embed-test",
       url: "http://localhost:4000",
     });
+    host = document.createElement("div");
+    host.style.width = "360px";
+    document.body.appendChild(host);
   });
 
   afterEach(async () => {
+    host.remove();
     stub?.restore();
+    // The font link is document-level state the orchestrator manages on
+    // update; isolate tests from each other.
+    document.getElementById("zl-font-link")?.remove();
     if (resetViewport) {
       resetViewport = false;
       await page.viewport(DEFAULT_VIEWPORT.width, DEFAULT_VIEWPORT.height);
@@ -343,7 +334,6 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
   });
 
   async function mount(
-    host: HTMLElement,
     response: CreateFlow201,
     configure?: (el: ZitadelLogin) => void,
   ): Promise<ZitadelLogin> {
@@ -364,8 +354,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     return element;
   }
 
-  it("widget default: content-sized, and transparent through every layer", async ({ host }) => {
-    const element = await mount(host, identifierStep);
+  it("widget default: content-sized, and transparent through every layer", async () => {
+    const element = await mount(identifierStep);
     expect(element.getAttribute("variant")).toBe("widget");
 
     const rect = element.getBoundingClientRect();
@@ -400,11 +390,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
-  it("keeps an ejected template's account row inside the card for a long address", async ({
-    host,
-  }) => {
+  it("keeps an ejected template's account row inside the card for a long address", async () => {
     const address = `${"a".repeat(64)}@${"b".repeat(40)}.example`;
-    const element = await mount(host, {
+    const element = await mount({
       ...identifierStep,
       step: {
         ...identifierStep.step,
@@ -434,14 +422,14 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(card.getBoundingClientRect().width).toBeLessThanOrEqual(360);
   });
 
-  it("widget default: does not steal focus on initial load", async ({ host }) => {
-    const element = await mount(host, identifierStep);
+  it("widget default: does not steal focus on initial load", async () => {
+    const element = await mount(identifierStep);
     expect(element.shadowRoot?.activeElement).toBeNull();
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("variant=page restores the full-page shape and initial focus", async ({ host }) => {
-    const element = await mount(host, identifierStep, (el) => {
+  it("variant=page restores the full-page shape and initial focus", async () => {
+    const element = await mount(identifierStep, (el) => {
       el.variant = "page";
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
@@ -452,8 +440,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(field);
   });
 
-  it("variant=page keeps its initial focus when mounted in a preview state", async ({ host }) => {
-    const element = await mount(host, identifierStep, (el) => {
+  it("variant=page keeps its initial focus when mounted in a preview state", async () => {
+    const element = await mount(identifierStep, (el) => {
       el.variant = "page";
       el.previewState = "validation_error";
     });
@@ -462,8 +450,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(field);
   });
 
-  it("variant=page focuses a select when it is the first field", async ({ host }) => {
-    const element = await mount(host, selectOnlyStep, (el) => {
+  it("variant=page focuses a select when it is the first field", async () => {
+    const element = await mount(selectOnlyStep, (el) => {
       el.variant = "page";
     });
     const select = element.shadowRoot?.querySelector("zl-select");
@@ -472,28 +460,28 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(select);
   });
 
-  it("variant=page leaves a fieldless initial step unfocused", async ({ host }) => {
-    const element = await mount(host, fieldlessStep, (el) => {
+  it("variant=page leaves a fieldless initial step unfocused", async () => {
+    const element = await mount(fieldlessStep, (el) => {
       el.variant = "page";
     });
     expect(element.shadowRoot?.querySelector("zl-button")).toBeTruthy();
     expect(element.shadowRoot?.activeElement).toBeNull();
   });
 
-  it("--zl-page-min-height still overrides the widget default", async ({ host }) => {
-    const element = await mount(host, identifierStep, (el) => {
+  it("--zl-page-min-height still overrides the widget default", async () => {
+    const element = await mount(identifierStep, (el) => {
       el.style.setProperty("--zl-page-min-height", "40rem");
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
     expect(getComputedStyle(mountNode).minHeight).toBe("640px");
   });
 
-  it("minimal design in widget mode sheds its page padding too", async ({ host }) => {
+  it("minimal design in widget mode sheds its page padding too", async () => {
     // The minimal design has no card, so its pane padding IS the page
     // chrome — in widget mode it must collapse exactly like the shell's
     // padding did, or a minimal-layout tenant gets 52px dead space above
     // and below the fields inside an embedder's own container.
-    const element = await mount(host, minimalStep);
+    const element = await mount(minimalStep);
     const rect = element.getBoundingClientRect();
     const minimal = element.shadowRoot?.querySelector(".zl-minimal") as HTMLElement;
     expect(minimal).toBeTruthy();
@@ -506,23 +494,21 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     );
   });
 
-  it("minimal design keeps its page padding in page mode", async ({ host }) => {
-    const element = await mount(host, minimalStep, (el) => {
+  it("minimal design keeps its page padding in page mode", async () => {
+    const element = await mount(minimalStep, (el) => {
       el.variant = "page";
     });
     const minimal = element.shadowRoot?.querySelector(".zl-minimal") as HTMLElement;
     expect(getComputedStyle(minimal).padding).toBe("52px 16px");
   });
 
-  it("split pane padding is composition, not page chrome — it survives widget mode", async ({
-    host,
-  }) => {
+  it("split pane padding is composition, not page chrome — it survives widget mode", async () => {
     // Deliberate asymmetry with the minimal design: the split panes' padding
     // separates the two panes' content (brand from form), so zeroing it in
     // widget mode would smash the design against the widget edge with no
     // host-CSS recourse — it lives inside the shadow chrome. Pinned so a
     // future "widgets never pad" sweep has to argue with this test first.
-    const element = await mount(host, splitHeroOnlyStep);
+    const element = await mount(splitHeroOnlyStep);
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
     expect(form).toBeTruthy();
     expect(getComputedStyle(form).padding).toBe("16px");
@@ -532,9 +518,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(brand).padding).toBe("32px 16px");
   });
 
-  it("wide split placeholder and attribution stay centred on the form track", async ({ host }) => {
+  it("wide split placeholder and attribution stay centred on the form track", async () => {
     host.style.width = "1200px";
-    const element = await mount(host, splitNoAssetsStep, (el) => {
+    const element = await mount(splitNoAssetsStep, (el) => {
       el.variant = "page";
     });
     const placeholder = element.shadowRoot?.querySelector(".zl-split__placeholder") as HTMLElement;
@@ -545,9 +531,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
-  it("wide split-right attribution stays centred on the mirrored form track", async ({ host }) => {
+  it("wide split-right attribution stays centred on the mirrored form track", async () => {
     host.style.width = "1200px";
-    const element = await mount(host, splitRightNoAssetsStep, (el) => {
+    const element = await mount(splitRightNoAssetsStep, (el) => {
       el.variant = "page";
     });
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
@@ -555,9 +541,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
-  it("custom split column tracks also carry through to the attribution row", async ({ host }) => {
+  it("custom split column tracks also carry through to the attribution row", async () => {
     host.style.width = "1200px";
-    const element = await mount(host, splitCustomColumnsStep, (el) => {
+    const element = await mount(splitCustomColumnsStep, (el) => {
       el.variant = "page";
     });
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
@@ -565,13 +551,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
-  it("projects host content onto the trustmark row through attribution-trailing", async ({
-    host,
-  }) => {
+  it("projects host content onto the trustmark row through attribution-trailing", async () => {
     // The design draws a badge beside the mark, but the widget has nothing
     // true to put there — so it exposes the position and a host fills it. The
     // console's claim page is the first, with the project's claim window.
-    const element = await mount(host, identifierStep, (el) => {
+    const element = await mount(identifierStep, (el) => {
       const badge = document.createElement("span");
       badge.slot = "attribution-trailing";
       badge.id = "trailing-probe";
@@ -593,13 +577,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.round(badgeBox.left - markBox.right)).toBe(10);
   });
 
-  it("an unfilled attribution-trailing slot leaves the trustmark row unchanged", async ({
-    host,
-  }) => {
+  it("an unfilled attribution-trailing slot leaves the trustmark row unchanged", async () => {
     // A slot is display:contents, so it is not a flex item and cannot add the
     // row's gap to the end of the mark. Every embed that ignores the slot has
     // to render exactly as it did before it existed.
-    const element = await mount(host, identifierStep);
+    const element = await mount(identifierStep);
     const row = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
     const mark = element.shadowRoot?.querySelector(".zl-trustmark__mark") as HTMLElement;
     expect(Math.round(row.getBoundingClientRect().width)).toBe(
@@ -607,16 +589,14 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     );
   });
 
-  it("the split designs hang the trustmark off the card, not off the pane seam", async ({
-    host,
-  }) => {
+  it("the split designs hang the trustmark off the card, not off the pane seam", async () => {
     // The shell's footer spans both panes, so a footer-slotted mark sits below
     // the split *row* — and the row is as tall as the brand pane, which has
     // nothing to do with the card. The templates carry an anchor in the form
     // column so the mark keeps the same 24px the centred design gives it, at
     // any card height and whatever the tenant's assets do to the brand pane.
     host.style.width = "1200px";
-    const element = await mount(host, splitNoAssetsStep, (el) => {
+    const element = await mount(splitNoAssetsStep, (el) => {
       el.variant = "page";
     });
     const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
@@ -628,14 +608,12 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     );
   });
 
-  it("a split template with no anchor still slots the trustmark into the shell footer", async ({
-    host,
-  }) => {
+  it("a split template with no anchor still slots the trustmark into the shell footer", async () => {
     // Tenants eject these templates, so the anchor cannot be assumed. Without
     // one the mark goes back to the footer, where the track-mirroring rules
     // keep it under the form column rather than under the seam.
     host.style.width = "1200px";
-    const element = await mount(host, splitNoAnchorStep, (el) => {
+    const element = await mount(splitNoAnchorStep, (el) => {
       el.variant = "page";
     });
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
@@ -646,11 +624,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
-  it("collapsed no-asset split keeps the form and attribution at the container width", async ({
-    host,
-  }) => {
+  it("collapsed no-asset split keeps the form and attribution at the container width", async () => {
     host.style.width = "600px";
-    const element = await mount(host, splitNoAssetsStep, (el) => {
+    const element = await mount(splitNoAssetsStep, (el) => {
       el.variant = "page";
     });
     const split = element.shadowRoot?.querySelector(".zl-split") as HTMLElement;
@@ -661,11 +637,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(Math.abs(centerX(split) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
-  it("split chrome collapses to the widget's width, not the viewport's", async ({ host }) => {
+  it("split chrome collapses to the widget's width, not the viewport's", async () => {
     // 360px host on the (wide) test viewport: a viewport media query would
     // keep two columns and hide the compact fallback — the container query
     // must collapse to one column and reveal it.
-    const element = await mount(host, splitHeroOnlyStep);
+    const element = await mount(splitHeroOnlyStep);
     const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
     expect(brand).toBeTruthy();
     expect(getComputedStyle(brand).display).toBe("none");
@@ -676,11 +652,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(compact.classList.contains("zl-split__compact--hero")).toBe(true);
   });
 
-  it("the compact fallback height cap applies to images, never to text", async ({ host }) => {
+  it("the compact fallback height cap applies to images, never to text", async () => {
     // The hero design's compact fallback is a <p>, and its copy is meant to
     // be edited — a fixed height cap inherited from the <img> case would clip
     // any brand name that wraps. Images keep the cap; text must not have one.
-    const element = await mount(host, heroNoLogoStep);
+    const element = await mount(heroNoLogoStep);
     const compact = element.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
     expect(compact.tagName).toBe("P");
     expect(getComputedStyle(compact).display).not.toBe("none");
@@ -696,25 +672,25 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // is held to 2.5rem, the hero banner to 6rem. Both rules are `img`-
     // qualified so source order decides — an unqualified banner rule would
     // lose to the qualified logo rule on specificity and silently shrink.
-    const withLogo = await mount(host, splitLogoStep);
+    const withLogo = await mount(splitLogoStep);
     const logo = withLogo.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
     expect(logo.tagName).toBe("IMG");
     expect(getComputedStyle(logo).maxHeight).toBe("40px");
 
-    const withHero = await mount(host, splitHeroOnlyStep);
+    const withHero = await mount(splitHeroOnlyStep);
     const banner = withHero.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
     expect(banner.tagName).toBe("IMG");
     expect(getComputedStyle(banner).maxHeight).toBe("96px");
   });
 
-  it("a square hero asset cannot grow the brand pane past the viewport", async ({ host }) => {
+  it("a square hero asset cannot grow the brand pane past the viewport", async () => {
     // The reported failure: `hero_url` pointed at a framework scaffold's own
     // `public/globe.svg` — square, and with no intrinsic size, so it laid out
     // at the brand pane's width and squared itself (656×656). The pane is
     // content-sized, so that became the page height (1028px at a 900px
     // viewport) and pushed the attribution below the fold.
     host.style.width = "1200px";
-    const element = await mount(host, splitSquareHeroStep, (el) => {
+    const element = await mount(splitSquareHeroStep, (el) => {
       el.variant = "page";
     });
 
@@ -738,12 +714,12 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(hero).objectFit).toBe("cover");
   });
 
-  it("the hero height cap leaves a conventional wide banner uncropped", async ({ host }) => {
+  it("the hero height cap leaves a conventional wide banner uncropped", async () => {
     // The other half of the cap: it may not turn into a fixed slot. A landscape
     // banner's height never reaches the cap, so it keeps its own ratio and
     // `object-fit` stays a no-op — the tenant sees the whole asset.
     host.style.width = "1200px";
-    const element = await mount(host, splitWideHeroStep, (el) => {
+    const element = await mount(splitWideHeroStep, (el) => {
       el.variant = "page";
     });
 
@@ -753,25 +729,25 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(heroRect.width / heroRect.height).toBeCloseTo(intrinsicRatio, 1);
   });
 
-  it("the collapsed compact banner caps the same square asset", async ({ host }) => {
+  it("the collapsed compact banner caps the same square asset", async () => {
     // Narrow container: the brand pane is gone and the hero rides in the form
     // pane instead. Its `width: 100%` is what makes the 6rem cap bite — without
     // it the same asset would square itself off the form pane's width and wall
     // off the card.
-    const element = await mount(host, splitSquareHeroStep);
+    const element = await mount(splitSquareHeroStep);
     const banner = await loadedImage(element, "img.zl-split__compact--hero");
     const rect = banner.getBoundingClientRect();
     expect(rect.width).toBeGreaterThan(100);
     expect(rect.height).toBeLessThanOrEqual(96 + 1);
   });
 
-  it("a tall logo asset cannot grow the brand pane past the viewport", async ({ host }) => {
+  it("a tall logo asset cannot grow the brand pane past the viewport", async () => {
     // The hero's sibling defect. `max-width: min(16rem, 60%)` bounds one axis
     // only, so a 1:4 portrait lockup clamped to 256px wide still resolved to
     // 1024px tall and handed that to the content-sized pane. A square asset
     // does not reproduce this — the width cap already squares it off at 256.
     host.style.width = "1200px";
-    const element = await mount(host, splitTallLogoStep, (el) => {
+    const element = await mount(splitTallLogoStep, (el) => {
       el.variant = "page";
     });
 
@@ -790,7 +766,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(rect.width / rect.height).toBeCloseTo(logo.naturalWidth / logo.naturalHeight, 1);
   });
 
-  it("a logo and a hero together stay inside the whole page shell's budget", async ({ host }) => {
+  it("a logo and a hero together stay inside the whole page shell's budget", async () => {
     // Capping each image on its own is not enough. The templates render both
     // when a tenant sets both, and the brand pane's padding and gap are only
     // half the chrome they compete with: the shell adds 3.25rem of block
@@ -803,7 +779,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     await page.viewport(1200, 800);
     expect(window.innerHeight).toBe(800);
     host.style.width = "1200px";
-    const element = await mount(host, splitBothAssetsStep, (el) => {
+    const element = await mount(splitBothAssetsStep, (el) => {
       el.variant = "page";
     });
 
@@ -822,9 +798,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(pill.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
   });
 
-  it("a viewport too short for the budget shrinks the hero, it does not erase it", async ({
-    host,
-  }) => {
+  it("a viewport too short for the budget shrinks the hero, it does not erase it", async () => {
     // The budget subtraction goes negative below ~420px of viewport height.
     // Floored at 0 the hero silently vanished while the pane kept the logo —
     // and it bought nothing, because at those heights the form card is already
@@ -833,7 +807,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     resetViewport = true;
     await page.viewport(1200, 420);
     host.style.width = "1200px";
-    const element = await mount(host, splitBothAssetsStep, (el) => {
+    const element = await mount(splitBothAssetsStep, (el) => {
       el.variant = "page";
     });
 
@@ -842,12 +816,12 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(hero).display).not.toBe("none");
   });
 
-  it("the logo cap never stretches a small logo to the pane", async ({ host }) => {
+  it("the logo cap never stretches a small logo to the pane", async () => {
     // The other direction of the same rule. `.zl-split__hero` pins `width:
     // 100%`, which upscales a small asset; the logo must not inherit that —
     // a 64px brand mark blown up to a 536px pane is a blurry mess.
     host.style.width = "1200px";
-    const element = await mount(host, splitLogoStep, (el) => {
+    const element = await mount(splitLogoStep, (el) => {
       el.variant = "page";
     });
 
@@ -857,13 +831,13 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(rect.height).toBeCloseTo(logo.naturalHeight, 0);
   });
 
-  it("a branding asset that fails to load degrades to the split placeholder", async ({ host }) => {
+  it("a branding asset that fails to load degrades to the split placeholder", async () => {
     // The reported failure: a well-formed but dead logo_url clears the CLI
     // gate and the server gate, then renders as a 0×0 img — the templates'
     // own placeholder is keyed on "no asset configured", so the brand pane
     // was left blank with nothing in the console.
     host.style.width = "1200px";
-    const element = await mount(host, splitBrokenLogoStep, (el) => {
+    const element = await mount(splitBrokenLogoStep, (el) => {
       el.variant = "page";
     });
 
@@ -880,8 +854,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(placeholder.getBoundingClientRect().width).toBeGreaterThan(0);
   });
 
-  it("a broken hero logo restores the compact text fallback at narrow widths", async ({ host }) => {
-    const element = await mount(host, heroBrokenLogoStep);
+  it("a broken hero logo restores the compact text fallback at narrow widths", async () => {
+    const element = await mount(heroBrokenLogoStep);
     await waitFor(() =>
       element.shadowRoot?.querySelector("img.zl-split__compact[data-zl-asset-broken]"),
     );

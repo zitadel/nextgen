@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { cloudGet, whenLive } from "./cloud-api";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function answer(status: number, body: unknown) {
   vi.stubGlobal(

@@ -1,27 +1,8 @@
 import { tokensCss } from "@zitadel/design-tokens";
-import { describe, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import "./zl-avatar.js";
 import type { ZlAvatar } from "./zl-avatar.js";
-import { test } from "../test/fixtures.js";
-
-/**
- * `it` with the design tokens injected into the document head for every test
- * and removed when it ends.
- */
-const it = test.extend<{ tokens: undefined }>({
-  tokens: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      const style = document.createElement("style");
-      style.textContent = tokensCss;
-      document.head.appendChild(style);
-      await use(undefined);
-      style.remove();
-    },
-    { auto: true },
-  ],
-});
 
 /**
  * Computed paint, in a real browser because jsdom resolves no `var()`. Tokens
@@ -30,10 +11,26 @@ const it = test.extend<{ tokens: undefined }>({
  * as on a page that never loads `avatar.css`.
  */
 describe("<zl-avatar> paint (chromium)", () => {
-  it("paints its gradient at the seed's own angle, with the moving angles unregistered", async ({
-    render,
-  }) => {
-    const element = await render<ZlAvatar>(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
+  let host: HTMLDivElement;
+  let style: HTMLStyleElement;
+
+  beforeEach(() => {
+    style = document.createElement("style");
+    style.textContent = tokensCss;
+    document.head.appendChild(style);
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+    style.remove();
+  });
+
+  it("paints its gradient at the seed's own angle, with the moving angles unregistered", async () => {
+    host.innerHTML = `<zl-avatar seed="maya@example.com"></zl-avatar>`;
+    const element = host.querySelector("zl-avatar") as ZlAvatar;
+    await element.updateComplete;
     const avatar = element.shadowRoot?.querySelector(".zl-avatar") as HTMLElement;
     expect(getComputedStyle(avatar).backgroundImage).toMatch(/^linear-gradient\(324deg, /);
   });

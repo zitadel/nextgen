@@ -1,8 +1,7 @@
-import { describe, expect, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
-import { it } from "../test/fixtures.js";
 
 /**
  * jsdom-friendly behaviour for `<zl-field>`. Form-associated semantics
@@ -11,25 +10,39 @@ import { it } from "../test/fixtures.js";
  * mode — jsdom 29 only ships a partial implementation.
  */
 describe("<zl-field> aria wiring", () => {
-  it("does not point aria-describedby at empty help/error nodes", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email"></zl-field>`);
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  function mount(html: string): ZlField {
+    host.innerHTML = html;
+    return host.querySelector("zl-field") as ZlField;
+  }
+
+  it("does not point aria-describedby at empty help/error nodes", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(input.getAttribute("aria-describedby")).toBeNull();
   });
 
-  it("references the error id once the field is in error", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email" error="Bad address"></zl-field>`);
+  it("references the error id once the field is in error", async () => {
+    const field = mount(`<zl-field name="email" error="Bad address"></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     const describedBy = input.getAttribute("aria-describedby") ?? "";
     expect(describedBy).toMatch(/-error$/);
   });
 
-  it("passes readonly to the input and drops the clear button", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="email" value="alice@acme.com" readonly></zl-field>`,
-    );
+  it("passes readonly to the input and drops the clear button", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com" readonly></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.readOnly).toBe(true);
@@ -37,18 +50,16 @@ describe("<zl-field> aria wiring", () => {
     expect(field.shadowRoot?.querySelector('[part="trailing-action"]')).toBeNull();
   });
 
-  it("keeps the error icon on a read-only field", async ({ render }) => {
-    const field = await render<ZlField>(
+  it("keeps the error icon on a read-only field", async () => {
+    const field = mount(
       `<zl-field name="email" value="alice@acme.com" readonly error="Taken"></zl-field>`,
     );
     await field.updateComplete;
     expect(field.shadowRoot?.querySelector('[part="trailing-icon"]')).not.toBeNull();
   });
 
-  it("reads formValue from the live input so autofill is captured", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="email" value="typed@acme.com"></zl-field>`,
-    );
+  it("reads formValue from the live input so autofill is captured", async () => {
+    const field = mount(`<zl-field name="email" value="typed@acme.com"></zl-field>`);
     await field.updateComplete;
     expect(field.formValue).toBe("typed@acme.com");
     // Simulate autofill writing the native input directly, bypassing `value`.
@@ -57,8 +68,8 @@ describe("<zl-field> aria wiring", () => {
     expect(field.formValue).toBe("autofilled@acme.com");
   });
 
-  it("normalises the auth-method credential name in the input testid", async ({ render }) => {
-    const field = await render<ZlField>(
+  it("normalises the auth-method credential name in the input testid", async () => {
+    const field = mount(
       `<zl-field name="x-auth-methods#password" type="password" data-testid="zitadel-field-password"></zl-field>`,
     );
     await field.updateComplete;
@@ -68,10 +79,8 @@ describe("<zl-field> aria wiring", () => {
     expect(input.getAttribute("name")).toBe("x-auth-methods#password");
   });
 
-  it("labels the input and marks a required field", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="email" label="Email" required></zl-field>`,
-    );
+  it("labels the input and marks a required field", async () => {
+    const field = mount(`<zl-field name="email" label="Email" required></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     const label = field.shadowRoot?.querySelector("label") as HTMLLabelElement;
@@ -81,20 +90,16 @@ describe("<zl-field> aria wiring", () => {
     expect(input.hasAttribute("aria-label")).toBe(false);
   });
 
-  it("falls back to aria-label when there is no visible label", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="code" aria-label="One-time code"></zl-field>`,
-    );
+  it("falls back to aria-label when there is no visible label", async () => {
+    const field = mount(`<zl-field name="code" aria-label="One-time code"></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.shadowRoot?.querySelector("label")).toBeNull();
     expect(input.getAttribute("aria-label")).toBe("One-time code");
   });
 
-  it("emits zl-submit with the action when the forgot-password link runs one", async ({
-    render,
-  }) => {
-    const field = await render<ZlField>(
+  it("emits zl-submit with the action when the forgot-password link runs one", async () => {
+    const field = mount(
       `<zl-field name="password" label="Password" forgot-password-href="#" forgot-password-action="forgot_password"></zl-field>`,
     );
     await field.updateComplete;
@@ -109,8 +114,8 @@ describe("<zl-field> aria wiring", () => {
     expect(detail).toEqual({ action: "forgot_password" });
   });
 
-  it("leaves the forgot-password link a plain navigation without an action", async ({ render }) => {
-    const field = await render<ZlField>(
+  it("leaves the forgot-password link a plain navigation without an action", async () => {
+    const field = mount(
       `<zl-field name="password" label="Password" forgot-password-href="#recover"></zl-field>`,
     );
     await field.updateComplete;
@@ -125,15 +130,15 @@ describe("<zl-field> aria wiring", () => {
     expect(submits).toBe(0);
   });
 
-  it("draws no clear button while the field is empty, but keeps its space", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email"></zl-field>`);
+  it("draws no clear button while the field is empty, but keeps its space", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
     await field.updateComplete;
     expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
     expect(field.shadowRoot?.querySelector(".zr-field__wrap--trailing")).not.toBeNull();
   });
 
-  it("draws the clear button once something is typed", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email"></zl-field>`);
+  it("draws the clear button once something is typed", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     input.value = "a";
@@ -142,10 +147,8 @@ describe("<zl-field> aria wiring", () => {
     expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).not.toBeNull();
   });
 
-  it("withdraws the clear button once it has cleared the field", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="email" value="alice@acme.com"></zl-field>`,
-    );
+  it("withdraws the clear button once it has cleared the field", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com"></zl-field>`);
     await field.updateComplete;
     const clear = field.shadowRoot?.querySelector('[aria-label="Clear"]') as HTMLButtonElement;
     clear.click();
@@ -154,10 +157,8 @@ describe("<zl-field> aria wiring", () => {
     expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
   });
 
-  it("swaps the trailing icon for the error and success states", async ({ render }) => {
-    const field = await render<ZlField>(
-      `<zl-field name="email" value="alice@acme.com"></zl-field>`,
-    );
+  it("swaps the trailing icon for the error and success states", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com"></zl-field>`);
     await field.updateComplete;
     const trailingIcon = () =>
       field.shadowRoot?.querySelector(".zr-field__trailing zl-icon")?.getAttribute("name");
@@ -175,8 +176,8 @@ describe("<zl-field> aria wiring", () => {
     expect(trailingIcon()).toBe("check");
   });
 
-  it("shows the success message only when the field is not in error", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email" success="Looks good"></zl-field>`);
+  it("shows the success message only when the field is not in error", async () => {
+    const field = mount(`<zl-field name="email" success="Looks good"></zl-field>`);
     await field.updateComplete;
     const success = field.shadowRoot?.querySelector(".zr-field__success") as HTMLElement;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
@@ -188,8 +189,8 @@ describe("<zl-field> aria wiring", () => {
     expect(success.hidden).toBe(true);
   });
 
-  it("syncs the native input when formValue is assigned", async ({ render }) => {
-    const field = await render<ZlField>(`<zl-field name="email"></zl-field>`);
+  it("syncs the native input when formValue is assigned", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
     await field.updateComplete;
     field.formValue = "restored@acme.com";
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
@@ -199,11 +200,18 @@ describe("<zl-field> aria wiring", () => {
 });
 
 describe("<zl-field> password toggle", () => {
-  async function mount(
-    host: HTMLElement,
-    html: string,
-    props: Partial<ZlField> = {},
-  ): Promise<ZlField> {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mount(html: string, props: Partial<ZlField> = {}): Promise<ZlField> {
     host.innerHTML = html;
     const field = host.querySelector("zl-field") as ZlField;
     Object.assign(field, props);
@@ -215,62 +223,47 @@ describe("<zl-field> password toggle", () => {
   const toggle = (field: ZlField) =>
     field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]') ?? null;
 
-  it("is off unless the property is set", async ({ host }) => {
-    const field = await mount(host, `<zl-field name="pw" type="password"></zl-field>`);
+  it("is off unless the property is set", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`);
     expect(toggle(field)).toBeNull();
     expect(input(field).hasAttribute("spellcheck")).toBe(false);
   });
 
-  it("cannot be switched on from markup", async ({ host }) => {
-    const field = await mount(
-      host,
-      `<zl-field name="pw" type="password" password-toggle></zl-field>`,
-    );
+  it("cannot be switched on from markup", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
     expect(field.passwordToggle).toBe(false);
     expect(toggle(field)).toBeNull();
   });
 
-  it("ignores the property on a non-password field", async ({ host }) => {
-    const field = await mount(host, `<zl-field name="email" type="email"></zl-field>`, {
+  it("ignores the property on a non-password field", async () => {
+    const field = await mount(`<zl-field name="email" type="email"></zl-field>`, {
       passwordToggle: true,
     });
     expect(toggle(field)).toBeNull();
   });
 
-  it("replaces the clear button, so the field shows one icon", async ({ host }) => {
-    const field = await mount(
-      host,
-      `<zl-field name="pw" type="password" value="hunter2"></zl-field>`,
-      {
-        passwordToggle: true,
-      },
-    );
+  it("replaces the clear button, so the field shows one icon", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+    });
     const actions = field.shadowRoot?.querySelectorAll('[part~="trailing-action"]') ?? [];
     expect(actions).toHaveLength(1);
     expect(actions[0]?.getAttribute("aria-label")).toBe("Show password");
   });
 
-  it("keeps the toggle in the error state instead of the alert icon", async ({ host }) => {
-    const field = await mount(
-      host,
-      `<zl-field name="pw" type="password" error="Wrong"></zl-field>`,
-      {
-        passwordToggle: true,
-      },
-    );
+  it("keeps the toggle in the error state instead of the alert icon", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" error="Wrong"></zl-field>`, {
+      passwordToggle: true,
+    });
     expect(toggle(field)).not.toBeNull();
     expect(field.shadowRoot?.querySelector('zl-icon[name="alert-circle"]')).toBeNull();
   });
 
-  it("reveals and hides the value from a button in the tab order", async ({ host }) => {
-    const field = await mount(
-      host,
-      `<zl-field name="pw" type="password" value="hunter2"></zl-field>`,
-      {
-        passwordToggle: true,
-        passwordToggleLabel: "Passwort anzeigen",
-      },
-    );
+  it("reveals and hides the value from a button in the tab order", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+      passwordToggleLabel: "Passwort anzeigen",
+    });
     const button = toggle(field)!;
     expect(button.tabIndex).toBe(0);
     expect(button.getAttribute("aria-pressed")).toBe("false");
@@ -291,22 +284,15 @@ describe("<zl-field> password toggle", () => {
     expect(toggle(field)!.getAttribute("aria-label")).toBe("Passwort anzeigen");
   });
 
-  it("points the toggle at the input it controls", async ({ host }) => {
-    const field = await mount(
-      host,
-      `<zl-field name="pw" type="password" label="Password"></zl-field>`,
-      {
-        passwordToggle: true,
-      },
-    );
+  it("points the toggle at the input it controls", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" label="Password"></zl-field>`, {
+      passwordToggle: true,
+    });
     expect(toggle(field)!.getAttribute("aria-controls")).toBe(input(field).id);
   });
 
-  it("keeps the toggle on a read-only password field, which still hides the clear button", async ({
-    host,
-  }) => {
+  it("keeps the toggle on a read-only password field, which still hides the clear button", async () => {
     const field = await mount(
-      host,
       `<zl-field name="pw" type="password" value="hunter2" readonly></zl-field>`,
       {
         passwordToggle: true,
@@ -316,8 +302,8 @@ describe("<zl-field> password toggle", () => {
     expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
   });
 
-  it("opts the input out of spellcheck and autocorrect", async ({ host }) => {
-    const field = await mount(host, `<zl-field name="pw" type="password"></zl-field>`, {
+  it("opts the input out of spellcheck and autocorrect", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
       passwordToggle: true,
     });
     expect(input(field).getAttribute("spellcheck")).toBe("false");
@@ -325,8 +311,8 @@ describe("<zl-field> password toggle", () => {
     expect(input(field).getAttribute("autocorrect")).toBe("off");
   });
 
-  it("hides the value again when the toggle is withdrawn", async ({ host }) => {
-    const field = await mount(host, `<zl-field name="pw" type="password"></zl-field>`, {
+  it("hides the value again when the toggle is withdrawn", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
       passwordToggle: true,
     });
     toggle(field)!.click();

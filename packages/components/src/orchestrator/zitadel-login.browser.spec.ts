@@ -1,9 +1,8 @@
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
-import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { it } from "../test/fixtures.js";
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
@@ -164,6 +163,7 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): {
 }
 
 describe("<zitadel-login> form + focus (chromium)", () => {
+  let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub>;
   let testProject: ZitadelProject;
 
@@ -174,14 +174,17 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       projectId: "test-project",
       url: "http://localhost:4000",
     });
+    host = document.createElement("div");
+    document.body.appendChild(host);
     stub = installFlowFetchStub([identifierStep, passkeyUpsellStep]);
   });
 
   afterEach(() => {
+    host.remove();
     stub.restore();
   });
 
-  async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+  async function mount(): Promise<ZitadelLogin> {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.project = testProject;
@@ -194,15 +197,15 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     return element;
   }
 
-  it("renders the step inside a real <form>", async ({ host }) => {
-    const element = await mount(host);
+  it("renders the step inside a real <form>", async () => {
+    const element = await mount();
     const form = element.shadowRoot?.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.querySelectorAll("zl-field").length).toBe(2);
   });
 
-  it("walks to the next step on orchestrated submit", async ({ host }) => {
-    const element = await mount(host);
+  it("walks to the next step on orchestrated submit", async () => {
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillSignInFields(root);
     root.dispatchEvent(
@@ -218,8 +221,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     });
   });
 
-  it("submits values filled through native input events", async ({ host }) => {
-    const element = await mount(host);
+  it("submits values filled through native input events", async () => {
+    const element = await mount();
     const root = element.shadowRoot!;
     const emailField = root.querySelector('[data-testid="zitadel-field-email"]') as
       | (HTMLElement & { updateComplete: Promise<unknown> })
@@ -252,10 +255,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 
-  it("captures native input values before submit even when automation did not emit input events", async ({
-    host,
-  }) => {
-    const element = await mount(host);
+  it("captures native input values before submit even when automation did not emit input events", async () => {
+    const element = await mount();
     const root = element.shadowRoot;
     expect(root).toBeTruthy();
     if (!root) return;
@@ -277,12 +278,12 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 
-  it("submits the step's primary action on Enter inside a field", async ({ host }) => {
+  it("submits the step's primary action on Enter inside a field", async () => {
     // Covers the orchestrator half of Enter-to-submit: `<zl-field>`
     // forwards Enter to `form.requestSubmit()` (zl-field.browser.spec),
     // and `handleFormSubmit` falls back to the first primary action
     // because Enter provides no submitter.
-    const element = await mount(host);
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillNativeField(root, "email", "alice@acme.com");
     await fillNativeField(root, "password", "hunter2");
@@ -323,8 +324,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(enterBody.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 
-  it("submits the current field value, not a stale cached one", async ({ host }) => {
-    const element = await mount(host);
+  it("submits the current field value, not a stale cached one", async () => {
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillNativeField(root, "email", "alice@acme.com");
     await fillNativeField(root, "password", "hunter2");
@@ -347,8 +348,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter3" });
   });
 
-  it("moves focus to the first focusable control after a step swap", async ({ host }) => {
-    const element = await mount(host);
+  it("moves focus to the first focusable control after a step swap", async () => {
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillSignInFields(root);
     root.dispatchEvent(
@@ -398,7 +399,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     },
   };
 
-  async function mountRegisterSelect(host: HTMLElement): Promise<ZitadelLogin> {
+  async function mountRegisterSelect(): Promise<ZitadelLogin> {
     stub.restore();
     stub = installFlowFetchStub([registerSelectStep, passkeyUpsellStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -410,8 +411,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     return element;
   }
 
-  it("blocks submit and shows a styled required error inline on the select", async ({ host }) => {
-    const element = await mountRegisterSelect(host);
+  it("blocks submit and shows a styled required error inline on the select", async () => {
+    const element = await mountRegisterSelect();
     const root = element.shadowRoot!;
     const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
       updateComplete: Promise<unknown>;
@@ -434,8 +435,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(root.querySelector("zl-alert[severity='error']")).toBeNull();
   });
 
-  it("submits once a required select has a chosen value", async ({ host }) => {
-    const element = await mountRegisterSelect(host);
+  it("submits once a required select has a chosen value", async () => {
+    const element = await mountRegisterSelect();
     const root = element.shadowRoot!;
     const select = root.querySelector('zl-select[name="favoriteColor"]') as HTMLElement & {
       updateComplete: Promise<unknown>;
@@ -482,7 +483,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     },
   };
 
-  it("submits a required, unticked checkbox as false instead of blocking", async ({ host }) => {
+  it("submits a required, unticked checkbox as false instead of blocking", async () => {
     stub.restore();
     stub = installFlowFetchStub([registerCheckboxStep, passkeyUpsellStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -507,7 +508,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(root.querySelector('zl-checkbox[name="terms"]')?.getAttribute("error")).toBeFalsy();
   });
 
-  it("applies no length rule to a checkbox, as the server applies none", async ({ host }) => {
+  it("applies no length rule to a checkbox, as the server applies none", async () => {
     // `buildValidation` copies a property's `minLength` whatever its type; the
     // checkbox's "false" is five characters, under this minimum of six.
     const [field] = registerCheckboxStep.step.fields ?? [];
@@ -538,7 +539,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   // Frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.
-  it("starts the flow when project is set after attach (React-style)", async ({ host }) => {
+  it("starts the flow when project is set after attach (React-style)", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     host.appendChild(element);
@@ -584,7 +585,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   };
 
   /** Mounts the password step and waits until it takes input. */
-  async function mountRegisterPassword(host: HTMLElement): Promise<ShadowRoot> {
+  async function mountRegisterPassword(): Promise<ShadowRoot> {
     stub.restore();
     stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -608,21 +609,16 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     submit.shadowRoot?.querySelector("button")?.click();
   }
 
-  async function submitPassword(
-    host: HTMLElement,
-    value: string,
-  ): Promise<{ root: ShadowRoot; calls: number }> {
-    const root = await mountRegisterPassword(host);
+  async function submitPassword(value: string): Promise<{ root: ShadowRoot; calls: number }> {
+    const root = await mountRegisterPassword();
     await fillNativeField(root, "x-auth-methods#password", value);
     await clickSubmit(root);
     await new Promise((resolve) => setTimeout(resolve, 150));
     return { root, calls: stub.calls.length };
   }
 
-  it("blocks a password shorter than its minimum, naming the minimum on the field", async ({
-    host,
-  }) => {
-    const { root, calls } = await submitPassword(host, "short123");
+  it("blocks a password shorter than its minimum, naming the minimum on the field", async () => {
+    const { root, calls } = await submitPassword("short123");
     expect(calls).toBe(1);
     const field = await waitFor(() => {
       const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
@@ -639,8 +635,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     return field?.error ?? "";
   };
 
-  it("shows the error again when an edited password is still too short", async ({ host }) => {
-    const { root } = await submitPassword(host, "short123");
+  it("shows the error again when an edited password is still too short", async () => {
+    const { root } = await submitPassword("short123");
     await waitFor(() => passwordError(root) || null);
     // Editing retires the error; a still-short value must bring it back on
     // the next submit rather than block it without a word.
@@ -651,8 +647,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(stub.calls.length).toBe(1);
   });
 
-  it("keeps an autofilled password when its length error rebuilds the step", async ({ host }) => {
-    const root = await mountRegisterPassword(host);
+  it("keeps an autofilled password when its length error rebuilds the step", async () => {
+    const root = await mountRegisterPassword();
     // Autofill writes the native input without an `input` event.
     await setNativeFieldValue(root, "x-auth-methods#password", "autofill1");
     await clickSubmit(root);
@@ -664,8 +660,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(await waitFor(() => field.formValue || null)).toBe("autofill1");
   });
 
-  it("blocks a password longer than its maximum", async ({ host }) => {
-    const { root, calls } = await submitPassword(host, "x".repeat(65));
+  it("blocks a password longer than its maximum", async () => {
+    const { root, calls } = await submitPassword("x".repeat(65));
     expect(calls).toBe(1);
     const field = await waitFor(() => {
       const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
@@ -674,22 +670,22 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(field?.getAttribute("error")).toContain("64");
   });
 
-  it("counts characters, not UTF-16 units, as the server does", async ({ host }) => {
+  it("counts characters, not UTF-16 units, as the server does", async () => {
     // Thirteen letters and one emoji: fourteen characters, but fifteen code
     // units, which `String#length` would let through.
-    const { calls } = await submitPassword(host, `${"a".repeat(13)}\u{1F511}`);
+    const { calls } = await submitPassword(`${"a".repeat(13)}\u{1F511}`);
     expect(calls).toBe(1);
   });
 
-  it("measures a password after NFC normalization, as the server does", async ({ host }) => {
+  it("measures a password after NFC normalization, as the server does", async () => {
     // 63 letters and "e" + a combining acute: 65 code points as typed, 64
     // once NFC composes the accent, so the 64-character maximum lets it by.
-    const { calls } = await submitPassword(host, `${"a".repeat(63)}e\u0301`);
+    const { calls } = await submitPassword(`${"a".repeat(63)}e\u0301`);
     expect(calls).toBe(2);
   });
 
-  it("submits a password within its bounds", async ({ host }) => {
-    const { calls } = await submitPassword(host, "a".repeat(15));
+  it("submits a password within its bounds", async () => {
+    const { calls } = await submitPassword("a".repeat(15));
     expect(calls).toBe(2);
   });
 });
@@ -731,6 +727,7 @@ const unpairedPasswordStep: CreateFlow201 = {
 };
 
 describe("<zitadel-login> paired identifier (chromium)", () => {
+  let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub>;
   let testProject: ZitadelProject;
 
@@ -741,14 +738,17 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
       projectId: "test-project",
       url: "http://localhost:4000",
     });
+    host = document.createElement("div");
+    document.body.appendChild(host);
     stub = installFlowFetchStub(responses);
   }
 
   afterEach(() => {
+    host.remove();
     stub.restore();
   });
 
-  async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+  async function mount(): Promise<ZitadelLogin> {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.project = testProject;
@@ -761,9 +761,9 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     return element;
   }
 
-  it("renders it as a nameless read-only control inside the form", async ({ host }) => {
+  it("renders it as a nameless read-only control inside the form", async () => {
     setup([pairedPasswordStep]);
-    const element = await mount(host);
+    const element = await mount();
     const form = element.shadowRoot?.querySelector("form");
     const paired = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
 
@@ -783,14 +783,14 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(paired?.tabIndex).toBe(-1);
   });
 
-  it("renders nothing when the step carries no identifier", async ({ host }) => {
+  it("renders nothing when the step carries no identifier", async () => {
     setup([unpairedPasswordStep]);
-    const element = await mount(host);
+    const element = await mount();
     const form = element.shadowRoot?.querySelector("form");
     expect(form?.querySelector('input[autocomplete="username"]')).toBeNull();
   });
 
-  it("comes back on a reload, which re-renders the step from flow state", async ({ host }) => {
+  it("comes back on a reload, which re-renders the step from flow state", async () => {
     // A reload loses `formValues` — the widget keeps collected values in memory
     // only — so the pairing has to survive on what GET /flows/{flow_id} returns.
     setup([pairedPasswordStep]);
@@ -812,11 +812,9 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(paired?.getAttribute("value")).toBe("alice@example.com");
   });
 
-  it("disappears when back lands on a step that collects the identifier itself", async ({
-    host,
-  }) => {
+  it("disappears when back lands on a step that collects the identifier itself", async () => {
     setup([pairedPasswordStep, identifierStep]);
-    const element = await mount(host);
+    const element = await mount();
     const root = element.shadowRoot!;
     expect(root.querySelector('input[part="paired-identifier"]')).toBeTruthy();
 
@@ -835,18 +833,18 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     expect(element.shadowRoot?.querySelector('input[part="paired-identifier"]')).toBeNull();
   });
 
-  it("hands focus to the step's first control when the host is focused", async ({ host }) => {
+  it("hands focus to the step's first control when the host is focused", async () => {
     // It is the shadow root's first focusable element, so `delegatesFocus`
     // sends host focus to it.
     setup([pairedPasswordStep]);
-    const element = await mount(host);
+    const element = await mount();
     (document.activeElement as HTMLElement | null)?.blur();
 
     element.focus();
     expect(element.shadowRoot?.activeElement?.tagName).toBe("ZL-FIELD");
   });
 
-  it("follows the server when a second identifier replaces the first", async ({ host }) => {
+  it("follows the server when a second identifier replaces the first", async () => {
     // Back, then a different address: the control must not keep the old one.
     // It reads `step.identifier` rather than the cross-step `formValues` cache,
     // where earlier entries win on conflict.
@@ -858,7 +856,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
       },
     };
     setup([pairedPasswordStep, second]);
-    const element = await mount(host);
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillNativeField(root, "x-auth-methods#password", "hunter2");
     root.dispatchEvent(
@@ -876,9 +874,9 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     });
   });
 
-  it("keeps it out of the submitted fields", async ({ host }) => {
+  it("keeps it out of the submitted fields", async () => {
     setup([pairedPasswordStep]);
-    const element = await mount(host);
+    const element = await mount();
     const root = element.shadowRoot!;
     await fillNativeField(root, "x-auth-methods#password", "hunter2");
     root.dispatchEvent(

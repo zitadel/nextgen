@@ -26,8 +26,6 @@ export default defineConfig({
           conditions: ["browser"],
         },
         test: {
-          unstubEnvs: true,
-          unstubGlobals: true,
           name: "dom",
           globals: true,
           environment: "jsdom",
@@ -41,8 +39,6 @@ export default defineConfig({
         cacheDir: ".vitest/ssr",
         plugins: [svelte()],
         test: {
-          unstubEnvs: true,
-          unstubGlobals: true,
           name: "ssr",
           globals: true,
           environment: "node",

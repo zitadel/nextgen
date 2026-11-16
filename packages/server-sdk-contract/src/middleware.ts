@@ -10,7 +10,7 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 import { createSign, generateKeyPairSync } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -263,6 +263,11 @@ export function describeServerMiddleware(adapter: ServerSdkAdapter): void {
 
     beforeEach(() => {
       vi.restoreAllMocks();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
     });
 
     it("public route with no token continues as unauthenticated", async () => {

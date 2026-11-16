@@ -1,16 +1,22 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe } from "vitest";
+import { afterEach, describe, test } from "vitest";
 
 import { runCapture } from "./dev-process.mjs";
-import { test } from "./fixtures.ts";
 
 const script = fileURLToPath(new URL("../apps/cloud/setup-secrets.sh", import.meta.url));
+const tempDirs = [];
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
-async function setup(dir, envs = [], { failKey = "", installed = true } = {}) {
+async function setup(envs = [], { failKey = "", installed = true } = {}) {
+  const dir = await mkdtemp(join(tmpdir(), "cloud-setup-test-"));
+  tempDirs.push(dir);
   const bin = join(dir, "bin");
   const out = join(dir, "secrets");
   const calls = join(dir, "calls.jsonl");
@@ -64,10 +70,8 @@ writeFileSync(process.argv[process.argv.indexOf("-out") + 1], "test-master-key")
 }
 
 describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requires jq)", () => {
-  test("cloud setup upserts scoped values over stdin and uses the shared bootstrap document", async ({
-    dir: temp,
-  }) => {
-    const fixture = await setup(temp);
+  test("cloud setup upserts scoped values over stdin and uses the shared bootstrap document", async () => {
+    const fixture = await setup();
     const { stdout, stderr } = await fixture.run("--email", "cloud@example.test", "preview");
     const updates = (await fixture.calls()).filter(({ args }) => args[3] === "add");
     assert.equal(updates.length, 3);
@@ -99,8 +103,8 @@ describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requi
     assert.equal((await stat(join(dir, "admin.json"))).mode & 0o777, 0o600);
   });
 
-  test("a failed replacement stops without removing existing configuration", async ({ dir }) => {
-    const fixture = await setup(dir, [{ key: "MASTER_KEY_PREVIOUS_ID", target: ["preview"] }], {
+  test("a failed replacement stops without removing existing configuration", async () => {
+    const fixture = await setup([{ key: "MASTER_KEY_PREVIOUS_ID", target: ["preview"] }], {
       failKey: "MASTER_KEY_ID",
     });
     await assert.rejects(fixture.run("preview"));
@@ -112,17 +116,15 @@ describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requi
     assert.ok(!calls.some(({ args }) => args[3] === "rm"));
   });
 
-  test("shared variables are rejected before minting or writing anything", async ({ dir }) => {
-    const fixture = await setup(dir, [{ key: "MASTER_KEY_ID", target: ["production", "preview"] }]);
+  test("shared variables are rejected before minting or writing anything", async () => {
+    const fixture = await setup([{ key: "MASTER_KEY_ID", target: ["production", "preview"] }]);
     await assert.rejects(fixture.run("preview"), (error) => error.code === 65);
     assert.equal((await fixture.calls()).length, 1);
     await assert.rejects(stat(fixture.out), { code: "ENOENT" });
   });
 
-  test("missing workspace dependencies are rejected before minting or contacting Vercel", async ({
-    dir,
-  }) => {
-    const fixture = await setup(dir, [], { installed: false });
+  test("missing workspace dependencies are rejected before minting or contacting Vercel", async () => {
+    const fixture = await setup([], { installed: false });
     await assert.rejects(fixture.run("preview"), (error) => {
       assert.equal(error.code, 69);
       assert.match(error.stderr, /pnpm install --frozen-lockfile/);
@@ -132,13 +134,13 @@ describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requi
     await assert.rejects(stat(fixture.out), { code: "ENOENT" });
   });
 
-  test.for([
+  test.each([
     "MASTER_KEY_ID",
     "MASTER_KEY_PEM_B64",
     "MASTER_KEY_PREVIOUS_ID",
     "MASTER_KEY_PREVIOUS_PEM_B64",
-  ])("rejects a %s branch override before minting or writing anything", async (key, { dir }) => {
-    const fixture = await setup(dir, [
+  ])("rejects a %s branch override before minting or writing anything", async (key) => {
+    const fixture = await setup([
       { key: "MASTER_KEY_PREVIOUS_ID", target: ["preview"] },
       { key, target: ["preview"], gitBranch: "feature" },
     ]);
@@ -147,16 +149,16 @@ describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requi
     await assert.rejects(stat(fixture.out), { code: "ENOENT" });
   });
 
-  test("preview branch overrides do not block production setup", async ({ dir }) => {
-    const fixture = await setup(dir, [
+  test("preview branch overrides do not block production setup", async () => {
+    const fixture = await setup([
       { key: "MASTER_KEY_PREVIOUS_ID", target: ["preview"], gitBranch: "feature" },
     ]);
     await fixture.run("production");
     assert.ok(!(await fixture.calls()).some(({ args }) => args[3] === "rm"));
   });
 
-  test("rotation preserves the old key before updating the current key", async ({ dir }) => {
-    const fixture = await setup(dir);
+  test("rotation preserves the old key before updating the current key", async () => {
+    const fixture = await setup();
     await fixture.run("--skip-vercel", "preview");
     assert.equal((await fixture.calls()).length, 0);
     const oldID = await readFile(join(fixture.out, "preview/master-key.id"), "utf8");
@@ -183,10 +185,8 @@ describe.skipIf(spawnSync("jq", ["--version"]).status !== 0)("cloud setup (requi
     assert.ok(!(await fixture.calls()).some(({ args }) => args[3] === "rm"));
   });
 
-  test("both stale rotation variables are removed after every replacement succeeds", async ({
-    dir,
-  }) => {
-    const fixture = await setup(dir, [
+  test("both stale rotation variables are removed after every replacement succeeds", async () => {
+    const fixture = await setup([
       { key: "MASTER_KEY_PREVIOUS_ID", target: ["preview"] },
       { key: "MASTER_KEY_PREVIOUS_PEM_B64", target: ["preview"] },
     ]);

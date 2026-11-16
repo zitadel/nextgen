@@ -1,12 +1,22 @@
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { it } from "./fixtures.ts";
 import { parseStage } from "./transcript.ts";
 
-const parse = (dir: string, events: ReadonlyArray<unknown>) => {
+const dirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of dirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const parse = (events: ReadonlyArray<unknown>) => {
+  const dir = mkdtempSync(join(tmpdir(), "transcript-"));
+  dirs.push(dir);
   const file = join(dir, "stage1.jsonl");
   writeFileSync(file, `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
   return parseStage(file);
@@ -34,14 +44,14 @@ describe("parseStage timing", () => {
     { type: "result", _t: 49_000, num_turns: 3, duration_ms: 48_000 },
   ];
 
-  it("gives each command its own run time and the model time before it", ({ dir }) => {
-    const [install, failing] = parse(dir, stamped).transcript;
+  it("gives each command its own run time and the model time before it", () => {
+    const [install, failing] = parse(stamped).transcript;
     expect(install).toMatchObject({ kind: "command", thought: 2_000, ran: 40_000 });
     expect(failing).toMatchObject({ kind: "command", thought: 3_000, ran: 500 });
   });
 
-  it("splits the stage into command, model and startup time", ({ dir }) => {
-    expect(parse(dir, stamped).timing).toEqual({
+  it("splits the stage into command, model and startup time", () => {
+    expect(parse(stamped).timing).toEqual({
       measured: true,
       commandMs: 40_500,
       modelMs: 5_000,
@@ -50,14 +60,14 @@ describe("parseStage timing", () => {
     });
   });
 
-  it("counts the developer's answers apart from commands and failures", ({ dir }) => {
-    const parsed = parse(dir, [{ type: "sim_user", text: "Next.js", _ms: 1_200 }, ...stamped]);
+  it("counts the developer's answers apart from commands and failures", () => {
+    const parsed = parse([{ type: "sim_user", text: "Next.js", _ms: 1_200 }, ...stamped]);
     expect(parsed.counts).toEqual({ questions: 1, commands: 2, failed: 1 });
     expect(parsed.timing.waitMs).toBe(1_200);
   });
 
-  it("reports no timing for a run captured before lines were stamped", ({ dir }) => {
-    const parsed = parse(dir, [
+  it("reports no timing for a run captured before lines were stamped", () => {
+    const parsed = parse([
       {
         type: "assistant",
         message: {
@@ -70,8 +80,8 @@ describe("parseStage timing", () => {
     expect(parsed.transcript[0]).toMatchObject({ ran: null, thought: null });
   });
 
-  it("charges the wait before the agent's init line to startup, not the model", ({ dir }) => {
-    const { timing, transcript } = parse(dir, [
+  it("charges the wait before the agent's init line to startup, not the model", () => {
+    const { timing, transcript } = parse([
       { type: "turn_start", _t: 0 },
       { type: "system", subtype: "init", _t: 4_000 },
       call("a", "ls", 6_000),
@@ -82,8 +92,8 @@ describe("parseStage timing", () => {
     expect(timing).toMatchObject({ modelMs: 2_000, commandMs: 1_000, startupMs: 4_500 });
   });
 
-  it("runs a command that never reported back through the end of its turn", ({ dir }) => {
-    const { timing, transcript } = parse(dir, [
+  it("runs a command that never reported back through the end of its turn", () => {
+    const { timing, transcript } = parse([
       { type: "turn_start", _t: 0 },
       call("a", "sleep 999", 1_000),
       { type: "result", _t: 61_000, is_error: true, subtype: "turn_failed", num_turns: 0 },
@@ -92,14 +102,14 @@ describe("parseStage timing", () => {
     expect(timing.commandMs).toBe(60_000);
   });
 
-  it("counts the developer's closing probe as waiting, not as a question", ({ dir }) => {
-    const parsed = parse(dir, [...stamped, { type: "sim_done", _ms: 900 }]);
+  it("counts the developer's closing probe as waiting, not as a question", () => {
+    const parsed = parse([...stamped, { type: "sim_done", _ms: 900 }]);
     expect(parsed.timing.waitMs).toBe(900);
     expect(parsed.counts.questions).toBe(0);
   });
 
-  it("keeps a command's time when background task notices arrive while it runs", ({ dir }) => {
-    const { timing, transcript } = parse(dir, [
+  it("keeps a command's time when background task notices arrive while it runs", () => {
+    const { timing, transcript } = parse([
       { type: "turn_start", _t: 0 },
       { type: "system", subtype: "init", _t: 500 },
       call("a", "npm install", 1_000),

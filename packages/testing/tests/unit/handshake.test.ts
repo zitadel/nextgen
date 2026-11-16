@@ -1,11 +1,11 @@
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { readHandshakeSync, waitForHandshake, writeHandshake } from "../../src/handshake";
 import type { InstanceHandle } from "../../src/types";
-import { it } from "./fixtures";
 
 const handle: InstanceHandle = {
   baseUrl: "http://localhost:8092",
@@ -16,19 +16,22 @@ const handle: InstanceHandle = {
 };
 
 describe("handshake", () => {
-  it("round-trips a handle, creating parent dirs", async ({ dir }) => {
+  it("round-trips a handle, creating parent dirs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "nested", "handshake.json");
     await writeHandshake(path, handle);
     expect(readHandshakeSync(path)).toEqual(handle);
   });
 
-  it("rejects handles with missing fields", async ({ dir }) => {
+  it("rejects handles with missing fields", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeFile(path, JSON.stringify({ baseUrl: "http://localhost:1" }));
     expect(() => readHandshakeSync(path)).toThrow(/missing "projectId"/);
   });
 
-  it("reports the handshake path when JSON is malformed", async ({ dir }) => {
+  it("reports the handshake path when JSON is malformed", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeFile(path, "not json");
 
@@ -43,13 +46,14 @@ describe("handshake", () => {
     expect(error?.cause).toBeInstanceOf(SyntaxError);
   });
 
-  it("rejects handles with a malformed baseUrl", async ({ dir }) => {
+  it("rejects handles with a malformed baseUrl", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeFile(path, JSON.stringify({ ...handle, baseUrl: "not a url" }));
     expect(() => readHandshakeSync(path)).toThrow(/malformed "baseUrl"/);
   });
 
-  it("round-trips the platform credential slot", async ({ dir }) => {
+  it("round-trips the platform credential slot", async () => {
     const withPlatform: InstanceHandle = {
       ...handle,
       platform: {
@@ -57,12 +61,14 @@ describe("handshake", () => {
         publishableKey: "pk_proj_platform",
       },
     };
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeHandshake(path, withPlatform);
     expect(readHandshakeSync(path)).toEqual(withPlatform);
   });
 
-  it("rejects a platform block without a projectId", async ({ dir }) => {
+  it("rejects a platform block without a projectId", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeFile(
       path,
@@ -71,15 +77,15 @@ describe("handshake", () => {
     expect(() => readHandshakeSync(path)).toThrow(/"projectId" is required/);
   });
 
-  it("rejects a platform block without a publishableKey", async ({ dir }) => {
+  it("rejects a platform block without a publishableKey", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     await writeFile(path, JSON.stringify({ ...handle, platform: { projectId: "proj_platform" } }));
     expect(() => readHandshakeSync(path)).toThrow(/"publishableKey" is required/);
   });
 
-  it("passes unknown platform fields through (future credentials join additively)", async ({
-    dir,
-  }) => {
+  it("passes unknown platform fields through (future credentials join additively)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     const written = {
       ...handle,
@@ -93,7 +99,8 @@ describe("handshake", () => {
     expect(readHandshakeSync(path)).toEqual(written);
   });
 
-  it("waitForHandshake resolves once the file appears", async ({ dir }) => {
+  it("waitForHandshake resolves once the file appears", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
     const pending = waitForHandshake(path, 5_000);
     setTimeout(() => {
@@ -102,7 +109,8 @@ describe("handshake", () => {
     await expect(pending).resolves.toEqual(handle);
   });
 
-  it("waitForHandshake times out with the path in the error", async ({ dir }) => {
+  it("waitForHandshake times out with the path in the error", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "never.json");
     await expect(waitForHandshake(path, 300)).rejects.toThrow(path);
   });

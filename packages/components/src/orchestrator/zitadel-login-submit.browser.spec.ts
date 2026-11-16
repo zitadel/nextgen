@@ -1,7 +1,7 @@
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { PASSWORD_FIELD } from "@zitadel/api-mock";
 import { serveMockFlowApi } from "@zitadel/api-mock/vitest-browser";
-import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
 import "./zitadel-login.js";
@@ -15,9 +15,10 @@ beforeEach(() => {
   login = document.createElement("zitadel-login");
   login.project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_demo" });
   document.body.appendChild(login);
-  onTestFinished(() => {
-    login.remove();
-  });
+});
+
+afterEach(() => {
+  login.remove();
 });
 
 const email = () => page.getByTestId("zitadel-input-email");
