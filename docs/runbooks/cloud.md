@@ -817,8 +817,12 @@ project and imports the root admin.
   a branch's first build starts from production's. The archive includes
   `node_modules`, Next.js caches and the Go caches configured in
   [vercel.json](../../vercel.json). All services use the root
-  [`install:cloud` script](../../package.json). A redeploy without the build
-  cache also clears dependencies retained from an older, broader install.
+  [`install:cloud` script](../../package.json). It removes the packages the
+  lockfile no longer names (`modules-cache-max-age=0`): pnpm keeps them in
+  `node_modules/.pnpm` for a week by default, so every archive would carry
+  the versions a dependency update replaced. A package of a workspace project
+  the install no longer selects stays; a redeploy without the build cache
+  clears those too.
 
   Only production saves an archive. The Preview environment sets
   `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD=1`, so a preview restores production's
