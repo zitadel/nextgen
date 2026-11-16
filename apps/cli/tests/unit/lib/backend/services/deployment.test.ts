@@ -18,14 +18,18 @@ const CANCEL_SERVER = "http://localhost:8080";
 function record(
   id: string,
   targets: readonly { origin: string }[],
-  extra: { reason?: "deploy" | "rollback"; kind?: "primary" | "preview" } = {},
+  extra: {
+    reason?: "deploy" | "rollback";
+    kind?: "primary" | "preview";
+    status?: "live" | "inactive";
+  } = {},
 ): ListDeployments200DeploymentsItem {
   return {
     id,
     project_id: "proj_1",
     release_id: "rel_1",
     kind: extra.kind ?? "primary",
-    status: "live",
+    status: extra.status ?? "live",
     deployed_at: "2026-01-01T00:00:00Z",
     targets,
     metadata: {
@@ -80,6 +84,223 @@ describe("Deployment.servesPrimary", () => {
 
   it("is false for a preview deployment", () => {
     expect(Deployment.of(preview("dep_1")).servesPrimary).toBe(false);
+  });
+});
+
+describe("Deployment.kind", () => {
+  it.each(["primary", "preview"] as const)("answers the %s kind the API recorded", (kind) => {
+    expect(Deployment.of(record("dep_1", [], { kind })).kind).toBe(kind);
+  });
+});
+
+describe("Deployment.servesLivePreview", () => {
+  it.each([
+    ["a live preview deployment", "preview", "live", true],
+    ["a preview deployment a later one replaced", "preview", "inactive", false],
+    ["a primary deployment", "primary", "live", false],
+  ] as const)("is %s: %s", (_name, kind, status, expected) => {
+    expect(Deployment.of(record("dep_1", [], { kind, status })).servesLivePreview).toBe(expected);
+  });
+});
+
+describe("Deployment.expiryAmong", () => {
+  const FIRST = "https://pr-7.preview.acme.com";
+  const SECOND = "https://pr-7-abc.preview.acme.com";
+  const SOON = "2026-02-01T00:00:00Z";
+  const LATER = "2026-02-08T00:00:00Z";
+
+  it("answers the expiry of the preview a live deployment made", () => {
+    const deployment = Deployment.of(preview("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe(SOON);
+  });
+
+  it("answers nothing for a primary deployment whose origin is also a live preview", () => {
+    const deployment = Deployment.of(primary("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe("");
+  });
+
+  it("answers nothing for a preview deployment a later one replaced", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }], { kind: "preview", status: "inactive" }),
+    );
+
+    expect(deployment.expiryAmong(new Map([[FIRST, SOON]]))).toBe("");
+  });
+
+  it("answers nothing when its preview is gone", () => {
+    const deployment = Deployment.of(preview("dep_1", FIRST));
+
+    expect(deployment.expiryAmong(new Map())).toBe("");
+  });
+
+  it("answers the earliest expiry when it made several previews", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" }),
+    );
+
+    expect(
+      deployment.expiryAmong(
+        new Map([
+          [FIRST, LATER],
+          [SECOND, SOON],
+        ]),
+      ),
+    ).toBe(SOON);
+  });
+
+  it("skips an origin whose preview is gone when it made several", () => {
+    const deployment = Deployment.of(
+      record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" }),
+    );
+
+    expect(deployment.expiryAmong(new Map([[SECOND, LATER]]))).toBe(LATER);
+  });
+});
+
+/** A walk that answers `page` and fails if anything reads past it. */
+async function* pageThenFailing<T>(page: T): AsyncGenerator<T> {
+  yield page;
+  throw new Error("read a page the answer did not need");
+}
+
+describe("DeploymentService.servingLivePreviews", () => {
+  const FIRST = "https://pr-7.preview.acme.com";
+  const SECOND = "https://pr-8.preview.acme.com";
+
+  /** A service whose live view lists `deployments` on one page. */
+  const liveViewOf = (deployments: readonly ListDeployments200DeploymentsItem[]) => {
+    return new DeploymentService(
+      fakeClient({
+        listDeployments: {
+          pages: () => {
+            return pagesOf({ deployments, next_page_token: null });
+          },
+        },
+      }),
+      "proj_1",
+    );
+  };
+
+  it("narrows a live preview deployment to the origins the live view still serves", async () => {
+    const page = [
+      Deployment.of(record("dep_1", [{ origin: FIRST }, { origin: SECOND }], { kind: "preview" })),
+    ];
+    const deploymentService = liveViewOf([
+      record("dep_2", [{ origin: SECOND }], { kind: "preview" }),
+      record("dep_1", [{ origin: FIRST }], { kind: "preview" }),
+    ]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect(serving.get("dep_1")?.origins).toEqual([FIRST]);
+  });
+
+  it("leaves out a deployment the live view no longer lists", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = liveViewOf([]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual([]);
+  });
+
+  it("answers only the page's live preview deployments", async () => {
+    const page = [
+      Deployment.of(primary("dep_3")),
+      Deployment.of(record("dep_2", [{ origin: SECOND }], { kind: "preview", status: "inactive" })),
+      Deployment.of(preview("dep_1", FIRST)),
+    ];
+    const deploymentService = liveViewOf([
+      primary("dep_3"),
+      record("dep_2", [{ origin: SECOND }], { kind: "preview", status: "inactive" }),
+      preview("dep_1", FIRST),
+    ]);
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual(["dep_1"]);
+  });
+
+  it("finds a deployment on a later page of the live view", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: {
+          pages: () => {
+            return pagesOf(
+              { deployments: [preview("dep_2", SECOND)], next_page_token: "t2" },
+              { deployments: [preview("dep_1", FIRST)], next_page_token: null },
+            );
+          },
+        },
+      }),
+      "proj_1",
+    );
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual(["dep_1"]);
+  });
+
+  it("stops reading once every deployment it was asked for is found", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: {
+          pages: () => {
+            return pageThenFailing({
+              deployments: [preview("dep_1", FIRST)],
+              next_page_token: "t2",
+            });
+          },
+        },
+      }),
+      "proj_1",
+    );
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual(["dep_1"]);
+  });
+
+  it("asks for the live view at the largest page the API gives", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const queries: unknown[] = [];
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: {
+          pages: (query: unknown) => {
+            queries.push(query);
+            return pagesOf({ deployments: [], next_page_token: null });
+          },
+        },
+      }),
+      "proj_1",
+    );
+
+    await deploymentService.servingLivePreviews(page, false);
+
+    expect(queries).toEqual([{ project_id: "proj_1", live: true, limit: 100 }]);
+  });
+
+  it("reads nothing for a page with no live preview deployment", async () => {
+    const page = [Deployment.of(primary("dep_1"))];
+    const deploymentService = new DeploymentService(fakeClient({}), "proj_1");
+
+    const serving = await deploymentService.servingLivePreviews(page, false);
+
+    expect([...serving.keys()]).toEqual([]);
+  });
+
+  it("reads nothing when the page is the live view", async () => {
+    const page = [Deployment.of(preview("dep_1", FIRST))];
+    const deploymentService = new DeploymentService(fakeClient({}), "proj_1");
+
+    const serving = await deploymentService.servingLivePreviews(page, true);
+
+    expect(serving.get("dep_1")?.origins).toEqual([FIRST]);
   });
 });
 
