@@ -5,8 +5,10 @@ import { Command, type Config, run } from "@oclif/core";
 import { vi } from "vitest";
 
 import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
-import { publicCliCommand } from "@/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
+// The leaf module, not `@/lib/suggestion`: this helper loads in every test's setup, and the area's
+// index would load much of the CLI before a test's own `vi.mock` of a node module can apply.
+import { Spelling } from "@/lib/suggestion/spelling";
 
 export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -200,7 +202,7 @@ export function stripAnsi(text: string): string {
 }
 
 export function expectedPublicCliCommand(args: string): string {
-  return publicCliCommand(args, cliVersion.version);
+  return Spelling.at(cliVersion.version).command(args);
 }
 
 /**

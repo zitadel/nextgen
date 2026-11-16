@@ -1,7 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, describe, expect } from "vitest";
 
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui";
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { Ui } from "@/lib/ui/ui";

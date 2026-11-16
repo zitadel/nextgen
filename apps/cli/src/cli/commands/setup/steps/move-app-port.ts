@@ -7,28 +7,22 @@ import {
   type SetupServices,
 } from "@/cli/commands/setup/shared";
 import { createZitadelClient, DeploymentService, OriginService } from "@/lib/backend";
-import { isRefusal } from "@/lib/consent";
+import { Consent } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor } from "@/lib/idp";
 import type { CommandResult } from "@/lib/oclif";
-import { createOrca, issuerFromPort } from "@/lib/orca";
+import { Orca, createOrca, issuerFromPort } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
-import {
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-  writeZitadelSecret,
-} from "@/lib/project";
-import { readScaffoldManifest } from "@/lib/scaffold-manifest";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { updateScaffold } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { userAgent } from "@/lib/user-agent";
-import { reportWarning } from "@/lib/warnings";
+import { Runtime } from "@/lib/runtime";
+import { warnings } from "@/lib/ui";
 import { EndStep } from "@/lib/wizard";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
+import { Project } from "@/lib/project";
 
 /**
  * The env file setup writes for the CLI's own commands. Every command setup
@@ -139,7 +133,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
         hint: "Pass --dev-port with the port the app should run on.",
       });
     }
-    const source = readProjectServer(await readZitadelConfig(this.deps.cwd));
+    const source = (await Project.at(this.deps.cwd).config()).server;
     const moving = this.deps.ui.begin(
       `Moving the app to ${issuerFromPort(devPort)}${this.deps.dryRun ? " (dry run)" : ""}`,
     );
@@ -148,7 +142,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       const context = await loadPatchContext(this.deps.cwd, orca, this.deps.cliVersion);
       const previousIssuer = context.issuer;
       const issuer = issuerFromPort(devPort);
-      const secret = await readZitadelSecret(this.deps.cwd);
+      const secret = await Project.at(this.deps.cwd).secret();
       const moved = previousIssuer !== issuer;
       const ssoProviders = moved
         ? await ZitadelConfig.loadKinds(new DiskStore(this.deps.cwd), ["connections"]).then(
@@ -181,14 +175,14 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
           )
         : [];
       const client = createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: source,
-        token: secret.project_secret,
+        token: secret.data.project_secret,
         signal: this.deps.signal,
       });
       if (!this.deps.dryRun) {
         try {
-          await new OriginService(client, secret.project_id).add(issuer, "primary");
+          await new OriginService(client, secret.data.project_id).add(issuer, "primary");
         } catch (error) {
           const normalized = toZitadelError(error);
           throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
@@ -220,12 +214,13 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
             return typeof pattern === "string";
           });
         };
-        await writeZitadelSecret(this.deps.cwd, {
-          ...secret,
-          primary_origins: rewrite(secret.primary_origins),
-          preview_origins: rewrite(secret.preview_origins),
-        });
-        const manifest = await readScaffoldManifest(this.deps.cwd);
+        await secret
+          .with({
+            primary_origins: rewrite(secret.data.primary_origins),
+            preview_origins: rewrite(secret.data.preview_origins),
+          })
+          .write();
+        const manifest = await Orca.readManifest(this.deps.cwd);
         if (manifest !== undefined) {
           await updateScaffold(this.deps.cwd, {
             ...manifest,
@@ -239,7 +234,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       }> =
         this.deps.dryRun || !moved
           ? {}
-          : await new DeploymentService(client, secret.project_id)
+          : await new DeploymentService(client, secret.data.project_id)
               .extendPrimary(issuer, `Moved the dev port to ${devPort}`)
               .then(
                 (extended) => {
@@ -296,10 +291,10 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
             .consent({
               verb: "replace",
               name: `remove ${previousIssuer} from the project's origins`,
-              message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
+              message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.data.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
             })
             .catch((error: unknown) => {
-              if (isRefusal(error)) {
+              if (Consent.isRefusal(error)) {
                 return "refused" as const;
               }
               throw error;
@@ -308,7 +303,7 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
       const granted = consent === undefined || consent === "refused" ? undefined : consent;
       const removal =
         replacing && granted !== undefined
-          ? await new OriginService(granted.unlock(client), secret.project_id)
+          ? await new OriginService(granted.unlock(client), secret.data.project_id)
               .remove(previousIssuer)
               .then(
                 () => {
@@ -342,17 +337,17 @@ export class MoveAppPort extends EndStep<"moveDevPort", CommandResult, Needs> {
               flags: { message: WHAT_CHANGED },
             });
       if (deploy !== undefined) {
-        reportWarning(
+        warnings.report(
           `${issuer} serves nothing until the next deploy: ${served.undeployed}. Run ${deploy}.`,
         );
       }
       if (staleOrigin !== undefined) {
-        reportWarning(
+        warnings.report(
           `${escapeControlCharacters(staleOrigin)} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with ${cleanup}.`}`,
         );
       }
       for (const slug of ssoProviders) {
-        reportWarning(
+        warnings.report(
           `Social sign-in with ${slug} redirects to the old port: add ${callbackUriFor(issuer, slug)} as a redirect URI at the provider.`,
         );
       }

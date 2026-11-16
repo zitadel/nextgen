@@ -11,26 +11,17 @@ import {
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
-import {
-  claimAction,
-  claimBoxAction,
-  claimCommand,
-  claimState,
-  claimWindowDeadline,
-} from "@/lib/claim-state";
+import { Claim } from "@/lib/claim";
 import { pathExists } from "@/lib/fs";
 import { callbackUriFor, republishCommands } from "@/lib/idp";
-import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
-import { readPackageJson } from "@/lib/npm";
 import type { CommandResult } from "@/lib/oclif";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { painted } from "@/lib/oclif/rendering";
 import { detectors } from "@/lib/orca/detectors";
-import { detectPackageManager } from "@/lib/package-manager";
-import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
-import { WHAT_CHANGED } from "@/lib/suggestion";
+import { PM } from "@/lib/pm";
+import { type Fact as SummaryFact, section, type Summary, style } from "@/lib/ui";
+import { Guidance, Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { type Fact as SummaryFact, section, type Summary } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { CONFIG_DIRECTORIES, PasswordPolicy } from "@/lib/zitadel";
 
@@ -161,7 +152,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
    * appending is not a way of deferring it.
    *
    * It is nudged on the cloud, and on a local server that actually hosts the
-   * platform plane: `claimState` is offline and gates local to
+   * platform plane: `Claim.state` is offline and gates local to
    * not-applicable, but setup is online anyway, so it asks the server's
    * runtime document (see localServerHostsPlatform). A dry run contacts no
    * platform, so it previews the nudge for local servers optimistically
@@ -281,18 +272,18 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             boxActions: [],
             commands: [],
           };
-    const deadline = this.deps.dryRun ? undefined : claimWindowDeadline(project.created_at);
+    const deadline = this.deps.dryRun ? undefined : Claim.deadline(project.created_at);
     const claimNudge =
       !ownedByLocalAdmin &&
-      (claimState({
+      (Claim.state({
         secret: {},
         server: answers.server,
       }).kind === "detached" ||
         (isLocal && (this.deps.dryRun || hostsPlatform)))
         ? {
-            actions: [claimAction(this.deps.suggest, deadline)],
-            boxActions: [claimBoxAction(this.deps.suggest, deadline)],
-            commands: [claimCommand(this.deps.suggest)],
+            actions: [Claim.nudge(this.deps.suggest, deadline)],
+            boxActions: [Claim.boxNudge(this.deps.suggest, deadline)],
+            commands: [Claim.command(this.deps.suggest)],
           }
         : {
             actions: [],
@@ -348,8 +339,8 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
       ? undefined
       : await Promise.all([
           pathExists(join(this.deps.cwd, "tsconfig.json")),
-          detectPackageManager(this.deps.cwd),
-          readPackageJson(this.deps.cwd).catch(() => {
+          PM.detect(this.deps.cwd),
+          PM.manifest(this.deps.cwd).catch(() => {
             return undefined;
           }),
         ]).then(([typescript, packageManager, packageJson]) => {
@@ -476,8 +467,8 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                       ? `${detector?.displayName ?? app.framework} ${version}`
                       : (detector?.displayName ?? app.framework),
                     ...(projectFacts.typescript ? ["TypeScript"] : []),
-                    projectFacts.packageManager,
-                  ].join(` ${dim("·")} `),
+                    projectFacts.packageManager.name,
+                  ].join(` ${style.dim("·")} `),
                 ],
                 ...(scaffoldedFramework
                   ? [
@@ -496,13 +487,13 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   ? [
                       [
                         "Package",
-                        `${result.depsAdded.join(", ")} ${dim("(")}${stylePath(basename(packageJsonHit))}${dim(")")}`,
+                        `${result.depsAdded.join(", ")} ${style.dim("(")}${style.path(basename(packageJsonHit))}${style.dim(")")}`,
                       ] as const,
                     ]
                   : []),
                 ...INSTALLED_FILES.flatMap(([label, suffix]): ReadonlyArray<SummaryFact> => {
                   const hit = pickWrittenFile(written, suffix);
-                  return hit ? [[label, stylePath(hit)]] : [];
+                  return hit ? [[label, style.path(hit)]] : [];
                 }),
                 ...written
                   .filter((file) => {
@@ -510,7 +501,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   })
                   .slice(0, 1)
                   .map((file): SummaryFact => {
-                    return ["Dev proxy", stylePath(file)];
+                    return ["Dev proxy", style.path(file)];
                   }),
               ),
               section(
@@ -536,7 +527,12 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                 "Customize",
                 ...CUSTOMIZE_FILES.flatMap(([label, suffix, dir]): ReadonlyArray<SummaryFact> => {
                   return pickWrittenFile(written, suffix)
-                    ? [[label, `${stylePath(`${dir}/`)} ${dim("(")}see its README.md${dim(")")}`]]
+                    ? [
+                        [
+                          label,
+                          `${style.path(`${dir}/`)} ${style.dim("(")}see its README.md${style.dim(")")}`,
+                        ],
+                      ]
                     : [];
                 }),
                 ...planned.connections.flatMap((entry): ReadonlyArray<SummaryFact> => {
@@ -544,17 +540,17 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
                   return [
                     [
                       "Social sign-in",
-                      `${provider.displayName} ${dim("(")}${stylePath(entry.connection.path)}${dim(")")}`,
+                      `${provider.displayName} ${style.dim("(")}${style.path(entry.connection.path)}${style.dim(")")}`,
                     ],
-                    ["Redirect URI", styleUrl(callbackUriFor(issuer, provider.slug))],
+                    ["Redirect URI", style.url(callbackUriFor(issuer, provider.slug))],
                   ];
                 }),
               ),
               section(
                 "Project",
-                ["Project id", styleId(project.id)],
-                ["Server", styleUrl(answers.server)],
-                ["App will run", styleUrl(issuer)],
+                ["Project id", style.id(project.id)],
+                ["Server", style.url(answers.server)],
+                ["App will run", style.url(issuer)],
               ),
             ].filter((drawn) => {
               return drawn.facts.length > 0;
@@ -563,7 +559,8 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
             next: nextActions,
             boxed: true,
           };
-    const [exploreText = "", exploreCommand] = exploreAllCommands(this.deps.cliVersion)
+    const [exploreText = "", exploreCommand] = Spelling.at(this.deps.cliVersion)
+      .exploreAllCommands()
       .split("\n")
       .map((line) => {
         return line.trim();
@@ -669,7 +666,7 @@ export class ShowResult extends WizardStep<"result", Readonly<{ answer: CommandR
           actions: [
             ...deployStep.actions,
             ...installOutcome.nextActions,
-            brandingGuidanceAction(this.deps.suggest),
+            new Guidance(this.deps.suggest).branding(),
             ...consoleStep.actions,
             ...ssoStep.actions,
             ...claimNudge.actions,

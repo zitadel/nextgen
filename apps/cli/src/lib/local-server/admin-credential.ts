@@ -7,7 +7,6 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { enforceMode } from "@/lib/fs-safe";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
@@ -18,6 +17,7 @@ import {
   sameLocalServer,
 } from "./runtime";
 import { shellCommand } from "@/lib/suggestion";
+import { SecretFile } from "@/lib/project/secret-file";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -162,7 +162,7 @@ export async function ensureLocalAdmin(
       mode: 0o644,
     },
   );
-  await enforceMode(staging, 0o644);
+  await SecretFile.enforceMode(staging, 0o644);
   await rename(staging, userFile);
 
   return { admin, userFile };
@@ -196,6 +196,6 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-  await enforceMode(path, 0o600);
+  await SecretFile.enforceMode(path, 0o600);
   return true;
 }

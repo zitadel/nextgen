@@ -5,7 +5,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
 
 import { variableNameArg } from "./name";
 
@@ -60,7 +60,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       });
     }
 
-    const cell = variableCell(variable);
+    const cell = VariableView.of(variable).cell();
 
     return this.emit({
       status: "ok",

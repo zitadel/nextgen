@@ -10,7 +10,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { liveExpiries, readingExpiries } from "@/lib/preview";
+import { PreviewExpiries } from "@/lib/preview";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
@@ -106,12 +106,10 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
 
     const serving = this.isJson
       ? new Map<string, Deployment>()
-      : await readingExpiries(() => {
+      : await PreviewExpiries.reading(() => {
           return deploymentService.servingLivePreviews(listed.items, flags.live === true);
         }, new Map<string, Deployment>());
-    const expiries = await liveExpiries(
-      client,
-      projectId,
+    const expiries = await PreviewExpiries.of(client, projectId).live(
       [...serving.values()].flatMap((deployment) => {
         return deployment.origins;
       }),

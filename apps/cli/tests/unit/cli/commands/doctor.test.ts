@@ -7,9 +7,7 @@ import { type Serve, test } from "@tests/helpers/fixtures";
 
 import { failureAdvice } from "@/cli/commands/doctor";
 import type { LocalServers } from "@/lib/local-server/processes";
-import { projectMetaSchemas } from "@/lib/meta-schemas";
-import { publicCliCommand } from "@/lib/public-cli";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { MetaSchemas } from "@/lib/meta-schemas";
 import { advisoryForWarnings, type DoctorAgain } from "@/cli/commands/doctor/index";
 import type { Suggest } from "@/lib/suggestion";
 import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
@@ -22,6 +20,8 @@ import {
 } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/helpers/terminal";
 import { stripAnsi } from "@tests/helpers/run-cli";
+import { Spelling } from "@/lib/suggestion";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
@@ -99,7 +99,7 @@ async function recordStartedServer(serve: Serve, dir: string): Promise<number> {
 async function makeHealthyProject(cwd: string): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
-  for (const file of projectMetaSchemas(cliVersion.version)) {
+  for (const file of MetaSchemas.of(cliVersion.version).files) {
     await writeFile(join(cwd, file.path), file.contents);
   }
   await mkdir(join(cwd, "app/login"), { recursive: true });
@@ -147,21 +147,21 @@ async function makeHealthyProject(cwd: string): Promise<string> {
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(
     join(cwd, "app/login/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function L() {}\n`,
   );
   await writeFile(
     join(cwd, "app/register/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function R() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function R() {}\n`,
   );
   await writeFile(
     join(cwd, "app/profile/page.tsx"),
-    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+    `${ManagedFile.MARKER}\nexport default function P() {}\n`,
   );
   await writeFile(
     join(cwd, "middleware.ts"),
-    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+    `${ManagedFile.MARKER}\nexport function middleware() {}\n`,
   );
-  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${ManagedFile.MARKER}\nexport {};\n`);
   return cwd;
 }
 
@@ -874,7 +874,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
       "pass",
     );
-    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(ManagedFile.MARKER);
   });
 
   it("warns on a missing scaffolded page and --fix restores it", async ({ dir, doctor }) => {
@@ -898,7 +898,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
       "pass",
     );
-    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(ManagedFile.MARKER);
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async ({
@@ -1244,9 +1244,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       );
 
       expect(advice.nextCommands).toEqual([
-        publicCliCommand(`start --cwd ${quoted}`, "1.0.0"),
-        publicCliCommand("start", "1.0.0"),
-        publicCliCommand(`reset --force --cwd ${quoted}`, "1.0.0"),
+        Spelling.at("1.0.0").command(`start --cwd ${quoted}`),
+        Spelling.at("1.0.0").command("start"),
+        Spelling.at("1.0.0").command(`reset --force --cwd ${quoted}`),
       ]);
       expect(advice.suggestedArgs).toEqual([
         ["start", "--cwd", dir],
@@ -1268,9 +1268,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
     );
 
     expect(advice.nextCommands).toEqual([
-      publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
-      publicCliCommand("start", "1.0.0"),
-      publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+      Spelling.at("1.0.0").command("start --cwd /home/dev/app"),
+      Spelling.at("1.0.0").command("start"),
+      Spelling.at("1.0.0").command("reset --force --cwd /home/dev/app"),
     ]);
   });
 
@@ -1324,8 +1324,8 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
 
     expect(advice.hint).not.toContain("parent folder");
     expect(advice.nextCommands).toEqual([
-      publicCliCommand("start", "1.0.0"),
-      publicCliCommand("reset --force", "1.0.0"),
+      Spelling.at("1.0.0").command("start"),
+      Spelling.at("1.0.0").command("reset --force"),
     ]);
   });
 });

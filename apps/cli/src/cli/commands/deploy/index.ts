@@ -15,7 +15,6 @@ import {
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { readZitadelSecret } from "@/lib/project";
 import {
   abbreviate,
   deployMessage,
@@ -33,7 +32,8 @@ import {
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
+import { Project } from "@/lib/project";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -228,7 +228,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
-      reportWarning(warning);
+      warnings.report(warning);
     }
     this.narrate(prepared.notices);
     if (!(await this.confirmLockouts(prepared.lockouts))) {
@@ -279,7 +279,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     // and warn: a release pins content, but its git provenance is only exact
     // when the tree was clean, so the reader knows the commit is approximate.
     if (prepared.gitDirty) {
-      reportWarning(
+      warnings.report(
         "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
@@ -386,7 +386,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       return true;
     }
     for (const lockout of lockouts) {
-      reportWarning(lockout);
+      warnings.report(lockout);
     }
     const { projectId, server } = await this.connect();
     const question = `Deploy to project ${projectId} on ${server.replace(/^https?:\/\//, "")} even though the users above will not be able to sign in?`;
@@ -425,14 +425,16 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     if (origins.primary.length > 0) {
       return;
     }
-    const setupProject = await readZitadelSecret(this.cwd).then(
-      (secret) => {
-        return secret.project_id;
-      },
-      () => {
-        return undefined;
-      },
-    );
+    const setupProject = await Project.at(this.cwd)
+      .secret()
+      .then(
+        (secret) => {
+          return secret.data.project_id;
+        },
+        () => {
+          return undefined;
+        },
+      );
     const missing = missingPrimaryOrigin({
       origins,
       issuer: environment.values.ZITADEL_ISSUER?.value,

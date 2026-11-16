@@ -1,6 +1,5 @@
-import { readZitadelConfig, readZitadelSecret } from "@/lib/project";
-
 import { AbstractSanityCheck, type CheckContext } from "./types";
+import { Project } from "@/lib/project";
 
 /** Verifies `.zitadel/secret`'s project_id matches `zitadel.json`'s project. */
 export class ProjectMatchCheck extends AbstractSanityCheck {
@@ -9,10 +8,10 @@ export class ProjectMatchCheck extends AbstractSanityCheck {
   protected readonly summary = ".zitadel/secret project_id matches zitadel.json project";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const config = await readZitadelConfig(ctx.cwd);
-    const secret = await readZitadelSecret(ctx.cwd);
-    const configProject = typeof config.project === "string" ? config.project : undefined;
-    if (secret.project_id !== configProject) {
+    const config = await Project.at(ctx.cwd).config();
+    const secret = await Project.at(ctx.cwd).secret();
+    const configProject = typeof config.data.project === "string" ? config.data.project : undefined;
+    if (secret.data.project_id !== configProject) {
       throw new Error(".zitadel/secret project_id does not match zitadel.json project");
     }
   }

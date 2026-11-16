@@ -4,6 +4,7 @@ import { type FrameworkFacts, issuerFromPort } from "@/lib/orca";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { WizardStep } from "@/lib/wizard";
+import { CliPackage } from "@/lib/upgrade";
 
 /**
  * The renderer the widgets are drawn with when `--renderer` names none.
@@ -84,6 +85,7 @@ export class PlanConfiguration extends WizardStep<
           issuer,
           server: answers.server,
           cliVersion: this.deps.cliVersion,
+          sdkVersion: CliPackage.at(this.deps.cliVersion).selector(),
           scaffoldedFramework,
           posture,
           preset: answers.preset,

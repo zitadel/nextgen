@@ -4,7 +4,7 @@ import { type MockInstance, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
 import { NODE_ENGINES_TIMEOUT_MS, describeAcceptedNode } from "@/lib/orca/scaffolders/node-engines";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 
 /**
  * A Node that every framework CLI's range accepts, for the tests of a
@@ -132,7 +132,7 @@ function npmPublishes(range: string): void {
 export function describeNodeEngines(c: NodeEnginesCase): void {
   describe("Node check", () => {
     beforeEach(() => {
-      takeReportedWarnings();
+      warnings.take();
     });
 
     it(`asks npm for the engine range of the ${c.spec} it runs`, async () => {
@@ -186,7 +186,7 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
 
       await c.make(node).scaffold("/tmp/proj", c.framework);
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(warnings.take()).toEqual([]);
     });
 
     it.each(c.warned)(
@@ -207,7 +207,7 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
 
       const odd =
         c.enforcement === "refuse" ? ", as odd-numbered Node versions never reach LTS" : "";
-      expect(takeReportedWarnings()).toEqual([
+      expect(warnings.take()).toEqual([
         `${c.label} supports Node ${c.fallback}; it runs on Node v${node} with a warning${odd}`,
       ]);
     });
@@ -265,7 +265,7 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
         await expect(run).rejects.toThrow(`needs Node >=98.0.0`);
       } else {
         await run;
-        expect(takeReportedWarnings()).toEqual([
+        expect(warnings.take()).toEqual([
           `${c.label} supports Node >=98.0.0; it runs on Node v${SUPPORTED_NODE} with a warning`,
         ]);
       }
@@ -286,7 +286,7 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
         await expect(run).rejects.toThrow(`needs Node ${c.fallback}`);
       } else {
         await run;
-        expect(takeReportedWarnings()).toEqual([
+        expect(warnings.take()).toEqual([
           `${c.label} supports Node ${c.fallback}; it runs on Node v${node} with a warning`,
         ]);
       }

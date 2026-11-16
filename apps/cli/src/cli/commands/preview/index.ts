@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -14,12 +15,12 @@ import {
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
-import { detectPreviewUrls, liveExpiries } from "@/lib/preview";
+import { PreviewExpiries, PreviewUrls } from "@/lib/preview";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { parseTtl, type Ttl } from "@/lib/ttl";
-import { reportWarning } from "@/lib/warnings";
+import { Ttl, TtlError } from "@/lib/ttl";
+import { warnings } from "@/lib/ui";
 
 const CREDENTIAL_REQUIRED_REFUSAL = {
   message: "{credential} is not set",
@@ -61,14 +62,32 @@ const ORIGIN = {
 } as const satisfies Refused<string>;
 
 /**
- * How long a preview stays live, as `7d`, `12h` or `90m`. `parseTtl` refuses a
+ * Reads a `--ttl` value, turning what `Ttl` refuses into the CLI's own validation error.
+ *
+ * @param input - The value as it was typed.
+ * @returns The parsed TTL.
+ * @throws {ZitadelError} `E_VALIDATION`, with `Ttl`'s message and hint, when it is not a TTL.
+ */
+function readTtl(input: string): Ttl {
+  try {
+    return Ttl.parse(input);
+  } catch (error) {
+    if (error instanceof TtlError) {
+      throw new ZitadelError("E_VALIDATION", error.message, { hint: error.hint });
+    }
+    throw error;
+  }
+}
+
+/**
+ * How long a preview stays live, as `7d`, `12h` or `90m`. `readTtl` refuses a
  * value that is not a duration, in its own words; the schema refuses one
  * outside the server's fixed limits of a minute and 365 days.
  */
 const TTL = {
   schema: z
     .string()
-    .transform(parseTtl)
+    .transform(readTtl)
     .refine((ttl) => {
       return ttl.ms >= TTL_MINIMUM_MS && ttl.ms <= TTL_MAXIMUM_MS;
     }),
@@ -153,7 +172,7 @@ export function readPreviewUrls(
   if (unique.length > 0) {
     return unique;
   }
-  const found = detectPreviewUrls(env);
+  const found = PreviewUrls.from(env);
   if (found.urls.length === 0) {
     throw refusalError(NO_URLS_REFUSAL, {
       variables: found.variablesLookedFor.join(", "),
@@ -274,7 +293,7 @@ export default class Preview extends PreviewCommand {
       suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
-      reportWarning(warning);
+      warnings.report(warning);
     }
     this.narrate(prepared.notices);
 
@@ -338,9 +357,7 @@ export default class Preview extends PreviewCommand {
           }),
     });
 
-    const expiries = await liveExpiries(
-      client,
-      projectId,
+    const expiries = await PreviewExpiries.of(client, projectId).live(
       deployment.targets.map((target) => {
         return target.origin;
       }),
@@ -427,7 +444,7 @@ export default class Preview extends PreviewCommand {
         };
       }
       case "unnamed-ci-build": {
-        reportWarning(
+        warnings.report(
           "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
         );
         return {
@@ -440,7 +457,7 @@ export default class Preview extends PreviewCommand {
         };
       }
       case "no-credential": {
-        reportWarning(
+        warnings.report(
           `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
         );
         return {

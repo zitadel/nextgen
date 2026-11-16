@@ -1,9 +1,9 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { errorMessage } from "@/lib/errors";
 import { Repository, RepositoryError } from "@/lib/git";
-import { isSecretPath } from "@/lib/secret-paths";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
+import { Project } from "@/lib/project";
 
 /**
  * The subject of the commit setup makes. Conventional-commit style, like every
@@ -156,7 +156,9 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
         const repository = existing ?? (await Repository.create(this.deps.cwd));
         return repository
           .commitAll(INITIAL_COMMIT_SUBJECT, {
-            except: isSecretPath,
+            except: (path) => {
+              return Project.isSecret(path);
+            },
             authorIfGitHasNone: FALLBACK_AUTHOR,
           })
           .then(
@@ -199,11 +201,11 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
     if (outcome.kind === "created" || outcome.kind === "committed") {
       committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       if (outcome.invented) {
-        reportWarning(
+        warnings.report(
           `git could build no author identity on this machine, so the commit was made as ${FALLBACK_AUTHOR.name} <${FALLBACK_AUTHOR.email}>. Set user.name and user.email, then run git commit --amend --reset-author to put your own name on it.`,
         );
       } else if (outcome.guessedIdentity) {
-        reportWarning(
+        warnings.report(
           "This machine has no git user.name/user.email, so git guessed the author from your " +
             "username and hostname. Set your identity and run git commit --amend --reset-author " +
             "to put your own name on the commit.",
@@ -214,7 +216,7 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
     }
     if (outcome.kind === "unavailable") {
       const warning = `Could not commit the scaffolded project (${outcome.reason || "git gave no reason"}); the first release records no commit, so the next deploy cannot show a diff.`;
-      reportWarning(
+      warnings.report(
         outcome.createdRepository
           ? `${warning} Setup created a new, empty git repository here.`
           : warning,

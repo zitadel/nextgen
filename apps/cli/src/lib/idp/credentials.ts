@@ -6,10 +6,10 @@ import type {
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
 
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui/log";
+import { warnings } from "@/lib/ui/warnings";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
 
 /**
  * The project variable a connection reads one of its credentials from.
@@ -300,14 +300,14 @@ function reportPublished(
     }
     case "deferred": {
       if (noValue) {
-        reportWarning(`${name} has no value yet. Publish it with: ${republish}`);
+        warnings.report(`${name} has no value yet. Publish it with: ${republish}`);
         return;
       }
-      reportWarning(`${name} was not published to the project. Publish it with: ${republish}`);
+      warnings.report(`${name} was not published to the project. Publish it with: ${republish}`);
       return;
     }
     case "failed": {
-      reportWarning(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+      warnings.report(`${name} could not be published. Sign-in fails until it is: ${republish}`);
       return;
     }
   }

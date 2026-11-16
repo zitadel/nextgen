@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Credential } from "@/lib/backend";
 import { NotFoundError } from "@/lib/backend/errors";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
 import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
@@ -325,7 +325,7 @@ const SIGN_UP_ONLY_COLLECTS: JsonObject = {
 const LISTED_METHODS = ["password", "passkey"] as const;
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 /**
@@ -337,7 +337,7 @@ beforeEach(() => {
  */
 async function everythingSaid(context: StepContext): Promise<readonly string[]> {
   const result = await lockoutStep.run(context);
-  return [...(result?.lockouts ?? []), ...takeReportedWarnings()];
+  return [...(result?.lockouts ?? []), ...warnings.take()];
 }
 
 describe("lockoutStep", () => {
@@ -367,7 +367,7 @@ describe("lockoutStep", () => {
     it("does not only warn about them", async () => {
       await lockoutStep.run(context());
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(warnings.take()).toEqual([]);
     });
   });
 
@@ -391,9 +391,7 @@ describe("lockoutStep", () => {
     it("warns that the check did not finish", async () => {
       await lockoutStep.run(context());
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("Could not finish checking"),
-      ]);
+      expect(warnings.take()).toEqual([expect.stringContaining("Could not finish checking")]);
     });
   });
 

@@ -1,7 +1,7 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { describe, expect, it, onTestFinished } from "vitest";
 
-import { log } from "@/lib/log";
+import { log } from "@/lib/ui";
 import { MARK } from "@/lib/ui/marks";
 import { Narration } from "@/lib/ui/narration";
 
