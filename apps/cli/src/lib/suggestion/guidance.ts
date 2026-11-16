@@ -1,4 +1,7 @@
-import type { Suggest } from "./index";
+import { Claim } from "@/lib/claim";
+import type { BoxAction } from "@/lib/ui";
+
+import type { Suggest, SuggestedCommand } from "./index";
 import { WHAT_CHANGED } from "./what-changed";
 
 /**
@@ -90,5 +93,62 @@ export class Guidance {
    */
   branding(): string {
     return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${this.suggest({ id: "branding:eject" })} scaffolds an editable template in .zitadel/branding/.`;
+  }
+
+  /**
+   * The command for `next_commands`.
+   *
+   * @returns The `claim` command.
+   */
+  claimCommand(): SuggestedCommand {
+    return this.suggest({ id: "claim" });
+  }
+
+  /**
+   * The one claim nudge for `next_actions`, shared by `setup`, `status` and
+   * `doctor`, quoting the command in prose. The command carries the run's own
+   * scope, so it targets the project this run is about rather than whatever
+   * the next shell's environment resolves to.
+   *
+   * @param deadline - When the claim window closes, if it is known.
+   * @returns The nudge.
+   */
+  claimNudge(deadline: Date | undefined): string {
+    return `${Claim.sentence(deadline)} Run ${this.claimCommand()}.`;
+  }
+
+  /**
+   * The same nudge for the human box, with the command on its own styled line.
+   *
+   * @param deadline - When the claim window closes, if it is known.
+   * @returns The box action.
+   */
+  claimBoxNudge(deadline: Date | undefined): BoxAction {
+    return {
+      text: Claim.sentence(deadline),
+      command: this.claimCommand(),
+    };
+  }
+
+  /**
+   * The nudge's counterpart for a closed claim window. Deliberately framed as
+   * reconciliation, not a verdict: the local record can be stale in one
+   * direction (a project claimed from another machine still reads detached
+   * here), so "window closed" from local data alone must not send the user off
+   * to duplicate a project that is already attached and working. Running
+   * `claim` is safe either way: the server checks the grant before the window,
+   * so an attached project answers with a clean already-claimed skip, and only
+   * a genuinely unattached one gets the final refusal.
+   *
+   * @returns The nudge.
+   */
+  claimWindowClosedNudge(): string {
+    return (
+      `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
+      `closed. Run ${this.claimCommand()} to reconcile: a project ` +
+      "claimed from another machine confirms its team, and one never claimed can no " +
+      `longer be claimed. ${this.suggest({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } })} in a fresh directory ` +
+      "gets you a new project you can claim."
+    );
   }
 }

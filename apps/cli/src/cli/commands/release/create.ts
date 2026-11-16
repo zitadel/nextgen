@@ -64,7 +64,6 @@ export default class ReleaseCreate extends EnvironmentCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

@@ -346,12 +346,11 @@ function nextActionsFor(
     project.claim?.kind === "detached"
       ? project.claim.claimable
         ? [
-            Claim.nudge(
-              suggest,
+            new Guidance(suggest).claimNudge(
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
             ),
           ]
-        : [Claim.windowClosedNudge(suggest)]
+        : [new Guidance(suggest).claimWindowClosedNudge()]
       : [];
   if (users === "none") {
     return [Guidance.verifyLogin(project.issuer), ...claim];
@@ -398,7 +397,7 @@ function nextCommandsFor(
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(Claim.command(suggest));
+      commands.push(new Guidance(suggest).claimCommand());
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a

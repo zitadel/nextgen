@@ -1,7 +1,5 @@
 import { serverKind } from "@/lib/oclif/server-kind";
 import type { ProjectSecretData } from "@/lib/project";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
-import type { BoxAction } from "@/lib/ui";
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
@@ -15,7 +13,7 @@ export type ClaimState =
   /**
    * `claimable` classifies the claim window from the locally recorded
    * creation time: once it has passed, nudges switch to reconciliation
-   * wording (Claim.windowClosedNudge). Never proof of anything: the local
+   * wording (`Guidance.claimWindowClosedNudge`). Never proof of anything: the local
    * record can be stale (a project claimed from another machine still reads
    * detached), so the claim command stays advertised as the safe check —
    * the server resolves the grant before the window. Lenient on an unknown
@@ -108,68 +106,6 @@ export class Claim {
   }
 
   /**
-   * The command for `next_commands`.
-   *
-   * @param suggest - Renders a suggestion for the run that reports it.
-   * @returns The `claim` command.
-   */
-  static command(suggest: Suggest): SuggestedCommand {
-    return suggest({ id: "claim" });
-  }
-
-  /**
-   * The one claim nudge for `next_actions`, shared by `setup` and `status`
-   * (doctor mirrors it with plain `zitadel` command names), quoting the
-   * command in prose. The command is rendered by `suggest`, so it carries the
-   * run's own scope and targets the project this run is about rather than
-   * whatever the next shell's environment resolves to.
-   *
-   * @param suggest - Renders a suggestion for the run that reports it.
-   * @param deadline - When the claim window closes, if it is known.
-   * @returns The nudge.
-   */
-  static nudge(suggest: Suggest, deadline: Date | undefined): string {
-    return `${Claim.sentence(deadline)} Run ${Claim.command(suggest)}.`;
-  }
-
-  /**
-   * The same nudge for the human box, with the command on its own styled line.
-   *
-   * @param suggest - Renders a suggestion for the run that reports it.
-   * @param deadline - When the claim window closes, if it is known.
-   * @returns The box action.
-   */
-  static boxNudge(suggest: Suggest, deadline: Date | undefined): BoxAction {
-    return {
-      text: Claim.sentence(deadline),
-      command: Claim.command(suggest),
-    };
-  }
-
-  /**
-   * The nudge's counterpart for a closed claim window. Deliberately framed as
-   * reconciliation, not a verdict: the local record can be stale in one
-   * direction (a project claimed from another machine still reads detached
-   * here), so "window closed" from local data alone must not send the user off
-   * to duplicate a project that is already attached and working. Running
-   * `zitadel claim` is safe either way: the server checks the grant before
-   * the window, so an attached project answers with a clean already-claimed
-   * skip, and only a genuinely unattached one gets the final refusal.
-   *
-   * @param suggest - Renders a suggestion for the run that reports it.
-   * @returns The nudge.
-   */
-  static windowClosedNudge(suggest: Suggest): string {
-    return (
-      `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
-      `closed. Run ${Claim.command(suggest)} to reconcile: a project ` +
-      "claimed from another machine confirms its team, and one never claimed can no " +
-      `longer be claimed. ${suggest({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } })} in a fresh directory ` +
-      "gets you a new project you can claim."
-    );
-  }
-
-  /**
    * Time and zone included, not just the date: the server closes the window
    * at an exact timestamp (created_at + 14 x 24h), and a bare "before Sep 18"
    * misleads in both directions at the boundary day.
@@ -197,7 +133,7 @@ export class Claim {
    * @param deadline - When the claim window closes, if it is known.
    * @returns The sentence.
    */
-  private static sentence(deadline?: Date): string {
+  static sentence(deadline?: Date): string {
     const when =
       deadline === undefined
         ? `within ${Claim.WINDOW_DAYS} days of creation`

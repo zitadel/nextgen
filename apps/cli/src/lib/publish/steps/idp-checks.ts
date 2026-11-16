@@ -1,7 +1,7 @@
 import { ForbiddenError, type VariableService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
-import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import type { Suggestion } from "@/lib/suggestion";
 import type { Connection } from "@/lib/zitadel";
 
 /**
@@ -29,8 +29,7 @@ const VARIABLE_KIND = {
  * A preview is checked the same way, except that its token may not read the
  * project's variables; that check then belongs to the deploy that merges it.
  *
- * @param ctx - The step's context: the connections, the variables and the
- *   commands a refusal suggests.
+ * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
  * @throws {@link ZitadelError} `E_VALIDATION` When a connection's client id and
  *   secret name one variable, or a variable is not the kind its field needs.
@@ -89,17 +88,12 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * @param mode - The publish the variable is for.
  * @returns The arguments.
  */
-function variableSet(
-  suggest: Suggest,
-  variable: string,
-  secret: boolean,
-  mode: PipelineMode,
-): SuggestedCommand {
-  return suggest({
+function variableSet(variable: string, secret: boolean, mode: PipelineMode): Suggestion {
+  return {
     id: "variable:set",
     args: { name: variable },
     flags: { secret, preview: mode === "preview" },
-  });
+  };
 }
 
 /**
@@ -107,7 +101,7 @@ function variableSet(
  * exist, the client id is a plain one it can put in the authorize URL, the
  * client secret is a secret one, and they are not one and the same.
  *
- * @param ctx - The step's context, for the commands a refusal suggests.
+ * @param ctx - The step's context.
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
  * @throws {@link ZitadelError} `E_VALIDATION` When the client id and secret
@@ -154,7 +148,7 @@ function checkCredentialVariables(
     const field = use.field;
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    const setCommand = variableSet(ctx.suggest, variable, wantsSecret, ctx.mode);
+    const setCommand = variableSet(variable, wantsSecret, ctx.mode);
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
       throw new ZitadelError(

@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { startedServer } from "@/cli/commands/local-server/started";
 import { createZitadelClient } from "@/lib/backend";
-import { Claim } from "@/lib/claim";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { Environment } from "@/lib/environment";
@@ -766,9 +765,9 @@ export function advisoryForWarnings(
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? Claim.windowClosedNudge(local)
-          : Claim.nudge(local, undefined),
-        Claim.command(local),
+          ? new Guidance(local).claimWindowClosedNudge()
+          : new Guidance(local).claimNudge(undefined),
+        new Guidance(local).claimCommand(),
       );
     }
   }

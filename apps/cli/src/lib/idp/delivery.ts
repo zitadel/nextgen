@@ -4,7 +4,7 @@ import {
   credentialVariables,
 } from "@zitadel/config/idp";
 
-import type { Suggest } from "@/lib/suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { warnings } from "@/lib/ui/warnings";
 import type { Connection, Credential } from "@/lib/zitadel";
 
@@ -40,10 +40,10 @@ export type DeliveryRun = {
   readonly reused: boolean;
 
   /**
-   * Renders a recovery command for the run, scope included, so it targets the
-   * same project.
+   * The command that publishes a credential the project did not receive,
+   * which the running command decides and renders for its own scope.
    */
-  readonly suggest: Suggest;
+  readonly republish: (missing: Unpublished) => SuggestedCommand;
 };
 
 /**
@@ -121,10 +121,18 @@ export class CredentialDelivery {
     const clientId = await this.publishClientId(given, publish);
     const secret = await this.storeSecret(given, publish);
     if (clientId !== undefined && names.clientId !== undefined) {
-      reportClientIdOutcome(names.clientId, clientId, this.run.suggest);
+      reportClientIdOutcome(
+        names.clientId,
+        clientId,
+        this.run.republish({ name: names.clientId, secret: false }),
+      );
     }
     if (secret !== undefined) {
-      reportSecretOutcome(secret, this.run.reused, this.run.suggest);
+      reportSecretOutcome(
+        secret,
+        this.run.reused,
+        this.run.republish({ name: secret.name, secret: true }),
+      );
     }
 
     return {

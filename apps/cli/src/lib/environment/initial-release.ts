@@ -48,7 +48,6 @@ export class InitialRelease {
       compare: false,
       json: input.json,
       color: input.color,
-      suggest: input.suggest,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);

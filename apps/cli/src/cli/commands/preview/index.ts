@@ -290,7 +290,6 @@ export default class Preview extends PreviewCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       warnings.report(warning);
