@@ -158,131 +158,6 @@ async function end(pid: number): Promise<void> {
 }
 
 /**
- * Whether something accepts a TCP connection on a port.
- *
- * @param port - The port.
- * @param host - The host, loopback unless one is named.
- * @returns Whether a connection was accepted.
- */
-function accepts(port: number, host: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = connect({ port, host });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
-}
-
-/**
- * The process ids on the lines of a file; a file that is not there holds none.
- *
- * @param path - The file.
- * @returns The ids, in the order written.
- */
-async function pidsIn(path: string): Promise<number[]> {
-  const text = await readFile(path, "utf8").catch(() => {
-    return "";
-  });
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
-      return Number.parseInt(line, 10);
-    })
-    .filter((pid) => {
-      return Number.isInteger(pid) && pid > 0;
-    });
-}
-
-/**
- * Starts a detached process and returns once it is ready.
- *
- * @param command - What to run.
- * @param args - Its arguments.
- * @param options - Where it runs, with what environment, and when it is ready.
- * @param started - Told of the process id as soon as there is one, so a process that never becomes
- *   ready is still ended with the test.
- * @returns The process.
- * @throws Error when it cannot be started or exits before it is ready.
- */
-async function start(
-  command: string,
-  args: readonly string[],
-  options: SpawnOptions,
-  started: (pid: number) => void,
-): Promise<Daemon> {
-  const child = spawn(command, [...args], {
-    cwd: options.cwd,
-    env: options.env,
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const chunks: string[] = [];
-  const listeners = new Set<() => void>();
-  const state = { closed: false };
-  const closed = new Promise<void>((resolve) => {
-    child.once("close", () => {
-      state.closed = true;
-      resolve();
-    });
-  });
-  for (const stream of [child.stdout, child.stderr]) {
-    stream.setEncoding("utf8");
-    stream.on("data", (chunk: string) => {
-      chunks.push(chunk);
-      for (const listener of listeners) {
-        listener();
-      }
-      listeners.clear();
-    });
-  }
-  const output = (): string => {
-    return chunks.join("");
-  };
-  const wrote = (): Promise<void> => {
-    return new Promise((resolve) => {
-      listeners.add(resolve);
-    });
-  };
-  const pid = await new Promise<number>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("spawn", () => {
-      if (child.pid === undefined) {
-        reject(new Error(`${command} started without a pid`));
-        return;
-      }
-      resolve(child.pid);
-    });
-  });
-  started(pid);
-  const failed = async (): Promise<Error> => {
-    await end(pid);
-    return new Error(`${command} exited before it was ready. It wrote:\n${output()}`);
-  };
-  const { ready } = options;
-  if (ready instanceof RegExp) {
-    while (!ready.test(output())) {
-      if (state.closed) {
-        throw await failed();
-      }
-      await Promise.race([wrote(), closed]);
-    }
-  } else if (ready !== undefined) {
-    while (!(await accepts(ready.port, ready.host ?? "127.0.0.1"))) {
-      if (state.closed) {
-        throw await failed();
-      }
-      await Promise.race([closed, pause(LOOK_AGAIN_MS)]);
-    }
-  }
-  return { pid, output, stop: () => end(pid) };
-}
-
-/**
  * `test` with the processes a test starts, ended with it. It knows nothing of the CLI: it starts
  * what it is told to and ends what it is given.
  *
@@ -298,9 +173,90 @@ export const test = base.extend<{ daemon: Daemons }>({
     const home = await mkdtemp(join(tmpdir(), "daemon-"));
     await use({
       async spawn(command, args, options = {}) {
-        return start(command, args, options, (pid) => {
-          pids.add(pid);
+        const child = spawn(command, [...args], {
+          cwd: options.cwd,
+          env: options.env,
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
         });
+        const chunks: string[] = [];
+        const listeners = new Set<() => void>();
+        const state = { closed: false };
+        const closed = new Promise<void>((resolve) => {
+          child.once("close", () => {
+            state.closed = true;
+            resolve();
+          });
+        });
+        for (const stream of [child.stdout, child.stderr]) {
+          stream.setEncoding("utf8");
+          stream.on("data", (chunk: string) => {
+            chunks.push(chunk);
+            for (const listener of listeners) {
+              listener();
+            }
+            listeners.clear();
+          });
+        }
+        const output = (): string => {
+          return chunks.join("");
+        };
+        const pid = await new Promise<number>((resolve, reject) => {
+          child.once("error", reject);
+          child.once("spawn", () => {
+            if (child.pid === undefined) {
+              reject(new Error(`${command} started without a pid`));
+              return;
+            }
+            resolve(child.pid);
+          });
+        });
+        pids.add(pid);
+        const failed = async (): Promise<Error> => {
+          await end(pid);
+          return new Error(`${command} exited before it was ready. It wrote:\n${output()}`);
+        };
+        const { ready } = options;
+        if (ready instanceof RegExp) {
+          while (!ready.test(output())) {
+            if (state.closed) {
+              throw await failed();
+            }
+            await Promise.race([
+              new Promise<void>((resolve) => {
+                listeners.add(resolve);
+              }),
+              closed,
+            ]);
+          }
+        } else if (ready !== undefined) {
+          const { port, host = "127.0.0.1" } = ready;
+          while (
+            !(await new Promise<boolean>((resolve) => {
+              const socket = connect({ port, host });
+              socket.once("connect", () => {
+                socket.destroy();
+                resolve(true);
+              });
+              socket.once("error", () => {
+                socket.destroy();
+                resolve(false);
+              });
+            }))
+          ) {
+            if (state.closed) {
+              throw await failed();
+            }
+            await Promise.race([closed, pause(LOOK_AGAIN_MS)]);
+          }
+        }
+        return {
+          pid,
+          output,
+          stop: () => {
+            return end(pid);
+          },
+        };
       },
       adopt(pid) {
         pids.add(pid);
@@ -312,8 +268,14 @@ export const test = base.extend<{ daemon: Daemons }>({
       },
     });
     for (const path of logs) {
-      for (const pid of await pidsIn(path)) {
-        pids.add(pid);
+      const text = await readFile(path, "utf8").catch(() => {
+        return "";
+      });
+      for (const line of text.split(/\r?\n/)) {
+        const pid = Number.parseInt(line, 10);
+        if (Number.isInteger(pid) && pid > 0) {
+          pids.add(pid);
+        }
       }
     }
     await Promise.all(

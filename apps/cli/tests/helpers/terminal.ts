@@ -167,51 +167,6 @@ function remembering(target: object, name: string): () => void {
 }
 
 /**
- * Puts the test's run at a terminal, as {@link atTerminal} does, and adds the controls a test
- * uses to change what the run finds there. Every swap is undone when the test ends.
- *
- * Each property is remembered before the terminal is put in place, so what is given back is what
- * the test started with whatever order the two sets of cleanups run in.
- *
- * @returns The terminal and its controls.
- */
-function atControllableTerminal(): TerminalFixture {
-  const restore = [
-    remembering(process, "stdin"),
-    remembering(process, "platform"),
-    remembering(process.stdout, "isTTY"),
-    remembering(process.stdout, "columns"),
-  ];
-  const terminal = atTerminal();
-  onTestFinished(() => {
-    for (const put of restore) {
-      put();
-    }
-  });
-  return {
-    ...terminal,
-    stdin(value) {
-      const source = typeof value === "string" ? Readable.from([value]) : value;
-      const piped = Object.assign(source, { isTTY: false });
-      Object.defineProperty(process, "stdin", { value: piped, configurable: true });
-    },
-    tty(on) {
-      Object.defineProperty(process.stdout, "isTTY", {
-        value: on,
-        writable: true,
-        configurable: true,
-      });
-    },
-    columns(count) {
-      Object.defineProperty(process.stdout, "columns", { value: count, configurable: true });
-    },
-    platform(name) {
-      Object.defineProperty(process, "platform", { value: name, configurable: true });
-    },
-  };
-}
-
-/**
  * `test` with the terminal the run is at: stdout and stdin are patched for the test that names it
  * and given back when it ends. A test that does not name it keeps the runner's own streams.
  *
@@ -220,6 +175,38 @@ function atControllableTerminal(): TerminalFixture {
 export const test = base.extend<{ terminal: TerminalFixture }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   terminal: async ({}, use) => {
-    await use(atControllableTerminal());
+    const restore = [
+      remembering(process, "stdin"),
+      remembering(process, "platform"),
+      remembering(process.stdout, "isTTY"),
+      remembering(process.stdout, "columns"),
+    ];
+    const terminal = atTerminal();
+    onTestFinished(() => {
+      for (const put of restore) {
+        put();
+      }
+    });
+    await use({
+      ...terminal,
+      stdin(value) {
+        const source = typeof value === "string" ? Readable.from([value]) : value;
+        const piped = Object.assign(source, { isTTY: false });
+        Object.defineProperty(process, "stdin", { value: piped, configurable: true });
+      },
+      tty(on) {
+        Object.defineProperty(process.stdout, "isTTY", {
+          value: on,
+          writable: true,
+          configurable: true,
+        });
+      },
+      columns(count) {
+        Object.defineProperty(process.stdout, "columns", { value: count, configurable: true });
+      },
+      platform(name) {
+        Object.defineProperty(process, "platform", { value: name, configurable: true });
+      },
+    });
   },
 });
