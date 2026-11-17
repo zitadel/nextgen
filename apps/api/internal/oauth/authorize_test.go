@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -88,7 +89,8 @@ func authorizeQuery(set map[string]string) string {
 
 // A valid request from a registered client reaches the login page, with or
 // without PKCE, stored with the deployment it was resolved from and bound
-// to the browser by a cookie of its own.
+// to the browser by a cookie of its own. A browser at the cookie limit loses
+// its oldest binding cookies.
 func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -96,23 +98,34 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 		set           map[string]string
 		wantChallenge string
 		wantState     string
+		cookies       string
+		wantExpired   []string
 	}{
 		{name: "without_pkce"},
 		{name: "with_pkce", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S256"}, wantChallenge: challenge},
 		{name: "state_at_limit", set: map[string]string{"state": strings.Repeat("s", 2048)}, wantState: strings.Repeat("s", 2048)},
+		{name: "under_cookie_limit", cookies: "session=1; " + bindingCookieNames(9)},
+		// Another cookie and a loopback binding cookie do not count.
+		{name: "at_cookie_limit", cookies: "session=1; _zauth_authreq_x=n; " + bindingCookieNames(10), wantExpired: []string{"__Host-_zauth_authreq_00"}},
+		{name: "over_cookie_limit", cookies: bindingCookieNames(12), wantExpired: []string{"__Host-_zauth_authreq_00", "__Host-_zauth_authreq_01", "__Host-_zauth_authreq_02"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			store := &authRequests{}
 			mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: store})
+			headers := map[string]string{"X-Forwarded-Proto": "https", "Accept": "text/html", "Cookie": tt.cookies}
 
-			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", browser)
+			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(tt.set), "app.example.com", headers)
 
 			require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 			assert.Equal(t, "https://app.example.com/login?auth_request=authreq_1", rec.Header().Get("Location"))
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-			assert.Equal(t, "__Host-_zauth_authreq_1=nonce; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax", rec.Header().Get("Set-Cookie"))
+			wantCookies := []string{"__Host-_zauth_authreq_1=nonce; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax"}
+			for _, name := range tt.wantExpired {
+				wantCookies = append(wantCookies, name+"=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax")
+			}
+			assert.Equal(t, wantCookies, rec.Header().Values("Set-Cookie"))
 			require.Len(t, store.stored, 1)
 			assert.Equal(t, &domain.AuthRequest{
 				ProjectID:     "proj_123",
@@ -435,6 +448,16 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 		})
 	}
+}
+
+// bindingCookieNames is the Cookie header of a browser holding n binding
+// cookies, oldest first.
+func bindingCookieNames(n int) string {
+	cookies := make([]string, n)
+	for i := range cookies {
+		cookies[i] = fmt.Sprintf("__Host-_zauth_authreq_%02d=n", i)
+	}
+	return strings.Join(cookies, "; ")
 }
 
 // assertErrorPage checks that rec is the error page with status and does not

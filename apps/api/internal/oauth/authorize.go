@@ -43,6 +43,10 @@ const (
 	// requestURINotSupported refuses a request object passed by reference
 	// (RFC 9101 §6.3). The library has no constructor for it.
 	requestURINotSupported = "request_uri_not_supported"
+	// maxBindingCookies bounds the binding cookies one browser holds. Every
+	// accepted request sets one, any site can send a browser here, and the
+	// browser sends all of them on every request to the origin.
+	maxBindingCookies = 10
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
@@ -157,7 +161,7 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 		return nil, oidc.ErrServerError().WithParent(err)
 	}
 	login.RawQuery = url.Values{"auth_request": {request.ID}}.Encode()
-	header := http.Header{"Set-Cookie": {bindingCookie(issuer, request.ID, nonce)}}
+	header := http.Header{"Set-Cookie": bindingCookies(issuer, r.Header, request.ID, nonce)}
 	return &op.Redirect{URL: login.String(), Header: header}, nil
 }
 
@@ -266,26 +270,42 @@ func loginURL(issuer Issuer, loginPath string) (*url.URL, error) {
 	return u, nil
 }
 
-// bindingCookie binds the request's handle to the browser that started it.
-// Each request has its own cookie, so a second request in the same browser
-// does not end the first (ADR 081 §8.3). The name is `__Host-` prefixed
-// unless the issuer is plain http on loopback, where Safari drops Secure
-// cookies (ADR 083).
-func bindingCookie(issuer Issuer, handle, nonce string) string {
+// bindingCookies are the Set-Cookie values of an accepted request. The first
+// binds the request's handle to the browser that started it. Each request has
+// its own cookie, so a second request in the same browser does not end the
+// first (ADR 081 §8.3). The name is `__Host-` prefixed unless the issuer is
+// plain http on loopback, where Safari drops Secure cookies (ADR 083). The
+// rest expire the oldest binding cookies the browser sent, so it holds at most
+// maxBindingCookies.
+func bindingCookies(issuer Issuer, sent http.Header, handle, nonce string) []string {
 	secure := issuer.URL.Scheme != "http" || !domain.IsLoopbackOrigin(issuer.Origin())
-	name := "_zauth_" + handle
+	prefix := "_zauth_"
 	if secure {
-		name = "__Host-" + name
+		prefix = "__Host-" + prefix
 	}
-	return (&http.Cookie{
-		Name:     name,
+	cookie := http.Cookie{
+		Name:     prefix + handle,
 		Value:    nonce,
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 		MaxAge:   int(domain.AuthRequestTTL.Seconds()),
-	}).String()
+	}
+	cookies := []string{cookie.String()}
+	// A browser sends its cookies oldest first (RFC 6265 §5.4).
+	var held []string
+	for _, c := range (&http.Request{Header: sent}).Cookies() {
+		if strings.HasPrefix(c.Name, prefix) {
+			held = append(held, c.Name)
+		}
+	}
+	overLimit := max(len(held)+1-maxBindingCookies, 0)
+	for _, name := range held[:overLimit] {
+		cookie.Name, cookie.Value, cookie.MaxAge = name, "", -1
+		cookies = append(cookies, cookie.String())
+	}
+	return cookies
 }
 
 // withoutLoggedState keeps the client's state out of the log. The library
