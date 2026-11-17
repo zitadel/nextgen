@@ -39,9 +39,15 @@ jobs:
       - name: CLI runs
         run: node apps/cli/bin/run.js --version && node apps/cli/bin/run.js --help
 
+      - name: Start the local server
+        run: |
+          mkdir -p "$RUNNER_TEMP/app"
+          cd "$RUNNER_TEMP/app"
+          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --help
+          node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" start --non-interactive --no-telemetry || true
+
       - name: Scaffold a project
         run: |
-          mkdir "$RUNNER_TEMP/app"
           cd "$RUNNER_TEMP/app"
           node "$GITHUB_WORKSPACE/apps/cli/bin/run.js" setup --framework react --server local --non-interactive --no-telemetry --no-git
 
