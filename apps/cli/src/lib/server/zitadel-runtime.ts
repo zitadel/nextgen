@@ -69,6 +69,7 @@ import {
   withStartLock,
   writeRuntimeMetadata,
 } from "./local";
+import { PsLocalServers } from "./local/processes";
 import { isLoopbackHost } from "./host";
 
 /** What a runtime is, as telemetry and decisions bucket it. */
@@ -325,6 +326,10 @@ export type LocalDirectory = Readonly<{
   processes: ServerProcesses;
   /** What it asks whether a server answers. */
   fetcher: typeof fetch;
+  /** The servers of the machine, found when a folder has no record that names its own. */
+  servers: LocalServers;
+  /** How it stops a process it found without a record. */
+  stopPid: typeof BinaryLauncher.stopPid;
 }>;
 
 /** What a folder's runtime is made with: the release, where it speaks, and what it asks. */
@@ -339,6 +344,10 @@ export type FolderOptions = Readonly<{
   processes?: ServerProcesses;
   /** What it asks whether a server answers (`fetch` by default). */
   fetcher?: typeof fetch;
+  /** The servers of the machine, found when a folder has no record that names its own (`ps` by default). */
+  servers?: LocalServers;
+  /** How it stops a process it found without a record (the real one by default). */
+  stopPid?: typeof BinaryLauncher.stopPid;
 }>;
 
 /** Where a runtime says what it is doing when nothing listens. */
@@ -715,6 +724,8 @@ export class LocalRuntime extends ZitadelRuntime {
       docker: options.docker ?? DockerLauncher,
       processes: options.processes ?? BinaryLauncher,
       fetcher: options.fetcher ?? fetch,
+      servers: options.servers ?? new PsLocalServers(),
+      stopPid: options.stopPid ?? BinaryLauncher.stopPid,
       progress: options.progress ?? NO_PROGRESS,
     });
   }
@@ -1238,7 +1249,12 @@ export class LocalRuntime extends ZitadelRuntime {
    *
    * @param permit - The caller's proof that deleting is meant.
    * @returns What stopping the server did.
+   * Without a readable record, the managed server processes running on this
+   * folder's data are stopped first, and none is deleted from under a process
+   * that would not stop.
+   *
    * @throws {LocalServerError} `permit-mismatch` when the permit is for another folder.
+   * @throws {LocalServerError} `server-did-not-stop` when a process on this folder's data would not stop.
    */
   async reset(permit: DestroyPermit): Promise<StopReport> {
     if (resolve(permit.folder) !== resolve(this.cwd)) {
@@ -1249,10 +1265,50 @@ export class LocalRuntime extends ZitadelRuntime {
       );
     }
     // A record that cannot be read must not stop the reset that is its way out.
-    const report = await this.halt(await peekRuntimeMetadata(this.cwd));
+    const record = await peekRuntimeMetadata(this.cwd);
+    const report = await this.halt(record);
+    const orphans: Array<{
+      process: ManagedRuntimeProcess;
+      stop_result: StopBinaryRuntimeResult;
+    }> = [];
+    if (record === undefined) {
+      // Without a record nothing names the server's process, so the ones
+      // running on this folder's data are found by their command lines, and
+      // stopped before the data is deleted from under them.
+      const discovery = await this.directory.servers.current();
+      const dataDir = resolve(localRuntimePaths(this.cwd).dataDir);
+      const mine = discovery.processes.filter((processInfo) => {
+        return processInfo.data_dir !== undefined && resolve(processInfo.data_dir) === dataDir;
+      });
+      for (const processInfo of mine) {
+        orphans.push({
+          process: processInfo,
+          stop_result: await this.directory.stopPid(processInfo.pid),
+        });
+      }
+      if (
+        orphans.some((orphan) => {
+          return orphan.stop_result.status === "failed";
+        })
+      ) {
+        throw new LocalServerError(
+          "server-did-not-stop",
+          "E_VALIDATION",
+          "Local Zitadel server did not stop",
+          { stop_results: orphans },
+        );
+      }
+    }
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);
-    return report;
+    return {
+      ...report,
+      stopped:
+        report.stopped ||
+        orphans.some((orphan) => {
+          return orphan.stop_result.status === "stopped";
+        }),
+    };
   }
 
   /**

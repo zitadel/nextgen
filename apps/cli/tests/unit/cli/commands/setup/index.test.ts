@@ -1091,6 +1091,25 @@ describe("setup", () => {
       });
     });
 
+    it("starts the server where it was started when its record is in a parent folder", async ({
+      dir,
+    }) => {
+      await LocalRuntime.write(dir, aRuntime(dir, DOWN_SERVER_URL));
+      const app = join(dir, "app");
+      await mkdir(app);
+
+      const res = await runCliForTest(setupIn(app, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(res).toFailWith("E_LOCAL_SERVER_NOT_RUNNING");
+      expect(parseJson(res.stdout)).toMatchObject({
+        hint: expect.stringContaining("It was started in"),
+        next_commands: [
+          expectedPublicCliCommand(`start --cwd ${dir}`),
+          expectedPublicCliCommand(`setup --framework next --server local --cwd ${app}`),
+        ],
+      });
+    });
+
     describe("with --sso google and a client id, run non-interactively", () => {
       const flags = ["--framework", "next", ...LOCAL, "--sso", "google"];
 

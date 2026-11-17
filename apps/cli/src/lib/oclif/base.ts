@@ -13,7 +13,7 @@ import { log, style, warnings } from "@/lib/ui";
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { LocalServerError, ZitadelRuntime } from "@/lib/server";
-import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
 import { interpolate } from "./refusal";
 import { resolveCwd } from "@/lib/paths";
 import {
@@ -1045,7 +1045,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (!(error instanceof LocalServerError)) {
       return error;
     }
-    const advice: { hint: string; next?: readonly Suggested[] } = LOCAL_SERVER_ADVICE[error.kind];
+    const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
     const details: Record<string, unknown> = {};
     if (isObject(error.details)) {
       Object.assign(details, error.details);
@@ -1082,19 +1082,22 @@ export abstract class BaseCommand extends Interruptible(Command) {
         quoted[key] = Cmd.quote(value);
       }
     }
-    const failure = (reported: unknown): ZitadelError => {
-      return new ZitadelError(error.code, error.message, {
-        hint: interpolate(advice.hint, quoted),
-        nextCommands: [...removal, ...next],
-        details: reported,
-      });
-    };
+    const hint = [elsewhere && advice.elsewhere, advice.hint].find((text) => {
+      return typeof text === "string";
+    });
+    const visible = Object.fromEntries(
+      Object.entries(details).filter(([key]) => {
+        return key !== "directory";
+      }),
+    );
     if (retargeted.length > 0) {
-      details.suggested_args = retargeted;
-      return failure(details);
-    } else {
-      return failure(error.details);
+      visible.suggested_args = retargeted;
     }
+    return new ZitadelError(error.code, error.message, {
+      hint: interpolate(hint ?? advice.hint, quoted),
+      nextCommands: [...removal, ...next],
+      details: error.details && visible,
+    });
   }
 
   /**

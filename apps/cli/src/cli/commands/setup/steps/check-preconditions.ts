@@ -2,7 +2,9 @@ import { isObject } from "@/lib/json";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isDirectoryOrMissing } from "@/lib/orca";
 import { LocalServerError, ZitadelRuntime } from "@/lib/server";
-import { LOCAL_SERVER_ADVICE } from "@/lib/suggestion/local-server-advice";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
+import { Cmd } from "@/lib/cmd";
+import { resolve } from "node:path";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -21,7 +23,7 @@ const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
   hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
-  next: [{ id: "start" }, "{setup}"],
+  next: ["{start}", "{setup}"],
 } as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -132,10 +134,21 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
       if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
         throw error;
       }
-      const hint = interpolate(
-        LOCAL_SERVER_ADVICE[error.kind].hint,
-        isObject(error.details) ? error.details : {},
-      );
+      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+      const details = isObject(error.details) ? error.details : {};
+      const { directory } = details;
+      const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
+      const startFlags: { cwd?: string } = {};
+      if (elsewhere) {
+        startFlags.cwd = directory;
+      }
+      const text = [elsewhere && advice.elsewhere, advice.hint].find((candidate) => {
+        return typeof candidate === "string";
+      });
+      const hint = interpolate(text ?? advice.hint, {
+        ...details,
+        ...(elsewhere && { directory: Cmd.quote(directory) }),
+      });
       const retry = retryOptionsFromFlags(flags);
       const recovery = ssoRecovery(retry, suggest);
       throw refusalError(
@@ -153,6 +166,7 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
               : recovery.hint,
         },
         {
+          start: { id: "start", flags: startFlags },
           setup: {
             id: "setup",
             flags: setupRetryFlags(retry),

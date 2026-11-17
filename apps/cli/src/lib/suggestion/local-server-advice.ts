@@ -6,6 +6,8 @@ import { CliPackage } from "@/lib/upgrade";
 /** What a reader is told to do about one kind of local server failure. */
 export interface LocalServerAdvice {
   readonly hint: string;
+  /** The hint when the failing record sits in another folder than the run's. */
+  readonly elsewhere?: string;
   readonly next?: readonly Suggested[];
 }
 
@@ -24,6 +26,8 @@ export const LOCAL_SERVER_ADVICE = {
   },
   "not-responding": {
     hint: "No healthy local server responded at {server_url}. Run `zitadel start` to bring it back.",
+    elsewhere:
+      "No healthy local server responded at {server_url}. It was started in {directory}, so run `zitadel start --cwd {directory}` to bring it back.",
     next: [{ id: "start" }],
   },
   "not-started": {
@@ -34,7 +38,9 @@ export const LOCAL_SERVER_ADVICE = {
     hint: "Check that {path} and its directory are readable by you.",
   },
   "record-malformed": {
-    hint: "Run `zitadel reset --force`, then `zitadel start`, each in {directory}.",
+    hint: "Run `zitadel reset --force`, then `zitadel start`.",
+    elsewhere:
+      "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
     next: [{ id: "reset", flags: { force: true } }, { id: "start" }],
   },
   "admin-unreadable": {

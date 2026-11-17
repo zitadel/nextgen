@@ -19,6 +19,7 @@ import {
   PortInUseError,
   ZitadelRuntime,
   type DockerEngine,
+  type LocalServers,
   type ServerProcesses,
 } from "@/lib/server";
 import type { Daemons } from "@tests/fixtures/daemon";
@@ -36,9 +37,16 @@ const at = (
     docker?: DockerEngine;
     processes?: ServerProcesses;
     fetcher?: typeof fetch;
+    servers?: LocalServers;
+    stopPid?: NonNullable<Parameters<typeof LocalRuntime.forFolder>[1]["stopPid"]>;
   } = {},
 ) => {
-  return LocalRuntime.forFolder(cwd, { cliVersion: "0.0.0-test", ...collaborators });
+  return LocalRuntime.forFolder(cwd, {
+    cliVersion: "0.0.0-test",
+    servers: { current: async () => ({ supported: true, processes: [] }) },
+    stopPid: async (pid) => ({ pid, status: "stale", target: "process" }),
+    ...collaborators,
+  });
 };
 
 /**
@@ -219,6 +227,80 @@ describe("LocalRuntime", () => {
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("stops the server process running on this folder's data before it deletes the data, when the record cannot be read", async ({
+      dir: cwd,
+    }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+      const stopped: number[] = [];
+      const dataStillThere: boolean[] = [];
+
+      await at(cwd, {
+        servers: {
+          current: async () => ({
+            supported: true,
+            processes: [
+              {
+                command: "nextgen",
+                data_dir: localRuntimePaths(cwd).dataDir,
+                kind: "server-binary",
+                pid: 4242,
+              },
+              {
+                command: "nextgen",
+                data_dir: join(cwd, "elsewhere"),
+                kind: "server-binary",
+                pid: 4343,
+              },
+            ],
+          }),
+        },
+        stopPid: async (pid) => {
+          stopped.push(pid);
+          dataStillThere.push(
+            await stat(join(cwd, LOCAL_DATA_DIR)).then(
+              () => true,
+              () => false,
+            ),
+          );
+          return { pid, status: "stopped", target: "process", signal: "SIGTERM" };
+        },
+      }).reset(DestroyPermit.forFolder(cwd));
+
+      expect(stopped).toEqual([4242]);
+      expect(dataStillThere).toEqual([true]);
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("deletes nothing when the server process on this folder's data will not stop", async ({
+      dir: cwd,
+    }) => {
+      await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+      await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+
+      await expect(
+        at(cwd, {
+          servers: {
+            current: async () => ({
+              supported: true,
+              processes: [
+                {
+                  command: "nextgen",
+                  data_dir: localRuntimePaths(cwd).dataDir,
+                  kind: "server-binary",
+                  pid: 4242,
+                },
+              ],
+            }),
+          },
+          stopPid: async (pid) => ({ pid, status: "failed", target: "process", signal: "SIGKILL" }),
+        }).reset(DestroyPermit.forFolder(cwd)),
+      ).rejects.toMatchObject({ kind: "server-did-not-stop" });
+
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
+      await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).resolves.toBeDefined();
     });
 
     it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {
