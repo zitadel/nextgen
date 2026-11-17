@@ -140,7 +140,7 @@ warnings.
 
 The files in `.zitadel/meta/` are a third kind of scaffolded file, beside the
 two classes above: CLI-owned generated output. Each is a pure function of the
-CLI version (`projectMetaSchemas` in `apps/cli/src/lib/meta-schemas.ts`), a
+CLI version (`MetaSchemas.of` in `apps/cli/src/lib/meta-schemas/meta-schemas.ts`), a
 dialect spec that editors read through a `$schema` pointer and agents read
 before an edit. No command and not the server reads them: `deploy` validates
 with the CLI's own Zod and the server with its embedded copy. They are JSON,

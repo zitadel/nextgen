@@ -3,7 +3,6 @@ import type { ZodType } from "zod";
 
 import type { Consent } from "@/lib/consent";
 import type { Connection } from "@/lib/oclif/environment-command";
-import type { CommandGroup } from "@/lib/oclif/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 import type { References } from "./secrets";
@@ -252,7 +251,7 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * Group the root help lists this resource's commands under. Generated
    * commands have no file to carry a `static group`, so the table says it.
    */
-  group?: CommandGroup;
+  group?: string;
   /** Position of the resource's row within its group on the root help, lowest first. */
   groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */

@@ -24,8 +24,8 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 
 | YAML key                     | Environment                          | Default | Description                                                                                                                                            |
 | ----------------------------- | ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) at startup. Needed for `zitadel claim` and self-registration to work on this deployment. `zitadel start` turns it on itself; set it to `false` to opt out of the platform project and the local admin.   |
-| `platform.operators`         | `NEXTGEN_PLATFORM_OPERATORS`          | (empty) | User ids, comma-separated in the environment, of the platform-project users who administer every project of the deployment ([ADR 075](../adrs/075-platform-operators.md)). Reconciled at every start: listed users that exist are granted, and those an earlier list granted are revoked. Needs a platform project (`bootstrap_project` or `project_id`). |
+| `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) when the server seeds: at startup, or in the `seed` command. Needed for `zitadel claim` and self-registration to work on this deployment. `zitadel start` turns it on itself; set it to `false` to opt out of the platform project and the local admin.   |
+| `platform.operators`         | `NEXTGEN_PLATFORM_OPERATORS`          | (empty) | User ids, comma-separated in the environment, of the platform-project users who administer every project of the deployment ([ADR 075](../adrs/075-platform-operators.md)). Reconciled at every seeding (a start, or the `seed` command): listed users that exist are granted, and those an earlier list granted are revoked. Needs a platform project (`bootstrap_project` or `project_id`). |
 | `platform.project_id`        | `NEXTGEN_PLATFORM_PROJECT_ID`         | (empty) | Pins an existing project as the standalone Console's sign-in target, overriding the first-created-project fallback. Does **not** provision the platform project or enable claiming, self-registration, or personal teams — only `bootstrap_project` does that. Mutually exclusive with `bootstrap_project` unless set to its built-in id. Transitional ([Console ADR 0004](../../apps/console/docs/adrs/0004-console-deployment-modes.md)); expect it to be removed once bootstrap always provisions the platform project. |
 
 On a server you start by hand (Docker Compose, or the Go binary), set both to
@@ -38,6 +38,26 @@ export NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:8080
 
 A runtime started by `zitadel start` needs neither: the CLI sets both values
 itself and creates a local admin you reach with `zitadel console`.
+
+The server seeds when it starts: it creates the platform project, deploys the
+configuration it ships for it, imports the `--user-file` users and reconciles
+`platform.operators`. A deployment with several replicas, or one whose
+instances start on demand, can seed once as it deploys instead, with the same
+configuration the servers read:
+
+```sh
+nextgen migrate
+nextgen seed --user-file admin.json
+nextgen server --seed=false
+```
+
+`seed` wraps the platform project's keys with the master key and never
+generates one: give it the key the servers are configured with
+([Encryption keys](#encryption-keys)). A server started with `--seed=false`
+writes nothing by starting and refuses to start on a database nothing seeded.
+It logs an error that starts `platform project:` when the console cannot sign
+anyone in at its public base, which the next `seed` repairs. Write the flag
+with `=`: `--seed false` is refused.
 
 ## OAuth
 

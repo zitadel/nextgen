@@ -1,9 +1,9 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 
-import { buildRequest, pathValuesOf, schemaOf, withPathValues } from "@/lib/api-request";
+import { ApiCall } from "@/lib/api";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
 import { toZitadelError } from "@/lib/errors";
 import { forcedConsent } from "@tests/helpers/consent";
@@ -40,13 +40,13 @@ const sendAll = async (
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
   const target = Operation.named(ref);
-  return withPathValues(
-    buildRequest({
-      target,
+  const call = ApiCall.to(target);
+  return call.fill(
+    call.request({
       fields,
       projectId: "proj_1",
     }),
-    pathValuesOf(target, positionals, "proj_1").values,
+    call.pathValues(positionals, "proj_1").values,
   );
 };
 
@@ -388,7 +388,7 @@ describe("Operation.all, over the whole table", () => {
   // it cannot find would leave every field of that operation untyped.
   it("finds the generated body schema of every operation that takes a body", () => {
     const missing = OPERATIONS.filter(
-      (operation) => operation.body !== null && schemaOf(operation, "Body") === undefined,
+      (operation) => operation.body !== null && ApiCall.schemaOf(operation, "Body") === undefined,
     ).map((operation) => operation.id);
 
     expect(missing).toEqual([]);
@@ -398,7 +398,7 @@ describe("Operation.all, over the whole table", () => {
     const missing = OPERATIONS.filter(
       (operation) =>
         operation.parameters.some((parameter) => parameter.in === "query") &&
-        schemaOf(operation, "QueryParams") === undefined,
+        ApiCall.schemaOf(operation, "QueryParams") === undefined,
     ).map((operation) => operation.id);
 
     expect(missing).toEqual([]);
@@ -408,8 +408,9 @@ describe("Operation.all, over the whole table", () => {
   // body otherwise, which only works while no name is both.
   it("has no query parameter named like a top-level field of the same operation's body", () => {
     const clashes = OPERATIONS.flatMap((operation) => {
-      const shape = (schemaOf(operation, "Body") as { shape?: Record<string, unknown> } | undefined)
-        ?.shape;
+      const shape = (
+        ApiCall.schemaOf(operation, "Body") as { shape?: Record<string, unknown> } | undefined
+      )?.shape;
       return operation.parameters
         .filter(
           (parameter) => parameter.in === "query" && shape && Object.hasOwn(shape, parameter.name),

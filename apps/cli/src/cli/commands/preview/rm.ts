@@ -1,7 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 
 import { PreviewService } from "@/lib/backend";
-import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive, Settled } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
@@ -31,7 +32,8 @@ const URL = {
  */
 export default class PreviewRm extends Destructive(PreviewCommand) {
   static override description = "Remove a live preview from the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app",

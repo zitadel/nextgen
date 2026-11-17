@@ -2,13 +2,8 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { PreviewService } from "@/lib/backend";
-import {
-  type Admitted,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-  PreviewCommand,
-} from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, type JsonEnvelope, nonBlankString, PreviewCommand } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
@@ -44,7 +39,8 @@ const LIMIT = {
  */
 export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.releases;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> preview list",

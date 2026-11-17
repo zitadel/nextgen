@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
@@ -20,8 +19,6 @@ import {
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-
-useLocalServers();
 
 /**
  * A full commit sha.

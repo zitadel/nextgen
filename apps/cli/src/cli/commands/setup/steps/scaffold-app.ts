@@ -1,7 +1,7 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { toZitadelError } from "@/lib/errors";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -117,7 +117,7 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           )} holds what it did before setup`,
         );
       } catch (error) {
-        reportWarning(
+        warnings.report(
           `Could not remove the new app setup scaffolded in ${this.deps.cwd}: ${toZitadelError(error).message}`,
         );
       }

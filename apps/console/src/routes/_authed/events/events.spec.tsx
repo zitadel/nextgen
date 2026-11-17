@@ -906,12 +906,19 @@ describe("events filters", () => {
     expect(queries.at(-1)?.has("category")).toBe(false);
   });
 
+  const BADGE_ON_HIGHLIGHT = "data-[selected=true]:**:data-[slot=badge]:text-accent-foreground";
+
   it("narrows to types chosen from the list, several at once, or to the failures", async () => {
     const queries = serveEvents({ events: [event("evt_1")] });
     const router = await renderAt("/events?category=auth");
     await screen.findByRole("link", { name: "user.deleted" });
 
     await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
+    // Resting, cmdk marks the first row selected but nothing is filled, so the
+    // shortcut's badge keeps its tint.
+    const resting = await screen.findByRole("option", { name: /^Only failures/ });
+    expect(resting).toHaveAttribute("data-selected", "true");
+    expect(resting).not.toHaveClass(BADGE_ON_HIGHLIGHT);
     await userEvent.click(await screen.findByRole("option", { name: "user.created" }));
     await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(["user.created"]));
     await userEvent.click(await screen.findByRole("option", { name: "user.deleted" }));
@@ -931,7 +938,27 @@ describe("events filters", () => {
 
     // The shortcut is the list's first row, so the types it ticks show under it.
     await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
-    await userEvent.click(await screen.findByRole("option", { name: /^Only failures/ }));
+    const failures = await screen.findByRole("option", { name: /^Only failures/ });
+    // Reopened, the list rests again: what was navigated before is not filled.
+    expect(failures).not.toHaveClass(BADGE_ON_HIGHLIGHT);
+    // Highlighted, its badge reads in the row's foreground: the tinted
+    // destructive text is under 4.5:1 on the fill in the dark theme.
+    await userEvent.keyboard("{ArrowDown}{ArrowUp}");
+    expect(failures).toHaveAttribute("data-selected", "true");
+    expect(failures).toHaveClass(BADGE_ON_HIGHLIGHT);
+
+    // The rule under the shortcut hides while a search narrows the list; the
+    // footer's stays.
+    const list = within(screen.getByRole("dialog", { name: "Event types" }));
+    const rules = () =>
+      list.getByRole("listbox").querySelectorAll('[data-slot="command-separator"]');
+    expect(rules()).toHaveLength(2);
+    const find = screen.getByRole("combobox", { name: "Find a type" });
+    await userEvent.type(find, "user");
+    await waitFor(() => expect(rules()).toHaveLength(1));
+    await userEvent.clear(find);
+    await waitFor(() => expect(rules()).toHaveLength(2));
+    await userEvent.click(failures);
 
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([

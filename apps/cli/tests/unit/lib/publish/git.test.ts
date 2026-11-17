@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { diffConfigAgainst, diffConfigFilesAgainst, worktreeIsDirty } from "@/lib/publish/git";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
 
 /**

@@ -1,4 +1,4 @@
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
@@ -24,7 +24,7 @@ const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;col
  * here in the generated app.
  */
 export function middlewareTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { createMiddleware } from "@solidjs/start/middleware";
 import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
 
@@ -39,7 +39,7 @@ export default createMiddleware(
 
 /** `src/routes/index.tsx` — the landing chooser linking to login/register/profile. */
 export function indexPageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 export default function Index() {
   return (
     <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
@@ -96,7 +96,7 @@ const ZitadelLogin = clientOnly(() =>
 const ZitadelLogin = clientOnly(() =>
   import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
 );`;
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { clientOnly } from "@solidjs/start";
 ${loader}
 
@@ -129,7 +129,7 @@ export function registerPageTemplate(ctx: PatchContext): string {
  * registers Lit custom elements at import time, which would crash SSR.
  */
 export function profilePageTemplate(): string {
-  return `${MANAGED_MARKER}
+  return `${ManagedFile.MARKER}
 import { clientOnly } from "@solidjs/start";
 
 const ZitadelSession = clientOnly(() =>

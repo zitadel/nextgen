@@ -1,7 +1,6 @@
 import { Dependencies } from "@/lib/upgrade/dependencies";
 
-import { wrapForBox } from "@/lib/box";
-import { command, notice } from "@/lib/style";
+import { Ui, style } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { drawBox } from "@/lib/ui/layout";
@@ -63,6 +62,8 @@ export async function updateNotice(input: {
     return undefined;
   }
 
-  const lines = [...behind, "", command(input.upgrade)];
-  return drawBox(wrapForBox(lines.join("\n"), columns), "Update available", notice);
+  const lines = [...behind, "", style.command(input.upgrade)];
+  return drawBox(Ui.wrap(lines.join("\n"), columns), "Update available", (text) => {
+    return style.notice(text);
+  });
 }

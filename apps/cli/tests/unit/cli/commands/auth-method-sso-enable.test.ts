@@ -15,7 +15,7 @@ import {
   schemaIdOf,
 } from "@tests/helpers/auth-method";
 import { aGoogleConnection, type DocumentsByName } from "@tests/helpers/config";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import {
   defaultSchema,
@@ -28,7 +28,7 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asOneLine } from "@tests/helpers/terminal";
+import { asOneLine } from "@tests/fixtures/terminal";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /**
@@ -455,7 +455,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         data: {
           next_commands: expect.arrayContaining([
-            expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
+            expect.stringMatching(/variable set GOOGLE_CLIENT_SECRET --secret .*--cwd /),
           ]),
         },
       });
@@ -1215,6 +1215,20 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("with a schema and no client id", () => {
+    it("keeps --schema in the retry it suggests", async ({ dir }) => {
+      const cwd = await aProject(dir, { customers: defaultSchema, employees: defaultSchema });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--schema", "employees"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: [expect.stringContaining("--schema employees")],
+      });
+    });
+  });
+
   describe("with a blank --client-id", () => {
     it("refuses it rather than taking it as one", async ({ dir }) => {
       const cwd = await aProject(dir);
@@ -1463,6 +1477,22 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         message: expect.stringContaining("cannot be checked against the changed schema"),
+      });
+    });
+
+    it("suggests a dry run of deploy, which reports those flow errors", async ({ dir }) => {
+      const cwd = await aProject(dir);
+      await writeJson(cwd, LOGIN_FLOW_FILE, {
+        ...loginFlow("default-human-user"),
+        purposes: { login: "missing" },
+      });
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        next_commands: expect.arrayContaining([expect.stringContaining("deploy --dry-run")]),
       });
     });
 

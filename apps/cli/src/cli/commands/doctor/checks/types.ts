@@ -76,7 +76,64 @@ export interface SanityCheck {
  * {@link fix} defaults to a no-op: checks whose failure has no safe automatic
  * remedy (a missing secret, an invalid user schema) simply do not override it.
  */
+/**
+ * A failure that carries facts for the report: the outcome that reports it
+ * puts `details` beside the message.
+ */
+export class CheckFailure extends Error {
+  readonly details: CheckOutcome["details"];
+
+  /**
+   * @param message - What is wrong, in one sentence.
+   * @param details - The facts behind it, for the report.
+   */
+  constructor(message: string, details: CheckOutcome["details"]) {
+    super(message);
+    this.details = details;
+  }
+}
+
 export abstract class AbstractSanityCheck implements SanityCheck {
+  /**
+   * Runs `run` and reports it as a check: a pass with what it returned, or the
+   * failure it threw as `failureStatus`, with the details a {@link CheckFailure}
+   * carries.
+   *
+   * @param name - The check's name.
+   * @param fallback - The message when what was thrown is not an error.
+   * @param run - The probe; it returns the passing message and throws to fail.
+   * @param failureStatus - What a failure counts as.
+   * @returns The check's outcome.
+   */
+  static async attempt(
+    name: string,
+    fallback: string,
+    run: () => Promise<string>,
+    failureStatus: "warn" | "fail" = "fail",
+  ): Promise<CheckOutcome> {
+    try {
+      return {
+        name,
+        status: "pass",
+        message: await run(),
+      };
+    } catch (error) {
+      if (error instanceof CheckFailure) {
+        return {
+          name,
+          status: failureStatus,
+          message: error.message,
+          details: error.details,
+        };
+      }
+      return {
+        name,
+        status: failureStatus,
+        message: error instanceof Error ? error.message : fallback,
+      };
+    }
+  }
+
   abstract readonly name: string;
   abstract readonly path: string;
   protected abstract readonly summary: string;

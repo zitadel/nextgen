@@ -97,8 +97,8 @@ func TestWebhooks(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListWebhooksResponse{}, res, helpers.MustMarshal(t, res))
 		list := res.(*api.ListWebhooksResponse)
-		require.Len(t, list.Data, 1)
-		assert.Equal(t, created.ID, list.Data[0].ID)
+		require.Len(t, list.Webhooks, 1)
+		assert.Equal(t, created.ID, list.Webhooks[0].ID)
 		assert.False(t, list.NextPageToken.Set && !list.NextPageToken.Null, "one webhook is one page")
 	})
 

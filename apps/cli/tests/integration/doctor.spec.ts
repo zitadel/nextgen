@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { Cmd } from "@/lib/cmd";
 import { asAnOlderSetupLeft, SVELTEKIT_GITIGNORE } from "@tests/helpers/gitignore";
-import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aSetUpApp,
@@ -14,7 +13,6 @@ import {
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
 

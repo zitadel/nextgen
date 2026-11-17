@@ -1,5 +1,5 @@
-import type { BoxAction } from "@/lib/box";
-import { command, dim, strong } from "@/lib/style";
+import type { BoxAction } from "@/lib/ui/box";
+import { style } from "@/lib/ui/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 
@@ -95,12 +95,12 @@ export function renderNextSteps(next: NextSteps): string {
   // what the server answered — a cursor to page with, an id to act on — so it
   // is spelled out here.
   return [
-    strong(NEXT_LABEL),
+    style.strong(NEXT_LABEL),
     ...actions.map((action) => {
       return `  ${escapeControlCharacters(action)}`;
     }),
     ...commands.map((suggested) => {
-      return `  ${dim("$")} ${command(suggested)}`;
+      return `  ${style.dim("$")} ${style.command(suggested)}`;
     }),
   ].join("\n");
 }

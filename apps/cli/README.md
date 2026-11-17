@@ -170,6 +170,10 @@ which ships in this package.
 * [`zitadel idp create`](#zitadel-idp-create)
 * [`zitadel idp get ID`](#zitadel-idp-get-id)
 * [`zitadel idp list`](#zitadel-idp-list)
+* [`zitadel invitation cancel [INVITATION_ID]`](#zitadel-invitation-cancel-invitation_id)
+* [`zitadel invitation create`](#zitadel-invitation-create)
+* [`zitadel invitation get INVITATION_ID`](#zitadel-invitation-get-invitation_id)
+* [`zitadel invitation list`](#zitadel-invitation-list)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
@@ -737,7 +741,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin.
+Open the console of the server the project uses.
 
 ```
 USAGE
@@ -752,17 +756,18 @@ FLAGS
       --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --no-open          Print the sign-in link instead of opening a browser.
+      --no-open          Print the link instead of opening a browser.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin.
+  Open the console of the server the project uses.
 
-  The local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local
-  admin is read from the nearest .zitadel/local/ on the way up.
+  Where a local server was started, the console opens signed in as the local admin the start command created: run this
+  in the directory it ran in, or one inside it, since the local admin is read from the nearest .zitadel/local/ on the
+  way up. Otherwise a project on a cloud or self-hosted server opens that server's console, where you sign in yourself.
 
 EXAMPLES
   $ zitadel console
@@ -1784,6 +1789,171 @@ EXAMPLES
   $ zitadel idp list --all --json
 
   $ zitadel idp list --filter slug=equals:<value> --sort slug:desc
+```
+
+## `zitadel invitation cancel [INVITATION_ID]`
+
+Cancel a pending invitation so its link stops working.
+
+```
+USAGE
+  $ zitadel invitation cancel [INVITATION_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+
+ARGUMENTS
+  [INVITATION_ID]  The invitation to cancel. Omit it to pick one of the pending invitations.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                          platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Cancel the invitation without the confirmation prompt. Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Cancel a pending invitation so its link stops working.
+
+EXAMPLES
+  $ zitadel invitation cancel
+
+  $ zitadel invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J
+
+  $ zitadel invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --force
+```
+
+## `zitadel invitation create`
+
+Invite someone into the project with a link to share.
+
+```
+USAGE
+  $ zitadel invitation create [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-e <value>] [--env-file <value>] [--name <value>] [--relation viewer|editor|admin] [--replaces
+    <value>]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive    Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --[no-]color         Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                           read from the current directory, not from --cwd. Cannot be combined with --env.
+      --name=<value>       Who the invitation is for, shown to other administrators. Never matched.
+      --relation=<option>  The project role whoever accepts receives.
+                           <options: viewer|editor|admin>
+      --replaces=<value>   The invitation this one replaces; the new one keeps its journey.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Invite someone into the project with a link to share.
+
+EXAMPLES
+  $ zitadel invitation create
+
+  $ zitadel invitation create --name "John Doe" --relation editor
+
+  $ zitadel invitation create --replaces inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --relation editor
+```
+
+## `zitadel invitation get INVITATION_ID`
+
+Read one invitation by id.
+
+```
+USAGE
+  $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>]
+
+ARGUMENTS
+  INVITATION_ID  The invitation to read.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                          platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Read one invitation by id.
+
+EXAMPLES
+  $ zitadel invitation get inv_01JCQK5R7T9V1X3Z5B7D9F1H3J
+```
+
+## `zitadel invitation list`
+
+List the project's invitations, newest first.
+
+```
+USAGE
+  $ zitadel invitation list [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-e <value>] [--env-file <value>] [--status pending|accepted|rejected|expired] [--type
+    project_member|team_member] [--limit <value>] [-a | --page-token <value>] [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                            platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
+      --status=<option>     Only invitations with this status.
+                            <options: pending|accepted|rejected|expired>
+      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
+      --type=<option>       Only invitations of this type.
+                            <options: project_member|team_member>
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's invitations, newest first.
+
+EXAMPLES
+  $ zitadel invitation list
+
+  $ zitadel invitation list --status pending
+
+  $ zitadel invitation list --all --json
 ```
 
 ## `zitadel logs`

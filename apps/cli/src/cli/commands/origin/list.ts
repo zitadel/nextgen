@@ -1,5 +1,6 @@
 import { OriginService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -14,7 +15,8 @@ const COLUMNS = ["pattern", "kind"] as const;
  */
 export default class OriginList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the origin patterns on the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 3;
 
   static override examples = [
     "<%= config.bin %> origin list",
