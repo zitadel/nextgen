@@ -11,10 +11,11 @@ import {
 } from "./backend";
 import { isObject } from "./json";
 import type { Suggested } from "./suggestion";
+import type { Rerun } from "./suggestion/run";
 import {
-  BrokenFlowsError,
   ConflictError as ConfigConflictError,
   ConfigError,
+  BrokenFlowsError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
 
@@ -102,6 +103,13 @@ export type ZitadelErrorOptions = {
    * below a command still aims at the run's project.
    */
   nextCommands?: readonly Suggested[];
+  /**
+   * The command that refused, run again with these changes, as data: code raised
+   * below the command names the change (`--file -` given a path) and the
+   * command's failure handler builds the command, with every flag and argument
+   * the run was given, and lists it under the next commands.
+   */
+  retry?: Rerun;
   details?: unknown;
 };
 
@@ -115,6 +123,7 @@ export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
   readonly nextCommands?: readonly Suggested[];
+  readonly retry?: Rerun;
   readonly details?: unknown;
 
   /**
@@ -132,6 +141,7 @@ export class ZitadelError extends Error {
     this.code = code;
     this.hint = opts.hint;
     this.nextCommands = opts.nextCommands;
+    this.retry = opts.retry;
     this.details = opts.details;
   }
 
@@ -274,8 +284,7 @@ export function toZitadelError(error: unknown): ZitadelError {
     return new ZitadelError(configErrorCode(error), error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
-      // A flow that is broken or still in use is checked again with a dry run
-      // of deploy, which the library cannot name: it knows no command.
+      // Flows that are broken or still in use are checked with a dry run of deploy.
       ...(error instanceof BrokenFlowsError
         ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
         : {}),

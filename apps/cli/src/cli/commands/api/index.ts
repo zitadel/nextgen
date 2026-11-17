@@ -1,4 +1,4 @@
-import { Args, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { ApiCall, type PathValues } from "@/lib/api";
@@ -27,7 +27,6 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import type { Suggested } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { Runtime } from "@/lib/runtime";
@@ -151,20 +150,29 @@ export function pathValuesFromWords(
 }
 
 /**
- * The flags a refused `--input -` changes: `--input` is given a path, and the
- * `--field` values are left out, since one may hold a secret a suggestion
- * must never print.
+ * A refusal that asks for the run again, with the operation a person chose at
+ * the prompt named: it was not in the arguments the run was given.
+ *
+ * @param failure - What the request raised.
+ * @param operation - The operation chosen.
+ * @returns The failure, asking for the run again with `operation` as its argument.
  */
-type InputFlags = {
-  input: Interfaces.OptionFlag<string | undefined>;
-  field: Interfaces.OptionFlag<string[] | undefined>;
-};
+function naming(failure: unknown, operation: string): unknown {
+  if (!(failure instanceof ZitadelError) || failure.retry === undefined) {
+    return failure;
+  }
+  return new ZitadelError(failure.code, failure.raised, {
+    hint: failure.hint,
+    nextCommands: failure.nextCommands,
+    details: failure.details,
+    retry: { ...failure.retry, arguments: [operation] },
+  });
+}
 
 /**
  * `--field` and `--input` laid over the operation's schema, each typed by it.
  * It refuses a field the operation does not take, a value of the wrong type, a
- * body on an operation that takes none, and `--input -` with nothing piped in,
- * which suggests `retry`: the run again with `--input <path>`.
+ * body on an operation that takes none, and `--input -` with nothing piped in.
  */
 export async function requestOf(
   target: Target,
@@ -173,11 +181,10 @@ export async function requestOf(
     input?: string;
   }>,
   projectId: string | undefined,
-  retry: () => Promise<Suggested>,
 ): Promise<ApiRequest> {
   return ApiCall.to(target).request({
     fields: flags.field ?? [],
-    input: await ApiCall.readInput(flags.input, retry),
+    input: await ApiCall.readInput(flags.input),
     projectId,
   });
 }
@@ -336,13 +343,8 @@ export default class Api extends Destructive(EnvironmentCommand) {
     });
     const { server, projectId, client } = await this.reach(operation);
 
-    const built = await requestOf(target, flags, projectId, () => {
-      // A chosen operation is not in the arguments the run was given.
-      return this.rerun<InputFlags>({
-        with: { input: "<path>" },
-        without: ["field"],
-        ...(args.operation === undefined ? { arguments: [operation.id] } : {}),
-      });
+    const built = await requestOf(target, flags, projectId).catch((failure: unknown) => {
+      throw args.operation === undefined ? naming(failure, operation.id) : failure;
     });
     // The question a person is asked, and the one a refusal hands to whoever must ask them.
     const question = [

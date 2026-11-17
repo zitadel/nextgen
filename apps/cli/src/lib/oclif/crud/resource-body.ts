@@ -1,6 +1,6 @@
 import { isObject } from "@/lib/json";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { helpOf, type Suggested } from "@/lib/suggestion";
+import { helpOf } from "@/lib/suggestion";
 
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
@@ -111,8 +111,6 @@ export type ResourceBodySource = Readonly<{
   document: ZodLike | undefined;
   fields: readonly BodyField[];
   references: References | undefined;
-  /** The run again with `--file <path>`, which a refusal to read stdin suggests. */
-  retry: () => Promise<Suggested>;
 }>;
 
 /**
@@ -140,7 +138,7 @@ export const resourceBody = async (source: ResourceBodySource, flags: Json): Pro
     source.document,
     source.references,
   );
-  const raw = await readRawBody(flags, source.retry);
+  const raw = await readRawBody(flags);
   const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
   refuseArgvCredentials(
     argvParts(flags, base, source.fields, fromFlags, assignments),

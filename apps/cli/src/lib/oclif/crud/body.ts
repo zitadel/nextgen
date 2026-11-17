@@ -3,7 +3,6 @@ import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject } from "@/lib/json";
-import type { Suggested } from "@/lib/suggestion";
 
 import type { Json } from "./types";
 
@@ -18,16 +17,11 @@ import type { Json } from "./types";
  * field flags and `--set`, against the schema that says what each value is.
  *
  * @param flags - The run's flags: `data`, `file`.
- * @param retry - The run again with `--file <path>`, which keeps the resource
- *   id and every other flag the run was given. Only a refusal builds it.
  * @returns The body the flags give, or `undefined` when they give none.
  * @throws {@link ZitadelError} With `E_VALIDATION` when `--file -` is given
  *   and nothing is piped in, or when the body is not a JSON object.
  */
-export const readRawBody = async (
-  flags: Json,
-  retry: () => Promise<Suggested>,
-): Promise<Json | undefined> => {
+export const readRawBody = async (flags: Json): Promise<Json | undefined> => {
   if (typeof flags.data === "string") {
     return parseJsonObject(flags.data, "--data");
   }
@@ -41,7 +35,7 @@ export const readRawBody = async (
         "--file - reads the body from a pipe, but nothing is piped in",
         {
           hint: "Pipe a body in and pass --file -, or pass it with --file <path> or --data '<json>'.",
-          nextCommands: [await retry()],
+          retry: { with: { file: "<path>" } },
         },
       );
     }

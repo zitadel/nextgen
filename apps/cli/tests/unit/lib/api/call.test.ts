@@ -7,9 +7,6 @@ import { ApiCall } from "@/lib/api";
 import { it } from "@tests/fixtures";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
-/** What a refusal suggests: the run again. */
-const RETRY = () => Promise.resolve({ id: "setup" } as const);
-
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
 /** The request for `ref` with `fields`, every path parameter already given. */
@@ -226,7 +223,7 @@ describe("ApiCall.readInput", () => {
   it("reads a body piped in", async ({ terminal }) => {
     terminal.stdin(Readable.from([Buffer.from('{"a":1}\n')]));
 
-    expect(await ApiCall.readInput("-", RETRY)).toEqual({ a: 1 });
+    expect(await ApiCall.readInput("-")).toEqual({ a: 1 });
   });
 
   it("reads a body piped in with a UTF-8 byte-order mark in front of it", async ({ terminal }) => {
@@ -234,20 +231,20 @@ describe("ApiCall.readInput", () => {
       Readable.from([Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a":1}\n')])]),
     );
 
-    expect(await ApiCall.readInput("-", RETRY)).toEqual({ a: 1 });
+    expect(await ApiCall.readInput("-")).toEqual({ a: 1 });
   });
 
   it("refuses a terminal with nothing piped in, and suggests the run again", async ({
     terminal: _terminal,
   }) => {
     const error = await rejectionOf(() => {
-      return ApiCall.readInput("-", RETRY);
+      return ApiCall.readInput("-");
     });
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       hint: "Pipe a body in and pass --input -, or pass --input <path>.",
-      nextCommands: [{ id: "setup" }],
+      retry: { with: { input: "<path>" }, without: ["field"] },
     });
   });
 });
