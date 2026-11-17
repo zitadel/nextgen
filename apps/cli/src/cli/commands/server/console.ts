@@ -74,6 +74,16 @@ export default class Console extends LocalServerCommand(ServerCommand(BaseComman
     );
   }
 
+  /**
+   * Before the flags are parsed this command names no server: the one it is
+   * about is read from the folder, by `sourceOf`, once they are.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
+
   protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
     // With no local server started here, the server `--server` or the project
     // names, when it is not on this machine, has only its own console to open.

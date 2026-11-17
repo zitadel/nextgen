@@ -348,12 +348,24 @@ export abstract class AuthMethodCommand extends Destructive(ServerCommand(Enviro
   };
 
   /**
-   * Legacy: `--server` is accepted and ignored, so the run names no server.
+   * Legacy: for a command that reads no environment (`meta.environment` false),
+   * `--server` is accepted and ignored, so the run names no server. One that
+   * reads an environment (`sso enable`) resolves it as every command does.
    *
-   * @returns No server.
+   * @param cwd - The directory the run addresses.
+   * @param serverFlag - What `--server` was given, if it was.
+   * @returns The run's server.
    */
-  protected override async resolveServer(): Promise<string> {
-    return "";
+  protected override async resolveServer(
+    cwd: string,
+    serverFlag: string | undefined,
+  ): Promise<string> {
+    const { meta } = this.constructor as typeof AuthMethodCommand;
+    if (meta.environment === false) {
+      return "";
+    } else {
+      return super.resolveServer(cwd, serverFlag);
+    }
   }
 
   static override meta = {

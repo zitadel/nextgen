@@ -157,6 +157,16 @@ export default class Doctor extends Destructive(LocalServerCommand(ServerCommand
     return hostedServer ?? LocalRuntime.urlOf(port);
   }
 
+  /**
+   * Before the flags are parsed this command names no server: the one it is
+   * about is read from the folder, by `sourceOf`, once they are.
+   *
+   * @returns No server.
+   */
+  protected override async resolveServer(): Promise<string> {
+    return "";
+  }
+
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
     const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
     const nearest = await this.started.of(cwd);

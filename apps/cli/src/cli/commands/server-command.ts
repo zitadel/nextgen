@@ -119,22 +119,14 @@ export function ChoosingServerCommand<
 >(Base: TBase) {
   abstract class ServerChoosing extends Promptable(ServerCommand(Base)) {
     /**
-     * Resolves `--server` when it was given, and nothing when it was not: the
-     * person is asked for the server instead.
+     * Resolves nothing before the person is asked: the run's `source` stays
+     * empty, as it does for a command that names no server, and
+     * {@link serverOrAsk} resolves `--server` when it was given.
      *
-     * @param cwd - The directory the run addresses.
-     * @param serverFlag - What `--server` was given, if it was.
-     * @returns The run's server, or none.
+     * @returns No server.
      */
-    protected override async resolveServer(
-      cwd: string,
-      serverFlag: string | undefined,
-    ): Promise<string> {
-      if (serverFlag === undefined) {
-        return "";
-      } else {
-        return super.resolveServer(cwd, serverFlag);
-      }
+    protected override async resolveServer(): Promise<string> {
+      return "";
     }
 
     /**
@@ -147,8 +139,9 @@ export function ChoosingServerCommand<
      * @throws {ZitadelError} When the answer is not a server, or no one can be asked.
      */
     protected async serverOrAsk(retry: SuggestedCommand): Promise<string> {
-      if (this.meta.serverFlag) {
-        return this.meta.source;
+      const { cwd, serverFlag } = this.meta;
+      if (serverFlag) {
+        return (await ZitadelRuntime.resolve({ cwd, serverFlag })).value;
       } else {
         return this.ask.text({
           name: "server",

@@ -31,9 +31,10 @@ in [`apps/cli/AGENTS.md`](../../../../AGENTS.md).
 - `localServers()` is the test seam for the machine's process list. It lives
   here and not in `BaseCommand` because only these commands ask it.
 - It sets no group and takes no `--server`: each command declares its own
-  `group`, and one that reads `--server` wraps `ServerCommand` inside it. The
-  commands that only accept `--server` and ignore it (`start`, `stop`, `logs`,
-  `reset`) say so on `resolveServer`.
+  `group`, and one that reads `--server` wraps `ServerCommand` inside it. Each
+  names no server before its flags are parsed (`resolveServer` returns none),
+  because its server is the one its folder started, which `sourceOf` reads; for
+  `start`, `stop`, `logs` and `reset` `--server` is accepted and ignored.
 - `status` is the one command about this server that does not extend it: it
   also reads the project's environment, so it extends
   `ServerCommand(EnvironmentCommand)`.
