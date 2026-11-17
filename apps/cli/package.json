@@ -157,6 +157,7 @@
     "ajv": "catalog:",
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
+    "fs-extra": "catalog:",
     "fastest-levenshtein": "catalog:",
     "ignore": "^7.0.14",
     "is-wsl": "catalog:",
@@ -178,6 +179,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/fs-extra": "catalog:",
     "@types/node": "catalog:",
     "@types/semver": "catalog:",
     "@types/wrap-ansi": "^3.0.0",

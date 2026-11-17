@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -64,6 +65,9 @@ func TestConfigMemoryUsesUniqueName(t *testing.T) {
 
 func TestConnectTightensFilePermissions(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes: it reports every file as 0666 and ignores chmod")
+	}
 
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "zitadel.db")
@@ -89,6 +93,9 @@ func TestConfigPathURIEscapesMetacharacters(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			if runtime.GOOS == "windows" && strings.ContainsAny(tc.dir, "?*<>|:\"") {
+				t.Skip("Windows does not allow this character in a directory name")
+			}
 			root := t.TempDir()
 			dir := filepath.Join(root, tc.dir)
 			require.NoError(t, os.MkdirAll(dir, 0o700))
