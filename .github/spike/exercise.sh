@@ -149,6 +149,14 @@ for fw in vue svelte next; do
   cd "$RUNNER_TEMP/host"
 done
 
+# --- 8. Teardown ---
+pkill -f vite 2>/dev/null || true
+cd "$RUNNER_TEMP/host"
+t "stop" z stop
+t "reset --force" z reset --force
+t "start after reset" z start --non-interactive
+t "stop (final)" z stop
+
 # --- 7c. Port in use, free-port fallback and shutdown hygiene ---
 mkdir -p "$RUNNER_TEMP/ports" && cd "$RUNNER_TEMP/ports"
 node -e 'require("net").createServer().listen(8080,"127.0.0.1");require("net").createServer().listen(8080,"::");setInterval(()=>{},1000)' > /dev/null 2>&1 &
@@ -172,14 +180,6 @@ if [ -n "$WAL" ]; then
 else PASS=$((PASS+1)); echo "| PASS | stop leaves no pending SQLite WAL | - |" >> "$OUT"; fi
 kill "$BLOCKER" 2>/dev/null || true
 cd "$RUNNER_TEMP"
-
-# --- 8. Teardown ---
-pkill -f vite 2>/dev/null || true
-cd "$RUNNER_TEMP/host"
-t "stop" z stop
-t "reset --force" z reset --force
-t "start after reset" z start --non-interactive
-t "stop (final)" z stop
 
 {
   echo "## CLI findings on $RUNNER_OS"; echo; echo "Passed: $PASS, failed: $FAIL"; echo
