@@ -1,7 +1,6 @@
 import type { EnableServices, Fact } from "@/cli/commands/auth-method/sso/enable/shared";
-import { log } from "@/lib/log";
+import { log, warnings } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { reportWarning } from "@/lib/warnings";
 import { WizardStep } from "@/lib/wizard";
 
 /**
@@ -52,7 +51,9 @@ export class WriteFiles extends WizardStep<"write", Fact<"written">, Needs> {
     this.deps.report(needs.change);
     const endpointIssuer = needs.given.endpoints?.issuer;
     if (endpointIssuer !== undefined && endpointIssuer !== needs.provider.issuer) {
-      reportWarning(`${needs.provider.displayName} points at ${endpointIssuer}, not the provider`);
+      warnings.report(
+        `${needs.provider.displayName} points at ${endpointIssuer}, not the provider`,
+      );
     }
     if (written.length === 0 && needs.change.notices.length === 0) {
       log.info(

@@ -581,6 +581,11 @@ type ListDeploymentsParams struct {
 	// Narrows the list to the deployments that targeted this origin, given exactly as the deployment
 	// records it. An origin no deployment targeted answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments of this release: the `id` that `createRelease`
+	// (`POST /releases`) returns or `listReleases` (`GET /releases`) lists. A release with nothing to
+	// list, one never deployed, one no longer served with `live=true`, or one of another project, answers
+	// an empty list, not an error.
+	ReleaseID OptReleaseID `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
@@ -708,10 +713,12 @@ type ListInvitationsParams struct {
 	// previous response. Omit to start from the beginning. Its format is opaque and may change between
 	// releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// Only invitations with this status.
-	Status OptInvitationStatus `json:",omitempty,omitzero"`
+	// Only invitations with this status. Repeat the parameter to match any of several statuses.
+	Status []InvitationStatus `json:",omitempty"`
 	// Only invitations of this type.
 	Type OptListInvitationsType `json:",omitempty,omitzero"`
+	// Related objects to embed on each returned invitation.
+	Expand []InvitationExpand `json:",omitempty"`
 }
 
 // ListMyIdentityLinksParams is parameters of listMyIdentityLinks operation.

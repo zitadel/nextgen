@@ -62,6 +62,7 @@ scopes:
   - build
   - ci
   - deps
+  - deps-dev # Dependabot's scope when every package it bumps is a devDependency
   - i18n
   - integration
   - perf

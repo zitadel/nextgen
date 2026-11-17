@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Credential } from "@/lib/backend";
 import { NotFoundError } from "@/lib/backend/errors";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
-import { takeReportedWarnings } from "@/lib/warnings";
+import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
 import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
@@ -325,7 +325,7 @@ const SIGN_UP_ONLY_COLLECTS: JsonObject = {
 const LISTED_METHODS = ["password", "passkey"] as const;
 
 beforeEach(() => {
-  takeReportedWarnings();
+  warnings.take();
 });
 
 /**
@@ -337,7 +337,12 @@ beforeEach(() => {
  */
 async function everythingSaid(context: StepContext): Promise<readonly string[]> {
   const result = await lockoutStep.run(context);
-  return [...(result?.lockouts ?? []), ...takeReportedWarnings()];
+  return [
+    ...(result?.lockouts ?? []).map((lockout) => {
+      return lockout.message;
+    }),
+    ...warnings.take(),
+  ];
 }
 
 describe("lockoutStep", () => {
@@ -360,14 +365,18 @@ describe("lockoutStep", () => {
       const result = await lockoutStep.run(context());
 
       expect(result?.lockouts).toEqual([
-        expect.stringContaining('1 of 1 existing user of "human-user" has no "username"'),
+        expect.objectContaining({
+          message: expect.stringContaining(
+            '1 of 1 existing user of "human-user" has no "username"',
+          ),
+        }),
       ]);
     });
 
     it("does not only warn about them", async () => {
       await lockoutStep.run(context());
 
-      expect(takeReportedWarnings()).toEqual([]);
+      expect(warnings.take()).toEqual([]);
     });
   });
 
@@ -391,9 +400,7 @@ describe("lockoutStep", () => {
     it("warns that the check did not finish", async () => {
       await lockoutStep.run(context());
 
-      expect(takeReportedWarnings()).toEqual([
-        expect.stringContaining("Could not finish checking"),
-      ]);
+      expect(warnings.take()).toEqual([expect.stringContaining("Could not finish checking")]);
     });
   });
 
@@ -419,7 +426,7 @@ describe("lockoutStep", () => {
       ]);
     });
 
-    it("tells the reader to move each user to the revision that defines the identifier", async () => {
+    it("hands back the update that moves each user to the revision that defines the identifier", async () => {
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "username") },
@@ -428,32 +435,23 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
       });
 
-      const said = await everythingSaid(context);
+      const result = await lockoutStep.run(context);
 
-      expect(said).toEqual([
-        expect.stringContaining(
-          "user update '<user_id>' --schema '<revision_id>' --set 'attributes.username=<value>'",
-        ),
+      expect(result?.lockouts).toEqual([
+        {
+          message: expect.stringMatching(
+            /Move each user to the schema revision that defines it.* update$/,
+          ),
+          fix: {
+            id: "user:update",
+            args: { id: "<user_id>" },
+            flags: { schema: "<revision_id>", set: "attributes.username=<value>" },
+          },
+        },
       ]);
     });
 
-    it("builds the recovery command with the deployment's environment selector", async () => {
-      const context = aStepContext({
-        config: aConfig({
-          schemas: { "1.json": signingInWith("human-user", "username") },
-          flows: { "1.json": aLoginFlow({ collects: ["username"] }) },
-        }),
-        client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
-      });
-
-      const said = await everythingSaid(context);
-
-      expect(said).toEqual([
-        expect.stringContaining("--set 'attributes.username=<value>' --env staging"),
-      ]);
-    });
-
-    it("suggests the dot-path form for a dotted identifier", async () => {
+    it("hands back the dot-path form for a dotted identifier", async () => {
       const context = aStepContext({
         config: aConfig({
           schemas: { "1.json": signingInWith("human-user", "account.handle") },
@@ -462,9 +460,15 @@ describe("lockoutStep", () => {
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
       });
 
-      const said = await everythingSaid(context);
+      const result = await lockoutStep.run(context);
 
-      expect(said).toEqual([expect.stringContaining("--set 'attributes.account.handle=<value>'")]);
+      expect(result?.lockouts).toEqual([
+        expect.objectContaining({
+          fix: expect.objectContaining({
+            flags: expect.objectContaining({ set: "attributes.account.handle=<value>" }),
+          }),
+        }),
+      ]);
     });
 
     it("does not read an inherited property as the identifier", async () => {

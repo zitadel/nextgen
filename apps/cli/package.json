@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -36,7 +36,7 @@
       "target": "./dist/index.mjs",
       "identifier": "COMMANDS"
     },
-    "helpClass": "./dist/lib/oclif/help",
+    "helpClass": "./dist/cli/help",
     "hooks": {
       "command_not_found": "./dist/hooks/command-not-found",
       "finally": "./dist/hooks/version-notice"
@@ -92,6 +92,9 @@
       },
       "origin": {
         "description": "Manage the project's allowed origins."
+      },
+      "invitation": {
+        "description": "Invite people into the project with a link."
       },
       "release": {
         "description": "Build and manage releases."
@@ -158,8 +161,8 @@
     "ignore": "^7.0.14",
     "is-wsl": "catalog:",
     "jsonc-parser": "catalog:",
-    "magicast": "^0.5.3",
-    "mixpanel": "^0.18.1",
+    "magicast": "^0.5.5",
+    "mixpanel": "^0.24.0",
     "open": "catalog:",
     "p-reduce": "catalog:",
     "p-retry": "catalog:",
@@ -170,7 +173,7 @@
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
     "sort-keys": "catalog:",
-    "undici": "^7.30.1",
+    "undici": "^7.30.2",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:"
   },

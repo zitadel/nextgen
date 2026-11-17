@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/fixtures";
 
 type RunCapture = (
   command: string,
@@ -47,8 +48,6 @@ type ServerBuildModule = {
   }) => string;
 };
 
-const tempDirs: string[] = [];
-
 async function loadModule(): Promise<ServerBuildModule> {
   return (await import(
     new URL("../../../../../scripts/server-build.mjs", import.meta.url).href
@@ -60,18 +59,9 @@ function goListStub(importPath = "github.com/zitadel/nextgen/internal/build"): R
   return async () => ({ stdout: `${importPath}\n` });
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("server build metadata", () => {
-  it("builds a source binary and writes matching sidecar metadata", async () => {
+  it("builds a source binary and writes matching sidecar metadata", async ({ dir: repoRoot }) => {
     const { buildLocalServer, readServerBuildMetadata } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-build-"));
-    tempDirs.push(repoRoot);
     const output = join(repoRoot, "dist/server/nextgen");
     const calls: Array<{ command: string; args: string[] }> = [];
 
@@ -118,10 +108,10 @@ describe("server build metadata", () => {
     await expect(readFile(built.metadataPath, "utf8")).resolves.toMatch(/\n$/);
   });
 
-  it("creates the metadata directory when it sits outside the binary's own", async () => {
+  it("creates the metadata directory when it sits outside the binary's own", async ({
+    dir: repoRoot,
+  }) => {
     const { buildLocalServer, readServerBuildMetadata } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-build-meta-"));
-    tempDirs.push(repoRoot);
     const commands: string[] = [];
 
     const built = await buildLocalServer({

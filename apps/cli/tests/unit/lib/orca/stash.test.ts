@@ -1,12 +1,13 @@
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { LocalRuntime } from "@/lib/server";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { Orca } from "@/lib/orca";
 import type { Detector } from "@/lib/orca";
 import type { Scaffolder } from "@/lib/orca/scaffolders/types";
+import { it } from "@tests/fixtures";
 
 // Real file system calls, with `rename` replaceable per test: the stash moves
 // each entry aside by renaming it.
@@ -15,10 +16,8 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return { ...actual, rename: vi.fn(actual.rename) };
 });
 
-const dirs: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   vi.mocked(rename).mockClear();
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe("Orca.scaffold stash", () => {
@@ -45,11 +44,9 @@ describe("Orca.scaffold stash", () => {
     canScaffold: (framework) => framework === "fake",
     scaffold,
   };
-  const orca = new Orca([fakeDetector], [fakeScaffolder], []);
+  const orca = new Orca([fakeDetector], [fakeScaffolder], [], LocalRuntime.DIR);
 
-  it("puts back what it moved when moving an entry aside fails", async () => {
-    const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-stash-"));
-    dirs.push(parent);
+  it("puts back what it moved when moving an entry aside fails", async ({ dir: parent }) => {
     const cwd = join(parent, "my-zitadel-app");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 type CheckChangesetsStatusModule = {
   checkChangesetsStatus: (options: {
@@ -597,20 +597,12 @@ describe("release publish guard", () => {
 
   it("merges overrides onto the process env for the publish step", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
-    const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
-    process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
-    try {
-      const env = releasePublishEnv({ ZITADEL_RELEASE_TEST_OVERRIDE: "included" });
+    vi.stubEnv("ZITADEL_RELEASE_TEST_BASE", "preserved");
 
-      expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
-      expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
-    } finally {
-      if (originalBase === undefined) {
-        delete process.env.ZITADEL_RELEASE_TEST_BASE;
-      } else {
-        process.env.ZITADEL_RELEASE_TEST_BASE = originalBase;
-      }
-    }
+    const env = releasePublishEnv({ ZITADEL_RELEASE_TEST_OVERRIDE: "included" });
+
+    expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
+    expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
   });
 });
 

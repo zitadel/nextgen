@@ -8,7 +8,7 @@ import { z } from "zod";
 import { COMMANDS, NO_PLURAL } from "@/index";
 import { aliasedCommands, pluralAliasOf } from "@/lib/oclif/plural-aliases";
 import { COLLECTION_PLURALS } from "@tests/helpers/collections";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 

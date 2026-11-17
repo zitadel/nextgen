@@ -228,9 +228,8 @@ var webhookByEventType = map[string]webhookDoc{
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
 	"invitation.accepted": {description: "An invitation was accepted. The grant events the acceptance writes " +
 		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{event_id}`) returns; there are " +
-		"none when the user already holds an identical active grant.",
-		status: statusContracted},
-	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
+		"none when the user already holds an identical active grant."},
+	"invitation.rejected": {description: "An invitation was declined."},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
 		"or an unaccepted one was deleted by its replacement."},
 

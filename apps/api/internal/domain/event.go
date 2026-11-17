@@ -205,7 +205,7 @@ func WrittenEventTypes() []EventType {
 		EventTypeAuthzGranted, EventTypeAuthzRevoked,
 		EventTypeAuthFactorPasswordSet, EventTypeAuthFactorPasskeyEnrolled,
 		EventTypeApplicationCreated, EventTypeApplicationUpdated,
-		EventTypeInvitationCreated, EventTypeInvitationCancelled,
+		EventTypeInvitationCreated, EventTypeInvitationAccepted, EventTypeInvitationRejected, EventTypeInvitationCancelled,
 		EventTypeWebhookCreated, EventTypeWebhookUpdated, EventTypeWebhookDeleted, EventTypeWebhookSecretRotated,
 	}
 }

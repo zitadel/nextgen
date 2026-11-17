@@ -167,7 +167,7 @@ describe("projects screen", () => {
     // Projects is the root's: it holds the root, not the project it was
     // opened from, and the pill names the root (D44). The list is every
     // project's, so no row is singled out.
-    const pill = screen.getByRole("button", { name: "Switch project" });
+    const pill = screen.getByRole("button", { name: /^Switch project/ });
     await waitFor(() => expect(pill).toHaveTextContent("All projects"));
     expect(pill).not.toHaveTextContent("Delta");
     expect(table.queryByText("Current")).not.toBeInTheDocument();
@@ -640,7 +640,7 @@ describe("projects screen", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    expect(await screen.findByRole("button", { name: "Switch project" })).toHaveTextContent(
+    expect(await screen.findByRole("button", { name: /^Switch project/ })).toHaveTextContent(
       "All projects",
     );
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/projects");

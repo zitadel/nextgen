@@ -1,9 +1,10 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { CommandGroups } from "@/cli/commands/groups";
+import { type Admitted, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { inventoryCell, variableCell } from "@/lib/variables";
+import { VariableView } from "@/lib/variable";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -20,7 +21,8 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
  */
 export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.projectSettings;
+  static override groupOrder = 4;
 
   static override examples = [
     "<%= config.bin %> variable list",
@@ -45,7 +47,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
         variable_count: items.length,
       });
       const rows = items.map((item) => {
-        return variableCell(item);
+        return VariableView.of(item).cell();
       });
       const columns = PREVIEW_COLUMNS;
       const empty = "No preview variables found";
@@ -70,7 +72,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
       variable_count: items.length,
     });
     const rows = items.map((item) => {
-      return inventoryCell(item);
+      return VariableView.of(item).inventoryCell();
     });
     const columns = COLUMNS;
     const empty = "No variables found";

@@ -1,4 +1,3 @@
-import { LocalServer } from "@/lib/local-server/server";
 import { WizardStep } from "@/lib/wizard";
 
 import type { Fact, PromptContext, SetupAnswers, SetupServices } from "@/cli/commands/setup/shared";
@@ -14,7 +13,7 @@ type Needs = Fact<"flags" | "orca" | "app" | "scaffoldedFramework" | "answers">;
  */
 type Deps = Pick<
   SetupServices,
-  "ask" | "cwd" | "dryRun" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
+  "ask" | "cwd" | "dryRun" | "machine" | "nonInteractive" | "serverFlag" | "suggest" | "ui"
 >;
 
 /**
@@ -82,10 +81,12 @@ export class ChooseDevPort extends WizardStep<"devPort", Fact<"answers">, Needs>
    * @returns The answers, with the port settled.
    */
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    if (ctx.devPortFromFlag || (await LocalServer.isPortFree(answers.devPort))) {
+    if (ctx.devPortFromFlag || (await this.deps.machine.isPortFree(answers.devPort))) {
       return answers;
     }
-    const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
+    const suggested = String(
+      (await this.deps.machine.nextFreePort(answers.devPort)) ?? answers.devPort,
+    );
     return {
       ...answers,
       devPort: await ctx.ask.text({

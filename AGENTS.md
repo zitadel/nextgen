@@ -18,7 +18,7 @@ conflict.
 | `apps/api/api/openapi/` | OpenAPI source of the wire contract | [openapi](apps/api/api/openapi/AGENTS.md) |
 | `apps/` | deployable apps | [apps](apps/AGENTS.md) |
 | `apps/server/`, `apps/server-*/` | `@zitadel/server`'s Go tasks, run against `apps/api`; the `@zitadel/server` npm binaries | — |
-| `apps/cli/` | the `zitadel` CLI | [cli](apps/cli/AGENTS.md), [tests](apps/cli/tests/AGENTS.md), [local server](apps/cli/src/lib/local-server/AGENTS.md) |
+| `apps/cli/` | the `zitadel` CLI | [cli](apps/cli/AGENTS.md), [tests](apps/cli/tests/AGENTS.md), [server package](apps/cli/src/lib/server/AGENTS.md), [local server](apps/cli/src/lib/server/local/AGENTS.md) |
 | `apps/console/` | the SPA the server embeds | [console](apps/console/AGENTS.md) |
 | `apps/cloud-console/` | the hosted cloud's add-on to the console | [cloud-console](apps/cloud-console/AGENTS.md) |
 | `apps/cloud-functions/` | the hosted cloud's backend: RPC, bot check, webhooks, workflows | [cloud-functions](apps/cloud-functions/AGENTS.md) |

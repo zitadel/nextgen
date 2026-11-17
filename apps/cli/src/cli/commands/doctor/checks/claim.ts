@@ -1,7 +1,8 @@
-import { CLAIM_WINDOW_DAYS, claimState, FRESH_DIRECTORY } from "@/lib/claim-state";
-import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
+import { Claim } from "@/lib/claim";
+import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { Project } from "@/lib/project";
 
 /**
  * Reports whether the project is attached to a team, reading `claimed_at` and
@@ -24,14 +25,17 @@ export class ClaimCheck implements SanityCheck {
   readonly path = ".zitadel/secret";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const state = await readZitadelSecret(ctx.cwd)
+    const state = await Project.at(ctx.cwd)
+      .secret()
       .then(async (secret) => {
-        return claimState({
-          secret,
+        return Claim.state({
+          secret: secret.data,
           // From `zitadel.json`, not the command's own source: `doctor` pins its
           // source to the local runtime URL, so asking it where the project lives
           // would report every project as local.
-          server: readProjectServer(await readZitadelConfig(ctx.cwd)),
+          cloud: ZitadelRuntime.fromUrl(
+            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+          ).isCloud(),
         });
       })
       .catch(() => {
@@ -58,13 +62,13 @@ export class ClaimCheck implements SanityCheck {
       // record may be stale and the server answers authoritatively.
       const claim = ctx.suggest({ id: "claim" });
       const message = state.claimable
-        ? `Claim your project within ${CLAIM_WINDOW_DAYS} days of creation to make it ` +
+        ? `Claim your project within ${Claim.WINDOW_DAYS} days of creation to make it ` +
           "permanent and start collaborating with your team. Until then, your project " +
           `is temporary and its data may be lost. Run ${claim}.`
-        : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
+        : `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
           `closed. Run ${claim} to reconcile: a project claimed from another ` +
           "machine confirms its team, and one never claimed can no longer be claimed. " +
-          `${ctx.suggest({ id: "setup", flags: { cwd: FRESH_DIRECTORY } })} in a fresh directory gets you a new project you can claim.`;
+          `${ctx.suggest({ id: "setup", flags: { cwd: Claim.FRESH_DIRECTORY } })} in a fresh directory gets you a new project you can claim.`;
       return {
         name: this.name,
         status: "warn",

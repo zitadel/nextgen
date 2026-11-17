@@ -2,10 +2,10 @@ import { dedupeUnionType } from "orval";
 import { describe, expect, it } from "vitest";
 
 // orval dedupes every union it emits by splitting it on its top-level `|`.
-// Unpatched, that scan reads a quote or bracket in a member's JSDoc ("the
-// server's clock") as code, splits members in the middle, and drops the pieces
+// Before 8.48 that scan read a quote or bracket in a member's JSDoc ("the
+// server's clock") as code, split members in the middle, and dropped the pieces
 // that repeat: the event union lost its shared fields this way.
-// patches/@orval__core@8.42.0.patch makes it skip comments.
+// orval-labs/orval#4484 made it skip comments.
 describe("dedupeUnionType", () => {
   const member = (eventType: string) => `({
   /** The event's ID. */

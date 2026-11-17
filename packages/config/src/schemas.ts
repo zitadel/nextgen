@@ -327,7 +327,7 @@ export const brandingConfigSchema = z.strictObject({
   }).optional(),
   typography: PublishBrandingBody.shape.typography
     .unwrap()
-    .extend({
+    .safeExtend({
       // The spec's pattern allows a comma inside a quoted name, but the server
       // splits the stack on every comma (ValidateBrandingFontFamily), so
       // `"Acme, Inc", sans-serif` reaches it and comes back refused.
@@ -342,25 +342,6 @@ export const brandingConfigSchema = z.strictObject({
         .optional(),
       font_url: withinUrlBytes(PublishBrandingBody.shape.typography.unwrap().shape.font_url),
     })
-    .refine(
-      (value) => {
-        // `when: () => true` runs this even when the value is not an object,
-        // such as `null`, which the object check has already refused.
-        if (typeof value !== "object" || value === null) {
-          return true;
-        }
-        return (
-          value.font_url === undefined || value.font_url === "" || value.font_family !== undefined
-        );
-      },
-      {
-        message:
-          "needs a typography.font_family to load; a stylesheet alone names no face to render in",
-        path: ["font_url"],
-        // A mistake of type in another typography field must not hide it.
-        when: () => true,
-      },
-    )
     .optional(),
   $schema: z.string().optional(),
   liquid_template: z

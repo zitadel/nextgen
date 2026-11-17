@@ -1,6 +1,5 @@
-import { readZitadelSecret } from "@/lib/project";
-
 import { AbstractSanityCheck, type CheckContext } from "./types";
+import { Project } from "@/lib/project";
 
 /** Verifies `.zitadel/secret` exists and parses. */
 export class SecretCheck extends AbstractSanityCheck {
@@ -9,6 +8,6 @@ export class SecretCheck extends AbstractSanityCheck {
   protected readonly summary = ".zitadel/secret parses";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    await readZitadelSecret(ctx.cwd);
+    await Project.at(ctx.cwd).secret();
   }
 }

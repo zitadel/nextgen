@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -8,13 +7,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
-import { DEFAULT_SERVER } from "@/lib/server";
+import { ZitadelRuntime } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { scratchDir } from "@tests/fixtures/scratch";
 
 /** The platform the unit tests' msw server answers for. */
-export const PLATFORM_URL = DEFAULT_SERVER;
+export const PLATFORM_URL = ZitadelRuntime.DEFAULT;
 
 /**
  * POSTs to the mock platform as a project's secret, and returns the parsed
@@ -50,14 +50,14 @@ const Created = z.object({
 });
 
 /**
- * A Next.js app directory bound to a project through `.zitadel/secret`. The
- * caller removes it.
+ * A Next.js app directory bound to a project through `.zitadel/secret`. It is
+ * removed when the test ends.
  */
 export async function aProjectDirectory(
   prefix: string,
   project: { id: string; secret: string },
 ): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), prefix));
+  const cwd = await scratchDir(prefix);
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ framework: { id: "next" } }));
   await writeFile(
@@ -240,7 +240,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
-                targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
+                kind: "primary",
+                targets: [{ origin: PRIMARY_ORIGIN }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },
@@ -252,9 +253,8 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
               {
                 id: "dep_preview",
                 release_id: "rel_preview",
-                targets: [
-                  { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
-                ],
+                kind: "preview",
+                targets: [{ origin: "https://pr-1.acme.com" }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-02T00:00:00.000Z",
               },
@@ -266,20 +266,18 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
 }
 
 /**
- * An msw server answering as the mock platform for the calling suite, and the
- * project directories it removes after each test.
+ * An msw server answering as the mock platform for the calling suite. The
+ * directories {@link aProjectDirectory} makes are removed when their test ends.
+ *
+ * @returns The server, to add per-test handlers to with `server.use`.
  */
-export function usePlatformServer(): { server: ReturnType<typeof setupServer>; dirs: string[] } {
+export function usePlatformServer(): { server: ReturnType<typeof setupServer> } {
   const server = setupServer(...setupPlatformHandlers());
-  const dirs: string[] = [];
   beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
   afterAll(() => server.close());
-  afterEach(async () => {
+  afterEach(() => {
     server.resetHandlers();
     resetPlatformStore();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
   });
-  return { server, dirs };
+  return { server };
 }

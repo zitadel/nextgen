@@ -118,13 +118,14 @@ The path that allowed is reported with the decision, for §5.
 ### 4. Issuance is deployment configuration
 
 `platform.operators` lists the user ids that hold the relation. The server
-reconciles it at startup:
+reconciles it when it seeds: at startup, or in the `seed` command of a
+deployment that starts its servers with `--seed=false`:
 
 - It grants every listed user who exists in the platform project, and warns
   about listed ids that do not.
 - It revokes the operator assignments it granted earlier
   (`grantor_type = config`) for users no longer listed. Removing a name is
-  how operator access is withdrawn, at the next start.
+  how operator access is withdrawn, at the next seeding.
 - Both write the ordinary `authz.granted` and `authz.revoked` events in the
   platform project.
 

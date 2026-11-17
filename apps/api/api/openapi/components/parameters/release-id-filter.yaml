@@ -1,0 +1,11 @@
+name: release_id
+in: query
+required: false
+description: |
+  Narrows the list to the deployments of this release: the `id` that
+  `createRelease` (`POST /releases`) returns or `listReleases`
+  (`GET /releases`) lists. A release with nothing to list, one never
+  deployed, one no longer served with `live=true`, or one of another
+  project, answers an empty list, not an error.
+schema:
+  $ref: '../schemas/release-id.yaml'
