@@ -185,7 +185,10 @@ function InvitationsTable({
   return (
     <>
       <div className={RESOURCE_TABLE_WRAP}>
-        <Table className={RESOURCE_TABLE_FIXED}>
+        {/* Wider than the shared minimum: the fixed columns alone are 668px,
+            so at 36rem the name column had no width left and its text ran
+            under Role. This leaves it 196px before the card scrolls. */}
+        <Table className={`${RESOURCE_TABLE_FIXED} min-w-[54rem]`}>
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell>Name</ResourceHeadCell>

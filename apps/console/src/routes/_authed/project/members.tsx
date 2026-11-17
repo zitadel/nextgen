@@ -81,7 +81,7 @@ function ProjectMembersPage() {
 
   return (
     <Tabs value={tab} onValueChange={(value) => open(value as MembersTab)} className="gap-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <TabsList variant="line" aria-label="Project members">
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
