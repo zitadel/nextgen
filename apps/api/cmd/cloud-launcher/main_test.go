@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -209,9 +208,7 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 		"      private_key: "+strconv.Quote(testPEM), string(config))
 	info, err := os.Stat(configPath)
 	require.NoError(t, err)
-	if runtime.GOOS != "windows" {
-		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-	}
+	assertOwnerOnly(t, info)
 
 	assert.Equal(t, ":9090", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "the listen address follows Vercel's PORT")
 	assert.Empty(t, os.Getenv("MASTER_KEY_PEM_B64"), "the secret leaves the environment once it is on disk")

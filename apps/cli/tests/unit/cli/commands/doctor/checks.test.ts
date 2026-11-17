@@ -604,6 +604,20 @@ describe("SecretPermissionsCheck", () => {
     expect(outcome.status).toBe("pass");
   });
 
+  it("passes at 0644 on Windows, which has no modes, and says it checked only that the file exists", async ({
+    dir,
+  }) => {
+    await aNextProject(dir);
+    await chmod(join(dir, SECRET_FILE), 0o644);
+
+    const outcome = await new SecretPermissionsCheck("win32").run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("Windows has no file modes"),
+    });
+  });
+
   it("fails at 0644", async ({ dir }) => {
     await aNextProject(dir);
     await chmod(join(dir, SECRET_FILE), 0o644);
