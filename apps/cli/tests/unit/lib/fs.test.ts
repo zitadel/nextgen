@@ -5,7 +5,6 @@ import { describe, expect } from "vitest";
 
 import {
   entryExists,
-  holdsFileModes,
   isFile,
   pathExists,
   pathExistsStrict,
@@ -139,15 +138,5 @@ describe("entryExists", () => {
 
     expect(await entryExists(join(dir, "a.txt"))).toBe(true);
     expect(await entryExists(join(dir, "missing"))).toBe(false);
-  });
-});
-
-describe("holdsFileModes", () => {
-  it.each([
-    ["linux", true],
-    ["darwin", true],
-    ["win32", false],
-  ] as const)("on %s is %s", (platform, expected) => {
-    expect(holdsFileModes(platform)).toBe(expected);
   });
 });

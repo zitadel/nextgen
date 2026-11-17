@@ -112,19 +112,6 @@ export async function entryExists(path: string): Promise<boolean> {
 }
 
 /**
- * Whether the platform keeps POSIX permission bits on a file. Windows reports
- * every file as `0666` and ignores `chmod`, so no mode can be read or set there.
- * This is where the platform is asked, so callers ask this and never look at
- * `process.platform` themselves.
- *
- * @param platform - The Node.js platform name.
- * @returns `true` when a file's mode can be read and set.
- */
-export function holdsFileModes(platform: NodeJS.Platform = process.platform): boolean {
-  return platform !== "win32";
-}
-
-/**
  * A file's text, or `undefined` when it is absent or cannot be read. For a
  * report on the state of files, where one that cannot be read is shown as
  * missing instead of aborting the rest.

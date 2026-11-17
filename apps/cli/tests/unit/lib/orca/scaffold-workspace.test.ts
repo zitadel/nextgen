@@ -3,7 +3,6 @@ import { basename, dirname, join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { holdsFileModes } from "@/lib/fs";
 import { ScaffoldWorkspace } from "@/lib/orca/scaffold-workspace";
 import { it } from "@tests/fixtures";
 
@@ -74,7 +73,7 @@ describe("ScaffoldWorkspace", () => {
     expect(await workspace?.replaced()).toEqual([".env"]);
   });
 
-  it.skipIf(!holdsFileModes())("keeps the backup to its owner", async ({ dir }) => {
+  it.skipIf(process.platform === "win32")("keeps the backup to its owner", async ({ dir }) => {
     const cwd = await aProjectHolding(dir, { "a.txt": "x" });
     const workspace = await ScaffoldWorkspace.open(cwd, ["a.txt"]);
     await writeFile(join(workspace?.work ?? "", "a.txt"), "y");

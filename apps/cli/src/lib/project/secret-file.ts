@@ -1,4 +1,5 @@
-import { chmod, writeFile } from "node:fs/promises";
+import { chmod, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -43,6 +44,46 @@ export class SecretFile {
       warnings.report(
         `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
       );
+    }
+  }
+
+  /**
+   * Whether the file is owner read/write only. Where the filesystem keeps no
+   * modes (Windows, FAT), nothing more can be done to it, so it is secure.
+   *
+   * @param path - The file.
+   * @returns `true` when it is as private as its filesystem lets it be.
+   * @throws Any `stat` error, such as the file being missing.
+   */
+  static async isSecure(path: string): Promise<boolean> {
+    const mode = (await stat(path)).mode & 0o777;
+    return mode === SECRET_MODE || !(await SecretFile.keepsModes(dirname(path)));
+  }
+
+  /**
+   * Makes the file owner read/write only, as far as its filesystem allows.
+   *
+   * @param path - The file.
+   */
+  static secure(path: string): Promise<void> {
+    return SecretFile.enforceMode(path, SECRET_MODE);
+  }
+
+  /**
+   * Whether a file made in `dir` keeps the mode it is given, found by trying
+   * one, so it needs no list of the platforms and filesystems that do not.
+   * A directory that cannot be tried in is taken to keep modes.
+   */
+  private static async keepsModes(dir: string): Promise<boolean> {
+    const probe = join(dir, `.mode-probe-${String(process.pid)}`);
+    try {
+      await writeFile(probe, "", { mode: SECRET_MODE });
+      await chmod(probe, 0o640);
+      return ((await stat(probe)).mode & 0o777) === 0o640;
+    } catch {
+      return true;
+    } finally {
+      await rm(probe, { force: true });
     }
   }
 

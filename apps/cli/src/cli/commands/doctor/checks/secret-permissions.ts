@@ -1,43 +1,24 @@
-import { chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { holdsFileModes } from "@/lib/fs";
+import { SecretFile } from "@/lib/project/secret-file";
 
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
-/**
- * Verifies `.zitadel/secret` is locked down to `0600`, and re-locks it on fix.
- * Windows has no file modes, so there it only checks that the file exists and
- * says so.
- */
+/** Verifies `.zitadel/secret` is owner-only, and secures it on fix. */
 export class SecretPermissionsCheck extends AbstractSanityCheck {
   readonly name = "secret-permissions";
   readonly path = ".zitadel/secret";
-  protected readonly summary: string;
-  private readonly keepsModes: boolean;
-
-  /**
-   * @param keepsModes - Whether files here hold modes; only tests pass it.
-   */
-  constructor(keepsModes = holdsFileModes()) {
-    super();
-    this.keepsModes = keepsModes;
-    this.summary = this.keepsModes
-      ? ".zitadel/secret has 0600 permissions"
-      : ".zitadel/secret exists (Windows has no file modes to check)";
-  }
+  protected readonly summary = ".zitadel/secret is owner-only";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const mode = (await stat(join(ctx.cwd, ".zitadel/secret"))).mode & 0o777;
-    if (this.keepsModes && mode !== 0o600) {
-      throw new Error(`expected 0600, got ${mode.toString(8)}`);
+    if (!(await SecretFile.isSecure(join(ctx.cwd, this.path)))) {
+      throw new Error(".zitadel/secret can be read by others; expected 0600");
     }
   }
 
   override async fix(ctx: CheckContext): Promise<void> {
-    if (ctx.dryRun) {
-      return;
+    if (!ctx.dryRun) {
+      await SecretFile.secure(join(ctx.cwd, this.path));
     }
-    await chmod(join(ctx.cwd, ".zitadel/secret"), 0o600);
   }
 }
