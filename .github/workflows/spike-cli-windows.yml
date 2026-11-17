@@ -11,7 +11,15 @@ on:
 
 jobs:
   windows:
-    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            binary: server-win32-x64
+          - os: ubuntu-24.04
+            binary: server-linux-x64
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
       run:
@@ -37,10 +45,10 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Build the CLI and the Windows server binary from this ref
+      - name: Build the CLI and the server binary from this ref
         run: |
           corepack pnpm exec turbo run build --filter=@zitadel/cli
-          corepack pnpm exec turbo run build-binary --filter=@zitadel/server-win32-x64 --output-logs=errors-only
+          corepack pnpm exec turbo run build-binary --filter=@zitadel/${{ matrix.binary }} --output-logs=errors-only
 
       - name: Exercise the CLI
         run: bash .github/spike/exercise.sh
@@ -48,7 +56,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: windows-findings
+          name: findings-${{ runner.os }}
           path: |
             ${{ runner.temp }}/summary.md
             ${{ runner.temp }}/dev.log
