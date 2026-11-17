@@ -377,7 +377,10 @@ describe("CLI telemetry against the catalog", () => {
   it("sends exactly the properties the catalog lists on each product event", async () => {
     const catalog = await loadCatalog();
     const { events } = cliOf(catalog);
-    const base = [...Object.keys(commandEventProperties(meta(), "invocation-1")), ...STAMPED];
+    const base = [
+      ...Object.keys(commandEventProperties(meta(), "cloud", "invocation-1")),
+      ...STAMPED,
+    ];
     for (const { command, event, keys } of await trackedEvents()) {
       const definition = events[event];
       expect(definition?.status, `${command} sends ${event}, not in the catalog as emitted`).toBe(

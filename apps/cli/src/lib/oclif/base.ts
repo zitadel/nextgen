@@ -621,7 +621,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }
     this.telemetry.track(
       event,
-      commandEventProperties(this.meta, this.telemetryInvocationId, properties),
+      commandEventProperties(
+        this.meta,
+        ZitadelRuntime.fromUrl(this.meta.source).kind,
+        this.telemetryInvocationId,
+        properties,
+      ),
     );
   }
 
