@@ -61,6 +61,8 @@ type Harness struct {
 	keyService            dependency[service.KeyService]
 	variableService       dependency[service.VariableService]
 	tokenService          dependency[service.TokenService]
+	grantService          dependency[*service.GrantService]
+	invitationService     dependency[*service.InvitationService]
 
 	schemaStore     dependency[domain.JSONSchemaStore]
 	schemaResolver  dependency[*domain.JSONSchemaResolver]

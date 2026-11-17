@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { LocalRuntime } from "@/lib/server";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -75,6 +76,7 @@ function baseContext(frameworkId: string, overrides: Partial<PatchContext> = {})
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
+    defaultServer: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.17",
     ...overrides,
   } as PatchContext;
@@ -99,7 +101,7 @@ const ALL_FRAMEWORK_IDS = detectors.map((detector) => detector.framework);
  * cannot be left out of the corpus by a hand-kept list.
  */
 function plannedByFramework(frameworkId: string) {
-  const patcher = createOrca().patcherFor(frameworkId) as AbstractRulePatcher;
+  const patcher = createOrca(LocalRuntime.DIR).patcherFor(frameworkId) as AbstractRulePatcher;
   const writes: string[] = [];
   const dependencies = new Set<string>();
   for (const posture of [undefined, "page", "widget"] as const) {

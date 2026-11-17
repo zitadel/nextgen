@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Shield } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
 import {
   DETAIL_BODY,
   DETAIL_VALUE,
@@ -37,7 +35,7 @@ export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
     // "Used by" has no API: it is every schema and flow whose latest revision
     // names the slug, read from the full lists.
     const [idp, schemas, flows] = await Promise.all([
-      api.getIdpById(params.idpId, { project_id: projectId }),
+      api.getIdp(params.idpId, { project_id: projectId }),
       fetchAllSchemas(projectId),
       fetchAllFlows(projectId),
     ]);
@@ -64,15 +62,21 @@ function IdpDetail() {
   return (
     <Page>
       <DetailHeader
-        icon={Shield}
-        title={idp.definition.display_name}
-        meta={
-          <>
-            <MetaValue label="Connection ID" value={idp.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(idp.created_at)} />
-          </>
+        // Authentication's tab, which the sidebar does not list on its own.
+        parent={
+          <Link
+            to="/authentication"
+            search={{ tab: "identity-providers" }}
+            className="hover:text-foreground transition-colors"
+          >
+            Identity providers
+          </Link>
         }
+        title={idp.definition.display_name}
+        meta={[
+          { label: "Connection ID", value: idp.id, copyable: true },
+          { label: "Created", value: formatDate(idp.created_at) },
+        ]}
       />
 
       <DetailSection title="Provider details" className={DETAIL_BODY}>

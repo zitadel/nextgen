@@ -75,7 +75,7 @@ export function sessionCookieName(projectId: string, url?: string | URL): string
 const MAX_FLOW_STEPS = 6;
 
 export interface MintSessionOptions {
-  /** Forwarded to `POST /flow`; the project's default flow when omitted. */
+  /** Forwarded to `POST /flows`; the project's default flow when omitted. */
   flowDefinitionName?: string;
   /** Origin header for flow calls (the project's origin check enforces it). */
   origin?: string;
@@ -104,7 +104,7 @@ export async function mintSession(
   const jar = new FlowCookieJar();
   const origin = options.origin;
 
-  let response = await flowFetch(handle, jar, origin, "/flow", {
+  let response = await flowFetch(handle, jar, origin, "/flows", {
     project_id: context.projectId,
     purpose: "login",
     ...(options.flowDefinitionName ? { flow_definition_name: options.flowDefinitionName } : {}),
@@ -134,7 +134,7 @@ export async function mintSession(
       handle,
       jar,
       origin,
-      `/flow/${encodeURIComponent(response.id)}/submit`,
+      `/flows/${encodeURIComponent(response.id)}/submit`,
       {
         session_token: response.session_token,
         action: "submit",

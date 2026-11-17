@@ -78,7 +78,7 @@ flowchart TD
 ## Walk-through
 
 ### Path A — known user logs in
-1. `POST /flow` with `purpose: login` → `identifier` step.
+1. `POST /flows` with `purpose: login` → `identifier` step.
 2. Submit `email`. Engine resolves the user, transitions to `password`.
 3. Submit `password`. Engine verifies, transitions to `done`, issues handoff.
 
@@ -98,7 +98,7 @@ flowchart TD
 3. User fills the remaining profile fields and continues as Path B.
 
 ### Path D — known user starts register, gets routed to login
-1. `POST /flow` with `purpose: register` → `register-identifier` step.
+1. `POST /flows` with `purpose: register` → `register-identifier` step.
 2. Submit an `email` that exists. Engine emits `user_already_exists`, flips
    to `login`, routes to `password`.
 3. User enters their existing password and completes.

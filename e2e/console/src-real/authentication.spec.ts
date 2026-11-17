@@ -35,7 +35,8 @@ test("lists a connection with its schemas and opens its detail", async ({
 
   await row.getByRole("link", { name: CONNECTION.display_name }).click();
   await expect(page.getByRole("heading", { name: CONNECTION.display_name })).toBeVisible();
-  await expect(page.getByText(created.id, { exact: true })).toBeVisible();
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(created.id, { exact: true })).toBeVisible();
   await expect(page.getByText(CONNECTION.slug, { exact: true })).toBeVisible();
   // A `${{ VAR }}` reference is shown as written, not resolved.
   await expect(page.getByText("${{ E2E_CLIENT_ID }}", { exact: true })).toBeVisible();

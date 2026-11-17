@@ -20,7 +20,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	f := newIdpFixture(t)
 	f.create(t, helpers.OIDCConnection("google"))
 
-	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+	defResp, err := f.client.PublishFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: ssoLoginFlowDefinition(apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)),
 	})
@@ -46,15 +46,15 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	f.revise(t, renamed)
 
 	stepResp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{
-		ID:    flowHeaders.Response.ID,
-		Zflow: mustExtractZflow(t, flowHeaders.SetCookie),
+		FlowID: flowHeaders.Response.ID,
+		Zflow:  mustExtractZflow(t, flowHeaders.SetCookie),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
 	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google", Template: ""}}, stepResp.(*api.FlowResponseHeaders).Response.Step.SSOProviders,
 		"a revision reaches a flow only through a deployed release")
 
-	getResp, err := f.client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: definitionID})
+	getResp, err := f.client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{FlowDefinitionID: definitionID})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, getResp, helpers.MustMarshal(t, getResp))
 	require.Equal(t, []string{"google"}, getResp.(*api.FlowDefinitionResponse).FlowDefinition.Steps[0].SSOProviders,

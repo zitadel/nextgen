@@ -1,6 +1,6 @@
 import type { Properties } from "mixpanel";
 
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 
 import { Outbox } from "./outbox";
 import { type TelemetrySink, trace } from "./sink";
@@ -69,7 +69,7 @@ export class VercelSink implements TelemetrySink {
           // `x-va-server` is what `@vercel/analytics/server` sends.
           headers: {
             "content-type": "application/json",
-            "user-agent": userAgent(),
+            "user-agent": Runtime.current().userAgent(),
             "x-va-server": "1",
           },
           body,

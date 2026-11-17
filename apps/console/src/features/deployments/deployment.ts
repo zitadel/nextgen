@@ -37,11 +37,7 @@ export function releaseRevoked(deployment: Deployment): boolean {
   return deployment.release?.revoked_at != null;
 }
 
-/**
- * Every deployment the filter matches, across pages. A release's own history
- * is a handful, so walking the pages is the honest read while
- * `GET /deployments` has no filter by release.
- */
+/** Every deployment the filter matches, across pages. */
 async function listAllDeployments(
   params: Omit<ListDeploymentsParams, "limit" | "page_token">,
 ): Promise<Deployment[]> {
@@ -60,8 +56,7 @@ export async function listReleaseDeployments(
   projectId: string,
   releaseId: string,
 ): Promise<Deployment[]> {
-  const history = await listAllDeployments({ project_id: projectId });
-  return history.filter((deployment) => deployment.release_id === releaseId);
+  return listAllDeployments({ project_id: projectId, release_id: releaseId });
 }
 
 /** One page of the project's deployments, newest first. */

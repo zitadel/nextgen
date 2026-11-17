@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { reclaimableOps } from "@/lib/orca/patchers/rule/reclaim";
-import { MANAGED_MARKER } from "@/lib/paths";
+import { ManagedFile } from "@/lib/orca/managed-file";
 
 const plan: ScaffoldPlan = {
   ops: [
     { kind: "mkdir", path: ".zitadel" },
     { kind: "write", path: ".zitadel/secret", contents: "{}" },
     { kind: "write", path: "zitadel.json", contents: "{}" },
-    { kind: "write", path: "app/login/page.tsx", contents: `${MANAGED_MARKER}\nexport {}` },
-    { kind: "append-gitignore", entries: [".env*"] },
+    { kind: "write", path: "app/login/page.tsx", contents: `${ManagedFile.MARKER}\nexport {}` },
+    { kind: "append-gitignore", rules: [{ path: ".env", ignored: true, entry: ".env*" }] },
     { kind: "merge-env", path: ".env.local", entries: { A: "1" } },
     { kind: "add-dep", name: "pkg", version: "1.0.0" },
     { kind: "edit", path: "vite.config.ts", edit: (source) => source ?? "" },

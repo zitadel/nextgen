@@ -288,8 +288,8 @@ describe("requiresProjectSecret", () => {
   it.each([
     ["GET", "/sessions/exchange"],
     ["PUT", "/sessions/exchange"],
-    ["POST", "/v1/flow"],
-    ["GET", "/v1/flow"],
+    ["POST", "/v1/flows"],
+    ["GET", "/v1/flows"],
     ["POST", "/sessions/exchange/"],
     ["POST", "/sessions/exchangex"],
     ["POST", "/sessions"],
@@ -657,15 +657,15 @@ describe("proxySessionCookies", () => {
   /** The server's session cookie on a loopback host, where the Console keeps its own. */
   const SHARED = "zitadel_session";
   const UPSTREAM = { url: "http://auth.test", timeoutMs: 1000 };
-  const HTTPS_APP = "https://app.example.com/__nextgen/flow";
+  const HTTPS_APP = "https://app.example.com/__nextgen/flows";
 
   function proxied(overrides: Partial<ProxiedRequest> = {}): ProxiedRequest {
     return {
       method: "GET",
-      path: "/flow",
+      path: "/flows",
       search: "",
       cookie: null,
-      requestUrl: "http://localhost:3000/__nextgen/flow",
+      requestUrl: "http://localhost:3000/__nextgen/flows",
       ...overrides,
     };
   }

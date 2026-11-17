@@ -71,7 +71,7 @@ beforeEach(() =>
       }),
     ),
     http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
-    http.get("*/api/v1/events", () => HttpResponse.json({ data: [] })),
+    http.get("*/api/v1/events", () => HttpResponse.json({ events: [] })),
     http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     http.get("*/api/v1/schemas", () => HttpResponse.json({ schemas: [] })),
     http.get("*/api/v1/users/me/projects", () =>

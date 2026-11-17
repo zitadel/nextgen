@@ -1,4 +1,4 @@
-import type { BoxAction } from "@/lib/box";
+import type { BoxAction } from "./box";
 import { Facts } from "@/lib/ui/layout";
 
 /**

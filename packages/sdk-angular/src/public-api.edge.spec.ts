@@ -1,5 +1,7 @@
 import type { ComponentRef, Type } from "@angular/core";
 
+import { describeEdgeEntry, describeEdgeRender } from "@zitadel/client-sdk-contract/client-edge";
+
 import { DOCUMENT } from "@angular/common";
 import { createComponent } from "@angular/core";
 import { createApplication } from "@angular/platform-browser";
@@ -10,7 +12,6 @@ import {
   ZitadelLogoutComponent as ZitadelLogout,
   ZitadelSessionComponent as ZitadelSession,
 } from "@zitadel/sdk-angular";
-import { describe, expect, it } from "vitest";
 
 const render = async <Component>(
   component: Type<Component>,
@@ -32,63 +33,9 @@ const render = async <Component>(
     { document: "<!doctype html><html><head></head><body></body></html>" },
   );
 
-// edge-entry:begin
-/**
- * Loads the built package, as a consumer's bundler resolves it, inside the
- * `edge-runtime` VM (the `edge` project in `vitest.config.ts`), which has no
- * `HTMLElement`, `document` or `customElements`, with dependencies resolved the
- * way a bundler resolves them for the edge.
- */
-describe("the SDK entry in the edge runtime", () => {
-  it("runs without a DOM", () => {
-    expect(typeof HTMLElement).toBe("undefined");
-    expect(typeof document).toBe("undefined");
-    expect(typeof customElements).toBe("undefined");
-  });
+const WIDGETS = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout };
 
-  it("keeps the locale data it re-exports", () => {
-    expect(Object.keys(businessLocales).length).toBeGreaterThan(0);
-  });
-});
-// edge-entry:end
+describeEdgeEntry(businessLocales);
 
-// edge-render:begin
-describe("the SDK in the edge runtime", () => {
-  it("renders the login widget as its custom element with its attributes", async () => {
-    const html = await render(ZitadelLogin, { projectId: "p1", proxyPath: "/px" });
-    expect(html).toContain("<zitadel-login ");
-    expect(html).toContain('project-id="p1"');
-    expect(html).toContain('proxy-path="/px"');
-  });
-
-  it("renders the session widget as its custom element with its attributes", async () => {
-    const html = await render(ZitadelSession, { projectId: "p1", proxyPath: "/px" });
-    expect(html).toContain("<zitadel-session ");
-    expect(html).toContain('project-id="p1"');
-    expect(html).toContain('proxy-path="/px"');
-  });
-
-  it("renders the logout widget as its custom element with its attributes", async () => {
-    const html = await render(ZitadelLogout, { projectId: "p1", proxyPath: "/px" });
-    expect(html).toContain("<zitadel-logout ");
-    expect(html).toContain('project-id="p1"');
-    expect(html).toContain('proxy-path="/px"');
-  });
-
-  it("writes the purpose and the resumed flow into the login markup", async () => {
-    const html = await render(ZitadelLogin, {
-      projectId: "p1",
-      proxyPath: "/px",
-      purpose: "register",
-      resumeFlowId: "flow_123",
-    });
-    expect(html).toContain('purpose="register"');
-    expect(html).toContain('resume-flow-id="flow_123"');
-  });
-
-  it("omits the language when none is set", async () => {
-    const html = await render(ZitadelLogin, { projectId: "p1", proxyPath: "/px" });
-    expect(html).not.toContain("lang=");
-  });
-});
-// edge-render:end
+// Each widget is its own component class; `render` needs only the inputs by name.
+describeEdgeRender((widget, props) => render<unknown>(WIDGETS[widget], props));

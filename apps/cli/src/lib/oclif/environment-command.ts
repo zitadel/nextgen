@@ -1,5 +1,6 @@
 import { createZitadelClient } from "@/lib/backend";
-import { type Environment, requireValueInteractive, resolveEnvironment } from "@/lib/environment";
+import { ZitadelRuntime } from "@/lib/server";
+import { Environment } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -9,7 +10,7 @@ import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
 
-import { userAgent } from "@/lib/user-agent";
+import { Runtime } from "@/lib/runtime";
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -53,7 +54,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
     if (options.environment === false) {
       return super.toMeta(given, { resolveServer: options.resolveServer, source: options.source });
     }
-    this.environment = await resolveEnvironment({
+    this.environment = await Environment.resolve({
+      servers: ZitadelRuntime,
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
       serverFlag: options.source ?? text(flags.server),
@@ -123,14 +125,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.nonInteractive && !this.dryRun && options.prompt !== false,
       ask: this.ui.questions(),
     };
-    const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
-    const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
-    const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
+    const server = await environment.requireInteractive("ZITADEL_URL", ask);
+    const projectId = await environment.requireInteractive("ZITADEL_PROJECT_ID", ask);
+    const token = await environment.requireInteractive(CREDENTIALS[credential], ask);
     this.ui.ranAgainst(projectId, server);
 
     return {
       client: createZitadelClient({
-        userAgent: userAgent(),
+        userAgent: Runtime.current().userAgent(),
         baseUrl: server,
         token,
         signal: this.signal,

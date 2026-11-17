@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { publishedIds, readState, updateScaffold, type ZitadelState } from "@/lib/sync/state";
-import { it } from "@tests/helpers/fixtures";
+import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

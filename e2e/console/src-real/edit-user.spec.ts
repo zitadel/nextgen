@@ -49,7 +49,7 @@ test("saves a user's attributes and keeps them across a reload", async ({
   // loader reads the stored user back.
   await expect(page.getByRole("heading", { name: renamed })).toBeVisible();
   await expect(save).toBeDisabled();
-  const stored = (await zitadel.api.getUserByID(subject.id)) as {
+  const stored = (await zitadel.api.getUser(subject.id)) as {
     attributes?: Record<string, unknown>;
   };
   expect(stored.attributes?.newsletter).toBe(true);

@@ -39,7 +39,8 @@ test("shows the bootstrapped project in the list and detail views", async ({
   // rather than as the error boundary: both cards are what proves the reads.
   await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Recent activity" })).toBeVisible();
-  await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -48,7 +49,8 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page).toHaveURL(
     new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
   );
-  await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
+  // The header cuts a long id in the middle; its full value is the title.
+  await expect(page.getByTitle(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
   expect(pageErrors).toEqual([]);
 });
@@ -94,7 +96,7 @@ test("shows a seeded user in the list and detail views", async ({ page, zitadel,
   // The selected project rides along on every link (`?project=`).
   await expect(page).toHaveURL(new RegExp(`/users/${user.id}\\?project=`));
   await expect(page.getByRole("heading", { name: user.email, exact: true })).toBeVisible();
-  await expect(page.getByText(user.id, { exact: true })).toBeVisible();
+  await expect(page.getByTitle(user.id, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
@@ -259,7 +261,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
 }) => {
   // The admins list is people only (#1462), so a grant to a team is a row of
   // its own from the grants read. Asserted against a real instance because
-  // which read carries the team, and that `DELETE /grants/{id}` takes the
+  // which read carries the team, and that `DELETE /grants/{grant_id}` takes the
   // team's grant without touching the operator's own, are server behaviour.
   const operator = await seed.user();
   const projectId = zitadel.handle.projectId;
@@ -308,7 +310,7 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     // come back as an id-only team row on later runs.
     if (grantId)
       await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
-    await zitadel.api.deleteTeam(team.id).catch(() => undefined);
+    await zitadel.api.deactivateTeam(team.id).catch(() => undefined);
   }
 });
 

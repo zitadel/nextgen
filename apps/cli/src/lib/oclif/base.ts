@@ -1,44 +1,46 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
 import { byName, type ByName } from "@/lib/names";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
-import { log } from "@/lib/log";
+import { log, style, warnings } from "@/lib/ui";
 
 import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
-import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
+import { LocalServerError, ZitadelRuntime } from "@/lib/server";
+import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
+import { interpolate } from "./refusal";
 import { resolveCwd } from "@/lib/paths";
-import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
-import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
-import { statusColor } from "@/lib/style";
 import {
-  type Again,
+  Spelling,
+  commandOf,
   declaredOf,
+  helpOf,
+  shellCommand,
+  isSuggestion,
+  spelled,
+  type Again,
   type FlagNameOf,
   type LooseNext,
-  helpOf,
-  commandOf,
-  isSuggestion,
   type Scope,
   type Suggest,
   type Suggested,
   type SuggestedCommand,
-  spelled,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
-import { processUserAgent, useUserAgent } from "@/lib/user-agent";
-import { claimSkills, eligibleForSkills } from "@/lib/skills-hint";
+import { Runtime } from "@/lib/runtime";
+import { Skills } from "@/lib/skills";
 import type { Presentation, Summary } from "@/lib/ui";
 import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
-import { takeReportedWarnings } from "@/lib/warnings";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -48,7 +50,6 @@ import {
   FIRST_RUN_NOTICE,
   vercelEventKeys,
 } from "./command-telemetry";
-import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
 import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
@@ -63,6 +64,14 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+
+/** The variable the server is named by when `--server` is not given. */
+const SERVER: FlagVariable = {
+  name: "ZITADEL_API_BASE",
+  flag: "server",
+  description: "The server URL, or `local`, as `--server` takes it.",
+  precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
+};
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -87,7 +96,7 @@ const FORCE_COLOR: FlagVariable = {
  * flags (`./reference.ts`).
  */
 export const FLAG_VARIABLES: readonly FlagVariable[] = [
-  SERVER_VARIABLE,
+  SERVER,
   NO_COLOR,
   FORCE_COLOR,
   DO_NOT_TRACK,
@@ -147,16 +156,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * question. See {@link Presentation}.
    *
    * {@link Presentation} names the one that sets it, `setup`. A command that merely
-   * *does* something — `variable rm`, `users delete` — is not one of them,
+   * *does* something — `variable rm`, `user delete` — is not one of them,
    * however much it asks on the way.
    */
   static wizard?: boolean;
 
   /**
-   * The group the root help lists this command under (see `lib/oclif/groups`).
+   * The group the root help lists this command under (the CLI's own list, `cli/commands/groups`).
    * Every product command must set it; the root-help test fails otherwise.
    */
-  static group?: CommandGroup;
+  static group?: string;
 
   /** Position within {@link group} on the root help, lowest first. */
   static groupOrder?: number;
@@ -423,10 +432,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected override async init(): Promise<void> {
     // A fresh invocation starts with no warnings, even when an earlier one in
     // the same process (a test run, say) failed before emitting its own.
-    takeReportedWarnings();
+    warnings.take();
     await super.init();
     this.listenForInterrupt();
-    useUserAgent(processUserAgent(this.config.version));
+    Runtime.current().useUserAgent(Runtime.userAgentFor(this.config.version));
   }
 
   /**
@@ -673,10 +682,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     });
     this.skillsOffered =
       this.summarises() && !this.meta.dryRun
-        ? await eligibleForSkills({
-            env: process.env,
-            interactive: !this.meta.nonInteractive,
-          })
+        ? await new Skills(process.env, !this.meta.nonInteractive).eligible()
         : false;
     this.settled = true;
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
@@ -695,7 +701,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Promise<{ value: string }> {
     return options.resolveServer === false
       ? { value: options.source ?? "" }
-      : await resolveServer({ cwd, serverFlag });
+      : await ZitadelRuntime.resolve({ cwd, serverFlag });
   }
 
   /**
@@ -745,14 +751,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return Telemetry.create(deps);
   }
 
-  /**
-   * Which local servers are running on the machine. Production asks `ps`; a
-   * test overrides this, like {@link createTelemetry}, to answer for the machine.
-   */
-  protected localServers(): LocalServers {
-    return new PsLocalServers();
-  }
-
   private openTelemetry(flag: boolean | undefined): void {
     if (this.telemetry) {
       return;
@@ -768,7 +766,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }
     this.telemetry.track(
       CLI_COMMAND_STARTED,
-      commandEventProperties(this.meta, this.telemetryInvocationId, this.telemetryProps),
+      commandEventProperties(
+        this.meta,
+        ZitadelRuntime.fromUrl(this.meta.source).kind,
+        this.telemetryInvocationId,
+        this.telemetryProps,
+      ),
     );
     if (this.telemetry.isFirstRun) {
       this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
@@ -810,11 +813,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
-        commandEventProperties(this.meta, this.telemetryInvocationId, {
-          ...this.telemetryProps,
-          status: result.status,
-          duration_ms: Date.now() - this.telemetryStartedAt,
-        }),
+        commandEventProperties(
+          this.meta,
+          ZitadelRuntime.fromUrl(this.meta.source).kind,
+          this.telemetryInvocationId,
+          {
+            ...this.telemetryProps,
+            status: result.status,
+            duration_ms: Date.now() - this.telemetryStartedAt,
+          },
+        ),
       );
     }
     const next =
@@ -865,7 +873,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
-    const reported = takeReportedWarnings();
+    const reported = warnings.take();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
   }
@@ -913,7 +921,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       return undefined;
     }
 
-    return hostUnlessDefault(this.meta.source);
+    return ZitadelRuntime.fromUrl(this.meta.source).hostUnlessDefault();
   }
 
   /**
@@ -958,12 +966,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
       : [
           {
             text: OVERVIEW,
-            command: publicCliCommand("", this.config.version),
+            command: Spelling.at(this.config.version).command(""),
           },
         ];
     const skills =
       this.skillsOffered && changed
-        ? [claimSkills(process.env, this.suggest({ id: "skills:add" }))]
+        ? [
+            new Skills(process.env, !this.meta.nonInteractive).claim(
+              this.suggest({ id: "skills:add" }),
+            ),
+          ]
         : [];
     return {
       ...summary,
@@ -1020,6 +1032,75 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * A failure of the local server with the advice for it: the server package
+   * names what failed, and this says what to do about it. Where the failing
+   * record or file sits in another folder than this run's, the commands it
+   * suggests carry that folder's `--cwd`, so they fix the right one.
+   *
+   * @param error - What the command threw.
+   * @param cwd - The folder this run acts on, from the settled meta.
+   * @returns The error with its hint and next commands, or the error as it was.
+   */
+  private advise(error: unknown, cwd: string): unknown {
+    if (!(error instanceof LocalServerError)) {
+      return error;
+    }
+    const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
+    const details: Record<string, unknown> = {};
+    if (isObject(error.details)) {
+      Object.assign(details, error.details);
+    }
+    const { directory } = details;
+    const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(cwd);
+    const removal: Suggested[] = [];
+    if (error.kind === "admin-malformed" && typeof details.path === "string") {
+      removal.push(shellCommand("rm", Cmd.quote(details.path)));
+    }
+    const retargeted: string[][] = [];
+    const next = (advice.next ?? []).map((step) => {
+      if (elsewhere && typeof step === "object" && (step.id === "reset" || step.id === "start")) {
+        const flags = { ...("flags" in step ? step.flags : undefined), cwd: directory };
+        retargeted.push([
+          step.id,
+          ...Object.entries(flags).flatMap(([name, value]) => {
+            if (value === true) {
+              return [`--${name}`];
+            } else {
+              return [`--${name}`, String(value)];
+            }
+          }),
+        ]);
+        return { ...step, flags } as Suggested;
+      } else {
+        return step;
+      }
+    });
+    const quoted = { ...details };
+    for (const key of ["directory", "path"]) {
+      const value = details[key];
+      if (typeof value === "string") {
+        quoted[key] = Cmd.quote(value);
+      }
+    }
+    const hint = [elsewhere && advice.elsewhere, advice.hint].find((text) => {
+      return typeof text === "string";
+    });
+    const visible = Object.fromEntries(
+      Object.entries(details).filter(([key]) => {
+        return key !== "directory";
+      }),
+    );
+    if (retargeted.length > 0) {
+      visible.suggested_args = retargeted;
+    }
+    return new ZitadelError(error.code, error.message, {
+      hint: interpolate(hint ?? advice.hint, quoted),
+      nextCommands: [...removal, ...next],
+      details: error.details && visible,
+    });
+  }
+
+  /**
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
@@ -1041,7 +1122,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? commandOf(["--help"], meta.cliVersion)
         : this.suggest(helpOf(meta.command));
     const zitadelError = presentedFailure(
-      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
+      this.suggestions.renderedFailure(
+        cancelled ? reason : toZitadelError(this.advise(error, meta.cwd)),
+      ),
       help,
     );
     this.meta = meta;
@@ -1049,17 +1132,22 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_FAILED,
-        commandEventProperties(meta, this.telemetryInvocationId, {
-          ...this.telemetryProps,
-          status: "error",
-          reason: zitadelError.code,
-          exit_code: zitadelError.exitCode,
-          duration_ms: Date.now() - this.telemetryStartedAt,
-        }),
+        commandEventProperties(
+          meta,
+          ZitadelRuntime.fromUrl(meta.source).kind,
+          this.telemetryInvocationId,
+          {
+            ...this.telemetryProps,
+            status: "error",
+            reason: zitadelError.code,
+            exit_code: zitadelError.exitCode,
+            duration_ms: Date.now() - this.telemetryStartedAt,
+          },
+        ),
       );
     }
     if (this.jsonEnabled()) {
-      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
+      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), warnings.take()));
     } else if (zitadelError.code === "E_CANCELLED") {
       this.ui.stop(zitadelError);
     } else {
@@ -1186,7 +1274,7 @@ function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): Com
     ...stated,
     next: {
       ...stated.next,
-      commands: normalizePublicCliCommands(stated.next.commands, meta.cliVersion),
+      commands: Spelling.at(meta.cliVersion).normalizeCommands(stated.next.commands),
     },
   } as CommandResult;
 }
@@ -1286,7 +1374,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     source: meta.source,
     code: error.code,
     message: error.message,
-    hint: error.hint === undefined ? undefined : spellOutCommands(error.hint, meta.cliVersion),
+    hint: error.hint === undefined ? undefined : Spelling.at(meta.cliVersion).spellOut(error.hint),
     next_commands: error.nextCommands === undefined ? undefined : renderedCommands(error),
     details: error.details,
   };
@@ -1335,10 +1423,10 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // Only the label is coloured, so there is nothing for the spelling to undo.
   const commands = renderedCommands(error);
   return {
-    title: `Error: ${escapeControlCharacters(spellOutCommands(error.message, meta.cliVersion))} (${error.code})`,
+    title: `Error: ${escapeControlCharacters(Spelling.at(meta.cliVersion).spellOut(error.message))} (${error.code})`,
     sections: [],
     lines: error.hint
-      ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
+      ? [escapeControlCharacters(Spelling.at(meta.cliVersion).spellOut(error.hint))]
       : [],
     ...(commands.length === 0
       ? {}
@@ -1385,7 +1473,7 @@ function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelE
  * the label is coloured, so there is nothing for the spelling to undo.
  */
 function warningLine(warning: string): string {
-  return `${statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
+  return `${style.statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
 }
 
 /** The last step of every box: where to find every command. */
