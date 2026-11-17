@@ -1,5 +1,21 @@
 import { execa } from "execa";
 
+/**
+ * How a program is run: its name, its arguments and how long to wait, answering
+ * with what it printed. The machine's own is `execa`; a test passes a function
+ * that answers from a string.
+ */
+export type Run = (
+  program: string,
+  args: readonly string[],
+  options: { timeout: number },
+) => Promise<{ stdout: string }>;
+
+/** Runs a program on this machine. */
+export const systemRun: Run = (program, args, options) => {
+  return execa(program, [...args], options);
+};
+
 import { isLoopbackHost } from "@/lib/server/host";
 
 export type TcpListener = Readonly<{
@@ -23,10 +39,14 @@ export type TcpListener = Readonly<{
  */
 export async function listListeningTcpListeners(opts?: {
   readonly timeoutMs?: number;
+  readonly run?: Run;
 }): Promise<ReadonlyArray<TcpListener>> {
   const timeoutMs = opts?.timeoutMs ?? 1000;
+  const run = opts?.run ?? systemRun;
   try {
-    const stdout = await runLsof(timeoutMs);
+    const { stdout } = await run("lsof", ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pcn"], {
+      timeout: timeoutMs,
+    });
     return parseLsofListeners(stdout);
   } catch {
     return [];
@@ -35,18 +55,11 @@ export async function listListeningTcpListeners(opts?: {
 
 export async function listenersForPort(
   port: number,
-  opts?: { readonly timeoutMs?: number },
+  opts?: { readonly timeoutMs?: number; readonly run?: Run },
 ): Promise<ReadonlyArray<TcpListener>> {
   return (await listListeningTcpListeners(opts)).filter((listener) => {
     return listener.port === port;
   });
-}
-
-/** Runs `lsof` with the canned argv and resolves to its stdout. */
-async function runLsof(timeoutMs: number): Promise<string> {
-  return (
-    await execa("lsof", ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pcn"], { timeout: timeoutMs })
-  ).stdout;
 }
 
 /**

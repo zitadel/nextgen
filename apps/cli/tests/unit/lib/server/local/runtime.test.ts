@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 
 import { join } from "node:path";
 
-import { describe, expect, vi } from "vitest";
+import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
@@ -271,9 +271,9 @@ describe("checkLocalServerHealth", () => {
 
   it("reads the health response body to the end", async () => {
     const { response, isRead } = aResponseWhoseBodyIsRead(200);
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+    const fetcher: typeof fetch = async () => response;
 
-    await checkLocalServerHealth("http://localhost:8081");
+    await checkLocalServerHealth("http://localhost:8081", 1500, fetcher);
 
     expect(isRead()).toBe(true);
   });
@@ -282,9 +282,9 @@ describe("checkLocalServerHealth", () => {
 describe("readPlatformRuntime", () => {
   it("reads a refused runtime document body to the end", async () => {
     const { response, isRead } = aResponseWhoseBodyIsRead(404);
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+    const fetcher: typeof fetch = async () => response;
 
-    await readPlatformRuntime("http://localhost:8081");
+    await readPlatformRuntime("http://localhost:8081", 1500, fetcher);
 
     expect(isRead()).toBe(true);
   });

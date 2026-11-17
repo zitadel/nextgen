@@ -46,9 +46,10 @@ export const PLATFORM_PROJECT_ID = "proj_platform";
 export async function readPlatformRuntime(
   serverUrl: string,
   timeoutMs = 1500,
+  fetcher: typeof fetch = fetch,
 ): Promise<{ publishable_key: string } | undefined> {
   try {
-    const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+    const res = await fetcher(new URL("/console/runtime.json", serverUrl), {
       headers: { "user-agent": Runtime.current().userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -384,10 +385,11 @@ export async function removeLocalData(cwd: string): Promise<void> {
 export async function checkLocalServerHealth(
   serverUrl: string,
   timeoutMs = 1500,
+  fetcher: typeof fetch = fetch,
 ): Promise<boolean> {
   try {
     const readyUrl = new URL("/readyz", serverUrl);
-    const response = await fetch(readyUrl, {
+    const response = await fetcher(readyUrl, {
       headers: { "user-agent": Runtime.current().userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
