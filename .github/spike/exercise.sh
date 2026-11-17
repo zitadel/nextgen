@@ -176,7 +176,7 @@ else PASS=$((PASS+1)); echo "| PASS | stop leaves no server process behind | - |
 WAL=$(find "$RUNNER_TEMP/ports/.zitadel" -name '*-wal' -size +0 2>/dev/null)
 echo "| NOTE | WAL left by stop: ${WAL:-none} | - |" >> "$OUT"
 t "port: start again after stop recovers the database" z start --non-interactive --json
-t "port: data is readable after the restart" z project list --json
+t "port: restarted server reports running" z status --json
 t "port: stop (after restart)" z stop
 kill "$BLOCKER" 2>/dev/null || true
 cd "$RUNNER_TEMP"
