@@ -127,10 +127,10 @@ t "release get" z release get "$RID" --json
 t "deployment create" z deployment create --release "$RID" --json
 DID=$(jid "$RUNNER_TEMP/last.log" deployment_id)
 t "deployment get" z deployment get "$DID" --json
-t "deployment rollback" z deployment rollback --json
+t "deployment rollback" z deployment rollback "$DID" --force --json
 t "deploy --dry-run" z deploy --dry-run --json
 t "preview (dry-run)" z preview --dry-run --json
-t "release revoke" z release revoke "$RID" --force --json
+tx "release revoke (still live, refused)" z release revoke "$RID" --force --json
 t "upgrade --dry-run" z upgrade --dry-run --json
 
 # --- 7. Project extras ---
